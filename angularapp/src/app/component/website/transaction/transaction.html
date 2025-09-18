@@ -1,0 +1,89 @@
+<div class="transaction-container">
+  <div class="back-button">
+    <button type="button" (click)="goBack()">⬅ Back to Dashboard</button>
+  </div>
+
+  <h2>User Transactions</h2>
+
+  <!-- Transaction Form -->
+  <form (ngSubmit)="addTransaction()">
+    <div class="form-group">
+      <label>Merchant</label>
+      <input type="text" [(ngModel)]="merchant" name="merchant" required>
+    </div>
+    <div class="form-group">
+      <label>Amount</label>
+      <input type="number" [(ngModel)]="amount" name="amount" required>
+    </div>
+    <div class="form-group">
+      <label>Type</label>
+      <select [(ngModel)]="type" name="type">
+        <option value="Debit">Debit</option>
+        <option value="Credit">Credit</option>
+      </select>
+    </div>
+    <button type="button" (click)="addTransaction()">Submit</button>
+  </form>
+
+  <!-- Filters -->
+  <div class="filters">
+    <input type="text" [(ngModel)]="searchTerm" placeholder="Search by merchant" name="search">
+    <input type="date" [(ngModel)]="fromDate" name="from">
+    <input type="date" [(ngModel)]="toDate" name="to">
+    <button type="button" (click)="downloadStatement()">Download CSV</button>
+  </div>
+
+  <!-- Mini Statement -->
+  <div class="mini-statement">
+    <h3>Mini Statement (Last 5 Transactions)</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Merchant</th>
+          <th>Amount</th>
+          <th>Type</th>
+          <th>Balance</th>
+          <th>Date</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let tx of miniStatement">
+          <td>{{tx.id}}</td>
+          <td>{{tx.merchant}}</td>
+          <td>{{tx.amount}}</td>
+          <td>{{tx.type}}</td>
+          <td>{{tx.balance}}</td>
+          <td>{{tx.date | date:'short'}}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Full Transaction Table -->
+  <div class="transaction-table">
+    <h3>All Transactions</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Merchant</th>
+          <th>Amount</th>
+          <th>Type</th>
+          <th>Balance</th>
+          <th>Date</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let tx of filteredTransactions">
+          <td>{{tx.id}}</td>
+          <td>{{tx.merchant}}</td>
+          <td>{{tx.amount}}</td>
+          <td>{{tx.type}}</td>
+          <td>{{tx.balance}}</td>
+          <td>{{tx.date | date:'short'}}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>

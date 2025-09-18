@@ -1,0 +1,37 @@
+<div class="kyc-container">
+  <h1>📑 KYC Verification</h1>
+  
+  <button class="back-btn" (click)="goBack()">⬅ Back to Dashboard</button>
+
+  <div class="kyc-table">
+    <table>
+      <thead>
+        <tr>
+          <th>User ID</th>
+          <th>Name</th>
+          <th>Email</th>
+          <th>Document</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let user of users">
+          <td>{{user.id}}</td>
+          <td>{{user.name}}</td>
+          <td>{{user.email}}</td>
+          <td>
+            <a [href]="user.documentUrl" target="_blank">View Document</a>
+          </td>
+          <td [ngClass]="{'approved': user.status==='Approved', 'pending': user.status==='Pending', 'rejected': user.status==='Rejected'}">
+            {{user.status}}
+          </td>
+          <td>
+            <button (click)="approve(user)"> Approve</button>
+            <button (click)="reject(user)">Reject</button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>

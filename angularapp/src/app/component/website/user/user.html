@@ -1,0 +1,235 @@
+<div class="login-container">
+  <!-- Left Section - Promotional Content -->
+  <div class="left-section">
+    <div class="promotional-content">
+      <div class="mobile-app-display">
+        <div class="phone-mockup">
+          <div class="phone-screen">
+            <div class="app-header">
+              <div class="app-logo">NeoBank</div>
+              <div class="app-status">Mobile Banking</div>
+            </div>
+            <div class="app-content">
+              <div class="welcome-message">Hi, Welcome!</div>
+              <div class="pin-section">
+                <label>Enter M-PIN</label>
+                <div class="pin-inputs">
+                  <input type="password" maxlength="1" class="pin-box">
+                  <input type="password" maxlength="1" class="pin-box">
+                  <input type="password" maxlength="1" class="pin-box">
+                  <input type="password" maxlength="1" class="pin-box">
+                </div>
+              </div>
+              <div class="quick-actions">
+                <div class="action-item">Quick Balance</div>
+                <div class="action-item">Internet Banking</div>
+                <div class="action-item">Trouble Logging In?</div>
+              </div>
+              <div class="products-section">
+                <div class="product-item">Savings A/C</div>
+                <div class="product-item">Loans</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="promotional-text">
+        <h1>Pay, Save, Borrow & Invest money with a single bank</h1>
+        <p>Login to experience the new world of banking</p>
+        
+        <div class="app-download-buttons">
+          <button class="download-btn google-play">
+            <span class="download-icon">📱</span>
+            <div class="download-text">
+              <span class="download-label">GET IT ON</span>
+              <span class="download-store">Google Play</span>
+            </div>
+          </button>
+          <button class="download-btn app-store">
+            <span class="download-icon">🍎</span>
+            <div class="download-text">
+              <span class="download-label">Download on the</span>
+              <span class="download-store">App Store</span>
+            </div>
+          </button>
+        </div>
+      </div>
+    </div>
+    
+    <div class="background-waves">
+      <div class="wave wave-1"></div>
+      <div class="wave wave-2"></div>
+    </div>
+  </div>
+
+  <!-- Right Section - Login/Signup Form -->
+  <div class="right-section">
+    <!-- Fraud Prevention Tips -->
+    <div class="fraud-tips-card">
+      <div class="fraud-header">
+        <div class="fraud-icon">🛡️</div>
+        <h3>Fraud Prevention Tips</h3>
+      </div>
+      <div class="fraud-tips">
+        <div class="tip-item">
+          <div class="tip-icon">🔐</div>
+          <div class="tip-content">
+            <div class="tip-title">Never Share OTP</div>
+            <div class="tip-description">NeoBank will never ask for your OTP via call, SMS, or email</div>
+          </div>
+        </div>
+        <div class="tip-item">
+          <div class="tip-icon">💳</div>
+          <div class="tip-content">
+            <div class="tip-title">Protect Card Details</div>
+            <div class="tip-description">Never share CVV, card number, or PIN with anyone</div>
+          </div>
+        </div>
+        <div class="tip-item">
+          <div class="tip-icon">📱</div>
+          <div class="tip-content">
+            <div class="tip-title">Secure Devices</div>
+            <div class="tip-description">Always log out from shared computers and keep devices updated</div>
+          </div>
+        </div>
+        <div class="tip-item">
+          <div class="tip-icon">🚫</div>
+          <div class="tip-content">
+            <div class="tip-title">Verify Transactions</div>
+            <div class="tip-description">Always verify transaction details before confirming payments</div>
+          </div>
+        </div>
+      </div>
+      <div class="fraud-warning">
+        <div class="warning-icon">⚠️</div>
+        <div class="warning-text">
+          <strong>Fraud Alert:</strong> If you receive suspicious calls or emails claiming to be from NeoBank, report immediately to our fraud helpline.
+        </div>
+      </div>
+    </div>
+
+    <div class="login-card">
+      <!-- Tabs -->
+      <div class="tab-container">
+        <button class="tab-button active" (click)="switchToLogin()">LOGIN</button>
+        <button class="tab-button" (click)="switchToSignup()">SIGNUP</button>
+      </div>
+
+      <!-- Login Form -->
+      <div *ngIf="currentPage === 'login'" class="form-content">
+        <div class="login-options">
+          <button class="login-option active">User/Cust ID</button>
+        </div>
+
+        <div class="virtual-keyboard-section">
+          <button class="virtual-keyboard-btn">
+            <span class="keyboard-icon">⌨️</span>
+            Use Virtual Keyboard
+          </button>
+        </div>
+
+        <form (ngSubmit)="login()" class="login-form">
+          <div class="input-group">
+            <label>User ID / Customer ID</label>
+            <input type="text" [(ngModel)]="loginUserId" name="loginUserId" placeholder="Enter User ID" required />
+            <div class="input-help">
+              <span class="help-text">User ID is case sensitive</span>
+              <div class="help-links">
+                <a href="#" class="help-link">Forgot User ID?</a>
+                <a href="#" class="help-link">Block User ID?</a>
+              </div>
+            </div>
+          </div>
+
+          <div class="input-group">
+            <label>Password</label>
+            <input type="password" [(ngModel)]="loginPassword" name="loginPassword" placeholder="Enter Password" required />
+          </div>
+
+          <div class="input-group">
+            <label>Directly go to screen</label>
+            <select [(ngModel)]="directScreen" name="directScreen" class="screen-select">
+              <option value="dashboard">Dashboard</option>
+              <option value="account">Account Summary</option>
+              <option value="transactions">Transactions</option>
+            </select>
+          </div>
+
+          <div class="captcha-section">
+            <label class="captcha-label">
+              <input type="checkbox" [(ngModel)]="captchaChecked" name="captchaChecked" />
+              <span class="captcha-text">I'm not a robot</span>
+            </label>
+          </div>
+
+          <button type="submit" class="secure-login-btn">
+            <span class="lock-icon">🔒</span>
+            Secure Login
+          </button>
+        </form>
+
+        <div class="utility-links">
+          <div class="utility-item">
+            <div class="utility-icon">▶️</div>
+            <span class="utility-text">Demo Videos</span>
+          </div>
+          <div class="utility-item">
+            <div class="utility-icon">🧮</div>
+            <span class="utility-text">Smart Calculator</span>
+          </div>
+          <div class="utility-item">
+            <div class="utility-icon">📍</div>
+            <span class="utility-text">Locate Us</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Signup Form -->
+      <div *ngIf="currentPage === 'signup'" class="form-content">
+        <form (ngSubmit)="createAccount()" class="signup-form">
+          <div class="input-group">
+            <label>Full Name</label>
+            <input type="text" [(ngModel)]="signupName" name="signupName" placeholder="Enter Full Name" required />
+          </div>
+
+          <div class="input-group">
+            <label>Email Address</label>
+            <input type="email" [(ngModel)]="signupEmail" name="signupEmail" placeholder="Enter Email Address" required />
+          </div>
+
+          <div class="input-group">
+            <label>Mobile Number</label>
+            <input type="tel" [(ngModel)]="signupMobile" name="signupMobile" placeholder="Enter Mobile Number" required />
+          </div>
+
+          <div class="input-group">
+            <label>Create Password</label>
+            <input type="password" [(ngModel)]="signupPassword" name="signupPassword" placeholder="Create Password" required />
+          </div>
+
+          <div class="input-group">
+            <label>Confirm Password</label>
+            <input type="password" [(ngModel)]="confirmPassword" name="confirmPassword" placeholder="Confirm Password" required />
+          </div>
+
+          <div class="terms-section">
+            <label class="terms-label">
+              <input type="checkbox" [(ngModel)]="termsAccepted" name="termsAccepted" required />
+              <span class="terms-text">I agree to the <a href="#" class="terms-link">Terms & Conditions</a> and <a href="#" class="terms-link">Privacy Policy</a></span>
+            </label>
+          </div>
+
+          <button type="submit" class="secure-login-btn">
+            <span class="lock-icon">🔒</span>
+            Create Account
+          </button>
+        </form>
+
+        <div class="signup-footer">
+          <p>Already have an account? <a href="#" (click)="switchToLogin()" class="login-link">Login here</a></p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

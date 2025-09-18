@@ -1,0 +1,45 @@
+<div class="loans-container">
+  <h2>Loan Requests</h2>
+
+  <!-- Back to Dashboard Button -->
+  <button class="back-btn" (click)="goBack()">← Back to Dashboard</button>
+
+  <!-- Loan Requests Table -->
+  <table class="loan-table">
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>User Name</th>
+        <th>Type</th>
+        <th>Amount</th>
+        <th>Tenure (Months)</th>
+        <th>Interest Rate (%)</th>
+        <th>Status</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      @for (loan of loanRequests; track loan.id) {
+        <tr>
+          <td>{{ loan.id }}</td>
+          <td>{{ loan.userName }}</td>
+          <td>{{ loan.type }}</td>
+          <td>{{ loan.amount | currency:'INR' }}</td>
+          <td>{{ loan.tenure }}</td>
+          <td>{{ loan.interestRate }}</td>
+          <td [class.pending]="loan.status === 'Pending'"
+              [class.approved]="loan.status === 'Approved'"
+              [class.rejected]="loan.status === 'Rejected'">
+            {{ loan.status }}
+          </td>
+          <td>
+            @if (loan.status === 'Pending') {
+              <button (click)="approve(loan)">Approve</button>
+              <button (click)="reject(loan)">Reject</button>
+            }
+          </td>
+        </tr>
+      }
+    </tbody>
+  </table>
+</div>

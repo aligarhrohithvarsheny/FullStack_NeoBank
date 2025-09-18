@@ -1,0 +1,811 @@
+/* Login Container */
+.login-container {
+  display: flex;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+}
+
+/* Left Section - Promotional Content */
+.left-section {
+  flex: 1;
+  background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  overflow: hidden;
+}
+
+.promotional-content {
+  display: flex;
+  align-items: center;
+  gap: 60px;
+  z-index: 2;
+  position: relative;
+}
+
+/* Mobile App Display */
+.mobile-app-display {
+  flex-shrink: 0;
+}
+
+.phone-mockup {
+  width: 280px;
+  height: 500px;
+  background: #000;
+  border-radius: 30px;
+  padding: 20px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+  transform: rotate(-5deg);
+  transition: transform 0.3s ease;
+}
+
+.phone-mockup:hover {
+  transform: rotate(-2deg) scale(1.02);
+}
+
+.phone-screen {
+  width: 100%;
+  height: 100%;
+  background: white;
+  border-radius: 20px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-header {
+  text-align: center;
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 2px solid #f1f5f9;
+}
+
+.app-logo {
+  font-size: 24px;
+  font-weight: bold;
+  color: #1e3a8a;
+  margin-bottom: 5px;
+}
+
+.app-status {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.app-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.welcome-message {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1e3a8a;
+  text-align: center;
+}
+
+.pin-section {
+  text-align: center;
+}
+
+.pin-section label {
+  display: block;
+  font-size: 14px;
+  color: #6b7280;
+  margin-bottom: 10px;
+}
+
+.pin-inputs {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+.pin-box {
+  width: 40px;
+  height: 40px;
+  border: 2px solid #e2e8f0;
+  border-radius: 8px;
+  text-align: center;
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.pin-box:focus {
+  border-color: #1e3a8a;
+  outline: none;
+}
+
+.quick-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.action-item {
+  padding: 8px 12px;
+  background: #f8fafc;
+  border-radius: 6px;
+  font-size: 12px;
+  color: #374151;
+  text-align: center;
+}
+
+.products-section {
+  display: flex;
+  gap: 10px;
+  margin-top: auto;
+}
+
+.product-item {
+  flex: 1;
+  padding: 10px;
+  background: #1e3a8a;
+  color: white;
+  border-radius: 8px;
+  font-size: 12px;
+  text-align: center;
+  font-weight: 500;
+}
+
+/* Promotional Text */
+.promotional-text {
+  color: white;
+  max-width: 400px;
+}
+
+.promotional-text h1 {
+  font-size: 32px;
+  font-weight: bold;
+  line-height: 1.2;
+  margin-bottom: 20px;
+}
+
+.promotional-text p {
+  font-size: 18px;
+  opacity: 0.9;
+  margin-bottom: 30px;
+}
+
+.app-download-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.download-btn {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 15px 20px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 12px;
+  color: white;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.download-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.5);
+  transform: translateY(-2px);
+}
+
+.download-icon {
+  font-size: 24px;
+}
+
+.download-text {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+}
+
+.download-label {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.download-store {
+  font-size: 16px;
+  font-weight: bold;
+}
+
+/* Background Waves */
+.background-waves {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 200px;
+  overflow: hidden;
+}
+
+.wave {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 100px;
+  background: linear-gradient(45deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
+  border-radius: 50% 50% 0 0;
+}
+
+.wave-1 {
+  animation: wave-animation 6s ease-in-out infinite;
+}
+
+.wave-2 {
+  height: 80px;
+  animation: wave-animation 8s ease-in-out infinite reverse;
+}
+
+@keyframes wave-animation {
+  0%, 100% { transform: translateX(-50px) scale(1); }
+  50% { transform: translateX(50px) scale(1.1); }
+}
+
+/* Right Section - Login Form */
+.right-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  background: white;
+  gap: 30px;
+}
+
+/* Fraud Prevention Tips Card */
+.fraud-tips-card {
+  width: 100%;
+  max-width: 450px;
+  background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+  border: 2px solid #f87171;
+  border-radius: 16px;
+  padding: 25px;
+  box-shadow: 0 8px 25px rgba(248, 113, 113, 0.2);
+}
+
+.fraud-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 2px solid #f87171;
+}
+
+.fraud-icon {
+  font-size: 24px;
+}
+
+.fraud-header h3 {
+  color: #dc2626;
+  font-size: 18px;
+  font-weight: bold;
+  margin: 0;
+}
+
+.fraud-tips {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+.tip-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 10px;
+  border-left: 4px solid #f87171;
+  transition: all 0.3s ease;
+}
+
+.tip-item:hover {
+  background: rgba(255, 255, 255, 0.9);
+  transform: translateX(5px);
+}
+
+.tip-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.tip-content {
+  flex: 1;
+}
+
+.tip-title {
+  font-size: 14px;
+  font-weight: bold;
+  color: #dc2626;
+  margin-bottom: 4px;
+}
+
+.tip-description {
+  font-size: 12px;
+  color: #991b1b;
+  line-height: 1.4;
+}
+
+.fraud-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 15px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid #ef4444;
+  border-radius: 10px;
+}
+
+.warning-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.warning-text {
+  font-size: 13px;
+  color: #dc2626;
+  line-height: 1.4;
+}
+
+.warning-text strong {
+  font-weight: bold;
+}
+
+.login-card {
+  width: 100%;
+  max-width: 450px;
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+/* Tabs */
+.tab-container {
+  display: flex;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.tab-button {
+  flex: 1;
+  padding: 20px;
+  background: transparent;
+  border: none;
+  font-size: 16px;
+  font-weight: 600;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.tab-button.active {
+  color: #1e3a8a;
+  background: white;
+}
+
+.tab-button.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: #1e3a8a;
+}
+
+/* Form Content */
+.form-content {
+  padding: 40px;
+}
+
+/* Login Options */
+.login-options {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.login-option {
+  padding: 12px 24px;
+  background: #f8fafc;
+  border: 2px solid #e2e8f0;
+  border-radius: 25px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.login-option.active {
+  background: #1e3a8a;
+  color: white;
+  border-color: #1e3a8a;
+}
+
+/* Virtual Keyboard */
+.virtual-keyboard-section {
+  margin-bottom: 25px;
+}
+
+.virtual-keyboard-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.virtual-keyboard-btn:hover {
+  background: #e2e8f0;
+}
+
+.keyboard-icon {
+  font-size: 16px;
+}
+
+/* Form Styles */
+.login-form, .signup-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.input-group label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.input-group input, .input-group select {
+  padding: 15px;
+  border: 2px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 16px;
+  transition: all 0.3s ease;
+}
+
+.input-group input:focus, .input-group select:focus {
+  border-color: #1e3a8a;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(30, 58, 138, 0.1);
+}
+
+.input-help {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 5px;
+}
+
+.help-text {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.help-links {
+  display: flex;
+  gap: 15px;
+}
+
+.help-link {
+  font-size: 12px;
+  color: #1e3a8a;
+  text-decoration: none;
+}
+
+.help-link:hover {
+  text-decoration: underline;
+}
+
+.screen-select {
+  background: white;
+  cursor: pointer;
+}
+
+/* Captcha Section */
+.captcha-section {
+  margin: 20px 0;
+}
+
+.captcha-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.captcha-label input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: #1e3a8a;
+}
+
+.captcha-text {
+  font-size: 14px;
+  color: #374151;
+}
+
+/* Secure Login Button */
+.secure-login-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 18px;
+  background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-top: 10px;
+}
+
+.secure-login-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(30, 58, 138, 0.3);
+}
+
+.lock-icon {
+  font-size: 18px;
+}
+
+/* Utility Links */
+.utility-links {
+  display: flex;
+  justify-content: space-around;
+  margin-top: 30px;
+  padding-top: 20px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.utility-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.utility-item:hover {
+  transform: translateY(-2px);
+}
+
+.utility-icon {
+  width: 40px;
+  height: 40px;
+  background: #f8fafc;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+}
+
+.utility-text {
+  font-size: 12px;
+  color: #6b7280;
+  text-align: center;
+}
+
+/* Terms Section */
+.terms-section {
+  margin: 20px 0;
+}
+
+.terms-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.terms-label input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: #1e3a8a;
+  margin-top: 2px;
+}
+
+.terms-text {
+  font-size: 14px;
+  color: #374151;
+  line-height: 1.4;
+}
+
+.terms-link {
+  color: #1e3a8a;
+  text-decoration: none;
+}
+
+.terms-link:hover {
+  text-decoration: underline;
+}
+
+/* Signup Footer */
+.signup-footer {
+  text-align: center;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.login-link {
+  color: #1e3a8a;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.login-link:hover {
+  text-decoration: underline;
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+  .promotional-content {
+    flex-direction: column;
+    gap: 40px;
+    text-align: center;
+  }
+  
+  .phone-mockup {
+    transform: rotate(0deg);
+  }
+  
+  .promotional-text h1 {
+    font-size: 28px;
+  }
+}
+
+@media (max-width: 768px) {
+  .login-container {
+    flex-direction: column;
+  }
+  
+  .left-section {
+    padding: 20px;
+    min-height: 400px;
+  }
+  
+  .promotional-content {
+    gap: 30px;
+  }
+  
+  .phone-mockup {
+    width: 200px;
+    height: 350px;
+  }
+  
+  .promotional-text h1 {
+    font-size: 24px;
+  }
+  
+  .promotional-text p {
+    font-size: 16px;
+  }
+  
+  .right-section {
+    padding: 20px;
+    gap: 20px;
+  }
+
+  .fraud-tips-card {
+    padding: 20px;
+  }
+  
+  .fraud-header h3 {
+    font-size: 16px;
+  }
+  
+  .tip-item {
+    padding: 10px;
+  }
+
+  .tip-title {
+    font-size: 13px;
+  }
+
+  .tip-description {
+    font-size: 11px;
+  }
+  
+  .form-content {
+    padding: 30px 20px;
+  }
+  
+  .utility-links {
+    flex-direction: column;
+    gap: 15px;
+  }
+  
+  .utility-item {
+    flex-direction: row;
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 480px) {
+  .phone-mockup {
+    width: 160px;
+    height: 280px;
+  }
+  
+  .promotional-text h1 {
+    font-size: 20px;
+  }
+  
+  .tab-button {
+    padding: 15px;
+    font-size: 14px;
+  }
+  
+  .form-content {
+    padding: 20px 15px;
+  }
+  
+  .secure-login-btn {
+    padding: 15px;
+    font-size: 14px;
+  }
+
+  .fraud-tips-card {
+    padding: 15px;
+  }
+
+  .fraud-header h3 {
+    font-size: 14px;
+  }
+
+  .tip-item {
+    padding: 8px;
+    gap: 8px;
+  }
+  
+  .tip-icon {
+    font-size: 16px;
+  }
+
+  .tip-title {
+    font-size: 12px;
+  }
+
+  .tip-description {
+    font-size: 10px;
+  }
+
+  .warning-text {
+    font-size: 11px;
+  }
+}

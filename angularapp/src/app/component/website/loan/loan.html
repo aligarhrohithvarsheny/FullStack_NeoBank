@@ -1,0 +1,85 @@
+<div class="apply-loan">
+  <div class="form-header">
+    <h1 class="form-title">Apply Loan</h1>
+  </div>
+<div class="back-container">
+  <button class="back-button" (click)="goBack()">←Dashboard</button>
+</div>
+
+  <form (ngSubmit)="submitLoan()" #loanFormRef="ngForm">
+    <div class="input-group">
+      <label class="input-label">Loan Type</label>
+      <select class="input-field" [(ngModel)]="loanForm.type" name="type" required>
+        <option value="">Select Loan Type</option>
+        <option value="Personal Loan">Personal Loan</option>
+        <option value="Car Loan">Car Loan</option>
+        <option value="Home Loan">Home Loan</option>
+        <option value="Education Loan">Education Loan</option>
+      </select>
+    </div>
+
+    <div class="input-group">
+      <label class="input-label">Loan Amount</label>
+      <input
+        type="number"
+        class="input-field"
+        placeholder="Enter loan amount"
+        [(ngModel)]="loanForm.amount"
+        name="amount"
+        required
+      />
+    </div>
+
+    <div class="input-group">
+      <label class="input-label">Tenure (Months)</label>
+      <input
+        type="number"
+        class="input-field"
+        placeholder="Loan tenure in months"
+        [(ngModel)]="loanForm.tenure"
+        name="tenure"
+        required
+      />
+    </div>
+
+    <div class="input-group">
+      <label class="input-label">Interest Rate (%)</label>
+      <input
+        type="number"
+        class="input-field"
+        placeholder="Annual interest rate"
+        [(ngModel)]="loanForm.interestRate"
+        name="interestRate"
+        required
+      />
+    </div>
+
+    <button class="submit-button" type="submit">Apply Loan</button>
+  </form>
+
+  <div class="loan-list" *ngIf="loans.length > 0">
+    <h2>My Loan Requests</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Type</th>
+          <th>Amount</th>
+          <th>Tenure</th>
+          <th>Interest Rate</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let loan of loans">
+          <td>{{ loan.id }}</td>
+          <td>{{ loan.type }}</td>
+          <td>₹{{ loan.amount }}</td>
+          <td>{{ loan.tenure }} months</td>
+          <td>{{ loan.interestRate }}%</td>
+          <td>{{ loan.status }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>

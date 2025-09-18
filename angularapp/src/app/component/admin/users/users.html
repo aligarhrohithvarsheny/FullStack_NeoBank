@@ -1,0 +1,37 @@
+<div class="users-container">
+  <h2>Pending Account Requests</h2>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Email</th>
+        <th>PAN</th>
+        <th>Aadhar</th>
+        <th>Income</th>
+        <th>Status</th>
+        <th>Account No.</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let user of pendingUsers">
+        <td>{{ user.name }}</td>
+        <td>{{ user.email }}</td>
+        <td>{{ user.pan }}</td>
+        <td>{{ user.aadhar }}</td>
+        <td>{{ user.income }}</td>
+        <td [ngClass]="{'approved': user.status==='APPROVED', 'pending': user.status==='PENDING', 'closed': user.status==='CLOSED'}">
+          {{ user.status }}
+        </td>
+        <td>{{ user.assignedAccountNumber || '-' }}</td>
+        <td>
+          <button *ngIf="user.status==='PENDING'" (click)="approveUser(user)">Assign Account</button>
+          <button *ngIf="user.status==='APPROVED'" (click)="closeAccount(user)" class="close-btn">Close Account</button>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <button class="back-btn" (click)="goBack()">⬅ Back to Dashboard</button>
+</div>

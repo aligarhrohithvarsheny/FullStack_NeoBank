@@ -1,0 +1,49 @@
+<!-- Include Font Awesome -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+<div class="dashboard-container">
+  <header>
+    <h2><i class="fa fa-bank"></i> Admin Dashboard</h2>
+    <button class="logout-btn" (click)="logout()"><i class="fa fa-right-from-bracket"></i> Logout</button>
+  </header>
+
+  <div class="horizontal-dashboard">
+<div class="dash-card" (click)="navigateTo('users')">
+    
+          <i class="fa fa-users dash-icon"></i>
+      <h3>Manage Users</h3>
+      <p>Create, view, and update users</p>
+    </div>
+
+<div class="dash-card" (click)="navigateTo('kyc')">
+          <i class="fa fa-id-card dash-icon"></i>
+      <h3>KYC Verification</h3>
+      <p>Approve or reject KYC requests</p>
+    </div>
+
+<div  class="dash-card" (click)="navigateTo('cards')">
+      <i class="fa fa-credit-card dash-icon"></i>
+      <h3>Manage Cards</h3>
+      <p>Issue, block, or update cards</p>
+    </div>
+
+    <div  class="dash-card" (click)="navigateTo('loans')">
+      <i class="fa fa-coins dash-icon"></i>
+      <h3>Loan Requests</h3>
+      <p>Approve or reject loan applications</p>
+    </div>
+
+<div class="dash-card" (click)="navigateTo('transactions')">
+          <i class="fa fa-chart-line dash-icon"></i>
+      <h3>Transactions</h3>
+      <p>View all user transactions</p>
+    </div>
+
+    <div class="dash-card" onclick="navigateTo('/admin/accounts')">
+      <i class="fa fa-piggy-bank dash-icon"></i>
+      <h3>Accounts</h3>
+      <p>Manage balances and accounts</p>
+      
+    </div>
+  </div>
+</div>

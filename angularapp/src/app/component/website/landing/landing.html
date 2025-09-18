@@ -1,0 +1,445 @@
+<div class="landing-container">
+
+  <!-- Top Navigation Bar -->
+  <div class="top-nav">
+    <div class="top-nav-content">
+      <div class="top-nav-left">
+        <a href="#" class="top-nav-link">{{ t('skipToMain') }}</a>
+        <a href="#" class="top-nav-link">{{ t('aboutUs') }}</a>
+        <a href="#" class="top-nav-link">{{ t('neobankOnline') }}</a>
+        <a href="#" class="top-nav-link">{{ t('investorCorner') }}</a>
+        <a href="#" class="top-nav-link">{{ t('forexCardRate') }}</a>
+      </div>
+      <div class="top-nav-center">
+        <span class="phone-number">📞 1800 103 1906</span>
+        <div class="accessibility">
+          <button class="font-size-btn">A+</button>
+          <button class="font-size-btn">A-</button>
+        </div>
+      </div>
+      <div class="top-nav-right">
+        <select class="language-select" (change)="changeLanguage($event)">
+          <option value="en">English</option>
+          <option value="hi">हिंदी</option>
+        </select>
+        <select class="country-select">
+          <option>🇮🇳 India</option>
+        </select>
+        <button class="location-btn">📍</button>
+        <button class="cart-btn">🛒</button>
+        <a href="#" class="digital-products">{{ t('digitalProducts') }}</a>
+        <button class="internet-banking-btn" (click)="goTo('website/user', $event)">{{ t('internetBanking') }} ▼</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Header -->
+  <header class="main-header">
+    <div class="header-content">
+      <div class="logo-section">
+      <div class="logo">
+          <span class="logo-icon">⭐</span>
+          <div class="logo-text">
+            <span class="bank-name">{{ t('bankName') }}</span>
+            <span class="tagline">{{ t('tagline') }}</span>
+          </div>
+        </div>
+        <nav class="main-nav">
+          <div class="nav-item dropdown">
+            <a href="#" class="nav-link active" (click)="togglePersonalDropdown($event)">{{ t('personal') }} ▼</a>
+            <div class="dropdown-menu" [class.show]="showPersonalDropdown">
+              <a href="#" class="dropdown-item" (click)="goTo('website/createaccount', $event)">{{ t('createAccount') }}</a>
+              <a href="#" class="dropdown-item" (click)="goTo('website/user', $event)">{{ t('userLogin') }}</a>
+              <a href="#" class="dropdown-item" (click)="goTo('website/user', $event)">{{ t('internetBankingLogin') }}</a>
+            </div>
+          </div>
+          <div class="nav-item dropdown">
+            <a href="#" class="nav-link" (click)="toggleBusinessDropdown($event)">{{ t('business') }} ▼</a>
+            <div class="dropdown-menu" [class.show]="showBusinessDropdown">
+              <a href="#" class="dropdown-item" (click)="goTo('admin/login', $event)">{{ t('corporateLogin') }}</a>
+            </div>
+          </div>
+          <a href="#" class="nav-link">{{ t('forex') }} ▼</a>
+          <a href="#" class="nav-link">{{ t('investInsure') }} ▼</a>
+          <a href="#" class="nav-link">{{ t('nri') }} ▼</a>
+          <a href="#" class="nav-link">{{ t('agri') }} ▼</a>
+        </nav>
+      </div>
+      <div class="header-actions">
+        <button class="search-btn">🔍</button>
+        <button class="digital-products-btn">{{ t('digitalProducts') }} 🖱️</button>
+        <button class="internet-banking-main-btn" (click)="goTo('website/user', $event)">{{ t('internetBanking') }} ▼</button>
+      </div>
+    </div>
+    
+    <!-- Important Notice Banner -->
+    <div class="notice-banner">
+      <span>IMPORTANT NOTICE: In compliance with the Reserve Bank of India (RBI) guidelines</span>
+    </div>
+  </header>
+
+  <!-- Main Content Area -->
+  <section class="main-content">
+    <div class="content-wrapper">
+      <!-- Left Section -->
+      <div class="left-section">
+        <h1 class="bank-title">{{ t('bankName') }}</h1>
+        <div class="announcement">
+          <h2 class="announcement-title">{{ t('announcementTitle') }}</h2>
+          <p class="announcement-subtitle">{{ t('announcementSubtitle') }}</p>
+        </div>
+        <div class="product-links">
+          <div class="product-category">
+            <h3>{{ t('accounts') }}</h3>
+            <ul>
+              <li><a href="#" (click)="goTo('website/createaccount', $event)">{{ t('savingsAccount') }}</a></li>
+              <li><a href="#">{{ t('currentAccount') }}</a></li>
+            </ul>
+          </div>
+          <div class="product-category">
+            <h3>{{ t('cards') }}</h3>
+            <ul>
+              <li><a href="#">{{ t('debitCard') }}</a></li>
+              <li><a href="#">{{ t('creditCard') }}</a></li>
+            </ul>
+          </div>
+          <div class="product-category">
+            <h3>{{ t('loans') }}</h3>
+            <ul>
+              <li><a href="#">{{ t('personalLoan') }}</a></li>
+              <li><a href="#">{{ t('homeLoan') }}</a></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Section - Promotional Banner -->
+      <div class="right-section">
+        <div class="promotional-banner">
+          <div class="banner-header">
+            <div class="banner-logo">
+              <span class="banner-icon">⭐</span>
+              <span class="banner-text">NeoBank</span>
+            </div>
+            <div class="banner-controls">
+              <button class="nav-arrow">‹</button>
+              <button class="nav-arrow">›</button>
+            </div>
+          </div>
+          
+          <div class="banner-content">
+            <h2 class="banner-title">Digital Banking Revolution</h2>
+            <div class="banner-visual">
+              <div class="years-display">
+                <span class="years-number">5</span>
+                <span class="years-text">Years</span>
+              </div>
+              <div class="banner-image">
+                <div class="family-image">👨‍👩‍👧‍👦</div>
+              </div>
+            </div>
+            
+            <div class="banner-stats">
+              <div class="main-stat">₹50,00,00,00,000</div>
+              <ul class="stat-list">
+                <li>₹50,000 crore deposited into digital bank accounts</li>
+                <li>10+ lakh digital bank accounts opened</li>
+                <li>60% accounts in the name of women</li>
+                <li>3 out of every 4 accounts are in urban areas</li>
+              </ul>
+            </div>
+          </div>
+          
+          <div class="banner-pagination">
+            <span class="dot active"></span>
+            <span class="dot"></span>
+            <span class="dot"></span>
+            <span class="dot"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Floating Utility Buttons -->
+  <div class="floating-utilities">
+    <button class="utility-btn">📤</button>
+    <button class="utility-btn">🔗</button>
+    <button class="utility-btn">🛡️</button>
+    <button class="utility-btn">👍</button>
+  </div>
+
+  <!-- Floating BOI SEVA Button -->
+  <div class="floating-seva">
+    <button class="seva-btn">
+      <span class="seva-icon">⭐</span>
+      <span class="seva-text">NeoBank SEVA</span>
+    </button>
+  </div>
+
+  <!-- Popular Products Section -->
+  <section class="popular-products">
+    <div class="products-container">
+      <h2 class="products-title">{{ t('popularProducts') }}</h2>
+      
+      <div class="products-grid">
+        <!-- STAR HOME LOAN -->
+        <div class="product-card">
+          <div class="product-image">
+            <div class="product-icon">🏠</div>
+          </div>
+          <div class="product-content">
+            <h3 class="product-title">{{ t('starHomeLoan') }}</h3>
+            <p class="product-details">ROI 7.35% p.a. onwards</p>
+            <p class="product-description">Provides loans to purchase a Plot for construction of a House, to purchase/construct house/flat, as well as for renovation/ repair/alteration/addition to house/flat</p>
+            <button class="learn-more-btn">
+              <span class="arrow-icon">→</span>
+              {{ t('learnMore') }}
+            </button>
+          </div>
+        </div>
+
+        <!-- STAR ASSET BACKED LOAN -->
+        <div class="product-card">
+          <div class="product-image">
+            <div class="product-icon">💰</div>
+          </div>
+          <div class="product-content">
+            <h3 class="product-title">{{ t('starAssetBackedLoan') }}</h3>
+            <p class="product-details">25% in NFB Commissions</p>
+            <p class="product-description">To provide working capital for building up of current assets.</p>
+            <button class="learn-more-btn">
+              <span class="arrow-icon">→</span>
+              {{ t('learnMore') }}
+            </button>
+          </div>
+</div>
+
+        <!-- GOLD LOAN -->
+        <div class="product-card">
+          <div class="product-image">
+            <div class="product-icon">🥇</div>
+          </div>
+          <div class="product-content">
+            <h3 class="product-title">{{ t('goldLoan') }}</h3>
+            <p class="product-details">At attractive rate of Interest</p>
+            <p class="product-description">Gold Loan is the most convenient and easy way to fulfil all your credit needs.</p>
+            <button class="learn-more-btn">
+              <span class="arrow-icon">→</span>
+              {{ t('learnMore') }}
+            </button>
+          </div>
+        </div>
+
+        <!-- GOVERNMENT SALARY ACCOUNT -->
+        <div class="product-card">
+          <div class="product-image">
+            <div class="product-icon">💼</div>
+          </div>
+          <div class="product-content">
+            <h3 class="product-title">{{ t('governmentSalaryAccount') }}</h3>
+            <p class="product-details">For all government sector employees.</p>
+            <p class="product-description">Start building a secure and prosperous future with a banking solution designed specifically for government sector employees.</p>
+            <button class="learn-more-btn">
+              <span class="arrow-icon">→</span>
+              {{ t('learnMore') }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features Section -->
+  <section class="features">
+    <div class="features-header">
+      <h2>{{ t('bankingMadeSimple') }}</h2>
+      <p>{{ t('bankingDescription') }}</p>
+    </div>
+
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon">🛡</div>
+        <h3>{{ t('secureSafe') }}</h3>
+        <p>{{ t('secureDescription') }}</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">⚡</div>
+        <h3>{{ t('adminApproved') }}</h3>
+        <p>{{ t('adminDescription') }}</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">🏢</div>
+        <h3>{{ t('completeBanking') }}</h3>
+        <p>{{ t('completeDescription') }}</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer Section -->
+  <footer class="footer">
+    <!-- Top Blue Header -->
+    <div class="footer-header">
+      <div class="footer-header-content">
+        <div class="footer-left">
+          <div class="address">
+            <p>C-5, "G" Block, Bandra Kurla Complex, Bandra (East), Mumbai 400 051.</p>
+          </div>
+          <div class="contact-info">
+            <p><strong>For NRI Contact:</strong> Helpline Number: +91 7969241100</p>
+            <p>Email: FEBO.NRI@NeoBank.Co.In</p>
+          </div>
+          <div class="links">
+            <a href="#" class="footer-link">Submit your Grievances Click Here</a>
+            <a href="#" class="footer-link">For Overseas Contact Click Here</a>
+          </div>
+        </div>
+        
+        <div class="footer-center">
+          <div class="quiz-info">
+            <p>6th National Online Quiz on IBBI code, 2016</p>
+          </div>
+          <div class="gov-link">
+            <a href="#" class="gov-link-text">india.gov.in</a>
+          </div>
+        </div>
+        
+        <div class="footer-right">
+          <div class="social-section">
+            <p class="connect-text">{{ t('connectWithUs') }}</p>
+            <div class="social-icons">
+              <a href="#" class="social-icon">📷</a>
+              <a href="#" class="social-icon">📘</a>
+              <a href="#" class="social-icon">🐦</a>
+              <a href="#" class="social-icon">📺</a>
+              <a href="#" class="social-icon">💼</a>
+            </div>
+          </div>
+          <button class="see-less-btn">{{ t('seeLess') }} ▼</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Footer Content -->
+    <div class="footer-main">
+      <div class="footer-content">
+        <div class="footer-column">
+          <h3 class="column-title">{{ t('popularProductsFooter') }}</h3>
+          <ul class="footer-links">
+            <li><a href="#" class="footer-link">Home Loan</a></li>
+            <li><a href="#" class="footer-link">Personal Loan</a></li>
+            <li><a href="#" class="footer-link">Vehicle Loan</a></li>
+            <li><a href="#" class="footer-link">Education Loan</a></li>
+            <li><a href="#" class="footer-link">Savings Account</a></li>
+            <li><a href="#" class="footer-link">Salary Account</a></li>
+            <li><a href="#" class="footer-link">Debit Card</a></li>
+            <li><a href="#" class="footer-link">Credit Card</a></li>
+            <li><a href="#" class="footer-link">Prepaid Cards</a></li>
+            <li><a href="#" class="footer-link">Term Deposits</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-column">
+          <h3 class="column-title">{{ t('usefulLinks') }}</h3>
+          <ul class="footer-links">
+            <li><a href="#" class="footer-link">Communication to BSE/NSE</a></li>
+            <li><a href="#" class="footer-link">Digital Banking Unit (DBU)</a></li>
+            <li><a href="#" class="footer-link">ESG Corner</a></li>
+            <li><a href="#" class="footer-link">Notice For Customers</a></li>
+            <li><a href="#" class="footer-link">AML/KYC</a></li>
+            <li><a href="#" class="footer-link">Sitemap</a></li>
+            <li><a href="#" class="footer-link">Customer Care</a></li>
+            <li><a href="#" class="footer-link">Disclaimer</a></li>
+            <li><a href="#" class="footer-link">RBI Kehta Hai</a></li>
+            <li><a href="#" class="footer-link">Information on RBI Monetary</a></li>
+            <li><a href="#" class="footer-link">USA PATRIOT Act</a></li>
+            <li><a href="#" class="footer-link">Calculator</a></li>
+            <li><a href="#" class="footer-link">Complaint for Failed Digital Transactions</a></li>
+            <li><a href="#" class="footer-link">RTI Act</a></li>
+            <li><a href="#" class="footer-link">Verify CheckSum value</a></li>
+            <li><a href="#" class="footer-link">Vigilance Overtone complaints</a></li>
+            <li><a href="#" class="footer-link">Govt. of India - Cyber Fraud Reporting Portal</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-column">
+          <h3 class="column-title">{{ t('importantLinks') }}</h3>
+          <ul class="footer-links">
+            <li><a href="#" class="footer-link">Tender</a></li>
+            <li><a href="#" class="footer-link">Death Claim Portal</a></li>
+            <li><a href="#" class="footer-link">Career</a></li>
+            <li><a href="#" class="footer-link">Regulatory Disclosure Section</a></li>
+            <li><a href="#" class="footer-link">Screen Reader Accessibility</a></li>
+            <li><a href="#" class="footer-link">Jansamarth Portal</a></li>
+            <li><a href="#" class="footer-link">Positive Pay System</a></li>
+            <li><a href="#" class="footer-link">Account Aggregator</a></li>
+            <li><a href="#" class="footer-link">Inoperative/Unclaimed Account</a></li>
+            <li><a href="#" class="footer-link">UDGAM Portal</a></li>
+            <li><a href="#" class="footer-link">BAANKNET - Bank Asset Auction Network</a></li>
+            <li><a href="#" class="footer-link">BAANKNET Buyer Manual</a></li>
+            <li><a href="#" class="footer-link">Our Health care Product</a></li>
+            <li><a href="#" class="footer-link">ASBA</a></li>
+            <li><a href="#" class="footer-link">Rajbhasha</a></li>
+            <li><a href="#" class="footer-link">Blocking of Internet Banking</a></li>
+            <li><a href="#" class="footer-link">Disability/ Divyangjan Accessible Branches</a></li>
+          </ul>
+          
+          <div class="app-download">
+            <p class="app-title">{{ t('installBizPay') }}</p>
+            <div class="app-stores">
+              <a href="#" class="store-link">📱</a>
+              <a href="#" class="store-link">🍎</a>
+            </div>
+          </div>
+        </div>
+
+        <div class="footer-column">
+          <h3 class="column-title">{{ t('otherLinks') }}</h3>
+          <ul class="footer-links">
+            <li><a href="#" class="footer-link">Application for empanelment of valuers</a></li>
+            <li><a href="#" class="footer-link">Independent External Monitor (IEM)</a></li>
+            <li><a href="#" class="footer-link">List of Recovery Agents</a></li>
+            <li><a href="#" class="footer-link">List of Enforcement Agents</a></li>
+            <li><a href="#" class="footer-link">RSETIs</a></li>
+            <li><a href="#" class="footer-link">CSR</a></li>
+            <li><a href="#" class="footer-link">Citizens' Duties-Constitution of India</a></li>
+            <li><a href="#" class="footer-link">Safe custody services</a></li>
+            <li><a href="#" class="footer-link">Staff Portal</a></li>
+            <li><a href="#" class="footer-link">Star Share Trade</a></li>
+            <li><a href="#" class="footer-link">Depository</a></li>
+            <li><a href="#" class="footer-link">Citizen Charter</a></li>
+            <li><a href="#" class="footer-link">Udyami</a></li>
+            <li><a href="#" class="footer-link">Downloads</a></li>
+            <li><a href="#" class="footer-link">Terms and Conditions</a></li>
+            <li><a href="#" class="footer-link">Bank Holiday Calender</a></li>
+            <li><a href="#" class="footer-link">Help</a></li>
+          </ul>
+          
+          <div class="app-download">
+            <p class="app-title">{{ t('installMobileBanking') }}</p>
+            <div class="app-stores">
+              <a href="#" class="store-link">📱</a>
+              <a href="#" class="store-link">🍎</a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bottom Footer -->
+      <div class="footer-bottom">
+        <div class="footer-bottom-content">
+          <div class="footer-bottom-left">
+            <p class="copyright">©2024 NeoBank. {{ t('allRightsReserved') }}</p>
+            <p class="resolution-info">{{ t('siteBestViewed') }}</p>
+            <p class="visitor-count">{{ t('visitorsCount') }}</p>
+          </div>
+          <div class="footer-bottom-right">
+            <p class="last-modified">{{ t('lastModified') }}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </footer>
+</div>

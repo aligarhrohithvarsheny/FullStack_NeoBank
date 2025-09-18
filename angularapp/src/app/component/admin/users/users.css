@@ -1,0 +1,103 @@
+.users-container {
+  max-width: 900px;
+  margin: 50px auto;
+  padding: 30px;
+  border-radius: 25px;
+  background: rgba(0, 0, 0, 0.4); /* darker glass */
+  backdrop-filter: blur(20px);
+  color: #e0e0e0; /* light gray for readability */
+  font-family: 'Poppins', sans-serif;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+}
+
+/* Heading */
+.users-container h2 {
+  text-align: center;
+  margin-bottom: 25px;
+  font-size: 2rem;
+  background: linear-gradient(90deg, #00f0ff, #00ffcc, #0055ff);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+/* Table */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 20px;
+  color: #fff; /* ensure table text is visible */
+}
+
+thead th {
+  padding: 12px;
+  text-align: left;
+  background: rgba(0, 0, 0, 0.6); /* darker header */
+  border-bottom: 2px solid #00f0ff;
+  color: #00ffcc; /* neon for headers */
+}
+
+tbody td {
+  padding: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  color: #f0f0f0; /* light gray */
+}
+
+/* Status badges */
+.pending {
+  color: #ffd966;
+  font-weight: 600;
+}
+
+.approved {
+  color: #00ff9f;
+  font-weight: 600;
+}
+
+/* Buttons */
+button {
+  padding: 8px 14px;
+  border-radius: 18px;
+  border: none;
+  background: linear-gradient(135deg, #00f0ff, #00ffcc, #0055ff);
+  color: #000; /* dark text on neon button */
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+button:hover {
+  background: linear-gradient(135deg, #00ffcc, #00f0ff, #0055ff);
+  color: #000;
+  transform: translateY(-2px);
+}
+
+/* Back button */
+.back-btn {
+  display: block;
+  margin: 20px auto 0;
+  width: 200px;
+  text-align: center;
+  color: #fff;
+  background: linear-gradient(135deg, #0055ff, #00ffcc);
+}
+
+/* Close account button */
+.close-btn {
+  background: linear-gradient(135deg, #ff4444, #ff6666) !important;
+  color: #fff !important;
+  font-size: 0.9rem;
+  padding: 6px 12px;
+}
+
+.close-btn:hover {
+  background: linear-gradient(135deg, #ff3333, #ff5555) !important;
+  transform: translateY(-2px);
+}
+
+/* Closed status */
+.closed {
+  color: #ff6666;
+  font-weight: 600;
+}

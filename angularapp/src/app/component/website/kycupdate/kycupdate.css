@@ -1,0 +1,54 @@
+.kyc-container {
+  max-width: 400px;
+  margin: 30px auto;
+  padding: 20px;
+  border: 2px solid #0077cc;
+  border-radius: 12px;
+  background: #f9f9f9;
+  text-align: center;
+}
+
+.kyc-container h2 {
+  color: #0077cc;
+  margin-bottom: 15px;
+}
+
+input {
+  width: 90%;
+  padding: 8px;
+  margin: 10px 0;
+  border: 1px solid #aaa;
+  border-radius: 8px;
+}
+
+.details {
+  margin-top: 15px;
+  text-align: left;
+  background: #eef6ff;
+  padding: 10px;
+  border-radius: 8px;
+}
+
+.buttons {
+  margin-top: 20px;
+}
+
+button {
+  margin: 5px;
+  padding: 8px 14px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  background: #0077cc;
+  color: white;
+  transition: 0.3s;
+}
+
+button:hover {
+  background: #005fa3;
+}
+
+button[disabled] {
+  background: #ccc;
+  cursor: not-allowed;
+}

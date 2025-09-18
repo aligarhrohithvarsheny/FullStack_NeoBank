@@ -1,0 +1,21 @@
+<div class="kyc-container">
+  <h2>KYC Update 🔑</h2>
+<div class="back-container">
+  <button class="back-button" (click)="goBack()">←Dashboard</button>
+</div>
+  <!-- PAN Input -->
+  <label>PAN Number:</label>
+  <input type="text" [(ngModel)]="panNumber" placeholder="Enter PAN Number" />
+
+  <!-- Show Name & Status -->
+  <div *ngIf="isRequested" class="details">
+    <p><strong>Name:</strong> {{ name }}</p>
+    <p><strong>Status:</strong> {{ status }}</p>
+  </div>
+
+  <!-- Buttons -->
+  <div class="buttons">
+    <button (click)="requestToAdmin()">Request to Admin</button>
+    
+  </div>
+</div>

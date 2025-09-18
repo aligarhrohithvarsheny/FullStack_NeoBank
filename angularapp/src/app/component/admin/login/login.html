@@ -1,0 +1,38 @@
+<div class="login-container">
+  <div class="login-box">
+    <h1 class="brand-name">NEOBANK</h1>
+    <h2> Admin Login</h2>
+
+    <form (ngSubmit)="onSubmit()">
+      <!-- Email -->
+      <div class="form-group">
+        <label>Email</label>
+        <input
+          type="email"
+          id="email"
+          [(ngModel)]="email"
+          name="email"
+          required
+          placeholder="Enter email"
+        />
+      </div>
+
+      <!-- Password -->
+      <div class="form-group">
+        <label>Password</label>
+        <input
+          type="password"
+          [(ngModel)]="password"
+          name="password"
+          required
+          placeholder="Enter password"
+        />
+      </div>
+
+      
+
+      <!-- Submit -->
+      <button type="submit">Login</button>
+    </form>
+  </div>
+</div>

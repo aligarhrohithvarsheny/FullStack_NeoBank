@@ -1,0 +1,38 @@
+<div class="cards-container">
+  <!-- Back Button -->
+  <div class="back-button">
+    <button (click)="goBack()">⬅ Back to Dashboard</button>
+  </div>
+
+  <h2>Manage Cards</h2>
+  <p>Issue, block, or update cards for users.</p>
+
+  <table class="cards-table">
+    <thead>
+      <tr>
+        <th>Account Number</th>
+        <th>Card Last 4 Digits</th>
+        <th>Card Type</th>
+        <th>Status</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let user of users">
+        <td>{{ user.accountNumber }}</td>
+        <td>{{ user.cardNumber ? user.cardNumber.slice(-4) : 'Not Assigned' }}</td>
+        <td>{{ user.cardType || 'Not Assigned' }}</td>
+        <td>
+          <span [class.active]="user.isActive" [class.inactive]="!user.isActive">
+            {{ user.cardNumber ? (user.isActive ? 'Active' : 'Blocked') : 'No Card' }}
+          </span>
+        </td>
+        <td>
+          <button (click)="assignCard(user)" [disabled]="user.cardNumber">Assign Card</button>
+          <button (click)="blockCard(user)" [disabled]="!user.isActive">Block</button>
+          <button (click)="generatePin(user)" [disabled]="!user.isActive">Generate PIN</button>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>
