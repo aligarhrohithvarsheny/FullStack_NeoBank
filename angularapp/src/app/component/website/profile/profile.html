@@ -1,0 +1,91 @@
+<div class="profile-container">
+  <div class="profile-header">
+    <button class="back-btn" (click)="goBack()">← Back to Dashboard</button>
+    <h2>My Profile</h2>
+  </div>
+
+  <div class="profile-content">
+    <!-- Profile Card -->
+    <div class="profile-card">
+      <div class="profile-avatar">
+        <div class="avatar-circle">
+          <span class="avatar-text">{{ userProfile.name.charAt(0) }}</span>
+        </div>
+      </div>
+      
+      <div class="profile-info">
+        <h3>{{ userProfile.name }}</h3>
+        <p class="account-type">{{ userProfile.accountType }}</p>
+        <p class="account-number">Account: {{ userProfile.accountNumber }}</p>
+      </div>
+
+      <div class="balance-section">
+        <div class="balance-card">
+          <h4>Current Balance</h4>
+          <p class="balance-amount">₹{{ currentBalance | number:'1.2-2' }}</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Personal Details -->
+    <div class="details-section">
+      <h3>Personal Information</h3>
+      <div class="details-grid">
+        <div class="detail-item">
+          <label>Full Name</label>
+          <p>{{ userProfile.name }}</p>
+        </div>
+        <div class="detail-item">
+          <label>Email Address</label>
+          <p>{{ userProfile.email }}</p>
+        </div>
+        <div class="detail-item">
+          <label>Account Number</label>
+          <p>{{ userProfile.accountNumber }}</p>
+        </div>
+        <div class="detail-item">
+          <label>Phone Number</label>
+          <p>{{ userProfile.phoneNumber || 'Not provided' }}</p>
+        </div>
+        <div class="detail-item">
+          <label>Date of Birth</label>
+          <p>{{ userProfile.dateOfBirth || 'Not provided' }}</p>
+        </div>
+        <div class="detail-item">
+          <label>Address</label>
+          <p>{{ userProfile.address || 'Not provided' }}</p>
+        </div>
+        <div class="detail-item">
+          <label>Account Type</label>
+          <p>{{ userProfile.accountType }}</p>
+        </div>
+        <div class="detail-item">
+          <label>Member Since</label>
+          <p>{{ userProfile.joinDate }}</p>
+        </div>
+        <div class="detail-item" *ngIf="userProfile.pan">
+          <label>PAN Number</label>
+          <p>{{ userProfile.pan }}</p>
+        </div>
+        <div class="detail-item" *ngIf="userProfile.aadhar">
+          <label>Aadhar Number</label>
+          <p>{{ userProfile.aadhar }}</p>
+        </div>
+        <div class="detail-item" *ngIf="userProfile.occupation">
+          <label>Occupation</label>
+          <p>{{ userProfile.occupation }}</p>
+        </div>
+        <div class="detail-item" *ngIf="userProfile.income">
+          <label>Annual Income</label>
+          <p>₹{{ userProfile.income | number:'1.2-2' }}</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="action-buttons">
+      <button class="edit-btn" (click)="editProfile()">Edit Profile</button>
+      <button class="refresh-btn" (click)="loadCurrentBalance()">Refresh Balance</button>
+    </div>
+  </div>
+</div>

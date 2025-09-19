@@ -1,28 +1,52 @@
 <div class="loans-container">
-  <h2>Loan Requests</h2>
+  <h2>Loan Applications Management</h2>
+  
+  <!-- Debug Info -->
+  <div style="background: #f0f0f0; padding: 10px; margin: 10px 0; border-radius: 5px;">
+    <strong>Debug Info:</strong><br>
+    Loading: {{ loading }}<br>
+    Loan Requests Count: {{ loanRequests.length }}<br>
+    Component Loaded: ✅
+  </div>
 
   <!-- Back to Dashboard Button -->
   <button class="back-btn" (click)="goBack()">← Back to Dashboard</button>
+  
+  <!-- Refresh Button -->
+  <button class="refresh-btn" (click)="loadAllLoans()">🔄 Refresh</button>
+
+  <!-- Loading indicator -->
+  <div *ngIf="loading" class="loading">Loading loan applications...</div>
 
   <!-- Loan Requests Table -->
-  <table class="loan-table">
-    <thead>
-      <tr>
-        <th>ID</th>
-        <th>User Name</th>
-        <th>Type</th>
-        <th>Amount</th>
-        <th>Tenure (Months)</th>
-        <th>Interest Rate (%)</th>
-        <th>Status</th>
-        <th>Actions</th>
-      </tr>
-    </thead>
-    <tbody>
-      @for (loan of loanRequests; track loan.id) {
+  <div *ngIf="!loading" class="table-container">
+    <table class="loan-table">
+      <thead>
         <tr>
+          <th>ID</th>
+          <th>Loan Account</th>
+          <th>User Name</th>
+          <th>Email</th>
+          <th>Account Number</th>
+          <th>Current Balance</th>
+          <th>Loan Type</th>
+          <th>Amount</th>
+          <th>Tenure (Months)</th>
+          <th>Interest Rate (%)</th>
+          <th>Status</th>
+          <th>Applied Date</th>
+          <th>Approved Date</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let loan of loanRequests; trackBy: trackByLoanId">
           <td>{{ loan.id }}</td>
+          <td>{{ loan.loanAccountNumber }}</td>
           <td>{{ loan.userName }}</td>
+          <td>{{ loan.userEmail }}</td>
+          <td>{{ loan.accountNumber }}</td>
+          <td>{{ loan.currentBalance | currency:'INR' }}</td>
           <td>{{ loan.type }}</td>
           <td>{{ loan.amount | currency:'INR' }}</td>
           <td>{{ loan.tenure }}</td>
@@ -32,14 +56,24 @@
               [class.rejected]="loan.status === 'Rejected'">
             {{ loan.status }}
           </td>
+          <td>{{ loan.applicationDate | date:'short' }}</td>
+          <td>{{ loan.approvalDate ? (loan.approvalDate | date:'short') : '-' }}</td>
           <td>
-            @if (loan.status === 'Pending') {
-              <button (click)="approve(loan)">Approve</button>
-              <button (click)="reject(loan)">Reject</button>
-            }
+            <ng-container *ngIf="loan.status === 'Pending'; else processedTemplate">
+              <button class="approve-btn" (click)="approve(loan)">Approve</button>
+              <button class="reject-btn" (click)="reject(loan)">Reject</button>
+            </ng-container>
+            <ng-template #processedTemplate>
+              <span class="processed">Processed</span>
+            </ng-template>
           </td>
         </tr>
-      }
-    </tbody>
-  </table>
+      </tbody>
+    </table>
+    
+    <!-- No loans message -->
+    <div *ngIf="loanRequests.length === 0" class="no-loans">
+      <p>No loan applications found.</p>
+    </div>
+  </div>
 </div>

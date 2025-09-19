@@ -4,35 +4,260 @@
     <button (click)="goBack()">⬅ Back to Dashboard</button>
   </div>
 
-  <h2>Manage Cards</h2>
-  <p>Issue, block, or update cards for users.</p>
+  <h1>💳 Card Management</h1>
 
-  <table class="cards-table">
-    <thead>
-      <tr>
-        <th>Account Number</th>
-        <th>Card Last 4 Digits</th>
-        <th>Card Type</th>
-        <th>Status</th>
-        <th>Actions</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr *ngFor="let user of users">
-        <td>{{ user.accountNumber }}</td>
-        <td>{{ user.cardNumber ? user.cardNumber.slice(-4) : 'Not Assigned' }}</td>
-        <td>{{ user.cardType || 'Not Assigned' }}</td>
-        <td>
-          <span [class.active]="user.isActive" [class.inactive]="!user.isActive">
-            {{ user.cardNumber ? (user.isActive ? 'Active' : 'Blocked') : 'No Card' }}
-          </span>
-        </td>
-        <td>
-          <button (click)="assignCard(user)" [disabled]="user.cardNumber">Assign Card</button>
-          <button (click)="blockCard(user)" [disabled]="!user.isActive">Block</button>
-          <button (click)="generatePin(user)" [disabled]="!user.isActive">Generate PIN</button>
-        </td>
-      </tr>
-    </tbody>
-  </table>
+  <!-- View Toggle -->
+  <div class="view-toggle">
+    <button 
+      (click)="toggleRequestsView()" 
+      [class.active]="!showRequests"
+      class="toggle-btn"
+    >
+      Manage Cards
+    </button>
+    <button 
+      (click)="toggleRequestsView()" 
+      [class.active]="showRequests"
+      class="toggle-btn"
+    >
+      View Requests ({{ pendingRequests }})
+    </button>
+  </div>
+
+  <!-- Cards Management View -->
+  <div *ngIf="!showRequests">
+    <!-- Filters and Search -->
+    <div class="filters-section">
+      <div class="search-box">
+        <input 
+          type="text" 
+          [(ngModel)]="searchTerm" 
+          (input)="onSearchChange()"
+          placeholder="Search by name, account number, or card number..."
+          class="search-input"
+        />
+      </div>
+      
+      <div class="status-filter">
+        <label for="statusFilter">Filter by Status:</label>
+        <select 
+          id="statusFilter"
+          [(ngModel)]="statusFilter" 
+          (change)="onStatusFilterChange()"
+          class="filter-select"
+        >
+          <option value="All">All Cards</option>
+          <option value="Active">Active</option>
+          <option value="Blocked">Blocked</option>
+          <option value="Replaced">Replaced</option>
+          <option value="Deactivated">Deactivated</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Summary Stats -->
+    <div class="stats-section">
+      <div class="stat-card">
+        <h3>Total Cards</h3>
+        <span class="stat-number">{{ totalCards }}</span>
+      </div>
+      <div class="stat-card active">
+        <h3>Active</h3>
+        <span class="stat-number">{{ activeCards }}</span>
+      </div>
+      <div class="stat-card blocked">
+        <h3>Blocked</h3>
+        <span class="stat-number">{{ blockedCards }}</span>
+      </div>
+      <div class="stat-card pending">
+        <h3>Pending Requests</h3>
+        <span class="stat-number">{{ pendingRequests }}</span>
+      </div>
+    </div>
+
+    <!-- Cards Table -->
+    <div class="cards-table">
+      <table>
+        <thead>
+          <tr>
+            <th>User Name</th>
+            <th>Account Number</th>
+            <th>Card Number</th>
+            <th>Card Type</th>
+            <th>Expiry</th>
+            <th>Status</th>
+            <th>PIN Set</th>
+            <th>Created</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let card of filteredCards; trackBy: trackByCardId">
+            <td class="user-name">{{ card.userName }}</td>
+            <td class="account-number">{{ card.userAccountNumber }}</td>
+            <td class="card-number">**** **** **** {{ card.cardNumber.slice(-4) }}</td>
+            <td class="card-type">{{ card.cardType }}</td>
+            <td class="expiry">{{ card.expiry }}</td>
+            <td [ngClass]="getStatusClass(card.status)">
+              <span class="status-badge">{{ card.status }}</span>
+            </td>
+            <td class="pin-status">
+              <span [class.pin-set]="card.pinSet" [class.pin-not-set]="!card.pinSet">
+                {{ card.pinSet ? '✅ Set' : '❌ Not Set' }}
+              </span>
+            </td>
+            <td class="created-date">{{ card.createdAt | date:'short' }}</td>
+            <td class="actions">
+              <div class="action-buttons">
+                <button 
+                  *ngIf="card.status === 'Active'"
+                  (click)="blockCard(card)" 
+                  class="block-btn"
+                >
+                  Block
+                </button>
+                <button 
+                  *ngIf="card.status === 'Blocked'"
+                  (click)="unblockCard(card)" 
+                  class="unblock-btn"
+                >
+                  Unblock
+                </button>
+                <button 
+                  (click)="replaceCard(card)" 
+                  class="replace-btn"
+                  [disabled]="card.status === 'Deactivated'"
+                >
+                  Replace
+                </button>
+                <button 
+                  (click)="deactivateCard(card)" 
+                  class="deactivate-btn"
+                  [disabled]="card.status === 'Deactivated'"
+                >
+                  Deactivate
+                </button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      
+      <!-- No Results Message -->
+      <div *ngIf="filteredCards.length === 0" class="no-results">
+        <p>No cards found matching your criteria.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Requests View -->
+  <div *ngIf="showRequests">
+    <!-- Replacement Requests -->
+    <div class="requests-section">
+      <h3>🔄 Card Replacement Requests</h3>
+      <div class="requests-table" *ngIf="replacementRequests.length > 0; else noReplacementRequests">
+        <table>
+          <thead>
+            <tr>
+              <th>User Name</th>
+              <th>Account Number</th>
+              <th>Reason</th>
+              <th>Requested Date</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let request of replacementRequests; trackBy: trackByRequestId">
+              <td class="user-name">{{ request.userName }}</td>
+              <td class="account-number">{{ request.userAccountNumber }}</td>
+              <td class="reason">{{ request.reason }}</td>
+              <td class="requested-date">{{ request.requestedDate | date:'short' }}</td>
+              <td [ngClass]="getRequestStatusClass(request.status)">
+                <span class="status-badge">{{ request.status }}</span>
+              </td>
+              <td class="actions">
+                <div *ngIf="request.status === 'Pending'" class="action-buttons">
+                  <button (click)="approveReplacementRequest(request)" class="approve-btn">
+                    Approve
+                  </button>
+                  <button (click)="rejectReplacementRequest(request)" class="reject-btn">
+                    Reject
+                  </button>
+                </div>
+                <span *ngIf="request.status !== 'Pending'" class="processed">
+                  {{ request.status === 'Approved' ? '✅ Processed' : '❌ Processed' }}
+                </span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <ng-template #noReplacementRequests>
+        <div class="no-requests">
+          <p>No card replacement requests found.</p>
+        </div>
+      </ng-template>
+    </div>
+
+    <!-- New Card Requests -->
+    <div class="requests-section">
+      <h3>🆕 New Card Requests</h3>
+      <div class="requests-table" *ngIf="newCardRequests.length > 0; else noNewCardRequests">
+        <table>
+          <thead>
+            <tr>
+              <th>User Name</th>
+              <th>Account Number</th>
+              <th>Card Type</th>
+              <th>Requested Date</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let request of newCardRequests; trackBy: trackByRequestId">
+              <td class="user-name">{{ request.userName }}</td>
+              <td class="account-number">{{ request.userAccountNumber }}</td>
+              <td class="card-type">{{ request.cardType }}</td>
+              <td class="requested-date">{{ request.requestedDate | date:'short' }}</td>
+              <td [ngClass]="getRequestStatusClass(request.status)">
+                <span class="status-badge">{{ request.status }}</span>
+              </td>
+              <td class="actions">
+                <div *ngIf="request.status === 'Pending'" class="action-buttons">
+                  <button (click)="approveNewCardRequest(request)" class="approve-btn">
+                    Approve
+                  </button>
+                  <button (click)="rejectNewCardRequest(request)" class="reject-btn">
+                    Reject
+                  </button>
+                </div>
+                <span *ngIf="request.status !== 'Pending'" class="processed">
+                  {{ request.status === 'Approved' ? '✅ Processed' : '❌ Processed' }}
+                </span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <ng-template #noNewCardRequests>
+        <div class="no-requests">
+          <p>No new card requests found.</p>
+        </div>
+      </ng-template>
+    </div>
+  </div>
+
+  <!-- Instructions -->
+  <div class="instructions">
+    <h4>📋 Admin Instructions:</h4>
+    <ul>
+      <li><strong>Block Card:</strong> Temporarily disable a card (can be unblocked)</li>
+      <li><strong>Replace Card:</strong> Issue a new card with new number and CVV</li>
+      <li><strong>Deactivate Card:</strong> Permanently disable a card</li>
+      <li><strong>Approve Requests:</strong> Process user requests for card replacement or new cards</li>
+      <li>All changes are synchronized with user accounts automatically</li>
+    </ul>
+  </div>
 </div>

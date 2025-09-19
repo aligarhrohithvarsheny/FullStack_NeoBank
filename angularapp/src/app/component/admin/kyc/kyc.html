@@ -3,35 +3,122 @@
   
   <button class="back-btn" (click)="goBack()">⬅ Back to Dashboard</button>
 
+  <!-- Filters and Search -->
+  <div class="filters-section">
+    <div class="search-box">
+      <input 
+        type="text" 
+        [(ngModel)]="searchTerm" 
+        (input)="onSearchChange()"
+        placeholder="Search by name, email, PAN, or account number..."
+        class="search-input"
+      />
+    </div>
+    
+    <div class="status-filter">
+      <label for="statusFilter">Filter by Status:</label>
+      <select 
+        id="statusFilter"
+        [(ngModel)]="statusFilter" 
+        (change)="onStatusFilterChange()"
+        class="filter-select"
+      >
+        <option value="All">All Requests</option>
+        <option value="Pending">Pending</option>
+        <option value="Approved">Approved</option>
+        <option value="Rejected">Rejected</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Summary Stats -->
+  <div class="stats-section">
+    <div class="stat-card">
+      <h3>Total Requests</h3>
+      <span class="stat-number">{{ totalRequests }}</span>
+    </div>
+    <div class="stat-card pending">
+      <h3>Pending</h3>
+      <span class="stat-number">{{ pendingRequests }}</span>
+    </div>
+    <div class="stat-card approved">
+      <h3>Approved</h3>
+      <span class="stat-number">{{ approvedRequests }}</span>
+    </div>
+    <div class="stat-card rejected">
+      <h3>Rejected</h3>
+      <span class="stat-number">{{ rejectedRequests }}</span>
+    </div>
+  </div>
+
+  <!-- KYC Requests Table -->
   <div class="kyc-table">
     <table>
       <thead>
         <tr>
-          <th>User ID</th>
+          <th>Request ID</th>
+          <th>Account Number</th>
           <th>Name</th>
           <th>Email</th>
-          <th>Document</th>
+          <th>PAN Number</th>
+          <th>Submitted Date</th>
           <th>Status</th>
           <th>Actions</th>
         </tr>
       </thead>
       <tbody>
-        <tr *ngFor="let user of users">
-          <td>{{user.id}}</td>
-          <td>{{user.name}}</td>
-          <td>{{user.email}}</td>
-          <td>
-            <a [href]="user.documentUrl" target="_blank">View Document</a>
+        <tr *ngFor="let request of filteredRequests; trackBy: trackByRequestId">
+          <td class="request-id">{{ request.id }}</td>
+          <td class="account-number">{{ request.userAccountNumber }}</td>
+          <td class="user-name">{{ request.userName }}</td>
+          <td class="user-email">{{ request.userEmail }}</td>
+          <td class="pan-number">{{ request.panNumber }}</td>
+          <td class="submitted-date">{{ request.submittedDate | date:'short' }}</td>
+          <td [ngClass]="getStatusClass(request.status)">
+            <span class="status-badge">{{ request.status }}</span>
+            <div *ngIf="request.approvedDate" class="approval-info">
+              <small>Approved: {{ request.approvedDate | date:'short' }}</small>
+              <small *ngIf="request.approvedBy">by {{ request.approvedBy }}</small>
+            </div>
           </td>
-          <td [ngClass]="{'approved': user.status==='Approved', 'pending': user.status==='Pending', 'rejected': user.status==='Rejected'}">
-            {{user.status}}
-          </td>
-          <td>
-            <button (click)="approve(user)"> Approve</button>
-            <button (click)="reject(user)">Reject</button>
+          <td class="actions">
+            <button 
+              *ngIf="request.status === 'Pending'"
+              (click)="approve(request)" 
+              class="approve-btn"
+            >
+              ✅ Approve
+            </button>
+            <button 
+              *ngIf="request.status === 'Pending'"
+              (click)="reject(request)" 
+              class="reject-btn"
+            >
+              ❌ Reject
+            </button>
+            <span *ngIf="request.status !== 'Pending'" class="processed">
+              {{ request.status === 'Approved' ? '✅ Processed' : '❌ Processed' }}
+            </span>
           </td>
         </tr>
       </tbody>
     </table>
+    
+    <!-- No Results Message -->
+    <div *ngIf="filteredRequests.length === 0" class="no-results">
+      <p>No KYC requests found matching your criteria.</p>
+    </div>
+  </div>
+
+  <!-- Instructions -->
+  <div class="instructions">
+    <h4>📋 Admin Instructions:</h4>
+    <ul>
+      <li>Review the PAN number and name provided by the user</li>
+      <li>Verify the information matches official documents</li>
+      <li>Approve if information is correct and complete</li>
+      <li>Reject if information is incorrect or incomplete</li>
+      <li>Approved KYC will automatically update the user's profile</li>
+    </ul>
   </div>
 </div>

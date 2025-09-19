@@ -1,5 +1,25 @@
 <div class="users-container">
-  <h2>Pending Account Requests</h2>
+  <h2>User Account Management</h2>
+
+  <!-- Summary Stats -->
+  <div class="stats-section">
+    <div class="stat-card">
+      <h3>Total Users</h3>
+      <span class="stat-number">{{ totalUsers }}</span>
+    </div>
+    <div class="stat-card pending">
+      <h3>Pending</h3>
+      <span class="stat-number">{{ pendingUsersCount }}</span>
+    </div>
+    <div class="stat-card approved">
+      <h3>Approved</h3>
+      <span class="stat-number">{{ approvedUsersCount }}</span>
+    </div>
+    <div class="stat-card closed">
+      <h3>Closed</h3>
+      <span class="stat-number">{{ closedUsersCount }}</span>
+    </div>
+  </div>
 
   <table>
     <thead>
@@ -9,29 +29,54 @@
         <th>PAN</th>
         <th>Aadhar</th>
         <th>Income</th>
-        <th>Status</th>
+        <th>Account Status</th>
+        <th>KYC Status</th>
         <th>Account No.</th>
         <th>Action</th>
       </tr>
     </thead>
     <tbody>
-      <tr *ngFor="let user of pendingUsers">
-        <td>{{ user.name }}</td>
-        <td>{{ user.email }}</td>
-        <td>{{ user.pan }}</td>
-        <td>{{ user.aadhar }}</td>
-        <td>{{ user.income }}</td>
+      <tr *ngFor="let user of pendingUsers; trackBy: trackByUserId">
+        <td class="user-name">{{ user.name }}</td>
+        <td class="user-email">{{ user.email }}</td>
+        <td class="pan-number">{{ user.pan }}</td>
+        <td class="aadhar-number">{{ user.aadhar }}</td>
+        <td class="income">₹{{ user.income | number:'1.0-0' }}</td>
         <td [ngClass]="{'approved': user.status==='APPROVED', 'pending': user.status==='PENDING', 'closed': user.status==='CLOSED'}">
-          {{ user.status }}
+          <span class="status-badge">{{ user.status }}</span>
         </td>
-        <td>{{ user.assignedAccountNumber || '-' }}</td>
-        <td>
-          <button *ngIf="user.status==='PENDING'" (click)="approveUser(user)">Assign Account</button>
-          <button *ngIf="user.status==='APPROVED'" (click)="closeAccount(user)" class="close-btn">Close Account</button>
+        <td [ngClass]="getKycStatusClass(user)">
+          <span class="kyc-badge">{{ getKycStatus(user) }}</span>
+          <div *ngIf="getKycStatus(user) !== 'Not Submitted'" class="kyc-info">
+            <small>{{ user.assignedAccountNumber ? 'Account: ' + user.assignedAccountNumber : 'Email: ' + user.email }}</small>
+          </div>
+        </td>
+        <td class="account-number">{{ user.assignedAccountNumber || '-' }}</td>
+        <td class="actions">
+          <button *ngIf="user.status==='PENDING'" (click)="approveUser(user)" class="approve-btn">
+            Assign Account
+          </button>
+          <button *ngIf="user.status==='APPROVED'" (click)="closeAccount(user)" class="close-btn">
+            Close Account
+          </button>
+          <span *ngIf="user.status==='CLOSED'" class="closed-status">
+            Account Closed
+          </span>
         </td>
       </tr>
     </tbody>
   </table>
+
+  <!-- Instructions -->
+  <div class="instructions">
+    <h4>📋 Admin Instructions:</h4>
+    <ul>
+      <li><strong>Account Status:</strong> PENDING users need account assignment, APPROVED users have active accounts</li>
+      <li><strong>KYC Status:</strong> Shows if user has submitted and status of their KYC verification</li>
+      <li>Users can submit KYC after getting an account number</li>
+      <li>KYC approval automatically updates user profile information</li>
+    </ul>
+  </div>
 
   <button class="back-btn" (click)="goBack()">⬅ Back to Dashboard</button>
 </div>

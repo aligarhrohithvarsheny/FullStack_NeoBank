@@ -1,5 +1,5 @@
-import { Component, OnInit } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, OnInit, Inject, PLATFORM_ID } from '@angular/core';
+import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { FormBuilder, FormGroup, Validators, AbstractControl, ValidationErrors, ReactiveFormsModule, FormsModule } from '@angular/forms';
 
 interface PendingAccount {
@@ -47,7 +47,7 @@ export class Createaccount implements OnInit {
   // Mobile: 10 digits starting 6-9
   private mobileRegex = /^[6-9]\d{9}$/;
 
-  constructor(private fb: FormBuilder) {}
+  constructor(private fb: FormBuilder, @Inject(PLATFORM_ID) private platformId: Object) {}
 
   ngOnInit(): void {
     this.form = this.fb.group({
@@ -100,18 +100,22 @@ export class Createaccount implements OnInit {
 
   // --- Helpers for local storage (mock backend) ---
   private readPendingAccounts(): PendingAccount[] {
+    if (!isPlatformBrowser(this.platformId)) return [];
     const raw = localStorage.getItem('pending_accounts');
     return raw ? JSON.parse(raw) as PendingAccount[] : [];
   }
   private writePendingAccounts(list: PendingAccount[]) {
+    if (!isPlatformBrowser(this.platformId)) return;
     localStorage.setItem('pending_accounts', JSON.stringify(list));
   }
 
   private readAdminUsers(): PendingAccount[] {
+    if (!isPlatformBrowser(this.platformId)) return [];
     const raw = localStorage.getItem('admin_users');
     return raw ? JSON.parse(raw) as PendingAccount[] : [];
   }
   private writeAdminUsers(list: PendingAccount[]) {
+    if (!isPlatformBrowser(this.platformId)) return;
     localStorage.setItem('admin_users', JSON.stringify(list));
   }
 
@@ -185,6 +189,10 @@ export class Createaccount implements OnInit {
     this.writeAdminUsers(admins);
 
     this.successMessage = 'Account request submitted successfully. Admin will review and assign account number.';
+    
+    // Save user profile data for future use
+    this.saveUserProfile(val);
+    
     this.form.reset();
     this.submitted = false;
   }
@@ -219,6 +227,46 @@ export class Createaccount implements OnInit {
     } else {
       this.trackingError = 'No account found with the provided email and mobile number.';
       this.trackingResult = null;
+    }
+  }
+
+  saveUserProfile(formData: any) {
+    // Generate a temporary account number for the profile
+    const tempAccountNumber = 'ACC' + Date.now().toString().slice(-6);
+    
+    const userProfile = {
+      name: formData.name,
+      email: formData.email.toLowerCase(),
+      accountNumber: tempAccountNumber,
+      phoneNumber: formData.mobile,
+      address: `${formData.city}, ${formData.state}`,
+      dateOfBirth: formData.dob,
+      accountType: 'Savings Account',
+      joinDate: new Date().toISOString().split('T')[0],
+      pan: formData.pan.toUpperCase(),
+      aadhar: formData.aadhar,
+      occupation: formData.occupation,
+      income: formData.income
+    };
+
+    // Save to localStorage
+    if (isPlatformBrowser(this.platformId)) {
+      localStorage.setItem('user_profile', JSON.stringify(userProfile));
+    }
+    
+    // Also create initial transaction record
+    const initialTransaction = {
+      id: 'TXN' + Date.now(),
+      merchant: 'Account Opening',
+      amount: 0,
+      type: 'Credit',
+      balance: 0,
+      date: new Date().toISOString(),
+      description: 'Account opened successfully'
+    };
+    
+    if (isPlatformBrowser(this.platformId)) {
+      localStorage.setItem(`user_transactions_${tempAccountNumber}`, JSON.stringify([initialTransaction]));
     }
   }
 

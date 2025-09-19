@@ -1,21 +1,86 @@
 <div class="kyc-container">
   <h2>KYC Update 🔑</h2>
-<div class="back-container">
-  <button class="back-button" (click)="goBack()">←Dashboard</button>
-</div>
-  <!-- PAN Input -->
-  <label>PAN Number:</label>
-  <input type="text" [(ngModel)]="panNumber" placeholder="Enter PAN Number" />
-
-  <!-- Show Name & Status -->
-  <div *ngIf="isRequested" class="details">
-    <p><strong>Name:</strong> {{ name }}</p>
-    <p><strong>Status:</strong> {{ status }}</p>
+  <div class="back-container">
+    <button class="back-button" (click)="goBack()">←Dashboard</button>
   </div>
 
-  <!-- Buttons -->
-  <div class="buttons">
-    <button (click)="requestToAdmin()">Request to Admin</button>
-    
+  <!-- User Info Display -->
+  <div *ngIf="userProfile" class="user-info">
+    <h3>Account Information</h3>
+    <p><strong>Account Number:</strong> {{ userProfile.accountNumber }}</p>
+    <p><strong>Email:</strong> {{ userProfile.email }}</p>
+  </div>
+
+  <!-- KYC Form -->
+  <div class="kyc-form">
+    <div class="form-group">
+      <label for="panNumber">PAN Number:</label>
+      <input 
+        id="panNumber"
+        type="text" 
+        [(ngModel)]="panNumber" 
+        placeholder="Enter PAN Number (e.g., ABCDE1234F)" 
+        maxlength="10"
+        [disabled]="isRequested && status !== 'Rejected'"
+      />
+    </div>
+
+    <div class="form-group">
+      <label for="name">Full Name:</label>
+      <input 
+        id="name"
+        type="text" 
+        [(ngModel)]="name" 
+        placeholder="Enter your full name as per PAN"
+        [disabled]="isRequested && status !== 'Rejected'"
+      />
+    </div>
+
+    <!-- Status Display -->
+    <div *ngIf="isRequested" class="status-display">
+      <div class="status-card" [ngClass]="{
+        'pending': status === 'Pending Approval',
+        'approved': status === 'Approved',
+        'rejected': status === 'Rejected'
+      }">
+        <h4>KYC Status</h4>
+        <p><strong>Status:</strong> {{ status }}</p>
+        <p *ngIf="kycRequest"><strong>Submitted:</strong> {{ kycRequest?.submittedDate | date:'medium' }}</p>
+        <p *ngIf="kycRequest?.approvedDate"><strong>Approved:</strong> {{ kycRequest?.approvedDate | date:'medium' }}</p>
+        <p *ngIf="kycRequest?.approvedBy"><strong>Approved By:</strong> {{ kycRequest?.approvedBy }}</p>
+      </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="buttons">
+      <button 
+        *ngIf="!isRequested || status === 'Rejected'"
+        (click)="requestToAdmin()" 
+        class="submit-btn"
+        [disabled]="!panNumber || !name"
+      >
+        Submit KYC Request
+      </button>
+      
+      <button 
+        *ngIf="status === 'Rejected'"
+        (click)="requestToAdmin()" 
+        class="resubmit-btn"
+        [disabled]="!panNumber || !name"
+      >
+        Resubmit KYC Request
+      </button>
+    </div>
+  </div>
+
+  <!-- Instructions -->
+  <div class="instructions">
+    <h4>📋 Instructions:</h4>
+    <ul>
+      <li>Enter your PAN number exactly as it appears on your PAN card</li>
+      <li>Enter your full name as it appears on your PAN card</li>
+      <li>Admin will verify your details and approve/reject your KYC</li>
+      <li>Once approved, your profile will be updated automatically</li>
+    </ul>
   </div>
 </div>

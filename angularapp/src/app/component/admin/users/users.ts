@@ -1,5 +1,5 @@
-import { Component } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, OnInit, Inject, PLATFORM_ID } from '@angular/core';
+import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 
@@ -19,6 +19,20 @@ interface PendingUser {
   createdAt: string;
 }
 
+interface KycRequest {
+  id: string;
+  userId: string;
+  userName: string;
+  userEmail: string;
+  userAccountNumber: string;
+  panNumber: string;
+  name: string;
+  status: 'Pending' | 'Approved' | 'Rejected';
+  submittedDate: string;
+  approvedDate?: string;
+  approvedBy?: string;
+}
+
 @Component({
   selector: 'app-users',
   standalone: true,
@@ -26,16 +40,41 @@ interface PendingUser {
   templateUrl: './users.html',
   styleUrls: ['./users.css']
 })
-export class Users {
-  constructor(private router: Router) {}
+export class Users implements OnInit {
+  constructor(private router: Router, @Inject(PLATFORM_ID) private platformId: Object) {}
 
   pendingUsers: PendingUser[] = [];
+  kycRequests: KycRequest[] = [];
   nextAccountNumber = 100001;
 
+  // Computed properties for statistics
+  get totalUsers(): number {
+    return this.pendingUsers.length;
+  }
+
+  get pendingUsersCount(): number {
+    return this.pendingUsers.filter(u => u.status === 'PENDING').length;
+  }
+
+  get approvedUsersCount(): number {
+    return this.pendingUsers.filter(u => u.status === 'APPROVED').length;
+  }
+
+  get closedUsersCount(): number {
+    return this.pendingUsers.filter(u => u.status === 'CLOSED').length;
+  }
+
   ngOnInit() {
+    if (!isPlatformBrowser(this.platformId)) return;
+    
     // Load from localStorage (mock backend)
     const raw = localStorage.getItem('admin_users');
     this.pendingUsers = raw ? JSON.parse(raw) : [];
+    
+    // Load KYC requests
+    const kycRaw = localStorage.getItem('kyc_requests');
+    this.kycRequests = kycRaw ? JSON.parse(kycRaw) : [];
+    
     this.calculateNextAccountNumber();
   }
 
@@ -72,7 +111,35 @@ export class Users {
   }
 
   saveUsers() {
+    if (!isPlatformBrowser(this.platformId)) return;
     localStorage.setItem('admin_users', JSON.stringify(this.pendingUsers));
+  }
+
+  getKycStatus(user: PendingUser): string {
+    const kycRequest = this.kycRequests.find(req => 
+      req.userAccountNumber === user.assignedAccountNumber || 
+      req.userEmail === user.email
+    );
+    
+    if (!kycRequest) {
+      return 'Not Submitted';
+    }
+    
+    return kycRequest.status;
+  }
+
+  getKycStatusClass(user: PendingUser): string {
+    const status = this.getKycStatus(user);
+    switch (status) {
+      case 'Approved': return 'kyc-approved';
+      case 'Pending': return 'kyc-pending';
+      case 'Rejected': return 'kyc-rejected';
+      default: return 'kyc-not-submitted';
+    }
+  }
+
+  trackByUserId(index: number, user: PendingUser): string {
+    return user.id;
   }
 
   goBack() {

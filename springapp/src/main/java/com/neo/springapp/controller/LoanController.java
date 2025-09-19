@@ -36,11 +36,16 @@ public class LoanController {
     }
 
     // Update loan status (e.g. Admin Approval)
-   // Admin updates loan status
-@PutMapping("/{id}/approve")
-public Loan approveLoan(@PathVariable Long id, @RequestParam String status) {
-    // status should be "Approved" or "Rejected"
-    return loanService.approveLoan(id, status);
-}
+    @PutMapping("/{id}/approve")
+    public Loan approveLoan(@PathVariable Long id, @RequestParam String status) {
+        // status should be "Approved" or "Rejected"
+        return loanService.approveLoan(id, status);
+    }
+
+    // Get loans by account number (for user to see their loan applications)
+    @GetMapping("/user/{accountNumber}")
+    public List<Loan> getLoansByAccountNumber(@PathVariable String accountNumber) {
+        return loanService.getLoansByAccountNumber(accountNumber);
+    }
 
 }

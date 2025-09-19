@@ -1,6 +1,7 @@
 <div class="transaction-container">
   <div class="back-button">
     <button type="button" (click)="goBack()">⬅ Back to Dashboard</button>
+    <button type="button" (click)="cleanupDuplicateLoanTransactions()" class="cleanup-btn">🧹 Clean Duplicates</button>
   </div>
 
   <h2>User Transactions</h2>
@@ -45,6 +46,7 @@
           <th>Type</th>
           <th>Balance</th>
           <th>Date</th>
+          <th>Description</th>
         </tr>
       </thead>
       <tbody>
@@ -52,9 +54,10 @@
           <td>{{tx.id}}</td>
           <td>{{tx.merchant}}</td>
           <td>{{tx.amount}}</td>
-          <td>{{tx.type}}</td>
+          <td [class.loan-credit]="tx.type === 'Loan Credit'">{{tx.type}}</td>
           <td>{{tx.balance}}</td>
           <td>{{tx.date | date:'short'}}</td>
+          <td>{{tx.description || '-'}}</td>
         </tr>
       </tbody>
     </table>
@@ -72,6 +75,7 @@
           <th>Type</th>
           <th>Balance</th>
           <th>Date</th>
+          <th>Description</th>
         </tr>
       </thead>
       <tbody>
@@ -79,9 +83,10 @@
           <td>{{tx.id}}</td>
           <td>{{tx.merchant}}</td>
           <td>{{tx.amount}}</td>
-          <td>{{tx.type}}</td>
+          <td [class.loan-credit]="tx.type === 'Loan Credit'">{{tx.type}}</td>
           <td>{{tx.balance}}</td>
           <td>{{tx.date | date:'short'}}</td>
+          <td>{{tx.description || '-'}}</td>
         </tr>
       </tbody>
     </table>

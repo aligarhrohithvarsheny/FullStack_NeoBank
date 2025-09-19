@@ -63,21 +63,31 @@
       <thead>
         <tr>
           <th>ID</th>
+          <th>Loan Account</th>
           <th>Type</th>
           <th>Amount</th>
           <th>Tenure</th>
           <th>Interest Rate</th>
           <th>Status</th>
+          <th>Applied Date</th>
+          <th>Approved Date</th>
         </tr>
       </thead>
       <tbody>
         <tr *ngFor="let loan of loans">
           <td>{{ loan.id }}</td>
+          <td>{{ loan.loanAccountNumber }}</td>
           <td>{{ loan.type }}</td>
           <td>₹{{ loan.amount }}</td>
           <td>{{ loan.tenure }} months</td>
           <td>{{ loan.interestRate }}%</td>
-          <td>{{ loan.status }}</td>
+          <td [class.pending]="loan.status === 'Pending'"
+              [class.approved]="loan.status === 'Approved'"
+              [class.rejected]="loan.status === 'Rejected'">
+            {{ loan.status }}
+          </td>
+          <td>{{ loan.applicationDate | date:'short' }}</td>
+          <td>{{ loan.approvalDate ? (loan.approvalDate | date:'short') : '-' }}</td>
         </tr>
       </tbody>
     </table>

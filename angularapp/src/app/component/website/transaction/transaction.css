@@ -71,6 +71,8 @@ th {
 }
 .back-button {
   margin-bottom: 1rem;
+  display: flex;
+  gap: 1rem;
 }
 
 .back-button button {
@@ -84,4 +86,21 @@ th {
 
 .back-button button:hover {
   background: #6b21a8;
+}
+
+.cleanup-btn {
+  background: #ef4444 !important;
+}
+
+.cleanup-btn:hover {
+  background: #dc2626 !important;
+}
+
+/* Loan Credit Transaction Styling */
+.loan-credit {
+  background-color: #d4edda !important;
+  color: #155724 !important;
+  font-weight: bold;
+  padding: 4px 8px;
+  border-radius: 4px;
 }

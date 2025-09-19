@@ -22,4 +22,17 @@ public class AccountService {
     public Account getAccountByNumber(String accountNumber) {
         return accountRepository.findByAccountNumber(accountNumber);
     }
+
+    public Account updateBalance(String accountNumber, Double amount) {
+        Account account = getAccountByNumber(accountNumber);
+        if (account != null) {
+            account.setBalance(account.getBalance() + amount);
+            return accountRepository.save(account);
+        }
+        return null;
+    }
+
+    public Account getAccountById(Long id) {
+        return accountRepository.findById(id).orElse(null);
+    }
 }

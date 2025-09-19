@@ -1,8 +1,11 @@
 package com.neo.springapp.model;
 
 import jakarta.persistence.*;
+import lombok.Data;
+import java.time.LocalDateTime;
 
 @Entity
+@Data
 @Table(name = "kyc_requests")
 public class KycRequest {
 
@@ -12,41 +15,32 @@ public class KycRequest {
 
     private String panNumber;
     private String name;
-    private String status; // "Pending", "Approved", "Rejected"
+    private String status = "Pending"; // "Pending", "Approved", "Rejected"
+    
+    // User information
+    private String userId;
+    private String userName;
+    private String userEmail;
+    private String userAccountNumber;
+    
+    // Timestamps
+    private LocalDateTime submittedDate;
+    private LocalDateTime approvedDate;
+    private String approvedBy; // Admin who approved the KYC
 
-    public KycRequest() {}
+    // Constructors
+    public KycRequest() {
+        this.submittedDate = LocalDateTime.now();
+    }
 
-    public KycRequest(String panNumber, String name, String status) {
+    public KycRequest(String panNumber, String name, String userId, String userName, 
+                      String userEmail, String userAccountNumber) {
+        this();
         this.panNumber = panNumber;
         this.name = name;
-        this.status = status;
-    }
-
-    public Long getId() {
-        return id;
-    }
-
-    public String getPanNumber() {
-        return panNumber;
-    }
-
-    public void setPanNumber(String panNumber) {
-        this.panNumber = panNumber;
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public void setName(String name) {
-        this.name = name;
-    }
-
-    public String getStatus() {
-        return status;
-    }
-
-    public void setStatus(String status) {
-        this.status = status;
+        this.userId = userId;
+        this.userName = userName;
+        this.userEmail = userEmail;
+        this.userAccountNumber = userAccountNumber;
     }
 }

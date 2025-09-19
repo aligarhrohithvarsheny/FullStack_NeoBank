@@ -48,3 +48,27 @@ tr:hover {
 .back-btn:hover {
   background-color: #3730a3;
 }
+
+.refresh-btn {
+  background: #28a745;
+  color: #fff;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 6px;
+  cursor: pointer;
+  margin-bottom: 20px;
+  font-size: 14px;
+}
+
+.refresh-btn:hover {
+  background: #218838;
+}
+
+/* Loan Credit Transaction Styling */
+.loan-credit {
+  background-color: #d4edda !important;
+  color: #155724 !important;
+  font-weight: bold;
+  padding: 4px 8px;
+  border-radius: 4px;
+}

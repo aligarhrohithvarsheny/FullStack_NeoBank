@@ -83,6 +83,33 @@ th {
   background: #f5f5f5;
 }
 
+/* Status styling */
+.pending {
+  color: #f39c12;
+  font-weight: bold;
+  background: #fef9e7;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.approved {
+  color: #27ae60;
+  font-weight: bold;
+  background: #e8f5e8;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.rejected {
+  color: #e74c3c;
+  font-weight: bold;
+  background: #fdeaea;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+}
 
 .back-container {
   margin-bottom: 15px;

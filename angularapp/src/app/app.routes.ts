@@ -3,6 +3,7 @@ import { Routes } from '@angular/router';
 import { Dashboard } from './component/admin/dashboard/dashboard';
 import { Users } from './component/admin/users/users';
 import { Loans } from './component/admin/loans/loans';
+import { LoansSimple } from './component/admin/loans/loans-simple';
 import { Cards } from './component/admin/cards/cards';
 import { Transactions } from './component/admin/transactions/transactions';
 import { Kyc } from './component/admin/kyc/kyc';
@@ -18,6 +19,7 @@ import { Loan } from './component/website/loan/loan';
 import { Card } from './component/website/card/card';
 import { Transaction } from './component/website/transaction/transaction';
 import { Kycupdate } from './component/website/kycupdate/kycupdate';
+import { Profile } from './component/website/profile/profile';
 
 
 
@@ -44,6 +46,7 @@ export const routes: Routes = [
       { path: 'transaction', component: Transaction },
       { path: 'landing', component: Landing },
       { path: 'kycupdate', component: Kycupdate },
+      { path: 'profile', component: Profile },
     ],
   },
 

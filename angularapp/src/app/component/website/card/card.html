@@ -3,52 +3,174 @@
     <button (click)="goBack()">⬅ Back to Dashboard</button>
   </div>
 
-  <div class="card">
-    <!-- Front view -->
-    <div class="view front">
-      <div class="debit">{{card.cardType}} Card</div>
-      <div class="bank">NeoBank</div>
-      <div class="number">{{fullNumber}}</div>
-      <div class="valid">
-        <span>VALID THRU</span>
-        <span>{{card.expiry}}</span>
+  <!-- User Info Display -->
+  <div *ngIf="userProfile" class="user-info">
+    <h3>Account Information</h3>
+    <p><strong>Account Number:</strong> {{ userProfile.accountNumber }}</p>
+    <p><strong>Name:</strong> {{ userProfile.name }}</p>
+    <p><strong>Email:</strong> {{ userProfile.email }}</p>
+  </div>
+
+  <!-- Card Display -->
+  <div *ngIf="card" class="card-container">
+    <div class="card" [ngClass]="statusClass">
+      <!-- Front view -->
+      <div class="view front">
+        <div class="debit">{{ card.cardType }} Card</div>
+        <div class="bank">NeoBank</div>
+        <div class="number">{{ fullNumber }}</div>
+        <div class="valid">
+          <span>VALID THRU</span>
+          <span>{{ card.expiry }}</span>
+        </div>
+        <div class="cardHolder">{{ card.userName }}</div>
+        <div class="status-indicator">
+          <span class="status-badge">{{ card.status }}</span>
+        </div>
       </div>
-      <div class="cardHolder">{{card.userName}}</div>
+
+      <!-- Back view -->
+      <div class="view back">
+        <div class="blackbar"></div>
+        <div class="cvvtext">
+          <h5>CVV</h5>
+          <div class="whiteBar"></div>
+          <div class="cvv">{{ maskedCVV }}</div>
+        </div>
+        <div class="text">
+          Use responsibly. Cardholder agrees to terms.
+        </div>
+      </div>
     </div>
 
-    <!-- Back view -->
-    <div class="view back">
-      <div class="blackbar"></div>
-      <div class="cvvtext">
-        <h5>CVV</h5>
-        <div class="whiteBar"></div>
-        <div class="cvv">{{maskedCVV}}</div>
-      </div>
-      <div class="text">
-        Use responsibly. Cardholder agrees to terms.
+    <!-- Card Details -->
+    <div class="card-details">
+      <h4>Card Information</h4>
+      <div class="detail-grid">
+        <div class="detail-item">
+          <span class="label">Card Number:</span>
+          <span class="value">{{ fullNumber }}</span>
+        </div>
+        <div class="detail-item">
+          <span class="label">Card Type:</span>
+          <span class="value">{{ card.cardType }}</span>
+        </div>
+        <div class="detail-item">
+          <span class="label">Expiry Date:</span>
+          <span class="value">{{ card.expiry }}</span>
+        </div>
+        <div class="detail-item">
+          <span class="label">CVV:</span>
+          <span class="value">{{ maskedCVV }}</span>
+        </div>
+        <div class="detail-item">
+          <span class="label">Status:</span>
+          <span class="value status-value" [ngClass]="statusClass">{{ card.status }}</span>
+        </div>
+        <div class="detail-item">
+          <span class="label">PIN Status:</span>
+          <span class="value">{{ card.pinSet ? 'Set' : 'Not Set' }}</span>
+        </div>
+        <div class="detail-item">
+          <span class="label">Created:</span>
+          <span class="value">{{ card.createdAt | date:'medium' }}</span>
+        </div>
+        <div class="detail-item">
+          <span class="label">Last Updated:</span>
+          <span class="value">{{ card.lastUpdated | date:'medium' }}</span>
+        </div>
       </div>
     </div>
   </div>
 
   <!-- Card Actions -->
   <div class="card-actions">
-    <button (click)="toggleDetails()">
-      {{showDetails ? 'Hide Card Details' : 'Show Card Details'}}
-    </button>
+    <div class="action-group">
+      <button (click)="toggleDetails()" class="toggle-btn">
+        {{ showDetails ? 'Hide Card Details' : 'Show Card Details' }}
+      </button>
+    </div>
 
-    <button (click)="applyNewCard()" class="apply-new-card-btn">Apply New Card</button>
+    <div class="action-group">
+      <button (click)="togglePinForm()" class="pin-btn" [disabled]="card?.pinSet">
+        {{ card?.pinSet ? 'PIN Already Set' : 'Set PIN' }}
+      </button>
+      
+      <div *ngIf="showPinForm" class="pin-form">
+        <input 
+          type="password" 
+          placeholder="Enter 4-digit PIN" 
+          [(ngModel)]="newPin" 
+          maxlength="4"
+          class="pin-input"
+        >
+        <button (click)="setPin()" class="set-pin-btn">Set PIN</button>
+        <button (click)="togglePinForm()" class="cancel-btn">Cancel</button>
+      </div>
+    </div>
 
-    <input type="text" placeholder="Enter 4-digit PIN" [(ngModel)]="newPin" maxlength="4">
-    <button (click)="setPin()">Set PIN</button>
+    <div class="action-group">
+      <button (click)="toggleReplaceForm()" class="replace-btn">
+        Request Card Replacement
+      </button>
+      
+      <div *ngIf="showReplaceForm" class="replace-form">
+        <textarea 
+          placeholder="Reason for replacement (e.g., Lost card, Damaged card, etc.)" 
+          [(ngModel)]="replaceReason"
+          class="replace-textarea"
+          rows="3"
+        ></textarea>
+        <button (click)="requestCardReplacement()" class="submit-replace-btn">Submit Request</button>
+        <button (click)="toggleReplaceForm()" class="cancel-btn">Cancel</button>
+      </div>
+    </div>
 
-    <button (click)="blockCard()" [disabled]="card.blocked">Block Card</button>
-    <button (click)="deactivateCard()" [disabled]="card.deactivated">Deactivate Card</button>
+    <div class="action-group">
+      <button (click)="blockCard()" class="block-btn" [disabled]="card?.status === 'Blocked' || card?.status === 'Deactivated'">
+        Block Card
+      </button>
+      <button (click)="deactivateCard()" class="deactivate-btn" [disabled]="card?.status === 'Deactivated'">
+        Deactivate Card
+      </button>
+    </div>
+
+    <div class="action-group">
+      <button (click)="applyNewCard()" class="apply-new-card-btn">
+        Apply for Additional Card
+      </button>
+    </div>
   </div>
 
   <!-- Status Info -->
-  <div class="status">
-    <p *ngIf="card.pinSet">🔒 PIN is set</p>
-    <p *ngIf="card.blocked">❌ Card is blocked</p>
-    <p *ngIf="card.deactivated">⚠️ Card is deactivated</p>
+  <div class="status-info">
+    <div *ngIf="card?.pinSet" class="status-item pin-set">
+      <span class="icon">🔒</span>
+      <span class="text">PIN is set</span>
+    </div>
+    <div *ngIf="card?.status === 'Blocked'" class="status-item blocked">
+      <span class="icon">❌</span>
+      <span class="text">Card is blocked</span>
+    </div>
+    <div *ngIf="card?.status === 'Deactivated'" class="status-item deactivated">
+      <span class="icon">⚠️</span>
+      <span class="text">Card is deactivated</span>
+    </div>
+    <div *ngIf="card?.status === 'Replaced'" class="status-item replaced">
+      <span class="icon">🔄</span>
+      <span class="text">Card has been replaced</span>
+    </div>
+  </div>
+
+  <!-- Instructions -->
+  <div class="instructions">
+    <h4>📋 Card Management Instructions:</h4>
+    <ul>
+      <li><strong>Set PIN:</strong> Create a 4-digit PIN for secure transactions</li>
+      <li><strong>Block Card:</strong> Temporarily disable your card (can be unblocked by admin)</li>
+      <li><strong>Deactivate Card:</strong> Permanently disable your card</li>
+      <li><strong>Replace Card:</strong> Request a new card if lost or damaged</li>
+      <li><strong>Apply New Card:</strong> Request an additional card for your account</li>
+    </ul>
   </div>
 </section>

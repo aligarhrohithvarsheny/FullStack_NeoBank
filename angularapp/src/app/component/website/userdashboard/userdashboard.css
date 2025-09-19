@@ -129,11 +129,55 @@
   margin: 0 auto;
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.balance-display {
+  background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+  color: white;
+  padding: 8px 16px;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 2px 8px rgba(40, 167, 69, 0.3);
+}
+
+.balance-label {
+  font-size: 14px;
+  opacity: 0.9;
+}
+
+.balance-amount {
+  font-weight: bold;
+  font-size: 16px;
+}
+
 .welcome-title {
   font-size: 2rem;
   font-weight: 700;
   color: #2d3748;
   margin: 0;
+}
+
+.profile-btn {
+  background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(0, 123, 255, 0.3);
+}
+
+.profile-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 123, 255, 0.4);
 }
 
 .logout-btn {

@@ -1,54 +1,229 @@
 .kyc-container {
-  max-width: 400px;
+  max-width: 600px;
   margin: 30px auto;
-  padding: 20px;
+  padding: 30px;
   border: 2px solid #0077cc;
-  border-radius: 12px;
-  background: #f9f9f9;
-  text-align: center;
+  border-radius: 15px;
+  background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  box-shadow: 0 8px 25px rgba(0, 119, 204, 0.15);
 }
 
 .kyc-container h2 {
   color: #0077cc;
-  margin-bottom: 15px;
+  margin-bottom: 25px;
+  text-align: center;
+  font-size: 1.8rem;
+  font-weight: 600;
 }
 
-input {
-  width: 90%;
-  padding: 8px;
-  margin: 10px 0;
-  border: 1px solid #aaa;
-  border-radius: 8px;
+.back-container {
+  margin-bottom: 20px;
 }
 
-.details {
-  margin-top: 15px;
-  text-align: left;
-  background: #eef6ff;
-  padding: 10px;
-  border-radius: 8px;
-}
-
-.buttons {
-  margin-top: 20px;
-}
-
-button {
-  margin: 5px;
-  padding: 8px 14px;
+.back-button {
+  background: #6c757d;
+  color: white;
+  padding: 8px 16px;
   border: none;
   border-radius: 8px;
   cursor: pointer;
-  background: #0077cc;
-  color: white;
-  transition: 0.3s;
+  font-size: 0.9rem;
+  transition: all 0.3s ease;
 }
 
-button:hover {
-  background: #005fa3;
+.back-button:hover {
+  background: #5a6268;
+  transform: translateY(-1px);
 }
 
-button[disabled] {
-  background: #ccc;
+/* User Info Section */
+.user-info {
+  background: linear-gradient(135deg, #e3f2fd, #bbdefb);
+  padding: 20px;
+  border-radius: 12px;
+  margin-bottom: 25px;
+  border-left: 4px solid #0077cc;
+}
+
+.user-info h3 {
+  color: #0077cc;
+  margin-bottom: 15px;
+  font-size: 1.2rem;
+}
+
+.user-info p {
+  margin: 8px 0;
+  color: #333;
+  font-weight: 500;
+}
+
+/* KYC Form */
+.kyc-form {
+  background: white;
+  padding: 25px;
+  border-radius: 12px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  margin-bottom: 20px;
+}
+
+.form-group {
+  margin-bottom: 20px;
+  text-align: left;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 8px;
+  color: #333;
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.form-group input {
+  width: 100%;
+  padding: 12px 15px;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 1rem;
+  transition: all 0.3s ease;
+  box-sizing: border-box;
+}
+
+.form-group input:focus {
+  outline: none;
+  border-color: #0077cc;
+  box-shadow: 0 0 0 3px rgba(0, 119, 204, 0.1);
+}
+
+.form-group input:disabled {
+  background-color: #f8f9fa;
+  color: #6c757d;
   cursor: not-allowed;
+}
+
+/* Status Display */
+.status-display {
+  margin-top: 25px;
+}
+
+.status-card {
+  padding: 20px;
+  border-radius: 12px;
+  text-align: left;
+  border: 2px solid;
+  transition: all 0.3s ease;
+}
+
+.status-card.pending {
+  background: linear-gradient(135deg, #fff3cd, #ffeaa7);
+  border-color: #ffc107;
+  color: #856404;
+}
+
+.status-card.approved {
+  background: linear-gradient(135deg, #d4edda, #a8e6cf);
+  border-color: #28a745;
+  color: #155724;
+}
+
+.status-card.rejected {
+  background: linear-gradient(135deg, #f8d7da, #f5c6cb);
+  border-color: #dc3545;
+  color: #721c24;
+}
+
+.status-card h4 {
+  margin-bottom: 15px;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.status-card p {
+  margin: 8px 0;
+  font-weight: 500;
+}
+
+/* Action Buttons */
+.buttons {
+  margin-top: 25px;
+  text-align: center;
+}
+
+.submit-btn, .resubmit-btn {
+  background: linear-gradient(135deg, #0077cc, #0056b3);
+  color: white;
+  padding: 12px 25px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  margin: 0 10px;
+}
+
+.submit-btn:hover, .resubmit-btn:hover {
+  background: linear-gradient(135deg, #0056b3, #004085);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(0, 119, 204, 0.3);
+}
+
+.submit-btn:disabled, .resubmit-btn:disabled {
+  background: #6c757d;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.resubmit-btn {
+  background: linear-gradient(135deg, #ffc107, #e0a800);
+}
+
+.resubmit-btn:hover {
+  background: linear-gradient(135deg, #e0a800, #d39e00);
+}
+
+/* Instructions */
+.instructions {
+  background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+  padding: 20px;
+  border-radius: 12px;
+  border-left: 4px solid #17a2b8;
+  margin-top: 20px;
+}
+
+.instructions h4 {
+  color: #17a2b8;
+  margin-bottom: 15px;
+  font-size: 1.1rem;
+}
+
+.instructions ul {
+  margin: 0;
+  padding-left: 20px;
+  color: #495057;
+}
+
+.instructions li {
+  margin-bottom: 8px;
+  line-height: 1.5;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .kyc-container {
+    margin: 15px;
+    padding: 20px;
+  }
+  
+  .buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .submit-btn, .resubmit-btn {
+    margin: 0;
+  }
 }
