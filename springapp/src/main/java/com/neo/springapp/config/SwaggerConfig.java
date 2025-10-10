@@ -12,8 +12,8 @@ public class SwaggerConfig {
     public OpenAPI customOpenAPI() {
         return new OpenAPI()
             .info(new Info()
-                .title("Gift Shop API")
+                .title(" NEOBANK API")
                 .version("1.0")
-                .description("API documentation for the Gift Shop application"));
+                .description("API documentation for the NEOBANK application"));
     }
 }

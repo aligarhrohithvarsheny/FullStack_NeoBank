@@ -21,6 +21,11 @@ public class User {
 
     @Column(unique = true)
     private String accountNumber;
+    
+    // Account lock fields
+    private int failedLoginAttempts = 0;
+    private boolean accountLocked = false;
+    private LocalDateTime lastFailedLoginTime;
 
     @OneToOne(cascade = CascadeType.ALL)
     @JoinColumn(name = "account_id")

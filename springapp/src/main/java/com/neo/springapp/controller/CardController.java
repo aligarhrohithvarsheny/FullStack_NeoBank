@@ -118,6 +118,18 @@ public class CardController {
         return cardService.setCardPin(cardId, pin);
     }
 
+    // Reset PIN for a card (forgot PIN functionality)
+    @PutMapping("/{cardId}/reset-pin")
+    public Card resetCardPin(@PathVariable Long cardId, @RequestParam String pin) {
+        return cardService.resetCardPin(cardId, pin);
+    }
+
+    // Replace a card (for admin approval of replacement requests)
+    @PutMapping("/{cardId}/replace")
+    public Card replaceCard(@PathVariable Long cardId, @RequestBody Card replacementData) {
+        return cardService.replaceCard(cardId, replacementData);
+    }
+
     // Generate new card
     @PostMapping("/generate")
     public Card generateNewCard(

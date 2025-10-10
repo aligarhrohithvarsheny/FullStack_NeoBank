@@ -116,6 +116,37 @@ public class CardService {
         return null;
     }
 
+    // Reset PIN for a card (forgot PIN functionality)
+    public Card resetCardPin(Long cardId, String pin) {
+        Card card = cardRepository.findById(cardId).orElse(null);
+        if (card != null) {
+            card.setPin(pin);
+            card.setPinSet(true);
+            // Reset any blocked/deactivated status when PIN is reset
+            card.setBlocked(false);
+            card.setDeactivated(false);
+            card.setStatus("Active");
+            return cardRepository.save(card);
+        }
+        return null;
+    }
+
+    // Replace a card (for admin approval of replacement requests)
+    public Card replaceCard(Long cardId, Card replacementData) {
+        Card card = cardRepository.findById(cardId).orElse(null);
+        if (card != null) {
+            card.setCardNumber(replacementData.getCardNumber());
+            card.setCvv(replacementData.getCvv());
+            card.setExpiryDate(replacementData.getExpiryDate());
+            card.setStatus(replacementData.getStatus());
+            card.setPinSet(replacementData.isPinSet());
+            card.setBlocked(false);
+            card.setDeactivated(false);
+            return cardRepository.save(card);
+        }
+        return null;
+    }
+
     // Generate new card
     public Card generateNewCard(String cardType, String userName, String accountNumber, String userEmail) {
         String cardNumber = generateCardNumber();

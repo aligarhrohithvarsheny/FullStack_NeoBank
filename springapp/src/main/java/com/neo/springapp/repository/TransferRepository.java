@@ -68,4 +68,85 @@ public interface TransferRepository extends JpaRepository<TransferRecord, Long> 
            "CASE WHEN :sortBy = 'amount' THEN t.amount END DESC, " +
            "CASE WHEN :sortBy = 'senderName' THEN t.senderName END ASC")
     Page<TransferRecord> findAllWithSorting(@Param("sortBy") String sortBy, Pageable pageable);
+
+    // Enhanced JPQL Queries for Advanced Search and Filtering
+    
+    // Multi-field search with JPQL
+    @Query("SELECT t FROM TransferRecord t WHERE " +
+           "(:searchTerm IS NULL OR " +
+           "LOWER(t.senderName) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
+           "LOWER(t.recipientName) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
+           "t.senderAccountNumber LIKE CONCAT('%', :searchTerm, '%') OR " +
+           "t.recipientAccountNumber LIKE CONCAT('%', :searchTerm, '%') OR " +
+           "t.ifsc LIKE CONCAT('%', :searchTerm, '%') OR " +
+           "t.phone LIKE CONCAT('%', :searchTerm, '%')) " +
+           "ORDER BY t.date DESC")
+    Page<TransferRecord> searchTransfers(@Param("searchTerm") String searchTerm, Pageable pageable);
+
+    // Advanced filtering with multiple criteria
+    @Query("SELECT t FROM TransferRecord t WHERE " +
+           "(:senderAccountNumber IS NULL OR t.senderAccountNumber = :senderAccountNumber) AND " +
+           "(:recipientAccountNumber IS NULL OR t.recipientAccountNumber = :recipientAccountNumber) AND " +
+           "(:transferType IS NULL OR t.transferType = :transferType) AND " +
+           "(:status IS NULL OR t.status = :status) AND " +
+           "(:minAmount IS NULL OR t.amount >= :minAmount) AND " +
+           "(:maxAmount IS NULL OR t.amount <= :maxAmount) AND " +
+           "(:startDate IS NULL OR t.date >= :startDate) AND " +
+           "(:endDate IS NULL OR t.date <= :endDate) " +
+           "ORDER BY t.date DESC")
+    Page<TransferRecord> findTransfersWithFilters(
+            @Param("senderAccountNumber") String senderAccountNumber,
+            @Param("recipientAccountNumber") String recipientAccountNumber,
+            @Param("transferType") TransferRecord.TransferType transferType,
+            @Param("status") String status,
+            @Param("minAmount") Double minAmount,
+            @Param("maxAmount") Double maxAmount,
+            @Param("startDate") LocalDateTime startDate,
+            @Param("endDate") LocalDateTime endDate,
+            Pageable pageable);
+
+    // Statistics queries
+    @Query("SELECT COUNT(t) FROM TransferRecord t WHERE t.status = :status")
+    Long countByStatus(@Param("status") String status);
+
+    @Query("SELECT COUNT(t) FROM TransferRecord t WHERE t.transferType = :transferType")
+    Long countByTransferType(@Param("transferType") TransferRecord.TransferType transferType);
+
+    @Query("SELECT SUM(t.amount) FROM TransferRecord t WHERE t.senderAccountNumber = :accountNumber AND t.status = 'Completed'")
+    Double getTotalTransferAmountBySender(@Param("accountNumber") String accountNumber);
+
+    @Query("SELECT AVG(t.amount) FROM TransferRecord t WHERE t.status = 'Completed'")
+    Double getAverageTransferAmount();
+
+    @Query("SELECT COUNT(t), SUM(t.amount) FROM TransferRecord t WHERE t.date >= :startDate AND t.date <= :endDate")
+    Object[] getTransferStatisticsByDateRange(@Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
+
+    // Recent transfers for dashboard
+    @Query("SELECT t FROM TransferRecord t WHERE t.senderAccountNumber = :accountNumber ORDER BY t.date DESC")
+    List<TransferRecord> findRecentTransfersBySender(@Param("accountNumber") String accountNumber, Pageable pageable);
+
+    @Query("SELECT t FROM TransferRecord t WHERE t.recipientAccountNumber = :accountNumber ORDER BY t.date DESC")
+    List<TransferRecord> findRecentTransfersByRecipient(@Param("accountNumber") String accountNumber, Pageable pageable);
+
+    // Pending transfers for processing
+    @Query("SELECT t FROM TransferRecord t WHERE t.status = 'Pending' ORDER BY t.date ASC")
+    List<TransferRecord> findPendingTransfersForProcessing(Pageable pageable);
+
+    // Failed transfers for retry
+    @Query("SELECT t FROM TransferRecord t WHERE t.status = 'Failed' ORDER BY t.date DESC")
+    List<TransferRecord> findFailedTransfersForRetry(Pageable pageable);
+
+    // Transfer volume by month
+    @Query("SELECT YEAR(t.date) as year, MONTH(t.date) as month, COUNT(t) as count, SUM(t.amount) as total " +
+           "FROM TransferRecord t WHERE t.status = 'Completed' " +
+           "GROUP BY YEAR(t.date), MONTH(t.date) " +
+           "ORDER BY year DESC, month DESC")
+    List<Object[]> getTransferVolumeByMonth();
+
+    // Top transfer recipients
+    @Query("SELECT t.recipientName, t.recipientAccountNumber, COUNT(t) as transferCount, SUM(t.amount) as totalAmount " +
+           "FROM TransferRecord t WHERE t.senderAccountNumber = :accountNumber AND t.status = 'Completed' " +
+           "GROUP BY t.recipientName, t.recipientAccountNumber " +
+           "ORDER BY totalAmount DESC")
+    List<Object[]> getTopRecipientsBySender(@Param("accountNumber") String accountNumber, Pageable pageable);
 }

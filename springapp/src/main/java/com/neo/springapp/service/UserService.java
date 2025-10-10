@@ -19,13 +19,14 @@ public class UserService {
 
     @Autowired
     private UserRepository userRepository;
+    
+    @Autowired
+    private AccountService accountService;
 
     // Basic CRUD operations
     public User saveUser(User user) {
-        // Generate account number if not provided
-        if (user.getAccountNumber() == null) {
-            user.setAccountNumber(generateAccountNumber());
-        }
+        // Don't generate account number automatically - only when admin approves
+        // Account number will be generated in approveUser() method
         return userRepository.save(user);
     }
 
@@ -71,11 +72,65 @@ public class UserService {
         Optional<User> userOpt = userRepository.findById(userId);
         if (userOpt.isPresent()) {
             User user = userOpt.get();
-            user.setStatus("APPROVED");
+            
+            // Check if user is already approved
+            if ("APPROVED".equals(user.getStatus())) {
+                System.out.println("User already approved: " + user.getUsername());
+                return user;
+            }
+            
+            // Generate unique account number for approval
             user.setAccountNumber(generateAccountNumber());
-            return userRepository.save(user);
+            
+            // Update user status
+            user.setStatus("APPROVED");
+            
+            // Create or update account
+            Account account = user.getAccount();
+            if (account == null) {
+                account = new Account();
+                account.setAccountNumber(user.getAccountNumber());
+                account.setName(user.getUsername());
+                account.setStatus("ACTIVE");
+                account.setCreatedAt(LocalDateTime.now());
+                account.setLastUpdated(LocalDateTime.now());
+                account.setBalance(0.0); // Initialize balance
+                
+                // Set required fields with unique values to avoid constraint violations
+                // Generate unique Aadhar and PAN numbers based on user ID and timestamp
+                String timestamp = String.valueOf(System.currentTimeMillis());
+                account.setAadharNumber("AADHAR_" + user.getId() + "_" + timestamp);
+                account.setPan("PAN" + user.getId() + timestamp.substring(timestamp.length() - 4));
+                
+                // Set other required fields with default values
+                account.setDob("1990-01-01"); // Default DOB
+                account.setAge(25); // Default age
+                account.setOccupation("Employee"); // Default occupation
+                account.setAccountType("Savings"); // Default account type
+                account.setIncome(50000.0); // Default income
+                account.setPhone("9999999999"); // Default phone
+                account.setAddress("Default Address"); // Default address
+            } else {
+                account.setAccountNumber(user.getAccountNumber());
+                account.setStatus("ACTIVE");
+                account.setLastUpdated(LocalDateTime.now());
+            }
+            
+            // Save account first
+            Account savedAccount = accountService.saveAccount(account);
+            user.setAccount(savedAccount);
+            
+            // Save updated user
+            User approvedUser = userRepository.save(user);
+            
+            System.out.println("✅ User approved successfully: " + approvedUser.getUsername());
+            System.out.println("Account Number: " + approvedUser.getAccountNumber());
+            
+            return approvedUser;
+        } else {
+            System.out.println("❌ User not found: " + userId);
+            return null;
         }
-        return null;
     }
 
     public User closeUserAccount(Long userId, String adminName) {
@@ -161,7 +216,22 @@ public class UserService {
 
     // Utility methods
     private String generateAccountNumber() {
-        return "ACC" + System.currentTimeMillis() + (int)(Math.random() * 1000);
+        String accountNumber;
+        do {
+            // Generate account number with timestamp and random number
+            long timestamp = System.currentTimeMillis();
+            int random = (int)(Math.random() * 10000); // Increased range for better uniqueness
+            accountNumber = "ACC" + timestamp + random;
+            
+            // Check if this account number already exists
+            Optional<User> existingUser = userRepository.findByAccountNumber(accountNumber);
+            if (!existingUser.isPresent()) {
+                break; // Account number is unique
+            }
+        } while (true);
+        
+        System.out.println("Generated unique account number: " + accountNumber);
+        return accountNumber;
     }
 
     // Validation methods
@@ -175,5 +245,10 @@ public class UserService {
 
     public boolean isAadharUnique(String aadhar) {
         return !userRepository.findByAadhar(aadhar).isPresent();
+    }
+
+
+    public Optional<User> findByEmail(String email) {
+        return userRepository.findByEmail(email);
     }
 }

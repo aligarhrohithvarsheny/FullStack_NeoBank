@@ -54,8 +54,92 @@
       />
     </div>
 
-    <button class="submit-button" type="submit">Apply Loan</button>
+    <div class="form-actions">
+      <button class="submit-button" type="submit">Apply Loan</button>
+      <button class="calculate-button" type="button" (click)="fillEMICalculator()">Calculate EMI</button>
+    </div>
   </form>
+
+  <!-- EMI Calculator Section -->
+  <div class="emi-calculator">
+    <h2>EMI Calculator</h2>
+    <div class="calculator-container">
+      <div class="calculator-inputs">
+        <div class="input-group">
+          <label class="input-label">Loan Amount (₹)</label>
+          <input
+            type="number"
+            class="input-field"
+            placeholder="Enter loan amount"
+            [(ngModel)]="emiCalculator.principal"
+            (input)="calculateEMI()"
+            name="emiPrincipal"
+          />
+        </div>
+
+        <div class="input-group">
+          <label class="input-label">Interest Rate (% per annum)</label>
+          <input
+            type="number"
+            class="input-field"
+            placeholder="Enter interest rate"
+            [(ngModel)]="emiCalculator.rate"
+            (input)="calculateEMI()"
+            name="emiRate"
+            step="0.01"
+          />
+        </div>
+
+        <div class="input-group">
+          <label class="input-label">Loan Tenure (Months)</label>
+          <input
+            type="number"
+            class="input-field"
+            placeholder="Enter tenure in months"
+            [(ngModel)]="emiCalculator.time"
+            (input)="calculateEMI()"
+            name="emiTime"
+          />
+        </div>
+      </div>
+
+      <div class="calculator-results" *ngIf="emiCalculator.emi > 0">
+        <div class="result-card">
+          <h3>EMI Calculation Results</h3>
+          <div class="result-item">
+            <span class="result-label">Monthly EMI:</span>
+            <span class="result-value">₹{{ emiCalculator.emi | number:'1.2-2' }}</span>
+          </div>
+          <div class="result-item">
+            <span class="result-label">Total Amount:</span>
+            <span class="result-value">₹{{ emiCalculator.totalAmount | number:'1.2-2' }}</span>
+          </div>
+          <div class="result-item">
+            <span class="result-label">Total Interest:</span>
+            <span class="result-value">₹{{ emiCalculator.totalInterest | number:'1.2-2' }}</span>
+          </div>
+          <div class="result-item">
+            <span class="result-label">Interest Percentage:</span>
+            <span class="result-value">{{ emiCalculator.interestPercentage | number:'1.2-2' }}%</span>
+          </div>
+        </div>
+
+        <div class="emi-breakdown" *ngIf="emiCalculator.emi > 0">
+          <h4>EMI Breakdown</h4>
+          <div class="breakdown-chart">
+            <div class="breakdown-item">
+              <div class="breakdown-bar principal" [style.width.%]="emiCalculator.principalPercentage"></div>
+              <span class="breakdown-label">Principal ({{ emiCalculator.principalPercentage | number:'1.1-1' }}%)</span>
+            </div>
+            <div class="breakdown-item">
+              <div class="breakdown-bar interest" [style.width.%]="emiCalculator.interestPercentage"></div>
+              <span class="breakdown-label">Interest ({{ emiCalculator.interestPercentage | number:'1.1-1' }}%)</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <div class="loan-list" *ngIf="loans.length > 0">
     <h2>My Loan Requests</h2>

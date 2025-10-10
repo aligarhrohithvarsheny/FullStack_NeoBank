@@ -39,6 +39,11 @@ public class LoanService {
         return loanRepository.findAll();
     }
 
+    // Get loans by account number
+    public List<Loan> getLoansByAccountNumber(String accountNumber) {
+        return loanRepository.findByAccountNumber(accountNumber);
+    }
+
     // Get loan by ID
     public Loan getLoanById(Long id) {
         return loanRepository.findById(id).orElse(null);
@@ -55,18 +60,13 @@ public class LoanService {
             if ("Approved".equals(status)) {
                 Account account = accountService.getAccountByNumber(loan.getAccountNumber());
                 if (account != null) {
-                    accountService.updateBalance(loan.getAccountNumber(), loan.getAmount());
+                    accountService.creditBalance(loan.getAccountNumber(), loan.getAmount());
                 }
             }
             
             return loanRepository.save(loan);
         }
         return null;
-    }
-
-    // Get loans by account number
-    public List<Loan> getLoansByAccountNumber(String accountNumber) {
-        return loanRepository.findByAccountNumber(accountNumber);
     }
 
     // Generate unique loan account number

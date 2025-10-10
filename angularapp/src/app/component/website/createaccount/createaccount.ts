@@ -1,6 +1,7 @@
 import { Component, OnInit, Inject, PLATFORM_ID } from '@angular/core';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { FormBuilder, FormGroup, Validators, AbstractControl, ValidationErrors, ReactiveFormsModule, FormsModule } from '@angular/forms';
+import { HttpClient } from '@angular/common/http';
 
 interface PendingAccount {
   id: string; // temp id
@@ -32,6 +33,7 @@ export class Createaccount implements OnInit {
   submitted = false;
   submitError = '';
   successMessage = '';
+  loading = false;
   
   // Approval tracking
   showTracking = false;
@@ -42,12 +44,203 @@ export class Createaccount implements OnInit {
 
   // PAN regex: 5 letters, 4 digits, 1 letter
   private panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]$/;
-  // Aadhar: 12 digits
-  private aadharRegex = /^\d{12}$/;
+  // Aadhar: 12 digits, cannot start with 0 or 1
+  private aadharRegex = /^[2-9]\d{11}$/;
   // Mobile: 10 digits starting 6-9
   private mobileRegex = /^[6-9]\d{9}$/;
 
-  constructor(private fb: FormBuilder, @Inject(PLATFORM_ID) private platformId: Object) {}
+  // Indian States and Union Territories
+  indianStates = [
+    'Andhra Pradesh',
+    'Arunachal Pradesh',
+    'Assam',
+    'Bihar',
+    'Chhattisgarh',
+    'Goa',
+    'Gujarat',
+    'Haryana',
+    'Himachal Pradesh',
+    'Jharkhand',
+    'Karnataka',
+    'Kerala',
+    'Madhya Pradesh',
+    'Maharashtra',
+    'Manipur',
+    'Meghalaya',
+    'Mizoram',
+    'Nagaland',
+    'Odisha',
+    'Punjab',
+    'Rajasthan',
+    'Sikkim',
+    'Tamil Nadu',
+    'Telangana',
+    'Tripura',
+    'Uttar Pradesh',
+    'Uttarakhand',
+    'West Bengal',
+    'Andaman and Nicobar Islands',
+    'Chandigarh',
+    'Dadra and Nagar Haveli and Daman and Diu',
+    'Delhi',
+    'Jammu and Kashmir',
+    'Ladakh',
+    'Lakshadweep',
+    'Puducherry'
+  ];
+
+  // Cities data organized by state
+  citiesByState: { [key: string]: string[] } = {
+    'Andhra Pradesh': [
+      'Visakhapatnam', 'Vijayawada', 'Guntur', 'Nellore', 'Kurnool', 
+      'Tirupati', 'Rajahmundry', 'Kadapa', 'Anantapur', 'Chittoor',
+      'Ongole', 'Eluru', 'Machilipatnam', 'Tenali', 'Proddatur'
+    ],
+    'Arunachal Pradesh': [
+      'Itanagar', 'Naharlagun', 'Pasighat', 'Tezpur', 'Namsai',
+      'Ziro', 'Along', 'Bomdila', 'Tezu', 'Seppa'
+    ],
+    'Assam': [
+      'Guwahati', 'Silchar', 'Dibrugarh', 'Jorhat', 'Nagaon',
+      'Tinsukia', 'Tezpur', 'Bongaigaon', 'Dhubri', 'Diphu'
+    ],
+    'Bihar': [
+      'Patna', 'Gaya', 'Bhagalpur', 'Muzaffarpur', 'Darbhanga',
+      'Purnia', 'Arrah', 'Begusarai', 'Katihar', 'Munger'
+    ],
+    'Chhattisgarh': [
+      'Raipur', 'Bhilai', 'Bilaspur', 'Korba', 'Rajnandgaon',
+      'Durg', 'Raigarh', 'Jagdalpur', 'Ambikapur', 'Chirmiri'
+    ],
+    'Goa': [
+      'Panaji', 'Margao', 'Vasco da Gama', 'Mapusa', 'Ponda',
+      'Sanquelim', 'Mormugao', 'Bicholim', 'Valpoi', 'Canacona'
+    ],
+    'Gujarat': [
+      'Ahmedabad', 'Surat', 'Vadodara', 'Rajkot', 'Bhavnagar',
+      'Jamnagar', 'Junagadh', 'Gandhinagar', 'Anand', 'Navsari'
+    ],
+    'Haryana': [
+      'Gurgaon', 'Faridabad', 'Panipat', 'Ambala', 'Yamunanagar',
+      'Rohtak', 'Hisar', 'Karnal', 'Sonipat', 'Panchkula'
+    ],
+    'Himachal Pradesh': [
+      'Shimla', 'Dharamshala', 'Solan', 'Mandi', 'Palampur',
+      'Kullu', 'Chamba', 'Una', 'Nahan', 'Baddi'
+    ],
+    'Jharkhand': [
+      'Ranchi', 'Jamshedpur', 'Dhanbad', 'Bokaro', 'Deoghar',
+      'Phusro', 'Hazaribagh', 'Giridih', 'Ramgarh', 'Medininagar'
+    ],
+    'Karnataka': [
+      'Bangalore', 'Mysore', 'Hubli', 'Mangalore', 'Belgaum',
+      'Gulbarga', 'Davanagere', 'Bellary', 'Bijapur', 'Shimoga'
+    ],
+    'Kerala': [
+      'Thiruvananthapuram', 'Kochi', 'Kozhikode', 'Thrissur', 'Kollam',
+      'Palakkad', 'Alappuzha', 'Malappuram', 'Kannur', 'Kasaragod'
+    ],
+    'Madhya Pradesh': [
+      'Bhopal', 'Indore', 'Gwalior', 'Jabalpur', 'Ujjain',
+      'Sagar', 'Dewas', 'Satna', 'Ratlam', 'Rewa'
+    ],
+    'Maharashtra': [
+      'Mumbai', 'Pune', 'Nagpur', 'Thane', 'Nashik',
+      'Aurangabad', 'Solapur', 'Amravati', 'Kolhapur', 'Sangli'
+    ],
+    'Manipur': [
+      'Imphal', 'Thoubal', 'Bishnupur', 'Churachandpur', 'Senapati',
+      'Tamenglong', 'Chandel', 'Ukhrul', 'Kangpokpi', 'Jiribam'
+    ],
+    'Meghalaya': [
+      'Shillong', 'Tura', 'Jowai', 'Nongstoin', 'Baghmara',
+      'Williamnagar', 'Resubelpara', 'Mairang', 'Mawkyrwat', 'Amlarem'
+    ],
+    'Mizoram': [
+      'Aizawl', 'Lunglei', 'Saiha', 'Champhai', 'Kolasib',
+      'Serchhip', 'Lawngtlai', 'Mamit', 'Saitual', 'Khawzawl'
+    ],
+    'Nagaland': [
+      'Kohima', 'Dimapur', 'Mokokchung', 'Tuensang', 'Wokha',
+      'Zunheboto', 'Phek', 'Mon', 'Longleng', 'Peren'
+    ],
+    'Odisha': [
+      'Bhubaneswar', 'Cuttack', 'Rourkela', 'Berhampur', 'Sambalpur',
+      'Puri', 'Balasore', 'Bhadrak', 'Baripada', 'Jharsuguda'
+    ],
+    'Punjab': [
+      'Ludhiana', 'Amritsar', 'Jalandhar', 'Patiala', 'Bathinda',
+      'Mohali', 'Firozpur', 'Batala', 'Pathankot', 'Moga'
+    ],
+    'Rajasthan': [
+      'Jaipur', 'Jodhpur', 'Udaipur', 'Kota', 'Bikaner',
+      'Ajmer', 'Bharatpur', 'Alwar', 'Sikar', 'Pali'
+    ],
+    'Sikkim': [
+      'Gangtok', 'Namchi', 'Mangan', 'Gyalshing', 'Ravangla',
+      'Singtam', 'Rangpo', 'Jorethang', 'Pakyong', 'Soreng'
+    ],
+    'Tamil Nadu': [
+      'Chennai', 'Coimbatore', 'Madurai', 'Tiruchirappalli', 'Salem',
+      'Tirunelveli', 'Tiruppur', 'Erode', 'Vellore', 'Thoothukkudi'
+    ],
+    'Telangana': [
+      'Hyderabad', 'Warangal', 'Nizamabad', 'Khammam', 'Karimnagar',
+      'Ramagundam', 'Mahbubnagar', 'Nalgonda', 'Adilabad', 'Suryapet'
+    ],
+    'Tripura': [
+      'Agartala', 'Dharmanagar', 'Udaipur', 'Ambassa', 'Kailasahar',
+      'Belonia', 'Khowai', 'Teliamura', 'Sabroom', 'Kamalpur'
+    ],
+    'Uttar Pradesh': [
+      'Lucknow', 'Kanpur', 'Ghaziabad', 'Agra', 'Meerut',
+      'Varanasi', 'Allahabad', 'Bareilly', 'Aligarh', 'Moradabad'
+    ],
+    'Uttarakhand': [
+      'Dehradun', 'Haridwar', 'Roorkee', 'Rudrapur', 'Kashipur',
+      'Haldwani', 'Rishikesh', 'Ramnagar', 'Pithoragarh', 'Srinagar'
+    ],
+    'West Bengal': [
+      'Kolkata', 'Asansol', 'Siliguri', 'Durgapur', 'Bardhaman',
+      'Malda', 'Bahraich', 'Habra', 'Kharagpur', 'Shantipur'
+    ],
+    'Andaman and Nicobar Islands': [
+      'Port Blair', 'Diglipur', 'Mayabunder', 'Rangat', 'Car Nicobar'
+    ],
+    'Chandigarh': [
+      'Chandigarh', 'Manimajra', 'Daria', 'Kaimbwala', 'Korakpur'
+    ],
+    'Dadra and Nagar Haveli and Daman and Diu': [
+      'Silvassa', 'Daman', 'Diu', 'Naroli', 'Amli'
+    ],
+    'Delhi': [
+      'New Delhi', 'Central Delhi', 'East Delhi', 'North Delhi', 'North East Delhi',
+      'North West Delhi', 'Shahdara', 'South Delhi', 'South East Delhi', 'South West Delhi',
+      'West Delhi'
+    ],
+    'Jammu and Kashmir': [
+      'Srinagar', 'Jammu', 'Anantnag', 'Baramulla', 'Sopore',
+      'Kathua', 'Udhampur', 'Rajauri', 'Poonch', 'Kupwara'
+    ],
+    'Ladakh': [
+      'Leh', 'Kargil', 'Drass', 'Nubra', 'Zanskar'
+    ],
+    'Lakshadweep': [
+      'Kavaratti', 'Agatti', 'Amini', 'Andrott', 'Bitra'
+    ],
+    'Puducherry': [
+      'Puducherry', 'Karaikal', 'Mahe', 'Yanam'
+    ]
+  };
+
+  // Available cities based on selected state
+  availableCities: string[] = [];
+
+  constructor(
+    private fb: FormBuilder, 
+    @Inject(PLATFORM_ID) private platformId: Object,
+    private http: HttpClient
+  ) {}
 
   ngOnInit(): void {
     this.form = this.fb.group({
@@ -64,6 +257,23 @@ export class Createaccount implements OnInit {
       password: ['', [Validators.required, Validators.minLength(6)]],
       confirmPassword: ['', [Validators.required]]
     }, { validators: this.passwordsMatchValidator });
+
+    // Listen for state changes to update cities
+    this.form.get('state')?.valueChanges.subscribe(selectedState => {
+      this.onStateChange(selectedState);
+    });
+  }
+
+  // Handle state selection change
+  onStateChange(selectedState: string) {
+    if (selectedState && this.citiesByState[selectedState]) {
+      this.availableCities = this.citiesByState[selectedState];
+      // Reset city selection when state changes
+      this.form.get('city')?.setValue('');
+    } else {
+      this.availableCities = [];
+      this.form.get('city')?.setValue('');
+    }
   }
 
   // --- Custom validators ---
@@ -83,7 +293,68 @@ export class Createaccount implements OnInit {
   aadharValidator(control: AbstractControl): ValidationErrors | null {
     const val = control.value || '';
     if (!val) return null;
-    return this.aadharRegex.test(val) ? null : { invalidAadhar: true };
+    
+    // Basic format check
+    if (!this.aadharRegex.test(val)) {
+      console.log('Aadhaar format check failed for:', val);
+      return { invalidAadhar: true };
+    }
+    
+    // Mathematical validation using Verhoeff algorithm
+    const isValid = this.isValidAadhaarNumber(val);
+    console.log('Aadhaar checksum validation for', val, ':', isValid);
+    
+    if (!isValid) {
+      return { invalidAadharChecksum: true };
+    }
+    
+    return null;
+  }
+
+  // Verhoeff algorithm for Aadhaar validation
+  private isValidAadhaarNumber(aadhaar: string): boolean {
+    // Remove any spaces or special characters
+    const cleanAadhaar = aadhaar.replace(/\D/g, '');
+    
+    // Check if it's exactly 12 digits
+    if (cleanAadhaar.length !== 12) {
+      return false;
+    }
+    
+    // Verhoeff algorithm implementation
+    const multiplication = [
+      [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+      [1, 2, 3, 4, 0, 6, 7, 8, 9, 5],
+      [2, 3, 4, 0, 1, 7, 8, 9, 5, 6],
+      [3, 4, 0, 1, 2, 8, 9, 5, 6, 7],
+      [4, 0, 1, 2, 3, 9, 5, 6, 7, 8],
+      [5, 9, 8, 7, 6, 0, 4, 3, 2, 1],
+      [6, 5, 9, 8, 7, 1, 0, 4, 3, 2],
+      [7, 6, 5, 9, 8, 2, 1, 0, 4, 3],
+      [8, 7, 6, 5, 9, 3, 2, 1, 0, 4],
+      [9, 8, 7, 6, 5, 4, 3, 2, 1, 0]
+    ];
+    
+    const permutation = [
+      [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+      [1, 5, 7, 6, 2, 8, 3, 0, 9, 4],
+      [5, 8, 0, 3, 7, 9, 6, 1, 4, 2],
+      [8, 9, 1, 6, 0, 4, 3, 5, 2, 7],
+      [9, 4, 5, 3, 1, 2, 6, 8, 7, 0],
+      [4, 2, 8, 6, 5, 7, 3, 9, 0, 1],
+      [2, 7, 9, 3, 8, 0, 6, 4, 1, 5],
+      [7, 0, 4, 6, 9, 1, 3, 2, 5, 8]
+    ];
+    
+    let checksum = 0;
+    const digits = cleanAadhaar.split('').map(Number);
+    
+    // Process digits from right to left
+    for (let i = 0; i < digits.length; i++) {
+      checksum = multiplication[checksum][permutation[i % 8][digits[digits.length - 1 - i]]];
+    }
+    
+    return checksum === 0;
   }
 
   mobileValidator(control: AbstractControl): ValidationErrors | null {
@@ -148,19 +419,75 @@ export class Createaccount implements OnInit {
     this.submitted = true;
     this.submitError = '';
     this.successMessage = '';
+    this.loading = true;
 
     if (this.form.invalid) {
       this.submitError = 'Please fix validation errors before submitting.';
+      this.loading = false;
       return;
     }
 
     const val = this.form.value;
-    const dup = this.isDuplicate(val.pan, val.aadhar, val.email);
-    if (dup.duplicate) {
-      this.submitError = dup.message || 'Duplicate identifier found.';
-      return;
-    }
+    
+    // Create user object for backend with proper structure
+    const userData = {
+      username: val.email.toLowerCase(), // Use email as username
+      email: val.email.toLowerCase(),
+      password: val.password,
+      status: 'PENDING',
+      account: {
+        name: val.name,
+        dob: val.dob,
+        age: new Date().getFullYear() - new Date(val.dob).getFullYear(),
+        occupation: val.occupation,
+        accountType: 'Savings',
+        aadharNumber: val.aadhar,
+        pan: val.pan.toUpperCase(),
+        income: Number(val.income),
+        phone: val.mobile,
+        address: `${val.city}, ${val.state}`,
+        balance: 0.0,
+        verifiedMatrix: false,
+        kycVerified: false
+      }
+    };
 
+    // Submit to backend using HttpClient directly
+    this.http.post('http://localhost:8080/api/users/create', userData).subscribe({
+      next: (response: any) => {
+        console.log('User created successfully in MySQL:', response);
+        
+        if (response.success) {
+          this.successMessage = response.message || 'Account request submitted successfully! Admin will review and approve your account.';
+          this.form.reset();
+          this.submitted = false;
+          this.loading = false;
+          
+          // Also save to localStorage as backup
+          this.submitToLocalStorage(val);
+        } else {
+          this.submitError = response.message || 'Failed to submit account request. Please try again.';
+          this.loading = false;
+        }
+      },
+      error: (err: any) => {
+        console.error('Error creating user:', err);
+        
+        // Try to parse error response
+        if (err.error && err.error.message) {
+          this.submitError = err.error.message;
+        } else {
+          this.submitError = 'Failed to submit account request. Please try again.';
+        }
+        this.loading = false;
+        
+        // Fallback to localStorage
+        this.submitToLocalStorage(val);
+      }
+    });
+  }
+
+  submitToLocalStorage(val: any) {
     const tempId = 'TMP-' + Date.now();
     const pending: PendingAccount = {
       id: tempId,
@@ -195,6 +522,7 @@ export class Createaccount implements OnInit {
     
     this.form.reset();
     this.submitted = false;
+    this.loading = false;
   }
 
   // Approval tracking methods

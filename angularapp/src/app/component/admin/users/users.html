@@ -67,6 +67,19 @@
     </tbody>
   </table>
 
+  <!-- Test Card Creation Buttons -->
+  <div class="test-section">
+    <button (click)="createCardManually()" class="test-card-btn">
+      🧪 Test Card Creation (for approved users)
+    </button>
+    <button (click)="createCardDirectly()" class="test-card-btn direct-btn">
+      🎯 Create Card Directly (any user)
+    </button>
+    <button (click)="createCardForExistingUser()" class="test-card-btn existing-btn">
+      👤 Create Card for Existing User
+    </button>
+  </div>
+
   <!-- Instructions -->
   <div class="instructions">
     <h4>📋 Admin Instructions:</h4>
@@ -75,6 +88,7 @@
       <li><strong>KYC Status:</strong> Shows if user has submitted and status of their KYC verification</li>
       <li>Users can submit KYC after getting an account number</li>
       <li>KYC approval automatically updates user profile information</li>
+      <li><strong>Card Creation:</strong> Cards are automatically created when users are approved</li>
     </ul>
   </div>
 

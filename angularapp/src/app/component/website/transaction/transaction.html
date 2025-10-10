@@ -4,6 +4,17 @@
     <button type="button" (click)="cleanupDuplicateLoanTransactions()" class="cleanup-btn">🧹 Clean Duplicates</button>
   </div>
 
+  <!-- Loading State -->
+  <div *ngIf="loading" class="loading-overlay">
+    <div class="loading-spinner"></div>
+    <p>Loading transactions...</p>
+  </div>
+
+  <!-- Error State -->
+  <div *ngIf="error && !loading" class="error-message">
+    <p>{{ error }}</p>
+  </div>
+
   <h2>User Transactions</h2>
 
   <!-- Transaction Form -->

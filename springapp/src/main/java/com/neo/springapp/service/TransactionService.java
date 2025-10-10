@@ -26,6 +26,18 @@ public class TransactionService {
         return transactionRepository.save(txn);
     }
 
+    // Create transfer transaction
+    public Transaction createTransferTransaction(String accountNumber, String description, Double amount, String type, Double balance) {
+        Transaction transaction = new Transaction();
+        transaction.setAccountNumber(accountNumber);
+        transaction.setDescription(description);
+        transaction.setAmount(amount);
+        transaction.setType(type);
+        transaction.setBalance(balance);
+        transaction.setDate(LocalDateTime.now());
+        return saveTransaction(transaction);
+    }
+
     // Get all transactions with pagination and sorting
     public Page<Transaction> getAllTransactions(int page, int size, String sortBy, String sortDir) {
         Sort sort = sortDir.equalsIgnoreCase("desc") ? Sort.by(sortBy).descending() : Sort.by(sortBy).ascending();

@@ -2,12 +2,16 @@ package com.neo.springapp.controller;
 
 import com.neo.springapp.model.TransferRecord;
 import com.neo.springapp.service.TransferService;
+import com.neo.springapp.service.AccountService;
+import com.neo.springapp.service.TransactionService;
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
 
 @RestController
 @RequestMapping("/api/transfers")
@@ -15,16 +19,99 @@ import java.util.List;
 public class TransferController {
 
     private final TransferService transferService;
+    private final AccountService accountService;
+    private final TransactionService transactionService;
 
-    public TransferController(TransferService transferService) {
+    public TransferController(TransferService transferService, AccountService accountService, TransactionService transactionService) {
         this.transferService = transferService;
+        this.accountService = accountService;
+        this.transactionService = transactionService;
     }
 
     // Create new transfer
     @PostMapping
-    public ResponseEntity<TransferRecord> createTransfer(@RequestBody TransferRecord transfer) {
-        TransferRecord saved = transferService.saveTransfer(transfer);
-        return ResponseEntity.ok(saved);
+    public ResponseEntity<Map<String, Object>> createTransfer(@RequestBody Map<String, Object> transferData) {
+        try {
+            // Extract transfer data
+            String senderAccountNumber = (String) transferData.get("senderAccountNumber");
+            String recipientAccountNumber = (String) transferData.get("recipientAccountNumber");
+            String recipientName = (String) transferData.get("recipientName");
+            String phone = (String) transferData.get("phone");
+            String ifsc = (String) transferData.get("ifsc");
+            Double amount = Double.valueOf(transferData.get("amount").toString());
+            String transferType = (String) transferData.get("transferType");
+            String description = (String) transferData.get("description");
+
+            // Validate transfer data
+            if (senderAccountNumber == null || recipientAccountNumber == null || amount == null || amount <= 0) {
+                Map<String, Object> errorResponse = new HashMap<>();
+                errorResponse.put("error", "Invalid transfer data");
+                return ResponseEntity.badRequest().body(errorResponse);
+            }
+
+            // Check sender account balance
+            Double currentBalance = accountService.getBalanceByAccountNumber(senderAccountNumber);
+            if (currentBalance == null || currentBalance < amount) {
+                Map<String, Object> errorResponse = new HashMap<>();
+                errorResponse.put("error", "Insufficient balance");
+                errorResponse.put("currentBalance", currentBalance);
+                return ResponseEntity.badRequest().body(errorResponse);
+            }
+
+            // Create transfer record
+            TransferRecord transfer = new TransferRecord();
+            transfer.setSenderAccountNumber(senderAccountNumber);
+            transfer.setRecipientAccountNumber(recipientAccountNumber);
+            transfer.setRecipientName(recipientName);
+            transfer.setPhone(phone);
+            transfer.setIfsc(ifsc);
+            transfer.setAmount(amount);
+            transfer.setTransferType(TransferRecord.TransferType.valueOf(transferType));
+            transfer.setStatus("Completed");
+            transfer.setDate(LocalDateTime.now());
+
+            // Save transfer
+            TransferRecord savedTransfer = transferService.saveTransfer(transfer);
+
+            // Update sender account balance (debit)
+            Double newBalance = accountService.debitBalance(senderAccountNumber, amount);
+
+            // Create transaction record for sender
+            transactionService.createTransferTransaction(
+                senderAccountNumber, 
+                description, 
+                amount, 
+                "Debit", 
+                newBalance
+            );
+
+            // Update recipient account balance (credit) if account exists
+            Double recipientBalance = accountService.getBalanceByAccountNumber(recipientAccountNumber);
+            if (recipientBalance != null) {
+                Double newRecipientBalance = accountService.creditBalance(recipientAccountNumber, amount);
+                transactionService.createTransferTransaction(
+                    recipientAccountNumber, 
+                    "Transfer received from " + senderAccountNumber, 
+                    amount, 
+                    "Credit", 
+                    newRecipientBalance
+                );
+            }
+
+            // Prepare response
+            Map<String, Object> response = new HashMap<>();
+            response.put("id", savedTransfer.getId());
+            response.put("transfer", savedTransfer);
+            response.put("newBalance", newBalance);
+            response.put("message", "Transfer completed successfully");
+
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("error", "Transfer failed: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(errorResponse);
+        }
     }
 
     // Get all transfers with pagination and sorting
@@ -35,6 +122,37 @@ public class TransferController {
             @RequestParam(defaultValue = "date") String sortBy,
             @RequestParam(defaultValue = "desc") String sortDir) {
         return transferService.getAllTransfers(page, size, sortBy, sortDir);
+    }
+
+    // Enhanced search functionality
+    @GetMapping("/search")
+    public Page<TransferRecord> searchTransfers(
+            @RequestParam String searchTerm,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        return transferService.searchTransfers(searchTerm, page, size);
+    }
+
+    // Advanced filtering with multiple criteria
+    @GetMapping("/filter")
+    public Page<TransferRecord> findTransfersWithFilters(
+            @RequestParam(required = false) String senderAccountNumber,
+            @RequestParam(required = false) String recipientAccountNumber,
+            @RequestParam(required = false) TransferRecord.TransferType transferType,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) Double minAmount,
+            @RequestParam(required = false) Double maxAmount,
+            @RequestParam(required = false) String startDate,
+            @RequestParam(required = false) String endDate,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        
+        LocalDateTime start = startDate != null ? LocalDateTime.parse(startDate) : null;
+        LocalDateTime end = endDate != null ? LocalDateTime.parse(endDate) : null;
+        
+        return transferService.findTransfersWithFilters(
+                senderAccountNumber, recipientAccountNumber, transferType, status,
+                minAmount, maxAmount, start, end, page, size);
     }
 
     // Get transfers by sender account number with pagination
@@ -122,6 +240,67 @@ public class TransferController {
         return transferService.getTransfersByIfsc(ifsc, page, size);
     }
 
+    // Statistics endpoints
+    @GetMapping("/statistics")
+    public Map<String, Object> getTransferStatistics() {
+        return transferService.getTransferStatistics();
+    }
+
+    @GetMapping("/statistics/account/{accountNumber}")
+    public Map<String, Object> getTransferStatisticsByAccount(@PathVariable String accountNumber) {
+        return transferService.getTransferStatisticsByAccount(accountNumber);
+    }
+
+    @GetMapping("/statistics/date-range")
+    public Map<String, Object> getTransferStatisticsByDateRange(
+            @RequestParam String startDate,
+            @RequestParam String endDate) {
+        LocalDateTime start = LocalDateTime.parse(startDate);
+        LocalDateTime end = LocalDateTime.parse(endDate);
+        return transferService.getTransferStatisticsByDateRange(start, end);
+    }
+
+    // Analytics endpoints
+    @GetMapping("/analytics/volume-by-month")
+    public List<Object[]> getTransferVolumeByMonth() {
+        return transferService.getTransferVolumeByMonth();
+    }
+
+    @GetMapping("/analytics/top-recipients/{accountNumber}")
+    public List<Object[]> getTopRecipientsBySender(
+            @PathVariable String accountNumber,
+            @RequestParam(defaultValue = "10") int limit) {
+        return transferService.getTopRecipientsBySender(accountNumber, limit);
+    }
+
+    // Recent transfers for dashboard
+    @GetMapping("/recent/sender/{accountNumber}")
+    public List<TransferRecord> getRecentTransfersBySender(
+            @PathVariable String accountNumber,
+            @RequestParam(defaultValue = "5") int limit) {
+        return transferService.getRecentTransfersBySender(accountNumber, limit);
+    }
+
+    @GetMapping("/recent/recipient/{accountNumber}")
+    public List<TransferRecord> getRecentTransfersByRecipient(
+            @PathVariable String accountNumber,
+            @RequestParam(defaultValue = "5") int limit) {
+        return transferService.getRecentTransfersByRecipient(accountNumber, limit);
+    }
+
+    // Processing endpoints
+    @GetMapping("/pending")
+    public List<TransferRecord> getPendingTransfersForProcessing(
+            @RequestParam(defaultValue = "10") int limit) {
+        return transferService.getPendingTransfersForProcessing(limit);
+    }
+
+    @GetMapping("/failed")
+    public List<TransferRecord> getFailedTransfersForRetry(
+            @RequestParam(defaultValue = "10") int limit) {
+        return transferService.getFailedTransfersForRetry(limit);
+    }
+
     // Get transfer summary by sender account
     @GetMapping("/summary/{accountNumber}")
     public Object[] getTransferSummary(@PathVariable String accountNumber) {
@@ -152,6 +331,31 @@ public class TransferController {
             return ResponseEntity.ok(updatedTransfer);
         }
         return ResponseEntity.notFound().build();
+    }
+
+    // Process transfer
+    @PutMapping("/{id}/process")
+    public ResponseEntity<TransferRecord> processTransfer(
+            @PathVariable Long id,
+            @RequestParam String status,
+            @RequestParam(required = false) String processedBy) {
+        TransferRecord updatedTransfer = transferService.processTransfer(id, status, processedBy);
+        if (updatedTransfer != null) {
+            return ResponseEntity.ok(updatedTransfer);
+        }
+        return ResponseEntity.notFound().build();
+    }
+
+    // Validate transfer amount
+    @PostMapping("/validate-amount")
+    public ResponseEntity<Map<String, Object>> validateTransferAmount(
+            @RequestParam Double amount,
+            @RequestParam Double availableBalance) {
+        Map<String, Object> response = new java.util.HashMap<>();
+        boolean isValid = transferService.validateTransferAmount(amount, availableBalance);
+        response.put("valid", isValid);
+        response.put("message", isValid ? "Amount is valid" : "Amount exceeds available balance");
+        return ResponseEntity.ok(response);
     }
 
     // Delete transfer

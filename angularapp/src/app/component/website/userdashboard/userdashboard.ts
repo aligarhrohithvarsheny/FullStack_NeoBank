@@ -1,6 +1,10 @@
 import { Component, OnInit, Inject, PLATFORM_ID } from '@angular/core';
 import { Router } from '@angular/router';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
+import { HttpClient } from '@angular/common/http';
+// import { UserService } from '../../service/user';
+// import { AccountService } from '../../service/account';
+// import { TransactionService } from '../../service/transaction';
 
 @Component({
   selector: 'app-userdashboard',
@@ -12,10 +16,20 @@ import { CommonModule, isPlatformBrowser } from '@angular/common';
 export class Userdashboard implements OnInit {
   username: string = 'User'; // default
   selectedFeature: string | null = null;
-  currentBalance: number = 50000;
-  userAccountNumber: string = 'ACC001';
+  currentBalance: number = 0;
+  userAccountNumber: string = '';
+  loading: boolean = false;
+  error: string = '';
+  userProfile: any = null;
 
-  constructor(private router: Router, @Inject(PLATFORM_ID) private platformId: Object) {
+  constructor(
+    private router: Router, 
+    @Inject(PLATFORM_ID) private platformId: Object,
+    private http: HttpClient
+    // private userService: UserService,
+    // private accountService: AccountService,
+    // private transactionService: TransactionService
+  ) {
     const nav = this.router.getCurrentNavigation();
     if (nav?.extras?.state && nav.extras.state['username']) {
       this.username = nav.extras.state['username'];
@@ -24,32 +38,88 @@ export class Userdashboard implements OnInit {
 
   ngOnInit() {
     this.loadUserProfile();
-    this.loadCurrentBalance();
   }
 
   loadUserProfile() {
     if (!isPlatformBrowser(this.platformId)) return;
     
-    // Load user profile from localStorage
-    const savedProfile = localStorage.getItem('user_profile');
-    if (savedProfile) {
-      const profile = JSON.parse(savedProfile);
-      this.username = profile.name || 'User';
-      this.userAccountNumber = profile.accountNumber || 'ACC001';
+    this.loading = true;
+    this.error = '';
+    
+    // Get user session from sessionStorage (MySQL-based authentication)
+    const currentUser = sessionStorage.getItem('currentUser');
+    if (currentUser) {
+      const user = JSON.parse(currentUser);
+      this.username = user.name;
+      this.userAccountNumber = user.accountNumber;
+      
+      // Load user profile and balance from MySQL database
+      this.loadUserDataFromMySQL(user.id);
+    } else {
+      // Try to get user from localStorage as fallback
+      const savedProfile = localStorage.getItem('user_profile');
+      if (savedProfile) {
+        const profile = JSON.parse(savedProfile);
+        this.username = profile.name || 'User';
+        this.userAccountNumber = profile.accountNumber || 'ACC001';
+        this.currentBalance = 0;
+        this.loading = false;
+        console.log('Using fallback profile from localStorage');
+      } else {
+        // No session found - use default values to avoid errors
+        this.username = 'User';
+        this.userAccountNumber = 'ACC001';
+        this.currentBalance = 0;
+        this.loading = false;
+        console.log('Using default values - no session found');
+      }
     }
   }
 
-  loadCurrentBalance() {
-    if (!isPlatformBrowser(this.platformId)) return;
-    
-    // Load current balance from transactions
-    const userTransactions = localStorage.getItem(`user_transactions_${this.userAccountNumber}`);
-    if (userTransactions) {
-      const transactions = JSON.parse(userTransactions);
-      if (transactions.length > 0) {
-        this.currentBalance = transactions[0].balance;
+  loadUserDataFromMySQL(userId: string) {
+    // Load user data from MySQL database
+    this.http.get(`http://localhost:8080/api/users/${userId}`).subscribe({
+      next: (userData: any) => {
+        console.log('User data loaded from MySQL:', userData);
+        
+        this.userProfile = userData;
+        this.username = userData.account?.name || userData.username || 'User';
+        this.userAccountNumber = userData.accountNumber || 'ACC001';
+        
+        // Load current balance from MySQL
+        this.loadCurrentBalanceFromMySQL();
+      },
+      error: (err: any) => {
+        console.error('Error loading user data from MySQL:', err);
+        // Use default values instead of showing error
+        this.username = 'User';
+        this.userAccountNumber = 'ACC001';
+        this.currentBalance = 0;
+        this.loading = false;
       }
+    });
+  }
+
+  loadCurrentBalanceFromMySQL() {
+    if (!this.userAccountNumber) {
+      this.loading = false;
+      return;
     }
+    
+    // Load current balance from MySQL database
+    this.http.get(`http://localhost:8080/api/accounts/balance/${this.userAccountNumber}`).subscribe({
+      next: (balanceData: any) => {
+        console.log('Balance loaded from MySQL:', balanceData);
+        this.currentBalance = balanceData.balance || 0;
+        this.loading = false;
+      },
+      error: (err: any) => {
+        console.error('Error loading balance from MySQL:', err);
+        // Fallback to user profile balance
+        this.currentBalance = this.userProfile?.account?.balance || 0;
+        this.loading = false;
+      }
+    });
   }
 
   selectFeature(feature: string) {
@@ -101,5 +171,11 @@ export class Userdashboard implements OnInit {
       'loan': '💰'
     };
     return icons[this.selectedFeature || ''] || '';
+  }
+
+  // Refresh user data (useful for real-time updates)
+  refreshUserData() {
+    console.log('Refreshing user data...');
+    this.loadUserProfile();
   }
 }

@@ -7,7 +7,7 @@
           <div class="phone-screen">
             <div class="app-header">
               <div class="app-logo">NeoBank</div>
-              <div class="app-status">Mobile Banking</div>
+              <div class="app-status">Internet Banking</div>
             </div>
             <div class="app-content">
               <div class="welcome-message">Hi, Welcome!</div>
@@ -35,22 +35,22 @@
       </div>
       
       <div class="promotional-text">
-        <h1>Pay, Save, Borrow & Invest money with a single bank</h1>
+        <h1>Pay, Save, Borrow  money with a single bank</h1>
         <p>Login to experience the new world of banking</p>
         
         <div class="app-download-buttons">
           <button class="download-btn google-play">
             <span class="download-icon">📱</span>
             <div class="download-text">
-              <span class="download-label">GET IT ON</span>
-              <span class="download-store">Google Play</span>
+              <span class="download-label">Get It On</span>
+              <span class="download-store">Chrome Web </span>
             </div>
           </button>
           <button class="download-btn app-store">
             <span class="download-icon">🍎</span>
             <div class="download-text">
-              <span class="download-label">Download on the</span>
-              <span class="download-store">App Store</span>
+              <span class="download-label">Get It On</span>
+              <span class="download-store">Safari</span>
             </div>
           </button>
         </div>
@@ -119,32 +119,21 @@
       <!-- Login Form -->
       <div *ngIf="currentPage === 'login'" class="form-content">
         <div class="login-options">
-          <button class="login-option active">User/Cust ID</button>
-        </div>
-
-        <div class="virtual-keyboard-section">
-          <button class="virtual-keyboard-btn">
-            <span class="keyboard-icon">⌨️</span>
-            Use Virtual Keyboard
-          </button>
+          <button class="login-option active">USER/GMAIL ID</button>
         </div>
 
         <form (ngSubmit)="login()" class="login-form">
           <div class="input-group">
-            <label>User ID / Customer ID</label>
-            <input type="text" [(ngModel)]="loginUserId" name="loginUserId" placeholder="Enter User ID" required />
-            <div class="input-help">
-              <span class="help-text">User ID is case sensitive</span>
-              <div class="help-links">
-                <a href="#" class="help-link">Forgot User ID?</a>
-                <a href="#" class="help-link">Block User ID?</a>
-              </div>
-            </div>
+            <label>USERID/GMAILID</label>
+            <input type="text" [(ngModel)]="loginUserId" name="loginUserId" placeholder="Enter an User or Gmail ID" required />
           </div>
 
           <div class="input-group">
             <label>Password</label>
             <input type="password" [(ngModel)]="loginPassword" name="loginPassword" placeholder="Enter Password" required />
+            <div class="forgot-password-link">
+              <a href="javascript:void(0)" (click)="showForgotPasswordModal()" class="forgot-link">Forgot Password?</a>
+            </div>
           </div>
 
           <div class="input-group">
@@ -168,6 +157,27 @@
             Secure Login
           </button>
         </form>
+
+        <!-- Account Unlock Button -->
+        <div class="unlock-section" *ngIf="showUnlockButton">
+          <button type="button" class="unlock-account-btn" (click)="showUnlockModal = true">
+            <span class="unlock-icon">🔓</span>
+            Unlock Account
+          </button>
+          <p class="unlock-description">Account locked? Use your Aadhar and DOB to unlock.</p>
+        </div>
+
+        <!-- Error/Success Messages -->
+        <div class="message-section" *ngIf="errorMessage || successMessage">
+          <div class="error-message" *ngIf="errorMessage">
+            <span class="error-icon">⚠️</span>
+            {{ errorMessage }}
+          </div>
+          <div class="success-message" *ngIf="successMessage">
+            <span class="success-icon">✅</span>
+            {{ successMessage }}
+          </div>
+        </div>
 
         <div class="utility-links">
           <div class="utility-item">
@@ -228,6 +238,155 @@
 
         <div class="signup-footer">
           <p>Already have an account? <a href="#" (click)="switchToLogin()" class="login-link">Login here</a></p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Account Unlock Modal -->
+  <div class="modal-overlay" *ngIf="showUnlockModal" (click)="closeUnlockModal()">
+    <div class="unlock-modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3><span class="unlock-icon">🔓</span> Unlock Account</h3>
+        <button class="close-btn" (click)="closeUnlockModal()">×</button>
+      </div>
+      
+      <div class="modal-body">
+        <p class="unlock-instructions">
+          Your account has been locked due to multiple failed login attempts. 
+          To unlock your account, please provide the following information:
+        </p>
+        
+        <form (ngSubmit)="unlockAccount()" class="unlock-form">
+          <div class="input-group">
+            <label>Email Address</label>
+            <input type="email" [(ngModel)]="unlockEmail" name="unlockEmail" 
+                   placeholder="Enter your registered email" required />
+          </div>
+          
+          <div class="input-group">
+            <label>First 4 Digits of Aadhar Number</label>
+            <input type="text" [(ngModel)]="unlockAadharFirst4" name="unlockAadharFirst4" 
+                   placeholder="Enter first 4 digits" maxlength="4" pattern="[0-9]{4}" required />
+            <div class="input-help">
+              <span class="help-text">Enter only the first 4 digits of your Aadhar number</span>
+            </div>
+          </div>
+          
+          <div class="input-group">
+            <label>Date of Birth</label>
+            <input type="date" [(ngModel)]="unlockDob" name="unlockDob" required />
+            <div class="input-help">
+              <span class="help-text">Enter date of birth as registered in your account</span>
+            </div>
+          </div>
+          
+          <div class="unlock-actions">
+            <button type="button" class="cancel-btn" (click)="closeUnlockModal()">Cancel</button>
+            <button type="submit" class="unlock-submit-btn" [disabled]="unlockingAccount">
+              <span *ngIf="unlockingAccount" class="loading-icon">⏳</span>
+              <span *ngIf="!unlockingAccount" class="unlock-icon">🔓</span>
+              {{ unlockingAccount ? 'Unlocking...' : 'Unlock Account' }}
+            </button>
+          </div>
+        </form>
+        
+        <div class="unlock-footer">
+          <p class="security-note">
+            <span class="security-icon">🛡️</span>
+            Your information is secure and encrypted. We use this data only for account verification.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Forgot Password Modal -->
+  <div class="modal-overlay" *ngIf="showForgotPasswordModalFlag" (click)="closeForgotPasswordModal()">
+    <div class="modal-content forgot-password-modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>🔐 Reset Password</h3>
+        <button class="close-btn" (click)="closeForgotPasswordModal()">×</button>
+      </div>
+      
+      <div class="modal-body">
+        <!-- Success Screen -->
+        <div *ngIf="showResetSuccessScreen" class="success-screen">
+          <div class="success-icon-container">
+            <div class="success-icon">✅</div>
+          </div>
+          <h3 class="success-title">Password Reset Successful!</h3>
+          <p class="success-message">
+            Your password has been successfully reset. You can now login with your new password.
+          </p>
+          <div class="success-actions">
+            <button type="button" class="success-btn" (click)="closeSuccessScreen()">
+              <span class="login-icon">🔑</span>
+              Continue to Login
+            </button>
+          </div>
+        </div>
+
+        <!-- Reset Form -->
+        <div *ngIf="!showResetSuccessScreen">
+          <p class="instruction-text">
+            Enter your email and first 4 digits of your Aadhar number to reset your password.
+          </p>
+          
+          <form (ngSubmit)="resetPassword()" class="reset-form">
+            <div class="form-row">
+              <div class="input-group">
+                <label>Email Address</label>
+                <input type="email" [(ngModel)]="resetEmail" name="resetEmail" placeholder="Enter your email address" required />
+              </div>
+            </div>
+            
+            <div class="form-row">
+              <div class="input-group">
+                <label>First 4 digits of Aadhar Number</label>
+                <input type="text" [(ngModel)]="resetAadharFirst4" name="resetAadharFirst4" placeholder="Enter first 4 digits" maxlength="4" pattern="[0-9]{4}" required />
+                <div class="input-help">
+                  <span class="help-text">Enter only the first 4 digits of your 12-digit Aadhar number</span>
+                </div>
+              </div>
+            </div>
+            
+            <div class="form-row">
+              <div class="input-group">
+                <label>New Password</label>
+                <input type="password" [(ngModel)]="newPassword" name="newPassword" placeholder="Enter new password" required />
+              </div>
+            </div>
+            
+            <div class="form-row">
+              <div class="input-group">
+                <label>Confirm New Password</label>
+                <input type="password" [(ngModel)]="confirmNewPassword" name="confirmNewPassword" placeholder="Confirm new password" required />
+              </div>
+            </div>
+            
+            <!-- Error Message -->
+            <div *ngIf="errorMessage" class="error-message">
+              <span class="error-icon">❌</span>
+              {{ errorMessage }}
+            </div>
+            
+            <div class="modal-actions">
+              <button type="button" class="cancel-btn" (click)="closeForgotPasswordModal()">Cancel</button>
+              <button type="submit" class="reset-submit-btn" [disabled]="resettingPassword">
+                <span *ngIf="resettingPassword" class="loading-icon">⏳</span>
+                <span *ngIf="!resettingPassword" class="reset-icon">🔄</span>
+                {{ resettingPassword ? 'Resetting...' : 'Reset Password' }}
+              </button>
+            </div>
+          </form>
+        </div>
+        
+        <div class="reset-footer">
+          <p class="security-note">
+            <span class="security-icon">🛡️</span>
+            Your information is secure and encrypted. We use this data only for password reset verification.
+          </p>
         </div>
       </div>
     </div>

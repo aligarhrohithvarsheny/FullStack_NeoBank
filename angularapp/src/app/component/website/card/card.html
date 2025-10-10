@@ -1,6 +1,7 @@
 <section>
   <div class="back-button">
     <button (click)="goBack()">⬅ Back to Dashboard</button>
+    <button (click)="refreshCardData()" class="refresh-btn">Refresh Card Data</button>
   </div>
 
   <!-- User Info Display -->
@@ -13,7 +14,7 @@
 
   <!-- Card Display -->
   <div *ngIf="card" class="card-container">
-    <div class="card" [ngClass]="statusClass">
+    <div class="card" [ngClass]="statusClass" [class.flipped]="isCardFlipped" (click)="flipCard()">
       <!-- Front view -->
       <div class="view front">
         <div class="debit">{{ card.cardType }} Card</div>
@@ -62,6 +63,9 @@
         <div class="detail-item">
           <span class="label">CVV:</span>
           <span class="value">{{ maskedCVV }}</span>
+          <button (click)="toggleCVV()" class="cvv-toggle-btn">
+            {{ showCVV ? 'Hide CVV' : 'Show CVV' }}
+          </button>
         </div>
         <div class="detail-item">
           <span class="label">Status:</span>
@@ -96,6 +100,10 @@
         {{ card?.pinSet ? 'PIN Already Set' : 'Set PIN' }}
       </button>
       
+      <button *ngIf="card?.pinSet" (click)="toggleForgotPinForm()" class="forgot-pin-btn">
+        Forgot PIN
+      </button>
+      
       <div *ngIf="showPinForm" class="pin-form">
         <input 
           type="password" 
@@ -106,6 +114,22 @@
         >
         <button (click)="setPin()" class="set-pin-btn">Set PIN</button>
         <button (click)="togglePinForm()" class="cancel-btn">Cancel</button>
+      </div>
+
+      <div *ngIf="showForgotPinForm" class="forgot-pin-form">
+        <h5>🔐 Reset Your PIN</h5>
+        <p class="forgot-pin-info">Enter a new 4-digit PIN to replace your current PIN.</p>
+        <input 
+          type="password" 
+          placeholder="Enter new 4-digit PIN" 
+          [(ngModel)]="newPin" 
+          maxlength="4"
+          class="pin-input"
+        >
+        <div class="forgot-pin-actions">
+          <button (click)="resetPin()" class="reset-pin-btn">Reset PIN</button>
+          <button (click)="toggleForgotPinForm()" class="cancel-btn">Cancel</button>
+        </div>
       </div>
     </div>
 
@@ -167,6 +191,7 @@
     <h4>📋 Card Management Instructions:</h4>
     <ul>
       <li><strong>Set PIN:</strong> Create a 4-digit PIN for secure transactions</li>
+      <li><strong>Forgot PIN:</strong> Reset your PIN if you've forgotten it</li>
       <li><strong>Block Card:</strong> Temporarily disable your card (can be unblocked by admin)</li>
       <li><strong>Deactivate Card:</strong> Permanently disable your card</li>
       <li><strong>Replace Card:</strong> Request a new card if lost or damaged</li>

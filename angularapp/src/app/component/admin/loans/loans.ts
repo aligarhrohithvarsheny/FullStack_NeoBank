@@ -1,6 +1,7 @@
 import { CurrencyPipe, CommonModule, isPlatformBrowser } from '@angular/common';
 import { Component, OnInit, Inject, PLATFORM_ID } from '@angular/core';
 import { Router } from '@angular/router';
+import { HttpClient } from '@angular/common/http';
 
 interface LoanRequest {
   id: number;
@@ -26,7 +27,7 @@ interface LoanRequest {
   imports: [CurrencyPipe, CommonModule]
 })
 export class Loans implements OnInit {
-  constructor(private router: Router, @Inject(PLATFORM_ID) private platformId: Object) {}
+  constructor(private router: Router, @Inject(PLATFORM_ID) private platformId: Object, private http: HttpClient) {}
 
   loanRequests: LoanRequest[] = [];
   loading = false;
@@ -42,72 +43,54 @@ export class Loans implements OnInit {
     this.loading = true;
     console.log('Loading loan applications...');
     
-    // Load loans from localStorage
-    const savedLoans = localStorage.getItem('user_loans');
-    console.log('Saved loans from localStorage:', savedLoans);
-    
-    if (savedLoans) {
-      try {
-        this.loanRequests = JSON.parse(savedLoans);
-        console.log('Parsed loan requests:', this.loanRequests);
-      } catch (error) {
-        console.error('Error parsing saved loans:', error);
-        this.loanRequests = [];
-      }
-    } else {
-      console.log('No saved loans found, creating sample data...');
-      // Add some sample data if no loans exist
-      this.loanRequests = [
-        {
-          id: 1,
-          userName: 'John Doe',
-          userEmail: 'john.doe@example.com',
-          type: 'Personal Loan',
-          amount: 250000,
-          tenure: 24,
-          interestRate: 10.5,
-          status: 'Pending',
-          accountNumber: 'ACC001',
-          currentBalance: 50000,
-          loanAccountNumber: 'LOAN001',
-          applicationDate: new Date().toISOString()
-        },
-        {
-          id: 2,
-          userName: 'Jane Smith',
-          userEmail: 'jane.smith@example.com',
-          type: 'Home Loan',
-          amount: 1500000,
-          tenure: 120,
-          interestRate: 8.2,
-          status: 'Pending',
-          accountNumber: 'ACC002',
-          currentBalance: 75000,
-          loanAccountNumber: 'LOAN002',
-          applicationDate: new Date().toISOString()
-        },
-        {
-          id: 3,
-          userName: 'Mike Johnson',
-          userEmail: 'mike.johnson@example.com',
-          type: 'Car Loan',
-          amount: 800000,
-          tenure: 60,
-          interestRate: 9.5,
-          status: 'Approved',
-          accountNumber: 'ACC003',
-          currentBalance: 100000,
-          loanAccountNumber: 'LOAN003',
-          applicationDate: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
-          approvalDate: new Date().toISOString()
+    // Load loans from MySQL database
+    this.http.get('http://localhost:8080/api/loans').subscribe({
+      next: (loans: any) => {
+        console.log('Loans loaded from MySQL:', loans);
+        this.loanRequests = loans.map((loan: any) => ({
+          id: loan.id,
+          userName: loan.userName,
+          userEmail: loan.userEmail,
+          type: loan.type,
+          amount: loan.amount,
+          tenure: loan.tenure,
+          interestRate: loan.interestRate,
+          status: loan.status,
+          accountNumber: loan.accountNumber,
+          currentBalance: loan.currentBalance,
+          loanAccountNumber: loan.loanAccountNumber,
+          applicationDate: loan.applicationDate,
+          approvalDate: loan.approvalDate
+        }));
+        
+        // Also save to localStorage as backup
+        this.saveLoansToStorage();
+        this.loading = false;
+      },
+      error: (err: any) => {
+        console.error('Error loading loans from database:', err);
+        // Fallback to localStorage
+        const savedLoans = localStorage.getItem('user_loans');
+        console.log('Fallback: Saved loans from localStorage:', savedLoans);
+        
+        if (savedLoans) {
+          try {
+            this.loanRequests = JSON.parse(savedLoans);
+            console.log('Parsed loan requests:', this.loanRequests);
+          } catch (error) {
+            console.error('Error parsing saved loans:', error);
+            this.loanRequests = [];
+          }
+        } else {
+          console.log('No saved loans found in database');
+          // No loans found in database - show empty list
+          this.loanRequests = [];
         }
-      ];
-      this.saveLoansToStorage();
-      console.log('Sample data created:', this.loanRequests);
-    }
     
     this.loading = false;
     console.log('Final loan requests count:', this.loanRequests.length);
+      }
+    });
   }
 
   saveLoansToStorage() {
@@ -124,71 +107,113 @@ export class Loans implements OnInit {
   approve(loan: LoanRequest) {
     if (!isPlatformBrowser(this.platformId)) return;
     
-    loan.status = 'Approved';
-    loan.approvalDate = new Date().toISOString();
+    console.log('Approving loan:', loan);
     
-    // Update in localStorage
-    this.saveLoansToStorage();
+    const updatedLoan = {
+      ...loan,
+      status: 'Approved',
+      approvalDate: new Date().toISOString()
+    };
     
-    // Create loan credit transaction for the user
-    this.createLoanCreditTransaction(loan);
-    
-    alert(`Loan for ${loan.userName} approved. Amount ₹${loan.amount} has been credited to their account.`);
-  }
-
-  createLoanCreditTransaction(loan: LoanRequest) {
-    if (!isPlatformBrowser(this.platformId)) return;
-    
-    // Get user's existing transactions
-    const userTransactions = localStorage.getItem(`user_transactions_${loan.accountNumber}`);
-    let transactions = userTransactions ? JSON.parse(userTransactions) : [];
-    
-    // Check if transaction already exists for this loan
-    const existingTransaction = transactions.find((tx: any) => 
-      tx.description && tx.description.includes(`Loan: ${loan.loanAccountNumber}`)
-    );
-
-    if (!existingTransaction) {
-      // Calculate new balance
-      let currentBalance = 50000; // Default balance
-      if (transactions.length > 0) {
-        currentBalance = transactions[0].balance;
+    // Update loan in MySQL database using enhanced approval endpoint
+    this.http.put(`http://localhost:8080/api/loans/${loan.id}/approve?status=Approved`, {}).subscribe({
+      next: (response: any) => {
+        console.log('Loan approved in MySQL:', response);
+        
+        if (response.success) {
+          loan.status = 'Approved';
+          loan.approvalDate = new Date().toISOString();
+          
+          // Update in localStorage as backup
+          this.saveLoansToStorage();
+          
+          // Show enhanced notification with transaction details
+          this.showLoanApprovalNotification(loan, response.transaction, response.loan.amount);
+          
+          console.log('✅ Loan approval completed successfully');
+        } else {
+          alert('Loan approval failed: ' + response.message);
+        }
+      },
+      error: (err: any) => {
+        console.error('Error approving loan:', err);
+        alert('Failed to approve loan. Please try again.');
       }
-
-      // Create loan credit transaction
-      const loanTransaction = {
-        id: 'TXN' + Math.floor(Math.random() * 1000000),
-        merchant: 'Loan Disbursement',
-        amount: loan.amount,
-        type: 'Loan Credit',
-        balance: currentBalance + loan.amount,
-        date: new Date().toISOString(),
-        description: `Loan Approved: ${loan.loanAccountNumber} - ${loan.type}`
-      };
-
-      // Add to beginning of transactions array (newest first)
-      transactions.unshift(loanTransaction);
-      
-      // Save updated transactions
-      localStorage.setItem(`user_transactions_${loan.accountNumber}`, JSON.stringify(transactions));
-    }
+    });
   }
+
+  // Note: createLoanCreditTransaction and updateUserBalance methods removed
+  // Backend now handles all loan approval, balance updates, and transaction creation
 
   // Reject loan
   reject(loan: LoanRequest) {
     if (!isPlatformBrowser(this.platformId)) return;
     
-    loan.status = 'Rejected';
-    loan.approvalDate = new Date().toISOString();
+    const updatedLoan = {
+      ...loan,
+      status: 'Rejected',
+      approvalDate: new Date().toISOString()
+    };
     
-    // Update in localStorage
-    this.saveLoansToStorage();
-    
-    alert(`Loan for ${loan.userName} rejected.`);
+    // Update loan in MySQL database
+    this.http.put(`http://localhost:8080/api/loans/${loan.id}/approve?status=Rejected`, {}).subscribe({
+      next: (response: any) => {
+        console.log('Loan rejected in MySQL:', response);
+        
+        loan.status = 'Rejected';
+        loan.approvalDate = new Date().toISOString();
+        
+        // Update in localStorage as backup
+        this.saveLoansToStorage();
+        
+        alert(`Loan for ${loan.userName} rejected.`);
+      },
+      error: (err: any) => {
+        console.error('Error rejecting loan:', err);
+        alert('Failed to reject loan. Please try again.');
+      }
+    });
   }
 
   // TrackBy function for ngFor performance
   trackByLoanId(index: number, loan: LoanRequest): number {
     return loan.id;
+  }
+
+  // Show loan approval notification with detailed information
+  showLoanApprovalNotification(loan: LoanRequest, transaction: any, newBalance: number) {
+    const notificationMessage = `
+🎉 LOAN APPROVED SUCCESSFULLY! 🎉
+
+👤 User: ${loan.userName}
+📧 Email: ${loan.userEmail}
+🏦 Account: ${loan.accountNumber}
+💰 Loan Amount: ₹${loan.amount.toLocaleString()}
+📋 Loan Type: ${loan.type}
+📅 Tenure: ${loan.tenure} months
+📊 Interest Rate: ${loan.interestRate}%
+
+💳 TRANSACTION DETAILS:
+🆔 Transaction ID: ${transaction.id}
+💵 Amount Credited: ₹${loan.amount.toLocaleString()}
+💳 New Balance: ₹${newBalance.toLocaleString()}
+📝 Description: ${transaction.description}
+⏰ Processed: ${new Date().toLocaleString()}
+
+✅ The loan amount has been credited to the user's account in real-time!
+✅ Transaction has been recorded with complete details!
+✅ User can now see the updated balance and transaction history!
+    `;
+    
+    alert(notificationMessage);
+    
+    // Also log to console for debugging
+    console.log('=== LOAN APPROVAL NOTIFICATION ===');
+    console.log('User:', loan.userName);
+    console.log('Account:', loan.accountNumber);
+    console.log('Loan Amount:', loan.amount);
+    console.log('Transaction ID:', transaction.id);
+    console.log('New Balance:', newBalance);
+    console.log('==================================');
   }
 }

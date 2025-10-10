@@ -1,7 +1,9 @@
 package com.neo.springapp.service;
 
 import com.neo.springapp.model.CardReplacementRequest;
+import com.neo.springapp.model.Card;
 import com.neo.springapp.repository.CardReplacementRequestRepository;
+import com.neo.springapp.repository.CardRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -18,6 +20,9 @@ public class CardReplacementRequestService {
 
     @Autowired
     private CardReplacementRequestRepository cardReplacementRequestRepository;
+
+    @Autowired
+    private CardRepository cardRepository;
 
     // Basic CRUD operations
     public CardReplacementRequest saveRequest(CardReplacementRequest request) {
@@ -68,7 +73,31 @@ public class CardReplacementRequestService {
             request.setStatus("Approved");
             request.setProcessedDate(LocalDateTime.now());
             request.setProcessedBy(adminName);
-            request.setNewCardNumber(generateNewCardNumber());
+            
+            // Generate new card details
+            String newCardNumber = generateNewCardNumber();
+            String newCvv = generateNewCVV();
+            String newExpiryDate = generateNewExpiryDate();
+            
+            request.setNewCardNumber(newCardNumber);
+            
+            // Update the user's card in the database
+            List<Card> userCards = cardRepository.findByAccountNumber(request.getAccountNumber());
+            if (!userCards.isEmpty()) {
+                Card userCard = userCards.get(0); // Get the first card for this account
+                userCard.setCardNumber(newCardNumber);
+                userCard.setCvv(newCvv);
+                userCard.setExpiryDate(newExpiryDate);
+                userCard.setStatus("Active");
+                userCard.setPinSet(false);
+                userCard.setBlocked(false);
+                userCard.setDeactivated(false);
+                cardRepository.save(userCard);
+                
+                System.out.println("✅ Card replaced for account: " + request.getAccountNumber() + 
+                                 " with new card number: " + newCardNumber);
+            }
+            
             return cardReplacementRequestRepository.save(request);
         }
         return null;
@@ -103,6 +132,16 @@ public class CardReplacementRequestService {
     // Utility methods
     private String generateNewCardNumber() {
         return "4" + String.format("%015d", System.currentTimeMillis() % 1000000000000000L);
+    }
+
+    private String generateNewCVV() {
+        return String.format("%03d", (int)(Math.random() * 1000));
+    }
+
+    private String generateNewExpiryDate() {
+        int month = (int)(Math.random() * 12) + 1;
+        int year = LocalDateTime.now().getYear() + (int)(Math.random() * 5) + 1;
+        return String.format("%02d/%02d", month, year % 100);
     }
 
     public void deleteRequest(Long id) {

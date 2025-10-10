@@ -1,7 +1,10 @@
 package com.neo.springapp.service;
 
 import com.neo.springapp.model.KycRequest;
+import com.neo.springapp.model.User;
+import com.neo.springapp.model.Account;
 import com.neo.springapp.repository.KycRepository;
+import com.neo.springapp.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -18,6 +21,9 @@ public class KycService {
 
     @Autowired
     private KycRepository kycRepository;
+    
+    @Autowired
+    private UserRepository userRepository;
 
     // Basic CRUD operations
     public KycRequest saveKycRequest(KycRequest kycRequest) {
@@ -79,7 +85,7 @@ public class KycService {
         return kycRepository.save(request);
     }
 
-    // Approve KYC
+    // Approve KYC and update user details across all systems
     public KycRequest approveKyc(Long kycRequestId, String adminName) {
         Optional<KycRequest> requestOpt = kycRepository.findById(kycRequestId);
         if (requestOpt.isPresent()) {
@@ -87,9 +93,53 @@ public class KycService {
             request.setStatus("Approved");
             request.setApprovedDate(LocalDateTime.now());
             request.setApprovedBy(adminName);
-            return kycRepository.save(request);
+            
+            // Save KYC request first
+            KycRequest savedRequest = kycRepository.save(request);
+            
+            // Update user details across all systems
+            updateUserDetailsFromKyc(request);
+            
+            System.out.println("✅ KYC approved and user details updated for: " + request.getUserAccountNumber());
+            return savedRequest;
         }
         return null;
+    }
+    
+    // Update user details from approved KYC
+    private void updateUserDetailsFromKyc(KycRequest kycRequest) {
+        try {
+            // Find user by account number
+            Optional<User> userOpt = userRepository.findByAccountNumber(kycRequest.getUserAccountNumber());
+            if (userOpt.isPresent()) {
+                User user = userOpt.get();
+                Account account = user.getAccount();
+                
+                if (account != null) {
+                    // Update account details with KYC information
+                    account.setName(kycRequest.getName());
+                    account.setPan(kycRequest.getPanNumber());
+                    account.setKycVerified(true);
+                    account.setLastUpdated(LocalDateTime.now());
+                    
+                    // Save updated account
+                    // Note: Account will be saved when user is saved due to cascade
+                }
+                
+                // Save updated user
+                userRepository.save(user);
+                
+                System.out.println("✅ Updated user account details from KYC:");
+                System.out.println("   Account Number: " + kycRequest.getUserAccountNumber());
+                System.out.println("   Name: " + kycRequest.getName());
+                System.out.println("   PAN: " + kycRequest.getPanNumber());
+                System.out.println("   KYC Verified: true");
+            } else {
+                System.out.println("❌ User not found for account number: " + kycRequest.getUserAccountNumber());
+            }
+        } catch (Exception e) {
+            System.out.println("❌ Error updating user details from KYC: " + e.getMessage());
+        }
     }
 
     // Reject KYC

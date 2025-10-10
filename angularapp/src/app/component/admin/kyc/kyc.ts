@@ -2,9 +2,10 @@ import { Component, OnInit, Inject, PLATFORM_ID } from '@angular/core';
 import { Router } from '@angular/router';
 import { CommonModule, isPlatformBrowser } from '@angular/common'; 
 import { FormsModule } from '@angular/forms';
+import { HttpClient } from '@angular/common/http';
 
 interface KycRequest {
-  id: string;
+  id?: string; // Make ID optional since backend auto-generates it
   userId: string;
   userName: string;
   userEmail: string;
@@ -62,7 +63,7 @@ export class Kyc implements OnInit {
     return this.kycRequests.filter(r => r.status === 'Rejected').length;
   }
 
-  constructor(private router: Router, @Inject(PLATFORM_ID) private platformId: Object) {}
+  constructor(private router: Router, @Inject(PLATFORM_ID) private platformId: Object, private http: HttpClient) {}
 
   ngOnInit() {
     this.loadKycRequests();
@@ -71,41 +72,62 @@ export class Kyc implements OnInit {
   loadKycRequests() {
     if (!isPlatformBrowser(this.platformId)) return;
     
-    const savedRequests = localStorage.getItem('kyc_requests');
-    if (savedRequests) {
-      this.kycRequests = JSON.parse(savedRequests);
-    } else {
-      // Add some sample data for demonstration
-      this.kycRequests = [
-        {
-          id: 'KYC_SAMPLE_1',
-          userId: 'ACC001',
-          userName: 'John Doe',
-          userEmail: 'john.doe@example.com',
-          userAccountNumber: 'ACC001',
-          panNumber: 'ABCDE1234F',
-          name: 'John Doe',
-          status: 'Pending',
-          submittedDate: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
-        },
-        {
-          id: 'KYC_SAMPLE_2',
-          userId: 'ACC002',
-          userName: 'Jane Smith',
-          userEmail: 'jane.smith@example.com',
-          userAccountNumber: 'ACC002',
-          panNumber: 'FGHIJ5678K',
-          name: 'Jane Smith',
-          status: 'Approved',
-          submittedDate: new Date(Date.now() - 172800000).toISOString(), // 2 days ago
-          approvedDate: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
-          approvedBy: 'Admin'
+    // Load KYC requests from MySQL database
+    console.log('Loading KYC requests from MySQL database...');
+    this.http.get('http://localhost:8080/api/kyc/all?page=0&size=100').subscribe({
+      next: (response: any) => {
+        console.log('KYC requests loaded from MySQL:', response);
+        console.log('Response type:', typeof response);
+        console.log('Response length:', response?.length || 'N/A');
+        if (response.content) {
+          this.kycRequests = response.content.map((kyc: any) => ({
+            id: kyc.id.toString(),
+            userId: kyc.userId,
+            userName: kyc.userName,
+            userEmail: kyc.userEmail,
+            userAccountNumber: kyc.userAccountNumber,
+            panNumber: kyc.panNumber,
+            name: kyc.name,
+            status: kyc.status,
+            submittedDate: kyc.submittedDate,
+            approvedDate: kyc.approvedDate,
+            approvedBy: kyc.approvedBy
+          }));
+        } else {
+          this.kycRequests = response.map((kyc: any) => ({
+            id: kyc.id.toString(),
+            userId: kyc.userId,
+            userName: kyc.userName,
+            userEmail: kyc.userEmail,
+            userAccountNumber: kyc.userAccountNumber,
+            panNumber: kyc.panNumber,
+            name: kyc.name,
+            status: kyc.status,
+            submittedDate: kyc.submittedDate,
+            approvedDate: kyc.approvedDate,
+            approvedBy: kyc.approvedBy
+          }));
         }
-      ];
-      this.saveKycRequests();
-    }
+        
+        // Also save to localStorage as backup
+        this.saveKycRequests();
+        this.applyFilters();
+      },
+      error: (err: any) => {
+        console.error('Error loading KYC requests from database:', err);
+        // Fallback to localStorage
+        const savedRequests = localStorage.getItem('kyc_requests');
+        if (savedRequests) {
+          this.kycRequests = JSON.parse(savedRequests);
+        } else {
+          // No KYC requests found in database - show empty list
+          this.kycRequests = [];
+          console.log('No KYC requests found in database');
+        }
     
     this.applyFilters();
+      }
+    });
   }
 
   saveKycRequests() {
@@ -136,30 +158,52 @@ export class Kyc implements OnInit {
 
   approve(request: KycRequest) {
     if (confirm(`Approve KYC for ${request.userName} (${request.userAccountNumber})?`)) {
-      request.status = 'Approved';
-      request.approvedDate = new Date().toISOString();
-      request.approvedBy = 'Admin';
-      
-      // Update user profile with approved KYC information
-      this.updateUserProfile(request);
-      
-      this.saveKycRequests();
-      this.applyFilters();
-      
-      alert(`✅ KYC approved for ${request.userName}! Profile updated successfully.`);
+      // Update KYC request in MySQL database
+      this.http.put(`http://localhost:8080/api/kyc/approve/${request.id}?adminName=Admin`, {}).subscribe({
+        next: (response: any) => {
+          console.log('KYC approved in MySQL:', response);
+          
+          request.status = 'Approved';
+          request.approvedDate = new Date().toISOString();
+          request.approvedBy = 'Admin';
+          
+          // Update user profile with approved KYC information
+          this.updateUserProfile(request);
+          
+          this.saveKycRequests(); // Also save to localStorage as backup
+          this.applyFilters();
+          
+          alert(`✅ KYC approved for ${request.userName}! User details have been updated across all systems (loans, cards, transactions).`);
+        },
+        error: (err: any) => {
+          console.error('Error approving KYC:', err);
+          alert('Failed to approve KYC. Please try again.');
+        }
+      });
     }
   }
 
   reject(request: KycRequest) {
     if (confirm(`Reject KYC for ${request.userName} (${request.userAccountNumber})?`)) {
-      request.status = 'Rejected';
-      request.approvedDate = new Date().toISOString();
-      request.approvedBy = 'Admin';
-      
-      this.saveKycRequests();
-      this.applyFilters();
-      
-      alert(`❌ KYC rejected for ${request.userName}. User can resubmit with correct information.`);
+      // Update KYC request in MySQL database
+      this.http.put(`http://localhost:8080/api/kyc/reject/${request.id}?adminName=Admin`, {}).subscribe({
+        next: (response: any) => {
+          console.log('KYC rejected in MySQL:', response);
+          
+          request.status = 'Rejected';
+          request.approvedDate = new Date().toISOString();
+          request.approvedBy = 'Admin';
+          
+          this.saveKycRequests(); // Also save to localStorage as backup
+          this.applyFilters();
+          
+          alert(`❌ KYC rejected for ${request.userName}. User can resubmit with correct information.`);
+        },
+        error: (err: any) => {
+          console.error('Error rejecting KYC:', err);
+          alert('Failed to reject KYC. Please try again.');
+        }
+      });
     }
   }
 
@@ -194,7 +238,7 @@ export class Kyc implements OnInit {
   }
 
   trackByRequestId(index: number, request: KycRequest): string {
-    return request.id;
+    return request.id || `kyc-${index}`;
   }
 
   goBack() {

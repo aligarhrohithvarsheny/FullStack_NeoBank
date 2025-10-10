@@ -45,7 +45,7 @@
       }">
         <h4>KYC Status</h4>
         <p><strong>Status:</strong> {{ status }}</p>
-        <p *ngIf="kycRequest"><strong>Submitted:</strong> {{ kycRequest?.submittedDate | date:'medium' }}</p>
+        <p *ngIf="kycRequest"><strong>Submitted:</strong> {{ kycRequest.submittedDate | date:'medium' }}</p>
         <p *ngIf="kycRequest?.approvedDate"><strong>Approved:</strong> {{ kycRequest?.approvedDate | date:'medium' }}</p>
         <p *ngIf="kycRequest?.approvedBy"><strong>Approved By:</strong> {{ kycRequest?.approvedBy }}</p>
       </div>

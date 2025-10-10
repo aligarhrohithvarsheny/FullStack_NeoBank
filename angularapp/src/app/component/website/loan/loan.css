@@ -58,6 +58,147 @@
   background: #6a1b9a;
 }
 
+.form-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.calculate-button {
+  flex: 1;
+  padding: 12px;
+  background: #2e7d32;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background 0.3s;
+}
+
+.calculate-button:hover {
+  background: #388e3c;
+}
+
+/* EMI Calculator Styles */
+.emi-calculator {
+  margin-top: 30px;
+  padding: 25px;
+  background: #f8f9fa;
+  border-radius: 12px;
+  border: 1px solid #e9ecef;
+}
+
+.emi-calculator h2 {
+  color: #4a148c;
+  margin-bottom: 20px;
+  text-align: center;
+  font-size: 22px;
+}
+
+.calculator-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 30px;
+  align-items: start;
+}
+
+.calculator-inputs {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.calculator-results {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.result-card {
+  background: #fff;
+  padding: 20px;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border-left: 4px solid #4a148c;
+}
+
+.result-card h3 {
+  color: #4a148c;
+  margin-bottom: 15px;
+  font-size: 18px;
+}
+
+.result-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid #eee;
+}
+
+.result-item:last-child {
+  border-bottom: none;
+}
+
+.result-label {
+  font-weight: 600;
+  color: #555;
+}
+
+.result-value {
+  font-weight: bold;
+  color: #4a148c;
+  font-size: 16px;
+}
+
+.emi-breakdown {
+  background: #fff;
+  padding: 20px;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.emi-breakdown h4 {
+  color: #4a148c;
+  margin-bottom: 15px;
+  font-size: 16px;
+}
+
+.breakdown-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.breakdown-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.breakdown-bar {
+  height: 20px;
+  border-radius: 10px;
+  min-width: 20px;
+  transition: width 0.3s ease;
+}
+
+.breakdown-bar.principal {
+  background: linear-gradient(90deg, #4a148c, #6a1b9a);
+}
+
+.breakdown-bar.interest {
+  background: linear-gradient(90deg, #ff6b6b, #ff8e8e);
+}
+
+.breakdown-label {
+  font-size: 14px;
+  color: #555;
+  font-weight: 500;
+}
+
 .loan-list {
   margin-top: 25px;
 }
@@ -127,4 +268,34 @@ th {
 
 .back-button:hover {
   background: #e0e0e0;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .calculator-container {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+  
+  .form-actions {
+    flex-direction: column;
+  }
+  
+  .emi-calculator {
+    padding: 15px;
+  }
+  
+  .result-card, .emi-breakdown {
+    padding: 15px;
+  }
+  
+  .breakdown-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 5px;
+  }
+  
+  .breakdown-bar {
+    width: 100%;
+  }
 }

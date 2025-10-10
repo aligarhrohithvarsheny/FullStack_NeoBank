@@ -7,43 +7,437 @@
     <button class="logout-btn" (click)="logout()"><i class="fa fa-right-from-bracket"></i> Logout</button>
   </header>
 
-  <div class="horizontal-dashboard">
-<div class="dash-card" (click)="navigateTo('users')">
+
+  <!-- User Search Section -->
+  <div class="search-section">
+    <div class="search-header">
+      <h3><i class="fa fa-search"></i> Search Users</h3>
+      <button class="refresh-btn" (click)="refreshUsersData()" title="Refresh data from database">
+        <i class="fa fa-refresh"></i> Refresh Data
+      </button>
+    </div>
+    <div class="search-form">
+      <div class="search-input-group">
+        <input 
+          type="text" 
+          [(ngModel)]="searchQuery" 
+          placeholder="Search by name, mobile number, or last 4 digits of card..."
+          class="search-input"
+          (keyup.enter)="searchUsers()"
+        >
+        <button class="search-btn" (click)="searchUsers()">
+          <i class="fa fa-search"></i> Search
+        </button>
+      </div>
+      <div class="search-results" *ngIf="searchResults.length > 0">
+        <h4><i class="fa fa-users"></i> Search Results ({{ searchResults.length }} found)</h4>
+        <div class="results-list">
+          <div 
+            *ngFor="let user of searchResults" 
+            class="result-item"
+            (click)="selectSearchedUser(user)"
+            [class.selected]="selectedSearchedUser?.id === user.id"
+          >
+            <div class="user-basic-info">
+              <h5>{{ user.name }}</h5>
+              <p>{{ user.email }}</p>
+              <p>Account: {{ user.accountNumber }}</p>
+            </div>
+            <div class="user-balance">
+              <span class="balance">₹{{ user.balance | number:'1.2-2' }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="no-results" *ngIf="searchQuery && searchResults.length === 0 && !isSearching">
+        <i class="fa fa-exclamation-circle"></i>
+        <p>No users found matching your search criteria.</p>
+      </div>
+      <div class="search-info" *ngIf="!searchQuery">
+        <i class="fa fa-info-circle"></i>
+        <p>Total users in database: {{ users.length }}</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- User Details Modal -->
+  <div class="user-details-modal" *ngIf="selectedSearchedUser">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3><i class="fa fa-user"></i> Complete User Details</h3>
+        <button class="close-btn" (click)="closeUserDetails()">
+          <i class="fa fa-times"></i>
+        </button>
+      </div>
+      
+      <div class="modal-body">
+        <!-- Personal Information -->
+        <div class="details-section">
+          <h4><i class="fa fa-id-card"></i> Personal Information</h4>
+          <div class="details-grid">
+            <div class="detail-item">
+              <label>Full Name</label>
+              <span>{{ selectedSearchedUser.name }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Email</label>
+              <span>{{ selectedSearchedUser.email }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Account Number</label>
+              <span>{{ selectedSearchedUser.accountNumber }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Phone Number</label>
+              <span>{{ selectedSearchedUser.phoneNumber || 'Not provided' }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Date of Birth</label>
+              <span>{{ selectedSearchedUser.dateOfBirth || 'Not provided' }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Address</label>
+              <span>{{ selectedSearchedUser.address || 'Not provided' }}</span>
+            </div>
+            <div class="detail-item">
+              <label>PAN Number</label>
+              <span>{{ selectedSearchedUser.pan || 'Not provided' }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Aadhar Number</label>
+              <span>{{ selectedSearchedUser.aadhar || 'Not provided' }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Occupation</label>
+              <span>{{ selectedSearchedUser.occupation || 'Not provided' }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Annual Income</label>
+              <span>₹{{ selectedSearchedUser.income | number:'1.2-2' }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Account Type</label>
+              <span>{{ selectedSearchedUser.accountType }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Account Opened</label>
+              <span>{{ selectedSearchedUser.joinDate }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Current Balance</label>
+              <span class="balance-amount">₹{{ selectedSearchedUser.balance | number:'1.2-2' }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Cards Information -->
+        <div class="details-section" *ngIf="userCards.length > 0">
+          <h4><i class="fa fa-credit-card"></i> Cards Information</h4>
+          <div class="cards-grid">
+            <div *ngFor="let card of userCards" class="card-item">
+              <div class="card-header">
+                <h5>{{ card.cardType || 'Debit Card' }}</h5>
+                <span class="card-status" [ngClass]="card.status?.toLowerCase()">{{ card.status }}</span>
+              </div>
+              <div class="card-details">
+                <p><strong>Card Number:</strong> **** **** **** {{ card.cardNumber?.slice(-4) }}</p>
+                <p><strong>Expiry:</strong> {{ card.expiry }}</p>
+                <p><strong>CVV:</strong> {{ card.cvv }}</p>
+                <p><strong>PIN Set:</strong> {{ card.pinSet ? 'Yes' : 'No' }}</p>
+                <p><strong>Blocked:</strong> {{ card.blocked ? 'Yes' : 'No' }}</p>
+                <p><strong>Deactivated:</strong> {{ card.deactivated ? 'Yes' : 'No' }}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Loans Information -->
+        <div class="details-section" *ngIf="userLoans.length > 0">
+          <h4><i class="fa fa-coins"></i> Loans Information</h4>
+          <div class="loans-grid">
+            <div *ngFor="let loan of userLoans" class="loan-item">
+              <div class="loan-header">
+                <h5>{{ loan.loanType || 'Personal Loan' }}</h5>
+                <span class="loan-status" [ngClass]="loan.status?.toLowerCase()">{{ loan.status }}</span>
+              </div>
+              <div class="loan-details">
+                <p><strong>Amount:</strong> ₹{{ loan.amount | number:'1.2-2' }}</p>
+                <p><strong>Interest Rate:</strong> {{ loan.interestRate }}%</p>
+                <p><strong>Tenure:</strong> {{ loan.tenure }} months</p>
+                <p><strong>EMI:</strong> ₹{{ loan.emi | number:'1.2-2' }}</p>
+                <p><strong>Applied Date:</strong> {{ loan.appliedDate }}</p>
+                <p><strong>Approved Date:</strong> {{ loan.approvedDate || 'Pending' }}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Recent Transactions -->
+        <div class="details-section" *ngIf="userTransactions.length > 0">
+          <h4><i class="fa fa-chart-line"></i> Recent Transactions</h4>
+          <div class="transactions-table">
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Type</th>
+                  <th>Amount</th>
+                  <th>Description</th>
+                  <th>Balance</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let transaction of userTransactions.slice(0, 10)">
+                  <td>{{ transaction.date }}</td>
+                  <td>
+                    <span class="transaction-type" [ngClass]="transaction.type?.toLowerCase()">
+                      {{ transaction.type }}
+                    </span>
+                  </td>
+                  <td class="amount" [ngClass]="transaction.type === 'Credit' ? 'positive' : 'negative'">
+                    {{ transaction.type === 'Credit' ? '+' : '-' }}₹{{ transaction.amount | number:'1.2-2' }}
+                  </td>
+                  <td>{{ transaction.description }}</td>
+                  <td>₹{{ transaction.balance | number:'1.2-2' }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Quick Actions Section -->
+  <div class="quick-actions">
+    <h3><i class="fa fa-bolt"></i> Quick Actions</h3>
     
-          <i class="fa fa-users dash-icon"></i>
+    <!-- Direct Deposit/Withdrawal Form -->
+    <div class="transaction-form-section">
+      <div class="form-row">
+        <div class="form-group">
+          <label for="userSelect">Select User</label>
+          <select id="userSelect" [(ngModel)]="selectedUserId" class="form-select" (change)="onUserSelect()">
+            <option value="">-- Select User --</option>
+            <option *ngFor="let user of filteredUsers" [value]="user.id">
+              {{ user.name }} ({{ user.accountNumber }}) - ₹{{ user.balance | number:'1.2-2' }}
+            </option>
+          </select>
+        </div>
+        
+        <div class="form-group">
+          <label for="operationType">Operation</label>
+          <select id="operationType" [(ngModel)]="operationType" class="form-select">
+            <option value="deposit">Deposit Money</option>
+            <option value="withdrawal">Withdraw Money</option>
+          </select>
+        </div>
+      </div>
+      
+      <div class="form-row">
+        <div class="form-group">
+          <label for="amount">Amount (₹)</label>
+          <input 
+            type="number" 
+            id="amount" 
+            [(ngModel)]="amount" 
+            placeholder="Enter amount"
+            min="1"
+            max="1000000"
+            class="form-input"
+          >
+        </div>
+        
+        <div class="form-group">
+          <label for="description">Description</label>
+          <input 
+            type="text" 
+            id="description" 
+            [(ngModel)]="description" 
+            placeholder="Enter transaction description"
+            class="form-input"
+          >
+        </div>
+      </div>
+      
+      <!-- Selected User Info -->
+      <div class="selected-user-display" *ngIf="selectedUser">
+        <h4><i class="fa fa-user"></i> Selected User Details</h4>
+        <div class="user-info-grid">
+          <div class="info-item">
+            <span class="label">Name:</span>
+            <span class="value">{{ selectedUser.name }}</span>
+          </div>
+          <div class="info-item">
+            <span class="label">Account:</span>
+            <span class="value">{{ selectedUser.accountNumber }}</span>
+          </div>
+          <div class="info-item">
+            <span class="label">Current Balance:</span>
+            <span class="value">₹{{ selectedUser.balance | number:'1.2-2' }}</span>
+          </div>
+          <div class="info-item" *ngIf="amount > 0">
+            <span class="label">New Balance:</span>
+            <span class="value" [ngClass]="operationType === 'deposit' ? 'positive' : 'negative'">
+              ₹{{ (selectedUser.balance + (operationType === 'deposit' ? amount : -amount)) | number:'1.2-2' }}
+            </span>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Action Buttons -->
+      <div class="form-actions">
+        <button 
+          type="button" 
+          class="btn-process" 
+          [ngClass]="operationType === 'deposit' ? 'btn-deposit' : 'btn-withdrawal'"
+          (click)="processDirectTransaction()"
+          [disabled]="!selectedUser || amount <= 0 || !description.trim()"
+        >
+          <i class="fa" [ngClass]="operationType === 'deposit' ? 'fa-plus' : 'fa-minus'"></i>
+          {{ operationType === 'deposit' ? 'Deposit' : 'Withdraw' }} ₹{{ amount | number:'1.2-2' }}
+        </button>
+        
+        <button type="button" class="btn-clear" (click)="clearForm()">
+          <i class="fa fa-refresh"></i>
+          Clear Form
+        </button>
+      </div>
+      
+      <!-- Success/Error Messages -->
+      <div class="message success-message" *ngIf="successMessage">
+        <i class="fa fa-check-circle"></i>
+        {{ successMessage }}
+      </div>
+
+      <div class="message error-message" *ngIf="errorMessage">
+        <i class="fa fa-exclamation-circle"></i>
+        {{ errorMessage }}
+      </div>
+    </div>
+  </div>
+
+
+  <!-- Deposit/Withdrawal Modal -->
+  <div class="modal-overlay" *ngIf="showDepositWithdrawal" (click)="closeDepositWithdrawal()">
+    <div class="modal-content" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>
+          <i class="fa" [ngClass]="operationType === 'deposit' ? 'fa-plus-circle' : 'fa-minus-circle'"></i>
+          {{ operationType === 'deposit' ? 'Deposit Money' : 'Withdraw Money' }}
+        </h3>
+        <button class="close-btn" (click)="closeDepositWithdrawal()">
+          <i class="fa fa-times"></i>
+        </button>
+      </div>
+
+      <div class="modal-body">
+        <div class="selected-user-info">
+          <h4>Selected User</h4>
+          <div class="user-details">
+            <p><strong>Name:</strong> {{ selectedUser?.name }}</p>
+            <p><strong>Account:</strong> {{ selectedUser?.accountNumber }}</p>
+            <p><strong>Current Balance:</strong> ₹{{ selectedUser?.balance | number:'1.2-2' }}</p>
+          </div>
+        </div>
+
+        <form class="transaction-form">
+          <div class="form-group">
+            <label for="amount">Amount (₹)</label>
+            <input 
+              type="number" 
+              id="amount" 
+              [(ngModel)]="amount" 
+              placeholder="Enter amount"
+              min="1"
+              max="1000000"
+              class="form-input"
+            >
+          </div>
+
+          <div class="form-group">
+            <label for="description">Description</label>
+            <textarea 
+              id="description" 
+              [(ngModel)]="description" 
+              placeholder="Enter transaction description"
+              class="form-textarea"
+              rows="3"
+            ></textarea>
+          </div>
+
+          <div class="transaction-summary" *ngIf="amount > 0">
+            <h4>Transaction Summary</h4>
+            <div class="summary-details">
+              <p><strong>Operation:</strong> {{ operationType === 'deposit' ? 'Deposit' : 'Withdrawal' }}</p>
+              <p><strong>Amount:</strong> ₹{{ amount | number:'1.2-2' }}</p>
+              <p><strong>Current Balance:</strong> ₹{{ selectedUser?.balance | number:'1.2-2' }}</p>
+              <p><strong>New Balance:</strong> ₹{{ (selectedUser?.balance || 0) + (operationType === 'deposit' ? amount : -amount) | number:'1.2-2' }}</p>
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button type="button" class="btn-cancel" (click)="closeDepositWithdrawal()">
+              Cancel
+            </button>
+            <button 
+              type="button" 
+              class="btn-confirm" 
+              [ngClass]="operationType === 'deposit' ? 'btn-deposit' : 'btn-withdrawal'"
+              (click)="processTransaction()"
+              [disabled]="amount <= 0 || !description.trim()"
+            >
+              <i class="fa" [ngClass]="operationType === 'deposit' ? 'fa-plus' : 'fa-minus'"></i>
+              {{ operationType === 'deposit' ? 'Deposit' : 'Withdraw' }} ₹{{ amount | number:'1.2-2' }}
+            </button>
+          </div>
+        </form>
+
+        <!-- Success/Error Messages -->
+        <div class="message success-message" *ngIf="successMessage">
+          <i class="fa fa-check-circle"></i>
+          {{ successMessage }}
+        </div>
+
+        <div class="message error-message" *ngIf="errorMessage">
+          <i class="fa fa-exclamation-circle"></i>
+          {{ errorMessage }}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Dashboard Cards -->
+  <div class="horizontal-dashboard">
+    <div class="dash-card" (click)="navigateTo('users')">
+      <i class="fa fa-users dash-icon"></i>
       <h3>Manage Users</h3>
       <p>Create, view, and update users</p>
     </div>
 
-<div class="dash-card" (click)="navigateTo('kyc')">
-          <i class="fa fa-id-card dash-icon"></i>
+    <div class="dash-card" (click)="navigateTo('kyc')">
+      <i class="fa fa-id-card dash-icon"></i>
       <h3>KYC Verification</h3>
       <p>Approve or reject KYC requests</p>
     </div>
 
-<div  class="dash-card" (click)="navigateTo('cards')">
+    <div class="dash-card" (click)="navigateTo('cards')">
       <i class="fa fa-credit-card dash-icon"></i>
       <h3>Manage Cards</h3>
       <p>Issue, block, or update cards</p>
     </div>
 
-    <div  class="dash-card" (click)="navigateTo('loans')">
+    <div class="dash-card" (click)="navigateTo('loans')">
       <i class="fa fa-coins dash-icon"></i>
       <h3>Loan Requests</h3>
       <p>Approve or reject loan applications</p>
     </div>
 
-<div class="dash-card" (click)="navigateTo('transactions')">
-          <i class="fa fa-chart-line dash-icon"></i>
+    <div class="dash-card" (click)="navigateTo('transactions')">
+      <i class="fa fa-chart-line dash-icon"></i>
       <h3>Transactions</h3>
       <p>View all user transactions</p>
     </div>
 
-    <div class="dash-card" onclick="navigateTo('/admin/accounts')">
-      <i class="fa fa-piggy-bank dash-icon"></i>
-      <h3>Accounts</h3>
-      <p>Manage balances and accounts</p>
-      
-    </div>
   </div>
 </div>

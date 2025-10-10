@@ -4,68 +4,162 @@
     <button type="button" (click)="goBack()">⬅ Back to Dashboard</button>
   </div>
 
-  <h2>Transfer Funds</h2>
+  <h2>💸 Transfer Funds</h2>
+
+  <!-- User Balance Display -->
+  <div class="balance-section">
+    <div class="balance-card">
+      <h3>Available Balance</h3>
+      <p class="balance-amount">{{ formatCurrency(currentBalance) }}</p>
+      <button (click)="refreshBalance()" class="refresh-btn"> Refresh Balance</button>
+    </div>
+  </div>
 
   <!-- Success Message -->
   <div *ngIf="transactionSuccess" class="success-message">
-    ✅ Transaction Successful!
+    <div class="success-icon"></div>
+    <div class="success-content">
+      <h4>Transaction Successful!</h4>
+      <p>{{ successMessage }}</p>
+    </div>
   </div>
 
   <!-- Transfer Form -->
-  <form (ngSubmit)="transferFunds()">
-    <div class="form-group">
-      <label>Account Number</label>
-      <input type="text" [(ngModel)]="accountNumber" name="accountNumber" required>
-    </div>
+  <div class="transfer-form-section">
+    <h3>Transfer Money</h3>
+    <form (ngSubmit)="transferFunds()">
+      <div class="form-row">
+        <div class="form-group">
+          <label for="recipientAccountNumber">Recipient Account Number</label>
+          <input 
+            id="recipientAccountNumber"
+            type="text" 
+            [(ngModel)]="recipientAccountNumber" 
+            name="recipientAccountNumber" 
+            placeholder="Enter recipient's account number"
+            required>
+        </div>
 
-    <div class="form-group">
-      <label>Name</label>
-      <input type="text" [(ngModel)]="name" name="name" required>
-    </div>
+        <div class="form-group">
+          <label for="recipientName">Recipient Name</label>
+          <input 
+            id="recipientName"
+            type="text" 
+            [(ngModel)]="recipientName" 
+            name="recipientName" 
+            placeholder="Enter recipient's full name"
+            required>
+        </div>
+      </div>
 
-    <div class="form-group">
-      <label>Phone Number</label>
-      <input type="text" [(ngModel)]="phone" name="phone" required>
-    </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="phone">Phone Number</label>
+          <input 
+            id="phone"
+            type="text" 
+            [(ngModel)]="phone" 
+            name="phone" 
+            placeholder="Enter recipient's phone number"
+            required>
+        </div>
 
-    <div class="form-group">
-      <label>IFSC</label>
-      <input type="text" [(ngModel)]="ifsc" name="ifsc" required>
-    </div>
+        <div class="form-group">
+          <label for="ifsc">IFSC Code</label>
+          <input 
+            id="ifsc"
+            type="text" 
+            [(ngModel)]="ifsc" 
+            name="ifsc" 
+            placeholder="Enter IFSC code"
+            required>
+        </div>
+      </div>
 
-    <div class="form-group">
-      <label>Amount</label>
-      <input type="number" [(ngModel)]="amount" name="amount" required>
-    </div>
+      <div class="form-row">
+        <div class="form-group amount-group">
+          <label for="amount">Transfer Amount</label>
+          <div class="amount-input-container">
+            <input 
+              id="amount"
+              type="number" 
+              [(ngModel)]="amount" 
+              name="amount" 
+              placeholder="Enter amount"
+              [max]="currentBalance"
+              required>
+            <button type="button" class="max-btn" (click)="setMaxAmount()">Max</button>
+          </div>
+          <small class="amount-hint">Maximum: {{ formatCurrency(currentBalance) }}</small>
+        </div>
 
-    <div class="form-group">
-      <label>Transfer Type</label>
-      <select [(ngModel)]="transferType" name="transferType">
-        <option value="NEFT">NEFT</option>
-        <option value="RTGS">RTGS</option>
-      </select>
-    </div>
+        <div class="form-group">
+          <label for="transferType">Transfer Type</label>
+          <select id="transferType" [(ngModel)]="transferType" name="transferType">
+            <option value="NEFT">NEFT</option>
+            <option value="RTGS">RTGS</option>
+          </select>
+        </div>
+      </div>
 
-    <button type="button" (click)="transferFunds()">Send Money</button>
-  </form>
+      <div class="form-actions">
+        <button type="button" class="transfer-btn" (click)="transferFunds()">
+          💸 Send Money
+        </button>
+        <button type="button" class="reset-btn" (click)="resetForm()">
+          🔄 Reset Form
+        </button>
+      </div>
+    </form>
+  </div>
 
-  <!-- Sent History -->
+  <!-- Transfer History -->
   <div class="transfer-history" *ngIf="transfers.length > 0">
-    <h3>Sent Transactions</h3>
-    <table>
-      <thead>
-        <tr>
-          <th>ID</th>
-          <th>Account No</th>
-          <th>Name</th>
-          <th>Phone</th>
-          <th>IFSC</th>
-          <th>Amount</th>
-          <th>Type</th>
-          <th>Date</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr *ngFor="let t of transfers">
-          <td>{{t.id}}</td>
-          <td>{{t.accountN
+    <h3>📋 Transfer History</h3>
+    <div class="table-container">
+      <table class="transfer-table">
+        <thead>
+          <tr>
+            <th>Transfer ID</th>
+            <th>Recipient</th>
+            <th>Account No</th>
+            <th>Phone</th>
+            <th>IFSC</th>
+            <th>Amount</th>
+            <th>Type</th>
+            <th>Status</th>
+            <th>Date</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let transfer of transfers">
+            <td class="transfer-id">{{ transfer.id }}</td>
+            <td class="recipient-name">{{ transfer.recipientName }}</td>
+            <td class="account-number">{{ transfer.recipientAccountNumber }}</td>
+            <td class="phone">{{ transfer.phone }}</td>
+            <td class="ifsc">{{ transfer.ifsc }}</td>
+            <td class="amount">{{ formatCurrency(transfer.amount) }}</td>
+            <td class="transfer-type">
+              <span class="type-badge" [ngClass]="{'neft': transfer.transferType === 'NEFT', 'rtgs': transfer.transferType === 'RTGS'}">
+                {{ transfer.transferType }}
+              </span>
+            </td>
+            <td class="status">
+              <span class="status-badge" [ngClass]="{'completed': transfer.status === 'Completed', 'pending': transfer.status === 'Pending', 'failed': transfer.status === 'Failed'}">
+                {{ transfer.status }}
+              </span>
+            </td>
+            <td class="date">{{ formatDate(transfer.date) }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- No transfers message -->
+  <div class="no-transfers" *ngIf="transfers.length === 0">
+    <div class="no-transfers-icon">📭</div>
+    <h4>No Transfer History</h4>
+    <p>You haven't made any transfers yet. Use the form above to send money.</p>
+  </div>
+</div>

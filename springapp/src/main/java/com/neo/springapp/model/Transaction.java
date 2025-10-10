@@ -16,7 +16,7 @@ public class Transaction {
     private String transactionId; // Custom transaction ID like TXN123456
     private String merchant;
     private Double amount;
-    private String type; // Debit / Credit / Deposit / Withdraw / Transfer
+    private String type; // Debit / Credit / Deposit / Withdraw / Transfer / Loan Credit
     private String description; // Detailed description of the transaction
     private Double balance;
     private LocalDateTime date;

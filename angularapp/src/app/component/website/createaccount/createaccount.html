@@ -1,7 +1,13 @@
 <div class="create-account-container">
   <h2>Create New Account</h2>
 
-  <!-- ✅ Success & Error messages -->
+  <!-- Loading State -->
+  <div *ngIf="loading" class="loading-overlay">
+    <div class="loading-spinner"></div>
+    <p>Creating your account...</p>
+  </div>
+
+  <!--  Success & Error messages -->
   <div *ngIf="submitError" class="error-msg">
     {{ submitError }}
   </div>
@@ -119,10 +125,28 @@
     <!-- Aadhar -->
     <div class="form-group">
       <label>Aadhar</label>
-      <input type="text" formControlName="aadhar" placeholder="12-digit Aadhar" /> 
+      <div class="aadhar-input-container">
+        <input 
+          type="text" 
+          formControlName="aadhar" 
+          placeholder="12-digit Aadhar" 
+          maxlength="12"
+          class="aadhar-input"
+          [class.valid]="f['aadhar'].valid && f['aadhar'].touched"
+          [class.invalid]="f['aadhar'].invalid && f['aadhar'].touched"
+        />
+        <div class="validation-indicator">
+          <span *ngIf="f['aadhar'].valid && f['aadhar'].touched" class="valid-icon"></span>
+          <span *ngIf="f['aadhar'].invalid && f['aadhar'].touched" class="invalid-icon"></span>
+        </div>
+      </div>
       <div *ngIf="submitted && f['aadhar'].errors" class="error">
         <small *ngIf="f['aadhar'].errors['required']">Aadhar is required.</small>
-        <small *ngIf="f['aadhar'].errors['invalidAadhar']">Invalid Aadhar format.</small>
+        <small *ngIf="f['aadhar'].errors['invalidAadhar']">Invalid Aadhar format. Must be 12 digits starting with 2-9.</small>
+        <small *ngIf="f['aadhar'].errors['invalidAadharChecksum']">Invalid Aadhar number. Please check the digits.</small>
+      </div>
+      <div *ngIf="f['aadhar'].valid && f['aadhar'].touched" class="success">
+        <small> Valid Aadhaar number</small>
       </div>
     </div>
 
@@ -139,7 +163,10 @@
     <!-- State -->
     <div class="form-group">
       <label>State</label>
-      <input type="text" formControlName="state" placeholder="Enter state" /> 
+      <select formControlName="state" class="state-dropdown">
+        <option value="">Select your state</option>
+        <option *ngFor="let state of indianStates" [value]="state">{{ state }}</option>
+      </select>
       <div *ngIf="submitted && f['state'].errors" class="error">
         <small>State is required.</small>
       </div>
@@ -148,9 +175,15 @@
     <!-- City -->
     <div class="form-group">
       <label>City</label>
-      <input type="text" formControlName="city" placeholder="Enter city" /> 
+      <select formControlName="city" class="city-dropdown" [disabled]="!availableCities.length">
+        <option value="">Select your city</option>
+        <option *ngFor="let city of availableCities" [value]="city">{{ city }}</option>
+      </select>
       <div *ngIf="submitted && f['city'].errors" class="error">
         <small>City is required.</small>
+      </div>
+      <div *ngIf="!availableCities.length && f['state'].value" class="info">
+        <small>Please select a state first to see available cities.</small>
       </div>
     </div>
 

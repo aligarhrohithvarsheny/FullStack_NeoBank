@@ -2,6 +2,7 @@ import { Component, OnInit, Inject, PLATFORM_ID } from '@angular/core';
 import { Router } from '@angular/router';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { HttpClient } from '@angular/common/http';
 
 interface CardDetails {
   id: string;
@@ -30,6 +31,7 @@ interface CardReplacementRequest {
   requestedDate: string;
   processedDate?: string;
   processedBy?: string;
+  newCardNumber?: string;
 }
 
 interface NewCardRequest {
@@ -75,7 +77,7 @@ export class Cards implements OnInit {
   searchTerm: string = '';
   showRequests: boolean = false;
 
-  constructor(private router: Router, @Inject(PLATFORM_ID) private platformId: Object) {}
+  constructor(private router: Router, @Inject(PLATFORM_ID) private platformId: Object, private http: HttpClient) {}
 
   ngOnInit() {
     this.loadCards();
@@ -85,15 +87,63 @@ export class Cards implements OnInit {
   loadCards() {
     if (!isPlatformBrowser(this.platformId)) return;
     
-    const savedCards = localStorage.getItem('user_cards');
-    if (savedCards) {
-      this.cards = JSON.parse(savedCards);
-    } else {
-      // Create some sample cards for demonstration
-      this.createSampleCards();
-    }
-    
-    this.applyFilters();
+    // Load cards from MySQL database
+    console.log('Loading cards from MySQL database...');
+    this.http.get('http://localhost:8080/api/cards?page=0&size=100').subscribe({
+      next: (response: any) => {
+        console.log('Cards loaded from MySQL:', response);
+        console.log('Response type:', typeof response);
+        console.log('Response length:', response?.length || 'N/A');
+        if (response.content) {
+          this.cards = response.content.map((card: any) => ({
+            id: card.id.toString(),
+            userId: card.accountNumber,
+            userName: card.userName,
+            userAccountNumber: card.accountNumber,
+            cardNumber: card.cardNumber,
+            cardType: card.cardType,
+            cvv: card.cvv,
+            expiry: card.expiryDate,
+            status: card.status,
+            pinSet: card.pinSet,
+            createdAt: card.createdAt || new Date().toISOString(),
+            lastUpdated: card.lastUpdated || new Date().toISOString()
+          }));
+        } else {
+          this.cards = response.map((card: any) => ({
+            id: card.id.toString(),
+            userId: card.accountNumber,
+            userName: card.userName,
+            userAccountNumber: card.accountNumber,
+            cardNumber: card.cardNumber,
+            cardType: card.cardType,
+            cvv: card.cvv,
+            expiry: card.expiryDate,
+            status: card.status,
+            pinSet: card.pinSet,
+            createdAt: card.createdAt || new Date().toISOString(),
+            lastUpdated: card.lastUpdated || new Date().toISOString()
+          }));
+        }
+        
+        // Also save to localStorage as backup
+        this.saveCards();
+        this.applyFilters();
+      },
+      error: (err: any) => {
+        console.error('Error loading cards from database:', err);
+        // Fallback to localStorage
+        const savedCards = localStorage.getItem('user_cards');
+        if (savedCards) {
+          this.cards = JSON.parse(savedCards);
+        } else {
+          // No cards found in database - show empty list
+          this.cards = [];
+          console.log('No cards found in database');
+        }
+        this.applyFilters();
+      }
+    });
   }
 
   createSampleCards() {
@@ -202,11 +252,27 @@ export class Cards implements OnInit {
       lastUpdated: new Date().toISOString()
     };
 
-    this.cards.push(newCard);
-    this.saveCards();
-    this.applyFilters();
-    
-    alert(`Visa Debit card assigned to ${userProfile.name} (${userAccountNumber}). Card No: **** **** **** ${cardNumber.slice(-4)}`);
+    // Submit new card to MySQL database
+    this.http.post('http://localhost:8080/api/cards', newCard).subscribe({
+      next: (response: any) => {
+        console.log('Card created in MySQL:', response);
+        
+        this.cards.push(newCard);
+        this.saveCards(); // Also save to localStorage as backup
+        this.applyFilters();
+        
+        alert(`Visa Debit card assigned to ${userProfile.name} (${userAccountNumber}). Card No: **** **** **** ${cardNumber.slice(-4)}`);
+      },
+      error: (err: any) => {
+        console.error('Error creating card:', err);
+        alert('Failed to assign card. Please try again.');
+        
+        // Fallback to localStorage
+        this.cards.push(newCard);
+        this.saveCards();
+        this.applyFilters();
+      }
+    });
   }
 
   blockCard(card: CardDetails) {
@@ -249,6 +315,40 @@ export class Cards implements OnInit {
     }
   }
 
+  updateCardInBackend(card: CardDetails, newCardNumber: string) {
+    const newCvv = Math.floor(100 + Math.random() * 900).toString();
+    const expiryMonth = String(Math.floor(1 + Math.random() * 12)).padStart(2, '0');
+    const expiryYear = String(new Date().getFullYear() + Math.floor(1 + Math.random() * 5));
+
+    // Update card in backend
+    this.http.put(`http://localhost:8080/api/cards/${card.id}/replace`, {
+      cardNumber: newCardNumber,
+      cvv: newCvv,
+      expiryDate: `${expiryMonth}/${expiryYear.slice(-2)}`,
+      status: 'Active',
+      pinSet: false
+    }).subscribe({
+      next: (response: any) => {
+        console.log('Card updated in backend:', response);
+        
+        // Update local card data
+        card.cardNumber = newCardNumber;
+        card.cvv = newCvv;
+        card.expiry = `${expiryMonth}/${expiryYear.slice(-2)}`;
+        card.status = 'Active';
+        card.pinSet = false;
+        card.lastUpdated = new Date().toISOString();
+        
+        this.saveCards();
+        this.applyFilters();
+      },
+      error: (err: any) => {
+        console.error('Error updating card in backend:', err);
+        alert('Failed to update card in backend. Please try again.');
+      }
+    });
+  }
+
   deactivateCard(card: CardDetails) {
     if (confirm(`Deactivate card ending with ${card.cardNumber.slice(-4)} for ${card.userName}? This action cannot be undone.`)) {
       card.status = 'Deactivated';
@@ -261,18 +361,31 @@ export class Cards implements OnInit {
 
   approveReplacementRequest(request: CardReplacementRequest) {
     if (confirm(`Approve card replacement request for ${request.userName}?`)) {
-      request.status = 'Approved';
-      request.processedDate = new Date().toISOString();
-      request.processedBy = 'Admin';
-      
-      // Find and replace the card
-      const card = this.cards.find(c => c.userAccountNumber === request.userAccountNumber);
-      if (card) {
-        this.replaceCard(card);
-      }
-      
-      this.saveReplacementRequests();
-      alert(`Card replacement approved for ${request.userName}`);
+      // First approve the request in the backend
+      this.http.put(`http://localhost:8080/api/card-replacement-requests/approve/${request.id}?adminName=Admin`, {}).subscribe({
+        next: (response: any) => {
+          console.log('Card replacement request approved in MySQL:', response);
+          
+          // Update local request
+          request.status = 'Approved';
+          request.processedDate = new Date().toISOString();
+          request.processedBy = 'Admin';
+          request.newCardNumber = response.newCardNumber;
+          
+          // Find and update the card in backend
+          const card = this.cards.find(c => c.userAccountNumber === request.userAccountNumber);
+          if (card) {
+            this.updateCardInBackend(card, response.newCardNumber);
+          }
+          
+          this.saveReplacementRequests();
+          alert(`Card replacement approved for ${request.userName}. New card number: ${response.newCardNumber}`);
+        },
+        error: (err: any) => {
+          console.error('Error approving card replacement request:', err);
+          alert('Failed to approve card replacement request. Please try again.');
+        }
+      });
     }
   }
 

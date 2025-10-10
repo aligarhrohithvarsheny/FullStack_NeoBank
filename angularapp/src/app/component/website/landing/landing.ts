@@ -1,16 +1,20 @@
 import { Component, ViewEncapsulation, HostListener } from '@angular/core';
 import { Router } from '@angular/router';
+import { CommonModule } from '@angular/common';
 
 @Component({
   selector: 'app-landing',
   templateUrl: './landing.html',
   styleUrls: ['./landing.css'],
-  encapsulation: ViewEncapsulation.None   // makes CSS global
+  encapsulation: ViewEncapsulation.None,   // makes CSS global
+  imports: [CommonModule]
 })
 export class Landing {
   showPersonalDropdown = false;
   showBusinessDropdown = false;
   currentLanguage = 'en';
+  showAnimatedLogo = true;
+  logoAnimationComplete = false;
 
   // Translation object
   translations = {
@@ -72,6 +76,23 @@ export class Landing {
       adminDescription: 'All accounts and transactions require admin approval for maximum security',
       completeBanking: 'Complete Banking',
       completeDescription: 'Loan applications, virtual cards, KYC verification, and fund transfers',
+      
+      // Seamless Banking Section
+      seamlessMobileBanking: 'Seamless Mobile Banking',
+      seamlessDescription: 'Experience banking like never before with our cutting-edge digital platform designed for the modern world',
+      instantTransfers: 'Instant Transfers',
+      instantTransfersDesc: 'Send money anywhere, anytime with instant processing',
+      secureBanking: 'Secure Banking',
+      secureBankingDesc: 'Bank-level security with advanced encryption and fraud protection',
+      mobileFirst: 'Mobile First',
+      mobileFirstDesc: 'Designed specifically for mobile devices with intuitive interface',
+      startBanking: 'Start Banking',
+      openAccount: 'Open Account',
+      scanToDownload: 'Scan to Download',
+      mobileApp: 'NeoBank Mobile App',
+      bankingHours: 'Banking Hours',
+      uptime: 'Uptime',
+      activeUsers: 'Active Users',
       
       // Footer
       connectWithUs: 'Connect with us',
@@ -146,6 +167,23 @@ export class Landing {
       completeBanking: 'पूर्ण बैंकिंग',
       completeDescription: 'ऋण आवेदन, वर्चुअल कार्ड, केवाईसी सत्यापन, और फंड ट्रांसफर',
       
+      // Seamless Banking Section
+      seamlessMobileBanking: 'सहज मोबाइल बैंकिंग',
+      seamlessDescription: 'आधुनिक दुनिया के लिए डिज़ाइन किए गए हमारे अत्याधुनिक डिजिटल प्लेटफॉर्म के साथ बैंकिंग का अनुभव करें',
+      instantTransfers: 'तत्काल ट्रांसफर',
+      instantTransfersDesc: 'तत्काल प्रसंस्करण के साथ कहीं भी, कभी भी पैसा भेजें',
+      secureBanking: 'सुरक्षित बैंकिंग',
+      secureBankingDesc: 'उन्नत एन्क्रिप्शन और धोखाधड़ी सुरक्षा के साथ बैंक-स्तरीय सुरक्षा',
+      mobileFirst: 'मोबाइल फर्स्ट',
+      mobileFirstDesc: 'सहज इंटरफेस के साथ विशेष रूप से मोबाइल उपकरणों के लिए डिज़ाइन किया गया',
+      startBanking: 'बैंकिंग शुरू करें',
+      openAccount: 'खाता खोलें',
+      scanToDownload: 'डाउनलोड करने के लिए स्कैन करें',
+      mobileApp: 'नियोबैंक मोबाइल ऐप',
+      bankingHours: 'बैंकिंग घंटे',
+      uptime: 'अपटाइम',
+      activeUsers: 'सक्रिय उपयोगकर्ता',
+      
       // Footer
       connectWithUs: 'हमसे जुड़ें',
       seeLess: 'कम देखें',
@@ -162,7 +200,9 @@ export class Landing {
     }
   };
 
-  constructor(private router: Router) {}
+  constructor(private router: Router) {
+    this.startLogoAnimation();
+  }
 
   togglePersonalDropdown(event: Event) {
     event.preventDefault();
@@ -216,5 +256,16 @@ export class Landing {
   // Helper method to get translation
   t(key: string): string {
     return this.translations[this.currentLanguage as keyof typeof this.translations][key as keyof typeof this.translations['en']] || key;
+  }
+
+  startLogoAnimation() {
+    // Show animated logo for 1.5 seconds, then animate upward
+    setTimeout(() => {
+      this.logoAnimationComplete = true;
+      // Hide animated logo after animation completes
+      setTimeout(() => {
+        this.showAnimatedLogo = false;
+      }, 800); // Animation duration
+    }, 1500); // Initial display duration
   }
 }
