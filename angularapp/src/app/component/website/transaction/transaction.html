@@ -1,7 +1,7 @@
 <div class="transaction-container">
   <div class="back-button">
     <button type="button" (click)="goBack()">⬅ Back to Dashboard</button>
-    <button type="button" (click)="cleanupDuplicateLoanTransactions()" class="cleanup-btn">🧹 Clean Duplicates</button>
+    <button type="button" (click)="cleanupDuplicateLoanTransactions()" class="cleanup-btn"> Clean Duplicates</button>
   </div>
 
   <!-- Loading State -->
@@ -42,7 +42,9 @@
     <input type="text" [(ngModel)]="searchTerm" placeholder="Search by merchant" name="search">
     <input type="date" [(ngModel)]="fromDate" name="from">
     <input type="date" [(ngModel)]="toDate" name="to">
-    <button type="button" (click)="downloadStatement()">Download CSV</button>
+    <button type="button" (click)="downloadStatement()" class="download-csv-btn" [disabled]="loading || transactions.length === 0">
+       Download CSV
+    </button>
   </div>
 
   <!-- Mini Statement -->

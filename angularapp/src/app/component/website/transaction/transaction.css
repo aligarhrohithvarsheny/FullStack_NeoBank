@@ -1,7 +1,12 @@
 .transaction-container {
-  padding: 2rem;
-  background: #f9fafb;
-  border-radius: 12px;
+  max-width: 1200px;
+  margin: 30px auto;
+  padding: 30px;
+  border: 2px solid #0077cc;
+  border-radius: 15px;
+  background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  box-shadow: 0 8px 25px rgba(0, 119, 204, 0.15);
   position: relative;
 }
 
@@ -42,8 +47,9 @@
   transform: translate(-50%, -50%);
   background: white;
   padding: 30px;
-  border-radius: 10px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  border-radius: 15px;
+  border: 2px solid #dc3545;
+  box-shadow: 0 8px 25px rgba(220, 53, 69, 0.15);
   text-align: center;
   z-index: 1000;
 }
@@ -64,87 +70,154 @@
 }
 
 h2, h3 {
-  color: #1f2937;
+  color: #0077cc;
+  margin-bottom: 25px;
+  text-align: center;
+  font-size: 1.8rem;
+  font-weight: 600;
+}
+
+h3 {
+  font-size: 1.4rem;
+  margin-bottom: 20px;
+  text-align: left;
 }
 
 form {
   display: flex;
   gap: 1rem;
   flex-wrap: wrap;
-  margin-bottom: 1rem;
-  background: #fff;
-  padding: 1rem;
-  border-radius: 8px;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+  margin-bottom: 25px;
+  background: white;
+  padding: 25px;
+  border-radius: 12px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  border-left: 4px solid #0077cc;
 }
 
 .form-group {
   flex: 1 1 200px;
   display: flex;
   flex-direction: column;
+  margin-bottom: 15px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 8px;
+  color: #333;
+  font-weight: 600;
+  font-size: 0.95rem;
 }
 
 input, select, button {
-  padding: 8px;
-  border-radius: 6px;
-  border: 1px solid #ccc;
-  margin-top: 4px;
+  padding: 12px 15px;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 1rem;
+  transition: all 0.3s ease;
+  box-sizing: border-box;
+}
+
+input:focus, select:focus {
+  outline: none;
+  border-color: #0077cc;
+  box-shadow: 0 0 0 3px rgba(0, 119, 204, 0.1);
 }
 
 button {
-  background: #0078ff;
+  background: linear-gradient(135deg, #0077cc, #0056b3);
   color: white;
   border: none;
   cursor: pointer;
   margin-top: auto;
+  font-weight: 600;
+  transition: all 0.3s ease;
 }
 
 button:hover {
-  background: #005ecb;
+  background: linear-gradient(135deg, #0056b3, #004085);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(0, 119, 204, 0.3);
 }
 
 .filters {
   display: flex;
   gap: 1rem;
-  margin-bottom: 1rem;
+  margin-bottom: 25px;
   flex-wrap: wrap;
+  background: white;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  border-left: 4px solid #17a2b8;
+}
+
+.mini-statement, .transaction-table {
+  background: white;
+  padding: 25px;
+  border-radius: 12px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  margin-bottom: 25px;
+  border-left: 4px solid #28a745;
 }
 
 table {
   width: 100%;
   border-collapse: collapse;
-  margin-top: 1rem;
+  margin-top: 20px;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 table, th, td {
-  border: 1px solid #ccc;
+  border: 1px solid #e0e0e0;
 }
 
 th, td {
-  padding: 8px;
+  padding: 12px 8px;
   text-align: center;
 }
 
 th {
-  background: #e5e7eb;
+  background: linear-gradient(135deg, #0077cc, #0056b3);
+  color: white;
+  font-weight: 600;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+td {
+  font-size: 0.9rem;
+  color: #333;
+}
+
+tr:hover {
+  background-color: #f8f9fa;
+  transition: background-color 0.2s ease;
 }
 .back-button {
-  margin-bottom: 1rem;
+  margin-bottom: 20px;
   display: flex;
   gap: 1rem;
 }
 
 .back-button button {
-  background: #9333ea; /* purple */
+  background: #6c757d;
   color: white;
   border: none;
-  padding: 8px 14px;
-  border-radius: 6px;
+  padding: 8px 16px;
+  border-radius: 8px;
   cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.3s ease;
 }
 
 .back-button button:hover {
-  background: #6b21a8;
+  background: #5a6268;
+  transform: translateY(-1px);
 }
 
 .cleanup-btn {
@@ -155,11 +228,315 @@ th {
   background: #dc2626 !important;
 }
 
-/* Loan Credit Transaction Styling */
-.loan-credit {
-  background-color: #d4edda !important;
+/* Transaction Type Styling - User Transaction Palette */
+
+/* Credit/Credited Transaction Styling (Green) */
+.credit, .credited, .loan-credit, .completed {
+  background: linear-gradient(135deg, #d4edda, #c3e6cb) !important;
   color: #155724 !important;
-  font-weight: bold;
-  padding: 4px 8px;
-  border-radius: 4px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 2px solid #28a745;
+  box-shadow: 0 3px 8px rgba(40, 167, 69, 0.25);
+  animation: pulse-credit 3s infinite;
+  text-transform: uppercase;
+  font-size: 0.85rem;
+  letter-spacing: 0.5px;
+}
+
+/* Debit Transaction Styling (Blue) */
+.debit, .loan-debit {
+  background: linear-gradient(135deg, #cce7ff, #b3d9ff) !important;
+  color: #004085 !important;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 2px solid #007bff;
+  box-shadow: 0 3px 8px rgba(0, 123, 255, 0.25);
+  animation: pulse-debit 2.5s infinite;
+  text-transform: uppercase;
+  font-size: 0.85rem;
+  letter-spacing: 0.5px;
+}
+
+/* Cancelled Transaction Styling (Red) */
+.cancelled, .failed, .rejected {
+  background: linear-gradient(135deg, #f8d7da, #f5c6cb) !important;
+  color: #721c24 !important;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 2px solid #dc3545;
+  box-shadow: 0 3px 8px rgba(220, 53, 69, 0.25);
+  animation: pulse-cancelled 2s infinite;
+  text-transform: uppercase;
+  font-size: 0.85rem;
+  letter-spacing: 0.5px;
+}
+
+/* Row-level styling for transaction types */
+/* Credit/Credited rows (Green) */
+table tbody tr:has(.credit),
+table tbody tr:has(.credited),
+table tbody tr:has(.loan-credit),
+table tbody tr:has(.completed) {
+  background: linear-gradient(135deg, rgba(40, 167, 69, 0.08), rgba(40, 167, 69, 0.03));
+  border-left: 4px solid #28a745;
+  box-shadow: 0 2px 4px rgba(40, 167, 69, 0.1);
+}
+
+/* Debit rows (Blue) */
+table tbody tr:has(.debit),
+table tbody tr:has(.loan-debit) {
+  background: linear-gradient(135deg, rgba(0, 123, 255, 0.08), rgba(0, 123, 255, 0.03));
+  border-left: 4px solid #007bff;
+  box-shadow: 0 2px 4px rgba(0, 123, 255, 0.1);
+}
+
+/* Cancelled/Failed rows (Red) */
+table tbody tr:has(.cancelled),
+table tbody tr:has(.failed),
+table tbody tr:has(.rejected) {
+  background: linear-gradient(135deg, rgba(220, 53, 69, 0.08), rgba(220, 53, 69, 0.03));
+  border-left: 4px solid #dc3545;
+  box-shadow: 0 2px 4px rgba(220, 53, 69, 0.1);
+}
+
+/* Alternative approach for row styling (if :has() is not supported) */
+table tbody tr.credit-row,
+table tbody tr.credited-row,
+table tbody tr.loan-credit-row,
+table tbody tr.completed-row {
+  background: linear-gradient(135deg, rgba(40, 167, 69, 0.08), rgba(40, 167, 69, 0.03));
+  border-left: 4px solid #28a745;
+  box-shadow: 0 2px 4px rgba(40, 167, 69, 0.1);
+}
+
+table tbody tr.debit-row,
+table tbody tr.loan-debit-row {
+  background: linear-gradient(135deg, rgba(0, 123, 255, 0.08), rgba(0, 123, 255, 0.03));
+  border-left: 4px solid #007bff;
+  box-shadow: 0 2px 4px rgba(0, 123, 255, 0.1);
+}
+
+table tbody tr.cancelled-row,
+table tbody tr.failed-row,
+table tbody tr.rejected-row {
+  background: linear-gradient(135deg, rgba(220, 53, 69, 0.08), rgba(220, 53, 69, 0.03));
+  border-left: 4px solid #dc3545;
+  box-shadow: 0 2px 4px rgba(220, 53, 69, 0.1);
+}
+
+/* Pulse animations */
+@keyframes pulse-credit {
+  0% {
+    box-shadow: 0 3px 8px rgba(40, 167, 69, 0.25);
+  }
+  50% {
+    box-shadow: 0 4px 12px rgba(40, 167, 69, 0.4);
+  }
+  100% {
+    box-shadow: 0 3px 8px rgba(40, 167, 69, 0.25);
+  }
+}
+
+@keyframes pulse-debit {
+  0% {
+    box-shadow: 0 3px 8px rgba(0, 123, 255, 0.25);
+  }
+  50% {
+    box-shadow: 0 4px 12px rgba(0, 123, 255, 0.4);
+  }
+  100% {
+    box-shadow: 0 3px 8px rgba(0, 123, 255, 0.25);
+  }
+}
+
+@keyframes pulse-cancelled {
+  0% {
+    box-shadow: 0 3px 8px rgba(220, 53, 69, 0.25);
+  }
+  50% {
+    box-shadow: 0 4px 12px rgba(220, 53, 69, 0.4);
+  }
+  100% {
+    box-shadow: 0 3px 8px rgba(220, 53, 69, 0.25);
+  }
+}
+
+/* Hover effects for transaction rows */
+/* Credit/Credited hover effects (Green) */
+table tbody tr:has(.credit):hover,
+table tbody tr:has(.credited):hover,
+table tbody tr:has(.loan-credit):hover,
+table tbody tr:has(.completed):hover {
+  background: linear-gradient(135deg, rgba(40, 167, 69, 0.15), rgba(40, 167, 69, 0.08));
+  transform: translateX(3px);
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 8px rgba(40, 167, 69, 0.2);
+}
+
+/* Debit hover effects (Blue) */
+table tbody tr:has(.debit):hover,
+table tbody tr:has(.loan-debit):hover {
+  background: linear-gradient(135deg, rgba(0, 123, 255, 0.15), rgba(0, 123, 255, 0.08));
+  transform: translateX(3px);
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 8px rgba(0, 123, 255, 0.2);
+}
+
+/* Cancelled/Failed hover effects (Red) */
+table tbody tr:has(.cancelled):hover,
+table tbody tr:has(.failed):hover,
+table tbody tr:has(.rejected):hover {
+  background: linear-gradient(135deg, rgba(220, 53, 69, 0.15), rgba(220, 53, 69, 0.08));
+  transform: translateX(3px);
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 8px rgba(220, 53, 69, 0.2);
+}
+
+/* Alternative hover effects */
+table tbody tr.credit-row:hover,
+table tbody tr.credited-row:hover,
+table tbody tr.loan-credit-row:hover,
+table tbody tr.completed-row:hover {
+  background: linear-gradient(135deg, rgba(40, 167, 69, 0.15), rgba(40, 167, 69, 0.08));
+  transform: translateX(3px);
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 8px rgba(40, 167, 69, 0.2);
+}
+
+table tbody tr.debit-row:hover,
+table tbody tr.loan-debit-row:hover {
+  background: linear-gradient(135deg, rgba(0, 123, 255, 0.15), rgba(0, 123, 255, 0.08));
+  transform: translateX(3px);
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 8px rgba(0, 123, 255, 0.2);
+}
+
+table tbody tr.cancelled-row:hover,
+table tbody tr.failed-row:hover,
+table tbody tr.rejected-row:hover {
+  background: linear-gradient(135deg, rgba(220, 53, 69, 0.15), rgba(220, 53, 69, 0.08));
+  transform: translateX(3px);
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 8px rgba(220, 53, 69, 0.2);
+}
+
+/* Cell styling for transaction types */
+/* Credit/Credited cell styling (Green) */
+table tbody tr:has(.credit) td,
+table tbody tr:has(.credited) td,
+table tbody tr:has(.loan-credit) td,
+table tbody tr:has(.completed) td {
+  color: #155724;
+  font-weight: 500;
+}
+
+/* Debit cell styling (Blue) */
+table tbody tr:has(.debit) td,
+table tbody tr:has(.loan-debit) td {
+  color: #004085;
+  font-weight: 500;
+}
+
+/* Cancelled/Failed cell styling (Red) */
+table tbody tr:has(.cancelled) td,
+table tbody tr:has(.failed) td,
+table tbody tr:has(.rejected) td {
+  color: #721c24;
+  font-weight: 500;
+}
+
+/* Alternative cell styling */
+table tbody tr.credit-row td,
+table tbody tr.credited-row td,
+table tbody tr.loan-credit-row td,
+table tbody tr.completed-row td {
+  color: #155724;
+  font-weight: 500;
+}
+
+table tbody tr.debit-row td,
+table tbody tr.loan-debit-row td {
+  color: #004085;
+  font-weight: 500;
+}
+
+table tbody tr.cancelled-row td,
+table tbody tr.failed-row td,
+table tbody tr.rejected-row td {
+  color: #721c24;
+  font-weight: 500;
+}
+
+/* Download CSV Button */
+.download-csv-btn {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.download-csv-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.download-csv-btn:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 2px 6px rgba(102, 126, 234, 0.3);
+}
+
+.download-csv-btn:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+  opacity: 0.6;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .transaction-container {
+    margin: 15px;
+    padding: 20px;
+  }
+  
+  .form-group {
+    flex: 1 1 100%;
+  }
+  
+  .filters {
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .back-button {
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .back-button button {
+    margin: 0;
+  }
+  
+  table {
+    font-size: 0.8rem;
+  }
+  
+  th, td {
+    padding: 8px 4px;
+  }
 }

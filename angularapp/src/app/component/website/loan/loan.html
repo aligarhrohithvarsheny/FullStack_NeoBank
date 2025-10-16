@@ -143,7 +143,8 @@
 
   <div class="loan-list" *ngIf="loans.length > 0">
     <h2>My Loan Requests</h2>
-    <table>
+    <div class="loan-table-container">
+      <table>
       <thead>
         <tr>
           <th>ID</th>
@@ -155,6 +156,7 @@
           <th>Status</th>
           <th>Applied Date</th>
           <th>Approved Date</th>
+          <th>Actions</th>
         </tr>
       </thead>
       <tbody>
@@ -172,8 +174,14 @@
           </td>
           <td>{{ loan.applicationDate | date:'short' }}</td>
           <td>{{ loan.approvalDate ? (loan.approvalDate | date:'short') : '-' }}</td>
+          <td>
+            <button class="download-pdf-btn" (click)="downloadLoanPDF(loan)" title="Download Loan Details PDF">
+               Download PDF
+            </button>
+          </td>
         </tr>
       </tbody>
-    </table>
+      </table>
+    </div>
   </div>
 </div>

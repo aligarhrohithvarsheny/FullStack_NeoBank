@@ -1,19 +1,12 @@
 <div class="loans-container">
   <h2>Loan Applications Management</h2>
   
-  <!-- Debug Info -->
-  <div style="background: #f0f0f0; padding: 10px; margin: 10px 0; border-radius: 5px;">
-    <strong>Debug Info:</strong><br>
-    Loading: {{ loading }}<br>
-    Loan Requests Count: {{ loanRequests.length }}<br>
-    Component Loaded: ✅
-  </div>
 
   <!-- Back to Dashboard Button -->
   <button class="back-btn" (click)="goBack()">← Back to Dashboard</button>
   
   <!-- Refresh Button -->
-  <button class="refresh-btn" (click)="loadAllLoans()">🔄 Refresh</button>
+  <button class="refresh-btn" (click)="loadAllLoans()"> Refresh</button>
 
   <!-- Loading indicator -->
   <div *ngIf="loading" class="loading">Loading loan applications...</div>

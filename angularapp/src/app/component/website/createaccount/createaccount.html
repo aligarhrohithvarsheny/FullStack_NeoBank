@@ -1,5 +1,11 @@
 <div class="create-account-container">
-  <h2>Create New Account</h2>
+  <div class="header-section">
+    <div class="brand-container">
+      <img src="/favicon.ico" alt="NeoBank Logo" class="logo">
+      <span class="brand-name">NeoBank</span>
+    </div>
+    <h2>Create New Account</h2>
+  </div>
 
   <!-- Loading State -->
   <div *ngIf="loading" class="loading-overlay">
@@ -175,7 +181,7 @@
     <!-- City -->
     <div class="form-group">
       <label>City</label>
-      <select formControlName="city" class="city-dropdown" [disabled]="!availableCities.length">
+      <select formControlName="city" class="city-dropdown">
         <option value="">Select your city</option>
         <option *ngFor="let city of availableCities" [value]="city">{{ city }}</option>
       </select>
@@ -210,4 +216,11 @@
     <!-- Submit -->
     <button type="submit">Submit Account Request</button>
   </form>
+
+  <!-- Back Button -->
+  <div class="back-button-section">
+    <button class="back-button" (click)="goBack()">
+      ← Back to Landing Page
+    </button>
+  </div>
 </div>

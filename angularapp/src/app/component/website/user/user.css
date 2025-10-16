@@ -231,52 +231,6 @@
   line-height: 1.4;
 }
 
-/* App Download Buttons */
-.app-download-buttons {
-  display: flex;
-  gap: 15px;
-  margin-top: 30px;
-}
-
-.download-btn {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  background: rgba(255, 255, 255, 0.1);
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  border-radius: 12px;
-  padding: 12px 20px;
-  color: white;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  backdrop-filter: blur(10px);
-}
-
-.download-btn:hover {
-  background: rgba(255, 255, 255, 0.2);
-  border-color: rgba(255, 255, 255, 0.5);
-  transform: translateY(-2px);
-}
-
-.download-icon {
-  font-size: 24px;
-}
-
-.download-text {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-}
-
-.download-label {
-  font-size: 12px;
-  opacity: 0.8;
-}
-
-.download-store {
-  font-size: 16px;
-  font-weight: 600;
-}
 
 .promotional-features {
   list-style: none;
@@ -314,7 +268,7 @@
   background: white;
   border-radius: 16px;
   padding: 25px;
-  margin-bottom: 30px;
+  margin-top: 20px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
   border: 1px solid #e2e8f0;
   max-width: 500px;
@@ -406,6 +360,54 @@
   max-width: 500px;
   width: 100%;
   overflow: hidden;
+}
+
+/* NeoBank Branding Section */
+.branding-section {
+  text-align: center;
+  padding: 30px 40px 25px;
+  background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+  border-bottom: 2px solid #e2e8f0;
+}
+
+.brand-logo-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 15px;
+  margin-bottom: 10px;
+}
+
+.brand-logo {
+  width: 50px;
+  height: 50px;
+  object-fit: contain;
+  filter: drop-shadow(0 4px 8px rgba(0, 119, 204, 0.2));
+  transition: transform 0.3s ease;
+}
+
+.brand-logo:hover {
+  transform: scale(1.1);
+}
+
+.brand-name {
+  font-size: 2.2rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, #0077cc, #0052a3);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin: 0;
+  letter-spacing: 2px;
+  text-shadow: 0 2px 4px rgba(0, 119, 204, 0.1);
+}
+
+.brand-tagline {
+  font-size: 0.9rem;
+  color: #666;
+  margin: 0;
+  font-weight: 500;
+  letter-spacing: 0.5px;
 }
 
 /* Tab Container */
@@ -550,32 +552,7 @@
   text-decoration: underline;
 }
 
-/* Screen Select */
-.screen-select {
-  background: white;
-}
 
-/* Captcha Section */
-.captcha-section {
-  margin-bottom: 20px;
-}
-
-.captcha-label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-}
-
-.captcha-label input[type="checkbox"] {
-  width: auto;
-  margin: 0;
-}
-
-.captcha-text {
-  font-size: 14px;
-  color: #374151;
-}
 
 /* Secure Login Button */
 .secure-login-btn {
@@ -604,37 +581,6 @@
   font-size: 18px;
 }
 
-/* Utility Links */
-.utility-links {
-  display: flex;
-  justify-content: space-around;
-  margin-top: 30px;
-  padding-top: 20px;
-  border-top: 1px solid #e2e8f0;
-}
-
-.utility-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 5px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.utility-item:hover {
-  transform: translateY(-2px);
-}
-
-.utility-icon {
-  font-size: 20px;
-}
-
-.utility-text {
-  font-size: 12px;
-  color: #64748b;
-  font-weight: 500;
-}
 
 /* Signup Form */
 .signup-form {
@@ -875,15 +821,30 @@
   .form-content {
     padding: 20px;
   }
-  
-  .app-download-buttons {
-    flex-direction: column;
-    gap: 10px;
+
+  /* Responsive Branding */
+  .branding-section {
+    padding: 25px 30px 20px;
+  }
+
+  .brand-logo-container {
+    gap: 12px;
+  }
+
+  .brand-logo {
+    width: 45px;
+    height: 45px;
+  }
+
+  .brand-name {
+    font-size: 1.8rem;
+    letter-spacing: 1.5px;
+  }
+
+  .brand-tagline {
+    font-size: 0.85rem;
   }
   
-  .download-btn {
-    justify-content: center;
-  }
 }
 
 @media (max-width: 480px) {
@@ -903,11 +864,30 @@
   .fraud-tips-card {
     padding: 15px;
   }
-  
-  .utility-links {
-    flex-direction: column;
-    gap: 15px;
+
+  /* Mobile Branding */
+  .branding-section {
+    padding: 20px 25px 15px;
   }
+
+  .brand-logo-container {
+    gap: 10px;
+  }
+
+  .brand-logo {
+    width: 40px;
+    height: 40px;
+  }
+
+  .brand-name {
+    font-size: 1.5rem;
+    letter-spacing: 1px;
+  }
+
+  .brand-tagline {
+    font-size: 0.8rem;
+  }
+  
 }
 
 /* Account Unlock Styles */
@@ -954,29 +934,31 @@
 }
 
 .error-message {
-  background: #fee2e2;
-  border: 1px solid #fca5a5;
-  color: #991b1b;
+  background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+  border: 2px solid #dc3545;
+  color: #333;
   padding: 12px 16px;
-  border-radius: 6px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   gap: 8px;
   font-size: 14px;
   margin-bottom: 10px;
+  box-shadow: 0 4px 15px rgba(220, 53, 69, 0.1);
 }
 
 .success-message {
-  background: #d1fae5;
-  border: 1px solid #a7f3d0;
-  color: #065f46;
+  background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+  border: 2px solid #28a745;
+  color: #333;
   padding: 12px 16px;
-  border-radius: 6px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   gap: 8px;
   font-size: 14px;
   margin-bottom: 10px;
+  box-shadow: 0 4px 15px rgba(40, 167, 69, 0.1);
 }
 
 /* Modal Styles */
@@ -992,6 +974,8 @@
   justify-content: center;
   z-index: 1000;
   backdrop-filter: blur(4px);
+  padding: 20px;
+  box-sizing: border-box;
 }
 
 .unlock-modal {
@@ -1199,18 +1183,22 @@
 
 .forgot-password-modal {
   max-width: 500px;
-  width: 90%;
+  width: 100%;
+  max-height: 90vh;
   background: white;
-  border-radius: 12px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-  border: 1px solid #e5e7eb;
+  border-radius: 15px;
+  border: 2px solid #0077cc;
+  box-shadow: 0 8px 25px rgba(0, 119, 204, 0.15);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
 }
 
 .forgot-password-modal .modal-header {
-  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+  background: linear-gradient(135deg, #0077cc, #0056b3);
   color: white;
   padding: 20px 24px;
-  border-radius: 12px 12px 0 0;
+  border-radius: 13px 13px 0 0;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -1243,13 +1231,15 @@
 }
 
 .forgot-password-modal .modal-body {
-  padding: 24px;
+  padding: 25px;
+  flex: 1;
+  overflow-y: auto;
 }
 
 /* Success Screen Styles */
 .success-screen {
   text-align: center;
-  padding: 20px 0;
+  padding: 25px 0;
 }
 
 .success-icon-container {
@@ -1316,9 +1306,9 @@
 
 /* Error Message Styles */
 .error-message {
-  background: #fef2f2;
-  border: 1px solid #fecaca;
-  color: #dc2626;
+  background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+  border: 2px solid #dc3545;
+  color: #333;
   padding: 12px 16px;
   border-radius: 8px;
   margin: 16px 0;
@@ -1327,6 +1317,7 @@
   gap: 8px;
   font-size: 14px;
   font-weight: 500;
+  box-shadow: 0 4px 15px rgba(220, 53, 69, 0.1);
 }
 
 .error-icon {
@@ -1344,33 +1335,33 @@
 .reset-form {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 20px;
 }
 
 .form-row {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
 }
 
 .reset-form .input-group {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 
 .reset-form .input-group label {
-  font-weight: 500;
-  color: #374151;
-  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+  font-size: 0.95rem;
 }
 
 .reset-form .input-group input {
-  padding: 14px 16px;
-  border: 2px solid #e5e7eb;
+  padding: 12px 15px;
+  border: 2px solid #e0e0e0;
   border-radius: 8px;
-  font-size: 14px;
-  transition: all 0.2s ease;
+  font-size: 1rem;
+  transition: all 0.3s ease;
   background: white;
   width: 100%;
   box-sizing: border-box;
@@ -1378,82 +1369,83 @@
 
 .reset-form .input-group input:focus {
   outline: none;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  border-color: #0077cc;
+  box-shadow: 0 0 0 3px rgba(0, 119, 204, 0.1);
   transform: translateY(-1px);
 }
 
 .reset-form .input-group input:invalid {
-  border-color: #ef4444;
-  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+  border-color: #dc3545;
+  box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.1);
 }
 
 .reset-form .input-group input:valid {
-  border-color: #10b981;
+  border-color: #28a745;
 }
 
 .reset-form .input-help {
-  margin-top: 4px;
+  margin-top: 6px;
 }
 
 .reset-form .help-text {
-  font-size: 12px;
-  color: #6b7280;
+  font-size: 0.85rem;
+  color: #666;
 }
 
 .modal-actions {
   display: flex;
-  gap: 12px;
+  gap: 15px;
   justify-content: flex-end;
-  margin-top: 24px;
+  margin-top: 25px;
   align-items: center;
 }
 
 .cancel-btn {
-  padding: 12px 24px;
-  border: 2px solid #e5e7eb;
+  padding: 12px 25px;
+  border: 2px solid #6c757d;
   background: white;
-  color: #6b7280;
+  color: #6c757d;
   border-radius: 8px;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s ease;
-  font-size: 14px;
+  transition: all 0.3s ease;
+  font-size: 1rem;
   min-width: 100px;
 }
 
 .cancel-btn:hover {
-  border-color: #d1d5db;
-  background: #f9fafb;
-  color: #374151;
+  border-color: #5a6268;
+  background: #f8f9fa;
+  color: #333;
+  transform: translateY(-1px);
 }
 
 .reset-submit-btn {
-  padding: 14px 28px;
-  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+  padding: 12px 25px;
+  background: linear-gradient(135deg, #0077cc, #0056b3);
   color: white;
   border: none;
   border-radius: 8px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.3s ease;
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 14px;
+  font-size: 1rem;
   min-width: 140px;
   justify-content: center;
 }
 
 .reset-submit-btn:hover:not(:disabled) {
-  background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%);
+  background: linear-gradient(135deg, #0056b3, #004085);
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+  box-shadow: 0 4px 15px rgba(0, 119, 204, 0.3);
 }
 
 .reset-submit-btn:active:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+  box-shadow: 0 4px 12px rgba(0, 119, 204, 0.3);
 }
 
 .reset-submit-btn:disabled {
@@ -1474,14 +1466,19 @@
 }
 
 /* Responsive forgot password modal */
-@media (max-width: 640px) {
+@media (max-width: 768px) {
+  .modal-overlay {
+    padding: 15px;
+  }
+  
   .forgot-password-modal {
-    margin: 20px;
-    width: calc(100% - 40px);
+    max-width: 100%;
+    width: 100%;
+    max-height: 95vh;
   }
   
   .forgot-password-modal .modal-header {
-    padding: 16px 20px;
+    padding: 18px 20px;
   }
   
   .forgot-password-modal .modal-body {
@@ -1490,11 +1487,29 @@
   
   .modal-actions {
     flex-direction: column;
-    gap: 12px;
+    gap: 15px;
   }
   
   .cancel-btn, .reset-submit-btn {
     width: 100%;
+  }
+}
+
+@media (max-width: 640px) {
+  .modal-overlay {
+    padding: 10px;
+  }
+  
+  .forgot-password-modal {
+    max-height: 98vh;
+  }
+  
+  .forgot-password-modal .modal-header {
+    padding: 16px 18px;
+  }
+  
+  .forgot-password-modal .modal-body {
+    padding: 18px;
   }
   
   .forgot-link {
@@ -1539,5 +1554,60 @@
   .cancel-btn, .unlock-submit-btn {
     width: 100%;
     justify-content: center;
+  }
+}
+
+/* Additional responsive breakpoint for very small screens */
+@media (max-width: 480px) {
+  .modal-overlay {
+    padding: 5px;
+  }
+  
+  .forgot-password-modal {
+    max-height: 99vh;
+    border-radius: 12px;
+  }
+  
+  .forgot-password-modal .modal-header {
+    padding: 15px 16px;
+  }
+  
+  .forgot-password-modal .modal-header h3 {
+    font-size: 18px;
+  }
+  
+  .forgot-password-modal .modal-body {
+    padding: 16px;
+  }
+  
+  .reset-form {
+    gap: 16px;
+  }
+  
+  .form-row {
+    gap: 10px;
+  }
+  
+  .reset-form .input-group {
+    gap: 8px;
+  }
+  
+  .reset-form .input-group input {
+    padding: 10px 12px;
+    font-size: 0.95rem;
+  }
+  
+  .reset-form .input-group label {
+    font-size: 0.9rem;
+  }
+  
+  .modal-actions {
+    margin-top: 20px;
+    gap: 12px;
+  }
+  
+  .cancel-btn, .reset-submit-btn {
+    padding: 10px 20px;
+    font-size: 0.95rem;
   }
 }

@@ -4,6 +4,7 @@ import { isPlatformBrowser } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
+import { AlertService } from '../../../service/alert.service';
 
 interface UserProfile {
   id: string;
@@ -101,7 +102,8 @@ export class Dashboard implements OnInit {
   constructor(
     private router: Router,
     @Inject(PLATFORM_ID) private platformId: Object,
-    private http: HttpClient
+    private http: HttpClient,
+    private alertService: AlertService
   ) {}
 
   ngOnInit() {
@@ -119,7 +121,7 @@ export class Dashboard implements OnInit {
   }
 
   logout() {
-    alert('Logged out successfully 🚪');
+    this.alertService.logoutSuccess();
     this.router.navigate(['/admin/login']);
   }
 
@@ -540,5 +542,337 @@ export class Dashboard implements OnInit {
     this.userCards = [];
     this.userLoans = [];
     this.userTransactions = [];
+  }
+
+  // Download all users details as PDF
+  downloadAllUsersPDF() {
+    if (!isPlatformBrowser(this.platformId)) {
+      return;
+    }
+
+    if (!this.users || this.users.length === 0) {
+      alert('No users available to download');
+      return;
+    }
+
+    try {
+      const pdfContent = this.generateUsersPDFContent();
+      
+      // Create and download as HTML file (can be printed as PDF)
+      const blob = new Blob([pdfContent], { type: 'text/html;charset=utf-8' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `NeoBank_All_Users_Details_${new Date().toISOString().split('T')[0]}.html`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      // Show instruction to user
+      setTimeout(() => {
+        const userChoice = confirm('Document downloaded! Would you like to open it now to save as PDF?\n\nClick OK to open, or Cancel to download later.');
+        if (userChoice) {
+          // Open the downloaded file in a new window for printing
+          const newWindow = window.open();
+          if (newWindow) {
+            newWindow.document.write(pdfContent);
+            newWindow.document.close();
+            // Focus on the new window
+            newWindow.focus();
+          }
+        }
+      }, 500);
+      
+      console.log('Users PDF download initiated successfully');
+    } catch (error) {
+      console.error('Error downloading users PDF:', error);
+      alert('Failed to download users document. Please try again.');
+    }
+  }
+
+  // Generate PDF content with bank passbook style and all users details
+  private generateUsersPDFContent(): string {
+    const currentDate = new Date().toLocaleDateString('en-IN');
+    const currentTime = new Date().toLocaleTimeString('en-IN');
+    const adminName = 'Admin'; // You can get this from authentication service
+    
+    return `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>NeoBank - All Users Details</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f8f9fa;
+            color: #333;
+            position: relative;
+        }
+        .watermark {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(-45deg);
+            font-size: 60px;
+            color: rgba(30, 64, 175, 0.1);
+            font-weight: bold;
+            z-index: -1;
+            pointer-events: none;
+            white-space: nowrap;
+        }
+        .watermark-logo {
+            position: fixed;
+            top: 20%;
+            left: 20%;
+            transform: rotate(-30deg);
+            font-size: 40px;
+            color: rgba(30, 64, 175, 0.08);
+            z-index: -1;
+            pointer-events: none;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            position: relative;
+            z-index: 1;
+        }
+        .header {
+            text-align: center;
+            border-bottom: 3px solid #0077cc;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+        .bank-logo {
+            font-size: 32px;
+            font-weight: bold;
+            color: #0077cc;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+        .bank-name {
+            font-size: 24px;
+            color: #1e40af;
+            margin-bottom: 5px;
+        }
+        .bank-tagline {
+            font-size: 14px;
+            color: #666;
+            font-style: italic;
+        }
+        .document-title {
+            text-align: center;
+            font-size: 20px;
+            font-weight: bold;
+            color: #333;
+            margin: 30px 0;
+            padding: 15px;
+            background: linear-gradient(135deg, #e3f2fd, #bbdefb);
+            border-radius: 8px;
+            border-left: 4px solid #0077cc;
+        }
+        .summary-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .stat-card {
+            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            border-left: 4px solid #0077cc;
+        }
+        .stat-number {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #0077cc;
+        }
+        .stat-label {
+            font-size: 0.9rem;
+            color: #666;
+            margin-top: 5px;
+        }
+        .users-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .users-table th {
+            background: linear-gradient(135deg, #0077cc, #0056b3);
+            color: white;
+            padding: 15px 10px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+        .users-table td {
+            padding: 12px 10px;
+            border-bottom: 1px solid #e9ecef;
+            font-size: 0.85rem;
+        }
+        .users-table tr:hover {
+            background-color: #f8f9fa;
+        }
+        .users-table tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .status-approved {
+            background: #d4edda;
+            color: #155724;
+        }
+        .status-pending {
+            background: #fff3cd;
+            color: #856404;
+        }
+        .status-closed {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .balance-positive {
+            color: #28a745;
+            font-weight: 600;
+        }
+        .balance-zero {
+            color: #6c757d;
+        }
+        .footer {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 2px solid #e9ecef;
+            text-align: center;
+            color: #666;
+            font-size: 12px;
+        }
+        .admin-info {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 4px solid #0077cc;
+        }
+        .admin-info h4 {
+            margin: 0 0 10px 0;
+            color: #0077cc;
+            font-size: 1.1rem;
+        }
+        .admin-info p {
+            margin: 5px 0;
+            color: #333;
+        }
+        @media print {
+            body { margin: 0; }
+            .container { box-shadow: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="watermark">NeoBank</div>
+    <div class="watermark-logo">🏦</div>
+    <div class="container">
+        <div class="header">
+            <div class="bank-logo">
+                <span>🏦</span>
+                <span>NeoBank</span>
+            </div>
+            <div class="bank-name">NeoBank India Limited</div>
+            <div class="bank-tagline">Relationship beyond banking</div>
+        </div>
+
+        <div class="document-title">
+            📊 COMPLETE USERS DETAILS REPORT
+        </div>
+
+        <div class="admin-info">
+            <h4>📋 Report Information</h4>
+            <p><strong>Generated By:</strong> ${adminName} (Administrator)</p>
+            <p><strong>Generated On:</strong> ${currentDate} at ${currentTime}</p>
+            <p><strong>Total Users:</strong> ${this.users.length}</p>
+            <p><strong>Report Type:</strong> Complete User Details</p>
+        </div>
+
+        <div class="summary-stats">
+            <div class="stat-card">
+                <div class="stat-number">${this.users.length}</div>
+                <div class="stat-label">Total Users</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">${this.users.filter(u => u.status === 'APPROVED' || u.status === 'ACTIVE').length}</div>
+                <div class="stat-label">Active Users</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">${this.users.filter(u => u.status === 'PENDING').length}</div>
+                <div class="stat-label">Pending Users</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">₹${this.users.reduce((sum, user) => sum + user.balance, 0).toLocaleString('en-IN')}</div>
+                <div class="stat-label">Total Balance</div>
+            </div>
+        </div>
+
+        <table class="users-table">
+            <thead>
+                <tr>
+                    <th>Sr. No.</th>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Account Number</th>
+                    <th>Phone</th>
+                    <th>Balance</th>
+                    <th>Status</th>
+                    <th>Join Date</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${this.users.map((user, index) => `
+                <tr>
+                    <td>${index + 1}</td>
+                    <td><strong>${user.name}</strong></td>
+                    <td>${user.email}</td>
+                    <td>${user.accountNumber}</td>
+                    <td>${user.phoneNumber || 'N/A'}</td>
+                    <td class="${user.balance > 0 ? 'balance-positive' : 'balance-zero'}">₹${user.balance.toLocaleString('en-IN')}</td>
+                    <td><span class="status-badge status-${user.status.toLowerCase()}">${user.status}</span></td>
+                    <td>${user.joinDate || 'N/A'}</td>
+                </tr>
+                `).join('')}
+            </tbody>
+        </table>
+
+        <div class="footer">
+            <p><strong>🏦 NeoBank India Limited</strong></p>
+            <p>📍 Registered Office: NeoBank Tower, Financial District, Mumbai - 400001</p>
+            <p>📞 Customer Care: 1800-NEOBANK | 📧 Email: support@neobank.in</p>
+            <p>🌐 Website: www.neobank.in</p>
+            <p>📄 This is a computer generated report and does not require signature.</p>
+            <p>© 2025 NeoBank. All rights reserved.</p>
+            <p><strong>Generated on:</strong> ${currentDate} at ${currentTime} | <strong>By:</strong> ${adminName}</p>
+        </div>
+    </div>
+</body>
+</html>`;
   }
 }

@@ -4,7 +4,7 @@
     <button type="button" (click)="goBack()">⬅ Back to Dashboard</button>
   </div>
 
-  <h2>💸 Transfer Funds</h2>
+  <h2> Transfer Funds</h2>
 
   <!-- User Balance Display -->
   <div class="balance-section">
@@ -104,10 +104,10 @@
 
       <div class="form-actions">
         <button type="button" class="transfer-btn" (click)="transferFunds()">
-          💸 Send Money
+           Send Money
         </button>
         <button type="button" class="reset-btn" (click)="resetForm()">
-          🔄 Reset Form
+          Reset Form
         </button>
       </div>
     </form>
@@ -115,7 +115,7 @@
 
   <!-- Transfer History -->
   <div class="transfer-history" *ngIf="transfers.length > 0">
-    <h3>📋 Transfer History</h3>
+    <h3> Transfer History</h3>
     <div class="table-container">
       <table class="transfer-table">
         <thead>
@@ -129,11 +129,12 @@
             <th>Type</th>
             <th>Status</th>
             <th>Date</th>
+            <th>Actions</th>
           </tr>
         </thead>
         <tbody>
           <tr *ngFor="let transfer of transfers">
-            <td class="transfer-id">{{ transfer.id }}</td>
+            <td class="transfer-id">{{ transfer.transferId || transfer.id }}</td>
             <td class="recipient-name">{{ transfer.recipientName }}</td>
             <td class="account-number">{{ transfer.recipientAccountNumber }}</td>
             <td class="phone">{{ transfer.phone }}</td>
@@ -145,11 +146,28 @@
               </span>
             </td>
             <td class="status">
-              <span class="status-badge" [ngClass]="{'completed': transfer.status === 'Completed', 'pending': transfer.status === 'Pending', 'failed': transfer.status === 'Failed'}">
+              <span class="status-badge" [ngClass]="{'completed': transfer.status === 'Completed', 'pending': transfer.status === 'Pending', 'failed': transfer.status === 'Failed', 'cancelled': transfer.status === 'Cancelled'}">
                 {{ transfer.status }}
               </span>
             </td>
             <td class="date">{{ formatDate(transfer.date) }}</td>
+            <td class="actions">
+              <div class="action-buttons">
+                <button 
+                  class="action-btn pdf-btn" 
+                  (click)="downloadReceipt(transfer)"
+                  title="Download Receipt">
+                   Download Pdf
+                </button>
+                <button 
+                  *ngIf="canCancelTransfer(transfer)"
+                  class="action-btn cancel-btn" 
+                  (click)="cancelTransfer(transfer)"
+                  title="Cancel Transfer">
+                  ❌
+                </button>
+              </div>
+            </td>
           </tr>
         </tbody>
       </table>

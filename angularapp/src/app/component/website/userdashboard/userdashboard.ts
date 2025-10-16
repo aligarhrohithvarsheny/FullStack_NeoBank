@@ -2,6 +2,7 @@ import { Component, OnInit, Inject, PLATFORM_ID } from '@angular/core';
 import { Router } from '@angular/router';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
+import { AlertService } from '../../../service/alert.service';
 // import { UserService } from '../../service/user';
 // import { AccountService } from '../../service/account';
 // import { TransactionService } from '../../service/transaction';
@@ -25,7 +26,8 @@ export class Userdashboard implements OnInit {
   constructor(
     private router: Router, 
     @Inject(PLATFORM_ID) private platformId: Object,
-    private http: HttpClient
+    private http: HttpClient,
+    private alertService: AlertService
     // private userService: UserService,
     // private accountService: AccountService,
     // private transactionService: TransactionService
@@ -136,7 +138,7 @@ export class Userdashboard implements OnInit {
   }
 
   logout() {
-    alert('Logged out successfully 🚪');
+    this.alertService.logoutSuccess();
     this.router.navigate(['/website/user']); // back to login
   }
 

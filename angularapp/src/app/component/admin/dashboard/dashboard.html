@@ -3,17 +3,17 @@
 
 <div class="dashboard-container">
   <header>
-    <h2><i class="fa fa-bank"></i> Admin Dashboard</h2>
-    <button class="logout-btn" (click)="logout()"><i class="fa fa-right-from-bracket"></i> Logout</button>
+    <h2>Admin Dashboard</h2>
+    <button class="logout-btn" (click)="logout()">Logout</button>
   </header>
 
 
   <!-- User Search Section -->
   <div class="search-section">
     <div class="search-header">
-      <h3><i class="fa fa-search"></i> Search Users</h3>
+      <h3>Search Users</h3>
       <button class="refresh-btn" (click)="refreshUsersData()" title="Refresh data from database">
-        <i class="fa fa-refresh"></i> Refresh Data
+        Refresh Data
       </button>
     </div>
     <div class="search-form">
@@ -26,7 +26,10 @@
           (keyup.enter)="searchUsers()"
         >
         <button class="search-btn" (click)="searchUsers()">
-          <i class="fa fa-search"></i> Search
+          Search
+        </button>
+        <button class="pdf-download-btn" (click)="downloadAllUsersPDF()" [disabled]="users.length === 0" title="Download all users details as PDF">
+          <i class="fa fa-file-pdf"></i> Download PDF
         </button>
       </div>
       <div class="search-results" *ngIf="searchResults.length > 0">
@@ -137,10 +140,10 @@
             <div *ngFor="let card of userCards" class="card-item">
               <div class="card-header">
                 <h5>{{ card.cardType || 'Debit Card' }}</h5>
-                <span class="card-status" [ngClass]="card.status?.toLowerCase()">{{ card.status }}</span>
+                <span class="card-status" [ngClass]="card.status.toLowerCase()">{{ card.status }}</span>
               </div>
               <div class="card-details">
-                <p><strong>Card Number:</strong> **** **** **** {{ card.cardNumber?.slice(-4) }}</p>
+                <p><strong>Card Number:</strong> **** **** **** {{ card.cardNumber.slice(-4) }}</p>
                 <p><strong>Expiry:</strong> {{ card.expiry }}</p>
                 <p><strong>CVV:</strong> {{ card.cvv }}</p>
                 <p><strong>PIN Set:</strong> {{ card.pinSet ? 'Yes' : 'No' }}</p>
@@ -158,7 +161,7 @@
             <div *ngFor="let loan of userLoans" class="loan-item">
               <div class="loan-header">
                 <h5>{{ loan.loanType || 'Personal Loan' }}</h5>
-                <span class="loan-status" [ngClass]="loan.status?.toLowerCase()">{{ loan.status }}</span>
+                <span class="loan-status" [ngClass]="loan.status.toLowerCase()">{{ loan.status }}</span>
               </div>
               <div class="loan-details">
                 <p><strong>Amount:</strong> ₹{{ loan.amount | number:'1.2-2' }}</p>
@@ -190,7 +193,7 @@
                 <tr *ngFor="let transaction of userTransactions.slice(0, 10)">
                   <td>{{ transaction.date }}</td>
                   <td>
-                    <span class="transaction-type" [ngClass]="transaction.type?.toLowerCase()">
+                    <span class="transaction-type" [ngClass]="transaction.type.toLowerCase()">
                       {{ transaction.type }}
                     </span>
                   </td>
@@ -210,7 +213,7 @@
 
   <!-- Quick Actions Section -->
   <div class="quick-actions">
-    <h3><i class="fa fa-bolt"></i> Quick Actions</h3>
+    <h3>Quick Actions</h3>
     
     <!-- Direct Deposit/Withdrawal Form -->
     <div class="transaction-form-section">
@@ -299,7 +302,6 @@
         </button>
         
         <button type="button" class="btn-clear" (click)="clearForm()">
-          <i class="fa fa-refresh"></i>
           Clear Form
         </button>
       </div>

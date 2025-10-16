@@ -2,10 +2,14 @@ package com.neo.springapp.controller;
 
 import com.neo.springapp.model.Card;
 import com.neo.springapp.service.CardService;
+import com.neo.springapp.service.PasswordService;
 import org.springframework.data.domain.Page;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/cards")
@@ -13,9 +17,11 @@ import java.util.List;
 public class CardController {
 
     private final CardService cardService;
+    private final PasswordService passwordService;
 
-    public CardController(CardService cardService) {
+    public CardController(CardService cardService, PasswordService passwordService) {
         this.cardService = cardService;
+        this.passwordService = passwordService;
     }
 
     // Create new card
@@ -115,13 +121,50 @@ public class CardController {
     // Set PIN for a card
     @PutMapping("/{cardId}/pin")
     public Card setCardPin(@PathVariable Long cardId, @RequestParam String pin) {
-        return cardService.setCardPin(cardId, pin);
+        // Encrypt PIN before setting
+        String encryptedPin = passwordService.encryptPin(pin);
+        return cardService.setCardPin(cardId, encryptedPin);
     }
 
     // Reset PIN for a card (forgot PIN functionality)
     @PutMapping("/{cardId}/reset-pin")
     public Card resetCardPin(@PathVariable Long cardId, @RequestParam String pin) {
-        return cardService.resetCardPin(cardId, pin);
+        // Encrypt PIN before resetting
+        String encryptedPin = passwordService.encryptPin(pin);
+        return cardService.resetCardPin(cardId, encryptedPin);
+    }
+
+    // Verify PIN for a card
+    @PostMapping("/{cardId}/verify-pin")
+    public ResponseEntity<Map<String, Object>> verifyCardPin(@PathVariable Long cardId, @RequestParam String pin) {
+        try {
+            Card card = cardService.getCardById(cardId);
+            if (card == null) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", false);
+                response.put("message", "Card not found");
+                return ResponseEntity.notFound().build();
+            }
+            
+            if (!card.isPinSet()) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", false);
+                response.put("message", "PIN not set for this card");
+                return ResponseEntity.badRequest().body(response);
+            }
+            
+            boolean isValid = passwordService.verifyPin(pin, card.getPin());
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", isValid);
+            response.put("message", isValid ? "PIN verified successfully" : "Invalid PIN");
+            
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("message", "PIN verification failed: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(response);
+        }
     }
 
     // Replace a card (for admin approval of replacement requests)

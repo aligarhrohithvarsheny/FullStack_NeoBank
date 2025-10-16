@@ -4,10 +4,10 @@ import com.neo.springapp.model.User;
 import com.neo.springapp.model.Account;
 import com.neo.springapp.service.UserService;
 import com.neo.springapp.service.AccountService;
+import com.neo.springapp.service.PasswordService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
-import org.springframework.http.ResponseEntity.BodyBuilder;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -26,6 +26,9 @@ public class UserController {
     
     @Autowired
     private AccountService accountService;
+    
+    @Autowired
+    private PasswordService passwordService;
 
     // Authentication endpoint
     @PostMapping("/authenticate")
@@ -60,8 +63,8 @@ public class UserController {
                     return ResponseEntity.badRequest().body(response);
                 }
                 
-                // Simple password check (in real app, use proper password hashing)
-                if (password.equals(user.getPassword())) {
+                // Use encrypted password verification
+                if (passwordService.verifyPassword(password, user.getPassword())) {
                     // Reset failed login attempts on successful login
                     user.setFailedLoginAttempts(0);
                     user.setAccountLocked(false);
@@ -152,6 +155,10 @@ public class UserController {
                 return ResponseEntity.badRequest().body(response);
             }
             
+            // Encrypt password before saving
+            if (user.getPassword() != null && !passwordService.isEncrypted(user.getPassword())) {
+                user.setPassword(passwordService.encryptPassword(user.getPassword()));
+            }
             User savedUser = userService.saveUser(user);
             System.out.println("✅ User created successfully: " + savedUser.getEmail());
             
@@ -530,8 +537,8 @@ public class UserController {
                     
                     // Check if the first 4 digits match
                     if (userAadhar.length() >= 4 && userAadhar.substring(0, 4).equals(aadharFirst4)) {
-                        // Reset password
-                        user.setPassword(newPassword);
+                        // Reset password with encryption
+                        user.setPassword(passwordService.encryptPassword(newPassword));
                         userService.saveUser(user);
                         
                         Map<String, Object> response = new HashMap<>();

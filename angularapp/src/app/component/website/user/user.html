@@ -38,22 +38,6 @@
         <h1>Pay, Save, Borrow  money with a single bank</h1>
         <p>Login to experience the new world of banking</p>
         
-        <div class="app-download-buttons">
-          <button class="download-btn google-play">
-            <span class="download-icon">📱</span>
-            <div class="download-text">
-              <span class="download-label">Get It On</span>
-              <span class="download-store">Chrome Web </span>
-            </div>
-          </button>
-          <button class="download-btn app-store">
-            <span class="download-icon">🍎</span>
-            <div class="download-text">
-              <span class="download-label">Get It On</span>
-              <span class="download-store">Safari</span>
-            </div>
-          </button>
-        </div>
       </div>
     </div>
     
@@ -65,51 +49,16 @@
 
   <!-- Right Section - Login/Signup Form -->
   <div class="right-section">
-    <!-- Fraud Prevention Tips -->
-    <div class="fraud-tips-card">
-      <div class="fraud-header">
-        <div class="fraud-icon">🛡️</div>
-        <h3>Fraud Prevention Tips</h3>
-      </div>
-      <div class="fraud-tips">
-        <div class="tip-item">
-          <div class="tip-icon">🔐</div>
-          <div class="tip-content">
-            <div class="tip-title">Never Share OTP</div>
-            <div class="tip-description">NeoBank will never ask for your OTP via call, SMS, or email</div>
-          </div>
-        </div>
-        <div class="tip-item">
-          <div class="tip-icon">💳</div>
-          <div class="tip-content">
-            <div class="tip-title">Protect Card Details</div>
-            <div class="tip-description">Never share CVV, card number, or PIN with anyone</div>
-          </div>
-        </div>
-        <div class="tip-item">
-          <div class="tip-icon">📱</div>
-          <div class="tip-content">
-            <div class="tip-title">Secure Devices</div>
-            <div class="tip-description">Always log out from shared computers and keep devices updated</div>
-          </div>
-        </div>
-        <div class="tip-item">
-          <div class="tip-icon">🚫</div>
-          <div class="tip-content">
-            <div class="tip-title">Verify Transactions</div>
-            <div class="tip-description">Always verify transaction details before confirming payments</div>
-          </div>
-        </div>
-      </div>
-      <div class="fraud-warning">
-        <div class="warning-icon">⚠️</div>
-        <div class="warning-text">
-          <strong>Fraud Alert:</strong> If you receive suspicious calls or emails claiming to be from NeoBank, report immediately to our fraud helpline.
-        </div>
-      </div>
-    </div>
-
     <div class="login-card">
+      <!-- NeoBank Branding -->
+      <div class="branding-section">
+        <div class="brand-logo-container">
+          <img src="/favicon.ico" alt="NeoBank Logo" class="brand-logo">
+          <h1 class="brand-name">NEOBANK</h1>
+        </div>
+        <p class="brand-tagline">Your Digital Banking Partner</p>
+      </div>
+
       <!-- Tabs -->
       <div class="tab-container">
         <button class="tab-button active" (click)="switchToLogin()">LOGIN</button>
@@ -136,21 +85,7 @@
             </div>
           </div>
 
-          <div class="input-group">
-            <label>Directly go to screen</label>
-            <select [(ngModel)]="directScreen" name="directScreen" class="screen-select">
-              <option value="dashboard">Dashboard</option>
-              <option value="account">Account Summary</option>
-              <option value="transactions">Transactions</option>
-            </select>
-          </div>
 
-          <div class="captcha-section">
-            <label class="captcha-label">
-              <input type="checkbox" [(ngModel)]="captchaChecked" name="captchaChecked" />
-              <span class="captcha-text">I'm not a robot</span>
-            </label>
-          </div>
 
           <button type="submit" class="secure-login-btn">
             <span class="lock-icon">🔒</span>
@@ -174,25 +109,11 @@
             {{ errorMessage }}
           </div>
           <div class="success-message" *ngIf="successMessage">
-            <span class="success-icon">✅</span>
+            <span class="success-icon"></span>
             {{ successMessage }}
           </div>
         </div>
 
-        <div class="utility-links">
-          <div class="utility-item">
-            <div class="utility-icon">▶️</div>
-            <span class="utility-text">Demo Videos</span>
-          </div>
-          <div class="utility-item">
-            <div class="utility-icon">🧮</div>
-            <span class="utility-text">Smart Calculator</span>
-          </div>
-          <div class="utility-item">
-            <div class="utility-icon">📍</div>
-            <span class="utility-text">Locate Us</span>
-          </div>
-        </div>
       </div>
 
       <!-- Signup Form -->
@@ -238,6 +159,50 @@
 
         <div class="signup-footer">
           <p>Already have an account? <a href="#" (click)="switchToLogin()" class="login-link">Login here</a></p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Fraud Prevention Tips -->
+    <div class="fraud-tips-card">
+      <div class="fraud-header">
+        <div class="fraud-icon">🛡️</div>
+        <h3>Fraud Prevention Tips</h3>
+      </div>
+      <div class="fraud-tips">
+        <div class="tip-item">
+          <div class="tip-icon">🔐</div>
+          <div class="tip-content">
+            <div class="tip-title">Never Share OTP</div>
+            <div class="tip-description">NeoBank will never ask for your OTP via call, SMS, or email</div>
+          </div>
+        </div>
+        <div class="tip-item">
+          <div class="tip-icon">💳</div>
+          <div class="tip-content">
+            <div class="tip-title">Protect Card Details</div>
+            <div class="tip-description">Never share CVV, card number, or PIN with anyone</div>
+          </div>
+        </div>
+        <div class="tip-item">
+          <div class="tip-icon">📱</div>
+          <div class="tip-content">
+            <div class="tip-title">Secure Devices</div>
+            <div class="tip-description">Always log out from shared computers and keep devices updated</div>
+          </div>
+        </div>
+        <div class="tip-item">
+          <div class="tip-icon">🚫</div>
+          <div class="tip-content">
+            <div class="tip-title">Verify Transactions</div>
+            <div class="tip-description">Always verify transaction details before confirming payments</div>
+          </div>
+        </div>
+      </div>
+      <div class="fraud-warning">
+        <div class="warning-icon">⚠️</div>
+        <div class="warning-text">
+          <strong>Fraud Alert:</strong> If you receive suspicious calls or emails claiming to be from NeoBank, report immediately to our fraud helpline.
         </div>
       </div>
     </div>
@@ -313,7 +278,7 @@
         <!-- Success Screen -->
         <div *ngIf="showResetSuccessScreen" class="success-screen">
           <div class="success-icon-container">
-            <div class="success-icon">✅</div>
+            <div class="success-icon"></div>
           </div>
           <h3 class="success-title">Password Reset Successful!</h3>
           <p class="success-message">
@@ -321,7 +286,7 @@
           </p>
           <div class="success-actions">
             <button type="button" class="success-btn" (click)="closeSuccessScreen()">
-              <span class="login-icon">🔑</span>
+              <span class="login-icon"></span>
               Continue to Login
             </button>
           </div>
@@ -374,8 +339,8 @@
             <div class="modal-actions">
               <button type="button" class="cancel-btn" (click)="closeForgotPasswordModal()">Cancel</button>
               <button type="submit" class="reset-submit-btn" [disabled]="resettingPassword">
-                <span *ngIf="resettingPassword" class="loading-icon">⏳</span>
-                <span *ngIf="!resettingPassword" class="reset-icon">🔄</span>
+                <span *ngIf="resettingPassword" class="loading-icon"></span>
+                <span *ngIf="!resettingPassword" class="reset-icon"></span>
                 {{ resettingPassword ? 'Resetting...' : 'Reset Password' }}
               </button>
             </div>

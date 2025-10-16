@@ -1,9 +1,12 @@
 .transfer-container {
   max-width: 1200px;
-  margin: 0 auto;
-  padding: 20px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  min-height: 100vh;
+  margin: 30px auto;
+  padding: 30px;
+  border: 2px solid #0077cc;
+  border-radius: 15px;
+  background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  box-shadow: 0 8px 25px rgba(0, 119, 204, 0.15);
   color: #333;
 }
 
@@ -12,62 +15,61 @@
 }
 
 .back-button button {
-  background: rgba(255, 255, 255, 0.2);
+  background: #6c757d;
   color: white;
   border: none;
-  padding: 10px 20px;
+  padding: 8px 16px;
   border-radius: 8px;
   cursor: pointer;
-  font-weight: 600;
+  font-size: 0.9rem;
   transition: all 0.3s ease;
 }
 
 .back-button button:hover {
-  background: rgba(255, 255, 255, 0.3);
-  transform: translateY(-2px);
+  background: #5a6268;
+  transform: translateY(-1px);
 }
 
 h2 {
-  color: white;
+  color: #0077cc;
+  margin-bottom: 25px;
   text-align: center;
-  font-size: 2.5rem;
-  margin-bottom: 30px;
-  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+  font-size: 1.8rem;
+  font-weight: 600;
 }
 
 /* Balance Section */
 .balance-section {
-  margin-bottom: 30px;
+  margin-bottom: 25px;
   display: flex;
   justify-content: center;
 }
 
 .balance-card {
-  background: rgba(255, 255, 255, 0.95);
+  background: white;
   padding: 25px;
-  border-radius: 15px;
+  border-radius: 12px;
   text-align: center;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  border-left: 4px solid #28a745;
 }
 
 .balance-card h3 {
-  margin: 0 0 10px 0;
-  color: #666;
-  font-size: 1.1rem;
+  margin: 0 0 15px 0;
+  color: #0077cc;
+  font-size: 1.2rem;
+  font-weight: 600;
 }
 
 .balance-amount {
-  font-size: 2.5rem;
+  font-size: 2rem;
   font-weight: bold;
   color: #28a745;
-  margin: 0;
-  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
+  margin: 0 0 15px 0;
 }
 
 .refresh-btn {
-  background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+  background: linear-gradient(135deg, #0077cc, #0056b3);
   color: white;
   border: none;
   padding: 8px 16px;
@@ -75,14 +77,13 @@ h2 {
   cursor: pointer;
   font-size: 0.9rem;
   font-weight: 600;
-  margin-top: 10px;
   transition: all 0.3s ease;
-  box-shadow: 0 2px 8px rgba(0, 123, 255, 0.3);
 }
 
 .refresh-btn:hover {
+  background: linear-gradient(135deg, #0056b3, #004085);
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 123, 255, 0.4);
+  box-shadow: 0 4px 15px rgba(0, 119, 204, 0.3);
 }
 
 .default-balance-btn {
@@ -107,15 +108,16 @@ h2 {
 
 /* Success Message */
 .success-message {
-  background: linear-gradient(135deg, #28a745, #20c997);
-  color: white;
+  background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+  color: #333;
   padding: 20px;
   border-radius: 12px;
-  margin-bottom: 30px;
+  margin-bottom: 25px;
   display: flex;
   align-items: center;
   gap: 15px;
-  box-shadow: 0 8px 32px rgba(40, 167, 69, 0.3);
+  border: 2px solid #28a745;
+  box-shadow: 0 4px 15px rgba(40, 167, 69, 0.1);
   animation: slideInDown 0.5s ease-out;
 }
 
@@ -146,19 +148,19 @@ h2 {
 
 /* Transfer Form Section */
 .transfer-form-section {
-  background: rgba(255, 255, 255, 0.95);
-  padding: 30px;
-  border-radius: 15px;
-  margin-bottom: 30px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: white;
+  padding: 25px;
+  border-radius: 12px;
+  margin-bottom: 25px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  border-left: 4px solid #0077cc;
 }
 
 .transfer-form-section h3 {
-  margin: 0 0 25px 0;
-  color: #333;
-  font-size: 1.5rem;
+  margin: 0 0 20px 0;
+  color: #0077cc;
+  font-size: 1.4rem;
+  font-weight: 600;
   text-align: center;
 }
 
@@ -172,28 +174,31 @@ h2 {
 .form-group {
   display: flex;
   flex-direction: column;
+  margin-bottom: 15px;
 }
 
 .form-group label {
   margin-bottom: 8px;
+  color: #333;
   font-weight: 600;
-  color: #555;
+  font-size: 0.95rem;
 }
 
 .form-group input,
 .form-group select {
-  padding: 12px;
-  border: 2px solid #e1e5e9;
+  padding: 12px 15px;
+  border: 2px solid #e0e0e0;
   border-radius: 8px;
   font-size: 1rem;
   transition: all 0.3s ease;
+  box-sizing: border-box;
 }
 
 .form-group input:focus,
 .form-group select:focus {
   outline: none;
-  border-color: #667eea;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  border-color: #0077cc;
+  box-shadow: 0 0 0 3px rgba(0, 119, 204, 0.1);
 }
 
 /* Amount Input Special Styling */
@@ -211,7 +216,7 @@ h2 {
 }
 
 .max-btn {
-  background: #28a745;
+  background: linear-gradient(135deg, #28a745, #1e7e34);
   color: white;
   border: none;
   padding: 12px 20px;
@@ -222,8 +227,9 @@ h2 {
 }
 
 .max-btn:hover {
-  background: #218838;
-  transform: translateY(-1px);
+  background: linear-gradient(135deg, #1e7e34, #155724);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
 }
 
 .amount-hint {
@@ -237,34 +243,34 @@ h2 {
   display: flex;
   gap: 15px;
   justify-content: center;
-  margin-top: 30px;
+  margin-top: 25px;
 }
 
 .transfer-btn {
-  background: linear-gradient(135deg, #667eea, #764ba2);
+  background: linear-gradient(135deg, #0077cc, #0056b3);
   color: white;
   border: none;
-  padding: 15px 30px;
-  border-radius: 10px;
-  font-size: 1.1rem;
+  padding: 12px 25px;
+  border-radius: 8px;
+  font-size: 1rem;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
-  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
 }
 
 .transfer-btn:hover {
+  background: linear-gradient(135deg, #0056b3, #004085);
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 4px 15px rgba(0, 119, 204, 0.3);
 }
 
 .reset-btn {
   background: #6c757d;
   color: white;
   border: none;
-  padding: 15px 30px;
-  border-radius: 10px;
-  font-size: 1.1rem;
+  padding: 12px 25px;
+  border-radius: 8px;
+  font-size: 1rem;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
@@ -277,18 +283,18 @@ h2 {
 
 /* Transfer History */
 .transfer-history {
-  background: rgba(255, 255, 255, 0.95);
-  padding: 30px;
-  border-radius: 15px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: white;
+  padding: 25px;
+  border-radius: 12px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  border-left: 4px solid #28a745;
 }
 
 .transfer-history h3 {
-  margin: 0 0 25px 0;
-  color: #333;
-  font-size: 1.5rem;
+  margin: 0 0 20px 0;
+  color: #0077cc;
+  font-size: 1.4rem;
+  font-weight: 600;
   text-align: center;
 }
 
@@ -306,15 +312,17 @@ h2 {
 }
 
 .transfer-table thead {
-  background: linear-gradient(135deg, #667eea, #764ba2);
+  background: linear-gradient(135deg, #0077cc, #0056b3);
   color: white;
 }
 
 .transfer-table th {
-  padding: 15px 12px;
+  padding: 12px 8px;
   text-align: left;
   font-weight: 600;
   font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .transfer-table td {
@@ -330,7 +338,7 @@ h2 {
 .transfer-id {
   font-family: monospace;
   font-weight: 600;
-  color: #667eea;
+  color: #0077cc;
 }
 
 .recipient-name {
@@ -386,6 +394,9 @@ h2 {
 .status-badge.completed {
   background: #d4edda;
   color: #155724;
+  border: 1px solid #28a745;
+  box-shadow: 0 2px 4px rgba(40, 167, 69, 0.2);
+  animation: pulse-completed 3s infinite;
 }
 
 .status-badge.pending {
@@ -398,6 +409,112 @@ h2 {
   color: #721c24;
 }
 
+.status-badge.cancelled {
+  background: #f8d7da;
+  color: #721c24;
+  border: 1px solid #dc3545;
+  box-shadow: 0 2px 4px rgba(220, 53, 69, 0.2);
+  animation: pulse-cancelled 2s infinite;
+}
+
+/* Completed transaction row styling */
+.transfer-table tbody tr:has(.status-badge.completed) {
+  background-color: rgba(40, 167, 69, 0.05);
+  border-left: 3px solid #28a745;
+}
+
+/* Alternative approach for completed row styling (if :has() is not supported) */
+.transfer-table tbody tr.completed-row {
+  background-color: rgba(40, 167, 69, 0.05);
+  border-left: 3px solid #28a745;
+}
+
+/* Cancelled transaction row styling */
+.transfer-table tbody tr:has(.status-badge.cancelled) {
+  background-color: rgba(220, 53, 69, 0.05);
+  border-left: 3px solid #dc3545;
+}
+
+/* Alternative approach for cancelled row styling (if :has() is not supported) */
+.transfer-table tbody tr.cancelled-row {
+  background-color: rgba(220, 53, 69, 0.05);
+  border-left: 3px solid #dc3545;
+}
+
+/* Pulse animation for completed status */
+@keyframes pulse-completed {
+  0% {
+    box-shadow: 0 2px 4px rgba(40, 167, 69, 0.2);
+  }
+  50% {
+    box-shadow: 0 2px 8px rgba(40, 167, 69, 0.4);
+  }
+  100% {
+    box-shadow: 0 2px 4px rgba(40, 167, 69, 0.2);
+  }
+}
+
+/* Pulse animation for cancelled status */
+@keyframes pulse-cancelled {
+  0% {
+    box-shadow: 0 2px 4px rgba(220, 53, 69, 0.2);
+  }
+  50% {
+    box-shadow: 0 2px 8px rgba(220, 53, 69, 0.4);
+  }
+  100% {
+    box-shadow: 0 2px 4px rgba(220, 53, 69, 0.2);
+  }
+}
+
+/* Hover effects for completed transactions */
+.transfer-table tbody tr:has(.status-badge.completed):hover {
+  background-color: rgba(40, 167, 69, 0.1);
+  transform: translateX(2px);
+  transition: all 0.3s ease;
+}
+
+.transfer-table tbody tr.completed-row:hover {
+  background-color: rgba(40, 167, 69, 0.1);
+  transform: translateX(2px);
+  transition: all 0.3s ease;
+}
+
+/* Hover effects for cancelled transactions */
+.transfer-table tbody tr:has(.status-badge.cancelled):hover {
+  background-color: rgba(220, 53, 69, 0.1);
+  transform: translateX(2px);
+  transition: all 0.3s ease;
+}
+
+.transfer-table tbody tr.cancelled-row:hover {
+  background-color: rgba(220, 53, 69, 0.1);
+  transform: translateX(2px);
+  transition: all 0.3s ease;
+}
+
+/* Additional styling for completed transaction cells */
+.transfer-table tbody tr:has(.status-badge.completed) td {
+  color: #155724;
+  font-weight: 500;
+}
+
+.transfer-table tbody tr.completed-row td {
+  color: #155724;
+  font-weight: 500;
+}
+
+/* Additional styling for cancelled transaction cells */
+.transfer-table tbody tr:has(.status-badge.cancelled) td {
+  color: #721c24;
+  font-weight: 500;
+}
+
+.transfer-table tbody tr.cancelled-row td {
+  color: #721c24;
+  font-weight: 500;
+}
+
 .date {
   color: #666;
   font-size: 0.85rem;
@@ -407,11 +524,10 @@ h2 {
 .no-transfers {
   text-align: center;
   padding: 40px;
-  background: rgba(255, 255, 255, 0.95);
-  border-radius: 15px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  border-left: 4px solid #17a2b8;
 }
 
 .no-transfers-icon {
@@ -421,8 +537,9 @@ h2 {
 
 .no-transfers h4 {
   margin: 0 0 10px 0;
-  color: #333;
+  color: #0077cc;
   font-size: 1.3rem;
+  font-weight: 600;
 }
 
 .no-transfers p {
@@ -431,14 +548,74 @@ h2 {
   font-size: 1rem;
 }
 
+/* Download PDF Button Styling */
+.pdf-btn {
+  background: linear-gradient(135deg, #0077cc, #0056b3);
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  text-decoration: none;
+  box-shadow: 0 2px 4px rgba(0, 119, 204, 0.2);
+}
+
+.pdf-btn:hover {
+  background: linear-gradient(135deg, #0056b3, #004085);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 119, 204, 0.3);
+}
+
+.pdf-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 6px rgba(0, 119, 204, 0.3);
+}
+
+.pdf-btn:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(0, 119, 204, 0.2);
+}
+
+/* PDF Button in Action Buttons */
+.action-btn.pdf-btn {
+  min-width: 120px;
+  justify-content: center;
+  font-size: 11px;
+  padding: 6px 10px;
+}
+
+/* PDF Button Icon Styling */
+.pdf-btn::before {
+  content: "📄";
+  font-size: 14px;
+  margin-right: 4px;
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
+  .transfer-container {
+    margin: 15px;
+    padding: 20px;
+  }
+  
   .form-row {
     grid-template-columns: 1fr;
   }
   
   .form-actions {
     flex-direction: column;
+    gap: 10px;
+  }
+  
+  .transfer-btn, .reset-btn {
+    width: 100%;
   }
   
   .transfer-table {
@@ -451,10 +628,23 @@ h2 {
   }
   
   .balance-amount {
-    font-size: 2rem;
+    font-size: 1.8rem;
   }
   
   h2 {
-    font-size: 2rem;
+    font-size: 1.5rem;
+  }
+  
+  /* Mobile PDF Button Styling */
+  .pdf-btn {
+    font-size: 10px;
+    padding: 5px 8px;
+    min-width: 100px;
+  }
+  
+  .action-btn.pdf-btn {
+    font-size: 10px;
+    padding: 5px 8px;
+    min-width: 100px;
   }
 }

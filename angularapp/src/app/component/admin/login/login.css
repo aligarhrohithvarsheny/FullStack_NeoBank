@@ -75,6 +75,22 @@
   background-clip: text;
   letter-spacing: -0.5px;
   position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.brand-logo {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+  transition: transform 0.3s ease;
+}
+
+.brand-logo:hover {
+  transform: scale(1.1);
 }
 
 .brand-name::after {
@@ -268,6 +284,12 @@ button:active {
   
   .brand-name {
     font-size: 28px;
+    gap: 10px;
+  }
+  
+  .brand-logo {
+    width: 32px;
+    height: 32px;
   }
   
   .brand-name::after {
@@ -291,6 +313,12 @@ button:active {
   
   .brand-name {
     font-size: 24px;
+    gap: 8px;
+  }
+  
+  .brand-logo {
+    width: 28px;
+    height: 28px;
   }
   
   .brand-name::after {

@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
+import { AlertService } from '../../../service/alert.service';
 
 @Component({
   selector: 'app-user',
@@ -15,8 +16,6 @@ export class User {
   // For login
   loginUserId: string = '';
   loginPassword: string = '';
-  directScreen: string = 'dashboard';
-  captchaChecked: boolean = false;
 
   // For create account
   signupName: string = '';
@@ -49,28 +48,23 @@ export class User {
 
   currentPage: string = 'login'; // 'login' | 'signup'
 
-  constructor(private router: Router, private http: HttpClient) {}
+  constructor(private router: Router, private http: HttpClient, private alertService: AlertService) {}
 
   login() {
     if (!this.loginUserId || !this.loginPassword) {
-      alert('Please enter User ID and Password ❌');
-      return;
-    }
-    
-    if (!this.captchaChecked) {
-      alert('Please verify that you are not a robot ❌');
+      this.alertService.userError('Validation Error', 'Please enter User ID and Password');
       return;
     }
 
     // Simple validation - in real app, this would check against database
     if (this.loginUserId === 'admin' && this.loginPassword === 'admin123') {
-      alert(`Login successful ✅ Welcome Admin`);
+      this.alertService.userSuccess('Login Successful', 'Welcome Admin!');
       this.router.navigate(['/admin/dashboard']);
     } else if (this.loginUserId && this.loginPassword) {
       // For regular users, fetch their real account data from database
       this.fetchUserDataAndLogin();
     } else {
-      alert('Invalid User ID or Password ❌');
+      this.alertService.userError('Login Failed', 'Invalid User ID or Password');
     }
   }
 
@@ -103,10 +97,10 @@ export class User {
             console.log('Session data stored:', sessionData);
             console.log('SessionStorage check:', sessionStorage.getItem('currentUser'));
             
-            alert(`Login successful ✅ Welcome ${userData.account?.name || userData.username}`);
+            this.alertService.userSuccess('Login Successful', `Welcome ${userData.account?.name || userData.username}!`);
             this.router.navigate(['/website/userdashboard']);
           } else {
-            alert('Account not approved yet. Please wait for admin approval ❌');
+            this.alertService.userError('Account Pending', 'Account not approved yet. Please wait for admin approval');
           }
         } else {
           // Check if account is locked
@@ -140,17 +134,17 @@ export class User {
 
   createAccount() {
     if (!this.signupName || !this.signupEmail || !this.signupMobile || !this.signupPassword || !this.confirmPassword) {
-      alert('Please fill in all fields ❌');
+      this.alertService.userError('Validation Error', 'Please fill in all fields');
       return;
     }
 
     if (this.signupPassword !== this.confirmPassword) {
-      alert('Passwords do not match ❌');
+      this.alertService.userError('Validation Error', 'Passwords do not match');
       return;
     }
 
     if (!this.termsAccepted) {
-      alert('Please accept Terms & Conditions ❌');
+      this.alertService.userError('Validation Error', 'Please accept Terms & Conditions');
       return;
     }
 
@@ -175,7 +169,7 @@ export class User {
         console.log('User account created successfully:', response);
         
         if (response.success) {
-          alert(`Account created successfully ✅ Welcome ${this.signupName}. Please wait for admin approval.`);
+          this.alertService.userSuccess('Account Created', `Welcome ${this.signupName}! Please wait for admin approval.`);
           
           // Reset form
           this.signupName = '';
@@ -188,7 +182,7 @@ export class User {
           // Switch back to login page
           this.currentPage = 'login';
         } else {
-          alert(`Account creation failed: ${response.message} ❌`);
+          this.alertService.userError('Account Creation Failed', response.message);
         }
       },
       error: (err: any) => {
@@ -196,11 +190,11 @@ export class User {
         
         // Try to parse error response
         if (err.error && err.error.message) {
-          alert(`Account creation failed: ${err.error.message} ❌`);
+          this.alertService.userError('Account Creation Failed', err.error.message);
         } else if (err.status === 400) {
-          alert('Account creation failed. Email, PAN, or Aadhar may already be in use. Please check your details and try again. ❌');
+          this.alertService.userError('Account Creation Failed', 'Email, PAN, or Aadhar may already be in use. Please check your details and try again.');
         } else {
-          alert('Account creation failed. Please try again. ❌');
+          this.alertService.userError('Account Creation Failed', 'Please try again.');
         }
       }
     });

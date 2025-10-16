@@ -1,22 +1,33 @@
 .apply-loan {
-  background: #fff;
-  border-radius: 12px;
-  padding: 25px;
-  max-width: 700px;
-  margin: 30px auto;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  font-family: Arial, sans-serif;
+  max-width: 1000px;
+  margin: 20px auto;
+  padding: 20px;
+  border: 2px solid #0077cc;
+  border-radius: 15px;
+  background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  box-shadow: 0 8px 25px rgba(0, 119, 204, 0.15);
 }
 
 .form-header {
   text-align: center;
-  margin-bottom: 20px;
+  margin-bottom: 15px;
 }
 
 .form-title {
-  font-size: 24px;
-  font-weight: bold;
-  color: #4a148c;
+  font-size: 1.6rem;
+  font-weight: 600;
+  color: #0077cc;
+  margin-bottom: 15px;
+}
+
+form {
+  background: white;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  margin-bottom: 20px;
+  border-left: 4px solid #0077cc;
 }
 
 .input-group {
@@ -26,115 +37,128 @@
 .input-label {
   display: block;
   margin-bottom: 6px;
-  font-weight: bold;
   color: #333;
+  font-weight: 600;
+  font-size: 0.9rem;
 }
 
 .input-field {
   width: 100%;
-  padding: 10px;
-  border: 1px solid #bbb;
+  padding: 10px 12px;
+  border: 2px solid #e0e0e0;
   border-radius: 8px;
-  font-size: 14px;
-  outline: none;
+  font-size: 0.95rem;
+  transition: all 0.3s ease;
+  box-sizing: border-box;
 }
 
 .input-field:focus {
-  border-color: #4a148c;
+  outline: none;
+  border-color: #0077cc;
+  box-shadow: 0 0 0 3px rgba(0, 119, 204, 0.1);
 }
 
 .submit-button {
   width: 100%;
-  padding: 12px;
-  background: #4a148c;
-  color: #fff;
+  padding: 12px 25px;
+  background: linear-gradient(135deg, #0077cc, #0056b3);
+  color: white;
   border: none;
   border-radius: 8px;
-  font-size: 16px;
+  font-size: 1rem;
+  font-weight: 600;
   cursor: pointer;
+  transition: all 0.3s ease;
 }
 
 .submit-button:hover {
-  background: #6a1b9a;
+  background: linear-gradient(135deg, #0056b3, #004085);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(0, 119, 204, 0.3);
 }
 
 .form-actions {
   display: flex;
   gap: 10px;
-  margin-top: 20px;
+  margin-top: 15px;
 }
 
 .calculate-button {
   flex: 1;
-  padding: 12px;
-  background: #2e7d32;
-  color: #fff;
+  padding: 12px 25px;
+  background: linear-gradient(135deg, #28a745, #1e7e34);
+  color: white;
   border: none;
   border-radius: 8px;
-  font-size: 16px;
-  font-weight: bold;
+  font-size: 1rem;
+  font-weight: 600;
   cursor: pointer;
-  transition: background 0.3s;
+  transition: all 0.3s ease;
 }
 
 .calculate-button:hover {
-  background: #388e3c;
+  background: linear-gradient(135deg, #1e7e34, #155724);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
 }
 
 /* EMI Calculator Styles */
 .emi-calculator {
-  margin-top: 30px;
-  padding: 25px;
-  background: #f8f9fa;
+  margin-top: 20px;
+  padding: 20px;
+  background: white;
   border-radius: 12px;
-  border: 1px solid #e9ecef;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  border-left: 4px solid #17a2b8;
 }
 
 .emi-calculator h2 {
-  color: #4a148c;
-  margin-bottom: 20px;
+  color: #0077cc;
+  margin-bottom: 15px;
   text-align: center;
-  font-size: 22px;
+  font-size: 1.3rem;
+  font-weight: 600;
 }
 
 .calculator-container {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 30px;
+  gap: 20px;
   align-items: start;
 }
 
 .calculator-inputs {
   display: flex;
   flex-direction: column;
-  gap: 15px;
+  gap: 12px;
 }
 
 .calculator-results {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 15px;
 }
 
 .result-card {
   background: #fff;
-  padding: 20px;
+  padding: 15px;
   border-radius: 10px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  border-left: 4px solid #4a148c;
+  border-left: 4px solid #0077cc;
 }
 
 .result-card h3 {
-  color: #4a148c;
-  margin-bottom: 15px;
-  font-size: 18px;
+  color: #0077cc;
+  margin-bottom: 12px;
+  font-size: 1rem;
+  font-weight: 600;
 }
 
 .result-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px 0;
+  padding: 6px 0;
   border-bottom: 1px solid #eee;
 }
 
@@ -149,27 +173,28 @@
 
 .result-value {
   font-weight: bold;
-  color: #4a148c;
-  font-size: 16px;
+  color: #0077cc;
+  font-size: 1rem;
 }
 
 .emi-breakdown {
   background: #fff;
-  padding: 20px;
+  padding: 15px;
   border-radius: 10px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .emi-breakdown h4 {
-  color: #4a148c;
-  margin-bottom: 15px;
-  font-size: 16px;
+  color: #0077cc;
+  margin-bottom: 12px;
+  font-size: 0.95rem;
+  font-weight: 600;
 }
 
 .breakdown-chart {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
 .breakdown-item {
@@ -186,7 +211,7 @@
 }
 
 .breakdown-bar.principal {
-  background: linear-gradient(90deg, #4a148c, #6a1b9a);
+  background: linear-gradient(90deg, #0077cc, #0056b3);
 }
 
 .breakdown-bar.interest {
@@ -200,28 +225,144 @@
 }
 
 .loan-list {
-  margin-top: 25px;
+  margin-top: 20px;
+  background: white;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  border-left: 4px solid #28a745;
 }
 
 .loan-list h2 {
   margin-bottom: 15px;
-  font-size: 20px;
-  color: #4a148c;
+  font-size: 1.3rem;
+  color: #0077cc;
+  font-weight: 600;
+}
+
+/* Table container with scroll indicator */
+.loan-table-container {
+  position: relative;
+  overflow-x: auto;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.loan-table-container::after {
+  content: "← Scroll to see more →";
+  position: absolute;
+  bottom: -25px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 12px;
+  color: #666;
+  opacity: 0.7;
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .loan-table-container::after {
+    display: block;
+  }
 }
 
 table {
   width: 100%;
   border-collapse: collapse;
+  background: #fff;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  margin-top: 15px;
 }
 
 th, td {
-  border: 1px solid #ddd;
-  padding: 10px;
-  text-align: center;
+  padding: 12px 10px;
+  text-align: left;
+  border-bottom: 1px solid #e9ecef;
 }
 
 th {
-  background: #f5f5f5;
+  background: linear-gradient(135deg, #0077cc, #0056b3);
+  color: white;
+  font-weight: 600;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+td {
+  font-size: 14px;
+  color: #333;
+  vertical-align: middle;
+}
+
+tr:hover {
+  background-color: #f8f9fa;
+  transition: background-color 0.2s ease;
+}
+
+tr:last-child td {
+  border-bottom: none;
+}
+
+/* Specific column alignments */
+th:nth-child(1), td:nth-child(1) { /* ID */
+  width: 8%;
+  text-align: center;
+}
+
+th:nth-child(2), td:nth-child(2) { /* Loan Account */
+  width: 15%;
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+}
+
+th:nth-child(3), td:nth-child(3) { /* Type */
+  width: 12%;
+  text-align: center;
+}
+
+th:nth-child(4), td:nth-child(4) { /* Amount */
+  width: 12%;
+  text-align: right;
+  font-weight: 600;
+  color: #2e7d32;
+}
+
+th:nth-child(5), td:nth-child(5) { /* Tenure */
+  width: 10%;
+  text-align: center;
+}
+
+th:nth-child(6), td:nth-child(6) { /* Interest Rate */
+  width: 10%;
+  text-align: center;
+}
+
+th:nth-child(7), td:nth-child(7) { /* Status */
+  width: 12%;
+  text-align: center;
+}
+
+th:nth-child(8), td:nth-child(8) { /* Applied Date */
+  width: 15%;
+  text-align: center;
+  font-size: 13px;
+}
+
+th:nth-child(9), td:nth-child(9) { /* Approved Date */
+  width: 12%;
+  text-align: center;
+  font-size: 13px;
+}
+
+th:nth-child(10), td:nth-child(10) { /* Actions */
+  width: 15%;
+  text-align: center;
 }
 
 /* Status styling */
@@ -257,24 +398,54 @@ th {
 }
 
 .back-button {
-  background: #f5f5f5;
-  color: #333;
-  border: 1px solid #ccc;
+  background: #6c757d;
+  color: white;
+  border: none;
   padding: 8px 16px;
-  border-radius: 6px;
+  border-radius: 8px;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 0.9rem;
+  transition: all 0.3s ease;
 }
 
 .back-button:hover {
-  background: #e0e0e0;
+  background: #5a6268;
+  transform: translateY(-1px);
+}
+
+/* Download PDF Button */
+.download-pdf-btn {
+  background: linear-gradient(135deg, #0077cc, #0056b3);
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.download-pdf-btn:hover {
+  background: linear-gradient(135deg, #0056b3, #004085);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 119, 204, 0.3);
+}
+
+.download-pdf-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 6px rgba(0, 119, 204, 0.3);
 }
 
 /* Responsive Design */
 @media (max-width: 768px) {
   .calculator-container {
     grid-template-columns: 1fr;
-    gap: 20px;
+    gap: 15px;
   }
   
   .form-actions {
@@ -286,7 +457,7 @@ th {
   }
   
   .result-card, .emi-breakdown {
-    padding: 15px;
+    padding: 12px;
   }
   
   .breakdown-item {
@@ -298,4 +469,103 @@ th {
   .breakdown-bar {
     width: 100%;
   }
+
+  /* Mobile table styling */
+  .loan-list {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  table {
+    min-width: 800px;
+    font-size: 12px;
+  }
+
+  th, td {
+    padding: 10px 8px;
+  }
+
+  th {
+    font-size: 11px;
+    letter-spacing: 0.3px;
+  }
+
+  /* Adjust column widths for mobile */
+  th:nth-child(1), td:nth-child(1) { /* ID */
+    width: 6%;
+  }
+
+  th:nth-child(2), td:nth-child(2) { /* Loan Account */
+    width: 18%;
+    font-size: 11px;
+  }
+
+  th:nth-child(3), td:nth-child(3) { /* Type */
+    width: 14%;
+  }
+
+  th:nth-child(4), td:nth-child(4) { /* Amount */
+    width: 14%;
+  }
+
+  th:nth-child(5), td:nth-child(5) { /* Tenure */
+    width: 12%;
+  }
+
+  th:nth-child(6), td:nth-child(6) { /* Interest Rate */
+    width: 12%;
+  }
+
+  th:nth-child(7), td:nth-child(7) { /* Status */
+    width: 14%;
+  }
+
+  th:nth-child(8), td:nth-child(8) { /* Applied Date */
+    width: 18%;
+    font-size: 11px;
+  }
+
+  th:nth-child(9), td:nth-child(9) { /* Approved Date */
+    width: 15%;
+    font-size: 11px;
+  }
+
+  th:nth-child(10), td:nth-child(10) { /* Actions */
+    width: 20%;
+  }
+
+  .download-pdf-btn {
+    font-size: 10px;
+    padding: 6px 8px;
+  }
 }
+
+/* Additional responsive improvements */
+@media (max-width: 480px) {
+  .apply-loan {
+    padding: 15px;
+    margin: 15px;
+  }
+
+  .form-title {
+    font-size: 1.3rem;
+  }
+
+  .emi-calculator h2 {
+    font-size: 1.1rem;
+  }
+
+  .loan-list h2 {
+    font-size: 1.1rem;
+  }
+
+  .form-actions {
+    flex-direction: column;
+  }
+  
+  .submit-button, .calculate-button {
+    width: 100%;
+    margin: 5px 0;
+  }
+}
+

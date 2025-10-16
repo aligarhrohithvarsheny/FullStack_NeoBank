@@ -19,13 +19,7 @@ export class Landing {
   // Translation object
   translations = {
     en: {
-      // Top Navigation
-      skipToMain: 'Skip to Main Content',
-      aboutUs: 'About Us',
-      neobankOnline: 'NeoBank Online',
-      investorCorner: 'Investor Corner',
-      forexCardRate: 'Forex Card Rate',
-      digitalProducts: 'Digital Products',
+      // Navigation
       internetBanking: 'Internet Banking',
       
       // Main Navigation
@@ -33,8 +27,6 @@ export class Landing {
       business: 'BUSINESS',
       forex: 'FOREX',
       investInsure: 'INVEST & INSURE',
-      nri: 'NRI',
-      agri: 'AGRI',
       
       // Dropdown Items
       createAccount: 'Create Account',
@@ -78,7 +70,7 @@ export class Landing {
       completeDescription: 'Loan applications, virtual cards, KYC verification, and fund transfers',
       
       // Seamless Banking Section
-      seamlessMobileBanking: 'Seamless Mobile Banking',
+      seamlessInternetBanking: 'Seamless Internet Banking',
       seamlessDescription: 'Experience banking like never before with our cutting-edge digital platform designed for the modern world',
       instantTransfers: 'Instant Transfers',
       instantTransfersDesc: 'Send money anywhere, anytime with instant processing',
@@ -89,6 +81,7 @@ export class Landing {
       startBanking: 'Start Banking',
       openAccount: 'Open Account',
       scanToDownload: 'Scan to Download',
+      webbanking: 'Web Banking',
       mobileApp: 'NeoBank Mobile App',
       bankingHours: 'Banking Hours',
       uptime: 'Uptime',
@@ -101,21 +94,13 @@ export class Landing {
       usefulLinks: 'Useful Links',
       importantLinks: 'Important Links',
       otherLinks: 'Other Links',
-      installBizPay: 'Install NeoBank BIZ PAY',
-      installMobileBanking: 'Install NeoBank Mobile Banking',
       allRightsReserved: 'All rights reserved',
       siteBestViewed: 'Site best viewed at 1366*768 resolution in Microsoft Edge 105+, Mozilla 105+ and Google Chrome 106+ browser versions',
       visitorsCount: 'Visitor\'s Count 41623399',
       lastModified: 'Last Modified On Tuesday, 16-09-2024'
     },
     hi: {
-      // Top Navigation
-      skipToMain: 'मुख्य सामग्री पर जाएं',
-      aboutUs: 'हमारे बारे में',
-      neobankOnline: 'नियोबैंक ऑनलाइन',
-      investorCorner: 'निवेशक कोना',
-      forexCardRate: 'फॉरेक्स कार्ड दर',
-      digitalProducts: 'डिजिटल उत्पाद',
+      // Navigation
       internetBanking: 'इंटरनेट बैंकिंग',
       
       // Main Navigation
@@ -123,8 +108,6 @@ export class Landing {
       business: 'व्यापार',
       forex: 'विदेशी मुद्रा',
       investInsure: 'निवेश और बीमा',
-      nri: 'एनआरआई',
-      agri: 'कृषि',
       
       // Dropdown Items
       createAccount: 'खाता बनाएं',
@@ -168,7 +151,7 @@ export class Landing {
       completeDescription: 'ऋण आवेदन, वर्चुअल कार्ड, केवाईसी सत्यापन, और फंड ट्रांसफर',
       
       // Seamless Banking Section
-      seamlessMobileBanking: 'सहज मोबाइल बैंकिंग',
+      seamlessInternetBanking: 'सहज इंटरनेट बैंकिंग',
       seamlessDescription: 'आधुनिक दुनिया के लिए डिज़ाइन किए गए हमारे अत्याधुनिक डिजिटल प्लेटफॉर्म के साथ बैंकिंग का अनुभव करें',
       instantTransfers: 'तत्काल ट्रांसफर',
       instantTransfersDesc: 'तत्काल प्रसंस्करण के साथ कहीं भी, कभी भी पैसा भेजें',
@@ -179,6 +162,7 @@ export class Landing {
       startBanking: 'बैंकिंग शुरू करें',
       openAccount: 'खाता खोलें',
       scanToDownload: 'डाउनलोड करने के लिए स्कैन करें',
+      webbanking: 'वेब बैंकिंग',
       mobileApp: 'नियोबैंक मोबाइल ऐप',
       bankingHours: 'बैंकिंग घंटे',
       uptime: 'अपटाइम',
@@ -191,8 +175,6 @@ export class Landing {
       usefulLinks: 'उपयोगी लिंक',
       importantLinks: 'महत्वपूर्ण लिंक',
       otherLinks: 'अन्य लिंक',
-      installBizPay: 'नियोबैंक बिज़ पे इंस्टॉल करें',
-      installMobileBanking: 'नियोबैंक मोबाइल बैंकिंग इंस्टॉल करें',
       allRightsReserved: 'सभी अधिकार सुरक्षित',
       siteBestViewed: 'साइट 1366*768 रिज़ॉल्यूशन पर Microsoft Edge 105+, Mozilla 105+ और Google Chrome 106+ ब्राउज़र संस्करणों में सबसे अच्छी दिखती है',
       visitorsCount: 'आगंतुकों की संख्या 41623399',

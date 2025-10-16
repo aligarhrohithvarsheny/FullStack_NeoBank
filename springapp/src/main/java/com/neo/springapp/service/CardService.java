@@ -83,6 +83,11 @@ public class CardService {
         return cardRepository.getCardStatistics();
     }
 
+    // Get card by ID
+    public Card getCardById(Long cardId) {
+        return cardRepository.findById(cardId).orElse(null);
+    }
+
     // Block a card
     public Card blockCard(Long cardId) {
         Card card = cardRepository.findById(cardId).orElse(null);

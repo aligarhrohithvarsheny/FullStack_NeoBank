@@ -2,6 +2,7 @@ import { Component, OnInit, Inject, PLATFORM_ID } from '@angular/core';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { FormBuilder, FormGroup, Validators, AbstractControl, ValidationErrors, ReactiveFormsModule, FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
+import { Router } from '@angular/router';
 
 interface PendingAccount {
   id: string; // temp id
@@ -239,7 +240,8 @@ export class Createaccount implements OnInit {
   constructor(
     private fb: FormBuilder, 
     @Inject(PLATFORM_ID) private platformId: Object,
-    private http: HttpClient
+    private http: HttpClient,
+    private router: Router
   ) {}
 
   ngOnInit(): void {
@@ -253,7 +255,7 @@ export class Createaccount implements OnInit {
       aadhar: ['', [Validators.required, this.aadharValidator.bind(this)]],
       mobile: ['', [Validators.required, this.mobileValidator.bind(this)]],
       state: ['', [Validators.required]],
-      city: ['', [Validators.required]],
+      city: [{value: '', disabled: true}, [Validators.required]], // Initially disabled
       password: ['', [Validators.required, Validators.minLength(6)]],
       confirmPassword: ['', [Validators.required]]
     }, { validators: this.passwordsMatchValidator });
@@ -270,9 +272,13 @@ export class Createaccount implements OnInit {
       this.availableCities = this.citiesByState[selectedState];
       // Reset city selection when state changes
       this.form.get('city')?.setValue('');
+      // Enable city dropdown when cities are available
+      this.form.get('city')?.enable();
     } else {
       this.availableCities = [];
       this.form.get('city')?.setValue('');
+      // Disable city dropdown when no cities are available
+      this.form.get('city')?.disable();
     }
   }
 
@@ -599,4 +605,8 @@ export class Createaccount implements OnInit {
   }
 
   get f() { return this.form.controls; }
+
+  goBack() {
+    this.router.navigate(['/website/landing']);
+  }
 }

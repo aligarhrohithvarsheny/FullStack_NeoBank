@@ -284,4 +284,383 @@ export class Loan implements OnInit {
     this.emiCalculator.time = this.loanForm.tenure;
     this.calculateEMI();
   }
+
+  // Download loan details as PDF
+  downloadLoanPDF(loan: LoanRequest) {
+    if (!isPlatformBrowser(this.platformId)) {
+      return;
+    }
+
+    try {
+      // Create PDF content
+      const pdfContent = this.generatePDFContent(loan);
+      
+      // Create and download as HTML file (can be printed as PDF)
+      const blob = new Blob([pdfContent], { type: 'text/html;charset=utf-8' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `Loan_Details_${loan.loanAccountNumber}.html`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      // Show instruction to user
+      setTimeout(() => {
+        const userChoice = confirm('Document downloaded! Would you like to open it now to save as PDF?\n\nClick OK to open, or Cancel to download later.');
+        if (userChoice) {
+          // Open the downloaded file in a new window for printing
+          const newWindow = window.open();
+          if (newWindow) {
+            newWindow.document.write(pdfContent);
+            newWindow.document.close();
+            // Focus on the new window
+            newWindow.focus();
+          }
+        }
+      }, 500);
+      
+      console.log('Loan PDF download initiated successfully');
+    } catch (error) {
+      console.error('Error downloading loan PDF:', error);
+      alert('Failed to download loan document. Please try again.');
+    }
+  }
+
+  // Generate PDF content with bank stamp and loan details
+  private generatePDFContent(loan: LoanRequest): string {
+    const currentDate = new Date().toLocaleDateString('en-IN');
+    const currentTime = new Date().toLocaleTimeString('en-IN');
+    
+    return `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Loan Details - NeoBank</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f8f9fa;
+            color: #333;
+            position: relative;
+        }
+        .watermark {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(-45deg);
+            font-size: 60px;
+            color: rgba(30, 64, 175, 0.1);
+            font-weight: bold;
+            z-index: -1;
+            pointer-events: none;
+            white-space: nowrap;
+        }
+        .watermark-logo {
+            position: fixed;
+            top: 20%;
+            left: 20%;
+            transform: rotate(-30deg);
+            font-size: 40px;
+            color: rgba(30, 64, 175, 0.08);
+            z-index: -1;
+            pointer-events: none;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            position: relative;
+            z-index: 1;
+        }
+        .header {
+            text-align: center;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+        .bank-logo {
+            font-size: 32px;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+        .bank-name {
+            font-size: 24px;
+            color: #764ba2;
+            margin-bottom: 5px;
+        }
+        .bank-tagline {
+            font-size: 14px;
+            color: #666;
+            font-style: italic;
+        }
+        .document-title {
+            font-size: 28px;
+            color: #333;
+            text-align: center;
+            margin: 30px 0;
+            font-weight: bold;
+        }
+        .section {
+            margin-bottom: 25px;
+        }
+        .section-title {
+            font-size: 18px;
+            color: #667eea;
+            border-bottom: 2px solid #e9ecef;
+            padding-bottom: 8px;
+            margin-bottom: 15px;
+            font-weight: bold;
+        }
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .info-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .info-label {
+            font-weight: bold;
+            color: #555;
+        }
+        .info-value {
+            color: #333;
+        }
+        .amount-highlight {
+            color: #2e7d32;
+            font-weight: bold;
+            font-size: 16px;
+        }
+        .status-badge {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 12px;
+            text-transform: uppercase;
+        }
+        .status-pending {
+            background: #fef9e7;
+            color: #f39c12;
+        }
+        .status-approved {
+            background: #e8f5e8;
+            color: #27ae60;
+        }
+        .status-rejected {
+            background: #fdeaea;
+            color: #e74c3c;
+        }
+        .footer {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 2px solid #e9ecef;
+            text-align: center;
+            color: #666;
+            font-size: 12px;
+        }
+        .stamp {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 120px;
+            height: 120px;
+            border: 3px solid #667eea;
+            border-radius: 50%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: rgba(102, 126, 234, 0.1);
+            transform: rotate(-15deg);
+        }
+        .stamp-text {
+            font-size: 10px;
+            font-weight: bold;
+            color: #667eea;
+            text-align: center;
+            line-height: 1.2;
+        }
+        .stamp-date {
+            font-size: 8px;
+            color: #666;
+            margin-top: 5px;
+        }
+        @media print {
+            body { 
+                background: white !important; 
+                margin: 0;
+                padding: 10px;
+            }
+            .container { 
+                box-shadow: none !important; 
+                margin: 0;
+                padding: 20px;
+            }
+            .stamp {
+                position: fixed !important;
+                top: 20px !important;
+                right: 20px !important;
+            }
+        }
+        
+        /* Ensure CSS works in downloaded file */
+        * {
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: Arial, sans-serif !important;
+            margin: 0 !important;
+            padding: 20px !important;
+            background: #f8f9fa !important;
+            color: #333 !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="watermark">NeoBank</div>
+    <div class="watermark-logo">🏦</div>
+    <div class="container">
+        <!-- Bank Stamp -->
+        <div class="stamp">
+            <div class="stamp-text">
+                NEOBANK<br>
+                OFFICIAL<br>
+                DOCUMENT
+            </div>
+            <div class="stamp-date">${currentDate}</div>
+        </div>
+
+        <!-- Header -->
+        <div class="header">
+            <div class="bank-logo">🏦</div>
+            <div class="bank-name">NeoBank</div>
+            <div class="bank-tagline">Your Digital Banking Partner</div>
+        </div>
+
+        <!-- Document Title -->
+        <div class="document-title">LOAN APPLICATION DETAILS</div>
+
+        <!-- User Information -->
+        <div class="section">
+            <div class="section-title">👤 Customer Information</div>
+            <div class="info-grid">
+                <div class="info-item">
+                    <span class="info-label">Customer Name:</span>
+                    <span class="info-value">${this.userName}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Email Address:</span>
+                    <span class="info-value">${this.userEmail}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Account Number:</span>
+                    <span class="info-value">${this.userAccountNumber}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Current Balance:</span>
+                    <span class="info-value amount-highlight">₹${this.currentBalance.toLocaleString('en-IN')}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Loan Information -->
+        <div class="section">
+            <div class="section-title">💰 Loan Details</div>
+            <div class="info-grid">
+                <div class="info-item">
+                    <span class="info-label">Loan ID:</span>
+                    <span class="info-value">#${loan.id}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Loan Account Number:</span>
+                    <span class="info-value">${loan.loanAccountNumber}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Loan Type:</span>
+                    <span class="info-value">${loan.type}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Loan Amount:</span>
+                    <span class="info-value amount-highlight">₹${loan.amount.toLocaleString('en-IN')}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Tenure:</span>
+                    <span class="info-value">${loan.tenure} months</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Interest Rate:</span>
+                    <span class="info-value">${loan.interestRate}% per annum</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Application Status:</span>
+                    <span class="info-value">
+                        <span class="status-badge status-${loan.status.toLowerCase()}">${loan.status}</span>
+                    </span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Application Date:</span>
+                    <span class="info-value">${new Date(loan.applicationDate).toLocaleDateString('en-IN')}</span>
+                </div>
+                ${loan.approvalDate ? `
+                <div class="info-item">
+                    <span class="info-label">Approval Date:</span>
+                    <span class="info-value">${new Date(loan.approvalDate).toLocaleDateString('en-IN')}</span>
+                </div>
+                ` : ''}
+            </div>
+        </div>
+
+        <!-- EMI Calculation (if available) -->
+        ${this.emiCalculator.emi > 0 ? `
+        <div class="section">
+            <div class="section-title">📊 EMI Calculation</div>
+            <div class="info-grid">
+                <div class="info-item">
+                    <span class="info-label">Monthly EMI:</span>
+                    <span class="info-value amount-highlight">₹${this.emiCalculator.emi.toLocaleString('en-IN')}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Total Amount:</span>
+                    <span class="info-value amount-highlight">₹${this.emiCalculator.totalAmount.toLocaleString('en-IN')}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Total Interest:</span>
+                    <span class="info-value">₹${this.emiCalculator.totalInterest.toLocaleString('en-IN')}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Interest Percentage:</span>
+                    <span class="info-value">${this.emiCalculator.interestPercentage.toFixed(2)}%</span>
+                </div>
+            </div>
+        </div>
+        ` : ''}
+
+        <!-- Footer -->
+        <div class="footer">
+            <p><strong>NeoBank - Digital Banking Solutions</strong></p>
+            <p>This document was generated on ${currentDate} at ${currentTime}</p>
+            <p>For any queries, contact us at support@neobank.com or call +91-1800-123-4567</p>
+            <p style="margin-top: 15px; font-size: 10px; color: #999;">
+                This is a computer-generated document and does not require a signature.
+            </p>
+        </div>
+    </div>
+</body>
+</html>
+    `;
+  }
 }

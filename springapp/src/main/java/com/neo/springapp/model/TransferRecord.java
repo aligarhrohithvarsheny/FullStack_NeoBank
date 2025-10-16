@@ -21,12 +21,15 @@ public class TransferRecord {
     private String phone;
     private String ifsc;
     private Double amount;
-    private String status = "Pending"; // Pending / Completed / Failed
+    private String status = "Pending"; // Pending / Completed / Failed / Cancelled
 
     @Enumerated(EnumType.STRING)
     private TransferType transferType;
 
     private LocalDateTime date;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
+    private Boolean isCancellable = true;
 
     // Enum for NEFT/RTGS
     public enum TransferType {
@@ -36,6 +39,8 @@ public class TransferRecord {
     // Constructors
     public TransferRecord() {
         this.date = LocalDateTime.now();
+        this.createdAt = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
         this.transferId = "TRF" + System.currentTimeMillis();
     }
 
@@ -50,5 +55,21 @@ public class TransferRecord {
         this.ifsc = ifsc;
         this.amount = amount;
         this.transferType = transferType;
+    }
+
+    // Method to check if transfer can be cancelled (within 3 minutes for NEFT/IMPS)
+    public boolean canBeCancelled() {
+        if (!isCancellable || !"Completed".equals(status)) {
+            return false;
+        }
+        
+        // Only NEFT and IMPS can be cancelled (assuming IMPS is similar to NEFT)
+        if (transferType != TransferType.NEFT) {
+            return false;
+        }
+        
+        // Check if within 3 minutes
+        LocalDateTime threeMinutesAgo = LocalDateTime.now().minusMinutes(3);
+        return createdAt.isAfter(threeMinutesAgo);
     }
 }

@@ -4,10 +4,14 @@ import com.neo.springapp.model.TransferRecord;
 import com.neo.springapp.service.TransferService;
 import com.neo.springapp.service.AccountService;
 import com.neo.springapp.service.TransactionService;
+import com.neo.springapp.service.PdfService;
 import org.springframework.data.domain.Page;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -21,11 +25,13 @@ public class TransferController {
     private final TransferService transferService;
     private final AccountService accountService;
     private final TransactionService transactionService;
+    private final PdfService pdfService;
 
-    public TransferController(TransferService transferService, AccountService accountService, TransactionService transactionService) {
+    public TransferController(TransferService transferService, AccountService accountService, TransactionService transactionService, PdfService pdfService) {
         this.transferService = transferService;
         this.accountService = accountService;
         this.transactionService = transactionService;
+        this.pdfService = pdfService;
     }
 
     // Create new transfer
@@ -356,6 +362,87 @@ public class TransferController {
         response.put("valid", isValid);
         response.put("message", isValid ? "Amount is valid" : "Amount exceeds available balance");
         return ResponseEntity.ok(response);
+    }
+
+    // Cancel transfer (within 3 minutes for NEFT/IMPS)
+    @PutMapping("/{id}/cancel")
+    public ResponseEntity<Map<String, Object>> cancelTransfer(@PathVariable Long id) {
+        try {
+            TransferRecord transfer = transferService.getTransferById(id);
+            if (transfer == null) {
+                Map<String, Object> errorResponse = new HashMap<>();
+                errorResponse.put("error", "Transfer not found");
+                return ResponseEntity.notFound().build();
+            }
+
+            // Check if transfer can be cancelled
+            if (!transfer.canBeCancelled()) {
+                Map<String, Object> errorResponse = new HashMap<>();
+                errorResponse.put("error", "Transfer cannot be cancelled. Only NEFT/IMPS transfers within 3 minutes can be cancelled.");
+                return ResponseEntity.badRequest().body(errorResponse);
+            }
+
+            // Cancel the transfer
+            TransferRecord cancelledTransfer = transferService.cancelTransfer(id);
+            
+            // Reverse the transaction (credit back to sender, debit from recipient)
+            Double newSenderBalance = accountService.creditBalance(transfer.getSenderAccountNumber(), transfer.getAmount());
+            Double newRecipientBalance = accountService.debitBalance(transfer.getRecipientAccountNumber(), transfer.getAmount());
+            
+            // Create transaction records for the reversal
+            transactionService.createTransferTransaction(
+                transfer.getSenderAccountNumber(), 
+                "Transfer cancelled - Amount credited back", 
+                transfer.getAmount(), 
+                "Credit", 
+                newSenderBalance
+            );
+            
+            transactionService.createTransferTransaction(
+                transfer.getRecipientAccountNumber(), 
+                "Transfer cancelled - Amount debited", 
+                transfer.getAmount(), 
+                "Debit", 
+                newRecipientBalance
+            );
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("transfer", cancelledTransfer);
+            response.put("newSenderBalance", newSenderBalance);
+            response.put("message", "Transfer cancelled successfully");
+            
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("error", "Transfer cancellation failed: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(errorResponse);
+        }
+    }
+
+    // Download transfer receipt as PDF
+    @GetMapping("/{id}/receipt")
+    public ResponseEntity<byte[]> downloadTransferReceipt(@PathVariable Long id) {
+        try {
+            TransferRecord transfer = transferService.getTransferById(id);
+            if (transfer == null) {
+                return ResponseEntity.notFound().build();
+            }
+
+            byte[] pdfBytes = pdfService.generateTransferReceipt(transfer);
+            
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_PDF);
+            headers.setContentDispositionFormData("attachment", "transfer_receipt_" + transfer.getTransferId() + ".pdf");
+            headers.setCacheControl("must-revalidate, post-check=0, pre-check=0");
+            
+            return ResponseEntity.ok()
+                    .headers(headers)
+                    .body(pdfBytes);
+                    
+        } catch (IOException e) {
+            return ResponseEntity.internalServerError().build();
+        }
     }
 
     // Delete transfer

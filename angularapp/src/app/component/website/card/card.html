@@ -89,106 +89,114 @@
 
   <!-- Card Actions -->
   <div class="card-actions">
-    <div class="action-group">
-      <button (click)="toggleDetails()" class="toggle-btn">
-        {{ showDetails ? 'Hide Card Details' : 'Show Card Details' }}
-      </button>
-    </div>
-
-    <div class="action-group">
-      <button (click)="togglePinForm()" class="pin-btn" [disabled]="card?.pinSet">
-        {{ card?.pinSet ? 'PIN Already Set' : 'Set PIN' }}
-      </button>
-      
-      <button *ngIf="card?.pinSet" (click)="toggleForgotPinForm()" class="forgot-pin-btn">
-        Forgot PIN
-      </button>
-      
-      <div *ngIf="showPinForm" class="pin-form">
-        <input 
-          type="password" 
-          placeholder="Enter 4-digit PIN" 
-          [(ngModel)]="newPin" 
-          maxlength="4"
-          class="pin-input"
-        >
-        <button (click)="setPin()" class="set-pin-btn">Set PIN</button>
-        <button (click)="togglePinForm()" class="cancel-btn">Cancel</button>
+    <h4 class="actions-title">Card Management Actions</h4>
+    <div class="actions-grid">
+      <div class="action-group">
+        <h5 class="group-title">Card Details</h5>
+        <button (click)="toggleDetails()" class="toggle-btn">
+          {{ showDetails ? 'Hide Card Details' : 'Show Card Details' }}
+        </button>
       </div>
 
-      <div *ngIf="showForgotPinForm" class="forgot-pin-form">
-        <h5>🔐 Reset Your PIN</h5>
-        <p class="forgot-pin-info">Enter a new 4-digit PIN to replace your current PIN.</p>
-        <input 
-          type="password" 
-          placeholder="Enter new 4-digit PIN" 
-          [(ngModel)]="newPin" 
-          maxlength="4"
-          class="pin-input"
-        >
-        <div class="forgot-pin-actions">
-          <button (click)="resetPin()" class="reset-pin-btn">Reset PIN</button>
-          <button (click)="toggleForgotPinForm()" class="cancel-btn">Cancel</button>
+      <div class="action-group">
+        <h5 class="group-title">PIN Management</h5>
+        <button (click)="togglePinForm()" class="pin-btn" [disabled]="card?.pinSet">
+          {{ card?.pinSet ? 'PIN Already Set' : 'Set PIN' }}
+        </button>
+        
+        <button *ngIf="card?.pinSet" (click)="toggleForgotPinForm()" class="forgot-pin-btn">
+          Forgot PIN
+        </button>
+        
+        <div *ngIf="showPinForm" class="pin-form">
+          <input 
+            type="password" 
+            placeholder="Enter 4-digit PIN" 
+            [(ngModel)]="newPin" 
+            maxlength="4"
+            class="pin-input"
+          >
+          <button (click)="setPin()" class="set-pin-btn">Set PIN</button>
+          <button (click)="togglePinForm()" class="cancel-btn">Cancel</button>
+        </div>
+
+        <div *ngIf="showForgotPinForm" class="forgot-pin-form">
+          <h5> Reset Your PIN</h5>
+          <p class="forgot-pin-info">Enter a new 4-digit PIN to replace your current PIN.</p>
+          <input 
+            type="password" 
+            placeholder="Enter new 4-digit PIN" 
+            [(ngModel)]="newPin" 
+            maxlength="4"
+            class="pin-input"
+          >
+          <div class="forgot-pin-actions">
+            <button (click)="resetPin()" class="reset-pin-btn">Reset PIN</button>
+            <button (click)="toggleForgotPinForm()" class="cancel-btn">Cancel</button>
+          </div>
         </div>
       </div>
-    </div>
 
-    <div class="action-group">
-      <button (click)="toggleReplaceForm()" class="replace-btn">
-        Request Card Replacement
-      </button>
-      
-      <div *ngIf="showReplaceForm" class="replace-form">
-        <textarea 
-          placeholder="Reason for replacement (e.g., Lost card, Damaged card, etc.)" 
-          [(ngModel)]="replaceReason"
-          class="replace-textarea"
-          rows="3"
-        ></textarea>
-        <button (click)="requestCardReplacement()" class="submit-replace-btn">Submit Request</button>
-        <button (click)="toggleReplaceForm()" class="cancel-btn">Cancel</button>
+      <div class="action-group">
+        <h5 class="group-title">Card Replacement</h5>
+        <button (click)="toggleReplaceForm()" class="replace-btn">
+          Request Card Replacement
+        </button>
+        
+        <div *ngIf="showReplaceForm" class="replace-form">
+          <textarea 
+            placeholder="Reason for replacement (e.g., Lost card, Damaged card, etc.)" 
+            [(ngModel)]="replaceReason"
+            class="replace-textarea"
+            rows="3"
+          ></textarea>
+          <button (click)="requestCardReplacement()" class="submit-replace-btn">Submit Request</button>
+          <button (click)="toggleReplaceForm()" class="cancel-btn">Cancel</button>
+        </div>
       </div>
-    </div>
 
-    <div class="action-group">
-      <button (click)="blockCard()" class="block-btn" [disabled]="card?.status === 'Blocked' || card?.status === 'Deactivated'">
-        Block Card
-      </button>
-      <button (click)="deactivateCard()" class="deactivate-btn" [disabled]="card?.status === 'Deactivated'">
-        Deactivate Card
-      </button>
-    </div>
+      <div class="action-group">
+        <h5 class="group-title">Card Security</h5>
+        <button (click)="blockCard()" class="block-btn" [disabled]="card?.status === 'Blocked' || card?.status === 'Deactivated'">
+          Block Card
+        </button>
+        <button (click)="deactivateCard()" class="deactivate-btn" [disabled]="card?.status === 'Deactivated'">
+          Deactivate Card
+        </button>
+      </div>
 
-    <div class="action-group">
-      <button (click)="applyNewCard()" class="apply-new-card-btn">
-        Apply for Additional Card
-      </button>
+      <div class="action-group">
+        <h5 class="group-title">Additional Services</h5>
+        <button (click)="applyNewCard()" class="apply-new-card-btn">
+          Apply for Additional Card
+        </button>
+      </div>
     </div>
   </div>
 
   <!-- Status Info -->
   <div class="status-info">
     <div *ngIf="card?.pinSet" class="status-item pin-set">
-      <span class="icon">🔒</span>
+      <span class="icon"></span>
       <span class="text">PIN is set</span>
     </div>
     <div *ngIf="card?.status === 'Blocked'" class="status-item blocked">
-      <span class="icon">❌</span>
+      <span class="icon"></span>
       <span class="text">Card is blocked</span>
     </div>
     <div *ngIf="card?.status === 'Deactivated'" class="status-item deactivated">
-      <span class="icon">⚠️</span>
+      <span class="icon"></span>
       <span class="text">Card is deactivated</span>
     </div>
     <div *ngIf="card?.status === 'Replaced'" class="status-item replaced">
-      <span class="icon">🔄</span>
+      <span class="icon"></span>
       <span class="text">Card has been replaced</span>
     </div>
   </div>
 
   <!-- Instructions -->
   <div class="instructions">
-    <h4>📋 Card Management Instructions:</h4>
+    <h4> Card Management Instructions:</h4>
     <ul>
       <li><strong>Set PIN:</strong> Create a 4-digit PIN for secure transactions</li>
       <li><strong>Forgot PIN:</strong> Reset your PIN if you've forgotten it</li>

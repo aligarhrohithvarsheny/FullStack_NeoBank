@@ -72,6 +72,8 @@ export class Users implements OnInit {
   ngOnInit() {
     if (!isPlatformBrowser(this.platformId)) return;
     
+    console.log('Admin Users component initialized');
+    
     // Load users from MySQL database
     this.loadUsersFromDatabase();
     
@@ -82,31 +84,91 @@ export class Users implements OnInit {
     this.createCardsForExistingUsers();
   }
 
+  // Method to refresh users data
+  refreshUsersData() {
+    console.log('Refreshing users data...');
+    this.loadUsersFromDatabase();
+    this.loadKycRequestsFromDatabase();
+  }
+
+  // Test method to create sample users if none exist
+  createSampleUsers() {
+    if (this.pendingUsers.length === 0) {
+      console.log('No users found, creating sample users for testing...');
+      
+      const sampleUsers: PendingUser[] = [
+        {
+          id: '1',
+          name: 'John Doe',
+          email: 'john.doe@example.com',
+          pan: 'ABCDE1234F',
+          aadhar: '123456789012',
+          income: 50000,
+          balance: 0,
+          status: 'PENDING',
+          assignedAccountNumber: '',
+          createdAt: new Date().toISOString(),
+          dob: '1990-01-01',
+          occupation: 'Software Engineer',
+          mobile: '9876543210'
+        },
+        {
+          id: '2',
+          name: 'Jane Smith',
+          email: 'jane.smith@example.com',
+          pan: 'FGHIJ5678K',
+          aadhar: '987654321098',
+          income: 75000,
+          balance: 25000,
+          status: 'APPROVED',
+          assignedAccountNumber: '100001',
+          createdAt: new Date().toISOString(),
+          dob: '1985-05-15',
+          occupation: 'Manager',
+          mobile: '9876543211'
+        }
+      ];
+      
+      this.pendingUsers = sampleUsers;
+      this.saveUsers();
+      console.log('Sample users created:', this.pendingUsers);
+    }
+  }
+
   // Load users from MySQL database
   loadUsersFromDatabase() {
     this.http.get('http://localhost:8080/api/users').subscribe({
       next: (users: any) => {
         console.log('Users loaded from MySQL:', users);
+        console.log('First user structure:', users[0]);
+        
         this.pendingUsers = users.map((user: any) => ({
-          id: user.id,
-          name: user.account?.name || user.username,
-          email: user.email,
+          id: user.id?.toString() || '',
+          name: user.account?.name || user.username || 'Unknown User',
+          email: user.email || '',
           pan: user.account?.pan || '',
           aadhar: user.account?.aadharNumber || '',
           income: user.account?.income || 0,
-          status: user.status,
+          status: user.status || 'PENDING',
           assignedAccountNumber: user.accountNumber || '',
-          createdAt: user.createdAt
+          createdAt: user.joinDate || user.createdAt || new Date().toISOString(),
+          dob: user.account?.dob || '',
+          occupation: user.account?.occupation || '',
+          mobile: user.account?.phone || ''
         }));
+        
+        console.log('Mapped pending users:', this.pendingUsers);
         
         // Also save to localStorage as backup
         this.saveUsers();
       },
       error: (err: any) => {
         console.error('Error loading users from database:', err);
+        console.error('Error details:', err);
         // Fallback to localStorage
         const raw = localStorage.getItem('admin_users');
         this.pendingUsers = raw ? JSON.parse(raw) : [];
+        console.log('Using fallback data from localStorage:', this.pendingUsers);
       }
     });
   }

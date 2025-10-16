@@ -10,8 +10,15 @@ public class AdminService {
 
     @Autowired
     private AdminRepository adminRepository;
+    
+    @Autowired
+    private PasswordService passwordService;
 
     public Admin saveAdmin(Admin admin) {
+        // Encrypt password before saving
+        if (admin.getPassword() != null && !passwordService.isEncrypted(admin.getPassword())) {
+            admin.setPassword(passwordService.encryptPassword(admin.getPassword()));
+        }
         return adminRepository.save(admin);
     }
 
@@ -30,7 +37,12 @@ public class AdminService {
                 admin.setEmail(adminDetails.getEmail());
             }
             if (adminDetails.getPassword() != null) {
-                admin.setPassword(adminDetails.getPassword());
+                // Encrypt password before updating
+                if (!passwordService.isEncrypted(adminDetails.getPassword())) {
+                    admin.setPassword(passwordService.encryptPassword(adminDetails.getPassword()));
+                } else {
+                    admin.setPassword(adminDetails.getPassword());
+                }
             }
             if (adminDetails.getRole() != null) {
                 admin.setRole(adminDetails.getRole());
@@ -44,6 +56,10 @@ public class AdminService {
     }
 
     public Admin login(String email, String password) {
-        return adminRepository.findByEmailAndPassword(email, password);
+        Admin admin = adminRepository.findByEmail(email);
+        if (admin != null && passwordService.verifyPassword(password, admin.getPassword())) {
+            return admin;
+        }
+        return null;
     }
 }

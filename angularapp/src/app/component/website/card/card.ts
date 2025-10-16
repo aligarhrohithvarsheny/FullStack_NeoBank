@@ -3,6 +3,7 @@ import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
+import { AlertService } from '../../../service/alert.service';
 
 interface CardDetails {
   id: string;
@@ -57,7 +58,7 @@ export class Card implements OnInit {
   replaceReason: string = '';
   isCardFlipped: boolean = false;
 
-  constructor(private router: Router, @Inject(PLATFORM_ID) private platformId: Object, private http: HttpClient) {}
+  constructor(private router: Router, @Inject(PLATFORM_ID) private platformId: Object, private http: HttpClient, private alertService: AlertService) {}
 
   ngOnInit() {
     this.loadUserProfile();
@@ -366,12 +367,12 @@ export class Card implements OnInit {
     if (!this.card || !this.userProfile) return;
     
     if (this.newPin.length !== 4) {
-      alert('PIN must be 4 digits');
+      this.alertService.validationError('PIN must be 4 digits');
       return;
     }
     
     if (!/^\d{4}$/.test(this.newPin)) {
-      alert('PIN must contain only numbers');
+      this.alertService.validationError('PIN must contain only numbers');
       return;
     }
     
@@ -388,13 +389,13 @@ export class Card implements OnInit {
               this.card!.lastUpdated = new Date().toISOString();
               this.saveCard(); // Also save to localStorage as backup
               
-              alert('PIN Set Successfully ✅');
+              this.alertService.cardSuccess('PIN Set', 'PIN has been set successfully!');
               this.newPin = '';
               this.showPinForm = false;
             },
             error: (err: any) => {
               console.error('Error updating card PIN:', err);
-              alert('Failed to set PIN. Please try again.');
+              this.alertService.cardError('PIN Setting Failed', 'Failed to set PIN. Please try again.');
             }
           });
         } else {
@@ -405,7 +406,7 @@ export class Card implements OnInit {
         console.error('Error getting card from backend:', err);
         console.error('Full error details:', err);
         console.error('Account number being searched:', this.userProfile?.accountNumber);
-        alert(`Failed to get card information for account ${this.userProfile?.accountNumber}. Error: ${err.message || 'Unknown error'}`);
+        this.alertService.operationError('Card information retrieval', err.message || 'Unknown error');
       }
     });
   }
@@ -414,18 +415,21 @@ export class Card implements OnInit {
     if (!this.card || !this.userProfile) return;
     
     if (this.newPin.length !== 4) {
-      alert('New PIN must be 4 digits');
+      this.alertService.validationError('New PIN must be 4 digits');
       return;
     }
     
     if (!/^\d{4}$/.test(this.newPin)) {
-      alert('New PIN must contain only numbers');
+      this.alertService.validationError('New PIN must contain only numbers');
       return;
     }
     
-    if (confirm('Are you sure you want to reset your PIN? This will disable your current PIN and set a new one.')) {
+    this.alertService.confirm(
+      'Reset PIN',
+      'Are you sure you want to reset your PIN? This will disable your current PIN and set a new one.',
+      () => {
       // First get the card from backend to get the correct Long ID
-      this.http.get(`http://localhost:8080/api/cards/account/${this.userProfile.accountNumber}`).subscribe({
+      this.http.get(`http://localhost:8080/api/cards/account/${this.userProfile!.accountNumber}`).subscribe({
         next: (cards: any) => {
           if (cards && cards.length > 0) {
             const backendCard = cards[0]; // Get the first card
@@ -437,13 +441,13 @@ export class Card implements OnInit {
                 this.card!.lastUpdated = new Date().toISOString();
                 this.saveCard(); // Also save to localStorage as backup
                 
-                alert('PIN Reset Successfully ✅\nYour new PIN has been set and is ready to use.');
+                this.alertService.cardSuccess('PIN Reset', 'PIN has been reset successfully! Your new PIN is ready to use.');
                 this.newPin = '';
                 this.showForgotPinForm = false;
               },
               error: (err: any) => {
                 console.error('Error resetting card PIN:', err);
-                alert('Failed to reset PIN. Please try again.');
+                this.alertService.cardError('PIN Reset Failed', 'Failed to reset PIN. Please try again.');
               }
             });
           } else {
@@ -454,18 +458,22 @@ export class Card implements OnInit {
           console.error('Error getting card from backend:', err);
           console.error('Full error details:', err);
           console.error('Account number being searched:', this.userProfile?.accountNumber);
-          alert(`Failed to get card information for account ${this.userProfile?.accountNumber}. Error: ${err.message || 'Unknown error'}`);
+          this.alertService.operationError('Card information retrieval', err.message || 'Unknown error');
         }
       });
-    }
+      }
+    );
   }
 
   blockCard() {
     if (!this.card || !this.userProfile) return;
     
-    if (confirm('Are you sure you want to block this card? This action can be reversed by admin.')) {
+    this.alertService.cardConfirm(
+      'Block Card',
+      'Are you sure you want to block this card? This action can be reversed by admin.',
+      () => {
       // First get the card from backend to get the correct Long ID
-      this.http.get(`http://localhost:8080/api/cards/account/${this.userProfile.accountNumber}`).subscribe({
+      this.http.get(`http://localhost:8080/api/cards/account/${this.userProfile!.accountNumber}`).subscribe({
         next: (cards: any) => {
           if (cards && cards.length > 0) {
             const backendCard = cards[0]; // Get the first card
@@ -475,11 +483,11 @@ export class Card implements OnInit {
                 this.card!.status = 'Blocked';
                 this.card!.lastUpdated = new Date().toISOString();
                 this.saveCard(); // Also save to localStorage as backup
-                alert('Card Blocked ❌');
+                this.alertService.cardSuccess('Card Blocked', 'Your card has been blocked for security reasons.');
               },
               error: (err: any) => {
                 console.error('Error blocking card:', err);
-                alert('Failed to block card. Please try again.');
+                this.alertService.cardError('Card Blocking Failed', 'Failed to block card. Please try again.');
               }
             });
           } else {
@@ -488,18 +496,22 @@ export class Card implements OnInit {
         },
         error: (err: any) => {
           console.error('Error getting card from backend:', err);
-          alert('Failed to get card information. Please try again.');
+          this.alertService.operationError('Card information retrieval');
         }
       });
-    }
+      }
+    );
   }
 
   deactivateCard() {
     if (!this.card || !this.userProfile) return;
     
-    if (confirm('Are you sure you want to deactivate this card? This action cannot be undone.')) {
+    this.alertService.cardConfirm(
+      'Deactivate Card',
+      'Are you sure you want to deactivate this card? This action cannot be undone.',
+      () => {
       // First get the card from backend to get the correct Long ID
-      this.http.get(`http://localhost:8080/api/cards/account/${this.userProfile.accountNumber}`).subscribe({
+      this.http.get(`http://localhost:8080/api/cards/account/${this.userProfile!.accountNumber}`).subscribe({
         next: (cards: any) => {
           if (cards && cards.length > 0) {
             const backendCard = cards[0]; // Get the first card
@@ -509,11 +521,11 @@ export class Card implements OnInit {
                 this.card!.status = 'Deactivated';
                 this.card!.lastUpdated = new Date().toISOString();
                 this.saveCard(); // Also save to localStorage as backup
-                alert('Card Deactivated ⚠️');
+                this.alertService.cardSuccess('Card Deactivated', 'Your card has been deactivated.');
               },
               error: (err: any) => {
                 console.error('Error deactivating card:', err);
-                alert('Failed to deactivate card. Please try again.');
+                this.alertService.cardError('Card Deactivation Failed', 'Failed to deactivate card. Please try again.');
               }
             });
           } else {
@@ -522,10 +534,11 @@ export class Card implements OnInit {
         },
         error: (err: any) => {
           console.error('Error getting card from backend:', err);
-          alert('Failed to get card information. Please try again.');
+          this.alertService.operationError('Card information retrieval');
         }
       });
-    }
+      }
+    );
   }
 
   toggleReplaceForm() {
@@ -537,7 +550,7 @@ export class Card implements OnInit {
     if (!this.card) return;
     
     if (!this.replaceReason.trim()) {
-      alert('Please provide a reason for card replacement');
+      this.alertService.validationError('Please provide a reason for card replacement');
       return;
     }
     
@@ -563,13 +576,13 @@ export class Card implements OnInit {
         requests.push(replacementRequest);
         localStorage.setItem('card_replacement_requests', JSON.stringify(requests));
         
-        alert('Card Replacement Request Submitted! 🎉\nAdmin will review your request and issue a new card.');
+        this.alertService.success('Card Replacement Request Submitted', 'Admin will review your request and issue a new card.');
         this.showReplaceForm = false;
         this.replaceReason = '';
       },
       error: (err: any) => {
         console.error('Error creating card replacement request:', err);
-        alert('Failed to submit replacement request. Please try again.');
+        this.alertService.operationError('Card replacement request submission');
         
         // Fallback to localStorage
         const savedRequests = localStorage.getItem('card_replacement_requests');
@@ -604,11 +617,11 @@ export class Card implements OnInit {
         requests.push(newCardRequest);
         localStorage.setItem('new_card_requests', JSON.stringify(requests));
         
-        alert('New Card Application Submitted! 🎉\nYou will receive your new card within 5-7 business days.');
+        this.alertService.success('New Card Application Submitted', 'You will receive your new card within 5-7 business days.');
       },
       error: (err: any) => {
         console.error('Error creating new card request:', err);
-        alert('Failed to submit new card application. Please try again.');
+        this.alertService.operationError('New card application submission');
         
         // Fallback to localStorage
         const savedRequests = localStorage.getItem('new_card_requests');

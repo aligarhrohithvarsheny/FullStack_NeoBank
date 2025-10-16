@@ -1,5 +1,12 @@
 <div class="users-container">
   <h2>User Account Management</h2>
+  
+  <div class="header-actions">
+    <button class="back-btn" (click)="goBack()">⬅ Back to Dashboard</button>
+    <button class="refresh-btn" (click)="refreshUsersData()" title="Refresh data from database">
+      🔄 Refresh Data
+    </button>
+  </div>
 
   <!-- Summary Stats -->
   <div class="stats-section">
@@ -21,7 +28,25 @@
     </div>
   </div>
 
-  <table>
+  <!-- Debug Information -->
+  <div class="debug-info" *ngIf="pendingUsers.length === 0">
+    <div class="debug-card">
+      <h4>🔍 Debug Information</h4>
+      <p><strong>Users Array Length:</strong> {{ pendingUsers.length }}</p>
+      <p><strong>Total Users Count:</strong> {{ totalUsers }}</p>
+      <p><strong>Pending Users Count:</strong> {{ pendingUsersCount }}</p>
+      <p><strong>Approved Users Count:</strong> {{ approvedUsersCount }}</p>
+      <p><strong>Closed Users Count:</strong> {{ closedUsersCount }}</p>
+      <div class="debug-actions">
+        <button class="debug-btn" (click)="refreshUsersData()">🔄 Refresh Data</button>
+        <button class="debug-btn" (click)="createSampleUsers()">👥 Create Sample Users</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Users Table -->
+  <div class="users-table">
+    <table>
     <thead>
       <tr>
         <th>Name</th>
@@ -65,18 +90,13 @@
         </td>
       </tr>
     </tbody>
-  </table>
+    </table>
+  </div>
 
   <!-- Test Card Creation Buttons -->
   <div class="test-section">
     <button (click)="createCardManually()" class="test-card-btn">
-      🧪 Test Card Creation (for approved users)
-    </button>
-    <button (click)="createCardDirectly()" class="test-card-btn direct-btn">
-      🎯 Create Card Directly (any user)
-    </button>
-    <button (click)="createCardForExistingUser()" class="test-card-btn existing-btn">
-      👤 Create Card for Existing User
+       Test Card Creation (for approved users)
     </button>
   </div>
 
@@ -91,6 +111,4 @@
       <li><strong>Card Creation:</strong> Cards are automatically created when users are approved</li>
     </ul>
   </div>
-
-  <button class="back-btn" (click)="goBack()">⬅ Back to Dashboard</button>
 </div>

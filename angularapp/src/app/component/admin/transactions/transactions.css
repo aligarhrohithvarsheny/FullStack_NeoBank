@@ -1,74 +1,236 @@
 .transaction-container {
-  max-width: 900px;
-  margin: 40px auto;
-  padding: 20px;
-  background: #f3f4f6;
-  border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  padding: 30px;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+  min-height: 100vh;
 }
 
-h2 {
+.transaction-container h2 {
+  color: #0077cc;
   text-align: center;
-  margin-bottom: 20px;
-}
-
-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-bottom: 20px;
-}
-
-th, td {
-  padding: 12px 15px;
-  text-align: center;
-  border-bottom: 1px solid #ddd;
-}
-
-th {
-  background-color: #4f46e5;
-  color: white;
-}
-
-tr:hover {
-  background-color: #e0e7ff;
+  margin-bottom: 30px;
+  font-size: 2.2rem;
+  font-weight: 600;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .back-btn {
-  display: block;
-  margin: 0 auto;
-  padding: 10px 25px;
-  background-color: #4f46e5;
+  background: linear-gradient(135deg, #6c757d, #495057);
   color: white;
+  padding: 10px 20px;
   border: none;
   border-radius: 8px;
   cursor: pointer;
+  font-size: 1rem;
+  font-weight: 500;
+  margin-bottom: 25px;
+  transition: all 0.3s ease;
 }
 
 .back-btn:hover {
-  background-color: #3730a3;
+  background: linear-gradient(135deg, #495057, #343a40);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
 }
 
 .refresh-btn {
-  background: #28a745;
-  color: #fff;
+  background: linear-gradient(135deg, #28a745, #20c997);
+  color: white;
   border: none;
   padding: 10px 20px;
-  border-radius: 6px;
+  border-radius: 8px;
   cursor: pointer;
-  margin-bottom: 20px;
-  font-size: 14px;
+  font-size: 1rem;
+  font-weight: 500;
+  margin-bottom: 25px;
+  transition: all 0.3s ease;
 }
 
 .refresh-btn:hover {
-  background: #218838;
+  background: linear-gradient(135deg, #20c997, #17a2b8);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+}
+
+/* Transactions Table - Matching KYC Structure */
+.transactions-table {
+  background: white;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  margin-bottom: 25px;
+}
+
+.transactions-table table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.transactions-table th {
+  background: linear-gradient(135deg, #0077cc, #0056b3);
+  color: white;
+  padding: 15px 12px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.transactions-table td {
+  padding: 15px 12px;
+  border-bottom: 1px solid #e9ecef;
+  color: #333;
+  font-size: 0.95rem;
+}
+
+.transactions-table tr:hover {
+  background-color: #f8f9fa;
+}
+
+.transactions-table tr:last-child td {
+  border-bottom: none;
+}
+
+/* Status Classes */
+.approved {
+  color: #28a745;
+  font-weight: 600;
+}
+
+.pending {
+  color: #ffc107;
+  font-weight: 600;
+}
+
+.rejected {
+  color: #dc3545;
+  font-weight: 600;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.approved .status-badge {
+  background: #d4edda;
+  color: #155724;
+}
+
+.pending .status-badge {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.rejected .status-badge {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+/* Transaction Type Styling */
+.credit {
+  color: #28a745;
+  font-weight: 600;
+}
+
+.debit {
+  color: #dc3545;
+  font-weight: 600;
+}
+
+.transaction-type {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.credit .transaction-type {
+  background: #d4edda;
+  color: #155724;
+}
+
+.debit .transaction-type {
+  background: #f8d7da;
+  color: #721c24;
 }
 
 /* Loan Credit Transaction Styling */
 .loan-credit {
-  background-color: #d4edda !important;
+  background: #d4edda !important;
   color: #155724 !important;
-  font-weight: bold;
-  padding: 4px 8px;
-  border-radius: 4px;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Amount Styling */
+.amount {
+  font-weight: 600;
+}
+
+.amount.positive {
+  color: #28a745;
+}
+
+.amount.negative {
+  color: #dc3545;
+}
+
+/* No Results */
+.no-results {
+  text-align: center;
+  padding: 40px;
+  color: #6c757d;
+  font-size: 1.1rem;
+}
+
+/* Instructions */
+.instructions {
+  background: linear-gradient(135deg, #e3f2fd, #bbdefb);
+  padding: 25px;
+  border-radius: 12px;
+  border-left: 4px solid #0077cc;
+  margin-top: 25px;
+}
+
+.instructions h4 {
+  color: #0077cc;
+  margin-bottom: 15px;
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+.instructions ul {
+  margin: 0;
+  padding-left: 20px;
+  color: #495057;
+}
+
+.instructions li {
+  margin-bottom: 10px;
+  line-height: 1.6;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .transactions-table {
+    overflow-x: auto;
+  }
+  
+  .transactions-table table {
+    min-width: 800px;
+  }
 }

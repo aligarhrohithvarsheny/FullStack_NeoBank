@@ -4,7 +4,7 @@
     <button (click)="goBack()">⬅ Back to Dashboard</button>
   </div>
 
-  <h1>💳 Card Management</h1>
+  <h1> Card Management</h1>
 
   <!-- View Toggle -->
   <div class="view-toggle">
@@ -103,7 +103,7 @@
             </td>
             <td class="pin-status">
               <span [class.pin-set]="card.pinSet" [class.pin-not-set]="!card.pinSet">
-                {{ card.pinSet ? '✅ Set' : '❌ Not Set' }}
+                {{ card.pinSet ? ' Set' : ' Not Set' }}
               </span>
             </td>
             <td class="created-date">{{ card.createdAt | date:'short' }}</td>
@@ -154,7 +154,7 @@
   <div *ngIf="showRequests">
     <!-- Replacement Requests -->
     <div class="requests-section">
-      <h3>🔄 Card Replacement Requests</h3>
+      <h3>Card Replacement Requests</h3>
       <div class="requests-table" *ngIf="replacementRequests.length > 0; else noReplacementRequests">
         <table>
           <thead>
@@ -186,7 +186,7 @@
                   </button>
                 </div>
                 <span *ngIf="request.status !== 'Pending'" class="processed">
-                  {{ request.status === 'Approved' ? '✅ Processed' : '❌ Processed' }}
+                  {{ request.status === 'Approved' ? ' Processed' : ' Processed' }}
                 </span>
               </td>
             </tr>
@@ -202,7 +202,7 @@
 
     <!-- New Card Requests -->
     <div class="requests-section">
-      <h3>🆕 New Card Requests</h3>
+      <h3> New Card Requests</h3>
       <div class="requests-table" *ngIf="newCardRequests.length > 0; else noNewCardRequests">
         <table>
           <thead>
@@ -234,7 +234,7 @@
                   </button>
                 </div>
                 <span *ngIf="request.status !== 'Pending'" class="processed">
-                  {{ request.status === 'Approved' ? '✅ Processed' : '❌ Processed' }}
+                  {{ request.status === 'Approved' ? ' Processed' : ' Processed' }}
                 </span>
               </td>
             </tr>

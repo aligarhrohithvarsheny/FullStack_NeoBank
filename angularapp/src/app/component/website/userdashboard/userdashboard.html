@@ -14,7 +14,9 @@
   <aside class="sidebar">
     <!-- NeoBank Title -->
     <div class="brand-section">
-      <div class="brand-logo"></div>
+      <div class="brand-logo">
+        <img src="/favicon.ico" alt="NeoBank Logo" class="logo-image">
+      </div>
       <span class="brand-name">NeoBank</span>
     </div>
 
@@ -76,7 +78,7 @@
             <span class="balance-label">Balance:</span>
             <span class="balance-amount">₹{{ currentBalance | number:'1.2-2' }}</span>
           </div>
-          <button (click)="goToProfile()" class="profile-btn">👤 Profile</button>
+          <button (click)="goToProfile()" class="profile-btn"> Profile</button>
           <button (click)="logout()" class="logout-btn">Logout</button>
         </div>
       </div>

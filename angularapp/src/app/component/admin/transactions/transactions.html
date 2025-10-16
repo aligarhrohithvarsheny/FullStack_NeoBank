@@ -1,35 +1,43 @@
 <div class="transaction-container">
   <h2>All User Transactions</h2>
   
-  <!-- Refresh Button -->
-  <button class="refresh-btn" (click)="loadAllTransactions()">🔄 Refresh</button>
+  <button class="back-btn" (click)="backToDashboard()">⬅ Back to Dashboard</button>
   
-  <table>
-    <thead>
-      <tr>
-        <th>ID</th>
-        <th>User</th>
-        <th>Account</th>
-        <th>Type</th>
-        <th>Amount</th>
-        <th>Date</th>
-        <th>Status</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr *ngFor="let txn of transactions">
-        <td>{{ txn.id }}</td>
-        <td>{{ txn.user }}</td>
-        <td>{{ txn.accountNumber }}</td>
-        <td [class.loan-credit]="txn.type === 'Loan Credit'">{{ txn.type }}</td>
-        <td>₹{{ txn.amount }}</td>
-        <td>{{ txn.date | date:'short' }}</td>
-        <td>{{ txn.status }}</td>
-        <td>{{ txn.description || '-' }}</td>
-      </tr>
-    </tbody>
-  </table>
+  <!-- Refresh Button -->
+  <button class="refresh-btn" (click)="loadAllTransactions()">Refresh</button>
 
-  <button class="back-btn" (click)="backToDashboard()">Back to Dashboard</button>
+  <!-- Transactions Table -->
+  <div class="transactions-table">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>User</th>
+          <th>Account</th>
+          <th>Type</th>
+          <th>Amount</th>
+          <th>Date</th>
+          <th>Status</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let txn of transactions">
+          <td>{{ txn.id }}</td>
+          <td>{{ txn.user }}</td>
+          <td>{{ txn.accountNumber }}</td>
+          <td [class.loan-credit]="txn.type === 'Loan Credit'">{{ txn.type }}</td>
+          <td>₹{{ txn.amount }}</td>
+          <td>{{ txn.date | date:'short' }}</td>
+          <td>{{ txn.status }}</td>
+          <td>{{ txn.description || '-' }}</td>
+        </tr>
+      </tbody>
+    </table>
+    
+    <!-- No Results Message -->
+    <div *ngIf="transactions.length === 0" class="no-results">
+      <p>No transactions found.</p>
+    </div>
+  </div>
 </div>

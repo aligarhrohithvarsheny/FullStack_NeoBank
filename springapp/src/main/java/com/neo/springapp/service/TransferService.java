@@ -245,6 +245,18 @@ public class TransferService {
         return false;
     }
 
+    // Cancel transfer
+    public TransferRecord cancelTransfer(Long id) {
+        TransferRecord transfer = transferRepository.findById(id).orElse(null);
+        if (transfer != null) {
+            transfer.setStatus("Cancelled");
+            transfer.setUpdatedAt(LocalDateTime.now());
+            transfer.setIsCancellable(false);
+            return transferRepository.save(transfer);
+        }
+        return null;
+    }
+
     // Validation methods
     public boolean validateTransferAmount(Double amount, Double availableBalance) {
         return amount != null && amount > 0 && amount <= availableBalance;

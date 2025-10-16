@@ -195,16 +195,59 @@ export class Transaction implements OnInit {
   }
 
   downloadStatement() {
-    if (!isPlatformBrowser(this.platformId)) return;
+    if (!isPlatformBrowser(this.platformId)) {
+      console.log('Not in browser environment, skipping CSV download');
+      return;
+    }
     
-    const csvContent = this.generateCSVContent();
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `statement_${this.userAccountNumber}_${new Date().toISOString().split('T')[0]}.csv`;
-    link.click();
-    window.URL.revokeObjectURL(url);
+    try {
+      // Check if we have transactions
+      if (!this.transactions || this.transactions.length === 0) {
+        alert('No transactions available to download');
+        return;
+      }
+
+      // Check if userAccountNumber is available
+      if (!this.userAccountNumber) {
+        alert('Account number not found. Please refresh the page and try again.');
+        return;
+      }
+      
+      const csvContent = this.generateCSVContent();
+      if (!csvContent || csvContent.trim() === '') {
+        alert('No transactions available to download');
+        return;
+      }
+      
+      // Create blob with proper encoding
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      
+      // Check if URL.createObjectURL is supported
+      if (!window.URL || !window.URL.createObjectURL) {
+        alert('Your browser does not support file downloads. Please try a different browser.');
+        return;
+      }
+      
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `statement_${this.userAccountNumber}_${new Date().toISOString().split('T')[0]}.csv`;
+      link.style.display = 'none';
+      
+      document.body.appendChild(link);
+      link.click();
+      
+      // Clean up
+      setTimeout(() => {
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      }, 100);
+      
+      console.log('CSV download initiated successfully');
+    } catch (error) {
+      console.error('Error downloading CSV:', error);
+      alert('Failed to download CSV. Please try again.');
+    }
   }
 
   cleanupDuplicateLoanTransactions() {
@@ -214,15 +257,75 @@ export class Transaction implements OnInit {
   }
 
   private generateCSVContent(): string {
-    const headers = ['Date', 'Merchant', 'Type', 'Amount', 'Balance'];
-    const rows = this.filteredTransactions.map(tx => [
-      new Date(tx.date).toLocaleDateString(),
-      tx.merchant,
-      tx.type,
-      tx.amount.toString(),
-      tx.balance.toString()
-    ]);
-    
-    return [headers, ...rows].map(row => row.join(',')).join('\n');
+    if (!this.transactions || this.transactions.length === 0) {
+      return '';
+    }
+
+    try {
+      const headers = ['Date', 'Merchant', 'Type', 'Amount (₹)', 'Balance (₹)', 'Description'];
+      
+      // Use all transactions, not just filtered ones for CSV
+      const rows = this.transactions.map(tx => {
+        // Safe date parsing
+        let formattedDate = 'N/A';
+        try {
+          if (tx.date) {
+            const date = new Date(tx.date);
+            if (!isNaN(date.getTime())) {
+              formattedDate = date.toLocaleDateString('en-IN');
+            }
+          }
+        } catch (e) {
+          console.warn('Error formatting date:', tx.date, e);
+        }
+        
+        // Safe number formatting
+        let formattedAmount = '0';
+        let formattedBalance = '0';
+        try {
+          const amount = Number(tx.amount);
+          const balance = Number(tx.balance);
+          
+          if (!isNaN(amount)) {
+            formattedAmount = amount.toLocaleString('en-IN');
+          }
+          if (!isNaN(balance)) {
+            formattedBalance = balance.toLocaleString('en-IN');
+          }
+        } catch (e) {
+          console.warn('Error formatting numbers:', e);
+        }
+        
+        return [
+          `"${formattedDate}"`,
+          `"${(tx.merchant || 'N/A').replace(/"/g, '""')}"`,
+          `"${(tx.type || 'N/A').replace(/"/g, '""')}"`,
+          `"${formattedAmount}"`,
+          `"${formattedBalance}"`,
+          `"${(tx.description || 'N/A').replace(/"/g, '""')}"`
+        ];
+      });
+      
+      // Add bank header information
+      const bankInfo = [
+        `"NeoBank - Account Statement"`,
+        `"Account Number: ${this.userAccountNumber || 'N/A'}"`,
+        `"Generated on: ${new Date().toLocaleDateString('en-IN')} at ${new Date().toLocaleTimeString('en-IN')}"`,
+        `"Total Transactions: ${this.transactions.length}"`,
+        `"Current Balance: ₹${this.currentBalance ? this.currentBalance.toLocaleString('en-IN') : '0'}"`,
+        `""` // Empty line
+      ];
+      
+      const csvContent = [
+        ...bankInfo,
+        headers.map(h => `"${h}"`).join(','),
+        ...rows.map(row => row.join(','))
+      ].join('\n');
+      
+      return csvContent;
+    } catch (error) {
+      console.error('Error generating CSV content:', error);
+      return '';
+    }
   }
 }

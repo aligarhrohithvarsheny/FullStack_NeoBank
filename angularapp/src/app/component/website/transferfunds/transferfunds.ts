@@ -3,9 +3,11 @@ import { FormsModule } from '@angular/forms';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
+import { AlertService } from '../../../service/alert.service';
 
 interface TransferRecord {
-  id: string;
+  id: number; // Database ID (Long)
+  transferId?: string; // Custom transfer ID
   senderAccountNumber: string;
   senderName: string;
   recipientAccountNumber: string;
@@ -14,8 +16,11 @@ interface TransferRecord {
   ifsc: string;
   amount: number;
   transferType: 'NEFT' | 'RTGS';
-  status: 'Pending' | 'Completed' | 'Failed';
+  status: 'Pending' | 'Completed' | 'Failed' | 'Cancelled';
   date: string;
+  createdAt?: string;
+  updatedAt?: string;
+  isCancellable?: boolean;
 }
 
 interface TransactionRecord {
@@ -75,7 +80,8 @@ export class Transferfunds implements OnInit {
   constructor(
     private router: Router, 
     @Inject(PLATFORM_ID) private platformId: Object,
-    private http: HttpClient
+    private http: HttpClient,
+    private alertService: AlertService
   ) {}
 
   ngOnInit() {
@@ -208,12 +214,12 @@ export class Transferfunds implements OnInit {
   // Validate transfer amount against available balance
   validateAmount(): boolean {
     if (this.amount <= 0) {
-      alert('Amount must be greater than 0');
+      this.alertService.transferValidationError('Amount must be greater than 0');
       return false;
     }
     
     if (this.amount > this.currentBalance) {
-      alert(`Insufficient balance! Available balance: ₹${this.currentBalance.toLocaleString()}`);
+      this.alertService.transferInsufficientBalance(this.currentBalance);
       return false;
     }
     
@@ -223,7 +229,7 @@ export class Transferfunds implements OnInit {
   // Handle fund transfer
   transferFunds() {
     if (!this.recipientAccountNumber || !this.recipientName || !this.phone || !this.ifsc || this.amount <= 0) {
-      alert('Please fill all fields correctly!');
+      this.alertService.transferValidationError('Please fill all fields correctly!');
       return;
     }
 
@@ -253,8 +259,10 @@ export class Transferfunds implements OnInit {
         console.log('Transfer successful:', response);
         
         // Create transfer record for local history
+        const now = new Date().toISOString();
         const newTransfer: TransferRecord = {
-          id: response.id || 'TRF' + Date.now() + Math.floor(Math.random() * 1000),
+          id: response.id || Date.now(), // Use database ID from backend
+          transferId: response.transfer?.transferId || 'TRF' + Date.now() + Math.floor(Math.random() * 1000),
           senderAccountNumber: this.userProfile.accountNumber,
           senderName: this.userProfile.name,
           recipientAccountNumber: this.recipientAccountNumber,
@@ -264,7 +272,10 @@ export class Transferfunds implements OnInit {
           amount: this.amount,
           transferType: this.transferType,
           status: 'Completed',
-          date: new Date().toISOString()
+          date: now,
+          createdAt: now,
+          updatedAt: now,
+          isCancellable: true
         };
 
         // Add to transfer history
@@ -277,6 +288,7 @@ export class Transferfunds implements OnInit {
         }
 
         // Show success message with timestamp
+        this.alertService.transferSuccess(newTransfer.amount, newTransfer.recipientName);
         this.showSuccessMessage(newTransfer);
 
         // Reset form
@@ -284,7 +296,7 @@ export class Transferfunds implements OnInit {
       },
       error: (err: any) => {
         console.error('Transfer failed:', err);
-        alert(`Transfer failed: ${err.error?.message || 'Unknown error'}`);
+        this.alertService.transferError(err.error?.message || 'Unknown error');
         this.transactionSuccess = false;
         this.successMessage = '';
       }
@@ -440,6 +452,93 @@ Time: ${timestamp}`;
       },
       error: (err: any) => {
         console.error('Error creating account:', err);
+      }
+    });
+  }
+
+  // Check if transfer can be cancelled (within 3 minutes for NEFT/IMPS)
+  canCancelTransfer(transfer: TransferRecord): boolean {
+    if (transfer.status !== 'Completed' || !transfer.isCancellable) {
+      return false;
+    }
+
+    // Only NEFT can be cancelled (assuming IMPS is similar to NEFT)
+    if (transfer.transferType !== 'NEFT') {
+      return false;
+    }
+
+    // Check if within 3 minutes
+    const transferDate = new Date(transfer.createdAt || transfer.date);
+    const threeMinutesAgo = new Date(Date.now() - 3 * 60 * 1000);
+    
+    return transferDate > threeMinutesAgo;
+  }
+
+  // Cancel transfer
+  cancelTransfer(transfer: TransferRecord) {
+    if (!this.canCancelTransfer(transfer)) {
+      this.alertService.transferValidationError('This transfer cannot be cancelled. Only NEFT/IMPS transfers within 3 minutes can be cancelled.');
+      return;
+    }
+
+    this.alertService.transferConfirm(
+      'Cancel Transfer',
+      `Are you sure you want to cancel the transfer of ₹${transfer.amount.toLocaleString()} to ${transfer.recipientName}?`,
+      () => {
+
+    this.http.put(`http://localhost:8080/api/transfers/${transfer.id}/cancel`, {}).subscribe({
+      next: (response: any) => {
+        console.log('Transfer cancelled successfully:', response);
+        
+        // Update the transfer status in the local array
+        const index = this.transfers.findIndex(t => t.id === transfer.id);
+        if (index !== -1) {
+          this.transfers[index].status = 'Cancelled';
+          this.transfers[index].isCancellable = false;
+        }
+
+        // Update balance if provided
+        if (response.newSenderBalance !== undefined) {
+          this.currentBalance = response.newSenderBalance;
+        }
+
+        this.alertService.transferSuccess(transfer.amount, 'your account (cancelled)');
+        this.saveTransferHistory();
+      },
+      error: (err: any) => {
+        console.error('Error cancelling transfer:', err);
+        this.alertService.transferError(err.error?.error || 'Unknown error');
+      }
+    });
+      }
+    );
+  }
+
+  // Download transfer receipt as PDF
+  downloadReceipt(transfer: TransferRecord) {
+    console.log('Downloading receipt for transfer:', transfer);
+    console.log('Transfer ID:', transfer.id);
+    
+    this.http.get(`http://localhost:8080/api/transfers/${transfer.id}/receipt`, {
+      responseType: 'blob'
+    }).subscribe({
+      next: (blob: Blob) => {
+        console.log('PDF blob received:', blob);
+        // Create download link
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `transfer_receipt_${transfer.transferId || transfer.id}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      },
+      error: (err: any) => {
+        console.error('Error downloading receipt:', err);
+        console.error('Error details:', err.error);
+        console.error('Error status:', err.status);
+        this.alertService.transferError(`Receipt download failed: ${err.status} - ${err.error?.error || err.message || 'Unknown error'}`);
       }
     });
   }

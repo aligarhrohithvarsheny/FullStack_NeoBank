@@ -70,6 +70,14 @@
       >
         Resubmit KYC Request
       </button>
+
+      <button 
+        *ngIf="isRequested && status === 'Approved'"
+        (click)="downloadKycDocument()" 
+        class="download-btn"
+      >
+        📄 Download KYC Document
+      </button>
     </div>
   </div>
 

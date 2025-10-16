@@ -87,17 +87,17 @@
               (click)="approve(request)" 
               class="approve-btn"
             >
-              ✅ Approve
+               Approve
             </button>
             <button 
               *ngIf="request.status === 'Pending'"
               (click)="reject(request)" 
               class="reject-btn"
             >
-              ❌ Reject
+               Reject
             </button>
             <span *ngIf="request.status !== 'Pending'" class="processed">
-              {{ request.status === 'Approved' ? '✅ Processed' : '❌ Processed' }}
+              {{ request.status === 'Approved' ? ' Processed' : ' Processed' }}
             </span>
           </td>
         </tr>

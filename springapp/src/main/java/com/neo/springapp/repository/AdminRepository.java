@@ -12,4 +12,7 @@ public interface AdminRepository extends JpaRepository<Admin, Long> {
 
     // Spring Data JPA method
     Admin findByEmailAndPassword(String email, String password);
+    
+    // Find admin by email only
+    Admin findByEmail(String email);
 }
