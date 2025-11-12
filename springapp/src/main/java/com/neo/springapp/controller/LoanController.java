@@ -17,7 +17,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/loans")
-@CrossOrigin(origins = "http://localhost:4200") // ✅ allow Angular frontend
+@CrossOrigin(origins = {"http://localhost:4200", "http://localhost:3000", "http://frontend:80"}) // ✅ allow Angular frontend
 public class LoanController {
 
     private final LoanService loanService;

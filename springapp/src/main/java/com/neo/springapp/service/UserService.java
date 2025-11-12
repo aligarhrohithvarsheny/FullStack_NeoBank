@@ -190,8 +190,14 @@ public class UserService {
         if (userOpt.isPresent()) {
             User user = userOpt.get();
             
-            // Update only non-null fields
-            if (userDetails.getEmail() != null) user.setEmail(userDetails.getEmail());
+            // Update email with uniqueness validation
+            if (userDetails.getEmail() != null && !userDetails.getEmail().equals(user.getEmail())) {
+                // Check if new email is unique
+                if (!isEmailUnique(userDetails.getEmail())) {
+                    throw new RuntimeException("Email already exists. Please use a different email.");
+                }
+                user.setEmail(userDetails.getEmail());
+            }
             if (userDetails.getStatus() != null) user.setStatus(userDetails.getStatus());
             
             // Update account fields if account exists

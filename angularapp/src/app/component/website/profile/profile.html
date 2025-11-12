@@ -37,7 +37,45 @@
         </div>
         <div class="detail-item">
           <label>Email Address</label>
-          <p>{{ userProfile.email }}</p>
+          <div *ngIf="!editingEmail" class="email-display">
+            <p>{{ userProfile.email }}</p>
+            <button class="edit-email-btn" (click)="startEditingEmail()" type="button">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+              </svg>
+              Update
+            </button>
+          </div>
+          <div *ngIf="editingEmail" class="email-edit">
+            <input 
+              type="email" 
+              [(ngModel)]="newEmail" 
+              class="email-input"
+              placeholder="Enter new email"
+              [disabled]="updatingEmail"
+            />
+            <div class="email-error" *ngIf="emailError">{{ emailError }}</div>
+            <div class="email-actions">
+              <button 
+                class="save-email-btn" 
+                (click)="updateEmail()" 
+                [disabled]="updatingEmail"
+                type="button"
+              >
+                <span *ngIf="!updatingEmail">Save</span>
+                <span *ngIf="updatingEmail">Updating...</span>
+              </button>
+              <button 
+                class="cancel-email-btn" 
+                (click)="cancelEditingEmail()" 
+                [disabled]="updatingEmail"
+                type="button"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
         </div>
         <div class="detail-item">
           <label>Account Number</label>

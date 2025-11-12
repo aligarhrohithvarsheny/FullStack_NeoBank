@@ -14,15 +14,17 @@
   <!-- KYC Form -->
   <div class="kyc-form">
     <div class="form-group">
-      <label for="panNumber">PAN Number:</label>
+      <label for="panNumber">PAN Number: <span class="read-only-badge">(Read Only)</span></label>
       <input 
         id="panNumber"
         type="text" 
         [(ngModel)]="panNumber" 
-        placeholder="Enter PAN Number (e.g., ABCDE1234F)" 
+        placeholder="PAN Number (loaded from account)" 
         maxlength="10"
-        [disabled]="isRequested && status !== 'Rejected'"
+        [disabled]="true"
+        class="read-only-input"
       />
+      <small class="field-help-text">PAN number cannot be changed. Only name can be updated.</small>
     </div>
 
     <div class="form-group">
@@ -32,43 +34,98 @@
         type="text" 
         [(ngModel)]="name" 
         placeholder="Enter your full name as per PAN"
-        [disabled]="isRequested && status !== 'Rejected'"
       />
     </div>
 
-    <!-- Status Display -->
+    <!-- OTP Verification Section for Subsequent Requests -->
+    <div *ngIf="requiresOtp" class="otp-verification-section">
+      <div class="otp-info-message">
+        <p class="otp-notice">
+          <span class="otp-icon">🔐</span>
+          <strong>Email OTP Verification Required</strong>
+          <br>
+          <span class="otp-notice-text">Since this is a subsequent KYC update request, email OTP verification is required for security.</span>
+        </p>
+      </div>
+
+      <!-- Send OTP Info (OTP will be sent automatically when user clicks submit) -->
+      <div *ngIf="!showOtpInput" class="otp-info-box">
+        <p class="otp-info-text">
+          <span class="info-icon">ℹ️</span>
+          Click the "Send OTP & Continue" button below to receive an OTP via email.
+        </p>
+      </div>
+
+      <!-- OTP Input -->
+      <div *ngIf="showOtpInput" class="form-group">
+        <label for="kycOtp">Enter OTP:</label>
+        <input 
+          id="kycOtp"
+          type="text" 
+          [(ngModel)]="kycOtp" 
+          name="kycOtp"
+          placeholder="Enter 6-digit OTP" 
+          maxlength="6" 
+          pattern="[0-9]{6}" 
+          class="otp-input"
+          [disabled]="sendingOtp"
+        />
+        <div class="otp-help-text">
+          <span>Enter the 6-digit OTP sent to {{ userProfile?.email }}</span>
+          <button 
+            type="button" 
+            class="resend-otp-link" 
+            (click)="sendKycOtp()" 
+            [disabled]="sendingOtp"
+          >
+            {{ sendingOtp ? 'Sending...' : 'Resend OTP' }}
+          </button>
+        </div>
+      </div>
+
+      <!-- OTP Success Message -->
+      <div *ngIf="otpSuccessMessage && !otpError" class="otp-success-message">
+        <span class="success-icon">✓</span>
+        {{ otpSuccessMessage }}
+      </div>
+
+      <!-- OTP Error Message -->
+      <div *ngIf="otpError" class="otp-error-message">
+        <span class="error-icon">❌</span>
+        {{ otpError }}
+      </div>
+    </div>
+
+    <!-- Status Display - Most Recent Request -->
     <div *ngIf="isRequested" class="status-display">
       <div class="status-card" [ngClass]="{
         'pending': status === 'Pending Approval',
         'approved': status === 'Approved',
         'rejected': status === 'Rejected'
       }">
-        <h4>KYC Status</h4>
+        <h4>Most Recent KYC Request Status</h4>
         <p><strong>Status:</strong> {{ status }}</p>
         <p *ngIf="kycRequest"><strong>Submitted:</strong> {{ kycRequest.submittedDate | date:'medium' }}</p>
         <p *ngIf="kycRequest?.approvedDate"><strong>Approved:</strong> {{ kycRequest?.approvedDate | date:'medium' }}</p>
         <p *ngIf="kycRequest?.approvedBy"><strong>Approved By:</strong> {{ kycRequest?.approvedBy }}</p>
+        <p class="update-notice">💡 You can submit a new KYC update request at any time using the form above.</p>
       </div>
     </div>
 
     <!-- Action Buttons -->
     <div class="buttons">
       <button 
-        *ngIf="!isRequested || status === 'Rejected'"
         (click)="requestToAdmin()" 
         class="submit-btn"
-        [disabled]="!panNumber || !name"
+        [disabled]="!name || (requiresOtp && showOtpInput && (!kycOtp || kycOtp.length !== 6)) || sendingOtp"
       >
-        Submit KYC Request
-      </button>
-      
-      <button 
-        *ngIf="status === 'Rejected'"
-        (click)="requestToAdmin()" 
-        class="resubmit-btn"
-        [disabled]="!panNumber || !name"
-      >
-        Resubmit KYC Request
+        <span *ngIf="requiresOtp && !showOtpInput">
+          <span *ngIf="sendingOtp">⏳</span>
+          <span *ngIf="!sendingOtp">📧</span>
+          {{ sendingOtp ? 'Sending OTP...' : 'Send OTP & Continue' }}
+        </span>
+        <span *ngIf="requiresOtp && showOtpInput">Submit KYC Update Request</span>
+        <span *ngIf="!requiresOtp">Submit KYC Update Request</span>
       </button>
 
       <button 
@@ -81,14 +138,84 @@
     </div>
   </div>
 
+  <!-- KYC History Section -->
+  <div *ngIf="kycHistory && kycHistory.length > 0" class="kyc-history-section">
+    <div class="history-header">
+      <h3>📜 KYC Update History</h3>
+      <button (click)="downloadKycHistoryPDF()" class="download-history-btn">
+        📄 Download History PDF
+      </button>
+    </div>
+    
+    <div class="history-table-container">
+      <table class="history-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>PAN Number</th>
+            <th>Name</th>
+            <th>Status</th>
+            <th>Submitted Date</th>
+            <th>Approved Date</th>
+            <th>Approved By</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let request of kycHistory; let i = index" 
+              class="history-row" 
+              [ngClass]="{
+                'approved': request.status === 'Approved',
+                'rejected': request.status === 'Rejected',
+                'pending': request.status === 'Pending'
+              }">
+            <td>{{ i + 1 }}</td>
+            <td>{{ request.panNumber || 'N/A' }}</td>
+            <td>{{ request.name || 'N/A' }}</td>
+            <td>
+              <span class="status-badge" 
+                    [ngClass]="{
+                      'approved': request.status === 'Approved',
+                      'rejected': request.status === 'Rejected',
+                      'pending': request.status === 'Pending'
+                    }">
+                {{ request.status || 'Pending' }}
+              </span>
+            </td>
+            <td>
+              <span *ngIf="request.submittedDate">
+                {{ request.submittedDate | date:'medium' }}
+              </span>
+              <span *ngIf="!request.submittedDate">N/A</span>
+            </td>
+            <td>
+              <span *ngIf="request.approvedDate">
+                {{ request.approvedDate | date:'medium' }}
+              </span>
+              <span *ngIf="!request.approvedDate">N/A</span>
+            </td>
+            <td>{{ request.approvedBy || 'N/A' }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    
+    <div class="history-summary">
+      <p><strong>Total KYC Updates:</strong> {{ kycHistory.length }}</p>
+    </div>
+  </div>
+
   <!-- Instructions -->
   <div class="instructions">
     <h4>📋 Instructions:</h4>
     <ul>
-      <li>Enter your PAN number exactly as it appears on your PAN card</li>
-      <li>Enter your full name as it appears on your PAN card</li>
+      <li>You can update your KYC information multiple times as needed</li>
+      <li><strong>PAN Number:</strong> Cannot be changed. It is loaded from your account and is read-only.</li>
+      <li><strong>Name:</strong> Enter your full name as it appears on your PAN card. Only the name can be updated.</li>
+      <li *ngIf="requiresOtp"><strong>Email OTP Verification:</strong> For subsequent KYC update requests, you will receive an OTP via email that needs to be entered before submission</li>
       <li>Admin will verify your details and approve/reject your KYC</li>
       <li>Once approved, your profile will be updated automatically</li>
+      <li>Each KYC update request will be reviewed independently</li>
+      <li>View your complete KYC update history in the table above</li>
     </ul>
   </div>
 </div>

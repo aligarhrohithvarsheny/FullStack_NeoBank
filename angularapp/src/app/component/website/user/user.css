@@ -468,6 +468,105 @@
   border-color: #1e3a8a;
 }
 
+.login-option.qr-option {
+  margin-left: 10px;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+  border-color: #10b981;
+}
+
+.login-option.qr-option:hover {
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+/* QR Code Section */
+.qr-code-section {
+  margin: 20px 0;
+  padding: 30px;
+  background: #f8fafc;
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  text-align: center;
+}
+
+.qr-code-container h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1e293b;
+  margin-bottom: 20px;
+}
+
+.qr-code-image {
+  width: 250px;
+  height: 250px;
+  margin: 0 auto 20px;
+  display: block;
+  border: 4px solid white;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  background: white;
+}
+
+.qr-instruction {
+  font-size: 14px;
+  color: #64748b;
+  margin-bottom: 15px;
+}
+
+.qr-status {
+  font-size: 14px;
+  color: #64748b;
+  font-style: italic;
+  margin-bottom: 15px;
+}
+
+.qr-status.scanned {
+  color: #10b981;
+  font-weight: 600;
+}
+
+.close-qr-btn {
+  background: #ef4444;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.close-qr-btn:hover {
+  background: #dc2626;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+}
+
+/* QR Login Mode Indicator */
+.qr-login-mode-indicator {
+  margin: 20px 0;
+  padding: 15px;
+  background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+  border: 2px solid #3b82f6;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.qr-mode-text {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1e3a8a;
+  margin-bottom: 5px;
+}
+
+.qr-mode-subtext {
+  font-size: 13px;
+  color: #64748b;
+}
+
 /* Virtual Keyboard */
 .virtual-keyboard-section {
   margin-bottom: 20px;
@@ -1609,5 +1708,407 @@
   .cancel-btn, .reset-submit-btn {
     padding: 10px 20px;
     font-size: 0.95rem;
+  }
+}
+
+/* OTP Verification Section Styles */
+.otp-verification-section {
+  animation: fadeIn 0.3s ease-in;
+  padding: 20px 0;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.otp-header {
+  text-align: center;
+  margin-bottom: 25px;
+}
+
+.otp-header h3 {
+  color: #1e3a8a;
+  font-size: 24px;
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+
+.otp-instruction {
+  color: #64748b;
+  font-size: 14px;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.otp-form {
+  margin-top: 20px;
+}
+
+.otp-input {
+  text-align: center;
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: 8px;
+  padding: 15px;
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  background: #f8fafc;
+  transition: all 0.3s ease;
+}
+
+.otp-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.otp-help-text {
+  text-align: center;
+  margin-top: 8px;
+}
+
+.otp-help-text span {
+  color: #64748b;
+  font-size: 12px;
+  font-style: italic;
+}
+
+.otp-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 25px;
+}
+
+.cancel-otp-btn {
+  flex: 1;
+  padding: 14px;
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #64748b;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.cancel-otp-btn:hover:not(:disabled) {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  color: #475569;
+}
+
+.cancel-otp-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.verify-otp-btn {
+  flex: 2;
+  padding: 14px;
+  border: none;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+  color: white;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.verify-otp-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(30, 58, 138, 0.3);
+}
+
+.verify-otp-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.resend-otp-section {
+  text-align: center;
+  margin-top: 25px;
+  padding-top: 20px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.resend-text {
+  color: #64748b;
+  font-size: 14px;
+  margin-bottom: 10px;
+}
+
+.resend-otp-btn {
+  background: transparent;
+  border: none;
+  color: #3b82f6;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 8px 16px;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.resend-otp-btn:hover:not(:disabled) {
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.resend-otp-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.loading-icon {
+  display: inline-block;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Responsive styles for OTP section */
+@media (max-width: 768px) {
+  .otp-header h3 {
+    font-size: 20px;
+  }
+  
+  .otp-input {
+    font-size: 20px;
+    letter-spacing: 6px;
+    padding: 12px;
+  }
+  
+  .otp-actions {
+    flex-direction: column;
+  }
+  
+  .cancel-otp-btn,
+  .verify-otp-btn {
+    width: 100%;
+  }
+}
+
+/* Verification Method Selection Styles */
+.verification-method-selection {
+  margin-bottom: 24px;
+  padding: 16px;
+  background: #f8fafc;
+  border: 2px solid #e2e8f0;
+  border-radius: 8px;
+}
+
+.method-label {
+  display: block;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 12px;
+  font-size: 14px;
+}
+
+.method-options {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.method-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 10px 16px;
+  border: 2px solid #e2e8f0;
+  border-radius: 8px;
+  background: white;
+  transition: all 0.3s ease;
+  flex: 1;
+  min-width: 140px;
+}
+
+.method-option:hover {
+  border-color: #0077cc;
+  background: #f0f7ff;
+}
+
+.method-option input[type="radio"] {
+  margin: 0;
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: #0077cc;
+}
+
+.method-option input[type="radio"]:checked + .method-text {
+  color: #0077cc;
+  font-weight: 600;
+}
+
+.method-option:has(input[type="radio"]:checked) {
+  border-color: #0077cc;
+  background: #f0f7ff;
+}
+
+.method-text {
+  font-size: 14px;
+  font-weight: 500;
+  color: #374151;
+  transition: all 0.3s ease;
+}
+
+/* Email OTP Section Styles */
+.email-otp-section {
+  animation: fadeIn 0.3s ease-in;
+}
+
+.send-otp-btn {
+  width: 100%;
+  padding: 12px 20px;
+  background: linear-gradient(135deg, #0077cc, #0056b3);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.send-otp-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #0056b3, #004085);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 119, 204, 0.3);
+}
+
+.send-otp-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.otp-input {
+  text-align: center;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: 4px;
+  padding: 12px;
+  border: 2px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+  transition: all 0.3s ease;
+  font-family: 'Courier New', monospace;
+}
+
+.otp-input:focus {
+  outline: none;
+  border-color: #0077cc;
+  background: white;
+  box-shadow: 0 0 0 3px rgba(0, 119, 204, 0.1);
+}
+
+.resend-otp-link {
+  background: none;
+  border: none;
+  color: #0077cc;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  margin-left: 8px;
+  text-decoration: underline;
+}
+
+.resend-otp-link:hover:not(:disabled) {
+  color: #0056b3;
+  background: #f0f7ff;
+}
+
+.resend-otp-link:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Aadhar Verification Section Styles */
+.aadhar-verification-section {
+  animation: fadeIn 0.3s ease-in;
+}
+
+/* Success Message in Reset Form */
+.reset-form .success-message {
+  background: linear-gradient(135deg, #d1fae5, #a7f3d0);
+  border: 2px solid #10b981;
+  color: #065f46;
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin: 16px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  box-shadow: 0 4px 15px rgba(16, 185, 129, 0.1);
+}
+
+.reset-form .success-icon {
+  font-size: 18px;
+  color: #10b981;
+}
+
+/* Responsive styles for verification method selection */
+@media (max-width: 640px) {
+  .verification-method-selection {
+    padding: 12px;
+  }
+
+  .method-options {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .method-option {
+    width: 100%;
+    min-width: auto;
+  }
+
+  .otp-input {
+    font-size: 18px;
+    letter-spacing: 3px;
+    padding: 10px;
+  }
+
+  .send-otp-btn {
+    padding: 10px 16px;
+    font-size: 13px;
   }
 }

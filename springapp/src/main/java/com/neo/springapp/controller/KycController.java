@@ -2,6 +2,8 @@ package com.neo.springapp.controller;
 
 import com.neo.springapp.model.KycRequest;
 import com.neo.springapp.service.KycService;
+import com.neo.springapp.service.EmailService;
+import com.neo.springapp.service.OtpService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
@@ -19,15 +21,138 @@ public class KycController {
 
     @Autowired
     private KycService kycService;
+    
+    @Autowired
+    private EmailService emailService;
+    
+    @Autowired
+    private OtpService otpService;
+
+    // Check if user has existing KYC requests (to determine if OTP is needed)
+    @GetMapping("/check-existing/{userAccountNumber}")
+    public ResponseEntity<Map<String, Object>> checkExistingKycRequests(@PathVariable String userAccountNumber) {
+        Map<String, Object> response = new HashMap<>();
+        boolean hasExisting = kycService.hasExistingKycRequests(userAccountNumber);
+        response.put("hasExisting", hasExisting);
+        response.put("requiresOtp", hasExisting);
+        return ResponseEntity.ok(response);
+    }
+
+    // Send OTP for KYC update request
+    @PostMapping("/send-otp")
+    public ResponseEntity<Map<String, Object>> sendKycOtp(@RequestBody Map<String, String> request) {
+        try {
+            String userEmail = request.get("userEmail");
+            String userAccountNumber = request.get("userAccountNumber");
+            
+            if (userEmail == null || userEmail.trim().isEmpty()) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", false);
+                response.put("message", "Email is required");
+                return ResponseEntity.badRequest().body(response);
+            }
+            
+            // Check if user has existing KYC requests
+            if (!kycService.hasExistingKycRequests(userAccountNumber)) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", false);
+                response.put("message", "This is your first KYC request. OTP is not required.");
+                response.put("requiresOtp", false);
+                return ResponseEntity.badRequest().body(response);
+            }
+            
+            // Validate email format
+            if (!userEmail.matches("^[A-Za-z0-9+_.-]+@(.+)$")) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", false);
+                response.put("message", "Invalid email format");
+                return ResponseEntity.badRequest().body(response);
+            }
+            
+            // Generate and send OTP
+            String otp = otpService.generateOtp();
+            otpService.storeOtp(userEmail, otp);
+            
+            // Send KYC update OTP via email
+            boolean emailSent = emailService.sendKycUpdateOtpEmail(userEmail, otp);
+            
+            if (emailSent) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", true);
+                response.put("message", "OTP has been sent to your email. Please check and enter the OTP.");
+                System.out.println("✅ KYC update OTP sent to email: " + userEmail);
+                return ResponseEntity.ok(response);
+            } else {
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", false);
+                response.put("message", "Failed to send OTP. Please try again.");
+                System.out.println("❌ Failed to send KYC update OTP to email: " + userEmail);
+                return ResponseEntity.badRequest().body(response);
+            }
+        } catch (Exception e) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("message", "Failed to send OTP: " + e.getMessage());
+            System.out.println("KYC update OTP error: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(response);
+        }
+    }
 
     // Basic CRUD operations
     @PostMapping("/create")
-    public ResponseEntity<KycRequest> createKycRequest(@RequestBody KycRequest kycRequest) {
+    public ResponseEntity<Map<String, Object>> createKycRequest(@RequestBody Map<String, Object> request) {
         try {
+            // Check if OTP is required (subsequent request)
+            String userAccountNumber = (String) request.get("userAccountNumber");
+            String userEmail = (String) request.get("userEmail");
+            boolean hasExisting = kycService.hasExistingKycRequests(userAccountNumber);
+            
+            // If this is a subsequent request, verify OTP
+            if (hasExisting) {
+                String otp = (String) request.get("otp");
+                if (otp == null || otp.trim().isEmpty()) {
+                    Map<String, Object> response = new HashMap<>();
+                    response.put("success", false);
+                    response.put("requiresOtp", true);
+                    response.put("message", "OTP is required for subsequent KYC update requests");
+                    return ResponseEntity.badRequest().body(response);
+                }
+                
+                // Verify OTP
+                if (!otpService.verifyOtp(userEmail, otp)) {
+                    Map<String, Object> response = new HashMap<>();
+                    response.put("success", false);
+                    response.put("requiresOtp", true);
+                    response.put("message", "Invalid or expired OTP. Please try again.");
+                    System.out.println("❌ Invalid OTP for KYC update: " + userEmail);
+                    return ResponseEntity.badRequest().body(response);
+                }
+            }
+            
+            // Create KYC request
+            KycRequest kycRequest = new KycRequest();
+            kycRequest.setPanNumber((String) request.get("panNumber"));
+            kycRequest.setName((String) request.get("name"));
+            kycRequest.setUserId((String) request.get("userId"));
+            kycRequest.setUserName((String) request.get("userName"));
+            kycRequest.setUserEmail(userEmail);
+            kycRequest.setUserAccountNumber(userAccountNumber);
+            kycRequest.setStatus("Pending");
+            
             KycRequest savedRequest = kycService.saveKycRequest(kycRequest);
-            return ResponseEntity.ok(savedRequest);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("kycRequest", savedRequest);
+            response.put("message", "KYC request submitted successfully");
+            System.out.println("✅ KYC request created: " + savedRequest.getId());
+            return ResponseEntity.ok(response);
         } catch (Exception e) {
-            return ResponseEntity.badRequest().build();
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("message", "Failed to create KYC request: " + e.getMessage());
+            System.out.println("❌ KYC request creation error: " + e.getMessage());
+            return ResponseEntity.badRequest().body(response);
         }
     }
 
@@ -83,6 +208,20 @@ public class KycController {
     public ResponseEntity<KycRequest> getStatusByPanNumber(@PathVariable String panNumber) {
         Optional<KycRequest> request = kycService.getKycStatusByPanNumber(panNumber);
         return request.map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
+    }
+
+    // Get KYC request by user account number
+    @GetMapping("/account/{userAccountNumber}")
+    public ResponseEntity<KycRequest> getKycRequestByAccountNumber(@PathVariable String userAccountNumber) {
+        Optional<KycRequest> request = kycService.getKycRequestByUserAccountNumber(userAccountNumber);
+        return request.map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
+    }
+
+    // Get all KYC requests by user account number
+    @GetMapping("/account/{userAccountNumber}/all")
+    public ResponseEntity<List<KycRequest>> getAllKycRequestsByAccountNumber(@PathVariable String userAccountNumber) {
+        List<KycRequest> requests = kycService.getAllKycRequestsByUserAccountNumber(userAccountNumber);
+        return ResponseEntity.ok(requests);
     }
 
     // Status-based operations

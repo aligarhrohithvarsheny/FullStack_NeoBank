@@ -1,0 +1,67 @@
+# Maven
+target/
+.mvn/wrapper/maven-wrapper.jar
+.mvn/wrapper/maven-wrapper.properties
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.settings/
+.project
+.classpath
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+
+# Dependency directories
+node_modules/
+
+# Optional npm cache directory
+.npm
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn Integrity file
+.yarn-integrity
+
+# dotenv environment variables file
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Git
+.git/
+.gitignore
+
+# Docker
+Dockerfile*
+docker-compose*
+.dockerignore
+
+# Documentation
+README.md
+HELP.md
+

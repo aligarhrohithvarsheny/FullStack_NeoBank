@@ -49,10 +49,45 @@ export class Kycupdate implements OnInit {
   isRequested: boolean = false;
   userProfile: UserProfile | null = null;
   kycRequest: KycRequest | null = null;
+  kycHistory: KycRequest[] = []; // All KYC requests history
+  
+  // OTP verification for subsequent requests
+  requiresOtp: boolean = false;
+  showOtpInput: boolean = false;
+  kycOtp: string = '';
+  sendingOtp: boolean = false;
+  otpError: string = '';
+  otpSuccessMessage: string = '';
 
   ngOnInit() {
     this.loadUserProfile();
     this.loadExistingKycRequest();
+  }
+  
+  checkIfOtpRequired() {
+    if (!this.userProfile || !this.userProfile.accountNumber) {
+      // Retry after a short delay if profile is not loaded yet
+      setTimeout(() => {
+        if (this.userProfile && this.userProfile.accountNumber) {
+          this.checkIfOtpRequired();
+        }
+      }, 500);
+      return;
+    }
+    
+    // Check if user has existing KYC requests
+    this.http.get(`http://localhost:8080/api/kyc/check-existing/${this.userProfile.accountNumber}`).subscribe({
+      next: (response: any) => {
+        console.log('Check existing KYC requests response:', response);
+        this.requiresOtp = response.requiresOtp || response.hasExisting || false;
+        console.log('OTP required for KYC update:', this.requiresOtp);
+      },
+      error: (err: any) => {
+        console.error('Error checking existing KYC requests:', err);
+        // Default to not requiring OTP if check fails
+        this.requiresOtp = false;
+      }
+    });
   }
 
   loadUserProfile() {
@@ -71,6 +106,14 @@ export class Kycupdate implements OnInit {
       };
       this.name = this.userProfile.name || '';
       console.log('Loaded user profile from session:', this.userProfile);
+      
+      // Load existing PAN from account
+      this.loadExistingPanFromAccount();
+      
+      // Check if OTP is required after profile is loaded
+      this.checkIfOtpRequired();
+      // Load KYC history after profile is loaded
+      this.loadKycHistory();
       return;
     }
     
@@ -79,11 +122,122 @@ export class Kycupdate implements OnInit {
     if (savedProfile) {
       this.userProfile = JSON.parse(savedProfile);
       this.name = this.userProfile?.name || '';
+      this.panNumber = this.userProfile?.pan || ''; // Load PAN from profile
       console.log('Loaded user profile from localStorage:', this.userProfile);
+      
+      // Load existing PAN from account
+      this.loadExistingPanFromAccount();
+      
+      // Check if OTP is required after profile is loaded
+      this.checkIfOtpRequired();
+      // Load KYC history after profile is loaded
+      this.loadKycHistory();
     }
   }
 
+  loadExistingPanFromAccount() {
+    if (!this.userProfile || !this.userProfile.accountNumber) return;
+    
+    // Load user account details to get existing PAN
+    this.http.get<any>(`http://localhost:8080/api/users/account/${this.userProfile.accountNumber}`).subscribe({
+      next: (userData: any) => {
+        // Get PAN from account
+        const existingPan = userData.account?.pan || userData.pan || this.userProfile?.pan || '';
+        if (existingPan) {
+          this.panNumber = existingPan;
+          console.log('Loaded existing PAN from account:', this.panNumber);
+        } else {
+          // If no PAN in account, try to get from most recent approved KYC
+          this.loadPanFromApprovedKyc();
+        }
+      },
+      error: (err: any) => {
+        console.error('Error loading account details:', err);
+        // Fallback to loading PAN from approved KYC
+        this.loadPanFromApprovedKyc();
+      }
+    });
+  }
+
+  loadPanFromApprovedKyc() {
+    if (!this.userProfile || !this.userProfile.accountNumber) return;
+    
+    // Try to get PAN from most recent approved KYC
+    this.http.get<any[]>(`http://localhost:8080/api/kyc/account/${this.userProfile.accountNumber}/all`).subscribe({
+      next: (kycRequests: any[]) => {
+        if (kycRequests && Array.isArray(kycRequests)) {
+          // Find the most recent approved KYC
+          const approvedKyc = kycRequests.find(req => req.status === 'Approved');
+          if (approvedKyc && approvedKyc.panNumber) {
+            this.panNumber = approvedKyc.panNumber;
+            console.log('Loaded PAN from approved KYC:', this.panNumber);
+          }
+        }
+      },
+      error: (err: any) => {
+        console.error('Error loading PAN from KYC:', err);
+      }
+    });
+  }
+
   loadExistingKycRequest() {
+    if (!isPlatformBrowser(this.platformId)) return;
+    
+    // First try to load from backend
+    if (this.userProfile && this.userProfile.accountNumber) {
+      // Fetch all existing KYC requests from backend by account number
+      this.http.get<any[]>(`http://localhost:8080/api/kyc/account/${this.userProfile.accountNumber}/all`).subscribe({
+        next: (kycRequests: any[]) => {
+          if (kycRequests && Array.isArray(kycRequests) && kycRequests.length > 0) {
+            // Get the most recent request (should be sorted by submittedDate desc from backend)
+            const mostRecentRequest = kycRequests[0];
+            this.kycRequest = mostRecentRequest;
+            // Don't auto-fill the form - let users enter new data for updates
+            // Only show status of most recent request
+            this.status = mostRecentRequest.status === 'Pending' ? 'Pending Approval' : mostRecentRequest.status;
+            this.isRequested = true;
+            console.log('Loaded existing KYC request from backend:', mostRecentRequest);
+            console.log('Total KYC requests for this account:', kycRequests.length);
+          }
+        },
+        error: (err: any) => {
+          // If error, fallback to localStorage
+          console.error('Error loading existing KYC request from backend:', err);
+          this.loadFromLocalStorage();
+        }
+      });
+    } else {
+      // Fallback to localStorage if profile is not loaded
+      this.loadFromLocalStorage();
+    }
+  }
+
+  loadKycHistory() {
+    if (!isPlatformBrowser(this.platformId)) return;
+    
+    if (this.userProfile && this.userProfile.accountNumber) {
+      // Fetch all KYC requests history from backend
+      this.http.get<any[]>(`http://localhost:8080/api/kyc/account/${this.userProfile.accountNumber}/all`).subscribe({
+        next: (kycRequests: any[]) => {
+          if (kycRequests && Array.isArray(kycRequests)) {
+            // Sort by submittedDate descending (most recent first)
+            this.kycHistory = kycRequests.sort((a, b) => {
+              const dateA = a.submittedDate ? new Date(a.submittedDate).getTime() : 0;
+              const dateB = b.submittedDate ? new Date(b.submittedDate).getTime() : 0;
+              return dateB - dateA;
+            });
+            console.log('Loaded KYC history:', this.kycHistory.length, 'requests');
+          }
+        },
+        error: (err: any) => {
+          console.error('Error loading KYC history:', err);
+          this.kycHistory = [];
+        }
+      });
+    }
+  }
+
+  loadFromLocalStorage() {
     if (!isPlatformBrowser(this.platformId)) return;
     
     const kycRequests = localStorage.getItem('kyc_requests');
@@ -101,9 +255,55 @@ export class Kycupdate implements OnInit {
     }
   }
 
+  sendKycOtp() {
+    if (!this.userProfile || !this.userProfile.email || !this.userProfile.accountNumber) {
+      this.otpError = 'User profile not found. Please refresh the page.';
+      return;
+    }
+
+    this.sendingOtp = true;
+    this.otpError = '';
+    this.otpSuccessMessage = '';
+
+    this.http.post('http://localhost:8080/api/kyc/send-otp', {
+      userEmail: this.userProfile.email,
+      userAccountNumber: this.userProfile.accountNumber
+    }).subscribe({
+      next: (response: any) => {
+        console.log('Send KYC OTP response:', response);
+        this.sendingOtp = false;
+
+        if (response.success) {
+          this.otpSuccessMessage = response.message || 'OTP has been sent to your email. Please check and enter the OTP.';
+          this.showOtpInput = true;
+          this.otpError = '';
+        } else {
+          this.otpError = response.message || 'Failed to send OTP. Please try again.';
+          if (!response.requiresOtp) {
+            // First-time request, no OTP needed
+            this.requiresOtp = false;
+            this.showOtpInput = false;
+          }
+        }
+      },
+      error: (err: any) => {
+        console.error('Send KYC OTP error:', err);
+        this.sendingOtp = false;
+        this.otpError = err.error?.message || 'Failed to send OTP. Please try again.';
+      }
+    });
+  }
+
   requestToAdmin() {
-    if (!this.panNumber || !this.name) {
-      alert('Please enter both PAN number and name!');
+    // Only validate name (PAN is read-only and loaded from account)
+    if (!this.name || this.name.trim() === '') {
+      alert('Please enter your full name!');
+      return;
+    }
+
+    // Ensure PAN is loaded from account
+    if (!this.panNumber || this.panNumber.trim() === '') {
+      alert('PAN number not found. Please contact support.');
       return;
     }
 
@@ -112,42 +312,102 @@ export class Kycupdate implements OnInit {
       return;
     }
 
-    const kycRequest: KycRequest = {
-      id: undefined, // Let backend auto-generate the ID
+    // If OTP is required but not yet sent, send OTP first
+    if (this.requiresOtp && !this.showOtpInput) {
+      // Send OTP first
+      this.sendKycOtp();
+      return;
+    }
+
+    // If OTP is required and input is shown, validate OTP before submitting
+    if (this.requiresOtp && this.showOtpInput) {
+      if (!this.kycOtp || this.kycOtp.length !== 6 || !/^\d{6}$/.test(this.kycOtp)) {
+        this.otpError = 'Please enter a valid 6-digit OTP.';
+        return;
+      }
+    }
+
+    // Prepare request data - use existing PAN from account, only update name
+    const requestData: any = {
       userId: this.userProfile.accountNumber,
-      userName: this.name,
+      userName: this.name.trim(),
       userEmail: this.userProfile.email,
       userAccountNumber: this.userProfile.accountNumber,
-      panNumber: this.panNumber,
-      name: this.name,
-      status: 'Pending',
-      submittedDate: new Date().toISOString(),
-      approvedBy: undefined
+      panNumber: this.panNumber, // Use existing PAN from account (read-only)
+      name: this.name.trim() // Only name can be updated
     };
 
+    // Include OTP if required
+    if (this.requiresOtp && this.showOtpInput) {
+      requestData.otp = this.kycOtp;
+    }
+
     // Submit KYC request to MySQL database
-    this.http.post('http://localhost:8080/api/kyc/create', kycRequest).subscribe({
+    this.http.post('http://localhost:8080/api/kyc/create', requestData).subscribe({
       next: (response: any) => {
         console.log('KYC request created in MySQL:', response);
         
-        // Also save to localStorage as backup
-        this.saveKycRequest(kycRequest);
-        
-        this.kycRequest = kycRequest;
-        this.status = 'Pending Approval';
-        this.isRequested = true;
-        
-        alert('KYC request submitted successfully! Admin will review your application.');
+        if (response.success) {
+          const kycRequest: KycRequest = {
+            id: response.kycRequest?.id?.toString(),
+            userId: this.userProfile!.accountNumber,
+            userName: this.name,
+            userEmail: this.userProfile!.email,
+            userAccountNumber: this.userProfile!.accountNumber,
+            panNumber: this.panNumber,
+            name: this.name,
+            status: 'Pending',
+            submittedDate: new Date().toISOString(),
+            approvedBy: undefined
+          };
+          
+          // Also save to localStorage as backup
+          this.saveKycRequest(kycRequest);
+          
+          this.kycRequest = kycRequest;
+          this.status = 'Pending Approval';
+          this.isRequested = true;
+          
+          // Reset only name field (PAN remains from account)
+          this.name = '';
+          // Reload PAN from account to ensure it's current
+          this.loadExistingPanFromAccount();
+          
+          // Reset OTP fields
+          this.kycOtp = '';
+          this.showOtpInput = false;
+          this.otpError = '';
+          this.otpSuccessMessage = '';
+          
+          // Reload to show updated status and history
+          this.loadExistingKycRequest();
+          this.loadKycHistory();
+          
+          alert('KYC update request submitted successfully! Admin will review your application. You can submit additional updates at any time.');
+        } else {
+          if (response.requiresOtp) {
+            // OTP is required but not provided or invalid
+            this.otpError = response.message || 'OTP is required for subsequent KYC update requests.';
+            if (!this.showOtpInput) {
+              this.sendKycOtp();
+            }
+          } else {
+            alert(response.message || 'Failed to submit KYC request. Please try again.');
+          }
+        }
       },
       error: (err: any) => {
         console.error('Error creating KYC request:', err);
-        alert('Failed to submit KYC request. Please try again.');
         
-        // Fallback to localStorage
-        this.saveKycRequest(kycRequest);
-        this.kycRequest = kycRequest;
-        this.status = 'Pending Approval';
-        this.isRequested = true;
+        if (err.error?.requiresOtp) {
+          // OTP is required
+          this.otpError = err.error?.message || 'OTP is required for subsequent KYC update requests.';
+          if (!this.showOtpInput) {
+            this.sendKycOtp();
+          }
+        } else {
+          alert(err.error?.message || 'Failed to submit KYC request. Please try again.');
+        }
       }
     });
   }
@@ -646,6 +906,290 @@ export class Kycupdate implements OnInit {
             }, 500);
         };
     </script>
+</body>
+</html>`;
+  }
+
+  downloadKycHistoryPDF() {
+    if (!this.userProfile || !this.kycHistory || this.kycHistory.length === 0) {
+      alert('No KYC history available to download.');
+      return;
+    }
+
+    if (!isPlatformBrowser(this.platformId)) return;
+
+    try {
+      const pdfContent = this.generateKycHistoryPDFContent();
+      
+      // Create and download as HTML file (can be printed as PDF)
+      const blob = new Blob([pdfContent], { type: 'text/html;charset=utf-8' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      const currentDate = new Date().toISOString().split('T')[0];
+      link.download = `NeoBank_KYC_History_${this.userProfile.accountNumber}_${currentDate}.html`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      // Show instruction to user
+      setTimeout(() => {
+        const userChoice = confirm('KYC History document downloaded! Would you like to open it now to save as PDF?\n\nClick OK to open, or Cancel to download later.');
+        if (userChoice) {
+          // Open the downloaded file in a new window for printing
+          const newWindow = window.open();
+          if (newWindow) {
+            newWindow.document.write(pdfContent);
+            newWindow.document.close();
+            newWindow.focus();
+          }
+        }
+      }, 500);
+      
+      console.log('KYC History PDF download initiated successfully');
+    } catch (error) {
+      console.error('Error downloading KYC History PDF:', error);
+      alert('Failed to download KYC History document. Please try again.');
+    }
+  }
+
+  private generateKycHistoryPDFContent(): string {
+    const currentDate = new Date().toLocaleDateString('en-IN', { 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    });
+    const currentTime = new Date().toLocaleTimeString();
+
+    let historyRows = '';
+    this.kycHistory.forEach((request, index) => {
+      const submittedDate = request.submittedDate 
+        ? new Date(request.submittedDate).toLocaleDateString('en-IN', { 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          })
+        : 'N/A';
+      
+      const approvedDate = request.approvedDate 
+        ? new Date(request.approvedDate).toLocaleDateString('en-IN', { 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          })
+        : 'N/A';
+
+      const statusClass = request.status === 'Approved' ? 'approved' : 
+                         request.status === 'Rejected' ? 'rejected' : 'pending';
+      
+      historyRows += `
+        <tr class="history-row ${statusClass}">
+          <td>${index + 1}</td>
+          <td>${request.panNumber || 'N/A'}</td>
+          <td>${request.name || 'N/A'}</td>
+          <td><span class="status-badge ${statusClass}">${request.status || 'Pending'}</span></td>
+          <td>${submittedDate}</td>
+          <td>${approvedDate}</td>
+          <td>${request.approvedBy || 'N/A'}</td>
+        </tr>
+      `;
+    });
+
+    return `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>NeoBank KYC History</title>
+    <style>
+        @page {
+            size: A4 landscape;
+            margin: 15mm;
+        }
+        body {
+            font-family: 'Arial', sans-serif;
+            font-size: 11px;
+            line-height: 1.4;
+            color: #333;
+            background: white;
+            margin: 0;
+            padding: 20px;
+        }
+        .header {
+            text-align: center;
+            border: 3px solid #0077cc;
+            padding: 20px;
+            margin-bottom: 20px;
+            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+        }
+        .bank-name {
+            font-size: 24px;
+            font-weight: bold;
+            color: #0077cc;
+            margin-bottom: 10px;
+        }
+        .document-title {
+            font-size: 18px;
+            color: #333;
+            margin-bottom: 15px;
+        }
+        .account-info {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 4px solid #0077cc;
+        }
+        .info-row {
+            display: flex;
+            margin: 5px 0;
+        }
+        .info-label {
+            font-weight: bold;
+            width: 150px;
+            color: #0077cc;
+        }
+        .info-value {
+            flex: 1;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            font-size: 10px;
+        }
+        th {
+            background: linear-gradient(135deg, #0077cc, #0056b3);
+            color: white;
+            padding: 12px 8px;
+            text-align: left;
+            font-weight: 600;
+            border: 1px solid #0056b3;
+        }
+        td {
+            padding: 10px 8px;
+            border: 1px solid #ddd;
+        }
+        .history-row {
+            transition: background-color 0.2s;
+        }
+        .history-row:hover {
+            background-color: #f8f9fa;
+        }
+        .history-row.approved {
+            background-color: #d4edda;
+        }
+        .history-row.rejected {
+            background-color: #f8d7da;
+        }
+        .history-row.pending {
+            background-color: #fff3cd;
+        }
+        .status-badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: 600;
+            font-size: 9px;
+        }
+        .status-badge.approved {
+            background-color: #28a745;
+            color: white;
+        }
+        .status-badge.rejected {
+            background-color: #dc3545;
+            color: white;
+        }
+        .status-badge.pending {
+            background-color: #ffc107;
+            color: #856404;
+        }
+        .footer {
+            margin-top: 30px;
+            padding-top: 15px;
+            border-top: 2px solid #0077cc;
+            text-align: center;
+            font-size: 10px;
+            color: #666;
+        }
+        .watermark {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(-45deg);
+            font-size: 60px;
+            color: rgba(30, 64, 175, 0.1);
+            font-weight: bold;
+            z-index: -1;
+            pointer-events: none;
+        }
+        @media print {
+            body { margin: 0; }
+            .no-print { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="watermark">NeoBank</div>
+    <div class="header">
+        <div class="bank-name">🏦 NEOBANK INDIA LIMITED</div>
+        <div class="document-title">KYC Update History Report</div>
+        <div style="font-size: 11px; color: #666;">
+            Generated on: ${currentDate} at ${currentTime}
+        </div>
+    </div>
+
+    <div class="account-info">
+        <div class="info-row">
+            <div class="info-label">Account Number:</div>
+            <div class="info-value">${this.userProfile?.accountNumber || 'N/A'}</div>
+        </div>
+        <div class="info-row">
+            <div class="info-label">Account Holder:</div>
+            <div class="info-value">${this.userProfile?.name || 'N/A'}</div>
+        </div>
+        <div class="info-row">
+            <div class="info-label">Email:</div>
+            <div class="info-value">${this.userProfile?.email || 'N/A'}</div>
+        </div>
+        <div class="info-row">
+            <div class="info-label">Total KYC Updates:</div>
+            <div class="info-value">${this.kycHistory.length}</div>
+        </div>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>PAN Number</th>
+                <th>Name</th>
+                <th>Status</th>
+                <th>Submitted Date</th>
+                <th>Approved Date</th>
+                <th>Approved By</th>
+            </tr>
+        </thead>
+        <tbody>
+            ${historyRows}
+        </tbody>
+    </table>
+
+    <div class="footer">
+        <div style="margin-bottom: 10px;">
+            <strong>NeoBank India Limited</strong><br>
+            📍 NeoBank Tower, Financial District, Mumbai - 400001, India<br>
+            📞 Customer Care: 1800-NEOBANK | 📧 Email: support@neobank.in
+        </div>
+        <div>
+            Generated by NeoBank KYC Verification System<br>
+            © ${new Date().getFullYear()} NeoBank India Limited. All Rights Reserved.
+        </div>
+    </div>
 </body>
 </html>`;
   }

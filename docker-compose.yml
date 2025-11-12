@@ -1,0 +1,80 @@
+services:
+  # MySQL Database
+  db:
+    image: mysql:8.0
+    container_name: neobank-db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root123}
+      MYSQL_DATABASE: ${DB_NAME:-springapp}
+      MYSQL_USER: ${DB_USER:-root}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-1234}
+    ports:
+      - "${DB_PORT:-3306}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./init-scripts:/docker-entrypoint-initdb.d
+    networks:
+      - neobank-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+  # Spring Boot Backend
+  backend:
+    build:
+      context: ./springapp
+      dockerfile: Dockerfile
+    container_name: neobank-backend
+    restart: unless-stopped
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_DATASOURCE_URL=jdbc:mysql://db:3306/${DB_NAME:-springapp}
+      - SPRING_DATASOURCE_USERNAME=${DB_USER:-neo}
+      - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD:-neo123}
+      - SPRING_DATASOURCE_DRIVER_CLASS_NAME=com.mysql.cj.jdbc.Driver
+      - SPRING_JPA_HIBERNATE_DDL_AUTO=update
+      - SPRING_JPA_SHOW_SQL=false
+      - SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT=org.hibernate.dialect.MySQL8Dialect
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - neobank-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+
+  # Angular Frontend
+  frontend:
+    build:
+      context: ./angularapp
+      dockerfile: Dockerfile
+    container_name: neobank-frontend
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - neobank-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  mysql_data:
+    driver: local
+
+networks:
+  neobank-network:
+    driver: bridge

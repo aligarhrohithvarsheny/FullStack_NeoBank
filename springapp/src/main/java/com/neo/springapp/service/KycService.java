@@ -46,6 +46,22 @@ public class KycService {
         return kycRepository.findByUserAccountNumber(userAccountNumber);
     }
 
+    public List<KycRequest> getAllKycRequestsByUserAccountNumber(String userAccountNumber) {
+        List<KycRequest> requests = kycRepository.findAllByUserAccountNumber(userAccountNumber);
+        // Sort by submittedDate descending to get most recent first
+        requests.sort((a, b) -> {
+            if (a.getSubmittedDate() == null && b.getSubmittedDate() == null) return 0;
+            if (a.getSubmittedDate() == null) return 1;
+            if (b.getSubmittedDate() == null) return -1;
+            return b.getSubmittedDate().compareTo(a.getSubmittedDate());
+        });
+        return requests;
+    }
+
+    public boolean hasExistingKycRequests(String userAccountNumber) {
+        return kycRepository.countByUserAccountNumber(userAccountNumber) > 0;
+    }
+
     public List<KycRequest> getAllKycRequests() {
         return kycRepository.findAll();
     }
@@ -107,6 +123,8 @@ public class KycService {
     }
     
     // Update user details from approved KYC
+    // This method updates the entire account when KYC is approved
+    // PAN number updates will propagate to the entire account
     private void updateUserDetailsFromKyc(KycRequest kycRequest) {
         try {
             // Find user by account number
@@ -117,16 +135,33 @@ public class KycService {
                 
                 if (account != null) {
                     // Update account details with KYC information
+                    // Name and PAN are updated from KYC request
                     account.setName(kycRequest.getName());
+                    
+                    // PAN number update - this updates the entire account
+                    // When PAN is updated, it propagates to all account-related systems
+                    String previousPan = account.getPan();
                     account.setPan(kycRequest.getPanNumber());
+                    
+                    // Mark KYC as verified and update timestamp
                     account.setKycVerified(true);
                     account.setLastUpdated(LocalDateTime.now());
                     
+                    // Log PAN update if it changed
+                    if (previousPan != null && !previousPan.equals(kycRequest.getPanNumber())) {
+                        System.out.println("⚠️ PAN Number Updated:");
+                        System.out.println("   Previous PAN: " + previousPan);
+                        System.out.println("   New PAN: " + kycRequest.getPanNumber());
+                        System.out.println("   This update will affect the entire account.");
+                    }
+                    
                     // Save updated account
                     // Note: Account will be saved when user is saved due to cascade
+                } else {
+                    System.out.println("⚠️ Account not found for user: " + kycRequest.getUserAccountNumber());
                 }
                 
-                // Save updated user
+                // Save updated user (this will cascade save the account)
                 userRepository.save(user);
                 
                 System.out.println("✅ Updated user account details from KYC:");
@@ -134,11 +169,13 @@ public class KycService {
                 System.out.println("   Name: " + kycRequest.getName());
                 System.out.println("   PAN: " + kycRequest.getPanNumber());
                 System.out.println("   KYC Verified: true");
+                System.out.println("   Account updated successfully - changes propagated to entire account");
             } else {
                 System.out.println("❌ User not found for account number: " + kycRequest.getUserAccountNumber());
             }
         } catch (Exception e) {
             System.out.println("❌ Error updating user details from KYC: " + e.getMessage());
+            e.printStackTrace();
         }
     }
 

@@ -19,6 +19,8 @@ public interface KycRepository extends JpaRepository<KycRequest, Long> {
     Optional<KycRequest> findByPanNumber(String panNumber);
     Optional<KycRequest> findByUserId(String userId);
     Optional<KycRequest> findByUserAccountNumber(String userAccountNumber);
+    List<KycRequest> findAllByUserAccountNumber(String userAccountNumber);
+    Long countByUserAccountNumber(String userAccountNumber);
     List<KycRequest> findByStatus(String status);
     Page<KycRequest> findByStatus(String status, Pageable pageable);
     

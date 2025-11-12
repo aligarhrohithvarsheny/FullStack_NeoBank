@@ -69,9 +69,30 @@
       <div *ngIf="currentPage === 'login'" class="form-content">
         <div class="login-options">
           <button class="login-option active">USER/GMAIL ID</button>
+          <button type="button" class="login-option qr-option" (click)="generateQrCode()" *ngIf="!showQrCode && !isQrLoginMode">
+            📱 QR CODE LOGIN
+          </button>
         </div>
 
-        <form (ngSubmit)="login()" class="login-form">
+        <!-- QR Code Display -->
+        <div *ngIf="showQrCode" class="qr-code-section">
+          <div class="qr-code-container">
+            <h3>Scan QR Code with Mobile</h3>
+            <img [src]="qrCodeImage" alt="QR Code" class="qr-code-image" *ngIf="qrCodeImage">
+            <p class="qr-instruction">Scan this QR code with your mobile device to login</p>
+            <p class="qr-status" *ngIf="qrStatus === 'PENDING'">Waiting for scan...</p>
+            <p class="qr-status scanned" *ngIf="qrStatus === 'SCANNED'">QR code scanned! Please complete login on mobile.</p>
+            <button type="button" class="close-qr-btn" (click)="closeQrCode()">Close QR Code</button>
+          </div>
+        </div>
+
+        <!-- QR Login Mode Indicator -->
+        <div *ngIf="isQrLoginMode" class="qr-login-mode-indicator">
+          <p class="qr-mode-text">📱 QR Code Login Mode</p>
+          <p class="qr-mode-subtext">Please enter your credentials to complete login</p>
+        </div>
+
+        <form (ngSubmit)="login()" class="login-form" *ngIf="!showOtpInput && !showQrCode">
           <div class="input-group">
             <label>USERID/GMAILID</label>
             <input type="text" [(ngModel)]="loginUserId" name="loginUserId" placeholder="Enter an User or Gmail ID" required />
@@ -85,13 +106,58 @@
             </div>
           </div>
 
-
-
           <button type="submit" class="secure-login-btn">
             <span class="lock-icon">🔒</span>
             Secure Login
           </button>
         </form>
+
+        <!-- OTP Verification Form -->
+        <div *ngIf="showOtpInput" class="otp-verification-section">
+          <div class="otp-header">
+            <h3>Enter OTP</h3>
+            <p class="otp-instruction">We've sent a 6-digit OTP to your email address. Please enter it below to complete your login.</p>
+          </div>
+
+          <form (ngSubmit)="verifyOtp()" class="otp-form">
+            <div class="input-group">
+              <label>Enter OTP</label>
+              <input 
+                type="text" 
+                [(ngModel)]="otpCode" 
+                name="otpCode" 
+                placeholder="Enter 6-digit OTP" 
+                maxlength="6" 
+                pattern="[0-9]{6}"
+                required 
+                class="otp-input"
+                autocomplete="off"
+              />
+              <div class="otp-help-text">
+                <span>Check your email for the OTP code</span>
+              </div>
+            </div>
+
+            <div class="otp-actions">
+              <button type="button" class="cancel-otp-btn" (click)="cancelOtpVerification()" [disabled]="verifyingOtp">
+                Cancel
+              </button>
+              <button type="submit" class="verify-otp-btn" [disabled]="verifyingOtp || !otpCode || otpCode.length !== 6">
+                <span *ngIf="verifyingOtp" class="loading-icon">⏳</span>
+                <span *ngIf="!verifyingOtp">✓</span>
+                {{ verifyingOtp ? 'Verifying...' : 'Verify OTP' }}
+              </button>
+            </div>
+
+            <div class="resend-otp-section">
+              <p class="resend-text">Didn't receive the OTP?</p>
+              <button type="button" class="resend-otp-btn" (click)="resendOtp()" [disabled]="resendingOtp">
+                <span *ngIf="resendingOtp" class="loading-icon">⏳</span>
+                {{ resendingOtp ? 'Sending...' : 'Resend OTP' }}
+              </button>
+            </div>
+          </form>
+        </div>
 
         <!-- Account Unlock Button -->
         <div class="unlock-section" *ngIf="showUnlockButton">
@@ -295,8 +361,35 @@
         <!-- Reset Form -->
         <div *ngIf="!showResetSuccessScreen">
           <p class="instruction-text">
-            Enter your email and first 4 digits of your Aadhar number to reset your password.
+            Choose a verification method to reset your password.
           </p>
+          
+          <!-- Verification Method Selection -->
+          <div class="verification-method-selection">
+            <label class="method-label">Verification Method:</label>
+            <div class="method-options">
+              <label class="method-option">
+                <input 
+                  type="radio" 
+                  name="resetVerificationMethod" 
+                  [(ngModel)]="resetVerificationMethod" 
+                  value="email" 
+                  (change)="onVerificationMethodChange()"
+                />
+                <span class="method-text">Email OTP</span>
+              </label>
+              <label class="method-option">
+                <input 
+                  type="radio" 
+                  name="resetVerificationMethod" 
+                  [(ngModel)]="resetVerificationMethod" 
+                  value="aadhar" 
+                  (change)="onVerificationMethodChange()"
+                />
+                <span class="method-text">Aadhar Verification</span>
+              </label>
+            </div>
+          </div>
           
           <form (ngSubmit)="resetPassword()" class="reset-form">
             <div class="form-row">
@@ -306,12 +399,61 @@
               </div>
             </div>
             
-            <div class="form-row">
-              <div class="input-group">
-                <label>First 4 digits of Aadhar Number</label>
-                <input type="text" [(ngModel)]="resetAadharFirst4" name="resetAadharFirst4" placeholder="Enter first 4 digits" maxlength="4" pattern="[0-9]{4}" required />
-                <div class="input-help">
-                  <span class="help-text">Enter only the first 4 digits of your 12-digit Aadhar number</span>
+            <!-- Email OTP Verification -->
+            <div *ngIf="resetVerificationMethod === 'email'" class="email-otp-section">
+              <div class="form-row" *ngIf="!showResetOtpInput">
+                <div class="input-group">
+                  <button type="button" class="send-otp-btn" (click)="sendResetOtp()" [disabled]="sendingResetOtp || !resetEmail">
+                    <span *ngIf="sendingResetOtp" class="loading-icon">⏳</span>
+                    <span *ngIf="!sendingResetOtp">📧</span>
+                    {{ sendingResetOtp ? 'Sending OTP...' : 'Send OTP to Email' }}
+                  </button>
+                  <div class="input-help">
+                    <span class="help-text">Click the button to receive an OTP via email</span>
+                  </div>
+                </div>
+              </div>
+              
+              <div class="form-row" *ngIf="showResetOtpInput">
+                <div class="input-group">
+                  <label>Enter OTP</label>
+                  <input 
+                    type="text" 
+                    [(ngModel)]="resetOtp" 
+                    name="resetOtp" 
+                    placeholder="Enter 6-digit OTP" 
+                    maxlength="6" 
+                    pattern="[0-9]{6}" 
+                    required 
+                    class="otp-input"
+                  />
+                  <div class="input-help">
+                    <span class="help-text">Enter the 6-digit OTP sent to your email</span>
+                    <button type="button" class="resend-otp-link" (click)="resendResetOtp()" [disabled]="sendingResetOtp">
+                      {{ sendingResetOtp ? 'Sending...' : 'Resend OTP' }}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Aadhar Verification -->
+            <div *ngIf="resetVerificationMethod === 'aadhar'" class="aadhar-verification-section">
+              <div class="form-row">
+                <div class="input-group">
+                  <label>First 4 digits of Aadhar Number</label>
+                  <input 
+                    type="text" 
+                    [(ngModel)]="resetAadharFirst4" 
+                    name="resetAadharFirst4" 
+                    placeholder="Enter first 4 digits" 
+                    maxlength="4" 
+                    pattern="[0-9]{4}" 
+                    required 
+                  />
+                  <div class="input-help">
+                    <span class="help-text">Enter only the first 4 digits of your 12-digit Aadhar number</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -330,6 +472,12 @@
               </div>
             </div>
             
+            <!-- Success Message -->
+            <div *ngIf="successMessage && !errorMessage" class="success-message">
+              <span class="success-icon">✓</span>
+              {{ successMessage }}
+            </div>
+            
             <!-- Error Message -->
             <div *ngIf="errorMessage" class="error-message">
               <span class="error-icon">❌</span>
@@ -338,9 +486,13 @@
             
             <div class="modal-actions">
               <button type="button" class="cancel-btn" (click)="closeForgotPasswordModal()">Cancel</button>
-              <button type="submit" class="reset-submit-btn" [disabled]="resettingPassword">
-                <span *ngIf="resettingPassword" class="loading-icon"></span>
-                <span *ngIf="!resettingPassword" class="reset-icon"></span>
+              <button 
+                type="submit" 
+                class="reset-submit-btn" 
+                [disabled]="resettingPassword || (resetVerificationMethod === 'email' && !showResetOtpInput)"
+              >
+                <span *ngIf="resettingPassword" class="loading-icon">⏳</span>
+                <span *ngIf="!resettingPassword">✓</span>
                 {{ resettingPassword ? 'Resetting...' : 'Reset Password' }}
               </button>
             </div>

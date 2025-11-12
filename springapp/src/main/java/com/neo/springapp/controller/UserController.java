@@ -5,12 +5,16 @@ import com.neo.springapp.model.Account;
 import com.neo.springapp.service.UserService;
 import com.neo.springapp.service.AccountService;
 import com.neo.springapp.service.PasswordService;
+import com.neo.springapp.service.OtpService;
+import com.neo.springapp.service.EmailService;
+import com.neo.springapp.service.QrCodeService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -18,7 +22,7 @@ import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/users")
-@CrossOrigin(origins = "http://localhost:4200")
+@CrossOrigin(origins = {"http://localhost:4200", "http://localhost:3000", "http://frontend:80"})
 public class UserController {
 
     @Autowired
@@ -29,8 +33,17 @@ public class UserController {
     
     @Autowired
     private PasswordService passwordService;
+    
+    @Autowired
+    private OtpService otpService;
+    
+    @Autowired
+    private EmailService emailService;
+    
+    @Autowired
+    private QrCodeService qrCodeService;
 
-    // Authentication endpoint
+    // Authentication endpoint - Step 1: Verify password and send OTP
     @PostMapping("/authenticate")
     public ResponseEntity<Map<String, Object>> authenticateUser(@RequestBody Map<String, String> credentials) {
         try {
@@ -65,18 +78,27 @@ public class UserController {
                 
                 // Use encrypted password verification
                 if (passwordService.verifyPassword(password, user.getPassword())) {
-                    // Reset failed login attempts on successful login
-                    user.setFailedLoginAttempts(0);
-                    user.setAccountLocked(false);
-                    user.setLastFailedLoginTime(null);
-                    userService.saveUser(user);
+                    // Password is correct - generate and send OTP
+                    String otp = otpService.generateOtp();
+                    otpService.storeOtp(email, otp);
                     
-                    Map<String, Object> response = new HashMap<>();
-                    response.put("success", true);
-                    response.put("user", user);
-                    response.put("message", "Authentication successful");
-                    System.out.println("Authentication successful for user: " + user.getUsername());
-                    return ResponseEntity.ok(response);
+                    // Send OTP via email
+                    boolean emailSent = emailService.sendOtpEmail(email, otp);
+                    
+                    if (emailSent) {
+                        Map<String, Object> response = new HashMap<>();
+                        response.put("success", true);
+                        response.put("requiresOtp", true);
+                        response.put("message", "Password verified. OTP has been sent to your email. Please enter the OTP to complete login.");
+                        System.out.println("Password verified for user: " + user.getUsername() + ". OTP sent to email.");
+                        return ResponseEntity.ok(response);
+                    } else {
+                        Map<String, Object> response = new HashMap<>();
+                        response.put("success", false);
+                        response.put("message", "Password verified but failed to send OTP. Please try again.");
+                        System.out.println("Password verified but OTP email failed for user: " + user.getUsername());
+                        return ResponseEntity.badRequest().body(response);
+                    }
                 } else {
                     // Increment failed login attempts
                     user.setFailedLoginAttempts(user.getFailedLoginAttempts() + 1);
@@ -116,6 +138,120 @@ public class UserController {
             response.put("success", false);
             response.put("message", "Authentication failed: " + e.getMessage());
             System.out.println("Authentication error: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(response);
+        }
+    }
+
+    // OTP Verification endpoint - Step 2: Verify OTP and complete login
+    @PostMapping("/verify-otp")
+    public ResponseEntity<Map<String, Object>> verifyOtp(@RequestBody Map<String, String> request) {
+        try {
+            String email = request.get("email");
+            String otp = request.get("otp");
+            
+            System.out.println("OTP verification attempt for email: " + email);
+            
+            if (email == null || otp == null) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", false);
+                response.put("message", "Email and OTP are required");
+                return ResponseEntity.badRequest().body(response);
+            }
+            
+            // Verify OTP
+            if (otpService.verifyOtp(email, otp)) {
+                // OTP is valid - complete login
+                Optional<User> userOpt = userService.findByEmail(email);
+                if (userOpt.isPresent()) {
+                    User user = userOpt.get();
+                    
+                    // Reset failed login attempts on successful login
+                    user.setFailedLoginAttempts(0);
+                    user.setAccountLocked(false);
+                    user.setLastFailedLoginTime(null);
+                    userService.saveUser(user);
+                    
+                    // Send login notification email for security purposes
+                    LocalDateTime loginTime = LocalDateTime.now();
+                    DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+                    String formattedTimestamp = loginTime.format(formatter);
+                    emailService.sendLoginNotificationEmail(user.getEmail(), user.getUsername(), formattedTimestamp);
+                    
+                    Map<String, Object> response = new HashMap<>();
+                    response.put("success", true);
+                    response.put("user", user);
+                    response.put("message", "Login successful");
+                    System.out.println("OTP verified and login successful for user: " + user.getUsername());
+                    return ResponseEntity.ok(response);
+                } else {
+                    Map<String, Object> response = new HashMap<>();
+                    response.put("success", false);
+                    response.put("message", "User not found");
+                    System.out.println("User not found after OTP verification: " + email);
+                    return ResponseEntity.badRequest().body(response);
+                }
+            } else {
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", false);
+                response.put("message", "Invalid or expired OTP. Please try again.");
+                System.out.println("Invalid OTP for email: " + email);
+                return ResponseEntity.badRequest().body(response);
+            }
+        } catch (Exception e) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("message", "OTP verification failed: " + e.getMessage());
+            System.out.println("OTP verification error: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(response);
+        }
+    }
+
+    // Resend OTP endpoint
+    @PostMapping("/resend-otp")
+    public ResponseEntity<Map<String, Object>> resendOtp(@RequestBody Map<String, String> request) {
+        try {
+            String email = request.get("email");
+            
+            System.out.println("Resend OTP request for email: " + email);
+            
+            if (email == null) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", false);
+                response.put("message", "Email is required");
+                return ResponseEntity.badRequest().body(response);
+            }
+            
+            Optional<User> userOpt = userService.findByEmail(email);
+            if (!userOpt.isPresent()) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", false);
+                response.put("message", "User not found");
+                return ResponseEntity.badRequest().body(response);
+            }
+            
+            // Generate and send new OTP
+            String otp = otpService.generateOtp();
+            otpService.storeOtp(email, otp);
+            
+            boolean emailSent = emailService.sendOtpEmail(email, otp);
+            
+            if (emailSent) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", true);
+                response.put("message", "OTP has been resent to your email");
+                System.out.println("OTP resent to email: " + email);
+                return ResponseEntity.ok(response);
+            } else {
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", false);
+                response.put("message", "Failed to resend OTP. Please try again.");
+                return ResponseEntity.badRequest().body(response);
+            }
+        } catch (Exception e) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("message", "Failed to resend OTP: " + e.getMessage());
+            System.out.println("Resend OTP error: " + e.getMessage());
             return ResponseEntity.internalServerError().body(response);
         }
     }
@@ -237,9 +373,98 @@ public class UserController {
     }
 
     @PutMapping("/update/{id}")
-    public ResponseEntity<User> updateUser(@PathVariable Long id, @RequestBody User userDetails) {
+    public ResponseEntity<Map<String, Object>> updateUser(@PathVariable Long id, @RequestBody User userDetails) {
+        try {
         User updatedUser = userService.updateUser(id, userDetails);
-        return updatedUser != null ? ResponseEntity.ok(updatedUser) : ResponseEntity.notFound().build();
+            if (updatedUser != null) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", true);
+                response.put("user", updatedUser);
+                response.put("message", "User updated successfully");
+                return ResponseEntity.ok(response);
+            } else {
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", false);
+                response.put("message", "User not found");
+                return ResponseEntity.status(404).body(response);
+            }
+        } catch (RuntimeException e) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(response);
+        } catch (Exception e) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("message", "Failed to update user: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(response);
+        }
+    }
+
+    // Dedicated endpoint for updating email
+    @PutMapping("/update-email/{id}")
+    public ResponseEntity<Map<String, Object>> updateEmail(@PathVariable Long id, @RequestBody Map<String, String> request) {
+        try {
+            String newEmail = request.get("email");
+            
+            if (newEmail == null || newEmail.trim().isEmpty()) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", false);
+                response.put("message", "Email is required");
+                return ResponseEntity.badRequest().body(response);
+            }
+            
+            // Validate email format (basic validation)
+            if (!newEmail.matches("^[A-Za-z0-9+_.-]+@(.+)$")) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", false);
+                response.put("message", "Invalid email format");
+                return ResponseEntity.badRequest().body(response);
+            }
+            
+            Optional<User> userOpt = userService.getUserById(id);
+            if (!userOpt.isPresent()) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", false);
+                response.put("message", "User not found");
+                return ResponseEntity.status(404).body(response);
+            }
+            
+            User user = userOpt.get();
+            
+            // Check if email is the same
+            if (newEmail.equals(user.getEmail())) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", false);
+                response.put("message", "New email is the same as current email");
+                return ResponseEntity.badRequest().body(response);
+            }
+            
+            // Check if email is unique
+            if (!userService.isEmailUnique(newEmail)) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", false);
+                response.put("message", "Email already exists. Please use a different email.");
+                return ResponseEntity.badRequest().body(response);
+            }
+            
+            // Update email
+            user.setEmail(newEmail);
+            User updatedUser = userService.saveUser(user);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("user", updatedUser);
+            response.put("message", "Email updated successfully");
+            System.out.println("✅ Email updated successfully for user ID: " + id);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("message", "Failed to update email: " + e.getMessage());
+            System.out.println("❌ Email update failed: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(response);
+        }
     }
 
 
@@ -572,6 +797,347 @@ public class UserController {
             response.put("success", false);
             response.put("message", "Password reset failed: " + e.getMessage());
             System.out.println("Password reset error: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(response);
+        }
+    }
+
+    // Send OTP for password reset
+    @PostMapping("/send-reset-otp")
+    public ResponseEntity<Map<String, Object>> sendResetOtp(@RequestBody Map<String, String> request) {
+        try {
+            String email = request.get("email");
+            
+            System.out.println("Password reset OTP request for email: " + email);
+            
+            if (email == null || email.trim().isEmpty()) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", false);
+                response.put("message", "Email is required");
+                return ResponseEntity.badRequest().body(response);
+            }
+            
+            // Validate email format
+            if (!email.matches("^[A-Za-z0-9+_.-]+@(.+)$")) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", false);
+                response.put("message", "Invalid email format");
+                return ResponseEntity.badRequest().body(response);
+            }
+            
+            // Check if user exists
+            Optional<User> userOpt = userService.findByEmail(email);
+            if (!userOpt.isPresent()) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", false);
+                response.put("message", "User not found with this email address");
+                System.out.println("❌ User not found for password reset OTP: " + email);
+                return ResponseEntity.badRequest().body(response);
+            }
+            
+            // Generate and send OTP
+            String otp = otpService.generateOtp();
+            otpService.storeOtp(email, otp);
+            
+            // Send password reset OTP via email
+            boolean emailSent = emailService.sendPasswordResetOtpEmail(email, otp);
+            
+            if (emailSent) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", true);
+                response.put("message", "OTP has been sent to your email. Please check and enter the OTP.");
+                System.out.println("✅ Password reset OTP sent to email: " + email);
+                return ResponseEntity.ok(response);
+            } else {
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", false);
+                response.put("message", "Failed to send OTP. Please try again.");
+                System.out.println("❌ Failed to send password reset OTP to email: " + email);
+                return ResponseEntity.badRequest().body(response);
+            }
+        } catch (Exception e) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("message", "Failed to send OTP: " + e.getMessage());
+            System.out.println("Password reset OTP error: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(response);
+        }
+    }
+
+    // Reset password with OTP verification
+    @PostMapping("/reset-password-with-otp")
+    public ResponseEntity<Map<String, Object>> resetPasswordWithOtp(@RequestBody Map<String, String> request) {
+        try {
+            String email = request.get("email");
+            String otp = request.get("otp");
+            String newPassword = request.get("newPassword");
+
+            System.out.println("Password reset with OTP request for email: " + email);
+
+            // Validate input
+            if (email == null || email.trim().isEmpty() || 
+                otp == null || otp.trim().isEmpty() ||
+                newPassword == null || newPassword.trim().isEmpty()) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", false);
+                response.put("message", "Email, OTP, and new password are required");
+                return ResponseEntity.badRequest().body(response);
+            }
+
+            // Validate OTP format
+            if (!otp.matches("\\d{6}")) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", false);
+                response.put("message", "OTP must be exactly 6 digits");
+                return ResponseEntity.badRequest().body(response);
+            }
+
+            // Validate password length
+            if (newPassword.length() < 6) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", false);
+                response.put("message", "Password must be at least 6 characters long");
+                return ResponseEntity.badRequest().body(response);
+            }
+
+            // Verify OTP
+            if (!otpService.verifyOtp(email, otp)) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", false);
+                response.put("message", "Invalid or expired OTP. Please try again.");
+                System.out.println("❌ Invalid OTP for password reset: " + email);
+                return ResponseEntity.badRequest().body(response);
+            }
+
+            // Find user by email
+            Optional<User> userOpt = userService.findByEmail(email);
+            if (!userOpt.isPresent()) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", false);
+                response.put("message", "User not found with this email address");
+                System.out.println("❌ User not found for password reset: " + email);
+                return ResponseEntity.badRequest().body(response);
+            }
+
+            User user = userOpt.get();
+            
+            // Reset password with encryption
+            user.setPassword(passwordService.encryptPassword(newPassword));
+            userService.saveUser(user);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("message", "Password reset successfully");
+            System.out.println("✅ Password reset successful with OTP for user: " + email);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("message", "Password reset failed: " + e.getMessage());
+            System.out.println("Password reset error: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(response);
+        }
+    }
+
+    // QR Code Login endpoints
+    
+    /**
+     * Generate QR code for login
+     * @return QR code image and token
+     */
+    @PostMapping("/generate-qr-login")
+    public ResponseEntity<Map<String, Object>> generateQrLogin() {
+        try {
+            String token = qrCodeService.generateQrSession();
+            
+            // Generate login URL (adjust based on your frontend URL)
+            String loginUrl = "http://localhost:4200/website/user?qrToken=" + token;
+            // For production, use: "https://yourdomain.com/website/user?qrToken=" + token;
+            
+            String qrCodeImage = qrCodeService.generateQrCodeImage(token, loginUrl);
+            
+            if (qrCodeImage == null) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", false);
+                response.put("message", "Failed to generate QR code");
+                return ResponseEntity.badRequest().body(response);
+            }
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("qrToken", token);
+            response.put("qrCodeImage", qrCodeImage);
+            response.put("expiresIn", 300); // 5 minutes in seconds
+            System.out.println("✅ QR code generated successfully. Token: " + token);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("message", "Failed to generate QR code: " + e.getMessage());
+            System.out.println("❌ QR code generation error: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.internalServerError().body(response);
+        }
+    }
+    
+    /**
+     * Check QR login status (for polling from desktop)
+     * @param token QR session token
+     * @return Status of QR login
+     */
+    @GetMapping("/check-qr-login-status/{token}")
+    public ResponseEntity<Map<String, Object>> checkQrLoginStatus(@PathVariable String token) {
+        try {
+            QrCodeService.QrSessionData session = qrCodeService.getQrSession(token);
+            
+            if (session == null) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", false);
+                response.put("status", "EXPIRED");
+                response.put("message", "QR code expired or invalid");
+                return ResponseEntity.ok(response);
+            }
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("status", session.getStatus());
+            response.put("token", token);
+            
+            if ("LOGGED_IN".equals(session.getStatus()) && session.getUserData() != null) {
+                response.put("user", session.getUserData());
+                response.put("message", "Login successful");
+            } else if ("SCANNED".equals(session.getStatus())) {
+                response.put("message", "QR code scanned. Please complete login on mobile device.");
+            } else {
+                response.put("message", "Waiting for QR code scan...");
+            }
+            
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("message", "Failed to check QR status: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(response);
+        }
+    }
+    
+    /**
+     * Complete login via QR code (called from mobile after scanning)
+     * @param request Contains qrToken, email, password, and optionally otp
+     * @return Login result
+     */
+    @PostMapping("/complete-qr-login")
+    public ResponseEntity<Map<String, Object>> completeQrLogin(@RequestBody Map<String, String> request) {
+        try {
+            String qrToken = request.get("qrToken");
+            String email = request.get("email");
+            String password = request.get("password");
+            String otp = request.get("otp");
+            
+            System.out.println("QR login attempt - Token: " + qrToken + ", Email: " + email);
+            
+            if (qrToken == null || email == null || password == null) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", false);
+                response.put("message", "QR token, email, and password are required");
+                return ResponseEntity.badRequest().body(response);
+            }
+            
+            // Verify QR session exists and is valid
+            QrCodeService.QrSessionData session = qrCodeService.getQrSession(qrToken);
+            if (session == null) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", false);
+                response.put("message", "QR code expired or invalid. Please generate a new QR code.");
+                return ResponseEntity.badRequest().body(response);
+            }
+            
+            // Mark as scanned
+            qrCodeService.updateQrSession(qrToken, "SCANNED", null);
+            
+            // Authenticate user
+            Optional<User> userOpt = userService.findByEmail(email);
+            if (!userOpt.isPresent()) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", false);
+                response.put("message", "User not found");
+                return ResponseEntity.badRequest().body(response);
+            }
+            
+            User user = userOpt.get();
+            
+            // Check if account is locked
+            if (user.isAccountLocked()) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", false);
+                response.put("accountLocked", true);
+                response.put("message", "Account is locked. Please use the unlock feature.");
+                return ResponseEntity.badRequest().body(response);
+            }
+            
+            // Verify password
+            if (!passwordService.verifyPassword(password, user.getPassword())) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", false);
+                response.put("message", "Invalid password");
+                return ResponseEntity.badRequest().body(response);
+            }
+            
+            // If OTP is provided, verify it
+            if (otp != null && !otp.isEmpty()) {
+                if (!otpService.verifyOtp(email, otp)) {
+                    Map<String, Object> response = new HashMap<>();
+                    response.put("success", false);
+                    response.put("message", "Invalid or expired OTP");
+                    return ResponseEntity.badRequest().body(response);
+                }
+            } else {
+                // Generate and send OTP for QR login
+                String generatedOtp = otpService.generateOtp();
+                otpService.storeOtp(email, generatedOtp);
+                emailService.sendOtpEmail(email, generatedOtp);
+                
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", false);
+                response.put("requiresOtp", true);
+                response.put("message", "OTP has been sent to your email. Please enter the OTP to complete login.");
+                return ResponseEntity.ok(response);
+            }
+            
+            // Check if account is approved
+            if (!"APPROVED".equals(user.getStatus())) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", false);
+                response.put("message", "Account not approved yet. Please wait for admin approval.");
+                return ResponseEntity.badRequest().body(response);
+            }
+            
+            // Login successful - update QR session
+            user.setFailedLoginAttempts(0);
+            user.setAccountLocked(false);
+            user.setLastFailedLoginTime(null);
+            userService.saveUser(user);
+            
+            // Send login notification email
+            LocalDateTime loginTime = LocalDateTime.now();
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+            String formattedTimestamp = loginTime.format(formatter);
+            emailService.sendLoginNotificationEmail(user.getEmail(), user.getUsername(), formattedTimestamp);
+            
+            // Update QR session with user data
+            qrCodeService.updateQrSession(qrToken, "LOGGED_IN", user);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("user", user);
+            response.put("message", "Login successful via QR code");
+            System.out.println("✅ QR login successful for user: " + user.getUsername());
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("message", "QR login failed: " + e.getMessage());
+            System.out.println("❌ QR login error: " + e.getMessage());
+            e.printStackTrace();
             return ResponseEntity.internalServerError().body(response);
         }
     }

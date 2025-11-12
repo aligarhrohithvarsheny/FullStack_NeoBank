@@ -1,6 +1,7 @@
 import { Component, OnInit, Inject, PLATFORM_ID } from '@angular/core';
 import { Router } from '@angular/router';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { AlertService } from '../../../service/alert.service';
 // import { UserService } from '../../service/user';
@@ -30,7 +31,7 @@ interface UserProfile {
 @Component({
   selector: 'app-profile',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, FormsModule],
   templateUrl: './profile.html',
   styleUrls: ['./profile.css']
 })
@@ -50,6 +51,11 @@ export class Profile implements OnInit {
   currentBalance: number = 0;
   loading: boolean = false;
   error: string = '';
+  editingEmail: boolean = false;
+  newEmail: string = '';
+  emailError: string = '';
+  updatingEmail: boolean = false;
+  currentUserId: number | null = null;
 
   constructor(
     private router: Router, 
@@ -78,6 +84,7 @@ export class Profile implements OnInit {
     if (currentUser) {
       const user = JSON.parse(currentUser);
       console.log('Profile component - parsed user data:', user);
+      this.currentUserId = user.id;
       
       // Load full user profile from MySQL database
       this.http.get(`http://localhost:8080/api/users/${user.id}`).subscribe({
@@ -138,6 +145,7 @@ export class Profile implements OnInit {
         const currentUser = sessionStorage.getItem('currentUser');
         if (currentUser) {
           const user = JSON.parse(currentUser);
+          this.currentUserId = user.id || null;
           this.userProfile = {
             name: user.name || 'User',
             email: user.email || 'user@example.com',
@@ -232,5 +240,78 @@ export class Profile implements OnInit {
   editProfile() {
     // For now, just show an alert. In a real app, this would open an edit form
     this.alertService.info('Profile Editing', 'Profile editing feature will be available soon!');
+  }
+
+  startEditingEmail() {
+    this.editingEmail = true;
+    this.newEmail = this.userProfile.email;
+    this.emailError = '';
+  }
+
+  cancelEditingEmail() {
+    this.editingEmail = false;
+    this.newEmail = '';
+    this.emailError = '';
+  }
+
+  validateEmail(email: string): boolean {
+    const emailRegex = /^[A-Za-z0-9+_.-]+@(.+)$/;
+    return emailRegex.test(email);
+  }
+
+  updateEmail() {
+    if (!this.currentUserId) {
+      this.emailError = 'User ID not found. Please refresh the page.';
+      return;
+    }
+
+    // Validate email format
+    if (!this.newEmail || this.newEmail.trim() === '') {
+      this.emailError = 'Email is required';
+      return;
+    }
+
+    if (!this.validateEmail(this.newEmail)) {
+      this.emailError = 'Invalid email format';
+      return;
+    }
+
+    // Check if email is the same as current email
+    if (this.newEmail === this.userProfile.email) {
+      this.emailError = 'New email is the same as current email';
+      return;
+    }
+
+    this.updatingEmail = true;
+    this.emailError = '';
+
+    // Call the backend API to update email
+    this.http.put(`http://localhost:8080/api/users/update-email/${this.currentUserId}`, { email: this.newEmail }).subscribe({
+      next: (response: any) => {
+        if (response.success) {
+          this.userProfile.email = this.newEmail;
+          this.editingEmail = false;
+          this.newEmail = '';
+          this.updatingEmail = false;
+          this.alertService.success('Email Updated', 'Your email has been updated successfully!');
+          
+          // Update session storage with new email
+          const currentUser = sessionStorage.getItem('currentUser');
+          if (currentUser) {
+            const user = JSON.parse(currentUser);
+            user.email = this.newEmail;
+            sessionStorage.setItem('currentUser', JSON.stringify(user));
+          }
+        } else {
+          this.emailError = response.message || 'Failed to update email';
+          this.updatingEmail = false;
+        }
+      },
+      error: (err: any) => {
+        console.error('Error updating email:', err);
+        this.emailError = err.error?.message || 'Failed to update email. Please try again.';
+        this.updatingEmail = false;
+      }
+    });
   }
 }

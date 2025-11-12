@@ -36,6 +36,10 @@ export class UserService {
     return this.http.put<UserModel>(`${this.apiUrl}/update/${id}`, userDetails);
   }
 
+  updateEmail(id: number, email: string): Observable<any> {
+    return this.http.put<any>(`${this.apiUrl}/update-email/${id}`, { email });
+  }
+
   deleteUser(id: number): Observable<void> {
     return this.http.delete<void>(`${this.apiUrl}/${id}`);
   }
