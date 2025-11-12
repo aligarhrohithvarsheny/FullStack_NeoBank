@@ -2,12 +2,13 @@ import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { KycRequest as KycModel, CreateKycRequest, UpdateKycRequest, ApproveKycRequest, RejectKycRequest, KycSearchRequest, KycStatistics } from '../model/kyc-request/kyc-request-module';
+import { environment } from '../../environment/environment';
 
 @Injectable({
   providedIn: 'root'
 })
 export class KycService {
-  private apiUrl = 'http://localhost:8080/api/kyc';
+  private apiUrl = `${environment.apiUrl}/kyc`;
 
   constructor(private http: HttpClient) { }
 

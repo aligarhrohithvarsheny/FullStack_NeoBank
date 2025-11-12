@@ -2,6 +2,7 @@ import { CurrencyPipe, CommonModule, isPlatformBrowser } from '@angular/common';
 import { Component, OnInit, Inject, PLATFORM_ID } from '@angular/core';
 import { Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
+import { environment } from '../../../environment/environment';
 
 interface LoanRequest {
   id: number;
@@ -44,7 +45,7 @@ export class Loans implements OnInit {
     console.log('Loading loan applications...');
     
     // Load loans from MySQL database
-    this.http.get('http://localhost:8080/api/loans').subscribe({
+    this.http.get('${environment.apiUrl}/loans').subscribe({
       next: (loans: any) => {
         console.log('Loans loaded from MySQL:', loans);
         this.loanRequests = loans.map((loan: any) => ({
@@ -116,7 +117,7 @@ export class Loans implements OnInit {
     };
     
     // Update loan in MySQL database using enhanced approval endpoint
-    this.http.put(`http://localhost:8080/api/loans/${loan.id}/approve?status=Approved`, {}).subscribe({
+    this.http.put(`${environment.apiUrl}/loans/${loan.id}/approve?status=Approved`, {}).subscribe({
       next: (response: any) => {
         console.log('Loan approved in MySQL:', response);
         
@@ -156,7 +157,7 @@ export class Loans implements OnInit {
     };
     
     // Update loan in MySQL database
-    this.http.put(`http://localhost:8080/api/loans/${loan.id}/approve?status=Rejected`, {}).subscribe({
+    this.http.put(`${environment.apiUrl}/loans/${loan.id}/approve?status=Rejected`, {}).subscribe({
       next: (response: any) => {
         console.log('Loan rejected in MySQL:', response);
         

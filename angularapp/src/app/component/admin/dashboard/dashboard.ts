@@ -5,6 +5,7 @@ import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { AlertService } from '../../../service/alert.service';
+import { environment } from '../../../environment/environment';
 
 interface UserProfile {
   id: string;
@@ -127,7 +128,7 @@ export class Dashboard implements OnInit {
 
   loadUsers() {
     // Load users from MySQL database
-    this.http.get('http://localhost:8080/api/users').subscribe({
+    this.http.get('${environment.apiUrl}/users').subscribe({
       next: (usersData: any) => {
         console.log('Users loaded from MySQL:', usersData);
         this.users = usersData.map((user: any) => ({
@@ -396,7 +397,7 @@ export class Dashboard implements OnInit {
   // Update user balance in MySQL database
   updateUserBalanceInDatabase(user: UserProfile) {
     // Find user by account number
-    this.http.get(`http://localhost:8080/api/users/account/${user.accountNumber}`).subscribe({
+    this.http.get(`${environment.apiUrl}/users/account/${user.accountNumber}`).subscribe({
       next: (dbUser: any) => {
         if (dbUser) {
           const updatedUser = {
@@ -407,7 +408,7 @@ export class Dashboard implements OnInit {
             }
           };
           
-          this.http.put(`http://localhost:8080/api/users/update/${dbUser.id}`, updatedUser).subscribe({
+          this.http.put(`${environment.apiUrl}/users/update/${dbUser.id}`, updatedUser).subscribe({
             next: (response: any) => {
               console.log('User balance updated in MySQL:', response);
             },
@@ -468,7 +469,7 @@ export class Dashboard implements OnInit {
 
   searchByCardLastFourDigits(lastFourDigits: string) {
     // Search for cards with matching last 4 digits
-    this.http.get('http://localhost:8080/api/cards').subscribe({
+    this.http.get('${environment.apiUrl}/cards').subscribe({
       next: (cards: any) => {
         const matchingCards = cards.filter((card: any) => 
           card.cardNumber && card.cardNumber.endsWith(lastFourDigits)
@@ -504,7 +505,7 @@ export class Dashboard implements OnInit {
 
   loadUserCompleteDetails(user: UserProfile) {
     // Load user cards
-    this.http.get(`http://localhost:8080/api/cards/account/${user.accountNumber}`).subscribe({
+    this.http.get(`${environment.apiUrl}/cards/account/${user.accountNumber}`).subscribe({
       next: (cards: any) => {
         this.userCards = cards || [];
       },
@@ -515,7 +516,7 @@ export class Dashboard implements OnInit {
     });
 
     // Load user loans
-    this.http.get(`http://localhost:8080/api/loans/account/${user.accountNumber}`).subscribe({
+    this.http.get(`${environment.apiUrl}/loans/account/${user.accountNumber}`).subscribe({
       next: (loans: any) => {
         this.userLoans = loans || [];
       },
@@ -526,7 +527,7 @@ export class Dashboard implements OnInit {
     });
 
     // Load user transactions
-    this.http.get(`http://localhost:8080/api/transactions/account/${user.accountNumber}`).subscribe({
+    this.http.get(`${environment.apiUrl}/transactions/account/${user.accountNumber}`).subscribe({
       next: (transactions: any) => {
         this.userTransactions = transactions || [];
       },

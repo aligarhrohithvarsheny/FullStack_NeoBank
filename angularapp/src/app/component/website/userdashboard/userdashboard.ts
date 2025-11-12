@@ -3,6 +3,7 @@ import { Router } from '@angular/router';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { AlertService } from '../../../service/alert.service';
+import { environment } from '../../../environment/environment';
 // import { UserService } from '../../service/user';
 // import { AccountService } from '../../service/account';
 // import { TransactionService } from '../../service/transaction';
@@ -80,7 +81,7 @@ export class Userdashboard implements OnInit {
 
   loadUserDataFromMySQL(userId: string) {
     // Load user data from MySQL database
-    this.http.get(`http://localhost:8080/api/users/${userId}`).subscribe({
+    this.http.get(`${environment.apiUrl}/users/${userId}`).subscribe({
       next: (userData: any) => {
         console.log('User data loaded from MySQL:', userData);
         
@@ -109,7 +110,7 @@ export class Userdashboard implements OnInit {
     }
     
     // Load current balance from MySQL database
-    this.http.get(`http://localhost:8080/api/accounts/balance/${this.userAccountNumber}`).subscribe({
+    this.http.get(`${environment.apiUrl}/accounts/balance/${this.userAccountNumber}`).subscribe({
       next: (balanceData: any) => {
         console.log('Balance loaded from MySQL:', balanceData);
         this.currentBalance = balanceData.balance || 0;

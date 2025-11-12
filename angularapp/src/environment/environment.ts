@@ -1,4 +1,4 @@
-export const environment = { 
-production: false, 
-apiUrl: '/api'   // <- relative path so proxy forwards 
+export const environment = {
+  production: false,
+  apiUrl: 'http://localhost:8080/api'  // Development: use localhost
 };

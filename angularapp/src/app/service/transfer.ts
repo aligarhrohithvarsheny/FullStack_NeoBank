@@ -2,12 +2,13 @@ import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { TransferRecord as TransferModel, CreateTransferRequest, UpdateTransferRequest, ProcessTransferRequest, TransferSearchRequest, TransferStatistics, TransferType } from '../model/transfer-record/transfer-record-module';
+import { environment } from '../../environment/environment';
 
 @Injectable({
   providedIn: 'root'
 })
 export class TransferService {
-  private apiUrl = 'http://localhost:8080/api/transfers';
+  private apiUrl = `${environment.apiUrl}/transfers`;
 
   constructor(private http: HttpClient) { }
 

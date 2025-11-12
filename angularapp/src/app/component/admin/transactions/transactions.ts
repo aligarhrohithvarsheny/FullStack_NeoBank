@@ -3,6 +3,7 @@ import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { ReactiveFormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
+import { environment } from '../../../environment/environment';
 
 interface Transaction {
   id: string;
@@ -36,7 +37,7 @@ export class Transactions implements OnInit {
     if (!isPlatformBrowser(this.platformId)) return;
     
     // Load all transactions from MySQL database
-    this.http.get('http://localhost:8080/api/transactions?page=0&size=100').subscribe({
+    this.http.get('${environment.apiUrl}/transactions?page=0&size=100').subscribe({
       next: (response: any) => {
         console.log('Transactions loaded from MySQL:', response);
         if (response.content) {

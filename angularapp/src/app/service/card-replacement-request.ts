@@ -2,12 +2,13 @@ import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { CardReplacementRequest as CardReplacementModel, CreateCardReplacementRequest, UpdateCardReplacementRequest, ApproveCardReplacementRequest, RejectCardReplacementRequest, CardReplacementSearchRequest, CardReplacementStatistics } from '../model/card-replacement-request/card-replacement-request-module';
+import { environment } from '../../environment/environment';
 
 @Injectable({
   providedIn: 'root'
 })
 export class CardReplacementRequestService {
-  private apiUrl = 'http://localhost:8080/api/card-replacement-requests';
+  private apiUrl = `${environment.apiUrl}/card-replacement-requests`;
 
   constructor(private http: HttpClient) { }
 

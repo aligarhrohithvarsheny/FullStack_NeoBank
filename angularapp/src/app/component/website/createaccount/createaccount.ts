@@ -2,6 +2,7 @@ import { Component, OnInit, Inject, PLATFORM_ID } from '@angular/core';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { FormBuilder, FormGroup, Validators, AbstractControl, ValidationErrors, ReactiveFormsModule, FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
+import { environment } from '../../../environment/environment';
 import { Router } from '@angular/router';
 
 interface PendingAccount {
@@ -459,7 +460,7 @@ export class Createaccount implements OnInit {
     };
 
     // Submit to backend using HttpClient directly
-    this.http.post('http://localhost:8080/api/users/create', userData).subscribe({
+    this.http.post('${environment.apiUrl}/users/create', userData).subscribe({
       next: (response: any) => {
         console.log('User created successfully in MySQL:', response);
         

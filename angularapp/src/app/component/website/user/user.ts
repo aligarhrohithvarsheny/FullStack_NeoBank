@@ -4,6 +4,7 @@ import { CommonModule } from '@angular/common';
 import { Router, ActivatedRoute } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { AlertService } from '../../../service/alert.service';
+import { environment } from '../../../environment/environment';
 
 @Component({
   selector: 'app-user',
@@ -117,7 +118,7 @@ export class User implements OnInit, OnDestroy {
 
   fetchUserDataAndLogin() {
     // Authenticate user with MySQL database
-    this.http.post('http://localhost:8080/api/users/authenticate', {
+    this.http.post('${environment.apiUrl}/users/authenticate', {
       email: this.loginUserId,
       password: this.loginPassword
     }).subscribe({
@@ -196,7 +197,7 @@ export class User implements OnInit, OnDestroy {
     this.errorMessage = '';
     this.successMessage = '';
 
-    this.http.post('http://localhost:8080/api/users/verify-otp', {
+    this.http.post('${environment.apiUrl}/users/verify-otp', {
       email: this.loginUserId,
       otp: this.otpCode
     }).subscribe({
@@ -247,7 +248,7 @@ export class User implements OnInit, OnDestroy {
     this.errorMessage = '';
     this.successMessage = '';
 
-    this.http.post('http://localhost:8080/api/users/resend-otp', {
+    this.http.post('${environment.apiUrl}/users/resend-otp', {
       email: this.loginUserId
     }).subscribe({
       next: (response: any) => {
@@ -309,7 +310,7 @@ export class User implements OnInit, OnDestroy {
 
     console.log('Creating new user account:', newUser);
     
-    this.http.post('http://localhost:8080/api/users/create', newUser).subscribe({
+    this.http.post('${environment.apiUrl}/users/create', newUser).subscribe({
       next: (response: any) => {
         console.log('User account created successfully:', response);
         
@@ -384,7 +385,7 @@ export class User implements OnInit, OnDestroy {
 
     console.log('Attempting to unlock account:', unlockData);
 
-    this.http.post('http://localhost:8080/api/users/unlock-account', unlockData).subscribe({
+    this.http.post('${environment.apiUrl}/users/unlock-account', unlockData).subscribe({
       next: (response: any) => {
         console.log('Account unlock response:', response);
         this.unlockingAccount = false;
@@ -471,7 +472,7 @@ export class User implements OnInit, OnDestroy {
     this.errorMessage = '';
     this.successMessage = '';
 
-    this.http.post('http://localhost:8080/api/users/send-reset-otp', {
+    this.http.post('${environment.apiUrl}/users/send-reset-otp', {
       email: this.resetEmail
     }).subscribe({
       next: (response: any) => {
@@ -553,8 +554,8 @@ export class User implements OnInit, OnDestroy {
 
     // Determine which endpoint to call based on verification method
     const endpoint = this.resetVerificationMethod === 'email' 
-      ? 'http://localhost:8080/api/users/reset-password-with-otp'
-      : 'http://localhost:8080/api/users/reset-password';
+      ? '${environment.apiUrl}/users/reset-password-with-otp'
+      : '${environment.apiUrl}/users/reset-password';
 
     const resetData = this.resetVerificationMethod === 'email'
       ? {
@@ -600,7 +601,7 @@ export class User implements OnInit, OnDestroy {
   
   generateQrCode() {
     this.showQrCode = true;
-    this.http.post('http://localhost:8080/api/users/generate-qr-login', {}).subscribe({
+    this.http.post('${environment.apiUrl}/users/generate-qr-login', {}).subscribe({
       next: (response: any) => {
         if (response.success) {
           this.qrCodeImage = response.qrCodeImage;
@@ -638,7 +639,7 @@ export class User implements OnInit, OnDestroy {
   checkQrStatus() {
     if (!this.qrToken) return;
     
-    this.http.get(`http://localhost:8080/api/users/check-qr-login-status/${this.qrToken}`).subscribe({
+    this.http.get(`${environment.apiUrl}/users/check-qr-login-status/${this.qrToken}`).subscribe({
       next: (response: any) => {
         if (response.success) {
           this.qrStatus = response.status;
@@ -701,7 +702,7 @@ export class User implements OnInit, OnDestroy {
       loginData.otp = this.otpCode;
     }
     
-    this.http.post('http://localhost:8080/api/users/complete-qr-login', loginData).subscribe({
+    this.http.post('${environment.apiUrl}/users/complete-qr-login', loginData).subscribe({
       next: (response: any) => {
         if (response.success && response.user) {
           // Login successful

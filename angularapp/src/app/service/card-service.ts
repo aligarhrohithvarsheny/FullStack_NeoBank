@@ -2,12 +2,13 @@ import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { Card as CardModel, CreateCardRequest, UpdateCardRequest, SetPinRequest, ChangePinRequest, CardSearchRequest, CardStatistics } from '../model/card/card-module';
+import { environment } from '../../environment/environment';
 
 @Injectable({
   providedIn: 'root'
 })
 export class CardService {
-  private apiUrl = 'http://localhost:8080/api/cards';
+  private apiUrl = `${environment.apiUrl}/cards`;
 
   constructor(private http: HttpClient) { }
 

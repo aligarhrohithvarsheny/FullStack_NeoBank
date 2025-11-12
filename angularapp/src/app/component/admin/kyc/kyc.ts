@@ -3,6 +3,7 @@ import { Router } from '@angular/router';
 import { CommonModule, isPlatformBrowser } from '@angular/common'; 
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
+import { environment } from '../../../environment/environment';
 
 interface KycRequest {
   id?: string; // Make ID optional since backend auto-generates it
@@ -74,7 +75,7 @@ export class Kyc implements OnInit {
     
     // Load KYC requests from MySQL database
     console.log('Loading KYC requests from MySQL database...');
-    this.http.get('http://localhost:8080/api/kyc/all?page=0&size=100').subscribe({
+    this.http.get('${environment.apiUrl}/kyc/all?page=0&size=100').subscribe({
       next: (response: any) => {
         console.log('KYC requests loaded from MySQL:', response);
         console.log('Response type:', typeof response);
@@ -159,7 +160,7 @@ export class Kyc implements OnInit {
   approve(request: KycRequest) {
     if (confirm(`Approve KYC for ${request.userName} (${request.userAccountNumber})?`)) {
       // Update KYC request in MySQL database
-      this.http.put(`http://localhost:8080/api/kyc/approve/${request.id}?adminName=Admin`, {}).subscribe({
+      this.http.put(`${environment.apiUrl}/kyc/approve/${request.id}?adminName=Admin`, {}).subscribe({
         next: (response: any) => {
           console.log('KYC approved in MySQL:', response);
           
@@ -186,7 +187,7 @@ export class Kyc implements OnInit {
   reject(request: KycRequest) {
     if (confirm(`Reject KYC for ${request.userName} (${request.userAccountNumber})?`)) {
       // Update KYC request in MySQL database
-      this.http.put(`http://localhost:8080/api/kyc/reject/${request.id}?adminName=Admin`, {}).subscribe({
+      this.http.put(`${environment.apiUrl}/kyc/reject/${request.id}?adminName=Admin`, {}).subscribe({
         next: (response: any) => {
           console.log('KYC rejected in MySQL:', response);
           

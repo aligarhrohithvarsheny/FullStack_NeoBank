@@ -3,6 +3,7 @@ import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
+import { environment } from '../../../environment/environment';
 
 interface LoanRequest {
   id: number;
@@ -92,7 +93,7 @@ export class Loan implements OnInit {
     this.loading = true;
     
     // Load user's loans from MySQL database
-    this.http.get(`http://localhost:8080/api/loans/account/${this.userAccountNumber}`).subscribe({
+    this.http.get(`${environment.apiUrl}/loans/account/${this.userAccountNumber}`).subscribe({
       next: (loans: any) => {
         console.log('User loans loaded from MySQL:', loans);
         this.loans = loans.map((loan: any) => ({
@@ -167,7 +168,7 @@ export class Loan implements OnInit {
     };
 
     // Submit to MySQL database
-    this.http.post('http://localhost:8080/api/loans', backendLoan).subscribe({
+    this.http.post('${environment.apiUrl}/loans', backendLoan).subscribe({
       next: (response: any) => {
         console.log('Loan request created successfully in MySQL:', response);
         

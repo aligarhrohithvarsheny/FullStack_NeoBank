@@ -3,6 +3,7 @@ import { Router } from '@angular/router';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
+import { environment } from '../../../environment/environment';
 
 interface CardDetails {
   id: string;
@@ -89,7 +90,7 @@ export class Cards implements OnInit {
     
     // Load cards from MySQL database
     console.log('Loading cards from MySQL database...');
-    this.http.get('http://localhost:8080/api/cards?page=0&size=100').subscribe({
+    this.http.get('${environment.apiUrl}/cards?page=0&size=100').subscribe({
       next: (response: any) => {
         console.log('Cards loaded from MySQL:', response);
         console.log('Response type:', typeof response);
@@ -253,7 +254,7 @@ export class Cards implements OnInit {
     };
 
     // Submit new card to MySQL database
-    this.http.post('http://localhost:8080/api/cards', newCard).subscribe({
+    this.http.post('${environment.apiUrl}/cards', newCard).subscribe({
       next: (response: any) => {
         console.log('Card created in MySQL:', response);
         
@@ -321,7 +322,7 @@ export class Cards implements OnInit {
     const expiryYear = String(new Date().getFullYear() + Math.floor(1 + Math.random() * 5));
 
     // Update card in backend
-    this.http.put(`http://localhost:8080/api/cards/${card.id}/replace`, {
+    this.http.put(`${environment.apiUrl}/cards/${card.id}/replace`, {
       cardNumber: newCardNumber,
       cvv: newCvv,
       expiryDate: `${expiryMonth}/${expiryYear.slice(-2)}`,
@@ -362,7 +363,7 @@ export class Cards implements OnInit {
   approveReplacementRequest(request: CardReplacementRequest) {
     if (confirm(`Approve card replacement request for ${request.userName}?`)) {
       // First approve the request in the backend
-      this.http.put(`http://localhost:8080/api/card-replacement-requests/approve/${request.id}?adminName=Admin`, {}).subscribe({
+      this.http.put(`${environment.apiUrl}/card-replacement-requests/approve/${request.id}?adminName=Admin`, {}).subscribe({
         next: (response: any) => {
           console.log('Card replacement request approved in MySQL:', response);
           

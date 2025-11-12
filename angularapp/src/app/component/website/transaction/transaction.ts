@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { isPlatformBrowser } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
+import { environment } from '../../../environment/environment';
 
 interface TransactionRecord {
   id: string;
@@ -83,7 +84,7 @@ export class Transaction implements OnInit {
     }
     
     // Load transactions from MySQL database
-    this.http.get(`http://localhost:8080/api/transactions/account/${this.userAccountNumber}?page=0&size=100`).subscribe({
+    this.http.get(`${environment.apiUrl}/transactions/account/${this.userAccountNumber}?page=0&size=100`).subscribe({
       next: (response: any) => {
         console.log('Transactions response from MySQL:', response);
         
@@ -151,7 +152,7 @@ export class Transaction implements OnInit {
     };
 
     // Submit to MySQL database
-    this.http.post('http://localhost:8080/api/transactions', transactionData).subscribe({
+    this.http.post('${environment.apiUrl}/transactions', transactionData).subscribe({
       next: (response: any) => {
         console.log('Transaction created successfully in MySQL:', response);
         this.currentBalance = transactionData.balance;

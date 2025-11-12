@@ -4,6 +4,7 @@ import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { AlertService } from '../../../service/alert.service';
+import { environment } from '../../../environment/environment';
 // import { UserService } from '../../service/user';
 // import { AccountService } from '../../service/account';
 // import { TransactionService } from '../../service/transaction';
@@ -87,7 +88,7 @@ export class Profile implements OnInit {
       this.currentUserId = user.id;
       
       // Load full user profile from MySQL database
-      this.http.get(`http://localhost:8080/api/users/${user.id}`).subscribe({
+      this.http.get(`${environment.apiUrl}/users/${user.id}`).subscribe({
         next: (userData: any) => {
           console.log('User profile loaded from MySQL:', userData);
           this.userProfile = {
@@ -196,7 +197,7 @@ export class Profile implements OnInit {
     }
     
     // Load current balance from MySQL database
-    this.http.get(`http://localhost:8080/api/accounts/balance/${this.userProfile.accountNumber}`).subscribe({
+    this.http.get(`${environment.apiUrl}/accounts/balance/${this.userProfile.accountNumber}`).subscribe({
       next: (balanceData: any) => {
         console.log('Balance loaded from MySQL:', balanceData);
         this.currentBalance = balanceData.balance || 0;
@@ -286,7 +287,7 @@ export class Profile implements OnInit {
     this.emailError = '';
 
     // Call the backend API to update email
-    this.http.put(`http://localhost:8080/api/users/update-email/${this.currentUserId}`, { email: this.newEmail }).subscribe({
+    this.http.put(`${environment.apiUrl}/users/update-email/${this.currentUserId}`, { email: this.newEmail }).subscribe({
       next: (response: any) => {
         if (response.success) {
           this.userProfile.email = this.newEmail;
