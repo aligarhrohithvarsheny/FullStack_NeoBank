@@ -460,7 +460,7 @@ export class Createaccount implements OnInit {
     };
 
     // Submit to backend using HttpClient directly
-    this.http.post('${environment.apiUrl}/users/create', userData).subscribe({
+    this.http.post(`${environment.apiUrl}/users/create`, userData).subscribe({
       next: (response: any) => {
         console.log('User created successfully in MySQL:', response);
         

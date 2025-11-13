@@ -128,7 +128,7 @@ export class Dashboard implements OnInit {
 
   loadUsers() {
     // Load users from MySQL database
-    this.http.get('${environment.apiUrl}/users').subscribe({
+    this.http.get(`${environment.apiUrl}/users`).subscribe({
       next: (usersData: any) => {
         console.log('Users loaded from MySQL:', usersData);
         this.users = usersData.map((user: any) => ({
@@ -469,7 +469,7 @@ export class Dashboard implements OnInit {
 
   searchByCardLastFourDigits(lastFourDigits: string) {
     // Search for cards with matching last 4 digits
-    this.http.get('${environment.apiUrl}/cards').subscribe({
+    this.http.get(`${environment.apiUrl}/cards`).subscribe({
       next: (cards: any) => {
         const matchingCards = cards.filter((card: any) => 
           card.cardNumber && card.cardNumber.endsWith(lastFourDigits)

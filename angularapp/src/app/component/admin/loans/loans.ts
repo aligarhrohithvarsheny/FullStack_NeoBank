@@ -45,7 +45,7 @@ export class Loans implements OnInit {
     console.log('Loading loan applications...');
     
     // Load loans from MySQL database
-    this.http.get('${environment.apiUrl}/loans').subscribe({
+    this.http.get(`${environment.apiUrl}/loans`).subscribe({
       next: (loans: any) => {
         console.log('Loans loaded from MySQL:', loans);
         this.loanRequests = loans.map((loan: any) => ({

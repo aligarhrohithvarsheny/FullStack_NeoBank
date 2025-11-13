@@ -266,7 +266,7 @@ export class Kycupdate implements OnInit {
     this.otpError = '';
     this.otpSuccessMessage = '';
 
-    this.http.post('${environment.apiUrl}/kyc/send-otp', {
+    this.http.post(`${environment.apiUrl}/kyc/send-otp`, {
       userEmail: this.userProfile.email,
       userAccountNumber: this.userProfile.accountNumber
     }).subscribe({
@@ -344,7 +344,7 @@ export class Kycupdate implements OnInit {
     }
 
     // Submit KYC request to MySQL database
-    this.http.post('${environment.apiUrl}/kyc/create', requestData).subscribe({
+    this.http.post(`${environment.apiUrl}/kyc/create`, requestData).subscribe({
       next: (response: any) => {
         console.log('KYC request created in MySQL:', response);
         

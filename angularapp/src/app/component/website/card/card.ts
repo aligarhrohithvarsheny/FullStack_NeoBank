@@ -264,7 +264,7 @@ export class Card implements OnInit {
     
     // Create card in MySQL database
     console.log('Creating new card in MySQL for account:', this.userProfile.accountNumber);
-    this.http.post('${environment.apiUrl}/cards', newCard).subscribe({
+    this.http.post(`${environment.apiUrl}/cards`, newCard).subscribe({
       next: (response: any) => {
         console.log('Card created successfully in MySQL:', response);
         
@@ -567,7 +567,7 @@ export class Card implements OnInit {
     };
     
     // Submit replacement request to MySQL database
-    this.http.post('${environment.apiUrl}/card-replacement-requests/create', replacementRequest).subscribe({
+    this.http.post(`${environment.apiUrl}/card-replacement-requests/create`, replacementRequest).subscribe({
       next: (response: any) => {
         console.log('Card replacement request created in MySQL:', response);
         
@@ -608,7 +608,7 @@ export class Card implements OnInit {
     };
     
     // Submit new card request to MySQL database
-    this.http.post('${environment.apiUrl}/new-card-requests/create', newCardRequest).subscribe({
+    this.http.post(`${environment.apiUrl}/new-card-requests/create`, newCardRequest).subscribe({
       next: (response: any) => {
         console.log('New card request created in MySQL:', response);
         

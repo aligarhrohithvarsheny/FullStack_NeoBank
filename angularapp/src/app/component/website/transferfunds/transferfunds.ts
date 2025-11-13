@@ -255,7 +255,7 @@ export class Transferfunds implements OnInit {
     };
 
     // Send transfer request to backend
-    this.http.post('${environment.apiUrl}/transfers', transferData).subscribe({
+    this.http.post(`${environment.apiUrl}/transfers`, transferData).subscribe({
       next: (response: any) => {
         console.log('Transfer successful:', response);
         
@@ -446,7 +446,7 @@ Time: ${timestamp}`;
       status: 'ACTIVE'
     };
 
-    this.http.post('${environment.apiUrl}/accounts/create', accountData).subscribe({
+    this.http.post(`${environment.apiUrl}/accounts/create`, accountData).subscribe({
       next: (response: any) => {
         console.log('Account created with 2 lakhs balance:', response);
         this.currentBalance = response.balance;

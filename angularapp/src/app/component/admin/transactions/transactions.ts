@@ -37,7 +37,7 @@ export class Transactions implements OnInit {
     if (!isPlatformBrowser(this.platformId)) return;
     
     // Load all transactions from MySQL database
-    this.http.get('${environment.apiUrl}/transactions?page=0&size=100').subscribe({
+    this.http.get(`${environment.apiUrl}/transactions?page=0&size=100`).subscribe({
       next: (response: any) => {
         console.log('Transactions loaded from MySQL:', response);
         if (response.content) {

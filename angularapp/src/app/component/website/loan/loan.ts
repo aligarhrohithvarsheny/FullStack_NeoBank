@@ -168,7 +168,7 @@ export class Loan implements OnInit {
     };
 
     // Submit to MySQL database
-    this.http.post('${environment.apiUrl}/loans', backendLoan).subscribe({
+    this.http.post(`${environment.apiUrl}/loans`, backendLoan).subscribe({
       next: (response: any) => {
         console.log('Loan request created successfully in MySQL:', response);
         

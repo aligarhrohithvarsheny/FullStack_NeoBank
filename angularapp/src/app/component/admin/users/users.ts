@@ -176,7 +176,7 @@ export class Users implements OnInit {
 
   // Load KYC requests from MySQL database
   loadKycRequestsFromDatabase() {
-    this.http.get('${environment.apiUrl}/kyc/all?page=0&size=100').subscribe({
+    this.http.get(`${environment.apiUrl}/kyc/all?page=0&size=100`).subscribe({
       next: (response: any) => {
         console.log('KYC requests loaded from MySQL:', response);
         if (response.content) {
@@ -319,7 +319,7 @@ export class Users implements OnInit {
     console.log('Creating card for user:', user.name, 'Account:', user.assignedAccountNumber);
     console.log('Card data being sent:', newCard);
     
-    this.http.post('${environment.apiUrl}/cards', newCard).subscribe({
+    this.http.post(`${environment.apiUrl}/cards`, newCard).subscribe({
       next: (response: any) => {
         console.log('Card created automatically for approved user:', response);
         alert(`Card created successfully for ${user.name}!`);

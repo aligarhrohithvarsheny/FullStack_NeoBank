@@ -152,7 +152,7 @@ export class Transaction implements OnInit {
     };
 
     // Submit to MySQL database
-    this.http.post('${environment.apiUrl}/transactions', transactionData).subscribe({
+    this.http.post(`${environment.apiUrl}/transactions`, transactionData).subscribe({
       next: (response: any) => {
         console.log('Transaction created successfully in MySQL:', response);
         this.currentBalance = transactionData.balance;

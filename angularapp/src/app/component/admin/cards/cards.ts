@@ -90,7 +90,7 @@ export class Cards implements OnInit {
     
     // Load cards from MySQL database
     console.log('Loading cards from MySQL database...');
-    this.http.get('${environment.apiUrl}/cards?page=0&size=100').subscribe({
+    this.http.get(`${environment.apiUrl}/cards?page=0&size=100`).subscribe({
       next: (response: any) => {
         console.log('Cards loaded from MySQL:', response);
         console.log('Response type:', typeof response);
@@ -254,7 +254,7 @@ export class Cards implements OnInit {
     };
 
     // Submit new card to MySQL database
-    this.http.post('${environment.apiUrl}/cards', newCard).subscribe({
+    this.http.post(`${environment.apiUrl}/cards`, newCard).subscribe({
       next: (response: any) => {
         console.log('Card created in MySQL:', response);
         

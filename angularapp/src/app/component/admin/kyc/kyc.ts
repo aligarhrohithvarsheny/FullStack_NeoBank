@@ -75,7 +75,7 @@ export class Kyc implements OnInit {
     
     // Load KYC requests from MySQL database
     console.log('Loading KYC requests from MySQL database...');
-    this.http.get('${environment.apiUrl}/kyc/all?page=0&size=100').subscribe({
+    this.http.get(`${environment.apiUrl}/kyc/all?page=0&size=100`).subscribe({
       next: (response: any) => {
         console.log('KYC requests loaded from MySQL:', response);
         console.log('Response type:', typeof response);
