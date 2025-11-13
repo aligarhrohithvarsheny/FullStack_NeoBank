@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "cd angularapp && npm install && npm run build && cp dist/angularapp/browser/index.csr.html dist/angularapp/browser/index.html",
+  "buildCommand": "cd angularapp && npm install && npm run build:prod && cp dist/angularapp/browser/index.csr.html dist/angularapp/browser/index.html",
   "outputDirectory": "angularapp/dist/angularapp/browser",
   "installCommand": "cd angularapp && npm install",
   "framework": null,
