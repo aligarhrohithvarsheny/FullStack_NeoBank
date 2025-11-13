@@ -3,7 +3,7 @@ import { Router } from '@angular/router';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { AlertService } from '../../../service/alert.service';
-import { environment } from '../../../environment/environment';
+import { environment } from '../../../../environment/environment';
 // import { UserService } from '../../service/user';
 // import { AccountService } from '../../service/account';
 // import { TransactionService } from '../../service/transaction';

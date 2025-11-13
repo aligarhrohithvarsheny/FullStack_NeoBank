@@ -2,7 +2,7 @@ import { CurrencyPipe, CommonModule, isPlatformBrowser } from '@angular/common';
 import { Component, OnInit, Inject, PLATFORM_ID } from '@angular/core';
 import { Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
-import { environment } from '../../../environment/environment';
+import { environment } from '../../../../environment/environment';
 
 interface LoanRequest {
   id: number;

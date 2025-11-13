@@ -3,7 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
-import { environment } from '../../../environment/environment';
+import { environment } from '../../../../environment/environment';
 
 interface KycRequest {
   id?: string; // Make ID optional since backend auto-generates it

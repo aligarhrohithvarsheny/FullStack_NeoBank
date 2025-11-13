@@ -4,7 +4,7 @@ import { CommonModule } from '@angular/common';
 import { Router, ActivatedRoute } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { AlertService } from '../../../service/alert.service';
-import { environment } from '../../../environment/environment';
+import { environment } from '../../../../environment/environment';
 
 @Component({
   selector: 'app-user',

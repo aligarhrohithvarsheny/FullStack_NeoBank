@@ -4,7 +4,7 @@ import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { AlertService } from '../../../service/alert.service';
-import { environment } from '../../../environment/environment';
+import { environment } from '../../../../environment/environment';
 
 interface TransferRecord {
   id: number; // Database ID (Long)
