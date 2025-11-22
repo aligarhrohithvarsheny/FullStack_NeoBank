@@ -13,3 +13,4 @@ ALTER TABLE users MODIFY COLUMN face_registered BOOLEAN DEFAULT FALSE;
 -- ALTER TABLE users DROP COLUMN face_registered;
 
 
+

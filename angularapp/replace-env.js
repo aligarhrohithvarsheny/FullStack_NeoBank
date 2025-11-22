@@ -29,8 +29,15 @@ if (!backendUrl || backendUrl === 'YOUR_BACKEND_URL') {
   console.log(`✅ Using backend URL from environment variable: ${finalUrl}`);
 }
 
-// Replace the placeholder
-envContent = envContent.replace(/YOUR_BACKEND_URL\/api/g, finalUrl);
+// Replace the apiUrl value in the environment file
+// Match: apiUrl: '/api' or apiUrl: 'http://...'
+const apiUrlRegex = /apiUrl:\s*['"`]([^'"`]+)['"`]/;
+if (apiUrlRegex.test(envContent)) {
+  envContent = envContent.replace(apiUrlRegex, `apiUrl: '${finalUrl}'`);
+  console.log(`✅ Updated apiUrl to: ${finalUrl}`);
+} else {
+  console.warn('⚠️  Could not find apiUrl in environment file');
+}
 
 // Write back the file
 fs.writeFileSync(envFilePath, envContent, 'utf8');

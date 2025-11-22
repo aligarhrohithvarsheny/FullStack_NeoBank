@@ -6,6 +6,10 @@
   "framework": null,
   "rewrites": [
     {
+      "source": "/api/(.*)",
+      "destination": "https://YOUR_BACKEND_URL_HERE/api/$1"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
