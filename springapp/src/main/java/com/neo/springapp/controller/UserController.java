@@ -10,8 +10,11 @@ import com.neo.springapp.service.EmailService;
 import com.neo.springapp.service.QrCodeService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -42,6 +45,12 @@ public class UserController {
     
     @Autowired
     private QrCodeService qrCodeService;
+    
+    @Autowired
+    private com.neo.springapp.service.AccountTrackingService accountTrackingService;
+    
+    @Autowired
+    private com.neo.springapp.service.PdfService pdfService;
 
     // Authentication endpoint - Step 1: Verify password and send OTP
     @PostMapping("/authenticate")
@@ -66,6 +75,15 @@ public class UserController {
                 System.out.println("Account locked: " + user.isAccountLocked());
                 System.out.println("Failed login attempts: " + user.getFailedLoginAttempts());
                 
+                // Debug: Check password format
+                String storedPassword = user.getPassword();
+                if (storedPassword != null) {
+                    System.out.println("Stored password format check - Length: " + storedPassword.length() + ", Contains colon: " + storedPassword.contains(":"));
+                    System.out.println("Is encrypted format: " + passwordService.isEncrypted(storedPassword));
+                } else {
+                    System.out.println("WARNING: Stored password is NULL!");
+                }
+                
                 // Check if account is locked
                 if (user.isAccountLocked()) {
                     Map<String, Object> response = new HashMap<>();
@@ -76,8 +94,19 @@ public class UserController {
                     return ResponseEntity.badRequest().body(response);
                 }
                 
+                // Check if password is in correct format, if not, re-encrypt it
+                if (storedPassword != null && !passwordService.isEncrypted(storedPassword)) {
+                    System.out.println("WARNING: Password is not in encrypted format. Re-encrypting...");
+                    // This shouldn't happen, but if it does, we can't verify the old password
+                    // So we'll treat it as invalid
+                    System.out.println("Password format invalid - cannot verify. User needs to reset password.");
+                }
+                
                 // Use encrypted password verification
-                if (passwordService.verifyPassword(password, user.getPassword())) {
+                boolean passwordValid = passwordService.verifyPassword(password, storedPassword);
+                System.out.println("Password verification result: " + passwordValid);
+                
+                if (passwordValid) {
                     // Password is correct - generate and send OTP
                     String otp = otpService.generateOtp();
                     otpService.storeOtp(email, otp);
@@ -291,6 +320,17 @@ public class UserController {
                 return ResponseEntity.badRequest().body(response);
             }
             
+            // Validate phone number if account is provided with phone
+            if (user.getAccount() != null && user.getAccount().getPhone() != null && !user.getAccount().getPhone().isEmpty()) {
+                if (!accountService.isPhoneUnique(user.getAccount().getPhone())) {
+                    System.out.println("❌ Phone number already exists: " + user.getAccount().getPhone());
+                    response.put("success", false);
+                    response.put("message", "Mobile number is already registered. Another account exists with this mobile number.");
+                    response.put("errorType", "PHONE_EXISTS");
+                    return ResponseEntity.badRequest().body(response);
+                }
+            }
+            
             // Encrypt password before saving
             if (user.getPassword() != null && !passwordService.isEncrypted(user.getPassword())) {
                 user.setPassword(passwordService.encryptPassword(user.getPassword()));
@@ -298,8 +338,36 @@ public class UserController {
             User savedUser = userService.saveUser(user);
             System.out.println("✅ User created successfully: " + savedUser.getEmail());
             
+            // Generate tracking ID and create tracking record
+            String aadharNumber = savedUser.getAadhar();
+            String mobileNumber = savedUser.getPhone();
+            if (aadharNumber != null && !aadharNumber.isEmpty() && mobileNumber != null && !mobileNumber.isEmpty()) {
+                try {
+                    com.neo.springapp.model.AccountTracking tracking = accountTrackingService.createTracking(savedUser, aadharNumber, mobileNumber);
+                    System.out.println("✅ Tracking ID generated: " + tracking.getTrackingId());
+                    
+                    // Send tracking ID email to user
+                    emailService.sendAccountTrackingEmail(
+                        savedUser.getEmail(), 
+                        savedUser.getUsername() != null ? savedUser.getUsername() : savedUser.getEmail(),
+                        tracking.getTrackingId(),
+                        aadharNumber,
+                        tracking.getStatus()
+                    );
+                    
+                    response.put("trackingId", tracking.getTrackingId());
+                    response.put("message", "Account created successfully! Tracking ID has been sent to your email. Please wait for admin approval.");
+                } catch (Exception e) {
+                    System.out.println("⚠️ Failed to create tracking or send email: " + e.getMessage());
+                    e.printStackTrace();
+                    // Continue even if tracking fails
+                    response.put("message", "Account created successfully! Please wait for admin approval.");
+                }
+            } else {
+                response.put("message", "Account created successfully! Please wait for admin approval.");
+            }
+            
             response.put("success", true);
-            response.put("message", "Account created successfully! Please wait for admin approval.");
             response.put("user", savedUser);
             
             return ResponseEntity.ok(response);
@@ -468,15 +536,6 @@ public class UserController {
     }
 
 
-    @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteUser(@PathVariable Long id) {
-        try {
-            userService.deleteUser(id);
-            return ResponseEntity.ok().build();
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().build();
-        }
-    }
 
     // Root endpoint for getting all users (for frontend compatibility)
     @GetMapping("")
@@ -521,6 +580,28 @@ public class UserController {
             User approvedUser = userService.approveUser(id, "Admin"); // Use default admin name
             
             if (approvedUser != null) {
+                // Update tracking status to ADMIN_APPROVED
+                try {
+                    Optional<com.neo.springapp.model.AccountTracking> trackingOpt = accountTrackingService.getTrackingByUserId(id);
+                    if (trackingOpt.isPresent()) {
+                        com.neo.springapp.model.AccountTracking tracking = trackingOpt.get();
+                        accountTrackingService.updateTrackingStatus(tracking.getId(), "ADMIN_APPROVED", "Admin");
+                        
+                        // Send email notification about approval
+                        emailService.sendAccountTrackingEmail(
+                            approvedUser.getEmail(),
+                            approvedUser.getUsername() != null ? approvedUser.getUsername() : approvedUser.getEmail(),
+                            tracking.getTrackingId(),
+                            tracking.getAadharNumber(),
+                            "ADMIN_APPROVED"
+                        );
+                        System.out.println("✅ Tracking status updated to ADMIN_APPROVED and email sent");
+                    }
+                } catch (Exception e) {
+                    System.out.println("⚠️ Failed to update tracking status: " + e.getMessage());
+                    // Continue even if tracking update fails
+                }
+                
                 Map<String, Object> response = new HashMap<>();
                 response.put("success", true);
                 response.put("user", approvedUser);
@@ -1140,5 +1221,429 @@ public class UserController {
             e.printStackTrace();
             return ResponseEntity.internalServerError().body(response);
         }
+    }
+
+    // Upload profile photo
+    @PostMapping("/{userId}/upload-profile-photo")
+    public ResponseEntity<Map<String, Object>> uploadProfilePhoto(
+            @PathVariable Long userId,
+            @RequestParam("profilePhoto") MultipartFile profilePhoto) {
+        Map<String, Object> response = new HashMap<>();
+        
+        try {
+            // Validate file size (max 5MB)
+            long maxSize = 5 * 1024 * 1024; // 5MB in bytes
+            if (profilePhoto.getSize() > maxSize) {
+                response.put("success", false);
+                response.put("message", "Profile photo size exceeds 5MB limit");
+                return ResponseEntity.badRequest().body(response);
+            }
+            
+            // Validate file type
+            String contentType = profilePhoto.getContentType();
+            if (contentType == null || (!contentType.equals("image/jpeg") && 
+                !contentType.equals("image/jpg") && 
+                !contentType.equals("image/png") && 
+                !contentType.equals("application/pdf"))) {
+                response.put("success", false);
+                response.put("message", "Profile photo must be JPEG, PNG, or PDF format");
+                return ResponseEntity.badRequest().body(response);
+            }
+            
+            Optional<User> userOpt = userService.getUserById(userId);
+            if (!userOpt.isPresent()) {
+                response.put("success", false);
+                response.put("message", "User not found");
+                return ResponseEntity.notFound().build();
+            }
+            
+            User user = userOpt.get();
+            user.setProfilePhoto(profilePhoto.getBytes());
+            user.setProfilePhotoType(profilePhoto.getContentType());
+            user.setProfilePhotoName(profilePhoto.getOriginalFilename());
+            
+            User savedUser = userService.saveUser(user);
+            
+            response.put("success", true);
+            response.put("message", "Profile photo uploaded successfully");
+            response.put("user", savedUser);
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "Failed to upload profile photo: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(response);
+        }
+    }
+
+    // Get profile photo
+    @GetMapping("/{userId}/profile-photo")
+    public ResponseEntity<byte[]> getProfilePhoto(@PathVariable Long userId) {
+        Optional<User> userOpt = userService.getUserById(userId);
+        if (!userOpt.isPresent() || userOpt.get().getProfilePhoto() == null) {
+            return ResponseEntity.notFound().build();
+        }
+        
+        User user = userOpt.get();
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.parseMediaType(
+            user.getProfilePhotoType() != null ? user.getProfilePhotoType() : "image/jpeg"));
+        headers.setContentDispositionFormData("inline", 
+            user.getProfilePhotoName() != null ? user.getProfilePhotoName() : "profile_photo.jpg");
+        
+        return ResponseEntity.ok()
+                .headers(headers)
+                .body(user.getProfilePhoto());
+    }
+
+    // Upload signature
+    @PostMapping("/{userId}/upload-signature")
+    public ResponseEntity<Map<String, Object>> uploadSignature(
+            @PathVariable Long userId,
+            @RequestParam("signature") MultipartFile signature) {
+        Map<String, Object> response = new HashMap<>();
+        
+        try {
+            // Validate file size (max 5MB)
+            long maxSize = 5 * 1024 * 1024; // 5MB in bytes
+            if (signature.getSize() > maxSize) {
+                response.put("success", false);
+                response.put("message", "Signature size exceeds 5MB limit");
+                return ResponseEntity.badRequest().body(response);
+            }
+            
+            // Validate file type
+            String contentType = signature.getContentType();
+            if (contentType == null || (!contentType.equals("image/jpeg") && 
+                !contentType.equals("image/jpg") && 
+                !contentType.equals("image/png") && 
+                !contentType.equals("application/pdf"))) {
+                response.put("success", false);
+                response.put("message", "Signature must be JPEG, PNG, or PDF format");
+                return ResponseEntity.badRequest().body(response);
+            }
+            
+            Optional<User> userOpt = userService.getUserById(userId);
+            if (!userOpt.isPresent()) {
+                response.put("success", false);
+                response.put("message", "User not found");
+                return ResponseEntity.notFound().build();
+            }
+            
+            User user = userOpt.get();
+            user.setSignature(signature.getBytes());
+            user.setSignatureType(signature.getContentType());
+            user.setSignatureName(signature.getOriginalFilename());
+            user.setSignatureStatus("PENDING");
+            user.setSignatureSubmittedDate(LocalDateTime.now());
+            
+            User savedUser = userService.saveUser(user);
+            
+            response.put("success", true);
+            response.put("message", "Signature uploaded successfully. Waiting for admin approval.");
+            response.put("user", savedUser);
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "Failed to upload signature: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(response);
+        }
+    }
+
+    // Get signature
+    @GetMapping("/{userId}/signature")
+    public ResponseEntity<byte[]> getSignature(@PathVariable Long userId) {
+        Optional<User> userOpt = userService.getUserById(userId);
+        if (!userOpt.isPresent() || userOpt.get().getSignature() == null) {
+            return ResponseEntity.notFound().build();
+        }
+        
+        User user = userOpt.get();
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.parseMediaType(
+            user.getSignatureType() != null ? user.getSignatureType() : "image/jpeg"));
+        headers.setContentDispositionFormData("inline", 
+            user.getSignatureName() != null ? user.getSignatureName() : "signature.jpg");
+        
+        return ResponseEntity.ok()
+                .headers(headers)
+                .body(user.getSignature());
+    }
+
+    // Admin: Get all users with pending signatures
+    @GetMapping("/pending-signatures")
+    public ResponseEntity<List<User>> getUsersWithPendingSignatures() {
+        List<User> users = userService.getUsersWithPendingSignatures();
+        return ResponseEntity.ok(users);
+    }
+
+    // Admin: Approve signature
+    @PutMapping("/{userId}/approve-signature")
+    public ResponseEntity<Map<String, Object>> approveSignature(
+            @PathVariable Long userId,
+            @RequestParam String adminName) {
+        Map<String, Object> response = new HashMap<>();
+        
+        try {
+            Optional<User> userOpt = userService.getUserById(userId);
+            if (!userOpt.isPresent()) {
+                response.put("success", false);
+                response.put("message", "User not found");
+                return ResponseEntity.notFound().build();
+            }
+            
+            User user = userOpt.get();
+            if (user.getSignature() == null) {
+                response.put("success", false);
+                response.put("message", "User has no signature uploaded");
+                return ResponseEntity.badRequest().body(response);
+            }
+            
+            user.setSignatureStatus("APPROVED");
+            user.setSignatureReviewedDate(LocalDateTime.now());
+            user.setSignatureReviewedBy(adminName);
+            user.setSignatureRejectionReason(null);
+            
+            User savedUser = userService.saveUser(user);
+            
+            response.put("success", true);
+            response.put("message", "Signature approved successfully");
+            response.put("user", savedUser);
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "Failed to approve signature: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(response);
+        }
+    }
+
+    // Admin: Reject signature
+    @PutMapping("/{userId}/reject-signature")
+    public ResponseEntity<Map<String, Object>> rejectSignature(
+            @PathVariable Long userId,
+            @RequestParam String adminName,
+            @RequestParam(required = false) String rejectionReason) {
+        Map<String, Object> response = new HashMap<>();
+        
+        try {
+            Optional<User> userOpt = userService.getUserById(userId);
+            if (!userOpt.isPresent()) {
+                response.put("success", false);
+                response.put("message", "User not found");
+                return ResponseEntity.notFound().build();
+            }
+            
+            User user = userOpt.get();
+            if (user.getSignature() == null) {
+                response.put("success", false);
+                response.put("message", "User has no signature uploaded");
+                return ResponseEntity.badRequest().body(response);
+            }
+            
+            user.setSignatureStatus("REJECTED");
+            user.setSignatureReviewedDate(LocalDateTime.now());
+            user.setSignatureReviewedBy(adminName);
+            user.setSignatureRejectionReason(rejectionReason != null ? rejectionReason : "Signature does not meet requirements");
+            
+            User savedUser = userService.saveUser(user);
+            
+            response.put("success", true);
+            response.put("message", "Signature rejected");
+            response.put("user", savedUser);
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "Failed to reject signature: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(response);
+        }
+    }
+
+    // Generate and download passbook
+    @GetMapping("/{userId}/passbook")
+    public ResponseEntity<byte[]> generatePassbook(@PathVariable Long userId) {
+        try {
+            Optional<User> userOpt = userService.getUserById(userId);
+            if (!userOpt.isPresent()) {
+                return ResponseEntity.notFound().build();
+            }
+            
+            User user = userOpt.get();
+            Account account = user.getAccount();
+            if (account == null) {
+                return ResponseEntity.badRequest().build();
+            }
+            
+            // Get current balance
+            Double currentBalance = accountService.getBalanceByAccountNumber(user.getAccountNumber());
+            if (currentBalance == null) {
+                currentBalance = account.getBalance() != null ? account.getBalance() : 0.0;
+            }
+            
+            // Generate passbook PDF
+            byte[] pdfBytes = pdfService.generatePassbook(userId, user, account, currentBalance);
+            
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_PDF);
+            headers.setContentDispositionFormData("attachment", 
+                "NeoBank_Passbook_" + user.getAccountNumber() + "_" + 
+                java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd")) + ".pdf");
+            headers.setCacheControl("must-revalidate, post-check=0, pre-check=0");
+            
+            return ResponseEntity.ok()
+                    .headers(headers)
+                    .body(pdfBytes);
+                    
+        } catch (Exception e) {
+            System.err.println("Error generating passbook: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    // Admin: Full user management - Update any user field
+    @PutMapping("/admin/update-full/{id}")
+    public ResponseEntity<Map<String, Object>> updateUserFull(
+            @PathVariable Long id,
+            @RequestBody Map<String, Object> updateData) {
+        Map<String, Object> response = new HashMap<>();
+        
+        try {
+            Optional<User> userOpt = userService.getUserById(id);
+            if (!userOpt.isPresent()) {
+                response.put("success", false);
+                response.put("message", "User not found");
+                return ResponseEntity.notFound().build();
+            }
+            
+            User user = userOpt.get();
+            Account account = user.getAccount();
+            
+            // Update user fields
+            if (updateData.containsKey("username")) {
+                user.setUsername((String) updateData.get("username"));
+            }
+            if (updateData.containsKey("email")) {
+                String newEmail = (String) updateData.get("email");
+                if (!newEmail.equals(user.getEmail()) && !userService.isEmailUnique(newEmail)) {
+                    response.put("success", false);
+                    response.put("message", "Email already exists");
+                    return ResponseEntity.badRequest().body(response);
+                }
+                user.setEmail(newEmail);
+            }
+            if (updateData.containsKey("status")) {
+                user.setStatus((String) updateData.get("status"));
+            }
+            if (updateData.containsKey("accountNumber")) {
+                user.setAccountNumber((String) updateData.get("accountNumber"));
+            }
+            if (updateData.containsKey("accountLocked")) {
+                user.setAccountLocked((Boolean) updateData.get("accountLocked"));
+            }
+            if (updateData.containsKey("failedLoginAttempts")) {
+                user.setFailedLoginAttempts(((Number) updateData.get("failedLoginAttempts")).intValue());
+            }
+            
+            // Update or create account
+            if (account == null) {
+                account = new Account();
+                account.setCreatedAt(LocalDateTime.now());
+            }
+            
+            // Update account fields
+            if (updateData.containsKey("name")) {
+                account.setName((String) updateData.get("name"));
+            }
+            if (updateData.containsKey("phone")) {
+                account.setPhone((String) updateData.get("phone"));
+            }
+            if (updateData.containsKey("address")) {
+                account.setAddress((String) updateData.get("address"));
+            }
+            if (updateData.containsKey("dob")) {
+                account.setDob((String) updateData.get("dob"));
+            }
+            if (updateData.containsKey("age")) {
+                account.setAge(((Number) updateData.get("age")).intValue());
+            }
+            if (updateData.containsKey("occupation")) {
+                account.setOccupation((String) updateData.get("occupation"));
+            }
+            if (updateData.containsKey("income")) {
+                account.setIncome(((Number) updateData.get("income")).doubleValue());
+            }
+            if (updateData.containsKey("accountType")) {
+                account.setAccountType((String) updateData.get("accountType"));
+            }
+            if (updateData.containsKey("balance")) {
+                account.setBalance(((Number) updateData.get("balance")).doubleValue());
+            }
+            if (updateData.containsKey("pan")) {
+                account.setPan((String) updateData.get("pan"));
+            }
+            if (updateData.containsKey("aadharNumber")) {
+                account.setAadharNumber((String) updateData.get("aadharNumber"));
+            }
+            if (updateData.containsKey("accountStatus")) {
+                account.setStatus((String) updateData.get("accountStatus"));
+            }
+            
+            account.setLastUpdated(LocalDateTime.now());
+            account.setAccountNumber(user.getAccountNumber());
+            
+            // Save account
+            Account savedAccount = accountService.saveAccount(account);
+            user.setAccount(savedAccount);
+            
+            // Save user
+            User savedUser = userService.saveUser(user);
+            
+            response.put("success", true);
+            response.put("message", "User updated successfully");
+            response.put("user", savedUser);
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "Failed to update user: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.internalServerError().body(response);
+        }
+    }
+
+    // Admin: Delete user
+    @DeleteMapping("/admin/delete/{id}")
+    public ResponseEntity<Map<String, Object>> deleteUser(@PathVariable Long id) {
+        Map<String, Object> response = new HashMap<>();
+        
+        try {
+            Optional<User> userOpt = userService.getUserById(id);
+            if (!userOpt.isPresent()) {
+                response.put("success", false);
+                response.put("message", "User not found");
+                return ResponseEntity.notFound().build();
+            }
+            
+            userService.deleteUser(id);
+            
+            response.put("success", true);
+            response.put("message", "User deleted successfully");
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "Failed to delete user: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(response);
+        }
+    }
+
+    // Admin: Get all users with full details
+    @GetMapping("/admin/all")
+    public ResponseEntity<List<User>> getAllUsersForAdmin() {
+        List<User> users = userService.getAllUsers();
+        return ResponseEntity.ok(users);
     }
 }

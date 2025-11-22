@@ -33,11 +33,20 @@ public class Account {
 
     private Double balance = 0.0; // Account balance
     private Double income;
+    
+    @Column(unique = true, nullable = false)
     private String phone;
+    
     private String address;
 
     private boolean verifiedMatrix = false;
     private boolean kycVerified = false;
+    
+    // Aadhaar verification fields
+    private boolean aadharVerified = false;
+    private LocalDateTime aadharVerifiedDate;
+    private String aadharVerificationReference; // Reference ID from Aadhaar verification
+    private String aadharVerificationStatus = "PENDING"; // PENDING, VERIFIED, FAILED, EXPIRED
 
     // Constructors
     public Account() {

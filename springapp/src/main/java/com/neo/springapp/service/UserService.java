@@ -96,21 +96,91 @@ public class UserService {
                 account.setLastUpdated(LocalDateTime.now());
                 account.setBalance(0.0); // Initialize balance
                 
-                // Set required fields with unique values to avoid constraint violations
-                // Generate unique Aadhar and PAN numbers based on user ID and timestamp
-                String timestamp = String.valueOf(System.currentTimeMillis());
-                account.setAadharNumber("AADHAR_" + user.getId() + "_" + timestamp);
-                account.setPan("PAN" + user.getId() + timestamp.substring(timestamp.length() - 4));
+                // Validate and set Aadhar number
+                String aadharNumber = user.getAadhar();
+                if (aadharNumber != null && !aadharNumber.isEmpty()) {
+                    // Check if Aadhar is already used by another account
+                    if (!accountService.isAadharUnique(aadharNumber)) {
+                        System.out.println("❌ Aadhar number already exists: " + aadharNumber);
+                        throw new RuntimeException("Aadhar number is already registered. Another account exists with this Aadhar number.");
+                    }
+                    account.setAadharNumber(aadharNumber);
+                } else {
+                    // Generate unique Aadhar number if not provided
+                    String timestamp = String.valueOf(System.currentTimeMillis());
+                    account.setAadharNumber("AADHAR_" + user.getId() + "_" + timestamp);
+                }
+                
+                // Validate and set PAN number
+                String pan = user.getPan();
+                if (pan != null && !pan.isEmpty()) {
+                    // Check if PAN is already used by another account
+                    if (!accountService.isPanUnique(pan)) {
+                        System.out.println("❌ PAN number already exists: " + pan);
+                        throw new RuntimeException("PAN number is already registered. Another account exists with this PAN number.");
+                    }
+                    account.setPan(pan);
+                } else {
+                    // Generate unique PAN number if not provided
+                    String timestamp = String.valueOf(System.currentTimeMillis());
+                    account.setPan("PAN" + user.getId() + timestamp.substring(timestamp.length() - 4));
+                }
+                
+                // Validate and set phone number
+                String phone = user.getPhone();
+                if (phone != null && !phone.isEmpty()) {
+                    // Check if phone is already used by another account
+                    if (!accountService.isPhoneUnique(phone)) {
+                        System.out.println("❌ Phone number already exists: " + phone);
+                        throw new RuntimeException("Mobile number is already registered. Another account exists with this mobile number.");
+                    }
+                    account.setPhone(phone);
+                } else {
+                    // Generate unique phone number if not provided
+                    String timestamp = String.valueOf(System.currentTimeMillis());
+                    account.setPhone("999" + user.getId() + timestamp.substring(timestamp.length() - 7));
+                }
                 
                 // Set other required fields with default values
-                account.setDob("1990-01-01"); // Default DOB
-                account.setAge(25); // Default age
-                account.setOccupation("Employee"); // Default occupation
-                account.setAccountType("Savings"); // Default account type
-                account.setIncome(50000.0); // Default income
-                account.setPhone("9999999999"); // Default phone
-                account.setAddress("Default Address"); // Default address
+                account.setDob(user.getDob() != null ? user.getDob() : "1990-01-01"); // Use user DOB or default
+                account.setAge(user.getDob() != null ? calculateAge(user.getDob()) : 25); // Calculate age or default
+                account.setOccupation(user.getOccupation() != null ? user.getOccupation() : "Employee"); // Use user occupation or default
+                account.setAccountType(user.getAccountType() != null ? user.getAccountType() : "Savings"); // Use user account type or default
+                account.setIncome(user.getIncome() != null ? user.getIncome() : 50000.0); // Use user income or default
+                account.setAddress(user.getAddress() != null ? user.getAddress() : "Default Address"); // Use user address or default
             } else {
+                // Account exists - validate unique fields before updating
+                String aadharNumber = account.getAadharNumber();
+                String pan = account.getPan();
+                String phone = account.getPhone();
+                
+                // Validate Aadhar if it exists
+                if (aadharNumber != null && !aadharNumber.isEmpty()) {
+                    Account existingAccount = accountService.getAccountByAadhar(aadharNumber);
+                    if (existingAccount != null && !existingAccount.getId().equals(account.getId())) {
+                        System.out.println("❌ Aadhar number already exists: " + aadharNumber);
+                        throw new RuntimeException("Aadhar number is already registered. Another account exists with this Aadhar number.");
+                    }
+                }
+                
+                // Validate PAN if it exists
+                if (pan != null && !pan.isEmpty()) {
+                    Account existingAccount = accountService.getAccountByPan(pan);
+                    if (existingAccount != null && !existingAccount.getId().equals(account.getId())) {
+                        System.out.println("❌ PAN number already exists: " + pan);
+                        throw new RuntimeException("PAN number is already registered. Another account exists with this PAN number.");
+                    }
+                }
+                
+                // Validate phone if it exists
+                if (phone != null && !phone.isEmpty()) {
+                    Account existingAccount = accountService.getAccountByPhone(phone);
+                    if (existingAccount != null && !existingAccount.getId().equals(account.getId())) {
+                        System.out.println("❌ Phone number already exists: " + phone);
+                        throw new RuntimeException("Mobile number is already registered. Another account exists with this mobile number.");
+                    }
+                }
+                
                 account.setAccountNumber(user.getAccountNumber());
                 account.setStatus("ACTIVE");
                 account.setLastUpdated(LocalDateTime.now());
@@ -256,5 +326,22 @@ public class UserService {
 
     public Optional<User> findByEmail(String email) {
         return userRepository.findByEmail(email);
+    }
+    
+    // Helper method to calculate age from DOB
+    private int calculateAge(String dob) {
+        try {
+            // Assuming DOB format is "YYYY-MM-DD"
+            int birthYear = Integer.parseInt(dob.substring(0, 4));
+            int currentYear = LocalDateTime.now().getYear();
+            return currentYear - birthYear;
+        } catch (Exception e) {
+            return 25; // Default age if calculation fails
+        }
+    }
+
+    // Get users with pending signatures
+    public List<User> getUsersWithPendingSignatures() {
+        return userRepository.findBySignatureStatus("PENDING");
     }
 }

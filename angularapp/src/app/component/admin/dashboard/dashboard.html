@@ -68,9 +68,14 @@
     <div class="modal-content">
       <div class="modal-header">
         <h3><i class="fa fa-user"></i> Complete User Details</h3>
-        <button class="close-btn" (click)="closeUserDetails()">
-          <i class="fa fa-times"></i>
-        </button>
+        <div class="header-actions">
+          <button class="pdf-download-btn" (click)="downloadUserDetailsPDF(selectedSearchedUser)" title="Download user details as PDF">
+            <i class="fa fa-file-pdf"></i> Download PDF
+          </button>
+          <button class="close-btn" (click)="closeUserDetails()">
+            <i class="fa fa-times"></i>
+          </button>
+        </div>
       </div>
       
       <div class="modal-body">
@@ -417,6 +422,12 @@
       <p>Create, view, and update users</p>
     </div>
 
+    <div class="dash-card" (click)="navigateTo('user-control')" style="background: linear-gradient(135deg, #dc3545 0%, #c82333 100%) !important; color: white !important;">
+      <i class="fa fa-user-cog dash-icon" style="color: white !important;"></i>
+      <h3 style="color: white !important;">🔐 Full User Control</h3>
+      <p style="color: rgba(255,255,255,0.9) !important;">Edit all user details & accounts</p>
+    </div>
+
     <div class="dash-card" (click)="navigateTo('kyc')">
       <i class="fa fa-id-card dash-icon"></i>
       <h3>KYC Verification</h3>
@@ -441,5 +452,140 @@
       <p>View all user transactions</p>
     </div>
 
+    <div class="dash-card foreclosure-card" (click)="navigateTo('loans')" style="background: linear-gradient(135deg, #6f42c1 0%, #5a32a3 100%) !important; color: white !important;">
+      <i class="fa fa-file-invoice-dollar dash-icon" style="color: white !important;"></i>
+      <h3 style="color: white !important;">🏦 Foreclose Loan</h3>
+      <p style="color: rgba(255,255,255,0.9) !important;">Process loan foreclosure</p>
+    </div>
+
+    <div class="dash-card" (click)="navigateTo('cheques')" style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%) !important; color: white !important;">
+      <i class="fa fa-file-invoice dash-icon" style="color: white !important;"></i>
+      <h3 style="color: white !important;">📝 Cheque Management</h3>
+      <p style="color: rgba(255,255,255,0.9) !important;">Draw and bounce cheques</p>
+    </div>
+
+    <div class="dash-card" (click)="toggleTrackingSection()" style="background: linear-gradient(135deg, #17a2b8 0%, #138496 100%) !important; color: white !important;">
+      <i class="fa fa-search-location dash-icon" style="color: white !important;"></i>
+      <h3 style="color: white !important;">📋 Account Tracking</h3>
+      <p style="color: rgba(255,255,255,0.9) !important;">Track account creation status</p>
+    </div>
+
+  </div>
+
+  <!-- Account Tracking Section -->
+  <div class="tracking-section" *ngIf="showTrackingSection">
+    <div class="section-header">
+      <h3><i class="fa fa-search-location"></i> Account Creation Tracking</h3>
+      <button class="close-btn" (click)="toggleTrackingSection()">
+        <i class="fa fa-times"></i>
+      </button>
+    </div>
+
+    <div class="tracking-filters">
+      <div class="filter-group">
+        <input 
+          type="text" 
+          [(ngModel)]="trackingSearchQuery" 
+          placeholder="Search by Tracking ID, Aadhar, Mobile, or Email..."
+          class="search-input"
+        >
+      </div>
+      <div class="filter-group">
+        <select [(ngModel)]="trackingStatusFilter" class="status-select">
+          <option *ngFor="let option of trackingStatusOptions" [value]="option">
+            {{ option === 'ALL' ? 'All Status' : option.replace('_', ' ') }}
+          </option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <button class="refresh-btn" (click)="loadAccountTrackings()">
+          <i class="fa fa-sync-alt"></i> Refresh
+        </button>
+      </div>
+      <div class="filter-group">
+        <button class="refresh-btn" (click)="trackByAadharAndMobile()" style="background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);">
+          <i class="fa fa-search"></i> Track by Aadhar & Mobile
+        </button>
+      </div>
+    </div>
+
+    <div class="tracking-table-container">
+      <table class="tracking-table">
+        <thead>
+          <tr>
+            <th>Sr. No.</th>
+            <th>Tracking ID</th>
+            <th>Aadhar Number</th>
+            <th>Mobile Number</th>
+            <th>User Email</th>
+            <th>Status</th>
+            <th>Created At</th>
+            <th>Last Updated</th>
+            <th>Updated By</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let tracking of filteredTrackings; let i = index">
+            <td>{{ i + 1 }}</td>
+            <td><strong>{{ tracking.trackingId }}</strong></td>
+            <td>{{ tracking.aadharNumber }}</td>
+            <td>{{ tracking.mobileNumber || 'N/A' }}</td>
+            <td>{{ tracking.user?.email || 'N/A' }}</td>
+            <td>
+              <span [class]="getStatusBadgeClass(tracking.status)">
+                {{ getStatusLabel(tracking.status) }}
+              </span>
+            </td>
+            <td>{{ tracking.createdAt | date:'short' }}</td>
+            <td>{{ tracking.updatedAt | date:'short' }}</td>
+            <td>{{ tracking.updatedBy || 'N/A' }}</td>
+            <td>
+              <div class="action-buttons">
+                <select 
+                  (change)="updateTrackingStatus(tracking, $any($event.target).value)"
+                  [value]="tracking.status"
+                  class="status-update-select"
+                >
+                  <option value="PENDING">Pending</option>
+                  <option value="ADMIN_SEEN">Admin Seen</option>
+                  <option value="ADMIN_APPROVED">Approved</option>
+                  <option value="ADMIN_SENT">Sent</option>
+                </select>
+              </div>
+            </td>
+          </tr>
+          <tr *ngIf="filteredTrackings.length === 0">
+            <td colspan="10" class="no-data">
+              <i class="fa fa-info-circle"></i>
+              No tracking records found
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="tracking-stats">
+      <div class="stat-item">
+        <span class="stat-label">Total:</span>
+        <span class="stat-value">{{ totalTrackings }}</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">Pending:</span>
+        <span class="stat-value">{{ pendingTrackings }}</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">Seen:</span>
+        <span class="stat-value">{{ seenTrackings }}</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">Approved:</span>
+        <span class="stat-value">{{ approvedTrackings }}</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">Sent:</span>
+        <span class="stat-value">{{ sentTrackings }}</span>
+      </div>
+    </div>
   </div>
 </div>

@@ -6,7 +6,69 @@
   <button class="back-button" (click)="goBack()">←Dashboard</button>
 </div>
 
+  <!-- CIBIL Information Card -->
+  <div class="cibil-info-card" *ngIf="cibilInfo.cibilScore > 0 || cibilInfo.loading || cibilInfo.error">
+    <h3>📊 Credit Information</h3>
+    <div *ngIf="cibilInfo.loading" class="loading-cibil">
+      <p>Checking CIBIL score...</p>
+    </div>
+    <div *ngIf="cibilInfo.error && !cibilInfo.loading" class="cibil-error">
+      <p>❌ {{ cibilInfo.error }}</p>
+    </div>
+    <div *ngIf="!cibilInfo.loading && !cibilInfo.error && cibilInfo.cibilScore > 0" class="cibil-details">
+      <div class="cibil-grid">
+        <div class="cibil-item">
+          <span class="cibil-label">CIBIL Score:</span>
+          <span class="cibil-value score" [ngClass]="{
+            'excellent': cibilInfo.cibilScore >= 750,
+            'good': cibilInfo.cibilScore >= 700 && cibilInfo.cibilScore < 750,
+            'fair': cibilInfo.cibilScore >= 650 && cibilInfo.cibilScore < 700,
+            'average': cibilInfo.cibilScore >= 600 && cibilInfo.cibilScore < 650,
+            'poor': cibilInfo.cibilScore < 600
+          }">{{ cibilInfo.cibilScore }}</span>
+          <span class="cibil-category">({{ cibilInfo.scoreCategory }})</span>
+        </div>
+        <div class="cibil-item">
+          <span class="cibil-label">Interest Rate:</span>
+          <span class="cibil-value">{{ cibilInfo.interestRate }}% p.a.</span>
+        </div>
+        <div class="cibil-item">
+          <span class="cibil-label">Available Credit Limit:</span>
+          <span class="cibil-value limit">₹{{ cibilInfo.creditLimit | number:'1.0-0' }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <form (ngSubmit)="submitLoan()" #loanFormRef="ngForm">
+    <div class="input-group">
+      <label class="input-label">PAN Card Number <span class="required">*</span></label>
+      <div class="pan-input-container">
+        <input
+          type="text"
+          class="input-field"
+          placeholder="Enter PAN number"
+          [(ngModel)]="loanForm.pan"
+          name="pan"
+          [readonly]="cibilInfo.cibilScore > 0"
+          [class.readonly]="cibilInfo.cibilScore > 0"
+          required
+          maxlength="10"
+          (blur)="loanForm.pan && loanForm.pan.trim() !== '' && checkCibilByPan(loanForm.pan)"
+        />
+        <button 
+          type="button" 
+          class="check-cibil-btn" 
+          (click)="checkCibilByPan(loanForm.pan)"
+          [disabled]="!loanForm.pan || cibilInfo.loading"
+        >
+          <span *ngIf="!cibilInfo.loading">✓ Check CIBIL</span>
+          <span *ngIf="cibilInfo.loading">⏳ Checking...</span>
+        </button>
+      </div>
+      <small class="input-hint">PAN will be auto-filled from your account. Click "Check CIBIL" to verify.</small>
+    </div>
+
     <div class="input-group">
       <label class="input-label">Loan Type</label>
       <select class="input-field" [(ngModel)]="loanForm.type" name="type" required>
@@ -26,8 +88,12 @@
         placeholder="Enter loan amount"
         [(ngModel)]="loanForm.amount"
         name="amount"
+        [max]="cibilInfo.creditLimit > 0 ? cibilInfo.creditLimit : null"
         required
       />
+      <small class="input-hint" *ngIf="cibilInfo.creditLimit > 0">
+        Maximum available credit limit: ₹{{ cibilInfo.creditLimit | number:'1.0-0' }}
+      </small>
     </div>
 
     <div class="input-group">
@@ -50,8 +116,14 @@
         placeholder="Annual interest rate"
         [(ngModel)]="loanForm.interestRate"
         name="interestRate"
+        [readonly]="cibilInfo.interestRate > 0"
+        [class.readonly]="cibilInfo.interestRate > 0"
         required
+        step="0.1"
       />
+      <small class="input-hint" *ngIf="cibilInfo.interestRate > 0">
+        Interest rate is auto-calculated based on your CIBIL score ({{ cibilInfo.interestRate }}% p.a.)
+      </small>
     </div>
 
     <div class="form-actions">
@@ -141,6 +213,16 @@
     </div>
   </div>
 
+  <!-- Foreclosure Quick Access -->
+  <div class="foreclosure-quick-access" *ngIf="hasApprovedLoans()">
+    <div class="foreclosure-banner">
+      <div class="foreclosure-banner-content">
+        <h3>🏦 Loan Foreclosure Available</h3>
+        <p>You have approved loans that can be foreclosed. Contact admin or check below for foreclosure details.</p>
+      </div>
+    </div>
+  </div>
+
   <div class="loan-list" *ngIf="loans.length > 0">
     <h2>My Loan Requests</h2>
     <div class="loan-table-container">
@@ -169,7 +251,8 @@
           <td>{{ loan.interestRate }}%</td>
           <td [class.pending]="loan.status === 'Pending'"
               [class.approved]="loan.status === 'Approved'"
-              [class.rejected]="loan.status === 'Rejected'">
+              [class.rejected]="loan.status === 'Rejected'"
+              [class.foreclosed]="loan.status === 'Foreclosed'">
             {{ loan.status }}
           </td>
           <td>{{ loan.applicationDate | date:'short' }}</td>
@@ -178,10 +261,315 @@
             <button class="download-pdf-btn" (click)="downloadLoanPDF(loan)" title="Download Loan Details PDF">
                Download PDF
             </button>
+            <button 
+              *ngIf="loan.status === 'Foreclosed'" 
+              class="download-foreclosure-btn" 
+              (click)="downloadForeclosurePDF(loan)" 
+              title="Download Foreclosure Statement PDF">
+               📄 Foreclosure PDF
+            </button>
+            <button 
+              *ngIf="loan.status === 'Approved' || loan.status === 'Paid'" 
+              class="view-emi-btn" 
+              (click)="showEmiDetails(loan)" 
+              title="View EMI Details">
+               💳 View EMIs
+            </button>
           </td>
         </tr>
       </tbody>
       </table>
+    </div>
+    
+    <!-- Foreclosure Information Section -->
+    <div class="foreclosure-section" *ngIf="hasForeclosedLoans()">
+      <h3>🏦 Foreclosed Loans</h3>
+      <div class="foreclosure-cards">
+        <div class="foreclosure-card" *ngFor="let loan of loans" [hidden]="loan.status !== 'Foreclosed'">
+          <div class="foreclosure-header">
+            <h4>{{ loan.loanAccountNumber }}</h4>
+            <span class="foreclosure-badge">Foreclosed</span>
+          </div>
+          <div class="foreclosure-details-grid">
+            <div class="foreclosure-item">
+              <span class="foreclosure-label">Foreclosure Date:</span>
+              <span class="foreclosure-value">{{ loan.foreclosureDate | date:'short' }}</span>
+            </div>
+            <div class="foreclosure-item">
+              <span class="foreclosure-label">Total Foreclosure Amount:</span>
+              <span class="foreclosure-value highlight">₹{{ loan.foreclosureAmount | number:'1.2-2' }}</span>
+            </div>
+            <div class="foreclosure-item">
+              <span class="foreclosure-label">Principal Paid:</span>
+              <span class="foreclosure-value">₹{{ loan.principalPaid | number:'1.2-2' }}</span>
+            </div>
+            <div class="foreclosure-item">
+              <span class="foreclosure-label">Interest Paid:</span>
+              <span class="foreclosure-value">₹{{ loan.interestPaid | number:'1.2-2' }}</span>
+            </div>
+            <div class="foreclosure-item">
+              <span class="foreclosure-label">Remaining Principal:</span>
+              <span class="foreclosure-value">₹{{ loan.remainingPrincipal | number:'1.2-2' }}</span>
+            </div>
+            <div class="foreclosure-item">
+              <span class="foreclosure-label">Remaining Interest:</span>
+              <span class="foreclosure-value">₹{{ loan.remainingInterest | number:'1.2-2' }}</span>
+            </div>
+            <div class="foreclosure-item">
+              <span class="foreclosure-label">Foreclosure Charges (4%):</span>
+              <span class="foreclosure-value">₹{{ loan.foreclosureCharges | number:'1.2-2' }}</span>
+            </div>
+            <div class="foreclosure-item">
+              <span class="foreclosure-label">GST (18% on Charges):</span>
+              <span class="foreclosure-value">₹{{ loan.foreclosureGst | number:'1.2-2' }}</span>
+            </div>
+          </div>
+          <div class="foreclosure-actions">
+            <button class="download-foreclosure-pdf-btn" (click)="downloadForeclosurePDF(loan)">
+              📄 Download Foreclosure Statement
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- EMI Details Modal/Section -->
+  <div class="emi-details-section" *ngIf="selectedLoanForEmi">
+    <div class="emi-details-container">
+      <div class="emi-header">
+        <h2>EMI Payment Details - {{ selectedLoanForEmi.loanAccountNumber }}</h2>
+        <button class="close-btn" (click)="closeEmiDetails()">✕</button>
+      </div>
+      
+      <div class="loan-summary-card">
+        <h3>Loan Summary</h3>
+        <div class="summary-grid">
+          <div class="summary-item">
+            <span class="summary-label">Loan Type:</span>
+            <span class="summary-value">{{ selectedLoanForEmi.type }}</span>
+          </div>
+          <div class="summary-item">
+            <span class="summary-label">Loan Amount:</span>
+            <span class="summary-value">₹{{ selectedLoanForEmi.amount | number:'1.2-2' }}</span>
+          </div>
+          <div class="summary-item">
+            <span class="summary-label">Tenure:</span>
+            <span class="summary-value">{{ selectedLoanForEmi.tenure }} months</span>
+          </div>
+          <div class="summary-item">
+            <span class="summary-label">Interest Rate:</span>
+            <span class="summary-value">{{ selectedLoanForEmi.interestRate }}% p.a.</span>
+          </div>
+          <div class="summary-item" *ngIf="selectedLoanForEmi.emiStartDate">
+            <span class="summary-label">EMI Start Date:</span>
+            <span class="summary-value">{{ selectedLoanForEmi.emiStartDate | date:'dd-MM-yyyy' }}</span>
+          </div>
+          <div class="summary-item">
+            <span class="summary-label">Current Balance:</span>
+            <span class="summary-value">₹{{ currentBalance | number:'1.2-2' }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Next Due EMI Alert -->
+      <div class="next-emi-alert" *ngIf="getNextDueEmi(selectedLoanForEmi.id)">
+        <div class="alert-content">
+          <h4>⚠️ Next EMI Due</h4>
+          <p><strong>Due Date:</strong> {{ getNextDueEmi(selectedLoanForEmi.id)!.dueDate | date:'dd-MM-yyyy' }}</p>
+          <p><strong>Amount:</strong> ₹{{ getNextDueEmi(selectedLoanForEmi.id)!.totalAmount | number:'1.2-2' }}</p>
+          <button class="pay-now-btn" (click)="payEmi(getNextDueEmi(selectedLoanForEmi.id)!)" [disabled]="payingEmi">
+            {{ payingEmi ? 'Processing...' : 'Pay Now' }}
+          </button>
+        </div>
+      </div>
+
+      <!-- EMI Schedule Table -->
+      <div class="emi-schedule">
+        <h3>EMI Schedule - Month by Month</h3>
+        <div class="emi-summary-stats">
+          <div class="stat-card">
+            <span class="stat-label">Total EMIs</span>
+            <span class="stat-value">{{ getTotalEmiCount(selectedLoanForEmi.id) }}</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">Paid</span>
+            <span class="stat-value paid-count">{{ getPaidEmiCount(selectedLoanForEmi.id) }}</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">Pending</span>
+            <span class="stat-value pending-count">{{ getPendingEmiCount(selectedLoanForEmi.id) }}</span>
+          </div>
+        </div>
+        
+        <div class="emi-cards-container">
+          <div *ngFor="let emi of getEmisForLoan(selectedLoanForEmi.id)" 
+               class="emi-card"
+               [class.emi-paid]="emi.status === 'Paid'"
+               [class.emi-pending]="emi.status === 'Pending'"
+               [class.emi-overdue]="emi.status === 'Overdue'">
+            
+            <!-- Green Ticket for Paid EMIs -->
+            <div class="paid-ticket" *ngIf="emi.status === 'Paid'">
+              <div class="ticket-icon">✓</div>
+              <div class="ticket-text">PAID</div>
+            </div>
+            
+            <div class="emi-card-header">
+              <div class="emi-number-badge">
+                <span class="emi-number">EMI #{{ emi.emiNumber }}</span>
+                <span class="emi-month">Month {{ emi.emiNumber }}</span>
+              </div>
+              <div class="emi-status-indicator" [class.status-paid]="emi.status === 'Paid'"
+                   [class.status-pending]="emi.status === 'Pending'"
+                   [class.status-overdue]="emi.status === 'Overdue'">
+                <span class="status-dot"></span>
+                <span class="status-text">{{ emi.status }}</span>
+              </div>
+            </div>
+            
+            <div class="emi-card-body">
+              <div class="emi-due-date">
+                <span class="date-label">Due Date:</span>
+                <span class="date-value">{{ emi.dueDate | date:'dd MMM yyyy' }}</span>
+              </div>
+              
+              <div class="emi-amount-breakdown">
+                <div class="breakdown-row">
+                  <span class="breakdown-label">Principal:</span>
+                  <span class="breakdown-value">₹{{ emi.principalAmount | number:'1.2-2' }}</span>
+                </div>
+                <div class="breakdown-row">
+                  <span class="breakdown-label">Interest:</span>
+                  <span class="breakdown-value">₹{{ emi.interestAmount | number:'1.2-2' }}</span>
+                </div>
+                <div class="breakdown-row total-row">
+                  <span class="breakdown-label">Total EMI:</span>
+                  <span class="breakdown-value total-amount">₹{{ emi.totalAmount | number:'1.2-2' }}</span>
+                </div>
+              </div>
+              
+              <div class="emi-remaining">
+                <span class="remaining-label">Remaining Principal:</span>
+                <span class="remaining-value">₹{{ emi.remainingPrincipal | number:'1.2-2' }}</span>
+              </div>
+              
+              <div class="emi-payment-info" *ngIf="emi.status === 'Paid' && emi.paymentDate">
+                <div class="payment-date">
+                  <span class="payment-label">Paid on:</span>
+                  <span class="payment-value">{{ emi.paymentDate | date:'dd MMM yyyy' }}</span>
+                </div>
+              </div>
+            </div>
+            
+            <div class="emi-card-actions">
+              <button *ngIf="emi.status === 'Pending'" 
+                      class="pay-emi-btn-card" 
+                      (click)="payEmi(emi)" 
+                      [disabled]="payingEmi">
+                <span class="btn-icon">💳</span>
+                <span class="btn-text">{{ payingEmi ? 'Processing...' : 'Pay Now' }}</span>
+              </button>
+              <button *ngIf="emi.status === 'Paid'" 
+                      class="download-receipt-btn-card" 
+                      (click)="downloadEmiReceipt(emi)">
+                <span class="btn-icon">📄</span>
+                <span class="btn-text">Download Receipt</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- EMI Payment Confirmation Modal -->
+  <div class="emi-payment-modal-overlay" *ngIf="showEmiPaymentModal" (click)="closeEmiPaymentModal()">
+    <div class="emi-payment-modal" (click)="$event.stopPropagation()" *ngIf="selectedEmiForPayment">
+      <div class="modal-header">
+        <h2>Confirm EMI Payment</h2>
+        <button class="modal-close-btn" (click)="closeEmiPaymentModal()">✕</button>
+      </div>
+      
+      <div class="modal-body">
+        <div class="payment-summary-card">
+          <div class="summary-header">
+            <div class="emi-number-large">EMI #{{ selectedEmiForPayment.emiNumber }}</div>
+            <div class="loan-account-info">{{ selectedLoanForEmi?.loanAccountNumber }}</div>
+          </div>
+          
+          <div class="payment-details-section">
+            <h3>Payment Details</h3>
+            <div class="detail-row">
+              <span class="detail-label">Due Date:</span>
+              <span class="detail-value">{{ selectedEmiForPayment.dueDate | date:'dd MMM yyyy' }}</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">Loan Type:</span>
+              <span class="detail-value">{{ selectedLoanForEmi?.type }}</span>
+            </div>
+          </div>
+          
+          <div class="amount-breakdown-section">
+            <h3>Amount Breakdown</h3>
+            <div class="breakdown-item">
+              <span class="breakdown-label">Principal Amount:</span>
+              <span class="breakdown-amount">₹{{ selectedEmiForPayment.principalAmount | number:'1.2-2' }}</span>
+            </div>
+            <div class="breakdown-item">
+              <span class="breakdown-label">Interest Amount:</span>
+              <span class="breakdown-amount">₹{{ selectedEmiForPayment.interestAmount | number:'1.2-2' }}</span>
+            </div>
+            <div class="breakdown-item total-breakdown">
+              <span class="breakdown-label">Total EMI Amount:</span>
+              <span class="breakdown-amount total-emi-amount">₹{{ selectedEmiForPayment.totalAmount | number:'1.2-2' }}</span>
+            </div>
+          </div>
+          
+          <div class="account-info-section">
+            <h3>Account Information</h3>
+            <div class="detail-row">
+              <span class="detail-label">Account Number:</span>
+              <span class="detail-value">{{ userAccountNumber }}</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">Current Balance:</span>
+              <span class="detail-value">₹{{ currentBalance | number:'1.2-2' }}</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">Balance After Payment:</span>
+              <span class="detail-value balance-after">₹{{ (currentBalance - selectedEmiForPayment.totalAmount) | number:'1.2-2' }}</span>
+            </div>
+          </div>
+          
+          <div class="remaining-info-section">
+            <div class="remaining-item">
+              <span class="remaining-label">Remaining Principal After Payment:</span>
+              <span class="remaining-value">₹{{ selectedEmiForPayment.remainingPrincipal | number:'1.2-2' }}</span>
+            </div>
+          </div>
+          
+          <div class="payment-warning" *ngIf="currentBalance < selectedEmiForPayment.totalAmount">
+            <div class="warning-icon">⚠️</div>
+            <div class="warning-text">
+              <strong>Insufficient Balance!</strong><br>
+              Your current balance (₹{{ currentBalance | number:'1.2-2' }}) is less than the required amount (₹{{ selectedEmiForPayment.totalAmount | number:'1.2-2' }}).
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="modal-footer">
+        <button class="cancel-btn" (click)="closeEmiPaymentModal()" [disabled]="payingEmi">
+          Cancel
+        </button>
+        <button class="confirm-pay-btn" 
+                (click)="confirmEmiPayment()" 
+                [disabled]="payingEmi || currentBalance < selectedEmiForPayment.totalAmount">
+          <span *ngIf="!payingEmi">💳 Confirm & Pay</span>
+          <span *ngIf="payingEmi">⏳ Processing...</span>
+        </button>
+      </div>
     </div>
   </div>
 </div>

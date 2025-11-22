@@ -63,6 +63,22 @@
             <span class="nav-text">Loans</span>
           </a>
         </li>
+        <li class="nav-item">
+          <a (click)="selectFeature('cheque')" 
+             [class.active]="selectedFeature === 'cheque'"
+             class="nav-link">
+            <span class="nav-icon"></span>
+            <span class="nav-text">Cheque</span>
+          </a>
+        </li>
+        <li class="nav-item">
+          <a (click)="selectFeature('goldloan')" 
+             [class.active]="selectedFeature === 'goldloan'"
+             class="nav-link">
+            <span class="nav-icon"></span>
+            <span class="nav-text">Gold Loan</span>
+          </a>
+        </li>
       </ul>
     </nav>
   </aside>
@@ -90,6 +106,49 @@
         <div class="welcome-card">
           <h2>Welcome to NeoBank Dashboard</h2>
           <p>Select a feature from the sidebar to get started</p>
+          
+          <!-- QR Code Section -->
+          <div class="qr-section">
+            <div class="qr-actions">
+              <button class="qr-btn receive-btn" (click)="generateQrCode()" [disabled]="isGeneratingQr">
+                <span class="qr-icon">📱</span>
+                <span>{{ isGeneratingQr ? 'Generating...' : 'Show My QR Code' }}</span>
+              </button>
+              <button class="qr-btn scan-btn" (click)="startQrScanner()" [disabled]="isScanning">
+                <span class="qr-icon">📷</span>
+                <span>{{ isScanning ? 'Scanning...' : 'Scan QR Code' }}</span>
+              </button>
+            </div>
+            
+            <!-- QR Code Display -->
+            <div *ngIf="showQrCode" class="qr-display">
+              <div class="qr-header">
+                <h3>Scan to Pay via UPI</h3>
+                <button class="close-btn" (click)="closeQrCode()">×</button>
+              </div>
+              <div class="qr-image-container">
+                <img [src]="qrCodeImage" alt="UPI QR Code" class="qr-image">
+              </div>
+              <div class="qr-info">
+                <p class="upi-id">UPI ID: <strong>{{ upiId }}</strong></p>
+                <p *ngIf="qrAmount > 0" class="qr-amount">Amount: <strong>₹{{ qrAmount | number:'1.2-2' }}</strong></p>
+                <p *ngIf="qrAmount === 0" class="qr-amount">Dynamic Amount</p>
+                <p class="qr-instruction">Scan with PhonePe, Google Pay, or any UPI app</p>
+              </div>
+
+            </div>
+            
+            <!-- QR Scanner -->
+            <div *ngIf="showQrScanner" class="qr-scanner">
+              <div class="qr-header">
+                <h3>Scan QR Code to Pay</h3>
+                <button class="close-btn" (click)="stopQrScanner()">×</button>
+              </div>
+              <div id="qr-reader" class="qr-reader-container"></div>
+              <p class="qr-instruction">Point your camera at a UPI QR code</p>
+            </div>
+          </div>
+          
           <div class="feature-grid">
             <div class="feature-card" (click)="selectFeature('transferfunds')">
               <span class="feature-icon">💸</span>
@@ -115,6 +174,16 @@
               <span class="feature-icon">💰</span>
               <h3>Loans</h3>
               <p>Apply for loans</p>
+            </div>
+            <div class="feature-card" (click)="selectFeature('cheque')">
+              <span class="feature-icon">📝</span>
+              <h3>Cheque</h3>
+              <p>Manage cheque leaves</p>
+            </div>
+            <div class="feature-card" (click)="selectFeature('goldloan')">
+              <span class="feature-icon">🥇</span>
+              <h3>Gold Loan</h3>
+              <p>Apply for gold loan</p>
             </div>
           </div>
         </div>

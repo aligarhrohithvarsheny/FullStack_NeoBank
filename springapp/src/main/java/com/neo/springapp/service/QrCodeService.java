@@ -136,6 +136,110 @@ public class QrCodeService {
     }
     
     /**
+     * Generate UPI payment QR code
+     * @param upiId UPI ID (e.g., phone@paytm, account@neobank)
+     * @param name Payee name
+     * @param amount Amount (optional, null for dynamic amount)
+     * @param transactionNote Transaction note (optional)
+     * @return Base64 encoded PNG image of QR code
+     */
+    public String generateUpiQrCode(String upiId, String name, Double amount, String transactionNote) {
+        try {
+            // Validate inputs
+            if (upiId == null || upiId.isEmpty()) {
+                System.err.println("Error: UPI ID is null or empty");
+                return null;
+            }
+            
+            // Build UPI payment URL
+            // Format: upi://pay?pa=<UPI_ID>&pn=<NAME>&am=<AMOUNT>&cu=INR&tn=<NOTE>
+            StringBuilder upiUrl = new StringBuilder("upi://pay?pa=");
+            upiUrl.append(upiId);
+            
+            // URL encode name properly
+            if (name != null && !name.isEmpty()) {
+                try {
+                    String encodedName = java.net.URLEncoder.encode(name, "UTF-8");
+                    upiUrl.append("&pn=").append(encodedName);
+                } catch (java.io.UnsupportedEncodingException e) {
+                    // Fallback to simple replacement
+                    upiUrl.append("&pn=").append(name.replace(" ", "%20"));
+                }
+            }
+            
+            if (amount != null && amount > 0) {
+                upiUrl.append("&am=").append(String.format("%.2f", amount));
+            }
+            upiUrl.append("&cu=INR");
+            
+            // URL encode transaction note properly
+            if (transactionNote != null && !transactionNote.isEmpty()) {
+                try {
+                    String encodedNote = java.net.URLEncoder.encode(transactionNote, "UTF-8");
+                    upiUrl.append("&tn=").append(encodedNote);
+                } catch (java.io.UnsupportedEncodingException e) {
+                    // Fallback to simple replacement
+                    upiUrl.append("&tn=").append(transactionNote.replace(" ", "%20"));
+                }
+            }
+            
+            String qrContent = upiUrl.toString();
+            System.out.println("Generated UPI URL: " + qrContent);
+            
+            Map<EncodeHintType, Object> hints = new HashMap<>();
+            hints.put(EncodeHintType.ERROR_CORRECTION, ErrorCorrectionLevel.H);
+            hints.put(EncodeHintType.CHARACTER_SET, "UTF-8");
+            hints.put(EncodeHintType.MARGIN, 1);
+            
+            QRCodeWriter qrCodeWriter = new QRCodeWriter();
+            BitMatrix bitMatrix = qrCodeWriter.encode(qrContent, BarcodeFormat.QR_CODE, QR_CODE_SIZE, QR_CODE_SIZE, hints);
+            
+            BufferedImage image = new BufferedImage(QR_CODE_SIZE, QR_CODE_SIZE, BufferedImage.TYPE_INT_RGB);
+            image.createGraphics();
+            
+            Graphics2D graphics = (Graphics2D) image.getGraphics();
+            graphics.setColor(Color.WHITE);
+            graphics.fillRect(0, 0, QR_CODE_SIZE, QR_CODE_SIZE);
+            graphics.setColor(Color.BLACK);
+            
+            for (int i = 0; i < QR_CODE_SIZE; i++) {
+                for (int j = 0; j < QR_CODE_SIZE; j++) {
+                    if (bitMatrix.get(i, j)) {
+                        graphics.fillRect(i, j, 1, 1);
+                    }
+                }
+            }
+            
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            ImageIO.write(image, "PNG", baos);
+            byte[] imageBytes = baos.toByteArray();
+            
+            if (imageBytes == null || imageBytes.length == 0) {
+                System.err.println("Error: Generated image bytes are null or empty");
+                return null;
+            }
+            
+            String base64Image = Base64.getEncoder().encodeToString(imageBytes);
+            String result = "data:image/png;base64," + base64Image;
+            
+            System.out.println("QR code image generated successfully. Size: " + imageBytes.length + " bytes");
+            return result;
+        } catch (WriterException e) {
+            System.err.println("WriterException generating UPI QR code: " + e.getMessage());
+            e.printStackTrace();
+            return null;
+        } catch (IOException e) {
+            System.err.println("IOException generating UPI QR code: " + e.getMessage());
+            e.printStackTrace();
+            return null;
+        } catch (Exception e) {
+            System.err.println("Unexpected error generating UPI QR code: " + e.getMessage());
+            e.printStackTrace();
+            return null;
+        }
+    }
+    
+    /**
      * Clean up expired sessions
      */
     private void cleanupExpiredSessions() {

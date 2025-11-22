@@ -1,5 +1,5 @@
 .kyc-container {
-  max-width: 600px;
+  max-width: 700px;
   margin: 30px auto;
   padding: 30px;
   border: 2px solid #0077cc;
@@ -123,6 +123,91 @@
   font-size: 0.85rem;
   color: #6c757d;
   font-style: italic;
+}
+
+/* Document Upload Section */
+.document-upload-section {
+  background: #f8f9fa;
+  padding: 20px;
+  border-radius: 12px;
+  margin: 25px 0;
+  border: 2px dashed #0077cc;
+}
+
+.document-upload-section h3 {
+  color: #0077cc;
+  margin-bottom: 10px;
+  font-size: 1.2rem;
+}
+
+.upload-info {
+  color: #666;
+  font-size: 0.9rem;
+  margin-bottom: 20px;
+}
+
+.file-input {
+  width: 100%;
+  padding: 10px;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  background: white;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.file-input:hover {
+  border-color: #0077cc;
+}
+
+.file-input:focus {
+  outline: none;
+  border-color: #0077cc;
+  box-shadow: 0 0 0 3px rgba(0, 119, 204, 0.1);
+}
+
+.file-info {
+  display: block;
+  margin-top: 8px;
+  color: #28a745;
+  font-weight: 500;
+  font-size: 0.9rem;
+}
+
+.file-help {
+  display: block;
+  margin-top: 5px;
+  font-size: 0.85rem;
+  color: #6c757d;
+}
+
+.document-error {
+  background: #f8d7da;
+  color: #721c24;
+  padding: 12px;
+  border-radius: 8px;
+  margin-top: 15px;
+  border-left: 4px solid #dc3545;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.document-success {
+  background: #d4edda;
+  color: #155724;
+  padding: 12px;
+  border-radius: 8px;
+  margin-top: 15px;
+  border-left: 4px solid #28a745;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.error-icon, .success-icon {
+  font-size: 1.2rem;
 }
 
 /* Status Display */

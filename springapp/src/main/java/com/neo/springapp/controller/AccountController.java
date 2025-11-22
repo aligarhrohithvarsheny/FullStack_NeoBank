@@ -23,20 +23,50 @@ public class AccountController {
 
     // Basic CRUD operations
     @PostMapping("/create")
-    public ResponseEntity<Account> createAccount(@RequestBody Account account) {
+    public ResponseEntity<Map<String, Object>> createAccount(@RequestBody Account account) {
         try {
-            // Validate unique fields
-            if (!accountService.isPanUnique(account.getPan())) {
-                return ResponseEntity.badRequest().build();
+            Map<String, Object> response = new HashMap<>();
+            
+            // Validate unique fields - Aadhar
+            if (account.getAadharNumber() != null && !account.getAadharNumber().isEmpty()) {
+                if (!accountService.isAadharUnique(account.getAadharNumber())) {
+                    response.put("success", false);
+                    response.put("error", "Aadhar number is already registered. Another account exists with this Aadhar number.");
+                    response.put("errorType", "AADHAR_EXISTS");
+                    return ResponseEntity.badRequest().body(response);
+                }
             }
-            if (!accountService.isAadharUnique(account.getAadharNumber())) {
-                return ResponseEntity.badRequest().build();
+            
+            // Validate unique fields - PAN
+            if (account.getPan() != null && !account.getPan().isEmpty()) {
+                if (!accountService.isPanUnique(account.getPan())) {
+                    response.put("success", false);
+                    response.put("error", "PAN number is already registered. Another account exists with this PAN number.");
+                    response.put("errorType", "PAN_EXISTS");
+                    return ResponseEntity.badRequest().body(response);
+                }
+            }
+            
+            // Validate unique fields - Phone
+            if (account.getPhone() != null && !account.getPhone().isEmpty()) {
+                if (!accountService.isPhoneUnique(account.getPhone())) {
+                    response.put("success", false);
+                    response.put("error", "Mobile number is already registered. Another account exists with this mobile number.");
+                    response.put("errorType", "PHONE_EXISTS");
+                    return ResponseEntity.badRequest().body(response);
+                }
             }
             
             Account savedAccount = accountService.saveAccount(account);
-            return ResponseEntity.ok(savedAccount);
+            response.put("success", true);
+            response.put("account", savedAccount);
+            response.put("message", "Account created successfully");
+            return ResponseEntity.ok(response);
         } catch (Exception e) {
-            return ResponseEntity.badRequest().build();
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("error", "Account creation failed: " + e.getMessage());
+            return ResponseEntity.badRequest().body(response);
         }
     }
 
@@ -287,10 +317,151 @@ public class AccountController {
         return ResponseEntity.ok(response);
     }
 
+    @GetMapping("/validate/phone/{phone}")
+    public ResponseEntity<Map<String, Boolean>> validatePhone(@PathVariable String phone) {
+        Map<String, Boolean> response = new HashMap<>();
+        response.put("isUnique", accountService.isPhoneUnique(phone));
+        return ResponseEntity.ok(response);
+    }
+
     @GetMapping("/validate/account-number/{accountNumber}")
     public ResponseEntity<Map<String, Boolean>> validateAccountNumber(@PathVariable String accountNumber) {
         Map<String, Boolean> response = new HashMap<>();
         response.put("isUnique", accountService.isAccountNumberUnique(accountNumber));
         return ResponseEntity.ok(response);
+    }
+
+    // Aadhaar verification endpoints
+    @PostMapping("/aadhar/verify/{accountNumber}")
+    public ResponseEntity<Map<String, Object>> initiateAadharVerification(@PathVariable String accountNumber) {
+        Map<String, Object> response = new HashMap<>();
+        
+        try {
+            Account account = accountService.getAccountByNumber(accountNumber);
+            if (account == null) {
+                response.put("success", false);
+                response.put("message", "Account not found");
+                return ResponseEntity.notFound().build();
+            }
+            
+            if (account.getAadharNumber() == null || account.getAadharNumber().isEmpty()) {
+                response.put("success", false);
+                response.put("message", "Aadhaar number not found in profile");
+                return ResponseEntity.badRequest().body(response);
+            }
+            
+            // Generate verification reference
+            String verificationRef = "AADHAR_" + System.currentTimeMillis() + "_" + accountNumber;
+            
+            // Create verification URL (in production, this would be UIDAI's e-KYC API URL)
+            // For demo purposes, we'll use a callback URL that simulates the verification
+            String baseUrl = "http://localhost:4200"; // Frontend URL
+            String callbackUrl = baseUrl + "/website/profile?aadhar_callback=" + verificationRef;
+            
+            // In production, this would redirect to UIDAI's Aadhaar verification portal
+            // For demo: https://uidai.gov.in/en/ (UIDAI official website)
+            String aadharVerificationUrl = "https://uidai.gov.in/en/";
+            
+            // Update account with verification reference
+            account.setAadharVerificationReference(verificationRef);
+            account.setAadharVerificationStatus("PENDING");
+            accountService.saveAccount(account);
+            
+            response.put("success", true);
+            response.put("verificationReference", verificationRef);
+            response.put("verificationUrl", aadharVerificationUrl);
+            response.put("callbackUrl", callbackUrl);
+            response.put("message", "Aadhaar verification initiated. Please complete verification on Aadhaar website.");
+            
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "Failed to initiate Aadhaar verification: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(response);
+        }
+    }
+
+    @PostMapping("/aadhar/callback")
+    public ResponseEntity<Map<String, Object>> aadharVerificationCallback(
+            @RequestParam String verificationReference,
+            @RequestParam String status,
+            @RequestParam(required = false) String aadharNumber,
+            @RequestParam(required = false) String name,
+            @RequestParam(required = false) String dob) {
+        
+        Map<String, Object> response = new HashMap<>();
+        
+        try {
+            // Find account by verification reference
+            Account account = accountService.getAccountByVerificationReference(verificationReference);
+            if (account == null) {
+                response.put("success", false);
+                response.put("message", "Invalid verification reference");
+                return ResponseEntity.badRequest().body(response);
+            }
+            
+            // Update verification status
+            if ("VERIFIED".equals(status) || "SUCCESS".equals(status)) {
+                account.setAadharVerified(true);
+                account.setAadharVerificationStatus("VERIFIED");
+                account.setAadharVerifiedDate(LocalDateTime.now());
+                
+                // Update account details if provided from Aadhaar
+                if (name != null && !name.isEmpty()) {
+                    account.setName(name);
+                }
+                if (dob != null && !dob.isEmpty()) {
+                    account.setDob(dob);
+                }
+                
+                account.setLastUpdated(LocalDateTime.now());
+                accountService.saveAccount(account);
+                
+                response.put("success", true);
+                response.put("message", "Aadhaar verified successfully");
+                response.put("accountNumber", account.getAccountNumber());
+            } else {
+                account.setAadharVerified(false);
+                account.setAadharVerificationStatus("FAILED");
+                account.setLastUpdated(LocalDateTime.now());
+                accountService.saveAccount(account);
+                
+                response.put("success", false);
+                response.put("message", "Aadhaar verification failed");
+            }
+            
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "Failed to process verification callback: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(response);
+        }
+    }
+
+    @GetMapping("/aadhar/status/{accountNumber}")
+    public ResponseEntity<Map<String, Object>> getAadharVerificationStatus(@PathVariable String accountNumber) {
+        Map<String, Object> response = new HashMap<>();
+        
+        try {
+            Account account = accountService.getAccountByNumber(accountNumber);
+            if (account == null) {
+                response.put("success", false);
+                response.put("message", "Account not found");
+                return ResponseEntity.notFound().build();
+            }
+            
+            response.put("success", true);
+            response.put("aadharVerified", account.isAadharVerified());
+            response.put("verificationStatus", account.getAadharVerificationStatus());
+            response.put("verifiedDate", account.getAadharVerifiedDate());
+            response.put("verificationReference", account.getAadharVerificationReference());
+            response.put("aadharNumber", account.getAadharNumber());
+            
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "Failed to get verification status: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(response);
+        }
     }
 }

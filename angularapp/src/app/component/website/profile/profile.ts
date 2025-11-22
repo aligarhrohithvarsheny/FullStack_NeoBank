@@ -23,6 +23,9 @@ interface UserProfile {
   occupation?: string;
   income?: number;
   ifscCode?: string;
+  aadharVerified?: boolean;
+  aadharVerificationStatus?: string;
+  aadharVerifiedDate?: string;
   account?: {
     balance?: number;
     [key: string]: any;
@@ -57,6 +60,66 @@ export class Profile implements OnInit {
   emailError: string = '';
   updatingEmail: boolean = false;
   currentUserId: number | null = null;
+  
+  // Aadhaar verification
+  aadharVerifying: boolean = false;
+  aadharVerificationStatus: any = null;
+
+  // Profile photo and signature
+  profilePhoto: File | null = null;
+  signature: File | null = null;
+  uploadingPhoto: boolean = false;
+  uploadingSignature: boolean = false;
+  profilePhotoUrl: string | null = null;
+  signatureUrl: string | null = null;
+  signatureStatus: string = '';
+  signatureRejectionReason: string = '';
+  showSignature: boolean = false;
+
+  // Helper method to trigger file input
+  triggerFileInput(inputId: string) {
+    const input = document.getElementById(inputId) as HTMLInputElement;
+    if (input) {
+      input.click();
+    }
+  }
+
+  // Generate and download passbook
+  generatingPassbook: boolean = false;
+
+  generatePassbook() {
+    if (!this.currentUserId) {
+      this.alertService.userError('Error', 'User ID not found. Please refresh the page.');
+      return;
+    }
+
+    this.generatingPassbook = true;
+    
+    // Download passbook PDF
+    this.http.get(`${environment.apiUrl}/users/${this.currentUserId}/passbook`, { 
+      responseType: 'blob' 
+    }).subscribe({
+      next: (blob: Blob) => {
+        // Create download link
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `NeoBank_Passbook_${this.userProfile.accountNumber}_${new Date().toISOString().split('T')[0]}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+        
+        this.alertService.userSuccess('Passbook Generated', 'Your passbook has been downloaded successfully!');
+        this.generatingPassbook = false;
+      },
+      error: (err: any) => {
+        console.error('Error generating passbook:', err);
+        this.alertService.userError('Error', 'Failed to generate passbook. Please try again.');
+        this.generatingPassbook = false;
+      }
+    });
+  }
 
   constructor(
     private router: Router, 
@@ -69,7 +132,35 @@ export class Profile implements OnInit {
   ) {}
 
   ngOnInit() {
-    this.loadUserProfile();
+    // Only load in browser, not during SSR
+    if (isPlatformBrowser(this.platformId)) {
+      this.checkAadharCallback();
+      this.loadUserProfile();
+    }
+  }
+
+  checkAadharCallback() {
+    // Check if returning from Aadhaar verification
+    const urlParams = new URLSearchParams(window.location.search);
+    const callbackRef = urlParams.get('aadhar_callback');
+    
+    if (callbackRef) {
+      // Simulate verification success (in production, this would come from UIDAI callback)
+      // For demo, we'll automatically mark as verified
+      const currentUser = sessionStorage.getItem('currentUser');
+      if (currentUser) {
+        const user = JSON.parse(currentUser);
+        const accountNumber = user.accountNumber;
+        
+        if (accountNumber) {
+          // Call backend to complete verification
+          this.completeAadharVerification(callbackRef, accountNumber);
+        }
+      }
+      
+      // Clean URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
   }
 
   loadUserProfile() {
@@ -104,11 +195,19 @@ export class Profile implements OnInit {
             aadhar: userData.account?.aadharNumber || userData.aadhar || '',
             occupation: userData.account?.occupation || userData.occupation || '',
             income: userData.account?.income || userData.income || 0,
-            ifscCode: 'NEO0008648'
+            ifscCode: 'NEO0008648',
+            aadharVerified: userData.account?.aadharVerified || false,
+            aadharVerificationStatus: userData.account?.aadharVerificationStatus || 'PENDING',
+            aadharVerifiedDate: userData.account?.aadharVerifiedDate || ''
           };
           
           // Load current balance from MySQL
           this.loadCurrentBalanceFromMySQL();
+          // Load Aadhaar verification status
+          this.loadAadharVerificationStatus();
+          // Load profile photo and signature status (not image)
+          this.loadProfilePhoto();
+          this.loadSignature();
         },
         error: (err: any) => {
           console.error('Error loading user profile from MySQL:', err);
@@ -314,5 +413,317 @@ export class Profile implements OnInit {
         this.updatingEmail = false;
       }
     });
+  }
+
+  loadAadharVerificationStatus() {
+    if (!this.userProfile.accountNumber) return;
+    
+    this.http.get(`${environment.apiUrl}/accounts/aadhar/status/${this.userProfile.accountNumber}`).subscribe({
+      next: (status: any) => {
+        if (status.success) {
+          this.userProfile.aadharVerified = status.aadharVerified;
+          this.userProfile.aadharVerificationStatus = status.verificationStatus;
+          this.userProfile.aadharVerifiedDate = status.verifiedDate;
+          this.aadharVerificationStatus = status;
+        }
+      },
+      error: (err: any) => {
+        console.error('Error loading Aadhaar verification status:', err);
+      }
+    });
+  }
+
+  initiateAadharVerification() {
+    if (!this.userProfile.accountNumber) {
+      this.alertService.error('Error', 'Account number not found');
+      return;
+    }
+
+    if (!this.userProfile.aadhar) {
+      this.alertService.error('Error', 'Aadhaar number not found in profile. Please update your profile first.');
+      return;
+    }
+
+    this.aadharVerifying = true;
+    
+    this.http.post(`${environment.apiUrl}/accounts/aadhar/verify/${this.userProfile.accountNumber}`, {}).subscribe({
+      next: (response: any) => {
+        if (response.success) {
+          this.alertService.info(
+            'Aadhaar Verification',
+            'Redirecting to Aadhaar website for verification. Please complete the verification process.'
+          );
+          
+          // Open Aadhaar verification URL in new window
+          // In production, this would be UIDAI's official verification portal
+          const verificationWindow = window.open(
+            response.verificationUrl,
+            'AadhaarVerification',
+            'width=800,height=600,scrollbars=yes,resizable=yes'
+          );
+          
+          // For demo purposes, simulate verification after 3 seconds
+          // In production, this would be handled by UIDAI callback
+          setTimeout(() => {
+            if (verificationWindow) {
+              verificationWindow.close();
+            }
+            // Simulate successful verification callback
+            this.completeAadharVerification(response.verificationReference, this.userProfile.accountNumber);
+          }, 3000);
+          
+          this.aadharVerifying = false;
+        } else {
+          this.alertService.error('Verification Failed', response.message || 'Failed to initiate Aadhaar verification');
+          this.aadharVerifying = false;
+        }
+      },
+      error: (err: any) => {
+        console.error('Error initiating Aadhaar verification:', err);
+        this.alertService.error('Verification Failed', err.error?.message || 'Failed to initiate Aadhaar verification');
+        this.aadharVerifying = false;
+      }
+    });
+  }
+
+  completeAadharVerification(verificationReference: string, accountNumber: string) {
+    // In production, this would be called by UIDAI's callback
+    // For demo, we'll simulate a successful verification
+    const params = new URLSearchParams();
+    params.set('verificationReference', verificationReference);
+    params.set('status', 'VERIFIED');
+    if (this.userProfile.aadhar) params.set('aadharNumber', this.userProfile.aadhar);
+    if (this.userProfile.name) params.set('name', this.userProfile.name);
+    if (this.userProfile.dateOfBirth) params.set('dob', this.userProfile.dateOfBirth);
+
+    this.http.post(`${environment.apiUrl}/accounts/aadhar/callback?${params.toString()}`, {}).subscribe({
+      next: (response: any) => {
+        if (response.success) {
+          this.alertService.success('Aadhaar Verified', 'Your Aadhaar has been verified successfully!');
+          this.loadUserProfile();
+          this.loadAadharVerificationStatus();
+        } else {
+          this.alertService.error('Verification Failed', response.message || 'Aadhaar verification failed');
+        }
+      },
+      error: (err: any) => {
+        console.error('Error completing Aadhaar verification:', err);
+        this.alertService.error('Verification Failed', err.error?.message || 'Failed to complete Aadhaar verification');
+      }
+    });
+  }
+
+  getAadharStatusClass(): string {
+    if (this.userProfile.aadharVerified) {
+      return 'status-verified';
+    } else if (this.userProfile.aadharVerificationStatus === 'PENDING') {
+      return 'status-pending';
+    } else if (this.userProfile.aadharVerificationStatus === 'FAILED') {
+      return 'status-failed';
+    }
+    return 'status-not-verified';
+  }
+
+  getAadharStatusText(): string {
+    if (this.userProfile.aadharVerified) {
+      return 'Verified';
+    } else if (this.userProfile.aadharVerificationStatus === 'PENDING') {
+      return 'Verification Pending';
+    } else if (this.userProfile.aadharVerificationStatus === 'FAILED') {
+      return 'Verification Failed';
+    }
+    return 'Not Verified';
+  }
+
+  // Profile photo upload
+  onProfilePhotoSelected(event: any) {
+    const file = event.target.files[0];
+    if (file) {
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        this.alertService.userError('File Too Large', 'Profile photo must be less than 5MB');
+        return;
+      }
+      
+      // Validate file type
+      const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
+      if (!validTypes.includes(file.type)) {
+        this.alertService.userError('Invalid File Type', 'Profile photo must be JPEG, PNG, or PDF');
+        return;
+      }
+      
+      this.profilePhoto = file;
+      // Preview image
+      const reader = new FileReader();
+      reader.onload = (e: any) => {
+        this.profilePhotoUrl = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+  }
+
+  uploadProfilePhoto() {
+    if (!this.profilePhoto || !this.currentUserId) {
+      this.alertService.userError('Error', 'Please select a profile photo');
+      return;
+    }
+
+    this.uploadingPhoto = true;
+    const formData = new FormData();
+    formData.append('profilePhoto', this.profilePhoto);
+
+    this.http.post(`${environment.apiUrl}/users/${this.currentUserId}/upload-profile-photo`, formData).subscribe({
+      next: (response: any) => {
+        if (response.success) {
+          this.alertService.userSuccess('Success', 'Profile photo uploaded successfully!');
+          this.profilePhoto = null;
+          this.loadProfilePhoto();
+        } else {
+          this.alertService.userError('Upload Failed', response.message || 'Failed to upload profile photo');
+        }
+        this.uploadingPhoto = false;
+      },
+      error: (err: any) => {
+        console.error('Error uploading profile photo:', err);
+        this.alertService.userError('Upload Failed', err.error?.message || 'Failed to upload profile photo');
+        this.uploadingPhoto = false;
+      }
+    });
+  }
+
+  loadProfilePhoto() {
+    if (!this.currentUserId) return;
+    
+    this.http.get(`${environment.apiUrl}/users/${this.currentUserId}/profile-photo`, { responseType: 'blob' }).subscribe({
+      next: (blob: Blob) => {
+        const reader = new FileReader();
+        reader.onload = (e: any) => {
+          this.profilePhotoUrl = e.target.result;
+        };
+        reader.readAsDataURL(blob);
+      },
+      error: (err: any) => {
+        // Profile photo not found or not uploaded yet - this is okay
+        if (err.status !== 404) {
+          console.error('Error loading profile photo:', err);
+        }
+      }
+    });
+  }
+
+  // Signature upload
+  onSignatureSelected(event: any) {
+    const file = event.target.files[0];
+    if (file) {
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        this.alertService.userError('File Too Large', 'Signature must be less than 5MB');
+        return;
+      }
+      
+      // Validate file type
+      const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
+      if (!validTypes.includes(file.type)) {
+        this.alertService.userError('Invalid File Type', 'Signature must be JPEG, PNG, or PDF');
+        return;
+      }
+      
+      this.signature = file;
+      // Preview image
+      const reader = new FileReader();
+      reader.onload = (e: any) => {
+        this.signatureUrl = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+  }
+
+  uploadSignature() {
+    if (!this.signature || !this.currentUserId) {
+      this.alertService.userError('Error', 'Please select a signature file');
+      return;
+    }
+
+    this.uploadingSignature = true;
+    const formData = new FormData();
+    formData.append('signature', this.signature);
+
+    this.http.post(`${environment.apiUrl}/users/${this.currentUserId}/upload-signature`, formData).subscribe({
+      next: (response: any) => {
+        if (response.success) {
+          this.alertService.userSuccess('Success', 'Signature uploaded successfully! Waiting for admin approval.');
+          this.signature = null;
+          this.loadSignature();
+          this.loadUserProfile(); // Reload to get updated signature status
+        } else {
+          this.alertService.userError('Upload Failed', response.message || 'Failed to upload signature');
+        }
+        this.uploadingSignature = false;
+      },
+      error: (err: any) => {
+        console.error('Error uploading signature:', err);
+        this.alertService.userError('Upload Failed', err.error?.message || 'Failed to upload signature');
+        this.uploadingSignature = false;
+      }
+    });
+  }
+
+  loadSignature() {
+    if (!this.currentUserId) return;
+    
+    // Load signature status only (not the image)
+    this.http.get(`${environment.apiUrl}/users/${this.currentUserId}`).subscribe({
+      next: (userData: any) => {
+        this.signatureStatus = userData.signatureStatus || '';
+        this.signatureRejectionReason = userData.signatureRejectionReason || '';
+        // Don't load image automatically - user must click "Show Signature"
+      },
+      error: (err: any) => {
+        console.error('Error loading signature status:', err);
+      }
+    });
+  }
+
+  loadSignatureImage() {
+    if (!this.currentUserId) return;
+    
+    this.http.get(`${environment.apiUrl}/users/${this.currentUserId}/signature`, { responseType: 'blob' }).subscribe({
+      next: (blob: Blob) => {
+        const reader = new FileReader();
+        reader.onload = (e: any) => {
+          this.signatureUrl = e.target.result;
+        };
+        reader.readAsDataURL(blob);
+      },
+      error: (err: any) => {
+        // Signature not found or not uploaded yet - this is okay
+        if (err.status !== 404) {
+          console.error('Error loading signature:', err);
+        }
+        this.signatureUrl = null;
+      }
+    });
+  }
+
+  getSignatureStatusClass(): string {
+    if (this.signatureStatus === 'APPROVED') {
+      return 'status-approved';
+    } else if (this.signatureStatus === 'PENDING') {
+      return 'status-pending';
+    } else if (this.signatureStatus === 'REJECTED') {
+      return 'status-rejected';
+    }
+    return 'status-not-uploaded';
+  }
+
+  getSignatureStatusText(): string {
+    if (this.signatureStatus === 'APPROVED') {
+      return 'Approved';
+    } else if (this.signatureStatus === 'PENDING') {
+      return 'Pending Approval';
+    } else if (this.signatureStatus === 'REJECTED') {
+      return 'Rejected';
+    }
+    return 'Not Uploaded';
   }
 }

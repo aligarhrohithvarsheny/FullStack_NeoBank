@@ -30,7 +30,10 @@ export class Transactions implements OnInit {
   transactions: Transaction[] = [];
 
   ngOnInit() {
-    this.loadAllTransactions();
+    // Only load in browser, not during SSR
+    if (isPlatformBrowser(this.platformId)) {
+      this.loadAllTransactions();
+    }
   }
 
   loadAllTransactions() {

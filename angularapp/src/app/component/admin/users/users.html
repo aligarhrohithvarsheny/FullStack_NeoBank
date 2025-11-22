@@ -56,6 +56,7 @@
         <th>Income</th>
         <th>Account Status</th>
         <th>KYC Status</th>
+        <th>Signature Status</th>
         <th>Account No.</th>
         <th>Action</th>
       </tr>
@@ -74,6 +75,18 @@
           <span class="kyc-badge">{{ getKycStatus(user) }}</span>
           <div *ngIf="getKycStatus(user) !== 'Not Submitted'" class="kyc-info">
             <small>{{ user.assignedAccountNumber ? 'Account: ' + user.assignedAccountNumber : 'Email: ' + user.email }}</small>
+          </div>
+        </td>
+        <td [ngClass]="getSignatureStatusClass(user)">
+          <span class="signature-badge">{{ getSignatureStatus(user) }}</span>
+          <div class="signature-actions-cell" *ngIf="user.signatureStatus">
+            <button 
+              class="view-signature-btn-small" 
+              (click)="viewUserSignature(user)"
+              title="View Signature"
+            >
+              👁️ View
+            </button>
           </div>
         </td>
         <td class="account-number">{{ user.assignedAccountNumber || '-' }}</td>
@@ -100,6 +113,78 @@
     </button>
   </div>
 
+  <!-- Signature Management Section -->
+  <div class="signature-section">
+    <h3>📝 Signature Approvals</h3>
+    <div class="signature-stats">
+      <span class="signature-count">Pending Signatures: {{ pendingSignatures.length }}</span>
+      <button class="refresh-btn" (click)="loadPendingSignatures()">🔄 Refresh</button>
+    </div>
+    
+    <div class="signature-list" *ngIf="pendingSignatures.length > 0">
+      <div class="signature-item" *ngFor="let user of pendingSignatures">
+        <div class="signature-info">
+          <strong>{{ user.username || user.account?.name || 'User' }}</strong>
+          <span class="user-email">{{ user.email }}</span>
+          <span class="account-number">Account: {{ user.accountNumber || 'N/A' }}</span>
+        </div>
+        <button class="view-signature-btn" (click)="viewSignature(user)">View Signature</button>
+      </div>
+    </div>
+    
+    <div class="no-signatures" *ngIf="pendingSignatures.length === 0">
+      <p>No pending signatures to review.</p>
+    </div>
+  </div>
+
+  <!-- Signature Modal -->
+  <div class="modal-overlay" *ngIf="selectedSignature" (click)="closeSignatureModal()">
+    <div class="modal-content" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>Review Signature</h3>
+        <button class="close-modal-btn" (click)="closeSignatureModal()">×</button>
+      </div>
+      
+      <div class="modal-body">
+        <div class="user-info-section">
+          <h4>User Information</h4>
+          <div class="user-details">
+            <p><strong>Name:</strong> {{ selectedSignature.username || selectedSignature.account?.name }}</p>
+            <p><strong>Email:</strong> {{ selectedSignature.email }}</p>
+            <p><strong>Account Number:</strong> {{ selectedSignature.accountNumber || 'N/A' }}</p>
+          </div>
+        </div>
+        
+        <div class="photo-section" *ngIf="profilePhotoUrl">
+          <h4>Profile Photo</h4>
+          <img [src]="profilePhotoUrl" alt="Profile Photo" class="preview-image">
+        </div>
+        
+        <div class="signature-section-modal">
+          <h4>Digital Signature</h4>
+          <img *ngIf="signatureImageUrl" [src]="signatureImageUrl" alt="Signature" class="signature-preview">
+          <p *ngIf="!signatureImageUrl">Loading signature...</p>
+        </div>
+        
+        <div class="rejection-section">
+          <label for="rejectionReason">Rejection Reason (if rejecting):</label>
+          <textarea 
+            id="rejectionReason" 
+            [(ngModel)]="rejectionReason" 
+            placeholder="Enter reason for rejection..."
+            rows="3"
+          ></textarea>
+        </div>
+      </div>
+      
+      <div class="modal-footer">
+        <button class="approve-signature-btn" (click)="approveSignature()">✓ Approve</button>
+        <button class="reject-signature-btn" (click)="rejectSignature()">✗ Reject</button>
+        <button class="cancel-btn" (click)="closeSignatureModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Instructions -->
   <div class="instructions">
     <h4>📋 Admin Instructions:</h4>
@@ -109,6 +194,7 @@
       <li>Users can submit KYC after getting an account number</li>
       <li>KYC approval automatically updates user profile information</li>
       <li><strong>Card Creation:</strong> Cards are automatically created when users are approved</li>
+      <li><strong>Signature Approval:</strong> Review and approve/reject user signatures. Rejection requires a reason.</li>
     </ul>
   </div>
 </div>

@@ -30,14 +30,34 @@
     <form (ngSubmit)="transferFunds()">
       <div class="form-row">
         <div class="form-group">
-          <label for="recipientAccountNumber">Recipient Account Number</label>
-          <input 
-            id="recipientAccountNumber"
-            type="text" 
-            [(ngModel)]="recipientAccountNumber" 
-            name="recipientAccountNumber" 
-            placeholder="Enter recipient's account number"
-            required>
+          <label for="recipientAccountNumber">Recipient Account Number <span class="required">*</span></label>
+          <div class="account-verify-container">
+            <input 
+              id="recipientAccountNumber"
+              type="text" 
+              [(ngModel)]="recipientAccountNumber" 
+              (ngModelChange)="onAccountNumberChange()"
+              (blur)="verifyAccountNumber()"
+              name="recipientAccountNumber" 
+              placeholder="Enter recipient's account number"
+              [class.verified]="isAccountVerified"
+              [class.error]="accountVerificationError"
+              required>
+            <button 
+              type="button" 
+              class="verify-btn" 
+              (click)="verifyAccountNumber()"
+              [disabled]="!recipientAccountNumber || isVerifyingAccount || recipientAccountNumber === userProfile.accountNumber">
+              <span *ngIf="!isVerifyingAccount">✓ Verify</span>
+              <span *ngIf="isVerifyingAccount">⏳ Verifying...</span>
+            </button>
+          </div>
+          <div *ngIf="isAccountVerified" class="verification-success">
+            ✓ Account verified: {{ recipientName }}
+          </div>
+          <div *ngIf="accountVerificationError" class="verification-error">
+            ❌ {{ accountVerificationError }}
+          </div>
         </div>
 
         <div class="form-group">
@@ -48,6 +68,8 @@
             [(ngModel)]="recipientName" 
             name="recipientName" 
             placeholder="Enter recipient's full name"
+            [readonly]="isAccountVerified"
+            [class.readonly]="isAccountVerified"
             required>
         </div>
       </div>
@@ -61,6 +83,8 @@
             [(ngModel)]="phone" 
             name="phone" 
             placeholder="Enter recipient's phone number"
+            [readonly]="isAccountVerified"
+            [class.readonly]="isAccountVerified"
             required>
         </div>
 
@@ -72,6 +96,8 @@
             [(ngModel)]="ifsc" 
             name="ifsc" 
             placeholder="Enter IFSC code"
+            [readonly]="isAccountVerified"
+            [class.readonly]="isAccountVerified"
             required>
         </div>
       </div>

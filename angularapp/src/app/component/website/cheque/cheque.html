@@ -1,0 +1,284 @@
+<div class="cheque-container">
+  <!-- Back Button -->
+  <div class="back-button">
+    <button type="button" (click)="goBack()">⬅ Back to Dashboard</button>
+  </div>
+
+  <h2>Cheque Management</h2>
+
+  <!-- Statistics Section -->
+  <div class="statistics-section">
+    <div class="stat-card">
+      <h3>Total Cheques</h3>
+      <p class="stat-value">{{ statistics.totalCheques || 0 }}</p>
+    </div>
+    <div class="stat-card active">
+      <h3>Active Cheques</h3>
+      <p class="stat-value">{{ statistics.activeCheques || 0 }}</p>
+    </div>
+    <div class="stat-card cancelled">
+      <h3>Cancelled Cheques</h3>
+      <p class="stat-value">{{ statistics.cancelledCheques || 0 }}</p>
+    </div>
+  </div>
+
+  <!-- Create Cheque Leaves Section -->
+  <div class="create-cheque-section">
+    <h3>Create Cheque Leaves</h3>
+    <div class="create-form">
+      <div class="form-group">
+        <label for="numberOfLeaves">Number of Leaves</label>
+        <input 
+          id="numberOfLeaves"
+          type="number" 
+          [(ngModel)]="numberOfLeaves" 
+          name="numberOfLeaves"
+          min="1"
+          max="100"
+          placeholder="Enter number of cheque leaves"
+          [disabled]="creatingCheques">
+        <small>Maximum 100 leaves at a time</small>
+      </div>
+      <div class="form-group">
+        <label for="chequeAmount">Amount per Cheque (₹)</label>
+        <input 
+          id="chequeAmount"
+          type="number" 
+          [(ngModel)]="chequeAmount" 
+          name="chequeAmount"
+          min="0"
+          step="0.01"
+          placeholder="Enter amount (optional)"
+          [disabled]="creatingCheques">
+        <small>Amount to be withdrawn when cheque is drawn (optional)</small>
+      </div>
+      <button 
+        type="button" 
+        (click)="createChequeLeaves()"
+        [disabled]="creatingCheques || numberOfLeaves <= 0 || numberOfLeaves > 100"
+        class="create-btn">
+        <span *ngIf="!creatingCheques">Create Cheque Leaves</span>
+        <span *ngIf="creatingCheques">Creating...</span>
+      </button>
+    </div>
+    <div *ngIf="createError" class="error-message">
+      <p>{{ createError }}</p>
+    </div>
+  </div>
+
+  <!-- Filter Section -->
+  <div class="filter-section">
+    <h3>My Cheques</h3>
+    <div class="filter-buttons">
+      <button 
+        type="button" 
+        (click)="filterCheques('ALL')"
+        [class.active]="filterStatus === 'ALL'"
+        class="filter-btn">
+        All ({{ cheques.length }})
+      </button>
+      <button 
+        type="button" 
+        (click)="filterCheques('ACTIVE')"
+        [class.active]="filterStatus === 'ACTIVE'"
+        class="filter-btn">
+        Active ({{ activeCheques.length }})
+      </button>
+      <button 
+        type="button" 
+        (click)="filterCheques('CANCELLED')"
+        [class.active]="filterStatus === 'CANCELLED'"
+        class="filter-btn">
+        Cancelled ({{ cancelledCheques.length }})
+      </button>
+    </div>
+  </div>
+
+  <!-- Loading State -->
+  <div *ngIf="loading" class="loading-overlay">
+    <div class="loading-spinner"></div>
+    <p>Loading cheques...</p>
+  </div>
+
+  <!-- Error State -->
+  <div *ngIf="error && !loading" class="error-message">
+    <p>{{ error }}</p>
+  </div>
+
+  <!-- Cheques List -->
+  <div *ngIf="!loading && !error" class="cheques-list">
+    <div *ngIf="getFilteredCheques().length === 0" class="no-cheques">
+      <p>No cheques found. Create cheque leaves to get started.</p>
+    </div>
+
+    <div *ngFor="let cheque of getFilteredCheques()" class="cheque-card">
+      <div class="cheque-header">
+        <div class="cheque-info">
+          <h4>Cheque #{{ cheque.chequeNumber }}</h4>
+          <span class="status-badge" [ngClass]="getStatusClass(cheque.status)">
+            {{ cheque.status }}
+          </span>
+          <span *ngIf="cheque.requestStatus && cheque.requestStatus !== 'NONE'" 
+                class="status-badge request-badge" 
+                [ngClass]="getRequestStatusClass(cheque.requestStatus)">
+            {{ cheque.requestStatus }}
+          </span>
+        </div>
+        <div class="cheque-actions">
+          <button 
+            type="button" 
+            (click)="viewCheque(cheque)"
+            class="action-btn view-btn">
+            View
+          </button>
+          <button 
+            type="button" 
+            (click)="downloadCheque(cheque)"
+            class="action-btn download-btn">
+            Download
+          </button>
+          <button 
+            *ngIf="canRequestCheque(cheque)"
+            type="button" 
+            (click)="requestChequeDraw(cheque)"
+            [disabled]="requesting"
+            class="action-btn request-btn">
+            <span *ngIf="!requesting">Request Draw</span>
+            <span *ngIf="requesting">Requesting...</span>
+          </button>
+          <button 
+            *ngIf="cheque.status === 'ACTIVE' && cheque.requestStatus !== 'PENDING'"
+            type="button" 
+            (click)="openCancelModal(cheque)"
+            class="action-btn cancel-btn">
+            Cancel
+          </button>
+        </div>
+      </div>
+      <div class="cheque-details">
+        <div class="detail-item">
+          <span class="detail-label">Account Number:</span>
+          <span class="detail-value">{{ cheque.accountNumber }}</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Account Holder:</span>
+          <span class="detail-value">{{ cheque.accountHolderName }}</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Account Type:</span>
+          <span class="detail-value">{{ cheque.accountType || 'N/A' }}</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">IFSC Code:</span>
+          <span class="detail-value">{{ cheque.ifscCode || 'NEOB0001234' }}</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Amount:</span>
+          <span class="detail-value">₹{{ cheque.amount || 0 | number:'1.2-2' }}</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Created Date:</span>
+          <span class="detail-value">{{ formatDate(cheque.createdAt) }}</span>
+        </div>
+        <div *ngIf="cheque.status === 'DRAWN'" class="detail-item">
+          <span class="detail-label">Drawn Date:</span>
+          <span class="detail-value">{{ formatDate(cheque.drawnDate) }}</span>
+        </div>
+        <div *ngIf="cheque.status === 'BOUNCED'" class="detail-item">
+          <span class="detail-label">Bounced Date:</span>
+          <span class="detail-value">{{ formatDate(cheque.bouncedDate) }}</span>
+        </div>
+        <div *ngIf="cheque.status === 'CANCELLED'" class="detail-item">
+          <span class="detail-label">Cancelled Date:</span>
+          <span class="detail-value">{{ formatDate(cheque.cancelledDate) }}</span>
+        </div>
+        <div *ngIf="cheque.cancellationReason" class="detail-item">
+          <span class="detail-label">Cancellation Reason:</span>
+          <span class="detail-value">{{ cheque.cancellationReason }}</span>
+        </div>
+        <div *ngIf="cheque.bounceReason" class="detail-item">
+          <span class="detail-label">Bounce Reason:</span>
+          <span class="detail-value">{{ cheque.bounceReason }}</span>
+        </div>
+        <div *ngIf="cheque.requestStatus === 'PENDING'" class="detail-item">
+          <span class="detail-label">Request Date:</span>
+          <span class="detail-value">{{ formatDate(cheque.requestDate) }}</span>
+        </div>
+        <div *ngIf="cheque.requestStatus === 'APPROVED'" class="detail-item">
+          <span class="detail-label">Approved Date:</span>
+          <span class="detail-value">{{ formatDate(cheque.approvedDate) }}</span>
+        </div>
+        <div *ngIf="cheque.requestStatus === 'REJECTED'" class="detail-item">
+          <span class="detail-label">Rejected Date:</span>
+          <span class="detail-value">{{ formatDate(cheque.rejectedDate) }}</span>
+        </div>
+        <div *ngIf="cheque.rejectionReason" class="detail-item">
+          <span class="detail-label">Rejection Reason:</span>
+          <span class="detail-value">{{ cheque.rejectionReason }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pagination -->
+  <div *ngIf="!loading && !error && totalPages > 1" class="pagination">
+    <button 
+      type="button" 
+      (click)="goToPage(currentPage - 1)"
+      [disabled]="currentPage === 0"
+      class="page-btn">
+      Previous
+    </button>
+    <span class="page-info">
+      Page {{ currentPage + 1 }} of {{ totalPages }} ({{ totalElements }} cheques)
+    </span>
+    <button 
+      type="button" 
+      (click)="goToPage(currentPage + 1)"
+      [disabled]="currentPage >= totalPages - 1"
+      class="page-btn">
+      Next
+    </button>
+  </div>
+</div>
+
+<!-- Cancel Cheque Modal -->
+<div *ngIf="selectedCheque" class="modal-overlay" (click)="closeCancelModal()">
+  <div class="modal-content" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3>Cancel Cheque</h3>
+      <button type="button" (click)="closeCancelModal()" class="close-btn">×</button>
+    </div>
+    <div class="modal-body">
+      <p>Are you sure you want to cancel cheque #{{ selectedCheque.chequeNumber }}?</p>
+      <div class="form-group">
+        <label for="cancelReason">Cancellation Reason <span class="required">*</span></label>
+        <textarea 
+          id="cancelReason"
+          [(ngModel)]="cancelReason"
+          name="cancelReason"
+          placeholder="Enter reason for cancellation"
+          rows="4"
+          required></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button 
+        type="button" 
+        (click)="closeCancelModal()"
+        class="btn-cancel"
+        [disabled]="cancelling">
+        Cancel
+      </button>
+      <button 
+        type="button" 
+        (click)="cancelCheque()"
+        class="btn-confirm"
+        [disabled]="cancelling || !cancelReason || cancelReason.trim().length === 0">
+        <span *ngIf="!cancelling">Confirm Cancellation</span>
+        <span *ngIf="cancelling">Cancelling...</span>
+      </button>
+    </div>
+  </div>
+</div>
+

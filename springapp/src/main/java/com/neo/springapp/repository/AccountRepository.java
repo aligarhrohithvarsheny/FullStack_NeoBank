@@ -18,6 +18,8 @@ public interface AccountRepository extends JpaRepository<Account, Long> {
     Account findByPan(String pan);
     Account findByAccountNumber(String accountNumber);
     Account findByAadharNumber(String aadharNumber);
+    List<Account> findByPhone(String phone);
+    Account findByAadharVerificationReference(String verificationReference);
     
     // Status-based queries
     List<Account> findByStatus(String status);

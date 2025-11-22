@@ -294,6 +294,32 @@ app-admin-dashboard .dashboard-container {
   align-items: center !important;
 }
 
+.user-details-modal .header-actions {
+  display: flex !important;
+  gap: 10px !important;
+  align-items: center !important;
+}
+
+.user-details-modal .header-actions .pdf-download-btn {
+  padding: 10px 15px !important;
+  background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%) !important;
+  color: white !important;
+  border: none !important;
+  border-radius: 8px !important;
+  font-size: 0.9rem !important;
+  font-weight: 600 !important;
+  cursor: pointer !important;
+  transition: all 0.3s ease !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+}
+
+.user-details-modal .header-actions .pdf-download-btn:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 8px 25px rgba(220, 38, 38, 0.3) !important;
+}
+
 .user-details-modal .modal-header h3 {
   color: #1e293b !important;
   font-size: 1.5rem !important;
@@ -1627,4 +1653,210 @@ app-admin-dashboard .dashboard-container {
 
 .dashboard-container .dash-card:hover {
   z-index: 3;
+}
+
+/* Account Tracking Section Styles */
+.tracking-section {
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%) !important;
+  padding: 30px !important;
+  border-radius: 20px !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1) !important;
+  border: 1px solid #e2e8f0 !important;
+  margin-top: 30px !important;
+}
+
+.tracking-section .section-header {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  margin-bottom: 25px !important;
+  padding-bottom: 15px !important;
+  border-bottom: 2px solid #e5e7eb !important;
+}
+
+.tracking-section .section-header h3 {
+  color: #1e293b !important;
+  font-size: 1.5rem !important;
+  font-weight: 700 !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  margin: 0 !important;
+}
+
+.tracking-section .close-btn {
+  background: #f3f4f6 !important;
+  border: none !important;
+  padding: 8px 12px !important;
+  border-radius: 8px !important;
+  cursor: pointer !important;
+  color: #6b7280 !important;
+  font-size: 1.2rem !important;
+  transition: all 0.3s ease !important;
+}
+
+.tracking-section .close-btn:hover {
+  background: #e5e7eb !important;
+  color: #374151 !important;
+}
+
+.tracking-filters {
+  display: flex !important;
+  gap: 15px !important;
+  margin-bottom: 25px !important;
+  flex-wrap: wrap !important;
+}
+
+.tracking-filters .filter-group {
+  flex: 1 !important;
+  min-width: 200px !important;
+}
+
+.tracking-filters .status-select {
+  width: 100% !important;
+  padding: 12px 16px !important;
+  border: 2px solid #e2e8f0 !important;
+  border-radius: 8px !important;
+  font-size: 14px !important;
+  background: white !important;
+  color: #374151 !important;
+  cursor: pointer !important;
+  transition: all 0.3s ease !important;
+}
+
+.tracking-filters .status-select:focus {
+  outline: none !important;
+  border-color: #3b82f6 !important;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+}
+
+.tracking-table-container {
+  overflow-x: auto !important;
+  margin-bottom: 25px !important;
+}
+
+.tracking-table {
+  width: 100% !important;
+  border-collapse: collapse !important;
+  background: #ffffff !important;
+  border-radius: 12px !important;
+  overflow: hidden !important;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1) !important;
+}
+
+.tracking-table thead {
+  background: #f8fafc !important;
+}
+
+.tracking-table th {
+  padding: 15px !important;
+  text-align: left !important;
+  font-weight: 600 !important;
+  color: #374151 !important;
+  border-bottom: 2px solid #e5e7eb !important;
+  font-size: 14px !important;
+}
+
+.tracking-table td {
+  padding: 15px !important;
+  border-bottom: 1px solid #e5e7eb !important;
+  color: #374151 !important;
+  font-size: 14px !important;
+}
+
+.tracking-table tbody tr:hover {
+  background: #f8fafc !important;
+}
+
+.tracking-table .no-data {
+  text-align: center !important;
+  padding: 40px !important;
+  color: #6b7280 !important;
+}
+
+.tracking-table .no-data i {
+  font-size: 2rem !important;
+  margin-bottom: 10px !important;
+  color: #9ca3af !important;
+}
+
+.status-badge {
+  display: inline-block !important;
+  padding: 6px 12px !important;
+  border-radius: 20px !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  text-transform: uppercase !important;
+}
+
+.status-badge.pending {
+  background: #fef3c7 !important;
+  color: #92400e !important;
+}
+
+.status-badge.seen {
+  background: #dbeafe !important;
+  color: #1e40af !important;
+}
+
+.status-badge.approved {
+  background: #dcfce7 !important;
+  color: #166534 !important;
+}
+
+.status-badge.sent {
+  background: #e0e7ff !important;
+  color: #3730a3 !important;
+}
+
+.status-update-select {
+  padding: 8px 12px !important;
+  border: 2px solid #e2e8f0 !important;
+  border-radius: 6px !important;
+  font-size: 13px !important;
+  background: white !important;
+  color: #374151 !important;
+  cursor: pointer !important;
+  transition: all 0.3s ease !important;
+  min-width: 140px !important;
+}
+
+.status-update-select:focus {
+  outline: none !important;
+  border-color: #3b82f6 !important;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+}
+
+.tracking-stats {
+  display: flex !important;
+  gap: 20px !important;
+  padding: 20px !important;
+  background: #f8fafc !important;
+  border-radius: 12px !important;
+  flex-wrap: wrap !important;
+}
+
+.tracking-stats .stat-item {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  padding: 15px 20px !important;
+  background: white !important;
+  border-radius: 8px !important;
+  border: 1px solid #e5e7eb !important;
+  min-width: 120px !important;
+}
+
+.tracking-stats .stat-label {
+  font-size: 12px !important;
+  color: #6b7280 !important;
+  font-weight: 600 !important;
+  text-transform: uppercase !important;
+  margin-bottom: 5px !important;
+}
+
+.tracking-stats .stat-value {
+  font-size: 20px !important;
+  color: #1e293b !important;
+  font-weight: 700 !important;
 }

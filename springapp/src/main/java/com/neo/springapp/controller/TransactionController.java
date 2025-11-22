@@ -1,12 +1,22 @@
 package com.neo.springapp.controller;
 
 import com.neo.springapp.model.Transaction;
+import com.neo.springapp.model.User;
 import com.neo.springapp.service.TransactionService;
+import com.neo.springapp.service.UserService;
+import com.neo.springapp.service.AccountService;
+import com.neo.springapp.service.PdfService;
+import com.neo.springapp.service.EmailService;
 import org.springframework.data.domain.Page;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.IOException;
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/transactions")
@@ -14,9 +24,18 @@ import java.util.List;
 public class TransactionController {
 
     private final TransactionService transactionService;
+    private final UserService userService;
+    private final AccountService accountService;
+    private final PdfService pdfService;
+    private final EmailService emailService;
 
-    public TransactionController(TransactionService transactionService) {
+    public TransactionController(TransactionService transactionService, UserService userService, 
+                                AccountService accountService, PdfService pdfService, EmailService emailService) {
         this.transactionService = transactionService;
+        this.userService = userService;
+        this.accountService = accountService;
+        this.pdfService = pdfService;
+        this.emailService = emailService;
     }
 
     // Add new transaction
@@ -124,5 +143,132 @@ public class TransactionController {
         
         return transactionService.searchTransactions(accountNumber, merchant, type, status, 
                                                     start, end, page, size, sortBy, sortDir);
+    }
+
+    // Send bank statement via email
+    @PostMapping("/send-statement/{accountNumber}")
+    public ResponseEntity<Map<String, Object>> sendBankStatementByEmail(@PathVariable String accountNumber) {
+        Map<String, Object> response = new HashMap<>();
+        
+        try {
+            // Get user by account number
+            Optional<User> userOptional = userService.getUserByAccountNumber(accountNumber);
+            if (!userOptional.isPresent()) {
+                response.put("success", false);
+                response.put("message", "User not found for account number: " + accountNumber);
+                return ResponseEntity.badRequest().body(response);
+            }
+            
+            User user = userOptional.get();
+            String userEmail = user.getEmail();
+            String userName = user.getName();
+            
+            if (userEmail == null || userEmail.trim().isEmpty()) {
+                response.put("success", false);
+                response.put("message", "Email address not found for this account. Please update your email address.");
+                return ResponseEntity.badRequest().body(response);
+            }
+            
+            // Get current balance
+            Double currentBalance = accountService.getBalanceByAccountNumber(accountNumber);
+            if (currentBalance == null) {
+                currentBalance = 0.0;
+            }
+            
+            // Get all transactions for the account (get a large number to include all)
+            Page<Transaction> transactionPage = transactionService.getTransactionsByAccountNumber(accountNumber, 0, 1000);
+            List<Transaction> transactions = transactionPage.getContent();
+            
+            // Generate PDF
+            byte[] pdfBytes;
+            try {
+                pdfBytes = pdfService.generateBankStatement(accountNumber, userName, userEmail, currentBalance, transactions);
+            } catch (IOException e) {
+                response.put("success", false);
+                response.put("message", "Failed to generate PDF: " + e.getMessage());
+                return ResponseEntity.internalServerError().body(response);
+            }
+            
+            // Send email with PDF attachment
+            boolean emailSent = false;
+            String emailError = null;
+            
+            try {
+                emailSent = emailService.sendBankStatementEmail(userEmail, accountNumber, userName, pdfBytes);
+            } catch (Exception emailException) {
+                emailError = emailException.getMessage();
+                System.err.println("Email sending exception caught in controller: " + emailError);
+                if (emailException.getCause() != null) {
+                    emailError = emailException.getCause().getMessage();
+                    System.err.println("Email error cause: " + emailError);
+                }
+            }
+            
+            if (emailSent) {
+                response.put("success", true);
+                response.put("message", "Bank statement has been sent successfully to " + userEmail);
+                response.put("email", userEmail);
+                response.put("note", "Please check your inbox and spam folder. If you don't receive the email within a few minutes, check the server logs for email configuration issues.");
+                return ResponseEntity.ok(response);
+            } else {
+                response.put("success", false);
+                response.put("message", "Failed to send email. " + (emailError != null ? "Error: " + emailError : "Please check email configuration in application.properties."));
+                response.put("email", userEmail);
+                response.put("error", emailError);
+                response.put("note", "Please check: 1) Gmail App Password is correct, 2) Email configuration in application.properties, 3) Server console logs for detailed error messages.");
+                return ResponseEntity.internalServerError().body(response);
+            }
+            
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "Error sending bank statement: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.internalServerError().body(response);
+        }
+    }
+
+    // Test email configuration endpoint
+    @PostMapping("/test-email/{accountNumber}")
+    public ResponseEntity<Map<String, Object>> testEmailConfiguration(@PathVariable String accountNumber) {
+        Map<String, Object> response = new HashMap<>();
+        
+        try {
+            // Get user by account number
+            Optional<User> userOptional = userService.getUserByAccountNumber(accountNumber);
+            if (!userOptional.isPresent()) {
+                response.put("success", false);
+                response.put("message", "User not found for account number: " + accountNumber);
+                return ResponseEntity.badRequest().body(response);
+            }
+            
+            User user = userOptional.get();
+            String userEmail = user.getEmail();
+            
+            if (userEmail == null || userEmail.trim().isEmpty()) {
+                response.put("success", false);
+                response.put("message", "Email address not found for this account.");
+                return ResponseEntity.badRequest().body(response);
+            }
+            
+            // Try to send a simple test email
+            // We'll use the email service's OTP method as a test
+            String testOtp = "TEST123";
+            boolean emailSent = emailService.sendOtpEmail(userEmail, testOtp);
+            
+            response.put("success", emailSent);
+            response.put("message", emailSent ? 
+                "Test email sent successfully! Check your inbox at " + userEmail : 
+                "Failed to send test email. Check server logs for details.");
+            response.put("email", userEmail);
+            response.put("note", "This is a test email. Check your inbox and spam folder.");
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "Error testing email: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.internalServerError().body(response);
+        }
     }
 }

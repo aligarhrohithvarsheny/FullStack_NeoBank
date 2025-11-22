@@ -5,6 +5,7 @@ import { CommonModule } from '@angular/common';
 import { isPlatformBrowser } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../../environment/environment';
+import { AlertService } from '../../../service/alert.service';
 
 interface TransactionRecord {
   id: string;
@@ -40,14 +41,21 @@ export class Transaction implements OnInit {
   fromDate: string = '';
   toDate: string = '';
 
+  // Email statement
+  sendingEmail: boolean = false;
+
   constructor(
     private router: Router, 
     @Inject(PLATFORM_ID) private platformId: Object,
-    private http: HttpClient
+    private http: HttpClient,
+    private alertService: AlertService
   ) {}
 
   ngOnInit() {
-    this.loadUserAccount();
+    // Only load in browser, not during SSR
+    if (isPlatformBrowser(this.platformId)) {
+      this.loadUserAccount();
+    }
   }
 
   // Navigate back to dashboard
@@ -125,17 +133,17 @@ export class Transaction implements OnInit {
 
   addTransaction() {
     if (!this.merchant || this.amount <= 0) {
-      alert('Please enter valid merchant name and amount');
+      this.alertService.error('Validation Error', 'Please enter valid merchant name and amount');
       return;
     }
 
     if (this.type === 'Debit' && this.amount > this.currentBalance) {
-      alert('Insufficient balance');
+      this.alertService.error('Insufficient Balance', 'Your account balance is insufficient for this transaction.');
       return;
     }
 
     if (!this.userAccountNumber) {
-      alert('No account number found');
+      this.alertService.error('Account Error', 'No account number found. Please refresh the page.');
       return;
     }
 
@@ -166,7 +174,7 @@ export class Transaction implements OnInit {
           description: transactionData.description
         });
         
-        alert('Transaction completed successfully!');
+        this.alertService.success('Transaction Successful', `Transaction of ₹${this.amount.toFixed(2)} completed successfully!`);
         this.merchant = '';
         this.amount = 0;
         this.type = 'Debit';
@@ -174,7 +182,7 @@ export class Transaction implements OnInit {
       },
       error: (err: any) => {
         console.error('Error creating transaction:', err);
-        alert('Failed to process transaction. Please try again.');
+        this.alertService.error('Transaction Failed', 'Failed to process transaction. Please try again.');
         this.loading = false;
       }
     });
@@ -204,19 +212,19 @@ export class Transaction implements OnInit {
     try {
       // Check if we have transactions
       if (!this.transactions || this.transactions.length === 0) {
-        alert('No transactions available to download');
+        this.alertService.warning('No Data', 'No transactions available to download');
         return;
       }
 
       // Check if userAccountNumber is available
       if (!this.userAccountNumber) {
-        alert('Account number not found. Please refresh the page and try again.');
+        this.alertService.error('Account Error', 'Account number not found. Please refresh the page and try again.');
         return;
       }
       
       const csvContent = this.generateCSVContent();
       if (!csvContent || csvContent.trim() === '') {
-        alert('No transactions available to download');
+        this.alertService.warning('No Data', 'No transactions available to download');
         return;
       }
       
@@ -225,7 +233,7 @@ export class Transaction implements OnInit {
       
       // Check if URL.createObjectURL is supported
       if (!window.URL || !window.URL.createObjectURL) {
-        alert('Your browser does not support file downloads. Please try a different browser.');
+        this.alertService.error('Browser Error', 'Your browser does not support file downloads. Please try a different browser.');
         return;
       }
       
@@ -247,7 +255,7 @@ export class Transaction implements OnInit {
       console.log('CSV download initiated successfully');
     } catch (error) {
       console.error('Error downloading CSV:', error);
-      alert('Failed to download CSV. Please try again.');
+      this.alertService.error('Download Failed', 'Failed to download CSV. Please try again.');
     }
   }
 
@@ -328,5 +336,61 @@ export class Transaction implements OnInit {
       console.error('Error generating CSV content:', error);
       return '';
     }
+  }
+
+  sendStatementByEmail() {
+    if (!isPlatformBrowser(this.platformId)) {
+      console.log('Not in browser environment, skipping email send');
+      return;
+    }
+
+    if (!this.userAccountNumber) {
+      this.alertService.error('Account Error', 'Account number not found. Please refresh the page and try again.');
+      return;
+    }
+
+    if (this.transactions.length === 0) {
+      this.alertService.warning('No Data', 'No transactions available to send.');
+      return;
+    }
+
+    // Confirm with user
+    this.alertService.confirm(
+      'Email Bank Statement',
+      'Send bank statement PDF to your registered email address?',
+      () => {
+        this.sendBankStatementEmail();
+      },
+      () => {
+        // User cancelled
+      },
+      'Send',
+      'Cancel'
+    );
+    return;
+  }
+
+  private sendBankStatementEmail() {
+
+    this.sendingEmail = true;
+    this.error = '';
+
+    this.http.post(`${environment.apiUrl}/transactions/send-statement/${this.userAccountNumber}`, {})
+      .subscribe({
+        next: (response: any) => {
+          this.sendingEmail = false;
+          if (response.success) {
+            this.alertService.success('Email Sent Successfully', `Your bank statement PDF has been sent to: ${response.email}`);
+          } else {
+            this.alertService.error('Email Failed', response.message || 'Failed to send bank statement. Please try again.');
+          }
+        },
+        error: (err: any) => {
+          console.error('Error sending bank statement:', err);
+          this.sendingEmail = false;
+          const errorMessage = err.error?.message || err.message || 'Failed to send bank statement. Please try again.';
+          this.alertService.error('Email Error', errorMessage);
+        }
+      });
   }
 }

@@ -24,44 +24,88 @@
   <!-- Approval Tracking Section -->
   <div class="tracking-section">
     <button type="button" (click)="toggleTracking()" class="tracking-toggle-btn">
+      <i class="fa" [ngClass]="showTracking ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
       {{ showTracking ? 'Hide' : 'Track' }} Approval Status
     </button>
     
     <div *ngIf="showTracking" class="tracking-form">
-      <h3>Track Your Account Approval</h3>
-      <p>Enter your email and mobile number to check your account status.</p>
+      <h3><i class="fa fa-search-location"></i> Track Your Account Approval</h3>
+      <p>Enter your Aadhar number and mobile number to check your account creation status.</p>
       
       <div class="form-group">
-        <label>Email</label>
-        <input type="email" [(ngModel)]="trackingEmail" placeholder="Enter your email" />
+        <label><i class="fa fa-id-card"></i> Aadhar Number</label>
+        <input 
+          type="text" 
+          [(ngModel)]="trackingAadhar" 
+          placeholder="Enter your 12-digit Aadhar number" 
+          maxlength="12"
+          (input)="filterDigits('aadhar', $event)"
+        />
       </div>
       
       <div class="form-group">
-        <label>Mobile Number</label>
-        <input type="text" [(ngModel)]="trackingMobile" placeholder="Enter your mobile number" />
+        <label><i class="fa fa-phone"></i> Mobile Number</label>
+        <input 
+          type="text" 
+          [(ngModel)]="trackingMobile" 
+          placeholder="Enter your 10-digit mobile number" 
+          maxlength="10"
+          (input)="filterDigits('mobile', $event)"
+        />
       </div>
       
-      <button type="button" (click)="trackApproval()">Check Status</button>
+      <button type="button" (click)="trackApproval()" class="track-btn" [disabled]="trackingLoading">
+        <i class="fa" [ngClass]="trackingLoading ? 'fa-spinner fa-spin' : 'fa-search'"></i>
+        {{ trackingLoading ? 'Checking...' : 'Check Status' }}
+      </button>
       
       <!-- Tracking Results -->
       <div *ngIf="trackingError" class="error-msg">
-        {{ trackingError }}
+        <i class="fa fa-exclamation-circle"></i> {{ trackingError }}
       </div>
       
       <div *ngIf="trackingResult" class="tracking-result">
-        <h4>Account Status</h4>
+        <h4><i class="fa fa-info-circle"></i> Account Tracking Status</h4>
         <div class="status-info">
-          <p><strong>Name:</strong> {{ trackingResult.name }}</p>
-          <p><strong>Email:</strong> {{ trackingResult.email }}</p>
-          <p><strong>Mobile:</strong> {{ trackingResult.mobile }}</p>
-          <p><strong>Status:</strong> 
-            <span [ngClass]="{'pending': trackingResult.status==='PENDING', 'approved': trackingResult.status==='APPROVED', 'closed': trackingResult.status==='CLOSED'}">
-              {{ trackingResult.status }}
+          <div class="tracking-detail-item">
+            <label><i class="fa fa-barcode"></i> Tracking ID:</label>
+            <span class="tracking-id">{{ trackingResult.trackingId }}</span>
+          </div>
+          <div class="tracking-detail-item">
+            <label><i class="fa fa-id-card"></i> Aadhar Number:</label>
+            <span>{{ trackingResult.aadharNumber }}</span>
+          </div>
+          <div class="tracking-detail-item">
+            <label><i class="fa fa-phone"></i> Mobile Number:</label>
+            <span>{{ trackingResult.mobileNumber }}</span>
+          </div>
+          <div class="tracking-detail-item">
+            <label><i class="fa fa-envelope"></i> Email:</label>
+            <span>{{ trackingResult.user?.email || 'N/A' }}</span>
+          </div>
+          <div class="tracking-detail-item">
+            <label><i class="fa fa-info-circle"></i> Status:</label>
+            <span [ngClass]="getTrackingStatusClass(trackingResult.status)" class="status-badge">
+              {{ getTrackingStatusLabel(trackingResult.status) }}
             </span>
-          </p>
-          <p *ngIf="trackingResult.assignedAccountNumber"><strong>Account Number:</strong> {{ trackingResult.assignedAccountNumber }}</p>
-          <p><strong>Request ID:</strong> {{ trackingResult.id }}</p>
-          <p><strong>Submitted:</strong> {{ trackingResult.createdAt | date:'medium' }}</p>
+          </div>
+          <div class="tracking-detail-item">
+            <label><i class="fa fa-calendar"></i> Created At:</label>
+            <span>{{ trackingResult.createdAt | date:'medium' }}</span>
+          </div>
+          <div class="tracking-detail-item" *ngIf="trackingResult.updatedAt">
+            <label><i class="fa fa-clock"></i> Last Updated:</label>
+            <span>{{ trackingResult.updatedAt | date:'medium' }}</span>
+          </div>
+          <div class="tracking-detail-item" *ngIf="trackingResult.updatedBy">
+            <label><i class="fa fa-user-shield"></i> Updated By:</label>
+            <span>{{ trackingResult.updatedBy }}</span>
+          </div>
+        </div>
+        
+        <div class="status-message" [ngClass]="getTrackingStatusClass(trackingResult.status)">
+          <i class="fa" [ngClass]="getTrackingStatusIcon(trackingResult.status)"></i>
+          <p>{{ getTrackingStatusMessage(trackingResult.status) }}</p>
         </div>
       </div>
     </div>
@@ -122,9 +166,18 @@
     <div class="form-group">
       <label>PAN</label>
       <input type="text" formControlName="pan" placeholder="ABCDE1234F" />
+      <div *ngIf="panChecking" class="info">
+        <small>Checking PAN availability...</small>
+      </div>
       <div *ngIf="submitted && f['pan'].errors" class="error">
         <small *ngIf="f['pan'].errors['required']">PAN is required.</small>
         <small *ngIf="f['pan'].errors['invalidPan']">Invalid PAN format.</small>
+      </div>
+      <div *ngIf="panExists && f['pan'].valid && f['pan'].touched" class="error">
+        <small>⚠️ PAN number is already registered. Another account exists with this PAN number.</small>
+      </div>
+      <div *ngIf="!panExists && !panChecking && f['pan'].valid && f['pan'].touched" class="success">
+        <small>✓ PAN number is available</small>
       </div>
     </div>
 
@@ -138,21 +191,27 @@
           placeholder="12-digit Aadhar" 
           maxlength="12"
           class="aadhar-input"
-          [class.valid]="f['aadhar'].valid && f['aadhar'].touched"
-          [class.invalid]="f['aadhar'].invalid && f['aadhar'].touched"
+          [class.valid]="f['aadhar'].valid && f['aadhar'].touched && !aadharExists"
+          [class.invalid]="f['aadhar'].invalid && f['aadhar'].touched || aadharExists"
         />
         <div class="validation-indicator">
-          <span *ngIf="f['aadhar'].valid && f['aadhar'].touched" class="valid-icon"></span>
-          <span *ngIf="f['aadhar'].invalid && f['aadhar'].touched" class="invalid-icon"></span>
+          <span *ngIf="f['aadhar'].valid && f['aadhar'].touched && !aadharExists && !aadharChecking" class="valid-icon"></span>
+          <span *ngIf="(f['aadhar'].invalid && f['aadhar'].touched) || aadharExists" class="invalid-icon"></span>
         </div>
+      </div>
+      <div *ngIf="aadharChecking" class="info">
+        <small>Checking Aadhar availability...</small>
       </div>
       <div *ngIf="submitted && f['aadhar'].errors" class="error">
         <small *ngIf="f['aadhar'].errors['required']">Aadhar is required.</small>
         <small *ngIf="f['aadhar'].errors['invalidAadhar']">Invalid Aadhar format. Must be 12 digits starting with 2-9.</small>
         <small *ngIf="f['aadhar'].errors['invalidAadharChecksum']">Invalid Aadhar number. Please check the digits.</small>
       </div>
-      <div *ngIf="f['aadhar'].valid && f['aadhar'].touched" class="success">
-        <small> Valid Aadhaar number</small>
+      <div *ngIf="aadharExists && f['aadhar'].valid && f['aadhar'].touched" class="error">
+        <small>⚠️ Aadhar number is already registered. Another account exists with this Aadhar number.</small>
+      </div>
+      <div *ngIf="!aadharExists && !aadharChecking && f['aadhar'].valid && f['aadhar'].touched" class="success">
+        <small>✓ Valid Aadhaar number and available</small>
       </div>
     </div>
 
@@ -160,9 +219,18 @@
     <div class="form-group">
       <label>Mobile</label>
       <input type="text" formControlName="mobile" placeholder="10-digit Mobile" /> 
+      <div *ngIf="mobileChecking" class="info">
+        <small>Checking mobile number availability...</small>
+      </div>
       <div *ngIf="submitted && f['mobile'].errors" class="error">
         <small *ngIf="f['mobile'].errors?.['required']">Mobile is required.</small>
         <small *ngIf="f['mobile'].errors?.['invalidMobile']">Invalid mobile number.</small>
+      </div>
+      <div *ngIf="mobileExists && f['mobile'].valid && f['mobile'].touched" class="error">
+        <small>⚠️ Mobile number is already registered. Another account exists with this mobile number.</small>
+      </div>
+      <div *ngIf="!mobileExists && !mobileChecking && f['mobile'].valid && f['mobile'].touched" class="success">
+        <small>✓ Mobile number is available</small>
       </div>
     </div>
 
@@ -213,8 +281,23 @@
       </div>
     </div>
 
+    <!-- Terms and Conditions -->
+    <div class="form-group terms-group">
+      <label class="terms-label">
+        <input 
+          type="checkbox" 
+          formControlName="termsAccepted" 
+          class="terms-checkbox"
+        />
+        <span>I accept the <a href="#" (click)="showTerms($event)" class="terms-link">Terms and Conditions</a> and <a href="#" (click)="showPrivacy($event)" class="terms-link">Privacy Policy</a></span>
+      </label>
+      <div *ngIf="submitted && f['termsAccepted'].errors" class="error">
+        <small>You must accept the Terms and Conditions to create an account.</small>
+      </div>
+    </div>
+
     <!-- Submit -->
-    <button type="submit">Submit Account Request</button>
+    <button type="submit" [disabled]="!form.get('termsAccepted')?.value">Submit Account Request</button>
   </form>
 
   <!-- Back Button -->

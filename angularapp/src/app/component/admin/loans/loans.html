@@ -1,12 +1,20 @@
 <div class="loans-container">
   <h2>Loan Applications Management</h2>
   
-
-  <!-- Back to Dashboard Button -->
-  <button class="back-btn" (click)="goBack()">← Back to Dashboard</button>
-  
-  <!-- Refresh Button -->
-  <button class="refresh-btn" (click)="loadAllLoans()"> Refresh</button>
+  <!-- Action Buttons Section -->
+  <div class="action-buttons-section">
+    <!-- Back to Dashboard Button -->
+    <button class="back-btn" (click)="goBack()">← Back to Dashboard</button>
+    
+    <!-- Refresh Button -->
+    <button class="refresh-btn" (click)="loadAllLoans()">🔄 Refresh</button>
+    
+    <!-- Foreclosure Button - Prominent -->
+    <button class="foreclosure-btn" (click)="openForeclosureModal()">
+      <span class="btn-icon">🏦</span>
+      <span class="btn-text">Foreclose Loan</span>
+    </button>
+  </div>
 
   <!-- Loading indicator -->
   <div *ngIf="loading" class="loading">Loading loan applications...</div>
@@ -46,7 +54,8 @@
           <td>{{ loan.interestRate }}</td>
           <td [class.pending]="loan.status === 'Pending'"
               [class.approved]="loan.status === 'Approved'"
-              [class.rejected]="loan.status === 'Rejected'">
+              [class.rejected]="loan.status === 'Rejected'"
+              [class.foreclosed]="loan.status === 'Foreclosed'">
             {{ loan.status }}
           </td>
           <td>{{ loan.applicationDate | date:'short' }}</td>
@@ -57,7 +66,12 @@
               <button class="reject-btn" (click)="reject(loan)">Reject</button>
             </ng-container>
             <ng-template #processedTemplate>
-              <span class="processed">Processed</span>
+              <ng-container *ngIf="loan.status === 'Approved'; else alreadyProcessed">
+                <button class="foreclose-action-btn" (click)="forecloseLoanFromTable(loan)">🏦 Foreclose</button>
+              </ng-container>
+              <ng-template #alreadyProcessed>
+                <span class="processed">{{ loan.status === 'Foreclosed' ? 'Foreclosed' : 'Processed' }}</span>
+              </ng-template>
             </ng-template>
           </td>
         </tr>
@@ -67,6 +81,105 @@
     <!-- No loans message -->
     <div *ngIf="loanRequests.length === 0" class="no-loans">
       <p>No loan applications found.</p>
+    </div>
+  </div>
+
+  <!-- Foreclosure Modal -->
+  <div class="modal-overlay" *ngIf="showForeclosureModal" (click)="closeForeclosureModal()">
+    <div class="modal-content" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>🏦 Loan Foreclosure</h3>
+        <button class="close-btn" (click)="closeForeclosureModal()">×</button>
+      </div>
+      
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="loanNumber">Loan Account Number:</label>
+          <input 
+            type="text" 
+            id="loanNumber"
+            [(ngModel)]="foreclosureLoanNumber" 
+            placeholder="Enter loan account number (e.g., LOAN20240101120000)"
+            class="form-input"
+            [disabled]="calculatingForeclosure || processingForeclosure"
+          />
+        </div>
+
+        <div class="error-message" *ngIf="foreclosureError">
+          ❌ {{ foreclosureError }}
+        </div>
+
+        <div class="button-group">
+          <button 
+            class="calculate-btn" 
+            (click)="calculateForeclosure()"
+            [disabled]="calculatingForeclosure || processingForeclosure || !foreclosureLoanNumber.trim()">
+            <span *ngIf="!calculatingForeclosure">Calculate Foreclosure</span>
+            <span *ngIf="calculatingForeclosure">⏳ Calculating...</span>
+          </button>
+        </div>
+
+        <!-- Foreclosure Details -->
+        <div class="foreclosure-details" *ngIf="foreclosureDetails">
+          <h4>Foreclosure Calculation</h4>
+          <div class="details-grid">
+            <div class="detail-item">
+              <span class="label">Months Elapsed:</span>
+              <span class="value">{{ foreclosureDetails.monthsElapsed }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="label">Remaining Months:</span>
+              <span class="value">{{ foreclosureDetails.remainingMonths }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="label">Monthly EMI:</span>
+              <span class="value">₹{{ foreclosureDetails.emi | number:'1.2-2' }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="label">Total Paid:</span>
+              <span class="value">₹{{ foreclosureDetails.totalPaid | number:'1.2-2' }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="label">Principal Paid:</span>
+              <span class="value">₹{{ foreclosureDetails.principalPaid | number:'1.2-2' }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="label">Interest Paid:</span>
+              <span class="value">₹{{ foreclosureDetails.interestPaid | number:'1.2-2' }}</span>
+            </div>
+            <div class="detail-item highlight">
+              <span class="label">Remaining Principal:</span>
+              <span class="value">₹{{ foreclosureDetails.remainingPrincipal | number:'1.2-2' }}</span>
+            </div>
+            <div class="detail-item highlight">
+              <span class="label">Remaining Interest:</span>
+              <span class="value">₹{{ foreclosureDetails.remainingInterest | number:'1.2-2' }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="label">Foreclosure Charges (4%):</span>
+              <span class="value">₹{{ foreclosureDetails.foreclosureCharges | number:'1.2-2' }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="label">GST (18% on Charges):</span>
+              <span class="value">₹{{ foreclosureDetails.gst | number:'1.2-2' }}</span>
+            </div>
+            <div class="detail-item total">
+              <span class="label">Total Foreclosure Amount:</span>
+              <span class="value">₹{{ foreclosureDetails.totalForeclosureAmount | number:'1.2-2' }}</span>
+            </div>
+          </div>
+
+          <div class="button-group">
+            <button 
+              class="process-btn" 
+              (click)="processForeclosure()"
+              [disabled]="processingForeclosure">
+              <span *ngIf="!processingForeclosure">✅ Process Foreclosure</span>
+              <span *ngIf="processingForeclosure">⏳ Processing...</span>
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </div>

@@ -1,0 +1,450 @@
+<div class="gold-loan-container">
+  <div class="header-section">
+    <button class="back-button" (click)="goBack()">← Back to Dashboard</button>
+    <h1>💰 Gold Loan Application</h1>
+    <p class="subtitle">Get instant loan against your gold at competitive rates</p>
+  </div>
+
+  <!-- Current Gold Rate Display -->
+  <div class="gold-rate-card" *ngIf="currentGoldRate">
+    <div class="rate-header">
+      <h3>📊 Current Gold Rate</h3>
+      <button class="refresh-btn" (click)="loadCurrentGoldRate()" [disabled]="loading">
+        <span *ngIf="!loading">🔄 Refresh</span>
+        <span *ngIf="loading">⏳ Loading...</span>
+      </button>
+    </div>
+    <div class="rate-details">
+      <div class="rate-value">
+        <span class="rate-label">Rate per Gram:</span>
+        <span class="rate-amount">₹{{ currentGoldRate.ratePerGram | number:'1.2-2' }}</span>
+      </div>
+      <div class="rate-date">
+        <span>Last Updated: {{ formatDate(currentGoldRate.lastUpdated) }}</span>
+      </div>
+    </div>
+    <div class="loan-info">
+      <p><strong>Gold Purity:</strong> 22 Karat (22K)</p>
+      <p><strong>Loan Amount:</strong> 75% of gold value (as per RBI guidelines)</p>
+      <p><strong>Interest Rate:</strong> 12% per annum (default)</p>
+    </div>
+  </div>
+
+  <!-- Loan Calculator -->
+  <div class="calculator-section">
+    <h2>Calculate Your Loan Amount</h2>
+    <div class="calculator-form">
+      <div class="input-group">
+        <label for="goldGrams">Gold Weight (in Grams) <span class="required">*</span></label>
+        <input
+          type="number"
+          id="goldGrams"
+          [(ngModel)]="goldGrams"
+          placeholder="Enter gold weight in grams"
+          min="0"
+          step="0.01"
+          class="input-field"
+          (input)="calculatedLoan = null"
+        />
+        <small class="input-hint">Enter the weight of 22 Karat (22K) gold you want to pledge</small>
+      </div>
+
+      <button
+        type="button"
+        class="calculate-btn"
+        (click)="calculateLoan()"
+        [disabled]="goldGrams <= 0 || calculating"
+      >
+        <span *ngIf="!calculating">💰 Calculate Loan Amount</span>
+        <span *ngIf="calculating">⏳ Calculating...</span>
+      </button>
+    </div>
+
+    <!-- Calculation Results -->
+    <div class="calculation-results" *ngIf="calculatedLoan && calculatedLoan.success">
+      <h3>Loan Calculation Results</h3>
+      <div class="results-grid">
+        <div class="result-item">
+          <span class="result-label">Gold Weight:</span>
+          <span class="result-value">{{ calculatedLoan.grams }} grams</span>
+        </div>
+        <div class="result-item">
+          <span class="result-label">Gold Rate per Gram:</span>
+          <span class="result-value">₹{{ calculatedLoan.goldRatePerGram | number:'1.2-2' }}</span>
+        </div>
+        <div class="result-item highlight">
+          <span class="result-label">Total Gold Value:</span>
+          <span class="result-value">₹{{ calculatedLoan.goldValue | number:'1.2-2' }}</span>
+        </div>
+        <div class="result-item highlight loan-amount">
+          <span class="result-label">Available Loan Amount (75%):</span>
+          <span class="result-value">₹{{ calculatedLoan.loanAmount | number:'1.2-2' }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loan Application Form -->
+  <div class="application-section" *ngIf="calculatedLoan && calculatedLoan.success">
+    <h2>Apply for Gold Loan</h2>
+    <form (ngSubmit)="applyGoldLoan()" #loanForm="ngForm">
+      <div class="form-grid">
+        <div class="input-group">
+          <label for="tenure">Loan Tenure (Months) <span class="required">*</span></label>
+          <select
+            id="tenure"
+            [(ngModel)]="tenure"
+            name="tenure"
+            class="input-field"
+            required
+          >
+            <option value="6">6 Months</option>
+            <option value="12" selected>12 Months</option>
+            <option value="18">18 Months</option>
+            <option value="24">24 Months</option>
+            <option value="36">36 Months</option>
+          </select>
+        </div>
+
+        <div class="input-group">
+          <label for="interestRate">Interest Rate (% per annum)</label>
+          <input
+            type="number"
+            id="interestRate"
+            [(ngModel)]="interestRate"
+            name="interestRate"
+            class="input-field"
+            value="12"
+            readonly
+          />
+          <small class="input-hint">Default rate: 12% per annum</small>
+        </div>
+      </div>
+
+      <div class="loan-summary">
+        <h4>Loan Summary</h4>
+        <div class="summary-details">
+          <div class="summary-item">
+            <span>Gold Weight:</span>
+            <span>{{ calculatedLoan.grams }} grams</span>
+          </div>
+          <div class="summary-item">
+            <span>Gold Purity:</span>
+            <span>22 Karat (22K)</span>
+          </div>
+          <div class="summary-item">
+            <span>Gold Value:</span>
+            <span>₹{{ calculatedLoan.goldValue | number:'1.2-2' }}</span>
+          </div>
+          <div class="summary-item">
+            <span>Loan Amount:</span>
+            <span class="highlight">₹{{ calculatedLoan.loanAmount | number:'1.2-2' }}</span>
+          </div>
+          <div class="summary-item">
+            <span>Tenure:</span>
+            <span>{{ tenure }} months</span>
+          </div>
+          <div class="summary-item">
+            <span>Interest Rate:</span>
+            <span>{{ interestRate }}% p.a.</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Declaration and Terms & Conditions -->
+      <div class="declaration-section">
+        <h4>📋 Declaration & Terms & Conditions</h4>
+        
+        <div class="terms-content">
+          <div class="terms-section">
+            <h5>RBI Guidelines for Gold Loans:</h5>
+            <ul>
+              <li>Gold loans are regulated by the Reserve Bank of India (RBI) under the Non-Banking Financial Company (NBFC) guidelines.</li>
+              <li>Maximum Loan-to-Value (LTV) ratio is 75% of the gold value as per RBI Master Direction on Lending against Gold.</li>
+              <li>Gold must be of minimum 18 Karat purity. We accept 22 Karat gold for better valuation.</li>
+              <li>Interest rates are regulated and transparent. No hidden charges.</li>
+              <li>Gold pledged will be safely stored in secure vaults as per RBI guidelines.</li>
+              <li>Loan tenure can be extended subject to payment of interest and charges.</li>
+              <li>Gold will be returned only after full repayment of principal and interest.</li>
+            </ul>
+          </div>
+
+          <div class="terms-section">
+            <h5>Important Terms & Conditions:</h5>
+            <ul>
+              <li><strong>Gold Purity:</strong> Only 22 Karat (22K) gold is accepted. Gold will be tested for purity at the time of pledge.</li>
+              <li><strong>Valuation:</strong> Gold will be valued at the current market rate on the date of application. Rate is subject to daily market fluctuations.</li>
+              <li><strong>Loan Amount:</strong> Maximum 75% of the gold value will be sanctioned as loan amount.</li>
+              <li><strong>Interest:</strong> Interest will be charged on the loan amount at the rate specified (12% per annum). Interest is calculated on reducing balance method.</li>
+              <li><strong>Storage:</strong> Pledged gold will be stored in secure vaults. Bank is not liable for any loss due to natural calamities or acts of God.</li>
+              <li><strong>Repayment:</strong> Loan can be repaid in EMIs or as a lump sum. Early repayment is allowed without penalty.</li>
+              <li><strong>Default:</strong> In case of default, gold may be auctioned after due notice as per RBI guidelines.</li>
+              <li><strong>Charges:</strong> Processing charges, valuation charges, and storage charges may apply as per bank policy.</li>
+              <li><strong>Documentation:</strong> Valid ID proof, address proof, and gold ownership documents are required.</li>
+            </ul>
+          </div>
+
+          <div class="terms-section">
+            <h5>Customer Declaration:</h5>
+            <div class="declaration-box">
+              <p>I hereby declare that:</p>
+              <ul>
+                <li>I am the lawful owner of the gold being pledged.</li>
+                <li>The gold is free from any encumbrances, liens, or charges.</li>
+                <li>All information provided by me is true and correct to the best of my knowledge.</li>
+                <li>I have read and understood all the terms and conditions mentioned above.</li>
+                <li>I agree to abide by the RBI guidelines and bank's policies for gold loans.</li>
+                <li>I understand that the gold rate is subject to market fluctuations and the loan amount is based on the rate at the time of application.</li>
+                <li>I agree to repay the loan amount along with interest as per the agreed schedule.</li>
+                <li>I understand that in case of default, the bank has the right to auction the gold as per RBI guidelines.</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="terms-section">
+            <h5>Disclaimer:</h5>
+            <p class="disclaimer-text">
+              <strong>Note:</strong> Gold loan is subject to approval by the bank. The bank reserves the right to reject any application without assigning any reason. 
+              Gold rates are indicative and subject to change. Final loan amount will be based on actual gold valuation at the time of processing. 
+              Please read all terms and conditions carefully before submitting your application. For any queries, please contact our customer care.
+            </p>
+          </div>
+        </div>
+
+        <div class="acceptance-checkbox">
+          <label class="checkbox-label">
+            <input
+              type="checkbox"
+              [(ngModel)]="acceptTerms"
+              name="acceptTerms"
+              required
+              class="checkbox-input"
+            />
+            <span class="checkbox-text">
+              I have read, understood, and agree to all the terms and conditions, RBI guidelines, and declaration mentioned above. <span class="required">*</span>
+            </span>
+          </label>
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button
+          type="submit"
+          class="submit-btn"
+          [disabled]="loading || !calculatedLoan || !acceptTerms"
+        >
+          <span *ngIf="!loading">📝 Submit Application</span>
+          <span *ngIf="loading">⏳ Submitting...</span>
+        </button>
+        <button
+          type="button"
+          class="reset-btn"
+          (click)="resetForm()"
+          [disabled]="loading"
+        >
+          Reset
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- My Gold Loans -->
+  <div class="my-loans-section">
+    <h2>My Gold Loans</h2>
+    <div *ngIf="loadingLoans" class="loading-message">
+      <p>Loading your gold loans...</p>
+    </div>
+    <div *ngIf="!loadingLoans && goldLoans.length === 0" class="no-loans">
+      <p>You don't have any gold loan applications yet.</p>
+    </div>
+    <div *ngIf="!loadingLoans && goldLoans.length > 0" class="loans-list">
+      <div *ngFor="let loan of goldLoans" class="loan-card">
+        <div class="loan-header">
+          <h4>Loan #{{ loan.loanAccountNumber || 'N/A' }}</h4>
+          <span class="status-badge" [ngClass]="getStatusClass(loan.status)">
+            {{ loan.status }}
+          </span>
+        </div>
+        <div class="loan-details">
+          <div class="detail-row">
+            <span class="detail-label">Gold Weight:</span>
+            <span class="detail-value">{{ loan.goldGrams }} grams</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Gold Value:</span>
+            <span class="detail-value">₹{{ loan.goldValue | number:'1.2-2' }}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Loan Amount:</span>
+            <span class="detail-value highlight">₹{{ loan.loanAmount | number:'1.2-2' }}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Tenure:</span>
+            <span class="detail-value">{{ loan.tenure }} months</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Interest Rate:</span>
+            <span class="detail-value">{{ loan.interestRate }}% p.a.</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Application Date:</span>
+            <span class="detail-value">{{ formatDate(loan.applicationDate) }}</span>
+          </div>
+          <div class="detail-row" *ngIf="loan.approvalDate">
+            <span class="detail-label">Approval Date:</span>
+            <span class="detail-value">{{ formatDate(loan.approvalDate) }}</span>
+          </div>
+        </div>
+
+        <!-- Gold Details (if approved) -->
+        <div class="gold-details-section" *ngIf="loan.status === 'Approved' && loan.goldItems">
+          <h5>📦 Verified Gold Details</h5>
+          <div class="details-grid">
+            <div class="detail-row" *ngIf="loan.goldItems">
+              <span class="detail-label">Gold Items:</span>
+              <span class="detail-value">{{ loan.goldItems }}</span>
+            </div>
+            <div class="detail-row" *ngIf="loan.goldDescription">
+              <span class="detail-label">Description:</span>
+              <span class="detail-value">{{ loan.goldDescription }}</span>
+            </div>
+            <div class="detail-row" *ngIf="loan.goldPurity">
+              <span class="detail-label">Verified Purity:</span>
+              <span class="detail-value">{{ loan.goldPurity }}</span>
+            </div>
+            <div class="detail-row" *ngIf="loan.verifiedGoldGrams">
+              <span class="detail-label">Verified Weight:</span>
+              <span class="detail-value">{{ loan.verifiedGoldGrams }} grams</span>
+            </div>
+            <div class="detail-row" *ngIf="loan.verifiedGoldValue">
+              <span class="detail-label">Verified Gold Value:</span>
+              <span class="detail-value">₹{{ loan.verifiedGoldValue | number:'1.2-2' }}</span>
+            </div>
+            <div class="detail-row" *ngIf="loan.storageLocation">
+              <span class="detail-label">Storage Location:</span>
+              <span class="detail-value">{{ loan.storageLocation }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Terms Acceptance Section -->
+        <div class="terms-acceptance-section" *ngIf="loan.status === 'Approved'">
+          <div class="terms-status" *ngIf="loan.termsAccepted">
+            <p class="terms-accepted">
+              ✓ Terms and conditions accepted on {{ formatDate(loan.termsAcceptedDate) }}
+            </p>
+          </div>
+          <div class="terms-action" *ngIf="!loan.termsAccepted">
+            <p class="terms-pending">
+              ⚠️ Please accept the terms and conditions to complete your loan process
+            </p>
+            <button
+              type="button"
+              class="accept-terms-btn"
+              (click)="showTermsAndAccept(loan)"
+            >
+              📋 View & Accept Terms
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Terms and Conditions Modal -->
+<div class="modal-overlay" *ngIf="showTermsModal" (click)="closeTermsModal()">
+  <div class="modal-content terms-modal" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3>📋 Terms and Conditions</h3>
+      <button class="close-btn" (click)="closeTermsModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="loan-summary-section" *ngIf="selectedLoanForTerms">
+        <h4>Loan Summary</h4>
+        <div class="summary-details">
+          <div class="summary-item">
+            <span>Loan Account Number:</span>
+            <span>{{ selectedLoanForTerms.loanAccountNumber }}</span>
+          </div>
+          <div class="summary-item">
+            <span>Loan Amount:</span>
+            <span class="highlight">₹{{ selectedLoanForTerms.loanAmount | number:'1.2-2' }}</span>
+          </div>
+          <div class="summary-item" *ngIf="selectedLoanForTerms.goldItems">
+            <span>Gold Items:</span>
+            <span>{{ selectedLoanForTerms.goldItems }}</span>
+          </div>
+          <div class="summary-item" *ngIf="selectedLoanForTerms.verifiedGoldGrams">
+            <span>Verified Weight:</span>
+            <span>{{ selectedLoanForTerms.verifiedGoldGrams }} grams</span>
+          </div>
+          <div class="summary-item">
+            <span>Tenure:</span>
+            <span>{{ selectedLoanForTerms.tenure }} months</span>
+          </div>
+          <div class="summary-item">
+            <span>Interest Rate:</span>
+            <span>{{ selectedLoanForTerms.interestRate }}% p.a.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="terms-content">
+        <div class="terms-section">
+          <h5>RBI Guidelines for Gold Loans:</h5>
+          <ul>
+            <li>Gold loans are regulated by the Reserve Bank of India (RBI) under the Non-Banking Financial Company (NBFC) guidelines.</li>
+            <li>Maximum Loan-to-Value (LTV) ratio is 75% of the gold value as per RBI Master Direction on Lending against Gold.</li>
+            <li>Gold must be of minimum 18 Karat purity. We accept 22 Karat gold for better valuation.</li>
+            <li>Interest rates are regulated and transparent. No hidden charges.</li>
+            <li>Gold pledged will be safely stored in secure vaults as per RBI guidelines.</li>
+            <li>Loan tenure can be extended subject to payment of interest and charges.</li>
+            <li>Gold will be returned only after full repayment of principal and interest.</li>
+          </ul>
+        </div>
+
+        <div class="terms-section">
+          <h5>Important Terms & Conditions:</h5>
+          <ul>
+            <li><strong>Gold Purity:</strong> Your gold has been verified at {{ selectedLoanForTerms?.goldPurity || '22K' }} purity.</li>
+            <li><strong>Valuation:</strong> Gold has been valued at ₹{{ selectedLoanForTerms?.goldRatePerGram | number:'1.2-2' }} per gram on the date of approval.</li>
+            <li><strong>Loan Amount:</strong> You have been sanctioned ₹{{ selectedLoanForTerms?.loanAmount | number:'1.2-2' }} (75% of verified gold value).</li>
+            <li><strong>Interest:</strong> Interest will be charged at {{ selectedLoanForTerms?.interestRate }}% per annum on the loan amount. Interest is calculated on reducing balance method.</li>
+            <li><strong>Storage:</strong> Your pledged gold is stored in secure vaults at {{ selectedLoanForTerms?.storageLocation || 'our secure facility' }}. Bank is not liable for any loss due to natural calamities or acts of God.</li>
+            <li><strong>Repayment:</strong> Loan can be repaid in EMIs or as a lump sum. Early repayment is allowed without penalty.</li>
+            <li><strong>Default:</strong> In case of default, gold may be auctioned after due notice as per RBI guidelines.</li>
+            <li><strong>Charges:</strong> Processing charges, valuation charges, and storage charges may apply as per bank policy.</li>
+            <li><strong>Gold Return:</strong> Gold will be returned only after full repayment of principal and interest along with all applicable charges.</li>
+          </ul>
+        </div>
+
+        <div class="terms-section">
+          <h5>Customer Declaration:</h5>
+          <div class="declaration-box">
+            <p>By accepting these terms, I hereby declare that:</p>
+            <ul>
+              <li>I have received the loan amount of ₹{{ selectedLoanForTerms?.loanAmount | number:'1.2-2' }} in my account.</li>
+              <li>I have verified the gold details mentioned above and found them correct.</li>
+              <li>I have read and understood all the terms and conditions mentioned above.</li>
+              <li>I agree to repay the loan amount along with interest as per the agreed schedule.</li>
+              <li>I understand that in case of default, the bank has the right to auction the gold as per RBI guidelines.</li>
+              <li>I agree to abide by the RBI guidelines and bank's policies for gold loans.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn-cancel" (click)="closeTermsModal()" [disabled]="acceptingTerms">
+          Cancel
+        </button>
+        <button type="button" class="btn-submit" (click)="acceptTermsAndConditions()" [disabled]="acceptingTerms">
+          <span *ngIf="!acceptingTerms">✓ Accept Terms & Conditions</span>
+          <span *ngIf="acceptingTerms">Processing...</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+

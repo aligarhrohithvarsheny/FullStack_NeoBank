@@ -11,6 +11,21 @@ export interface User {
   accountNumber: string;
   account?: Account; // One-to-one relationship with Account
 
+  // Profile photo fields
+  profilePhoto?: string; // Base64 or URL
+  profilePhotoType?: string;
+  profilePhotoName?: string;
+
+  // Signature fields
+  signature?: string; // Base64 or URL
+  signatureType?: string;
+  signatureName?: string;
+  signatureStatus?: 'PENDING' | 'APPROVED' | 'REJECTED';
+  signatureSubmittedDate?: string;
+  signatureReviewedDate?: string;
+  signatureReviewedBy?: string;
+  signatureRejectionReason?: string;
+
   // Convenience methods to access account fields
   getName?(): string | null;
   getPhone?(): string | null;

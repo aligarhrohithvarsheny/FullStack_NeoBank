@@ -64,4 +64,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
     
     @Query("SELECT u FROM User u ORDER BY u.joinDate DESC")
     List<User> findRecentUsers(Pageable pageable);
+    
+    // Signature status queries
+    List<User> findBySignatureStatus(String signatureStatus);
 }

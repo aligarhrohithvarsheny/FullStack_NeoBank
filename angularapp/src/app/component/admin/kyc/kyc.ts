@@ -67,7 +67,10 @@ export class Kyc implements OnInit {
   constructor(private router: Router, @Inject(PLATFORM_ID) private platformId: Object, private http: HttpClient) {}
 
   ngOnInit() {
-    this.loadKycRequests();
+    // Only load in browser, not during SSR
+    if (isPlatformBrowser(this.platformId)) {
+      this.loadKycRequests();
+    }
   }
 
   loadKycRequests() {
@@ -182,6 +185,60 @@ export class Kyc implements OnInit {
         }
       });
     }
+  }
+
+  downloadAadharDocument(kycId: string | undefined) {
+    if (!kycId) return;
+    
+    this.http.get(`${environment.apiUrl}/kyc/${kycId}/aadhar-document`, {
+      responseType: 'blob'
+    }).subscribe({
+      next: (blob: Blob) => {
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `aadhar_document_${kycId}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      },
+      error: (err: any) => {
+        console.error('Error downloading Aadhar document:', err);
+        if (err.status === 404) {
+          alert('Aadhar document not found for this KYC request.');
+        } else {
+          alert('Failed to download Aadhar document. Please try again.');
+        }
+      }
+    });
+  }
+
+  downloadPanDocument(kycId: string | undefined) {
+    if (!kycId) return;
+    
+    this.http.get(`${environment.apiUrl}/kyc/${kycId}/pan-document`, {
+      responseType: 'blob'
+    }).subscribe({
+      next: (blob: Blob) => {
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `pan_document_${kycId}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      },
+      error: (err: any) => {
+        console.error('Error downloading PAN document:', err);
+        if (err.status === 404) {
+          alert('PAN document not found for this KYC request.');
+        } else {
+          alert('Failed to download PAN document. Please try again.');
+        }
+      }
+    });
   }
 
   reject(request: KycRequest) {

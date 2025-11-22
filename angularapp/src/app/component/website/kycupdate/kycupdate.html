@@ -37,6 +37,52 @@
       />
     </div>
 
+    <!-- Document Upload Section -->
+    <div class="document-upload-section">
+      <h3>Upload KYC Documents</h3>
+      <p class="upload-info">Upload Aadhar or PAN document (JPEG or PDF, maximum 5MB each)</p>
+      
+      <div class="form-group">
+        <label for="aadharDocument">Aadhar Document (Optional):</label>
+        <input 
+          id="aadharDocument"
+          type="file" 
+          accept=".jpg,.jpeg,.pdf,image/jpeg,application/pdf"
+          (change)="onAadharFileSelected($event)"
+          class="file-input"
+        />
+        <small class="file-info" *ngIf="aadharDocument">
+          Selected: {{ aadharDocument.name }} ({{ formatFileSize(aadharDocument.size) }})
+        </small>
+        <small class="file-help">Accepted formats: JPEG, PDF (Max 5MB)</small>
+      </div>
+
+      <div class="form-group">
+        <label for="panDocument">PAN Document (Optional):</label>
+        <input 
+          id="panDocument"
+          type="file" 
+          accept=".jpg,.jpeg,.pdf,image/jpeg,application/pdf"
+          (change)="onPanFileSelected($event)"
+          class="file-input"
+        />
+        <small class="file-info" *ngIf="panDocument">
+          Selected: {{ panDocument.name }} ({{ formatFileSize(panDocument.size) }})
+        </small>
+        <small class="file-help">Accepted formats: JPEG, PDF (Max 5MB)</small>
+      </div>
+
+      <!-- Document Upload Status -->
+      <div *ngIf="documentUploadError" class="document-error">
+        <span class="error-icon">❌</span>
+        {{ documentUploadError }}
+      </div>
+      <div *ngIf="documentUploadSuccess" class="document-success">
+        <span class="success-icon">✓</span>
+        {{ documentUploadSuccess }}
+      </div>
+    </div>
+
     <!-- OTP Verification Section for Subsequent Requests -->
     <div *ngIf="requiresOtp" class="otp-verification-section">
       <div class="otp-info-message">

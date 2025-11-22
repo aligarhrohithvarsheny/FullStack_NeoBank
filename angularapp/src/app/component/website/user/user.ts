@@ -158,31 +158,53 @@ export class User implements OnInit, OnDestroy {
             this.alertService.userError('Account Pending', 'Account not approved yet. Please wait for admin approval');
           }
         } else {
+          // Authentication failed - show specific error message
+          console.log('Authentication failed response:', authResponse);
+          
           // Check if account is locked
           if (authResponse.accountLocked) {
             this.showUnlockButton = true;
             this.errorMessage = authResponse.message || 'Account is locked due to multiple failed login attempts.';
             this.unlockEmail = this.loginUserId; // Pre-fill email
+            this.alertService.userError('Account Locked', this.errorMessage);
           } else if (authResponse.failedAttempts !== undefined) {
             this.errorMessage = authResponse.message || `Invalid credentials. ${3 - authResponse.failedAttempts} attempts remaining.`;
+            this.alertService.userError('Login Failed', this.errorMessage);
+          } else if (authResponse.message) {
+            // Show the specific error message from backend
+            this.errorMessage = authResponse.message;
+            this.alertService.userError('Login Failed', this.errorMessage);
           } else {
             this.errorMessage = 'Invalid credentials. Please check your email and password.';
+            this.alertService.userError('Login Failed', this.errorMessage);
           }
           this.successMessage = '';
         }
       },
       error: (err: any) => {
         console.error('Authentication error:', err);
+        console.error('Error details:', JSON.stringify(err, null, 2));
+        
         if (err.error && err.error.accountLocked) {
           this.showUnlockButton = true;
           this.errorMessage = err.error.message || 'Account is locked due to multiple failed login attempts.';
           this.unlockEmail = this.loginUserId; // Pre-fill email
         } else if (err.error && err.error.failedAttempts !== undefined) {
           this.errorMessage = err.error.message || 'Invalid credentials.';
+        } else if (err.error && err.error.message) {
+          // Show the actual error message from backend
+          this.errorMessage = err.error.message;
+        } else if (err.status === 0) {
+          this.errorMessage = 'Unable to connect to server. Please check your connection.';
+        } else if (err.status === 404) {
+          this.errorMessage = 'Service not found. Please contact support.';
+        } else if (err.status >= 500) {
+          this.errorMessage = 'Server error. Please try again later.';
         } else {
           this.errorMessage = 'Login failed. Please check your credentials.';
         }
         this.successMessage = '';
+        this.alertService.userError('Login Failed', this.errorMessage);
       }
     });
   }

@@ -293,6 +293,54 @@
   border-radius: 6px;
 }
 
+/* Document Buttons */
+.documents {
+  padding: 8px;
+}
+
+.document-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.document-btn {
+  background: linear-gradient(135deg, #0077cc, #0056b3);
+  color: white;
+  padding: 6px 12px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.document-btn:hover {
+  background: linear-gradient(135deg, #0056b3, #004085);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 119, 204, 0.3);
+}
+
+.document-btn.aadhar-btn {
+  background: linear-gradient(135deg, #17a2b8, #138496);
+}
+
+.document-btn.aadhar-btn:hover {
+  background: linear-gradient(135deg, #138496, #117a8b);
+}
+
+.document-btn.pan-btn {
+  background: linear-gradient(135deg, #6f42c1, #5a32a3);
+}
+
+.document-btn.pan-btn:hover {
+  background: linear-gradient(135deg, #5a32a3, #4a2a8a);
+}
+
 /* No Results */
 .no-results {
   text-align: center;

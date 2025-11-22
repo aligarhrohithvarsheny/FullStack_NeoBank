@@ -27,6 +27,26 @@ public class User {
     private boolean accountLocked = false;
     private LocalDateTime lastFailedLoginTime;
 
+    // Profile photo and signature fields
+    @Lob
+    @Column(name = "profile_photo", columnDefinition = "LONGBLOB")
+    private byte[] profilePhoto; // Profile photo (JPEG, PNG, PDF - max 5MB)
+    
+    private String profilePhotoType; // "image/jpeg", "image/png", "application/pdf"
+    private String profilePhotoName; // Original filename
+    
+    @Lob
+    @Column(name = "signature", columnDefinition = "LONGBLOB")
+    private byte[] signature; // Signature (PDF, IMAGE, PNG, JPEG)
+    
+    private String signatureType; // "image/jpeg", "image/png", "application/pdf"
+    private String signatureName; // Original filename
+    private String signatureStatus = "PENDING"; // PENDING, APPROVED, REJECTED
+    private LocalDateTime signatureSubmittedDate;
+    private LocalDateTime signatureReviewedDate;
+    private String signatureReviewedBy; // Admin who reviewed the signature
+    private String signatureRejectionReason; // Reason if rejected
+
     @OneToOne(cascade = CascadeType.ALL)
     @JoinColumn(name = "account_id")
     private Account account;

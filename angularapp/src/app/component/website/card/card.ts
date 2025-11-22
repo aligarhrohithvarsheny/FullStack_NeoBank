@@ -62,8 +62,11 @@ export class Card implements OnInit {
   constructor(private router: Router, @Inject(PLATFORM_ID) private platformId: Object, private http: HttpClient, private alertService: AlertService) {}
 
   ngOnInit() {
-    this.loadUserProfile();
-    this.loadUserCard();
+    // Only load in browser, not during SSR
+    if (isPlatformBrowser(this.platformId)) {
+      this.loadUserProfile();
+      this.loadUserCard();
+    }
   }
 
   // Method to refresh card data (can be called when user returns to page)

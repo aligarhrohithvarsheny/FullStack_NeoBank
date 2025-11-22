@@ -39,6 +39,15 @@ public class AccountService {
         return accountRepository.findByAadharNumber(aadharNumber);
     }
 
+    public Account getAccountByPhone(String phone) {
+        List<Account> accounts = accountRepository.findByPhone(phone);
+        return accounts != null && !accounts.isEmpty() ? accounts.get(0) : null;
+    }
+
+    public Account getAccountByVerificationReference(String verificationReference) {
+        return accountRepository.findByAadharVerificationReference(verificationReference);
+    }
+
     public Optional<Account> getAccountById(Long id) {
         return accountRepository.findById(id);
     }
@@ -232,6 +241,11 @@ public class AccountService {
 
     public boolean isAadharUnique(String aadharNumber) {
         return accountRepository.findByAadharNumber(aadharNumber) == null;
+    }
+
+    public boolean isPhoneUnique(String phone) {
+        List<Account> accounts = accountRepository.findByPhone(phone);
+        return accounts == null || accounts.isEmpty();
     }
 
     public boolean isAccountNumberUnique(String accountNumber) {

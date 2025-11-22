@@ -6,8 +6,11 @@ import com.neo.springapp.service.EmailService;
 import com.neo.springapp.service.OtpService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.HashMap;
 import java.util.List;
@@ -96,6 +99,130 @@ public class KycController {
             System.out.println("KYC update OTP error: " + e.getMessage());
             return ResponseEntity.internalServerError().body(response);
         }
+    }
+
+    // Upload KYC documents
+    @PostMapping("/upload-documents")
+    public ResponseEntity<Map<String, Object>> uploadKycDocuments(
+            @RequestParam("userAccountNumber") String userAccountNumber,
+            @RequestParam(value = "aadharDocument", required = false) MultipartFile aadharDocument,
+            @RequestParam(value = "panDocument", required = false) MultipartFile panDocument) {
+        Map<String, Object> response = new HashMap<>();
+        
+        try {
+            // Validate file sizes (max 5MB)
+            long maxSize = 5 * 1024 * 1024; // 5MB in bytes
+            
+            if (aadharDocument != null && !aadharDocument.isEmpty()) {
+                if (aadharDocument.getSize() > maxSize) {
+                    response.put("success", false);
+                    response.put("message", "Aadhar document size exceeds 5MB limit");
+                    return ResponseEntity.badRequest().body(response);
+                }
+                
+                String contentType = aadharDocument.getContentType();
+                if (contentType == null || (!contentType.equals("image/jpeg") && 
+                    !contentType.equals("image/jpg") && 
+                    !contentType.equals("application/pdf"))) {
+                    response.put("success", false);
+                    response.put("message", "Aadhar document must be JPEG or PDF format");
+                    return ResponseEntity.badRequest().body(response);
+                }
+            }
+            
+            if (panDocument != null && !panDocument.isEmpty()) {
+                if (panDocument.getSize() > maxSize) {
+                    response.put("success", false);
+                    response.put("message", "PAN document size exceeds 5MB limit");
+                    return ResponseEntity.badRequest().body(response);
+                }
+                
+                String contentType = panDocument.getContentType();
+                if (contentType == null || (!contentType.equals("image/jpeg") && 
+                    !contentType.equals("image/jpg") && 
+                    !contentType.equals("application/pdf"))) {
+                    response.put("success", false);
+                    response.put("message", "PAN document must be JPEG or PDF format");
+                    return ResponseEntity.badRequest().body(response);
+                }
+            }
+            
+            // Get the most recent pending KYC request for this user
+            Optional<KycRequest> latestRequest = kycService.getLatestPendingKycRequest(userAccountNumber);
+            
+            if (!latestRequest.isPresent()) {
+                response.put("success", false);
+                response.put("message", "No pending KYC request found. Please submit KYC request first.");
+                return ResponseEntity.badRequest().body(response);
+            }
+            
+            KycRequest kycRequest = latestRequest.get();
+            
+            // Save documents
+            if (aadharDocument != null && !aadharDocument.isEmpty()) {
+                kycRequest.setAadharDocument(aadharDocument.getBytes());
+                kycRequest.setAadharDocumentType(aadharDocument.getContentType());
+                kycRequest.setAadharDocumentName(aadharDocument.getOriginalFilename());
+            }
+            
+            if (panDocument != null && !panDocument.isEmpty()) {
+                kycRequest.setPanDocument(panDocument.getBytes());
+                kycRequest.setPanDocumentType(panDocument.getContentType());
+                kycRequest.setPanDocumentName(panDocument.getOriginalFilename());
+            }
+            
+            KycRequest savedRequest = kycService.saveKycRequest(kycRequest);
+            
+            response.put("success", true);
+            response.put("message", "Documents uploaded successfully");
+            response.put("kycRequest", savedRequest);
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "Failed to upload documents: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(response);
+        }
+    }
+
+    // Download Aadhar document
+    @GetMapping("/{id}/aadhar-document")
+    public ResponseEntity<byte[]> downloadAadharDocument(@PathVariable Long id) {
+        Optional<KycRequest> request = kycService.getKycRequestById(id);
+        if (!request.isPresent() || request.get().getAadharDocument() == null) {
+            return ResponseEntity.notFound().build();
+        }
+        
+        KycRequest kycRequest = request.get();
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.parseMediaType(
+            kycRequest.getAadharDocumentType() != null ? kycRequest.getAadharDocumentType() : "application/pdf"));
+        headers.setContentDispositionFormData("attachment", 
+            kycRequest.getAadharDocumentName() != null ? kycRequest.getAadharDocumentName() : "aadhar_document.pdf");
+        
+        return ResponseEntity.ok()
+                .headers(headers)
+                .body(kycRequest.getAadharDocument());
+    }
+
+    // Download PAN document
+    @GetMapping("/{id}/pan-document")
+    public ResponseEntity<byte[]> downloadPanDocument(@PathVariable Long id) {
+        Optional<KycRequest> request = kycService.getKycRequestById(id);
+        if (!request.isPresent() || request.get().getPanDocument() == null) {
+            return ResponseEntity.notFound().build();
+        }
+        
+        KycRequest kycRequest = request.get();
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.parseMediaType(
+            kycRequest.getPanDocumentType() != null ? kycRequest.getPanDocumentType() : "application/pdf"));
+        headers.setContentDispositionFormData("attachment", 
+            kycRequest.getPanDocumentName() != null ? kycRequest.getPanDocumentName() : "pan_document.pdf");
+        
+        return ResponseEntity.ok()
+                .headers(headers)
+                .body(kycRequest.getPanDocument());
     }
 
     // Basic CRUD operations

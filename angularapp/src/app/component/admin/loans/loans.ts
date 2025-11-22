@@ -2,6 +2,7 @@ import { CurrencyPipe, CommonModule, isPlatformBrowser } from '@angular/common';
 import { Component, OnInit, Inject, PLATFORM_ID } from '@angular/core';
 import { Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
+import { FormsModule } from '@angular/forms';
 import { environment } from '../../../../environment/environment';
 
 interface LoanRequest {
@@ -12,7 +13,7 @@ interface LoanRequest {
   amount: number;
   tenure: number;
   interestRate: number;
-  status: 'Pending' | 'Approved' | 'Rejected';
+  status: 'Pending' | 'Approved' | 'Rejected' | 'Foreclosed';
   accountNumber: string;
   currentBalance: number;
   loanAccountNumber: string;
@@ -20,22 +21,47 @@ interface LoanRequest {
   approvalDate?: string;
 }
 
+interface ForeclosureDetails {
+  principalPaid: number;
+  interestPaid: number;
+  remainingPrincipal: number;
+  remainingInterest: number;
+  foreclosureCharges: number;
+  gst: number;
+  totalForeclosureAmount: number;
+  monthsElapsed: number;
+  remainingMonths: number;
+  emi: number;
+  totalPaid: number;
+}
+
 @Component({
   selector: 'app-loans',
   standalone: true,
   templateUrl: './loans.html',
   styleUrls: ['./loans.css'],
-  imports: [CurrencyPipe, CommonModule]
+  imports: [CurrencyPipe, CommonModule, FormsModule]
 })
 export class Loans implements OnInit {
   constructor(private router: Router, @Inject(PLATFORM_ID) private platformId: Object, private http: HttpClient) {}
 
   loanRequests: LoanRequest[] = [];
   loading = false;
+  
+  // Foreclosure properties
+  showForeclosureModal = false;
+  foreclosureLoanNumber = '';
+  calculatingForeclosure = false;
+  processingForeclosure = false;
+  foreclosureDetails: ForeclosureDetails | null = null;
+  foreclosureError = '';
 
   ngOnInit() {
-    console.log('Loans component initialized!');
-    this.loadAllLoans();
+    // Only load in browser, not during SSR
+    if (isPlatformBrowser(this.platformId)) {
+      console.log('Loans component initialized!');
+      this.loadAllLoans();
+    }
   }
 
   loadAllLoans() {
@@ -216,5 +242,119 @@ export class Loans implements OnInit {
     console.log('Transaction ID:', transaction.id);
     console.log('New Balance:', newBalance);
     console.log('==================================');
+  }
+
+  // Open foreclosure modal
+  openForeclosureModal() {
+    this.showForeclosureModal = true;
+    this.foreclosureLoanNumber = '';
+    this.foreclosureDetails = null;
+    this.foreclosureError = '';
+  }
+
+  // Foreclose loan directly from table
+  forecloseLoanFromTable(loan: LoanRequest) {
+    if (!confirm(`Are you sure you want to foreclose loan ${loan.loanAccountNumber}?\n\nThis will calculate the foreclosure amount and debit it from the user's account.`)) {
+      return;
+    }
+
+    // Set the loan number and calculate
+    this.foreclosureLoanNumber = loan.loanAccountNumber;
+    this.showForeclosureModal = true;
+    this.foreclosureError = '';
+    this.foreclosureDetails = null;
+
+    // Auto-calculate foreclosure
+    this.calculateForeclosure();
+  }
+
+  // Close foreclosure modal
+  closeForeclosureModal() {
+    this.showForeclosureModal = false;
+    this.foreclosureLoanNumber = '';
+    this.foreclosureDetails = null;
+    this.foreclosureError = '';
+  }
+
+  // Calculate foreclosure amount
+  calculateForeclosure() {
+    if (!this.foreclosureLoanNumber || this.foreclosureLoanNumber.trim() === '') {
+      this.foreclosureError = 'Please enter a loan account number';
+      return;
+    }
+
+    this.calculatingForeclosure = true;
+    this.foreclosureError = '';
+    this.foreclosureDetails = null;
+
+    this.http.get(`${environment.apiUrl}/loans/foreclosure/calculate/${this.foreclosureLoanNumber.trim()}`).subscribe({
+      next: (response: any) => {
+        this.calculatingForeclosure = false;
+        if (response.success) {
+          this.foreclosureDetails = {
+            principalPaid: response.principalPaid,
+            interestPaid: response.interestPaid,
+            remainingPrincipal: response.remainingPrincipal,
+            remainingInterest: response.remainingInterest,
+            foreclosureCharges: response.foreclosureCharges,
+            gst: response.gst,
+            totalForeclosureAmount: response.totalForeclosureAmount,
+            monthsElapsed: response.monthsElapsed,
+            remainingMonths: response.remainingMonths,
+            emi: response.emi,
+            totalPaid: response.totalPaid
+          };
+        } else {
+          this.foreclosureError = response.message || 'Failed to calculate foreclosure amount';
+        }
+      },
+      error: (err: any) => {
+        this.calculatingForeclosure = false;
+        this.foreclosureError = err.error?.message || 'Error calculating foreclosure. Please check the loan number.';
+        console.error('Error calculating foreclosure:', err);
+      }
+    });
+  }
+
+  // Process foreclosure
+  processForeclosure() {
+    if (!this.foreclosureLoanNumber || this.foreclosureLoanNumber.trim() === '') {
+      this.foreclosureError = 'Please enter a loan account number';
+      return;
+    }
+
+    if (!this.foreclosureDetails) {
+      this.foreclosureError = 'Please calculate foreclosure amount first';
+      return;
+    }
+
+    if (!confirm(`Are you sure you want to foreclose this loan?\n\nTotal Foreclosure Amount: ₹${this.foreclosureDetails.totalForeclosureAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n\nThis action cannot be undone.`)) {
+      return;
+    }
+
+    this.processingForeclosure = true;
+    this.foreclosureError = '';
+
+    this.http.post(`${environment.apiUrl}/loans/foreclose/${this.foreclosureLoanNumber.trim()}`, {}).subscribe({
+      next: (response: any) => {
+        this.processingForeclosure = false;
+        if (response.success) {
+          alert(`✅ Loan foreclosed successfully!\n\nTotal Amount: ₹${this.foreclosureDetails!.totalForeclosureAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n\nPDF has been generated and sent to user's email.`);
+          
+          // Reload loans to update status
+          this.loadAllLoans();
+          
+          // Close modal
+          this.closeForeclosureModal();
+        } else {
+          this.foreclosureError = response.message || 'Failed to process foreclosure';
+        }
+      },
+      error: (err: any) => {
+        this.processingForeclosure = false;
+        this.foreclosureError = err.error?.message || 'Error processing foreclosure. Please try again.';
+        console.error('Error processing foreclosure:', err);
+      }
+    });
   }
 }

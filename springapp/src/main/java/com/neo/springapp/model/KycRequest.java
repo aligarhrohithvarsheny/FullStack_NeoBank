@@ -27,6 +27,21 @@ public class KycRequest {
     private LocalDateTime submittedDate;
     private LocalDateTime approvedDate;
     private String approvedBy; // Admin who approved the KYC
+    
+    // Document uploads
+    @Lob
+    @Column(name = "aadhar_document", columnDefinition = "LONGBLOB")
+    private byte[] aadharDocument; // Aadhar document (JPEG or PDF)
+    
+    @Lob
+    @Column(name = "pan_document", columnDefinition = "LONGBLOB")
+    private byte[] panDocument; // PAN document (JPEG or PDF)
+    
+    private String aadharDocumentType; // "image/jpeg" or "application/pdf"
+    private String panDocumentType; // "image/jpeg" or "application/pdf"
+    
+    private String aadharDocumentName; // Original filename
+    private String panDocumentName; // Original filename
 
     // Constructors
     public KycRequest() {

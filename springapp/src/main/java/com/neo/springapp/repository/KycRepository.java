@@ -57,4 +57,7 @@ public interface KycRepository extends JpaRepository<KycRequest, Long> {
     // Admin queries
     @Query("SELECT k FROM KycRequest k WHERE k.approvedBy = :adminName")
     List<KycRequest> findByApprovedBy(@Param("adminName") String adminName);
+    
+    // Find pending KYC requests by user account number
+    List<KycRequest> findByUserAccountNumberAndStatusOrderBySubmittedDateDesc(String userAccountNumber, String status);
 }

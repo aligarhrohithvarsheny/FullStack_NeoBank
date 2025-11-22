@@ -36,13 +36,23 @@ export class Createaccount implements OnInit {
   submitError = '';
   successMessage = '';
   loading = false;
+  termsAccepted = false;
   
   // Approval tracking
   showTracking = false;
-  trackingEmail = '';
+  trackingAadhar = '';
   trackingMobile = '';
   trackingResult: any = null;
   trackingError = '';
+  trackingLoading = false;
+
+  // Validation status for uniqueness checks
+  aadharChecking = false;
+  aadharExists = false;
+  panChecking = false;
+  panExists = false;
+  mobileChecking = false;
+  mobileExists = false;
 
   // PAN regex: 5 letters, 4 digits, 1 letter
   private panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]$/;
@@ -258,12 +268,40 @@ export class Createaccount implements OnInit {
       state: ['', [Validators.required]],
       city: [{value: '', disabled: true}, [Validators.required]], // Initially disabled
       password: ['', [Validators.required, Validators.minLength(6)]],
-      confirmPassword: ['', [Validators.required]]
+      confirmPassword: ['', [Validators.required]],
+      termsAccepted: [false, [Validators.requiredTrue]]
     }, { validators: this.passwordsMatchValidator });
 
     // Listen for state changes to update cities
     this.form.get('state')?.valueChanges.subscribe(selectedState => {
       this.onStateChange(selectedState);
+    });
+
+    // Listen for Aadhar changes to check uniqueness
+    this.form.get('aadhar')?.valueChanges.subscribe(aadhar => {
+      if (aadhar && this.form.get('aadhar')?.valid && !this.form.get('aadhar')?.hasError('invalidAadhar') && !this.form.get('aadhar')?.hasError('invalidAadharChecksum')) {
+        this.checkAadharUniqueness(aadhar);
+      } else {
+        this.aadharExists = false;
+      }
+    });
+
+    // Listen for PAN changes to check uniqueness
+    this.form.get('pan')?.valueChanges.subscribe(pan => {
+      if (pan && this.form.get('pan')?.valid && !this.form.get('pan')?.hasError('invalidPan')) {
+        this.checkPanUniqueness(pan.toUpperCase());
+      } else {
+        this.panExists = false;
+      }
+    });
+
+    // Listen for Mobile changes to check uniqueness
+    this.form.get('mobile')?.valueChanges.subscribe(mobile => {
+      if (mobile && this.form.get('mobile')?.valid && !this.form.get('mobile')?.hasError('invalidMobile')) {
+        this.checkMobileUniqueness(mobile);
+      } else {
+        this.mobileExists = false;
+      }
     });
   }
 
@@ -376,6 +414,93 @@ export class Createaccount implements OnInit {
     return pw && cpw && pw !== cpw ? { passwordsMismatch: true } : null;
   }
 
+  // Check Aadhar uniqueness
+  checkAadharUniqueness(aadhar: string) {
+    if (!aadhar || aadhar.length !== 12) {
+      this.aadharExists = false;
+      return;
+    }
+
+    this.aadharChecking = true;
+    this.aadharExists = false;
+
+    // Debounce: wait 500ms before making API call
+    setTimeout(() => {
+      if (this.form.get('aadhar')?.value === aadhar) {
+        this.http.get<{isUnique: boolean}>(`${environment.apiUrl}/accounts/validate/aadhar/${aadhar}`).subscribe({
+          next: (response) => {
+            this.aadharExists = !response.isUnique;
+            this.aadharChecking = false;
+          },
+          error: (err) => {
+            console.error('Error checking Aadhar uniqueness:', err);
+            this.aadharChecking = false;
+          }
+        });
+      } else {
+        this.aadharChecking = false;
+      }
+    }, 500);
+  }
+
+  // Check PAN uniqueness
+  checkPanUniqueness(pan: string) {
+    if (!pan || pan.length !== 10) {
+      this.panExists = false;
+      return;
+    }
+
+    this.panChecking = true;
+    this.panExists = false;
+
+    // Debounce: wait 500ms before making API call
+    setTimeout(() => {
+      if (this.form.get('pan')?.value?.toUpperCase() === pan) {
+        this.http.get<{isUnique: boolean}>(`${environment.apiUrl}/accounts/validate/pan/${pan}`).subscribe({
+          next: (response) => {
+            this.panExists = !response.isUnique;
+            this.panChecking = false;
+          },
+          error: (err) => {
+            console.error('Error checking PAN uniqueness:', err);
+            this.panChecking = false;
+          }
+        });
+      } else {
+        this.panChecking = false;
+      }
+    }, 500);
+  }
+
+  // Check Mobile uniqueness
+  checkMobileUniqueness(mobile: string) {
+    if (!mobile || mobile.length !== 10) {
+      this.mobileExists = false;
+      return;
+    }
+
+    this.mobileChecking = true;
+    this.mobileExists = false;
+
+    // Debounce: wait 500ms before making API call
+    setTimeout(() => {
+      if (this.form.get('mobile')?.value === mobile) {
+        this.http.get<{isUnique: boolean}>(`${environment.apiUrl}/accounts/validate/phone/${mobile}`).subscribe({
+          next: (response) => {
+            this.mobileExists = !response.isUnique;
+            this.mobileChecking = false;
+          },
+          error: (err) => {
+            console.error('Error checking Mobile uniqueness:', err);
+            this.mobileChecking = false;
+          }
+        });
+      } else {
+        this.mobileChecking = false;
+      }
+    }, 500);
+  }
+
   // --- Helpers for local storage (mock backend) ---
   private readPendingAccounts(): PendingAccount[] {
     if (!isPlatformBrowser(this.platformId)) return [];
@@ -427,9 +552,40 @@ export class Createaccount implements OnInit {
     this.submitError = '';
     this.successMessage = '';
     this.loading = true;
+    
+    // Clear any previous validation errors
+    this.aadharExists = false;
+    this.panExists = false;
+    this.mobileExists = false;
+
+    // Check terms acceptance
+    if (!this.form.get('termsAccepted')?.value) {
+      this.submitError = 'Please accept the Terms and Conditions to proceed.';
+      this.loading = false;
+      return;
+    }
 
     if (this.form.invalid) {
       this.submitError = 'Please fix validation errors before submitting.';
+      this.loading = false;
+      return;
+    }
+
+    // Check for duplicate fields before submitting
+    if (this.aadharExists) {
+      this.submitError = 'Aadhar number is already registered. Another account exists with this Aadhar number.';
+      this.loading = false;
+      return;
+    }
+
+    if (this.panExists) {
+      this.submitError = 'PAN number is already registered. Another account exists with this PAN number.';
+      this.loading = false;
+      return;
+    }
+
+    if (this.mobileExists) {
+      this.submitError = 'Mobile number is already registered. Another account exists with this mobile number.';
       this.loading = false;
       return;
     }
@@ -465,14 +621,23 @@ export class Createaccount implements OnInit {
         console.log('User created successfully in MySQL:', response);
         
         if (response.success) {
-          this.successMessage = response.message || 'Account request submitted successfully! Admin will review and approve your account.';
+          // Clear any previous errors
+          this.submitError = '';
+          this.successMessage = response.message || 'Account request submitted successfully. Admin will review and assign account number.';
           this.form.reset();
           this.submitted = false;
           this.loading = false;
           
+          // Clear validation flags
+          this.aadharExists = false;
+          this.panExists = false;
+          this.mobileExists = false;
+          
           // Also save to localStorage as backup
           this.submitToLocalStorage(val);
         } else {
+          // Clear success message if there's an error
+          this.successMessage = '';
           this.submitError = response.message || 'Failed to submit account request. Please try again.';
           this.loading = false;
         }
@@ -480,16 +645,39 @@ export class Createaccount implements OnInit {
       error: (err: any) => {
         console.error('Error creating user:', err);
         
+        // Clear success message on error
+        this.successMessage = '';
+        
         // Try to parse error response
-        if (err.error && err.error.message) {
-          this.submitError = err.error.message;
+        if (err.error) {
+          if (err.error.message) {
+            this.submitError = err.error.message;
+          } else if (err.error.error) {
+            this.submitError = err.error.error;
+          } else {
+            this.submitError = 'Account creation failed. Please try again.';
+          }
+          
+          // Check for specific error types
+          if (err.error.errorType === 'AADHAR_EXISTS') {
+            this.aadharExists = true;
+            this.submitError = 'Aadhar number is already registered. Another account exists with this Aadhar number.';
+          } else if (err.error.errorType === 'PAN_EXISTS') {
+            this.panExists = true;
+            this.submitError = 'PAN number is already registered. Another account exists with this PAN number.';
+          } else if (err.error.errorType === 'PHONE_EXISTS') {
+            this.mobileExists = true;
+            this.submitError = 'Mobile number is already registered. Another account exists with this mobile number.';
+          } else if (err.error.errorType === 'EMAIL_EXISTS') {
+            this.submitError = 'Email address is already registered. Please use a different email or try logging in.';
+          }
         } else {
-          this.submitError = 'Failed to submit account request. Please try again.';
+          this.submitError = 'Account creation failed. Please try again.';
         }
         this.loading = false;
         
-        // Fallback to localStorage
-        this.submitToLocalStorage(val);
+        // Don't fallback to localStorage on error - only show error message
+        // this.submitToLocalStorage(val);
       }
     });
   }
@@ -537,31 +725,122 @@ export class Createaccount implements OnInit {
     this.showTracking = !this.showTracking;
     this.trackingResult = null;
     this.trackingError = '';
-    this.trackingEmail = '';
+    this.trackingAadhar = '';
     this.trackingMobile = '';
   }
 
+  filterDigits(type: 'aadhar' | 'mobile', event: Event) {
+    const input = event.target as HTMLInputElement;
+    const value = input.value.replace(/\D/g, '');
+    if (type === 'aadhar') {
+      this.trackingAadhar = value;
+    } else {
+      this.trackingMobile = value;
+    }
+  }
+
   trackApproval() {
-    if (!this.trackingEmail || !this.trackingMobile) {
-      this.trackingError = 'Please enter both email and mobile number.';
+    if (!this.trackingAadhar || !this.trackingMobile) {
+      this.trackingError = 'Please enter both Aadhar number and mobile number.';
       return;
     }
 
-    const email = this.trackingEmail.toLowerCase();
-    const mobile = this.trackingMobile;
+    if (this.trackingAadhar.length !== 12) {
+      this.trackingError = 'Aadhar number must be 12 digits.';
+      return;
+    }
 
-    // Search in admin users (where all accounts are stored)
-    const adminUsers = this.readAdminUsers();
-    const match = adminUsers.find(acc => 
-      acc.email.toLowerCase() === email && acc.mobile === mobile
-    );
+    if (this.trackingMobile.length !== 10) {
+      this.trackingError = 'Mobile number must be 10 digits.';
+      return;
+    }
 
-    if (match) {
-      this.trackingResult = match;
-      this.trackingError = '';
-    } else {
-      this.trackingError = 'No account found with the provided email and mobile number.';
-      this.trackingResult = null;
+    this.trackingLoading = true;
+    this.trackingError = '';
+    this.trackingResult = null;
+
+    // Call backend API to get tracking status
+    this.http.get(`${environment.apiUrl}/tracking/track?aadharNumber=${this.trackingAadhar}&mobileNumber=${this.trackingMobile}`).subscribe({
+      next: (response: any) => {
+        this.trackingLoading = false;
+        if (response.success && response.tracking) {
+          this.trackingResult = response.tracking;
+          this.trackingError = '';
+        } else {
+          this.trackingError = 'No tracking record found with the provided Aadhar number and mobile number.';
+          this.trackingResult = null;
+        }
+      },
+      error: (err: any) => {
+        this.trackingLoading = false;
+        console.error('Error tracking approval:', err);
+        if (err.status === 404) {
+          this.trackingError = 'No tracking record found. Please verify your Aadhar number and mobile number.';
+        } else {
+          this.trackingError = err.error?.message || 'Failed to retrieve tracking information. Please try again.';
+        }
+        this.trackingResult = null;
+      }
+    });
+  }
+
+  getTrackingStatusClass(status: string): string {
+    switch (status) {
+      case 'PENDING':
+        return 'status-pending';
+      case 'ADMIN_SEEN':
+        return 'status-seen';
+      case 'ADMIN_APPROVED':
+        return 'status-approved';
+      case 'ADMIN_SENT':
+        return 'status-sent';
+      default:
+        return 'status-default';
+    }
+  }
+
+  getTrackingStatusLabel(status: string): string {
+    switch (status) {
+      case 'PENDING':
+        return 'Pending';
+      case 'ADMIN_SEEN':
+        return 'Admin Seen';
+      case 'ADMIN_APPROVED':
+        return 'Approved';
+      case 'ADMIN_SENT':
+        return 'Sent';
+      default:
+        return status;
+    }
+  }
+
+  getTrackingStatusIcon(status: string): string {
+    switch (status) {
+      case 'PENDING':
+        return 'fa-clock';
+      case 'ADMIN_SEEN':
+        return 'fa-eye';
+      case 'ADMIN_APPROVED':
+        return 'fa-check-circle';
+      case 'ADMIN_SENT':
+        return 'fa-paper-plane';
+      default:
+        return 'fa-info-circle';
+    }
+  }
+
+  getTrackingStatusMessage(status: string): string {
+    switch (status) {
+      case 'PENDING':
+        return 'Your account creation request is pending admin review. We will notify you once it is reviewed.';
+      case 'ADMIN_SEEN':
+        return 'Your account creation request has been seen by admin and is under review.';
+      case 'ADMIN_APPROVED':
+        return 'Congratulations! Your account has been approved by admin. You will receive your account details soon.';
+      case 'ADMIN_SENT':
+        return 'Your account details have been sent. Please check your email for further instructions.';
+      default:
+        return 'Your account status: ' + status;
     }
   }
 
@@ -606,6 +885,75 @@ export class Createaccount implements OnInit {
   }
 
   get f() { return this.form.controls; }
+
+  showTerms(event: Event) {
+    event.preventDefault();
+    const termsText = `
+TERMS AND CONDITIONS
+
+1. Account Opening:
+   - By creating an account, you agree to provide accurate and complete information.
+   - You must be at least 18 years old to open an account.
+   - All documents submitted must be genuine and valid.
+
+2. Account Usage:
+   - You are responsible for maintaining the confidentiality of your account credentials.
+   - You must notify us immediately of any unauthorized access to your account.
+   - You agree to use the account only for lawful purposes.
+
+3. Fees and Charges:
+   - Account maintenance fees may apply as per our schedule of charges.
+   - Transaction fees may be charged for certain services.
+   - All fees will be clearly communicated before they are charged.
+
+4. Account Closure:
+   - You may close your account at any time by submitting a written request.
+   - We reserve the right to close your account if you violate these terms.
+
+5. Privacy:
+   - We collect and use your personal information as described in our Privacy Policy.
+   - Your data will be protected in accordance with applicable laws.
+
+6. Limitation of Liability:
+   - NeoBank shall not be liable for any indirect, incidental, or consequential damages.
+   - Our liability is limited to the extent permitted by law.
+
+By accepting these terms, you acknowledge that you have read, understood, and agree to be bound by these Terms and Conditions.
+    `;
+    alert(termsText);
+  }
+
+  showPrivacy(event: Event) {
+    event.preventDefault();
+    const privacyText = `
+PRIVACY POLICY
+
+1. Information Collection:
+   - We collect personal information including name, email, phone, Aadhar, PAN, and financial details.
+   - This information is collected to provide banking services and comply with regulatory requirements.
+
+2. Information Use:
+   - Your information is used to process account applications, provide services, and comply with legal obligations.
+   - We may use your information for marketing purposes with your consent.
+
+3. Information Sharing:
+   - We do not sell your personal information to third parties.
+   - We may share information with regulatory authorities as required by law.
+   - Information may be shared with service providers who assist in our operations.
+
+4. Data Security:
+   - We implement appropriate security measures to protect your information.
+   - However, no method of transmission over the internet is 100% secure.
+
+5. Your Rights:
+   - You have the right to access, correct, or delete your personal information.
+   - You can opt-out of marketing communications at any time.
+
+6. Contact:
+   - For privacy concerns, contact us at privacy@neobank.com
+    `;
+    alert(privacyText);
+  }
 
   goBack() {
     this.router.navigate(['/website/landing']);

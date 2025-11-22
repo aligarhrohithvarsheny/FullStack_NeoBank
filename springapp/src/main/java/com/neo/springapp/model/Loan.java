@@ -3,6 +3,7 @@ package com.neo.springapp.model;
 import jakarta.persistence.*;
 import lombok.Data;
 import java.time.LocalDateTime;
+import java.time.LocalDate;
 
 @Data
 @Entity
@@ -25,12 +26,29 @@ public class Loan {
     private String userEmail;
     private String accountNumber;
     private Double currentBalance;
+    private String pan; // PAN card number for CIBIL check
+    
+    // CIBIL and credit information
+    private Integer cibilScore; // CIBIL score (300-900)
+    private Double creditLimit; // Available credit limit based on CIBIL
     
     // Loan account information
     private String loanAccountNumber;
     private LocalDateTime applicationDate;
     private LocalDateTime approvalDate;
+    private LocalDate emiStartDate; // EMI payment start date (1 month after approval)
     private String approvedBy; // Admin who approved the loan
+    
+    // Foreclosure information
+    private LocalDateTime foreclosureDate;
+    private Double foreclosureAmount; // Total amount paid for foreclosure
+    private Double foreclosureCharges; // 4% foreclosure charges
+    private Double foreclosureGst; // GST on foreclosure charges
+    private Double principalPaid; // Principal amount already paid
+    private Double interestPaid; // Interest amount already paid
+    private Double remainingPrincipal; // Remaining principal to be paid
+    private Double remainingInterest; // Remaining interest to be paid
+    private String foreclosedBy; // Admin who processed foreclosure
 
     // Constructors
     public Loan() {

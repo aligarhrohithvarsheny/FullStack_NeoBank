@@ -19,6 +19,7 @@ public interface LoanRepository extends JpaRepository<Loan, Long> {
     List<Loan> findByUserEmail(String userEmail);
     List<Loan> findByStatus(String status);
     Page<Loan> findByStatus(String status, Pageable pageable);
+    java.util.Optional<Loan> findByLoanAccountNumber(String loanAccountNumber);
     
     // Loan type queries
     List<Loan> findByType(String type);

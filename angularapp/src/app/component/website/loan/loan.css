@@ -58,6 +58,168 @@ form {
   box-shadow: 0 0 0 3px rgba(0, 119, 204, 0.1);
 }
 
+/* Readonly input styling */
+input[readonly], input.readonly {
+  background-color: #f8f9fa;
+  cursor: not-allowed;
+  color: #6c757d;
+  border-color: #dee2e6;
+}
+
+input[readonly]:focus, input.readonly:focus {
+  border-color: #dee2e6;
+  box-shadow: none;
+}
+
+.input-hint {
+  display: block;
+  margin-top: 5px;
+  font-size: 0.85rem;
+  color: #666;
+  font-style: italic;
+}
+
+.required {
+  color: #dc3545;
+  font-weight: bold;
+}
+
+/* PAN Input Container */
+.pan-input-container {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.pan-input-container input {
+  flex: 1;
+}
+
+.check-cibil-btn {
+  background: linear-gradient(135deg, #28a745, #20c997);
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: all 0.3s ease;
+  min-width: 120px;
+}
+
+.check-cibil-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #218838, #1aa179);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+}
+
+.check-cibil-btn:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+  opacity: 0.6;
+  transform: none;
+}
+
+/* CIBIL Information Card */
+.cibil-info-card {
+  background: white;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  margin-bottom: 20px;
+  border-left: 4px solid #667eea;
+}
+
+.cibil-info-card h3 {
+  margin: 0 0 15px 0;
+  color: #667eea;
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+.loading-cibil {
+  text-align: center;
+  padding: 20px;
+  color: #666;
+}
+
+.cibil-error {
+  padding: 15px;
+  background-color: #f8d7da;
+  color: #721c24;
+  border-radius: 8px;
+  border-left: 3px solid #dc3545;
+}
+
+.cibil-details {
+  margin-top: 10px;
+}
+
+.cibil-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 20px;
+}
+
+.cibil-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 15px;
+  background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+  border-radius: 8px;
+  border-left: 3px solid #667eea;
+}
+
+.cibil-label {
+  font-size: 0.85rem;
+  color: #666;
+  font-weight: 500;
+}
+
+.cibil-value {
+  font-size: 1.3rem;
+  font-weight: bold;
+  color: #333;
+}
+
+.cibil-value.score {
+  font-size: 1.8rem;
+}
+
+.cibil-value.score.excellent {
+  color: #28a745;
+}
+
+.cibil-value.score.good {
+  color: #20c997;
+}
+
+.cibil-value.score.fair {
+  color: #ffc107;
+}
+
+.cibil-value.score.average {
+  color: #fd7e14;
+}
+
+.cibil-value.score.poor {
+  color: #dc3545;
+}
+
+.cibil-value.limit {
+  color: #0077cc;
+  font-size: 1.5rem;
+}
+
+.cibil-category {
+  font-size: 0.9rem;
+  color: #666;
+  font-style: italic;
+}
+
 .submit-button {
   width: 100%;
   padding: 12px 25px;
@@ -384,6 +546,11 @@ th:nth-child(10), td:nth-child(10) { /* Actions */
   font-size: 12px;
 }
 
+.foreclosed {
+  color: #6f42c1;
+  font-weight: 600;
+}
+
 .rejected {
   color: #e74c3c;
   font-weight: bold;
@@ -439,6 +606,34 @@ th:nth-child(10), td:nth-child(10) { /* Actions */
 .download-pdf-btn:active {
   transform: translateY(0);
   box-shadow: 0 2px 6px rgba(0, 119, 204, 0.3);
+}
+
+.download-foreclosure-btn {
+  background: linear-gradient(135deg, #6f42c1, #5a32a3);
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  margin-left: 8px;
+}
+
+.download-foreclosure-btn:hover {
+  background: linear-gradient(135deg, #5a32a3, #4a2a8a);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(111, 66, 193, 0.3);
+}
+
+.download-foreclosure-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 6px rgba(111, 66, 193, 0.3);
 }
 
 /* Responsive Design */
@@ -534,6 +729,12 @@ th:nth-child(10), td:nth-child(10) { /* Actions */
     width: 20%;
   }
 
+  .download-foreclosure-btn {
+    margin-left: 0;
+    margin-top: 5px;
+    width: 100%;
+  }
+
   .download-pdf-btn {
     font-size: 10px;
     padding: 6px 8px;
@@ -566,6 +767,1113 @@ th:nth-child(10), td:nth-child(10) { /* Actions */
   .submit-button, .calculate-button {
     width: 100%;
     margin: 5px 0;
+  }
+}
+
+/* Foreclosure Quick Access Banner */
+.foreclosure-quick-access {
+  margin: 20px 0;
+}
+
+.foreclosure-banner {
+  background: linear-gradient(135deg, #6f42c1, #5a32a3);
+  color: white;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 4px 15px rgba(111, 66, 193, 0.3);
+  margin-bottom: 20px;
+}
+
+.foreclosure-banner-content h3 {
+  margin: 0 0 10px 0;
+  font-size: 1.3rem;
+  color: white;
+}
+
+.foreclosure-banner-content p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.95rem;
+}
+
+/* Foreclosure Section */
+.foreclosure-section {
+  margin-top: 40px;
+  padding: 25px;
+  background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+  border-radius: 12px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+.foreclosure-section h3 {
+  color: #6f42c1;
+  font-size: 1.5rem;
+  margin-bottom: 25px;
+  text-align: center;
+}
+
+.foreclosure-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+  gap: 20px;
+}
+
+.foreclosure-card {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border: 2px solid #e9ecef;
+  transition: all 0.3s ease;
+}
+
+.foreclosure-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 20px rgba(111, 66, 193, 0.2);
+  border-color: #6f42c1;
+}
+
+.foreclosure-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 2px solid #e9ecef;
+}
+
+.foreclosure-header h4 {
+  margin: 0;
+  color: #333;
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+.foreclosure-badge {
+  background: linear-gradient(135deg, #6f42c1, #5a32a3);
+  color: white;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.foreclosure-details-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+.foreclosure-item {
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border-left: 3px solid #6f42c1;
+}
+
+.foreclosure-label {
+  font-size: 0.85rem;
+  color: #666;
+  margin-bottom: 5px;
+  font-weight: 500;
+}
+
+.foreclosure-value {
+  font-size: 1rem;
+  color: #333;
+  font-weight: 600;
+}
+
+.foreclosure-value.highlight {
+  color: #6f42c1;
+  font-size: 1.2rem;
+}
+
+.foreclosure-actions {
+  margin-top: 20px;
+  text-align: center;
+}
+
+.download-foreclosure-pdf-btn {
+  background: linear-gradient(135deg, #6f42c1, #5a32a3);
+  color: white;
+  border: none;
+  padding: 12px 25px;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  width: 100%;
+}
+
+.download-foreclosure-pdf-btn:hover {
+  background: linear-gradient(135deg, #5a32a3, #4a2a8a);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(111, 66, 193, 0.3);
+}
+
+.download-foreclosure-pdf-btn:active {
+  transform: translateY(0);
+}
+
+@media (max-width: 768px) {
+  .foreclosure-cards {
+    grid-template-columns: 1fr;
+  }
+  
+  .foreclosure-details-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* EMI Details Section */
+.emi-details-section {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  overflow-y: auto;
+}
+
+.emi-details-container {
+  background: white;
+  border-radius: 15px;
+  max-width: 1200px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+  position: relative;
+}
+
+.emi-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 30px;
+  border-bottom: 3px solid #0077cc;
+  background: linear-gradient(135deg, #0077cc, #0056b3);
+  color: white;
+  border-radius: 15px 15px 0 0;
+}
+
+.emi-header h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.close-btn {
+  background: rgba(255, 255, 255, 0.2);
+  border: 2px solid white;
+  color: white;
+  width: 35px;
+  height: 35px;
+  border-radius: 50%;
+  font-size: 1.2rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.close-btn:hover {
+  background: white;
+  color: #0077cc;
+  transform: rotate(90deg);
+}
+
+.loan-summary-card {
+  padding: 25px 30px;
+  background: #f8f9fa;
+  border-bottom: 2px solid #e9ecef;
+}
+
+.loan-summary-card h3 {
+  margin: 0 0 20px 0;
+  color: #0077cc;
+  font-size: 1.3rem;
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 15px;
+}
+
+.summary-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 12px;
+  background: white;
+  border-radius: 8px;
+  border-left: 3px solid #0077cc;
+}
+
+.summary-label {
+  font-weight: 600;
+  color: #555;
+}
+
+.summary-value {
+  color: #333;
+  font-weight: 600;
+}
+
+.next-emi-alert {
+  margin: 20px 30px;
+  padding: 20px;
+  background: linear-gradient(135deg, #fff3cd, #ffeaa7);
+  border: 2px solid #ffc107;
+  border-radius: 10px;
+  box-shadow: 0 4px 15px rgba(255, 193, 7, 0.3);
+}
+
+.alert-content h4 {
+  margin: 0 0 15px 0;
+  color: #856404;
+  font-size: 1.2rem;
+}
+
+.alert-content p {
+  margin: 8px 0;
+  color: #856404;
+  font-size: 1rem;
+}
+
+.pay-now-btn {
+  margin-top: 15px;
+  padding: 12px 30px;
+  background: linear-gradient(135deg, #28a745, #20c997);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.pay-now-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(40, 167, 69, 0.4);
+}
+
+.pay-now-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.emi-schedule {
+  padding: 25px 30px;
+}
+
+.emi-schedule h3 {
+  margin: 0 0 20px 0;
+  color: #0077cc;
+  font-size: 1.3rem;
+}
+
+.emi-summary-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 15px;
+  margin-bottom: 25px;
+}
+
+.stat-card {
+  background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+  padding: 15px;
+  border-radius: 10px;
+  text-align: center;
+  border-left: 4px solid #0077cc;
+}
+
+.stat-label {
+  display: block;
+  font-size: 0.85rem;
+  color: #666;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+.stat-value {
+  display: block;
+  font-size: 1.8rem;
+  font-weight: bold;
+  color: #0077cc;
+}
+
+.stat-value.paid-count {
+  color: #28a745;
+}
+
+.stat-value.pending-count {
+  color: #ffc107;
+}
+
+.emi-cards-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 20px;
+  margin-top: 20px;
+}
+
+.emi-card {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  padding: 20px;
+  position: relative;
+  border-left: 5px solid #ffc107;
+  transition: all 0.3s ease;
+  overflow: hidden;
+}
+
+.emi-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+}
+
+.emi-card.emi-paid {
+  border-left-color: #28a745;
+  background: linear-gradient(135deg, #ffffff, #f0f9f4);
+}
+
+.emi-card.emi-pending {
+  border-left-color: #ffc107;
+  background: linear-gradient(135deg, #ffffff, #fffef5);
+}
+
+.emi-card.emi-overdue {
+  border-left-color: #dc3545;
+  background: linear-gradient(135deg, #ffffff, #fff5f5);
+}
+
+/* Green Ticket for Paid EMIs */
+.paid-ticket {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  background: linear-gradient(135deg, #28a745, #20c997);
+  color: white;
+  padding: 8px 15px;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: bold;
+  font-size: 0.85rem;
+  box-shadow: 0 2px 10px rgba(40, 167, 69, 0.4);
+  z-index: 10;
+  animation: ticketPulse 2s ease-in-out infinite;
+}
+
+@keyframes ticketPulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 2px 10px rgba(40, 167, 69, 0.4);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 4px 15px rgba(40, 167, 69, 0.6);
+  }
+}
+
+.ticket-icon {
+  font-size: 1.2rem;
+  font-weight: bold;
+}
+
+.ticket-text {
+  letter-spacing: 1px;
+}
+
+.emi-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+  padding-bottom: 15px;
+  border-bottom: 2px solid #e9ecef;
+}
+
+.emi-number-badge {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.emi-number {
+  font-size: 1.1rem;
+  font-weight: bold;
+  color: #0077cc;
+}
+
+.emi-month {
+  font-size: 0.85rem;
+  color: #666;
+  font-style: italic;
+}
+
+.emi-status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.emi-status-indicator.status-paid {
+  background: #d4edda;
+  color: #155724;
+}
+
+.emi-status-indicator.status-pending {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.emi-status-indicator.status-overdue {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.status-paid .status-dot {
+  background: #28a745;
+}
+
+.status-pending .status-dot {
+  background: #ffc107;
+}
+
+.status-overdue .status-dot {
+  background: #dc3545;
+}
+
+.emi-card-body {
+  margin-bottom: 15px;
+}
+
+.emi-due-date {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  margin-bottom: 15px;
+}
+
+.date-label {
+  font-weight: 600;
+  color: #555;
+  font-size: 0.9rem;
+}
+
+.date-value {
+  font-weight: bold;
+  color: #0077cc;
+  font-size: 1rem;
+}
+
+.emi-amount-breakdown {
+  background: #f8f9fa;
+  padding: 15px;
+  border-radius: 8px;
+  margin-bottom: 15px;
+}
+
+.breakdown-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.breakdown-row:last-child {
+  border-bottom: none;
+}
+
+.breakdown-row.total-row {
+  border-top: 2px solid #0077cc;
+  padding-top: 12px;
+  margin-top: 8px;
+}
+
+.breakdown-label {
+  font-size: 0.9rem;
+  color: #666;
+  font-weight: 500;
+}
+
+.breakdown-value {
+  font-size: 0.95rem;
+  color: #333;
+  font-weight: 600;
+}
+
+.breakdown-value.total-amount {
+  font-size: 1.2rem;
+  color: #0077cc;
+  font-weight: bold;
+}
+
+.emi-remaining {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px;
+  background: #e8f4f8;
+  border-radius: 8px;
+  margin-bottom: 10px;
+}
+
+.remaining-label {
+  font-size: 0.85rem;
+  color: #666;
+  font-weight: 500;
+}
+
+.remaining-value {
+  font-size: 1rem;
+  color: #0077cc;
+  font-weight: bold;
+}
+
+.emi-payment-info {
+  padding: 10px;
+  background: #d4edda;
+  border-radius: 8px;
+  margin-top: 10px;
+}
+
+.payment-date {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.payment-label {
+  font-size: 0.85rem;
+  color: #155724;
+  font-weight: 500;
+}
+
+.payment-value {
+  font-size: 0.9rem;
+  color: #155724;
+  font-weight: bold;
+}
+
+.status-badge {
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+}
+
+.status-badge.status-pending {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.status-badge.status-paid {
+  background: #d4edda;
+  color: #155724;
+}
+
+.status-badge.status-overdue {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+.emi-card-actions {
+  margin-top: 15px;
+  padding-top: 15px;
+  border-top: 2px solid #e9ecef;
+}
+
+.pay-emi-btn-card, .download-receipt-btn-card {
+  width: 100%;
+  padding: 12px 20px;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.pay-emi-btn-card {
+  background: linear-gradient(135deg, #28a745, #20c997);
+  color: white;
+}
+
+.pay-emi-btn-card:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(40, 167, 69, 0.4);
+}
+
+.pay-emi-btn-card:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.download-receipt-btn-card {
+  background: linear-gradient(135deg, #0077cc, #0056b3);
+  color: white;
+}
+
+.download-receipt-btn-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(0, 119, 204, 0.4);
+}
+
+.btn-icon {
+  font-size: 1.1rem;
+}
+
+.btn-text {
+  font-weight: 600;
+}
+
+/* Legacy button styles for table view (if still used) */
+.pay-emi-btn, .download-receipt-btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.pay-emi-btn {
+  background: linear-gradient(135deg, #28a745, #20c997);
+  color: white;
+}
+
+.pay-emi-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(40, 167, 69, 0.3);
+}
+
+.pay-emi-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.download-receipt-btn {
+  background: linear-gradient(135deg, #0077cc, #0056b3);
+  color: white;
+}
+
+.download-receipt-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 119, 204, 0.3);
+}
+
+.view-emi-btn {
+  padding: 6px 12px;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-left: 5px;
+}
+
+.view-emi-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+}
+
+@media (max-width: 768px) {
+  .emi-details-container {
+    max-width: 100%;
+    margin: 10px;
+  }
+  
+  .summary-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .emi-cards-container {
+    grid-template-columns: 1fr;
+  }
+  
+  .emi-summary-stats {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  
+  .stat-value {
+    font-size: 1.4rem;
+  }
+  
+  .paid-ticket {
+    top: 10px;
+    right: 10px;
+    padding: 6px 12px;
+    font-size: 0.75rem;
+  }
+}
+
+/* EMI Payment Modal */
+.emi-payment-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.75);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.emi-payment-modal {
+  background: white;
+  border-radius: 15px;
+  max-width: 600px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 10px 50px rgba(0, 0, 0, 0.3);
+  animation: slideUp 0.3s ease;
+  position: relative;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(50px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 25px 30px;
+  border-bottom: 3px solid #0077cc;
+  background: linear-gradient(135deg, #0077cc, #0056b3);
+  border-radius: 15px 15px 0 0;
+  color: white;
+}
+
+.modal-header h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.modal-close-btn {
+  background: rgba(255, 255, 255, 0.2);
+  border: 2px solid white;
+  color: white;
+  width: 35px;
+  height: 35px;
+  border-radius: 50%;
+  font-size: 1.2rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-close-btn:hover {
+  background: white;
+  color: #0077cc;
+  transform: rotate(90deg);
+}
+
+.modal-body {
+  padding: 30px;
+}
+
+.payment-summary-card {
+  background: #f8f9fa;
+  border-radius: 12px;
+  padding: 25px;
+  border: 2px solid #e9ecef;
+}
+
+.summary-header {
+  text-align: center;
+  margin-bottom: 25px;
+  padding-bottom: 20px;
+  border-bottom: 2px solid #dee2e6;
+}
+
+.emi-number-large {
+  font-size: 2rem;
+  font-weight: bold;
+  color: #0077cc;
+  margin-bottom: 8px;
+}
+
+.loan-account-info {
+  font-size: 0.9rem;
+  color: #666;
+  font-family: 'Courier New', monospace;
+}
+
+.payment-details-section,
+.amount-breakdown-section,
+.account-info-section,
+.remaining-info-section {
+  margin-bottom: 25px;
+  padding: 20px;
+  background: white;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.payment-details-section h3,
+.amount-breakdown-section h3,
+.account-info-section h3 {
+  margin: 0 0 15px 0;
+  color: #0077cc;
+  font-size: 1.1rem;
+  font-weight: 600;
+  border-bottom: 2px solid #e9ecef;
+  padding-bottom: 10px;
+}
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.detail-row:last-child {
+  border-bottom: none;
+}
+
+.detail-label {
+  font-weight: 600;
+  color: #555;
+  font-size: 0.95rem;
+}
+
+.detail-value {
+  color: #333;
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.detail-value.balance-after {
+  color: #28a745;
+  font-size: 1.1rem;
+}
+
+.breakdown-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 0;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.breakdown-item:last-child {
+  border-bottom: none;
+}
+
+.breakdown-item.total-breakdown {
+  border-top: 3px solid #0077cc;
+  margin-top: 10px;
+  padding-top: 20px;
+  background: linear-gradient(135deg, #f0f8ff, #e6f3ff);
+  border-radius: 8px;
+  padding: 20px;
+}
+
+.breakdown-label {
+  font-size: 1rem;
+  color: #666;
+  font-weight: 500;
+}
+
+.breakdown-amount {
+  font-size: 1.1rem;
+  color: #333;
+  font-weight: 600;
+}
+
+.breakdown-amount.total-emi-amount {
+  font-size: 1.5rem;
+  color: #0077cc;
+  font-weight: bold;
+}
+
+.remaining-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px;
+  background: linear-gradient(135deg, #e8f4f8, #d1e9f0);
+  border-radius: 8px;
+  border-left: 4px solid #0077cc;
+}
+
+.remaining-label {
+  font-size: 0.95rem;
+  color: #555;
+  font-weight: 500;
+}
+
+.remaining-value {
+  font-size: 1.2rem;
+  color: #0077cc;
+  font-weight: bold;
+}
+
+.payment-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 15px;
+  padding: 20px;
+  background: linear-gradient(135deg, #fff3cd, #ffeaa7);
+  border: 2px solid #ffc107;
+  border-radius: 10px;
+  margin-top: 20px;
+}
+
+.warning-icon {
+  font-size: 2rem;
+  flex-shrink: 0;
+}
+
+.warning-text {
+  color: #856404;
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+.warning-text strong {
+  font-size: 1.1rem;
+  display: block;
+  margin-bottom: 5px;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 15px;
+  padding: 25px 30px;
+  border-top: 2px solid #e9ecef;
+  background: #f8f9fa;
+  border-radius: 0 0 15px 15px;
+}
+
+.cancel-btn,
+.confirm-pay-btn {
+  padding: 12px 30px;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  min-width: 150px;
+}
+
+.cancel-btn {
+  background: #6c757d;
+  color: white;
+}
+
+.cancel-btn:hover:not(:disabled) {
+  background: #5a6268;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(108, 117, 125, 0.3);
+}
+
+.confirm-pay-btn {
+  background: linear-gradient(135deg, #28a745, #20c997);
+  color: white;
+}
+
+.confirm-pay-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(40, 167, 69, 0.4);
+}
+
+.confirm-pay-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background: #6c757d;
+}
+
+@media (max-width: 768px) {
+  .emi-payment-modal {
+    max-width: 100%;
+    margin: 10px;
+  }
+  
+  .modal-header,
+  .modal-body,
+  .modal-footer {
+    padding: 20px;
+  }
+  
+  .modal-footer {
+    flex-direction: column;
+  }
+  
+  .cancel-btn,
+  .confirm-pay-btn {
+    width: 100%;
   }
 }
 

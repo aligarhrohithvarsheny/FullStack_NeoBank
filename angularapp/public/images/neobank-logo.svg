@@ -1,0 +1,41 @@
+<svg width="120" height="120" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ff6b35;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#d45113;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#8b2e0a;stop-opacity:1" />
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- Glow effect circle -->
+  <circle cx="60" cy="60" r="55" fill="rgba(255, 107, 53, 0.2)" filter="url(#glow)"/>
+  
+  <!-- Main logo circle background -->
+  <circle cx="60" cy="60" r="50" fill="white" stroke="url(#logoGradient)" stroke-width="2"/>
+  
+  <!-- Stylized 'i' shape -->
+  <!-- Dot of the 'i' -->
+  <ellipse cx="60" cy="35" rx="12" ry="10" fill="#8b2e0a"/>
+  
+  <!-- Body of the 'i' - curved stroke -->
+  <path d="M 50 45 Q 45 55, 48 65 Q 52 75, 60 80 Q 68 75, 72 65 Q 75 55, 70 45" 
+        fill="none" 
+        stroke="url(#logoGradient)" 
+        stroke-width="6" 
+        stroke-linecap="round"
+        transform="rotate(5 60 60)"/>
+  
+  <!-- Inner white highlight -->
+  <path d="M 52 48 Q 48 56, 50 64 Q 54 72, 60 76 Q 66 72, 70 64 Q 72 56, 68 48" 
+        fill="white" 
+        opacity="0.8"
+        transform="rotate(5 60 60)"/>
+</svg>
+

@@ -59,10 +59,20 @@ export class Kycupdate implements OnInit {
   sendingOtp: boolean = false;
   otpError: string = '';
   otpSuccessMessage: string = '';
+  
+  // Document upload
+  aadharDocument: File | null = null;
+  panDocument: File | null = null;
+  uploadingDocuments: boolean = false;
+  documentUploadError: string = '';
+  documentUploadSuccess: string = '';
 
   ngOnInit() {
-    this.loadUserProfile();
-    this.loadExistingKycRequest();
+    // Only load in browser, not during SSR
+    if (isPlatformBrowser(this.platformId)) {
+      this.loadUserProfile();
+      this.loadExistingKycRequest();
+    }
   }
   
   checkIfOtpRequired() {
@@ -295,6 +305,115 @@ export class Kycupdate implements OnInit {
     });
   }
 
+  // File selection handlers
+  onAadharFileSelected(event: any) {
+    const file: File = event.target.files[0];
+    if (file) {
+      // Validate file size (5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        this.documentUploadError = 'Aadhar document size exceeds 5MB limit';
+        event.target.value = '';
+        this.aadharDocument = null;
+        return;
+      }
+      
+      // Validate file type
+      const validTypes = ['image/jpeg', 'image/jpg', 'application/pdf'];
+      if (!validTypes.includes(file.type)) {
+        this.documentUploadError = 'Aadhar document must be JPEG or PDF format';
+        event.target.value = '';
+        this.aadharDocument = null;
+        return;
+      }
+      
+      this.aadharDocument = file;
+      this.documentUploadError = '';
+    }
+  }
+
+  onPanFileSelected(event: any) {
+    const file: File = event.target.files[0];
+    if (file) {
+      // Validate file size (5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        this.documentUploadError = 'PAN document size exceeds 5MB limit';
+        event.target.value = '';
+        this.panDocument = null;
+        return;
+      }
+      
+      // Validate file type
+      const validTypes = ['image/jpeg', 'image/jpg', 'application/pdf'];
+      if (!validTypes.includes(file.type)) {
+        this.documentUploadError = 'PAN document must be JPEG or PDF format';
+        event.target.value = '';
+        this.panDocument = null;
+        return;
+      }
+      
+      this.panDocument = file;
+      this.documentUploadError = '';
+    }
+  }
+
+  formatFileSize(bytes: number): string {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+  }
+
+  uploadDocuments() {
+    if (!this.userProfile || !this.userProfile.accountNumber) {
+      this.documentUploadError = 'User account not found';
+      return;
+    }
+
+    if (!this.aadharDocument && !this.panDocument) {
+      this.documentUploadError = 'Please select at least one document to upload';
+      return;
+    }
+
+    this.uploadingDocuments = true;
+    this.documentUploadError = '';
+    this.documentUploadSuccess = '';
+
+    const formData = new FormData();
+    formData.append('userAccountNumber', this.userProfile.accountNumber);
+    if (this.aadharDocument) {
+      formData.append('aadharDocument', this.aadharDocument);
+    }
+    if (this.panDocument) {
+      formData.append('panDocument', this.panDocument);
+    }
+
+    this.http.post(`${environment.apiUrl}/kyc/upload-documents`, formData).subscribe({
+      next: (response: any) => {
+        if (response.success) {
+          this.documentUploadSuccess = 'Documents uploaded successfully!';
+          this.documentUploadError = '';
+          // Clear file inputs
+          this.aadharDocument = null;
+          this.panDocument = null;
+          // Clear file input elements
+          const aadharInput = document.getElementById('aadharDocument') as HTMLInputElement;
+          const panInput = document.getElementById('panDocument') as HTMLInputElement;
+          if (aadharInput) aadharInput.value = '';
+          if (panInput) panInput.value = '';
+        } else {
+          this.documentUploadError = response.message || 'Failed to upload documents';
+        }
+        this.uploadingDocuments = false;
+      },
+      error: (err: any) => {
+        console.error('Error uploading documents:', err);
+        this.documentUploadError = err.error?.message || 'Failed to upload documents. Please try again.';
+        this.uploadingDocuments = false;
+      }
+    });
+  }
+
   requestToAdmin() {
     // Only validate name (PAN is read-only and loaded from account)
     if (!this.name || this.name.trim() === '') {
@@ -379,6 +498,11 @@ export class Kycupdate implements OnInit {
           this.showOtpInput = false;
           this.otpError = '';
           this.otpSuccessMessage = '';
+          
+          // Upload documents if any were selected
+          if (this.aadharDocument || this.panDocument) {
+            this.uploadDocuments();
+          }
           
           // Reload to show updated status and history
           this.loadExistingKycRequest();

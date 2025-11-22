@@ -72,6 +72,24 @@ interface TransactionRecord {
   accountNumber: string;
 }
 
+interface AccountTracking {
+  id: number;
+  trackingId: string;
+  aadharNumber: string;
+  mobileNumber: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+  statusChangedAt: string;
+  updatedBy?: string;
+  user?: {
+    id: number;
+    email: string;
+    username: string;
+    accountNumber?: string;
+  };
+}
+
 @Component({
   selector: 'app-admin-dashboard',
   templateUrl: './dashboard.html',
@@ -100,6 +118,14 @@ export class Dashboard implements OnInit {
   userLoans: LoanDetails[] = [];
   userTransactions: TransactionDetails[] = [];
 
+  // Account Tracking
+  accountTrackings: AccountTracking[] = [];
+  selectedTracking: AccountTracking | null = null;
+  showTrackingSection: boolean = false;
+  trackingSearchQuery: string = '';
+  trackingStatusFilter: string = 'ALL';
+  trackingStatusOptions = ['ALL', 'PENDING', 'ADMIN_SEEN', 'ADMIN_APPROVED', 'ADMIN_SENT'];
+
   constructor(
     private router: Router,
     @Inject(PLATFORM_ID) private platformId: Object,
@@ -108,7 +134,11 @@ export class Dashboard implements OnInit {
   ) {}
 
   ngOnInit() {
-    this.loadUsers();
+    // Only load users in the browser, not during SSR
+    if (isPlatformBrowser(this.platformId)) {
+      this.loadUsers();
+      this.loadAccountTrackings();
+    }
   }
 
   // Refresh users data from database
@@ -214,64 +244,8 @@ export class Dashboard implements OnInit {
   }
 
   processTransaction() {
-    if (!this.selectedUser) {
-      this.errorMessage = 'Please select a user';
-      return;
-    }
-
-    if (!this.validateAmount()) {
-      return;
-    }
-
-    if (!this.description.trim()) {
-      this.errorMessage = 'Please enter a description';
-      return;
-    }
-
-    // Update user balance
-    const balanceChange = this.operationType === 'deposit' ? this.amount : -this.amount;
-    this.selectedUser.balance += balanceChange;
-
-    // Update users array
-    const userIndex = this.users.findIndex(u => u.id === this.selectedUser!.id);
-    if (userIndex !== -1) {
-      this.users[userIndex] = { ...this.selectedUser };
-    }
-
-    // Save updated users
-    if (isPlatformBrowser(this.platformId)) {
-      localStorage.setItem('userProfiles', JSON.stringify(this.users));
-    }
-
-    // Create transaction record
-    const transaction: TransactionRecord = {
-      id: Date.now().toString(),
-      transactionId: `TXN${Date.now()}`,
-      merchant: this.operationType === 'deposit' ? 'Admin Deposit' : 'Admin Withdrawal',
-      amount: this.amount,
-      type: this.operationType === 'deposit' ? 'Credit' : 'Debit',
-      description: this.description,
-      balance: this.selectedUser.balance,
-      date: new Date().toISOString(),
-      status: 'Completed',
-      userName: this.selectedUser.name,
-      accountNumber: this.selectedUser.accountNumber
-    };
-
-    // Save transaction to user's transaction history
-    this.saveUserTransaction(transaction);
-
-    // Save transaction to admin transaction history
-    this.saveAdminTransaction(transaction);
-
-    // Show success message
-    this.successMessage = `${this.operationType === 'deposit' ? 'Deposit' : 'Withdrawal'} of ₹${this.amount} successful!`;
-    this.errorMessage = '';
-
-    // Reset form after 2 seconds
-    setTimeout(() => {
-      this.resetForm();
-    }, 2000);
+    // Use the same implementation as processDirectTransaction
+    this.processDirectTransaction();
   }
 
   saveUserTransaction(transaction: TransactionRecord) {
@@ -339,50 +313,100 @@ export class Dashboard implements OnInit {
       return;
     }
 
-    // Update user balance
-    const balanceChange = this.operationType === 'deposit' ? this.amount : -this.amount;
-    this.selectedUser.balance += balanceChange;
-
-    // Update users array
-    const userIndex = this.users.findIndex(u => u.id === this.selectedUser!.id);
-    if (userIndex !== -1) {
-      this.users[userIndex] = { ...this.selectedUser };
-    }
-
-    // Save updated users
-    if (isPlatformBrowser(this.platformId)) {
-      localStorage.setItem('userProfiles', JSON.stringify(this.users));
-    }
-
-    // Create transaction record
-    const transaction: TransactionRecord = {
-      id: Date.now().toString(),
-      transactionId: `TXN${Date.now()}`,
-      merchant: this.operationType === 'deposit' ? 'Admin Deposit' : 'Admin Withdrawal',
-      amount: this.amount,
-      type: this.operationType === 'deposit' ? 'Credit' : 'Debit',
-      description: this.description,
-      balance: this.selectedUser.balance,
-      date: new Date().toISOString(),
-      status: 'Completed',
-      userName: this.selectedUser.name,
-      accountNumber: this.selectedUser.accountNumber
-    };
-
-    // Save transaction to user's transaction history
-    this.saveUserTransaction(transaction);
-
-    // Save transaction to admin transaction history
-    this.saveAdminTransaction(transaction);
-
-    // Show success message
-    this.successMessage = `${this.operationType === 'deposit' ? 'Deposit' : 'Withdrawal'} of ₹${this.amount} successful!`;
+    // Disable form during processing
+    const processingMessage = this.operationType === 'deposit' ? 'Processing deposit...' : 'Processing withdrawal...';
+    this.successMessage = processingMessage;
     this.errorMessage = '';
 
-    // Reset form after 3 seconds
-    setTimeout(() => {
-      this.clearForm();
-    }, 3000);
+    // Ensure selectedUser is not null
+    if (!this.selectedUser) {
+      this.errorMessage = 'Please select a user';
+      return;
+    }
+
+    const accountNumber = this.selectedUser.accountNumber;
+    const userName = this.selectedUser.name;
+
+    // Step 1: Update account balance in database
+    const balanceEndpoint = this.operationType === 'deposit' 
+      ? `${environment.apiUrl}/accounts/balance/credit/${accountNumber}?amount=${this.amount}`
+      : `${environment.apiUrl}/accounts/balance/debit/${accountNumber}?amount=${this.amount}`;
+
+    this.http.put(balanceEndpoint, {}).subscribe({
+      next: (balanceResponse: any) => {
+        console.log('Balance updated in database:', balanceResponse);
+        const newBalance = balanceResponse.balance;
+
+        // Step 2: Create transaction record in database
+        const transactionData = {
+          transactionId: `TXN${Date.now()}`,
+          merchant: this.operationType === 'deposit' ? 'Admin Deposit' : 'Admin Withdrawal',
+          amount: this.amount,
+          type: this.operationType === 'deposit' ? 'Credit' : 'Debit',
+          description: this.description,
+          balance: newBalance,
+          date: new Date().toISOString(),
+          status: 'Completed',
+          userName: userName,
+          accountNumber: accountNumber
+        };
+
+        this.http.post(`${environment.apiUrl}/transactions`, transactionData).subscribe({
+          next: (transactionResponse: any) => {
+            console.log('Transaction saved to database:', transactionResponse);
+
+            // Update local user balance
+            if (this.selectedUser) {
+              this.selectedUser.balance = newBalance;
+
+              // Update users array
+              const userIndex = this.users.findIndex(u => u.id === this.selectedUser!.id);
+              if (userIndex !== -1 && this.selectedUser) {
+                this.users[userIndex] = { ...this.selectedUser } as UserProfile;
+              }
+
+              // Save to localStorage as backup
+              if (isPlatformBrowser(this.platformId)) {
+                localStorage.setItem('userProfiles', JSON.stringify(this.users));
+              }
+
+              // Show success message
+              this.successMessage = `${this.operationType === 'deposit' ? 'Deposit' : 'Withdrawal'} of ₹${this.amount} successful!`;
+              this.errorMessage = '';
+
+              // Refresh user data to get latest from database
+              this.refreshUsersData();
+
+              // Reset form after 3 seconds
+              setTimeout(() => {
+                this.clearForm();
+              }, 3000);
+            }
+          },
+          error: (txnErr: any) => {
+            console.error('Error saving transaction to database:', txnErr);
+            this.errorMessage = 'Transaction processed but failed to save transaction history. Balance updated successfully.';
+            this.successMessage = '';
+            
+            // Still update local balance since balance was updated
+            if (this.selectedUser) {
+              this.selectedUser.balance = newBalance;
+              const userIndex = this.users.findIndex(u => u.id === this.selectedUser!.id);
+              if (userIndex !== -1 && this.selectedUser) {
+                this.users[userIndex] = { ...this.selectedUser } as UserProfile;
+              }
+              this.refreshUsersData();
+            }
+          }
+        });
+      },
+      error: (balanceErr: any) => {
+        console.error('Error updating balance in database:', balanceErr);
+        const errorMsg = balanceErr.error?.error || balanceErr.message || 'Failed to process transaction';
+        this.errorMessage = errorMsg;
+        this.successMessage = '';
+      }
+    });
   }
 
   clearForm() {
@@ -543,6 +567,219 @@ export class Dashboard implements OnInit {
     this.userCards = [];
     this.userLoans = [];
     this.userTransactions = [];
+  }
+
+  // Download individual user details as PDF
+  downloadUserDetailsPDF(user: UserProfile) {
+    if (!isPlatformBrowser(this.platformId)) {
+      return;
+    }
+
+    try {
+      const htmlContent = this.generateUserDetailsPDFContent(user);
+      const printWindow = window.open('', '_blank');
+      if (printWindow) {
+        printWindow.document.write(htmlContent);
+        printWindow.document.close();
+        printWindow.onload = () => {
+          setTimeout(() => {
+            printWindow.print();
+          }, 250);
+        };
+      }
+    } catch (error) {
+      console.error('Error generating user details PDF:', error);
+      alert('Failed to download user details document. Please try again.');
+    }
+  }
+
+  // Generate PDF content for individual user details
+  private generateUserDetailsPDFContent(user: UserProfile): string {
+    const currentDate = new Date().toLocaleDateString('en-IN');
+    const currentTime = new Date().toLocaleTimeString('en-IN');
+    const adminName = 'Admin';
+
+    return `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>NeoBank - User Details</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f8f9fa;
+            color: #333;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            border-bottom: 3px solid #0077cc;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+        .bank-logo {
+            font-size: 32px;
+            font-weight: bold;
+            color: #0077cc;
+            margin-bottom: 10px;
+        }
+        .document-title {
+            text-align: center;
+            font-size: 20px;
+            font-weight: bold;
+            color: #333;
+            margin: 30px 0;
+            padding: 15px;
+            background: linear-gradient(135deg, #e3f2fd, #bbdefb);
+            border-radius: 8px;
+        }
+        .details-section {
+            margin-bottom: 30px;
+        }
+        .details-section h4 {
+            color: #0077cc;
+            border-bottom: 2px solid #0077cc;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+        .details-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+        }
+        .detail-item {
+            background: #f8f9fa;
+            padding: 12px;
+            border-radius: 6px;
+            border-left: 3px solid #0077cc;
+        }
+        .detail-item label {
+            display: block;
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+        .detail-item span {
+            display: block;
+            font-size: 14px;
+            color: #333;
+            font-weight: 500;
+        }
+        .balance-amount {
+            color: #28a745;
+            font-weight: 700;
+            font-size: 16px;
+        }
+        .footer {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 2px solid #e9ecef;
+            text-align: center;
+            color: #666;
+            font-size: 12px;
+        }
+        @media print {
+            body { margin: 0; }
+            .container { box-shadow: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="bank-logo">🏦 NeoBank</div>
+            <div style="font-size: 24px; color: #1e40af; margin-bottom: 5px;">NeoBank India Limited</div>
+            <div style="font-size: 14px; color: #666; font-style: italic;">Relationship beyond banking</div>
+        </div>
+
+        <div class="document-title">
+            👤 USER DETAILS REPORT
+        </div>
+
+        <div class="details-section">
+            <h4>📋 Personal Information</h4>
+            <div class="details-grid">
+                <div class="detail-item">
+                    <label>Full Name</label>
+                    <span>${user.name || 'N/A'}</span>
+                </div>
+                <div class="detail-item">
+                    <label>Email</label>
+                    <span>${user.email || 'N/A'}</span>
+                </div>
+                <div class="detail-item">
+                    <label>Account Number</label>
+                    <span>${user.accountNumber || 'N/A'}</span>
+                </div>
+                <div class="detail-item">
+                    <label>Phone Number</label>
+                    <span>${user.phoneNumber || 'N/A'}</span>
+                </div>
+                <div class="detail-item">
+                    <label>Date of Birth</label>
+                    <span>${user.dateOfBirth || 'N/A'}</span>
+                </div>
+                <div class="detail-item">
+                    <label>Address</label>
+                    <span>${user.address || 'N/A'}</span>
+                </div>
+                <div class="detail-item">
+                    <label>PAN Number</label>
+                    <span>${user.pan || 'N/A'}</span>
+                </div>
+                <div class="detail-item">
+                    <label>Aadhar Number</label>
+                    <span>${user.aadhar || 'N/A'}</span>
+                </div>
+                <div class="detail-item">
+                    <label>Occupation</label>
+                    <span>${user.occupation || 'N/A'}</span>
+                </div>
+                <div class="detail-item">
+                    <label>Annual Income</label>
+                    <span>₹${user.income ? user.income.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '0.00'}</span>
+                </div>
+                <div class="detail-item">
+                    <label>Account Type</label>
+                    <span>${user.accountType || 'N/A'}</span>
+                </div>
+                <div class="detail-item">
+                    <label>Account Status</label>
+                    <span>${user.status || 'N/A'}</span>
+                </div>
+                <div class="detail-item">
+                    <label>Account Opened</label>
+                    <span>${user.joinDate || 'N/A'}</span>
+                </div>
+                <div class="detail-item">
+                    <label>Current Balance</label>
+                    <span class="balance-amount">₹${user.balance ? user.balance.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '0.00'}</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p><strong>📍 Registered Office:</strong> NeoBank Tower, Financial District, Mumbai - 400001</p>
+            <p><strong>📞 Customer Care:</strong> 1800-NEOBANK | <strong>📧 Email:</strong> support@neobank.in</p>
+            <p><strong>🌐 Website:</strong> www.neobank.in</p>
+            <p><strong>📄 This is a computer generated report and does not require signature.</strong></p>
+            <p>© ${new Date().getFullYear()} NeoBank. All rights reserved.</p>
+            <p><strong>Generated on:</strong> ${currentDate} at ${currentTime} | <strong>By:</strong> ${adminName}</p>
+        </div>
+    </div>
+</body>
+</html>`;
   }
 
   // Download all users details as PDF
@@ -875,5 +1112,185 @@ export class Dashboard implements OnInit {
     </div>
 </body>
 </html>`;
+  }
+
+  // Account Tracking Methods
+  loadAccountTrackings() {
+    this.http.get(`${environment.apiUrl}/tracking?page=0&size=100&sortBy=createdAt&sortDir=desc`).subscribe({
+      next: (response: any) => {
+        console.log('Account trackings loaded:', response);
+        if (response.content) {
+          this.accountTrackings = response.content;
+        } else if (Array.isArray(response)) {
+          this.accountTrackings = response;
+        }
+      },
+      error: (err: any) => {
+        console.error('Error loading account trackings:', err);
+        this.accountTrackings = [];
+      }
+    });
+  }
+
+  toggleTrackingSection() {
+    this.showTrackingSection = !this.showTrackingSection;
+    if (this.showTrackingSection && this.accountTrackings.length === 0) {
+      this.loadAccountTrackings();
+    }
+  }
+
+  get filteredTrackings(): AccountTracking[] {
+    let filtered = this.accountTrackings;
+
+    // Filter by status
+    if (this.trackingStatusFilter !== 'ALL') {
+      filtered = filtered.filter(t => t.status === this.trackingStatusFilter);
+    }
+
+    // Filter by search query
+    if (this.trackingSearchQuery) {
+      const query = this.trackingSearchQuery.toLowerCase();
+      filtered = filtered.filter(t =>
+        t.trackingId.toLowerCase().includes(query) ||
+        t.aadharNumber.toLowerCase().includes(query) ||
+        (t.mobileNumber && t.mobileNumber.toLowerCase().includes(query)) ||
+        (t.user?.email && t.user.email.toLowerCase().includes(query))
+      );
+    }
+
+    return filtered;
+  }
+
+  // Track by Aadhar and Mobile Number
+  trackByAadharAndMobile() {
+    const aadhar = prompt('Enter Aadhar Number:');
+    const mobile = prompt('Enter Mobile Number:');
+    
+    if (!aadhar || !mobile) {
+      this.alertService.userError('Invalid Input', 'Please provide both Aadhar number and mobile number.');
+      return;
+    }
+
+    this.http.get(`${environment.apiUrl}/tracking/track?aadharNumber=${aadhar}&mobileNumber=${mobile}`).subscribe({
+      next: (response: any) => {
+        if (response.success && response.tracking) {
+          const tracking = response.tracking;
+          this.alertService.userSuccess('Tracking Found', 
+            `Tracking ID: ${tracking.trackingId}\nStatus: ${this.getStatusLabel(tracking.status)}\nAadhar: ${tracking.aadharNumber}\nMobile: ${tracking.mobileNumber}`);
+          
+          // Scroll to the tracking in the list if it exists
+          const foundTracking = this.accountTrackings.find(t => t.id === tracking.id);
+          if (foundTracking) {
+            this.selectedTracking = foundTracking;
+          }
+        } else {
+          this.alertService.userError('Not Found', 'No tracking record found with the provided details.');
+        }
+      },
+      error: (err: any) => {
+        console.error('Error tracking by Aadhar and Mobile:', err);
+        this.alertService.userError('Error', err.error?.message || 'Failed to retrieve tracking information.');
+      }
+    });
+  }
+
+  updateTrackingStatus(tracking: AccountTracking, newStatus: string) {
+    if (!tracking || !tracking.id) {
+      this.alertService.userError('Update Failed', 'Invalid tracking record. Missing ID.');
+      return;
+    }
+
+    if (!newStatus || newStatus.trim() === '') {
+      this.alertService.userError('Update Failed', 'Status cannot be empty.');
+      return;
+    }
+
+    if (!confirm(`Are you sure you want to update the status to ${newStatus}?`)) {
+      return;
+    }
+
+    console.log('Updating tracking status:', {
+      trackingId: tracking.id,
+      trackingTrackingId: tracking.trackingId,
+      newStatus: newStatus,
+      currentStatus: tracking.status
+    });
+
+    const url = `${environment.apiUrl}/tracking/${tracking.id}/status?status=${encodeURIComponent(newStatus)}&updatedBy=Admin`;
+    console.log('API URL:', url);
+
+    this.http.put(url, {}).subscribe({
+      next: (response: any) => {
+        console.log('Tracking status updated response:', response);
+        if (response.success) {
+          this.alertService.userSuccess('Status Updated', `Tracking status updated to ${newStatus}`);
+          this.loadAccountTrackings();
+        } else {
+          this.alertService.userError('Update Failed', response.message || 'Failed to update status');
+        }
+      },
+      error: (err: any) => {
+        console.error('Error updating tracking status:', err);
+        console.error('Error details:', {
+          status: err.status,
+          statusText: err.statusText,
+          error: err.error,
+          message: err.message
+        });
+        const errorMessage = err.error?.message || err.message || 'Failed to update tracking status';
+        this.alertService.userError('Update Failed', errorMessage);
+      }
+    });
+  }
+
+  getStatusBadgeClass(status: string): string {
+    switch (status) {
+      case 'PENDING':
+        return 'status-badge pending';
+      case 'ADMIN_SEEN':
+        return 'status-badge seen';
+      case 'ADMIN_APPROVED':
+        return 'status-badge approved';
+      case 'ADMIN_SENT':
+        return 'status-badge sent';
+      default:
+        return 'status-badge';
+    }
+  }
+
+  getStatusLabel(status: string): string {
+    switch (status) {
+      case 'PENDING':
+        return 'Pending';
+      case 'ADMIN_SEEN':
+        return 'Admin Seen';
+      case 'ADMIN_APPROVED':
+        return 'Approved';
+      case 'ADMIN_SENT':
+        return 'Sent';
+      default:
+        return status;
+    }
+  }
+
+  // Tracking statistics getters
+  get totalTrackings(): number {
+    return this.accountTrackings.length;
+  }
+
+  get pendingTrackings(): number {
+    return this.accountTrackings.filter(t => t.status === 'PENDING').length;
+  }
+
+  get seenTrackings(): number {
+    return this.accountTrackings.filter(t => t.status === 'ADMIN_SEEN').length;
+  }
+
+  get approvedTrackings(): number {
+    return this.accountTrackings.filter(t => t.status === 'ADMIN_APPROVED').length;
+  }
+
+  get sentTrackings(): number {
+    return this.accountTrackings.filter(t => t.status === 'ADMIN_SENT').length;
   }
 }

@@ -81,8 +81,11 @@ export class Cards implements OnInit {
   constructor(private router: Router, @Inject(PLATFORM_ID) private platformId: Object, private http: HttpClient) {}
 
   ngOnInit() {
-    this.loadCards();
-    this.loadRequests();
+    // Only load in browser, not during SSR
+    if (isPlatformBrowser(this.platformId)) {
+      this.loadCards();
+      this.loadRequests();
+    }
   }
 
   loadCards() {

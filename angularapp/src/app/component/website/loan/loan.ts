@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../../environment/environment';
+import { AlertService } from '../../../service/alert.service';
 
 interface LoanRequest {
   id: number;
@@ -11,7 +12,7 @@ interface LoanRequest {
   amount: number;
   tenure: number;
   interestRate: number;
-  status: 'Pending' | 'Approved' | 'Rejected';
+  status: 'Pending' | 'Approved' | 'Rejected' | 'Foreclosed' | 'Paid';
   userName: string;
   userEmail: string;
   accountNumber: string;
@@ -19,6 +20,33 @@ interface LoanRequest {
   loanAccountNumber: string;
   applicationDate: string;
   approvalDate?: string;
+  emiStartDate?: string;
+  foreclosureDate?: string;
+  foreclosureAmount?: number;
+  foreclosureCharges?: number;
+  foreclosureGst?: number;
+  principalPaid?: number;
+  interestPaid?: number;
+  remainingPrincipal?: number;
+  remainingInterest?: number;
+}
+
+interface EmiPayment {
+  id: number;
+  loanId: number;
+  loanAccountNumber: string;
+  accountNumber: string;
+  emiNumber: number;
+  dueDate: string;
+  principalAmount: number;
+  interestAmount: number;
+  totalAmount: number;
+  remainingPrincipal: number;
+  status: 'Pending' | 'Paid' | 'Overdue' | 'Skipped';
+  paymentDate?: string;
+  balanceBeforePayment?: number;
+  balanceAfterPayment?: number;
+  transactionId?: string;
 }
 
 @Component({
@@ -29,7 +57,12 @@ interface LoanRequest {
   styleUrls: ['./loan.css']
 })
 export class Loan implements OnInit {
-  constructor(private router: Router, @Inject(PLATFORM_ID) private platformId: Object, private http: HttpClient) {}
+  constructor(
+    private router: Router, 
+    @Inject(PLATFORM_ID) private platformId: Object, 
+    private http: HttpClient,
+    private alertService: AlertService
+  ) {}
 
   loans: LoanRequest[] = [];
   userAccountNumber: string = '';
@@ -37,12 +70,29 @@ export class Loan implements OnInit {
   userEmail: string = '';
   currentBalance: number = 0;
   loading: boolean = false;
+  emiPayments: Map<number, EmiPayment[]> = new Map(); // Map loanId to EMIs
+  selectedLoanForEmi: LoanRequest | null = null;
+  payingEmi: boolean = false;
+  showEmiPaymentModal: boolean = false;
+  selectedEmiForPayment: EmiPayment | null = null;
 
   loanForm = {
     type: '',
     amount: 0,
     tenure: 0,
-    interestRate: 0
+    interestRate: 0,
+    pan: ''
+  };
+
+  // CIBIL and credit information
+  cibilInfo = {
+    cibilScore: 0,
+    interestRate: 0,
+    creditLimit: 0,
+    scoreCategory: '',
+    pan: '',
+    loading: false,
+    error: ''
   };
 
   // EMI Calculator properties
@@ -58,7 +108,10 @@ export class Loan implements OnInit {
   };
 
   ngOnInit() {
-    this.loadUserData();
+    // Only load in browser, not during SSR
+    if (isPlatformBrowser(this.platformId)) {
+      this.loadUserData();
+    }
   }
 
   loadUserData() {
@@ -72,6 +125,9 @@ export class Loan implements OnInit {
       this.userName = user.name;
       this.userEmail = user.email;
       
+      // Auto-load PAN and check CIBIL
+      this.loadUserPanAndCibil();
+      
       // Load user loans after getting user data
       this.loadUserLoans();
     } else {
@@ -82,9 +138,116 @@ export class Loan implements OnInit {
         this.userAccountNumber = profile.accountNumber;
         this.userName = profile.name;
         this.userEmail = profile.email;
+        this.loadUserPanAndCibil();
         this.loadUserLoans();
       }
     }
+  }
+
+  // Load user PAN and check CIBIL
+  loadUserPanAndCibil() {
+    if (!this.userAccountNumber) return;
+
+    this.cibilInfo.loading = true;
+    this.cibilInfo.error = '';
+
+    // First get PAN
+    this.http.get(`${environment.apiUrl}/loans/user-pan/${this.userAccountNumber}`).subscribe({
+      next: (response: any) => {
+        if (response.success && response.pan) {
+          this.loanForm.pan = response.pan;
+          
+          // Then check CIBIL
+          this.checkCibilByPan(response.pan);
+        } else {
+          this.cibilInfo.loading = false;
+          this.cibilInfo.error = 'PAN not found. Please update your KYC details.';
+        }
+      },
+      error: (err: any) => {
+        console.error('Error loading PAN:', err);
+        // Try to check CIBIL directly by account number
+        this.checkCibilByAccount();
+      }
+    });
+  }
+
+  // Check CIBIL by account number (auto-fetches PAN)
+  checkCibilByAccount() {
+    if (!this.userAccountNumber) return;
+
+    this.cibilInfo.loading = true;
+    this.cibilInfo.error = '';
+
+    this.http.get(`${environment.apiUrl}/loans/check-cibil-by-account/${this.userAccountNumber}`).subscribe({
+      next: (response: any) => {
+        if (response.success) {
+          this.cibilInfo.cibilScore = response.cibilScore || 0;
+          this.cibilInfo.interestRate = response.interestRate || 0;
+          this.cibilInfo.creditLimit = response.creditLimit || 0;
+          this.cibilInfo.scoreCategory = response.scoreCategory || '';
+          this.cibilInfo.pan = response.pan || '';
+          
+          // Auto-fill PAN and interest rate in loan form
+          if (response.pan) {
+            this.loanForm.pan = response.pan;
+          }
+          if (response.interestRate) {
+            this.loanForm.interestRate = response.interestRate;
+          }
+          
+          this.cibilInfo.loading = false;
+          console.log('CIBIL info loaded:', this.cibilInfo);
+        } else {
+          this.cibilInfo.loading = false;
+          this.cibilInfo.error = response.message || 'Failed to check CIBIL';
+        }
+      },
+      error: (err: any) => {
+        console.error('Error checking CIBIL:', err);
+        this.cibilInfo.loading = false;
+        this.cibilInfo.error = err.error?.message || 'Failed to check CIBIL score';
+      }
+    });
+  }
+
+  // Check CIBIL by PAN
+  checkCibilByPan(pan: string) {
+    if (!pan || pan.trim() === '') {
+      this.cibilInfo.error = 'Please enter PAN number';
+      return;
+    }
+
+    this.cibilInfo.loading = true;
+    this.cibilInfo.error = '';
+
+    this.http.get(`${environment.apiUrl}/loans/check-cibil/${pan}`).subscribe({
+      next: (response: any) => {
+        if (response.success) {
+          this.cibilInfo.cibilScore = response.cibilScore || 0;
+          this.cibilInfo.interestRate = response.interestRate || 0;
+          this.cibilInfo.creditLimit = response.creditLimit || 0;
+          this.cibilInfo.scoreCategory = response.scoreCategory || '';
+          this.cibilInfo.pan = response.pan || '';
+          
+          // Auto-fill interest rate in loan form
+          if (response.interestRate) {
+            this.loanForm.interestRate = response.interestRate;
+          }
+          
+          this.cibilInfo.loading = false;
+          console.log('CIBIL info loaded:', this.cibilInfo);
+        } else {
+          this.cibilInfo.loading = false;
+          this.cibilInfo.error = response.message || 'Failed to check CIBIL';
+        }
+      },
+      error: (err: any) => {
+        console.error('Error checking CIBIL:', err);
+        this.cibilInfo.loading = false;
+        this.cibilInfo.error = err.error?.message || 'Failed to check CIBIL score';
+      }
+    });
   }
 
   loadUserLoans() {
@@ -109,8 +272,28 @@ export class Loan implements OnInit {
           currentBalance: loan.currentBalance,
           loanAccountNumber: loan.loanAccountNumber,
           applicationDate: loan.applicationDate,
-          approvalDate: loan.approvalDate
+          approvalDate: loan.approvalDate,
+          foreclosureDate: loan.foreclosureDate,
+          foreclosureAmount: loan.foreclosureAmount,
+          foreclosureCharges: loan.foreclosureCharges,
+          foreclosureGst: loan.foreclosureGst,
+          principalPaid: loan.principalPaid,
+          interestPaid: loan.interestPaid,
+          remainingPrincipal: loan.remainingPrincipal,
+          remainingInterest: loan.remainingInterest,
+          emiStartDate: loan.emiStartDate
         }));
+        
+        // Load EMIs for approved loans
+        this.loans.forEach(loan => {
+          if (loan.status === 'Approved' || loan.status === 'Paid') {
+            this.loadEmisForLoan(loan.id);
+          }
+        });
+        
+        // Load account balance
+        this.loadAccountBalance();
+        
         this.loading = false;
       },
       error: (err: any) => {
@@ -130,9 +313,38 @@ export class Loan implements OnInit {
   submitLoan() {
     // Validate form
     if (!this.loanForm.type || this.loanForm.amount <= 0 || this.loanForm.tenure <= 0 || this.loanForm.interestRate <= 0) {
-      alert('Please fill all fields correctly!');
+      this.alertService.error('Validation Error', 'Please fill all fields correctly!');
       return;
     }
+
+    // Validate PAN
+    if (!this.loanForm.pan || this.loanForm.pan.trim() === '') {
+      this.alertService.error('PAN Required', 'PAN number is required. Please check CIBIL first.');
+      return;
+    }
+
+    // Validate loan amount against credit limit
+    if (this.cibilInfo.creditLimit > 0 && this.loanForm.amount > this.cibilInfo.creditLimit) {
+      const confirmMsg = `Your available credit limit is ₹${this.cibilInfo.creditLimit.toLocaleString('en-IN')}, but you are requesting ₹${this.loanForm.amount.toLocaleString('en-IN')}.\n\nDo you want to proceed anyway?`;
+      this.alertService.confirm(
+        'Credit Limit Exceeded',
+        confirmMsg,
+        () => {
+          this.proceedWithLoanSubmission();
+        },
+        () => {
+          // User cancelled
+        },
+        'Proceed',
+        'Cancel'
+      );
+      return;
+    }
+    
+    this.proceedWithLoanSubmission();
+  }
+
+  private proceedWithLoanSubmission() {
 
     // Generate loan account number with better uniqueness
     const loanAccountNumber = 'LOAN' + Date.now() + Math.floor(Math.random() * 1000);
@@ -164,7 +376,10 @@ export class Loan implements OnInit {
       accountNumber: newLoan.accountNumber,
       currentBalance: newLoan.currentBalance,
       loanAccountNumber: newLoan.loanAccountNumber,
-      applicationDate: newLoan.applicationDate
+      applicationDate: newLoan.applicationDate,
+      pan: this.loanForm.pan,
+      cibilScore: this.cibilInfo.cibilScore,
+      creditLimit: this.cibilInfo.creditLimit
     };
 
     // Submit to MySQL database
@@ -178,12 +393,12 @@ export class Loan implements OnInit {
         // Also save to localStorage as backup
         this.saveLoansToStorage();
         
-        alert('Loan request submitted successfully! Admin will review your application.');
+        this.alertService.success('Loan Application Submitted', 'Loan request submitted successfully! Admin will review your application.');
         this.resetForm();
       },
       error: (err: any) => {
         console.error('Error creating loan request:', err);
-        alert('Failed to submit loan request. Please try again.');
+        this.alertService.error('Submission Failed', 'Failed to submit loan request. Please try again.');
         
         // Fallback to localStorage
         this.loans.unshift(newLoan);
@@ -211,7 +426,8 @@ export class Loan implements OnInit {
   }
 
   resetForm() {
-    this.loanForm = { type: '', amount: 0, tenure: 0, interestRate: 0 };
+    this.loanForm = { type: '', amount: 0, tenure: 0, interestRate: 0, pan: '' };
+    // Don't reset CIBIL info as it's based on user's PAN
   }
 
   goBack() {
@@ -287,6 +503,32 @@ export class Loan implements OnInit {
   }
 
   // Download loan details as PDF
+  downloadForeclosurePDF(loan: LoanRequest) {
+    if (!loan.loanAccountNumber) {
+      this.alertService.error('Error', 'Loan account number not found');
+      return;
+    }
+
+    this.http.get(`${environment.apiUrl}/loans/foreclosure/pdf/${loan.loanAccountNumber}`, {
+      responseType: 'blob'
+    }).subscribe({
+      next: (blob: Blob) => {
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `Foreclosure_Statement_${loan.loanAccountNumber}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      },
+      error: (err: any) => {
+        console.error('Error downloading foreclosure PDF:', err);
+        this.alertService.error('Download Failed', 'Failed to download foreclosure PDF. Please try again.');
+      }
+    });
+  }
+
   downloadLoanPDF(loan: LoanRequest) {
     if (!isPlatformBrowser(this.platformId)) {
       return;
@@ -309,23 +551,31 @@ export class Loan implements OnInit {
       
       // Show instruction to user
       setTimeout(() => {
-        const userChoice = confirm('Document downloaded! Would you like to open it now to save as PDF?\n\nClick OK to open, or Cancel to download later.');
-        if (userChoice) {
-          // Open the downloaded file in a new window for printing
-          const newWindow = window.open();
-          if (newWindow) {
-            newWindow.document.write(pdfContent);
-            newWindow.document.close();
-            // Focus on the new window
-            newWindow.focus();
-          }
-        }
+        this.alertService.confirm(
+          'Document Downloaded',
+          'Document downloaded! Would you like to open it now to save as PDF?',
+          () => {
+            // Open the downloaded file in a new window for printing
+            const newWindow = window.open();
+            if (newWindow) {
+              newWindow.document.write(pdfContent);
+              newWindow.document.close();
+              // Focus on the new window
+              newWindow.focus();
+            }
+          },
+          () => {
+            // User cancelled
+          },
+          'Open',
+          'Cancel'
+        );
       }, 500);
       
       console.log('Loan PDF download initiated successfully');
     } catch (error) {
       console.error('Error downloading loan PDF:', error);
-      alert('Failed to download loan document. Please try again.');
+      this.alertService.error('Download Failed', 'Failed to download loan document. Please try again.');
     }
   }
 
@@ -663,5 +913,165 @@ export class Loan implements OnInit {
 </body>
 </html>
     `;
+  }
+
+  // Load EMIs for a specific loan
+  loadEmisForLoan(loanId: number) {
+    this.http.get(`${environment.apiUrl}/emis/loan/${loanId}`).subscribe({
+      next: (emis: any) => {
+        this.emiPayments.set(loanId, emis);
+        console.log(`Loaded ${emis.length} EMIs for loan ${loanId}`);
+      },
+      error: (err: any) => {
+        console.error('Error loading EMIs:', err);
+      }
+    });
+  }
+
+  // Get EMIs for a loan
+  getEmisForLoan(loanId: number): EmiPayment[] {
+    return this.emiPayments.get(loanId) || [];
+  }
+
+  // Get pending EMIs for a loan
+  getPendingEmis(loanId: number): EmiPayment[] {
+    const emis = this.getEmisForLoan(loanId);
+    return emis.filter(emi => emi.status === 'Pending');
+  }
+
+  // Get next due EMI
+  getNextDueEmi(loanId: number): EmiPayment | null {
+    const pending = this.getPendingEmis(loanId);
+    if (pending.length === 0) return null;
+    return pending.sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())[0];
+  }
+
+  // Show EMI details for a loan
+  showEmiDetails(loan: LoanRequest) {
+    this.selectedLoanForEmi = loan;
+    if (!this.emiPayments.has(loan.id)) {
+      this.loadEmisForLoan(loan.id);
+    }
+  }
+
+  // Close EMI details
+  closeEmiDetails() {
+    this.selectedLoanForEmi = null;
+  }
+
+  // Pay EMI - Show custom modal
+  payEmi(emi: EmiPayment) {
+    this.selectedEmiForPayment = emi;
+    this.showEmiPaymentModal = true;
+  }
+
+  // Close payment modal
+  closeEmiPaymentModal() {
+    this.showEmiPaymentModal = false;
+    this.selectedEmiForPayment = null;
+  }
+
+  // Confirm and process EMI payment
+  confirmEmiPayment() {
+    if (!this.selectedEmiForPayment) return;
+
+    const emi = this.selectedEmiForPayment;
+    this.payingEmi = true;
+    
+    this.http.post(`${environment.apiUrl}/emis/pay/${emi.id}?accountNumber=${this.userAccountNumber}`, {}).subscribe({
+      next: (response: any) => {
+        if (response.success) {
+          // Close modal
+          this.closeEmiPaymentModal();
+          
+          // Show success message with custom modal
+          this.alertService.success(
+            'EMI Payment Successful', 
+            `EMI #${emi.emiNumber} of ₹${emi.totalAmount.toFixed(2)} has been paid successfully!\n\nPrincipal: ₹${emi.principalAmount.toFixed(2)}\nInterest: ₹${emi.interestAmount.toFixed(2)}\n\nYour new balance: ₹${response.newBalance?.toFixed(2) || 'N/A'}`,
+            true,
+            5000
+          );
+          
+          // Reload EMIs
+          if (emi.loanId) {
+            this.loadEmisForLoan(emi.loanId);
+          }
+          // Reload loans to update balance
+          this.loadUserLoans();
+          // Reload account balance
+          this.loadAccountBalance();
+        } else {
+          this.alertService.error('Payment Failed', response.message || 'Failed to pay EMI');
+        }
+        this.payingEmi = false;
+      },
+      error: (err: any) => {
+        console.error('Error paying EMI:', err);
+        this.alertService.error('Payment Error', err.error?.message || 'Failed to pay EMI. Please try again.');
+        this.payingEmi = false;
+      }
+    });
+  }
+
+  // Download EMI receipt
+  downloadEmiReceipt(emi: EmiPayment) {
+    this.http.get(`${environment.apiUrl}/emis/${emi.id}/receipt`, {
+      responseType: 'blob'
+    }).subscribe({
+      next: (blob: Blob) => {
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `EMI_Receipt_${emi.loanAccountNumber}_${emi.emiNumber}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      },
+      error: (err: any) => {
+        console.error('Error downloading EMI receipt:', err);
+        this.alertService.error('Download Failed', 'Failed to download EMI receipt. Please try again.');
+      }
+    });
+  }
+
+  // Load account balance
+  loadAccountBalance() {
+    if (!this.userAccountNumber) return;
+    this.http.get(`${environment.apiUrl}/accounts/balance/${this.userAccountNumber}`).subscribe({
+      next: (response: any) => {
+        if (response.balance !== undefined) {
+          this.currentBalance = response.balance;
+        }
+      },
+      error: (err: any) => {
+        console.error('Error loading balance:', err);
+      }
+    });
+  }
+
+  // Check if there are approved loans
+  hasApprovedLoans(): boolean {
+    return this.loans.length > 0 && this.loans.some(loan => loan.status === 'Approved');
+  }
+
+  // Check if there are foreclosed loans
+  hasForeclosedLoans(): boolean {
+    return this.loans.some(loan => loan.status === 'Foreclosed');
+  }
+
+  // Get total EMI count for a loan
+  getTotalEmiCount(loanId: number): number {
+    return this.getEmisForLoan(loanId).length;
+  }
+
+  // Get paid EMI count for a loan
+  getPaidEmiCount(loanId: number): number {
+    return this.getEmisForLoan(loanId).filter(emi => emi.status === 'Paid').length;
+  }
+
+  // Get pending EMI count for a loan
+  getPendingEmiCount(loanId: number): number {
+    return this.getEmisForLoan(loanId).filter(emi => emi.status === 'Pending').length;
   }
 }

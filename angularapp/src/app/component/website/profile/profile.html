@@ -8,9 +8,10 @@
     <!-- Profile Card -->
     <div class="profile-card">
       <div class="profile-avatar">
-        <div class="avatar-circle">
+        <div class="avatar-circle" *ngIf="!profilePhotoUrl">
           <span class="avatar-text">{{ userProfile.name.charAt(0) }}</span>
         </div>
+        <img *ngIf="profilePhotoUrl" [src]="profilePhotoUrl" alt="Profile Photo" class="profile-photo-img">
       </div>
       
       <div class="profile-info">
@@ -24,6 +25,123 @@
           <h4>Current Balance</h4>
           <p class="balance-amount">₹{{ currentBalance | number:'1.2-2' }}</p>
         </div>
+      </div>
+    </div>
+
+    <!-- Profile Photo Section -->
+    <div class="details-section">
+      <h3>Profile Photo</h3>
+      <div class="upload-section">
+        <div class="photo-preview-container">
+          <div class="passport-photo-frame" *ngIf="profilePhotoUrl">
+            <img [src]="profilePhotoUrl" alt="Profile Photo Preview" class="passport-size-photo">
+          </div>
+          <div class="no-photo-placeholder" *ngIf="!profilePhotoUrl">
+            <div class="placeholder-icon">📷</div>
+            <p>No photo uploaded</p>
+          </div>
+        </div>
+        <div class="upload-controls">
+          <input 
+            type="file" 
+            id="profilePhotoInput" 
+            accept="image/jpeg,image/jpg,image/png,application/pdf"
+            (change)="onProfilePhotoSelected($event)"
+            style="display: none;"
+          />
+          <button 
+            type="button"
+            class="upload-button-primary"
+            (click)="triggerFileInput('profilePhotoInput')"
+          >
+            <span class="button-icon">📤</span>
+            <span>Choose Profile Photo</span>
+          </button>
+          <button 
+            *ngIf="profilePhoto" 
+            class="upload-button-secondary" 
+            (click)="uploadProfilePhoto()"
+            [disabled]="uploadingPhoto"
+            type="button"
+          >
+            <span *ngIf="!uploadingPhoto" class="button-icon">✓</span>
+            <span *ngIf="!uploadingPhoto">Upload Photo</span>
+            <span *ngIf="uploadingPhoto" class="button-icon">⏳</span>
+            <span *ngIf="uploadingPhoto">Uploading...</span>
+          </button>
+          <p class="file-info-text">Accepted: JPEG, PNG, PDF | Max Size: 5MB</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Signature Section -->
+    <div class="details-section">
+      <h3>Digital Signature</h3>
+      <div class="upload-section">
+        <div class="signature-status" *ngIf="signatureStatus">
+          <span class="status-badge" [ngClass]="getSignatureStatusClass()">
+            {{ getSignatureStatusText() }}
+          </span>
+          <p *ngIf="signatureStatus === 'REJECTED' && signatureRejectionReason" class="rejection-reason">
+            Reason: {{ signatureRejectionReason }}
+          </p>
+        </div>
+        <div class="signature-preview-container" *ngIf="showSignature && signatureUrl">
+          <div class="signature-frame">
+            <img [src]="signatureUrl" alt="Signature Preview" class="signature-preview-image">
+          </div>
+        </div>
+        <div class="signature-actions" *ngIf="signatureStatus">
+          <button 
+            *ngIf="!showSignature"
+            type="button"
+            class="show-signature-btn"
+            (click)="showSignature = true; loadSignatureImage()"
+          >
+            <span class="button-icon">👁️</span>
+            <span>Show Signature</span>
+          </button>
+          <button 
+            *ngIf="showSignature"
+            type="button"
+            class="hide-signature-btn"
+            (click)="showSignature = false; signatureUrl = null"
+          >
+            <span class="button-icon">🙈</span>
+            <span>Hide Signature</span>
+          </button>
+        </div>
+        <div class="upload-controls">
+          <input 
+            type="file" 
+            id="signatureInput" 
+            accept="image/jpeg,image/jpg,image/png,application/pdf"
+            (change)="onSignatureSelected($event)"
+            style="display: none;"
+          />
+          <button 
+            type="button"
+            class="upload-button-primary"
+            (click)="triggerFileInput('signatureInput')"
+          >
+            <span class="button-icon">📤</span>
+            <span>Choose Signature</span>
+          </button>
+          <button 
+            *ngIf="signature" 
+            class="upload-button-secondary" 
+            (click)="uploadSignature()"
+            [disabled]="uploadingSignature"
+            type="button"
+          >
+            <span *ngIf="!uploadingSignature" class="button-icon">✓</span>
+            <span *ngIf="!uploadingSignature">Upload Signature</span>
+            <span *ngIf="uploadingSignature" class="button-icon">⏳</span>
+            <span *ngIf="uploadingSignature">Uploading...</span>
+          </button>
+          <p class="file-info-text">Accepted: JPEG, PNG, PDF | Max Size: 5MB</p>
+        </div>
+        <p class="info-text">* Signature requires admin approval before it can be used.</p>
       </div>
     </div>
 
@@ -111,7 +229,30 @@
         </div>
         <div class="detail-item" *ngIf="userProfile.aadhar">
           <label>Aadhar Number</label>
-          <p>{{ userProfile.aadhar }}</p>
+          <div class="aadhar-section">
+            <p>{{ userProfile.aadhar }}</p>
+            <div class="verification-status">
+              <span class="status-badge" [ngClass]="getAadharStatusClass()">
+                {{ getAadharStatusText() }}
+              </span>
+              <span *ngIf="userProfile.aadharVerified && userProfile.aadharVerifiedDate" class="verified-date">
+                Verified on: {{ userProfile.aadharVerifiedDate | date:'short' }}
+              </span>
+            </div>
+            <button 
+              *ngIf="!userProfile.aadharVerified || userProfile.aadharVerificationStatus === 'FAILED'"
+              type="button"
+              class="verify-aadhar-btn"
+              (click)="initiateAadharVerification()"
+              [disabled]="aadharVerifying || !userProfile.aadhar"
+            >
+              <span *ngIf="!aadharVerifying">🔐 Verify Aadhaar</span>
+              <span *ngIf="aadharVerifying">⏳ Verifying...</span>
+            </button>
+            <div *ngIf="userProfile.aadharVerificationStatus === 'PENDING'" class="verification-pending">
+              <p class="pending-message">⚠️ Verification in progress. Please complete the process on Aadhaar website.</p>
+            </div>
+          </div>
         </div>
         <div class="detail-item" *ngIf="userProfile.occupation">
           <label>Occupation</label>
@@ -128,6 +269,17 @@
     <div class="action-buttons">
       <button class="edit-btn" (click)="editProfile()">Edit Profile</button>
       <button class="refresh-btn" (click)="loadCurrentBalance()">Refresh Balance</button>
+      <button 
+        class="generate-passbook-btn" 
+        (click)="generatePassbook()"
+        [disabled]="generatingPassbook"
+        type="button"
+      >
+        <span *ngIf="!generatingPassbook" class="button-icon">📄</span>
+        <span *ngIf="!generatingPassbook">Generate Passbook</span>
+        <span *ngIf="generatingPassbook" class="button-icon">⏳</span>
+        <span *ngIf="generatingPassbook">Generating...</span>
+      </button>
     </div>
   </div>
 </div>

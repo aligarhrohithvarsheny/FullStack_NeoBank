@@ -1,0 +1,378 @@
+<div class="user-control-container">
+  <div class="header-section">
+    <button class="back-btn" (click)="goBack()">← Back to Dashboard</button>
+    <h2>🔐 Full User Control Panel</h2>
+    <p class="subtitle">Complete access to view, edit, and manage all user accounts</p>
+  </div>
+
+  <div class="controls-section">
+    <div class="search-bar">
+      <input 
+        type="text" 
+        [(ngModel)]="searchTerm" 
+        (input)="searchUsers()"
+        placeholder="Search by name, email, account number, phone, PAN, Aadhar..."
+        class="search-input"
+      />
+      <button class="add-user-btn" (click)="toggleAddUserForm()">
+        <span>➕</span> Add New User
+      </button>
+      <button class="refresh-btn" (click)="loadAllUsers()" [disabled]="loading">
+        <span>🔄</span> Refresh
+      </button>
+    </div>
+  </div>
+
+  <!-- Add User Form -->
+  <div class="add-user-form" *ngIf="showAddUserForm">
+    <h3>Create New User</h3>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Username *</label>
+        <input type="text" [(ngModel)]="newUser.username" />
+      </div>
+      <div class="form-group">
+        <label>Email *</label>
+        <input type="email" [(ngModel)]="newUser.email" />
+      </div>
+      <div class="form-group">
+        <label>Password *</label>
+        <input type="password" [(ngModel)]="newUser.password" />
+      </div>
+      <div class="form-group">
+        <label>Status</label>
+        <select [(ngModel)]="newUser.status">
+          <option value="PENDING">PENDING</option>
+          <option value="APPROVED">APPROVED</option>
+          <option value="CLOSED">CLOSED</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Full Name</label>
+        <input type="text" [(ngModel)]="newUser.account.name" />
+      </div>
+      <div class="form-group">
+        <label>Phone</label>
+        <input type="text" [(ngModel)]="newUser.account.phone" />
+      </div>
+      <div class="form-group">
+        <label>Address</label>
+        <textarea [(ngModel)]="newUser.account.address" rows="2"></textarea>
+      </div>
+      <div class="form-group">
+        <label>Date of Birth</label>
+        <input type="date" [(ngModel)]="newUser.account.dob" />
+      </div>
+      <div class="form-group">
+        <label>Age</label>
+        <input type="number" [(ngModel)]="newUser.account.age" />
+      </div>
+      <div class="form-group">
+        <label>Occupation</label>
+        <input type="text" [(ngModel)]="newUser.account.occupation" />
+      </div>
+      <div class="form-group">
+        <label>Income</label>
+        <input type="number" [(ngModel)]="newUser.account.income" />
+      </div>
+      <div class="form-group">
+        <label>Account Type</label>
+        <select [(ngModel)]="newUser.account.accountType">
+          <option value="Savings">Savings</option>
+          <option value="Current">Current</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Initial Balance</label>
+        <input type="number" [(ngModel)]="newUser.account.balance" />
+      </div>
+      <div class="form-group">
+        <label>PAN</label>
+        <input type="text" [(ngModel)]="newUser.account.pan" />
+      </div>
+      <div class="form-group">
+        <label>Aadhar Number</label>
+        <input type="text" [(ngModel)]="newUser.account.aadharNumber" />
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="save-btn" (click)="createUser()" [disabled]="loading">Create User</button>
+      <button class="cancel-btn" (click)="toggleAddUserForm()">Cancel</button>
+    </div>
+  </div>
+
+  <!-- Users List -->
+  <div class="users-list" *ngIf="!loading && filteredUsers.length > 0">
+    <div class="user-card" *ngFor="let user of filteredUsers">
+      <div class="user-header">
+        <div class="user-info">
+          <h3>{{ user.account?.name || user.username }}</h3>
+          <p class="user-email">{{ user.email }}</p>
+          <p class="user-account">Account: {{ user.accountNumber || 'N/A' }}</p>
+        </div>
+        <div class="user-status">
+          <span class="status-badge" [ngClass]="'status-' + user.status.toLowerCase()">
+            {{ user.status }}
+          </span>
+          <span class="balance-display">Balance: ₹{{ user.account?.balance || 0 | number:'1.2-2' }}</span>
+        </div>
+      </div>
+      
+      <div class="user-details">
+        <div class="detail-row">
+          <span class="detail-label">Phone:</span>
+          <span class="detail-value">{{ user.account?.phone || 'N/A' }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">PAN:</span>
+          <span class="detail-value">{{ user.account?.pan || 'N/A' }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Aadhar:</span>
+          <span class="detail-value">{{ user.account?.aadharNumber || 'N/A' }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Account Type:</span>
+          <span class="detail-value">{{ user.account?.accountType || 'N/A' }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">Account Locked:</span>
+          <span class="detail-value">{{ user.accountLocked ? 'Yes' : 'No' }}</span>
+        </div>
+      </div>
+
+      <div class="user-actions">
+        <button class="view-btn" (click)="viewUser(user)">👁️ View</button>
+        <button class="edit-btn" (click)="editUser(user)">✏️ Edit</button>
+        <button class="delete-btn" (click)="deleteUser(user)">🗑️ Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="no-users" *ngIf="!loading && filteredUsers.length === 0">
+    <p>No users found</p>
+  </div>
+
+  <div class="loading" *ngIf="loading">
+    <p>Loading users...</p>
+  </div>
+
+  <!-- View/Edit Modal -->
+  <div class="modal-overlay" *ngIf="selectedUser || editingUser" (click)="cancelEdit()">
+    <div class="modal-content" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>{{ editingUser ? 'Edit User' : 'User Details' }}</h3>
+        <button class="close-btn" (click)="cancelEdit()">×</button>
+      </div>
+
+      <div class="modal-body" *ngIf="selectedUser && !editingUser">
+        <div class="detail-section">
+          <h4>User Information</h4>
+          <div class="detail-grid">
+            <div class="detail-item">
+              <label>ID:</label>
+              <span>{{ selectedUser.id }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Username:</label>
+              <span>{{ selectedUser.username }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Email:</label>
+              <span>{{ selectedUser.email }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Status:</label>
+              <span>{{ selectedUser.status }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Account Number:</label>
+              <span>{{ selectedUser.accountNumber }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Account Locked:</label>
+              <span>{{ selectedUser.accountLocked ? 'Yes' : 'No' }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Failed Login Attempts:</label>
+              <span>{{ selectedUser.failedLoginAttempts }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Join Date:</label>
+              <span>{{ selectedUser.joinDate | date:'short' }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="detail-section" *ngIf="selectedUser.account">
+          <h4>Account Information</h4>
+          <div class="detail-grid">
+            <div class="detail-item">
+              <label>Name:</label>
+              <span>{{ selectedUser.account.name }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Phone:</label>
+              <span>{{ selectedUser.account.phone }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Address:</label>
+              <span>{{ selectedUser.account.address }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Date of Birth:</label>
+              <span>{{ selectedUser.account.dob }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Age:</label>
+              <span>{{ selectedUser.account.age }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Occupation:</label>
+              <span>{{ selectedUser.account.occupation }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Income:</label>
+              <span>₹{{ selectedUser.account.income | number:'1.2-2' }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Account Type:</label>
+              <span>{{ selectedUser.account.accountType }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Balance:</label>
+              <span class="balance-highlight">₹{{ selectedUser.account.balance | number:'1.2-2' }}</span>
+            </div>
+            <div class="detail-item">
+              <label>PAN:</label>
+              <span>{{ selectedUser.account.pan }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Aadhar:</label>
+              <span>{{ selectedUser.account.aadharNumber }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Account Status:</label>
+              <span>{{ selectedUser.account.status }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button class="edit-btn" (click)="editUser(selectedUser!)">Edit User</button>
+          <button class="close-btn" (click)="cancelEdit()">Close</button>
+        </div>
+      </div>
+
+      <!-- Edit Form -->
+      <div class="modal-body" *ngIf="editingUser">
+        <form class="edit-form">
+          <div class="form-section">
+            <h4>User Information</h4>
+            <div class="form-grid">
+              <div class="form-group">
+                <label>Username *</label>
+                <input type="text" [(ngModel)]="editingUser.username" name="username" />
+              </div>
+              <div class="form-group">
+                <label>Email *</label>
+                <input type="email" [(ngModel)]="editingUser.email" name="email" />
+              </div>
+              <div class="form-group">
+                <label>Status</label>
+                <select [(ngModel)]="editingUser.status" name="status">
+                  <option value="PENDING">PENDING</option>
+                  <option value="APPROVED">APPROVED</option>
+                  <option value="CLOSED">CLOSED</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Account Number</label>
+                <input type="text" [(ngModel)]="editingUser.accountNumber" name="accountNumber" />
+              </div>
+              <div class="form-group">
+                <label>Account Locked</label>
+                <input type="checkbox" [(ngModel)]="editingUser.accountLocked" name="accountLocked" />
+              </div>
+              <div class="form-group">
+                <label>Failed Login Attempts</label>
+                <input type="number" [(ngModel)]="editingUser.failedLoginAttempts" name="failedLoginAttempts" />
+              </div>
+            </div>
+          </div>
+
+          <div class="form-section" *ngIf="editingUser.account">
+            <h4>Account Information</h4>
+            <div class="form-grid">
+              <div class="form-group">
+                <label>Full Name</label>
+                <input type="text" [(ngModel)]="editingUser.account.name" name="name" />
+              </div>
+              <div class="form-group">
+                <label>Phone</label>
+                <input type="text" [(ngModel)]="editingUser.account.phone" name="phone" />
+              </div>
+              <div class="form-group full-width">
+                <label>Address</label>
+                <textarea [(ngModel)]="editingUser.account.address" name="address" rows="3"></textarea>
+              </div>
+              <div class="form-group">
+                <label>Date of Birth</label>
+                <input type="date" [(ngModel)]="editingUser.account.dob" name="dob" />
+              </div>
+              <div class="form-group">
+                <label>Age</label>
+                <input type="number" [(ngModel)]="editingUser.account.age" name="age" />
+              </div>
+              <div class="form-group">
+                <label>Occupation</label>
+                <input type="text" [(ngModel)]="editingUser.account.occupation" name="occupation" />
+              </div>
+              <div class="form-group">
+                <label>Income</label>
+                <input type="number" [(ngModel)]="editingUser.account.income" name="income" step="0.01" />
+              </div>
+              <div class="form-group">
+                <label>Account Type</label>
+                <select [(ngModel)]="editingUser.account.accountType" name="accountType">
+                  <option value="Savings">Savings</option>
+                  <option value="Current">Current</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Balance *</label>
+                <input type="number" [(ngModel)]="editingUser.account.balance" name="balance" step="0.01" />
+                <small class="warning-text">⚠️ Changing balance directly affects account funds</small>
+              </div>
+              <div class="form-group">
+                <label>PAN</label>
+                <input type="text" [(ngModel)]="editingUser.account.pan" name="pan" />
+              </div>
+              <div class="form-group">
+                <label>Aadhar Number</label>
+                <input type="text" [(ngModel)]="editingUser.account.aadharNumber" name="aadharNumber" />
+              </div>
+              <div class="form-group">
+                <label>Account Status</label>
+                <select [(ngModel)]="editingUser.account.status" name="accountStatus">
+                  <option value="ACTIVE">ACTIVE</option>
+                  <option value="INACTIVE">INACTIVE</option>
+                  <option value="CLOSED">CLOSED</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="modal-footer">
+            <button type="button" class="save-btn" (click)="saveUser()" [disabled]="loading">
+              {{ loading ? 'Saving...' : 'Save Changes' }}
+            </button>
+            <button type="button" class="cancel-btn" (click)="cancelEdit()">Cancel</button>
+            <button type="button" class="delete-btn" (click)="deleteUser(editingUser!)">Delete User</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+

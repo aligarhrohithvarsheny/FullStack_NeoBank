@@ -43,7 +43,11 @@
     <input type="date" [(ngModel)]="fromDate" name="from">
     <input type="date" [(ngModel)]="toDate" name="to">
     <button type="button" (click)="downloadStatement()" class="download-csv-btn" [disabled]="loading || transactions.length === 0">
-       Download CSV
+       📥 Download CSV
+    </button>
+    <button type="button" (click)="sendStatementByEmail()" class="send-email-btn" [disabled]="loading || sendingEmail || transactions.length === 0">
+      <span *ngIf="!sendingEmail">📧 Send Statement to Email</span>
+      <span *ngIf="sendingEmail">⏳ Sending...</span>
     </button>
   </div>
 

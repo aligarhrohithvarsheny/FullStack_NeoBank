@@ -447,6 +447,43 @@ body {
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
+/* Terms and Conditions */
+.terms-group {
+  margin: 20px 0;
+  padding: 15px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+.terms-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.terms-checkbox {
+  margin-top: 3px;
+  cursor: pointer;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.terms-link {
+  color: #3b82f6;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.terms-link:hover {
+  color: #1d4ed8;
+}
+
 /* Submit Button */
 button[type="submit"] {
   width: 100%;
@@ -459,9 +496,19 @@ button[type="submit"] {
   font-weight: 700;
   cursor: pointer;
   transition: all 0.3s ease;
-  box-shadow: 0 8px 25px rgba(59, 130, 246, 0.3);
-  position: relative;
-  overflow: hidden;
+}
+
+button[type="submit"]:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(59, 130, 246, 0.4);
+}
+
+button[type="submit"]:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+  opacity: 0.6;
+  transform: none;
+  box-shadow: none;
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -654,29 +701,142 @@ button[type="submit"]:disabled:hover {
   color: #1f2937;
   margin-bottom: 15px;
   font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-.status-info p {
-  margin-bottom: 8px;
-  color: #374151;
+.tracking-detail-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  background: white;
+  border-radius: 8px;
+  margin-bottom: 10px;
+  border-left: 3px solid #3b82f6;
+}
+
+.tracking-detail-item label {
+  color: #6b7280;
+  font-weight: 600;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tracking-detail-item span {
+  color: #1f2937;
+  font-weight: 500;
   font-size: 0.95rem;
 }
 
-.status-info strong {
-  color: #1f2937;
-  font-weight: 600;
+.tracking-detail-item .tracking-id {
+  font-family: 'Courier New', monospace;
+  font-weight: 700;
+  color: #3b82f6;
+  font-size: 1rem;
 }
 
-.status-info span {
-  padding: 4px 8px;
-  border-radius: 6px;
+.status-badge {
+  padding: 6px 12px;
+  border-radius: 20px;
   font-weight: 600;
   font-size: 0.85rem;
+  text-transform: uppercase;
 }
 
-.status-info span.pending {
+.status-badge.status-pending {
   background: #fef3c7;
   color: #92400e;
+}
+
+.status-badge.status-seen {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.status-badge.status-approved {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.status-badge.status-sent {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+
+.status-message {
+  margin-top: 20px;
+  padding: 15px;
+  border-radius: 8px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.status-message.status-pending {
+  background: #fef3c7;
+  border-left: 4px solid #f59e0b;
+  color: #92400e;
+}
+
+.status-message.status-seen {
+  background: #dbeafe;
+  border-left: 4px solid #3b82f6;
+  color: #1e40af;
+}
+
+.status-message.status-approved {
+  background: #dcfce7;
+  border-left: 4px solid #22c55e;
+  color: #166534;
+}
+
+.status-message.status-sent {
+  background: #e0e7ff;
+  border-left: 4px solid #6366f1;
+  color: #3730a3;
+}
+
+.status-message i {
+  font-size: 1.2rem;
+  margin-top: 2px;
+}
+
+.status-message p {
+  margin: 0;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+.track-btn {
+  width: 100%;
+  padding: 14px 24px;
+  border-radius: 12px;
+  border: none;
+  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+  color: white;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.track-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(59, 130, 246, 0.4);
+}
+
+.track-btn:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 .status-info span.approved {

@@ -5,6 +5,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.Base64;
+import java.nio.charset.StandardCharsets;
 
 @Service
 public class PasswordService {
@@ -35,20 +36,27 @@ public class PasswordService {
      */
     public boolean verifyPassword(String plainPassword, String encryptedPassword) {
         if (plainPassword == null || encryptedPassword == null) {
+            System.out.println("PasswordService: verifyPassword - null password or encrypted password");
             return false;
         }
         try {
             // Extract salt from encrypted password
             String[] parts = encryptedPassword.split(":");
             if (parts.length != 2) {
+                System.out.println("PasswordService: verifyPassword - Invalid password format. Expected 'salt:hash' but got " + parts.length + " parts");
+                System.out.println("PasswordService: Encrypted password length: " + encryptedPassword.length() + ", Contains colon: " + encryptedPassword.contains(":"));
                 return false;
             }
             String salt = parts[0];
             
             // Hash the plain password with the extracted salt
             String hashedInput = hashWithSalt(plainPassword, salt);
-            return hashedInput.equals(encryptedPassword);
+            boolean matches = hashedInput.equals(encryptedPassword);
+            System.out.println("PasswordService: verifyPassword - Password match result: " + matches);
+            return matches;
         } catch (Exception e) {
+            System.out.println("PasswordService: verifyPassword - Exception occurred: " + e.getMessage());
+            e.printStackTrace();
             return false;
         }
     }
@@ -134,11 +142,15 @@ public class PasswordService {
             MessageDigest md = MessageDigest.getInstance("SHA-256");
             byte[] saltBytes = Base64.getDecoder().decode(salt);
             md.update(saltBytes);
-            byte[] hashedPassword = md.digest(password.getBytes());
+            // Use UTF-8 encoding explicitly to avoid charset issues
+            byte[] hashedPassword = md.digest(password.getBytes(StandardCharsets.UTF_8));
             String hash = Base64.getEncoder().encodeToString(hashedPassword);
             return salt + ":" + hash;
         } catch (NoSuchAlgorithmException e) {
             throw new RuntimeException("SHA-256 algorithm not available", e);
+        } catch (IllegalArgumentException e) {
+            System.out.println("PasswordService: hashWithSalt - Invalid Base64 salt: " + e.getMessage());
+            throw new RuntimeException("Invalid salt format", e);
         }
     }
 }

@@ -63,6 +63,7 @@
           <th>PAN Number</th>
           <th>Submitted Date</th>
           <th>Status</th>
+          <th>Documents</th>
           <th>Actions</th>
         </tr>
       </thead>
@@ -79,6 +80,24 @@
             <div *ngIf="request.approvedDate" class="approval-info">
               <small>Approved: {{ request.approvedDate | date:'short' }}</small>
               <small *ngIf="request.approvedBy">by {{ request.approvedBy }}</small>
+            </div>
+          </td>
+          <td class="documents">
+            <div class="document-buttons">
+              <button 
+                (click)="downloadAadharDocument(request.id)"
+                class="document-btn aadhar-btn"
+                title="Download Aadhar Document"
+              >
+                📄 Aadhar
+              </button>
+              <button 
+                (click)="downloadPanDocument(request.id)"
+                class="document-btn pan-btn"
+                title="Download PAN Document"
+              >
+                📄 PAN
+              </button>
             </div>
           </td>
           <td class="actions">

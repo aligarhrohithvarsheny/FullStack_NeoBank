@@ -19,6 +19,10 @@ interface PendingUser {
   status: 'PENDING' | 'APPROVED' | 'CLOSED';
   assignedAccountNumber?: string;
   createdAt: string;
+  signatureStatus?: 'PENDING' | 'APPROVED' | 'REJECTED' | null;
+  signatureRejectionReason?: string | null;
+  signatureReviewedBy?: string | null;
+  signatureReviewedDate?: string | null;
 }
 
 interface KycRequest {
@@ -52,6 +56,14 @@ export class Users implements OnInit {
   pendingUsers: PendingUser[] = [];
   kycRequests: KycRequest[] = [];
   nextAccountNumber = 100001;
+  
+  // Signature management
+  pendingSignatures: any[] = [];
+  selectedSignature: any = null;
+  signatureImageUrl: string | null = null;
+  profilePhotoUrl: string | null = null;
+  rejectionReason: string = '';
+  adminName: string = 'Admin'; // You can get this from session
 
   // Computed properties for statistics
   get totalUsers(): number {
@@ -80,6 +92,9 @@ export class Users implements OnInit {
     
     // Load KYC requests from MySQL database
     this.loadKycRequestsFromDatabase();
+    
+    // Load pending signatures
+    this.loadPendingSignatures();
     
     this.calculateNextAccountNumber();
     this.createCardsForExistingUsers();
@@ -155,7 +170,11 @@ export class Users implements OnInit {
           createdAt: user.joinDate || user.createdAt || new Date().toISOString(),
           dob: user.account?.dob || '',
           occupation: user.account?.occupation || '',
-          mobile: user.account?.phone || ''
+          mobile: user.account?.phone || '',
+          signatureStatus: user.signatureStatus || null,
+          signatureRejectionReason: user.signatureRejectionReason || null,
+          signatureReviewedBy: user.signatureReviewedBy || null,
+          signatureReviewedDate: user.signatureReviewedDate || null
         }));
         
         console.log('Mapped pending users:', this.pendingUsers);
@@ -496,8 +515,151 @@ export class Users implements OnInit {
     console.log('=== USER APPROVAL NOTIFICATION ===');
     console.log('User:', user.name);
     console.log('Email:', user.email);
-    console.log('Account Number:', user.assignedAccountNumber);
-    console.log('Status: APPROVED');
-    console.log('==================================');
+  }
+
+  // Signature Management Methods
+  loadPendingSignatures() {
+    this.http.get(`${environment.apiUrl}/users/pending-signatures`).subscribe({
+      next: (users: any) => {
+        this.pendingSignatures = users.filter((u: any) => u.signatureStatus === 'PENDING');
+        console.log('Pending signatures loaded:', this.pendingSignatures);
+      },
+      error: (err: any) => {
+        console.error('Error loading pending signatures:', err);
+      }
+    });
+  }
+
+  viewSignature(user: any) {
+    // Convert user to proper format if needed
+    const userId = typeof user.id === 'string' ? parseInt(user.id) : user.id;
+    this.selectedSignature = { ...user, id: userId };
+    this.rejectionReason = '';
+    
+    // Load signature image
+    this.http.get(`${environment.apiUrl}/users/${userId}/signature`, { responseType: 'blob' }).subscribe({
+      next: (blob: Blob) => {
+        const reader = new FileReader();
+        reader.onload = (e: any) => {
+          this.signatureImageUrl = e.target.result;
+        };
+        reader.readAsDataURL(blob);
+      },
+      error: (err: any) => {
+        console.error('Error loading signature:', err);
+        if (err.status === 404) {
+          alert('Signature not found for this user');
+        } else {
+          alert('Failed to load signature image');
+        }
+        this.signatureImageUrl = null;
+      }
+    });
+
+    // Load profile photo
+    this.http.get(`${environment.apiUrl}/users/${userId}/profile-photo`, { responseType: 'blob' }).subscribe({
+      next: (blob: Blob) => {
+        const reader = new FileReader();
+        reader.onload = (e: any) => {
+          this.profilePhotoUrl = e.target.result;
+        };
+        reader.readAsDataURL(blob);
+      },
+      error: (err: any) => {
+        // Profile photo not found - this is okay
+        this.profilePhotoUrl = null;
+      }
+    });
+  }
+
+  approveSignature() {
+    if (!this.selectedSignature) return;
+
+    this.http.put(`${environment.apiUrl}/users/${this.selectedSignature.id}/approve-signature`, null, {
+      params: { adminName: this.adminName }
+    }).subscribe({
+      next: (response: any) => {
+        if (response.success) {
+          alert('Signature approved successfully!');
+          this.closeSignatureModal();
+          this.loadPendingSignatures();
+          // Refresh users list to update signature status column
+          this.loadUsersFromDatabase();
+        } else {
+          alert('Failed to approve signature: ' + response.message);
+        }
+      },
+      error: (err: any) => {
+        console.error('Error approving signature:', err);
+        alert('Failed to approve signature: ' + (err.error?.message || 'Unknown error'));
+      }
+    });
+  }
+
+  rejectSignature() {
+    if (!this.selectedSignature) return;
+    
+    if (!this.rejectionReason || this.rejectionReason.trim() === '') {
+      alert('Please provide a reason for rejection');
+      return;
+    }
+
+    this.http.put(`${environment.apiUrl}/users/${this.selectedSignature.id}/reject-signature`, null, {
+      params: { 
+        adminName: this.adminName,
+        rejectionReason: this.rejectionReason
+      }
+    }).subscribe({
+      next: (response: any) => {
+        if (response.success) {
+          alert('Signature rejected');
+          this.closeSignatureModal();
+          this.loadPendingSignatures();
+          // Refresh users list to update signature status column
+          this.loadUsersFromDatabase();
+        } else {
+          alert('Failed to reject signature: ' + response.message);
+        }
+      },
+      error: (err: any) => {
+        console.error('Error rejecting signature:', err);
+        alert('Failed to reject signature: ' + (err.error?.message || 'Unknown error'));
+      }
+    });
+  }
+
+  closeSignatureModal() {
+    this.selectedSignature = null;
+    this.signatureImageUrl = null;
+    this.profilePhotoUrl = null;
+    this.rejectionReason = '';
+  }
+
+  // View signature for any user (admin can see anytime)
+  viewUserSignature(user: any) {
+    this.viewSignature(user);
+  }
+
+  // Get signature status for display
+  getSignatureStatus(user: any): string {
+    if (!user.signatureStatus) {
+      return 'Not Uploaded';
+    }
+    return user.signatureStatus;
+  }
+
+  // Get signature status class for styling
+  getSignatureStatusClass(user: any): string {
+    if (!user.signatureStatus) {
+      return 'signature-not-uploaded';
+    }
+    if (user.signatureStatus === 'APPROVED') {
+      return 'signature-approved';
+    } else if (user.signatureStatus === 'PENDING') {
+      return 'signature-pending';
+    } else if (user.signatureStatus === 'REJECTED') {
+      return 'signature-rejected';
+    }
+    return 'signature-not-uploaded';
   }
 }

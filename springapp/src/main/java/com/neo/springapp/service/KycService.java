@@ -225,4 +225,11 @@ public class KycService {
     public void deleteKycRequest(Long id) {
         kycRepository.deleteById(id);
     }
+
+    // Get latest pending KYC request for a user
+    public Optional<KycRequest> getLatestPendingKycRequest(String userAccountNumber) {
+        List<KycRequest> pendingRequests = kycRepository.findByUserAccountNumberAndStatusOrderBySubmittedDateDesc(
+            userAccountNumber, "Pending");
+        return pendingRequests.isEmpty() ? Optional.empty() : Optional.of(pendingRequests.get(0));
+    }
 }

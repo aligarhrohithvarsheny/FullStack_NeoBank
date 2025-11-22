@@ -61,6 +61,12 @@ export class Transferfunds implements OnInit {
   amount: number = 0;
   transferType: 'NEFT' | 'RTGS' = 'NEFT';
 
+  // Account verification
+  isAccountVerified: boolean = false;
+  isVerifyingAccount: boolean = false;
+  accountVerificationError: string = '';
+  verifiedAccountDetails: any = null;
+
   // User data
   userProfile: UserProfile = {
     name: 'John Doe',
@@ -86,10 +92,53 @@ export class Transferfunds implements OnInit {
   ) {}
 
   ngOnInit() {
-    console.log('TransferFunds component initialized');
-    this.loadUserProfile();
-    this.loadCurrentBalance();
-    this.loadTransferHistory();
+    // Only load in browser, not during SSR
+    if (isPlatformBrowser(this.platformId)) {
+      console.log('TransferFunds component initialized');
+      this.loadUserProfile();
+      this.loadCurrentBalance();
+      this.loadTransferHistory();
+      
+      // Check for scanned QR code data from navigation state
+      const nav = this.router.getCurrentNavigation();
+      if (nav?.extras?.state) {
+        const state = nav.extras.state as any;
+        if (state.scannedUpiId || state.scannedName || state.scannedAmount) {
+          this.handleScannedQrCode(state);
+        }
+      }
+    }
+  }
+
+  handleScannedQrCode(state: any) {
+    // Extract UPI ID and try to find account number
+    if (state.scannedUpiId) {
+      // UPI ID format: phone@neobank or account@neobank
+      const upiId = state.scannedUpiId;
+      const accountPart = upiId.split('@')[0];
+      
+      // Try to use as account number or phone
+      if (accountPart.length > 10) {
+        // Likely account number
+        this.recipientAccountNumber = accountPart;
+      } else {
+        // Likely phone number - try to find account by phone
+        this.phone = accountPart;
+      }
+    }
+    
+    if (state.scannedName) {
+      this.recipientName = decodeURIComponent(state.scannedName);
+    }
+    
+    if (state.scannedAmount) {
+      this.amount = state.scannedAmount;
+    }
+    
+    // If we have account number, verify it
+    if (this.recipientAccountNumber) {
+      this.verifyAccountNumber();
+    }
   }
 
   loadUserProfile() {
@@ -212,6 +261,109 @@ export class Transferfunds implements OnInit {
     localStorage.setItem(`transfer_history_${this.userProfile.accountNumber}`, JSON.stringify(this.transfers));
   }
 
+  // Verify recipient account number
+  verifyAccountNumber() {
+    if (!this.recipientAccountNumber || this.recipientAccountNumber.trim() === '') {
+      this.isAccountVerified = false;
+      this.accountVerificationError = '';
+      this.verifiedAccountDetails = null;
+      this.clearRecipientDetails();
+      return;
+    }
+
+    // Don't verify if it's the same as sender account
+    if (this.recipientAccountNumber === this.userProfile.accountNumber) {
+      this.isAccountVerified = false;
+      this.accountVerificationError = 'Cannot transfer to your own account';
+      this.verifiedAccountDetails = null;
+      this.clearRecipientDetails();
+      return;
+    }
+
+    this.isVerifyingAccount = true;
+    this.accountVerificationError = '';
+    this.isAccountVerified = false;
+
+    // First try to get account details
+    this.http.get(`${environment.apiUrl}/accounts/number/${this.recipientAccountNumber}`).subscribe({
+      next: (accountData: any) => {
+        console.log('Account found:', accountData);
+        
+        // If account exists, try to get user details for name
+        this.http.get(`${environment.apiUrl}/users/account/${this.recipientAccountNumber}`).subscribe({
+          next: (userData: any) => {
+            console.log('User data found:', userData);
+            
+            // Auto-fill with account and user data
+            this.recipientName = userData.account?.name || accountData.name || '';
+            this.phone = accountData.phone || userData.account?.phone || '';
+            this.ifsc = 'NEOB0001234'; // Default IFSC for NeoBank accounts
+            
+            this.isAccountVerified = true;
+            this.isVerifyingAccount = false;
+            this.verifiedAccountDetails = {
+              accountNumber: this.recipientAccountNumber,
+              name: this.recipientName,
+              phone: this.phone,
+              ifsc: this.ifsc,
+              account: accountData,
+              user: userData
+            };
+            this.accountVerificationError = '';
+            
+            console.log('Account verified and details auto-filled');
+          },
+          error: (userErr: any) => {
+            // If user not found, use account data only
+            console.log('User not found, using account data only');
+            this.recipientName = accountData.name || '';
+            this.phone = accountData.phone || '';
+            this.ifsc = 'NEOB0001234';
+            
+            this.isAccountVerified = true;
+            this.isVerifyingAccount = false;
+            this.verifiedAccountDetails = {
+              accountNumber: this.recipientAccountNumber,
+              name: this.recipientName,
+              phone: this.phone,
+              ifsc: this.ifsc,
+              account: accountData
+            };
+            this.accountVerificationError = '';
+          }
+        });
+      },
+      error: (err: any) => {
+        console.error('Account not found:', err);
+        this.isAccountVerified = false;
+        this.isVerifyingAccount = false;
+        this.accountVerificationError = 'Account number not found. Please verify the account number.';
+        this.verifiedAccountDetails = null;
+        this.clearRecipientDetails();
+      }
+    });
+  }
+
+  // Clear recipient details when account number changes
+  clearRecipientDetails() {
+    if (!this.isAccountVerified) {
+      this.recipientName = '';
+      this.phone = '';
+      this.ifsc = '';
+    }
+  }
+
+  // Handle account number input change
+  onAccountNumberChange() {
+    // Reset verification when account number changes
+    if (this.isAccountVerified && this.verifiedAccountDetails?.accountNumber !== this.recipientAccountNumber) {
+      this.isAccountVerified = false;
+      this.verifiedAccountDetails = null;
+      this.accountVerificationError = '';
+      this.clearRecipientDetails();
+    }
+  }
+
   // Validate transfer amount against available balance
   validateAmount(): boolean {
     if (this.amount <= 0) {
@@ -227,9 +379,35 @@ export class Transferfunds implements OnInit {
     return true;
   }
 
+  // Validate account before transfer
+  validateAccount(): boolean {
+    if (!this.recipientAccountNumber || this.recipientAccountNumber.trim() === '') {
+      this.alertService.transferValidationError('Please enter recipient account number');
+      return false;
+    }
+
+    if (!this.isAccountVerified) {
+      this.alertService.transferValidationError('Please verify the recipient account number first');
+      return false;
+    }
+
+    if (this.recipientAccountNumber === this.userProfile.accountNumber) {
+      this.alertService.transferValidationError('Cannot transfer to your own account');
+      return false;
+    }
+
+    return true;
+  }
+
   // Handle fund transfer
   transferFunds() {
-    if (!this.recipientAccountNumber || !this.recipientName || !this.phone || !this.ifsc || this.amount <= 0) {
+    // First validate account
+    if (!this.validateAccount()) {
+      return;
+    }
+
+    // Validate required fields
+    if (!this.recipientName || !this.phone || !this.ifsc || this.amount <= 0) {
       this.alertService.transferValidationError('Please fill all fields correctly!');
       return;
     }
@@ -374,6 +552,9 @@ Time: ${timestamp}`;
     this.ifsc = '';
     this.amount = 0;
     this.transferType = 'NEFT';
+    this.isAccountVerified = false;
+    this.verifiedAccountDetails = null;
+    this.accountVerificationError = '';
   }
 
   // Set maximum amount to available balance
