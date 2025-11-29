@@ -14,3 +14,4 @@ ALTER TABLE users MODIFY COLUMN face_registered BOOLEAN DEFAULT FALSE;
 
 
 
+
