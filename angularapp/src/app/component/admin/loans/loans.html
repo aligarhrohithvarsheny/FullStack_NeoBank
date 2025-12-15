@@ -29,6 +29,7 @@
           <th>User Name</th>
           <th>Email</th>
           <th>Account Number</th>
+          <th>Child Account</th>
           <th>Current Balance</th>
           <th>Loan Type</th>
           <th>Amount</th>
@@ -46,9 +47,24 @@
           <td>{{ loan.loanAccountNumber }}</td>
           <td>{{ loan.userName }}</td>
           <td>{{ loan.userEmail }}</td>
-          <td>{{ loan.accountNumber }}</td>
+          <td>
+            <div class="account-info">
+              <span class="account-number">{{ loan.accountNumber }}</span>
+              <span *ngIf="loan.type === 'Education Loan' && loan.childAccountNumber" class="account-badge applicant">Applicant</span>
+            </div>
+          </td>
+          <td>
+            <div *ngIf="loan.type === 'Education Loan' && loan.childAccountNumber" class="account-info">
+              <span class="account-number">{{ loan.childAccountNumber }}</span>
+              <span class="account-badge child">Child</span>
+            </div>
+            <span *ngIf="!(loan.type === 'Education Loan' && loan.childAccountNumber)">-</span>
+          </td>
           <td>{{ loan.currentBalance | currency:'INR' }}</td>
-          <td>{{ loan.type }}</td>
+          <td>
+            <span>{{ loan.type }}</span>
+            <span *ngIf="loan.type === 'Education Loan' && loan.childAccountNumber" class="mapped-badge" title="Mapped to both applicant and child accounts">🔗</span>
+          </td>
           <td>{{ loan.amount | currency:'INR' }}</td>
           <td>{{ loan.tenure }}</td>
           <td>{{ loan.interestRate }}</td>
@@ -58,21 +74,40 @@
               [class.foreclosed]="loan.status === 'Foreclosed'">
             {{ loan.status }}
           </td>
-          <td>{{ loan.applicationDate | date:'short' }}</td>
-          <td>{{ loan.approvalDate ? (loan.approvalDate | date:'short') : '-' }}</td>
+          <td>{{ formatDateTime(loan.applicationDate) }}</td>
+          <td>{{ loan.approvalDate ? formatDateTime(loan.approvalDate) : '-' }}</td>
           <td>
-            <ng-container *ngIf="loan.status === 'Pending'; else processedTemplate">
-              <button class="approve-btn" (click)="approve(loan)">Approve</button>
-              <button class="reject-btn" (click)="reject(loan)">Reject</button>
-            </ng-container>
-            <ng-template #processedTemplate>
-              <ng-container *ngIf="loan.status === 'Approved'; else alreadyProcessed">
-                <button class="foreclose-action-btn" (click)="forecloseLoanFromTable(loan)">🏦 Foreclose</button>
+            <div class="actions">
+              <ng-container *ngIf="loan.status === 'Pending'; else processedTemplate">
+                <button class="approve-btn" (click)="approve(loan)">Approve</button>
+                <button class="reject-btn" (click)="reject(loan)">Reject</button>
               </ng-container>
-              <ng-template #alreadyProcessed>
-                <span class="processed">{{ loan.status === 'Foreclosed' ? 'Foreclosed' : 'Processed' }}</span>
+              <ng-template #processedTemplate>
+                <ng-container *ngIf="loan.status === 'Approved'; else alreadyProcessed">
+                  <button class="foreclose-action-btn" (click)="forecloseLoanFromTable(loan)">🏦 Foreclose</button>
+                </ng-container>
+                <ng-template #alreadyProcessed>
+                  <span class="processed">{{ loan.status === 'Foreclosed' ? 'Foreclosed' : 'Processed' }}</span>
+                </ng-template>
               </ng-template>
-            </ng-template>
+
+              <!-- View Personal Loan Form (only for Personal Loans) -->
+              <button 
+                *ngIf="loan.type === 'Personal Loan' && loan.personalLoanFormPath"
+                class="view-form-btn" 
+                (click)="viewPersonalLoanForm(loan)"
+                title="View Uploaded Application Form">
+                📄 View Form
+              </button>
+
+              <!-- EMI per‑month payment details (available once loan is approved) -->
+              <button 
+                class="emi-details-btn" 
+                (click)="openEmiDetails(loan)"
+                [disabled]="loan.status !== 'Approved' && loan.status !== 'Foreclosed' && loan.status !== 'Paid'">
+                📅 EMI Details
+              </button>
+            </div>
           </td>
         </tr>
       </tbody>
@@ -177,6 +212,109 @@
               <span *ngIf="!processingForeclosure">✅ Process Foreclosure</span>
               <span *ngIf="processingForeclosure">⏳ Processing...</span>
             </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- EMI Schedule & Payments Modal -->
+  <div class="modal-overlay" *ngIf="showEmiModal" (click)="closeEmiModal()">
+    <div class="modal-content" (click)="$event.stopPropagation()">
+      <div class="modal-header emi-header">
+        <h3>📅 EMI Schedule & Payments</h3>
+        <button class="close-btn" (click)="closeEmiModal()">×</button>
+      </div>
+
+      <div class="modal-body">
+        <div *ngIf="selectedLoanForEmi" class="emi-summary">
+          <h4>Loan Overview</h4>
+          <div class="emi-summary-grid">
+            <div class="emi-summary-item">
+              <span class="label">Loan Account</span>
+              <span class="value">{{ selectedLoanForEmi.loanAccountNumber }}</span>
+            </div>
+            <div class="emi-summary-item">
+              <span class="label">Customer</span>
+              <span class="value">{{ selectedLoanForEmi.userName }} ({{ selectedLoanForEmi.userEmail }})</span>
+            </div>
+            <div class="emi-summary-item">
+              <span class="label">Linked Account</span>
+              <span class="value">{{ selectedLoanForEmi.accountNumber }}</span>
+            </div>
+            <div class="emi-summary-item">
+              <span class="label">Loan Amount</span>
+              <span class="value">{{ selectedLoanForEmi.amount | currency:'INR' }}</span>
+            </div>
+            <div class="emi-summary-item">
+              <span class="label">Tenure</span>
+              <span class="value">{{ selectedLoanForEmi.tenure }} months</span>
+            </div>
+            <div class="emi-summary-item">
+              <span class="label">Interest Rate</span>
+              <span class="value">{{ selectedLoanForEmi.interestRate }}%</span>
+            </div>
+          </div>
+        </div>
+
+        <div *ngIf="loadingEmis" class="loading">
+          Loading EMI schedule...
+        </div>
+
+        <div *ngIf="!loadingEmis && emisError" class="error-message">
+          ❌ {{ emisError }}
+        </div>
+
+        <div *ngIf="!loadingEmis && !emisError">
+          <div *ngIf="emis.length === 0" class="no-loans">
+            <p>No EMI schedule found for this loan.</p>
+          </div>
+
+          <div *ngIf="emis.length > 0" class="emi-table-container">
+            <table class="emi-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Due Date</th>
+                  <th>Status</th>
+                  <th>EMI Amount</th>
+                  <th>Principal</th>
+                  <th>Interest</th>
+                  <th>Remaining Principal</th>
+                  <th>Payment Date</th>
+                  <th>Paid From (Account)</th>
+                  <th>Balance Before</th>
+                  <th>Balance After</th>
+                  <th>Transaction ID</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let emi of emis; trackBy: trackByEmiId">
+                  <td>{{ emi.emiNumber }}</td>
+                  <td>{{ emi.dueDate | date:'mediumDate' }}</td>
+                  <td>
+                    <span 
+                      class="emi-status" 
+                      [ngClass]="{
+                        'emi-paid': emi.status === 'Paid',
+                        'emi-pending': emi.status === 'Pending',
+                        'emi-overdue': emi.status === 'Overdue'
+                      }">
+                      {{ emi.status }}
+                    </span>
+                  </td>
+                  <td>{{ emi.totalAmount | currency:'INR' }}</td>
+                  <td>{{ emi.principalAmount | currency:'INR' }}</td>
+                  <td>{{ emi.interestAmount | currency:'INR' }}</td>
+                  <td>{{ emi.remainingPrincipal | currency:'INR' }}</td>
+                  <td>{{ emi.paymentDate ? formatDateTime(emi.paymentDate) : '-' }}</td>
+                  <td>{{ emi.accountNumber }}</td>
+                  <td>{{ emi.balanceBeforePayment !== undefined ? (emi.balanceBeforePayment | currency:'INR') : '-' }}</td>
+                  <td>{{ emi.balanceAfterPayment !== undefined ? (emi.balanceAfterPayment | currency:'INR') : '-' }}</td>
+                  <td>{{ emi.transactionId || '-' }}</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
       </div>

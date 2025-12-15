@@ -1,0 +1,229 @@
+<div class="subsidy-claim-container">
+  <div class="header-section">
+    <h2>Education Loan Interest Subsidy</h2>
+    <p class="subtitle">Claim 3 years of interest subsidy on your approved education loans</p>
+  </div>
+
+  <!-- Info Banner -->
+  <div class="info-banner">
+    <div class="info-icon">ℹ️</div>
+    <div class="info-content">
+      <h4>About Education Loan Interest Subsidy</h4>
+      <ul>
+        <li>Subsidy is available only for <strong>Education Loans</strong></li>
+        <li>You can claim <strong>3 years of interest</strong> on your approved education loan</li>
+        <li>Admin will review your request and approve the subsidy amount</li>
+        <li>Once approved, the subsidy will be credited directly to your account</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <div *ngIf="loading" class="loading">
+    <p>Loading your education loans...</p>
+  </div>
+
+  <!-- Education Loans Section -->
+  <div *ngIf="!loading" class="loans-section">
+    <h3>Your Education Loans</h3>
+    
+    <div *ngIf="educationLoans.length === 0" class="no-loans">
+      <p>You don't have any approved Education Loans yet.</p>
+      <p>Apply for an Education Loan first to be eligible for interest subsidy.</p>
+    </div>
+
+    <div *ngIf="educationLoans.length > 0" class="loans-grid">
+      <div *ngFor="let loan of educationLoans" class="loan-card">
+        <div class="loan-header">
+          <h4>{{ loan.loanAccountNumber }}</h4>
+          <span class="loan-status approved">{{ loan.status }}</span>
+        </div>
+        
+        <div class="loan-details">
+          <div class="detail-row">
+            <span class="label">Loan Amount:</span>
+            <span class="value">{{ formatCurrency(loan.amount) }}</span>
+          </div>
+          <div class="detail-row">
+            <span class="label">Interest Rate:</span>
+            <span class="value">{{ loan.interestRate }}% p.a.</span>
+          </div>
+          <div class="detail-row">
+            <span class="label">Tenure:</span>
+            <span class="value">{{ loan.tenure }} months</span>
+          </div>
+          <div class="detail-row">
+            <span class="label">Approved Date:</span>
+            <span class="value">{{ formatDate(loan.approvalDate) }}</span>
+          </div>
+          <div class="detail-row highlight">
+            <span class="label">Estimated Subsidy (3 Years):</span>
+            <span class="value">{{ formatCurrency(calculateSubsidy(loan)) }}</span>
+          </div>
+        </div>
+
+        <div class="claim-section">
+          <!-- Claim Count Info -->
+          <div class="claim-count-info" *ngIf="getClaimCountForLoan(loan.id) > 0">
+            <p><strong>Claims Made:</strong> {{ getClaimCountForLoan(loan.id) }}/3</p>
+          </div>
+          
+          <!-- Existing Claims List -->
+          <div *ngIf="getAllClaimsForLoan(loan.id).length > 0" class="existing-claims-list">
+            <div *ngFor="let claim of getAllClaimsForLoan(loan.id); let i = index" class="existing-claim">
+              <div class="claim-header">
+                <span class="claim-number">Claim #{{ i + 1 }}</span>
+                <button class="download-btn" (click)="downloadSubsidyDetails(claim)" title="Download Details">
+                  📄 Download
+                </button>
+              </div>
+              <div class="claim-status" [ngClass]="getStatusClass(claim.status)">
+                <strong>Status:</strong> {{ claim.status }}
+              </div>
+              <div class="claim-details">
+                <p><strong>Requested Amount:</strong> {{ formatCurrency(claim.calculatedSubsidyAmount) }}</p>
+                <p *ngIf="claim.approvedSubsidyAmount"><strong>Approved Amount:</strong> {{ formatCurrency(claim.approvedSubsidyAmount) }}</p>
+                <p><strong>Request Date:</strong> {{ formatDate(claim.requestDate) }}</p>
+                <p *ngIf="claim.processedDate"><strong>Processed Date:</strong> {{ formatDate(claim.processedDate) }}</p>
+                <p *ngIf="claim.rejectionReason" class="rejection-reason">
+                  <strong>Rejection Reason:</strong> {{ claim.rejectionReason }}
+                </p>
+                <p *ngIf="claim.status === 'Credited'" class="credited-info">
+                  ✅ Subsidy has been credited to your account!
+                </p>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Request Button -->
+          <button 
+            *ngIf="canRequestMoreClaims(loan.id)"
+            (click)="openClaimModal(loan)" 
+            class="claim-btn"
+          >
+            Request Subsidy ({{ getClaimCountForLoan(loan.id) }}/3)
+          </button>
+          <div *ngIf="!canRequestMoreClaims(loan.id)" class="limit-reached">
+            <p>⚠️ Maximum limit of 3 claims reached for this loan</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Claim Request Modal -->
+<div *ngIf="showClaimModal" class="modal-overlay" (click)="closeClaimModal()">
+  <div class="modal-content" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3>Request Education Loan Interest Subsidy</h3>
+      <button class="close-btn" (click)="closeClaimModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="info-box">
+        <p><strong>You are requesting a subsidy for:</strong></p>
+        <p>3 years of interest on your Education Loan</p>
+        <p>The subsidy amount will be calculated automatically based on your loan details.</p>
+      </div>
+      
+      <div class="form-group">
+        <label>Child's Aadhar Number <span class="required">*</span></label>
+        <input 
+          type="text"
+          [(ngModel)]="childAadharNumber"
+          class="form-input"
+          placeholder="Enter child's 12-digit Aadhar number"
+          maxlength="12"
+          pattern="[0-9]{12}"
+          required
+        />
+        <small class="input-hint">Enter the 12-digit Aadhar number of the child/student for whom the education loan is taken</small>
+      </div>
+      
+      <div class="form-group">
+        <label>Additional Notes (Optional):</label>
+        <textarea 
+          [(ngModel)]="userNotes" 
+          class="form-textarea"
+          placeholder="Add any additional information or notes for the admin..."
+          rows="4"
+        ></textarea>
+      </div>
+      
+      <div class="form-group">
+        <label class="terms-checkbox-label">
+          <input 
+            type="checkbox" 
+            [(ngModel)]="termsAccepted" 
+            name="termsAccepted"
+            required
+            class="terms-checkbox"
+          />
+          <span>I accept the <a href="#" (click)="showTermsModal = true; $event.preventDefault()" class="terms-link">Terms and Conditions</a> <span class="required">*</span></span>
+        </label>
+      </div>
+      
+      <div class="modal-actions">
+        <button 
+          (click)="submitClaim()" 
+          class="submit-btn" 
+          [disabled]="submittingClaim"
+        >
+          {{ submittingClaim ? 'Submitting...' : 'Submit Request' }}
+        </button>
+        <button (click)="closeClaimModal()" class="cancel-btn">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Terms and Conditions Modal -->
+<div *ngIf="showTermsModal" class="modal-overlay" (click)="showTermsModal = false">
+  <div class="modal-content" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3>Terms and Conditions</h3>
+      <button class="close-btn" (click)="showTermsModal = false">×</button>
+    </div>
+    <div class="modal-body" style="max-height: 60vh; overflow-y: auto;">
+      <h4>1. Subsidy Claim Terms</h4>
+      <ul>
+        <li>Subsidy is available only for approved Education Loans.</li>
+        <li>You can claim a maximum of 3 subsidy requests per education loan.</li>
+        <li>Subsidy amount is calculated based on 3 years of interest on your loan.</li>
+      </ul>
+
+      <h4>2. Eligibility</h4>
+      <ul>
+        <li>Only approved Education Loans are eligible for interest subsidy.</li>
+        <li>The loan must be in active status (not foreclosed or fully paid).</li>
+        <li>All required documents and information must be provided accurately.</li>
+      </ul>
+
+      <h4>3. Processing and Approval</h4>
+      <ul>
+        <li>Subsidy claims are subject to admin review and approval.</li>
+        <li>NeoBank reserves the right to approve or reject any subsidy claim.</li>
+        <li>Approved subsidy amount will be credited to your account within 5-7 business days.</li>
+      </ul>
+
+      <h4>4. Information Accuracy</h4>
+      <ul>
+        <li>You confirm that all information provided, including child's Aadhar number, is accurate.</li>
+        <li>False or misleading information may result in rejection of your claim.</li>
+        <li>You authorize NeoBank to verify the information provided.</li>
+      </ul>
+
+      <h4>5. General Terms</h4>
+      <ul>
+        <li>These terms are subject to change, and you will be notified of any material changes.</li>
+        <li>Subsidy claims are subject to government regulations and NeoBank policies.</li>
+        <li>Disputes, if any, will be subject to the jurisdiction of courts in Mumbai, India.</li>
+      </ul>
+
+      <p style="margin-top: 20px; font-weight: 600; color: #0077cc;">
+        By accepting these terms, you acknowledge that you have read, understood, and agree to be bound by all the terms and conditions mentioned above.
+      </p>
+    </div>
+  </div>
+</div>
+

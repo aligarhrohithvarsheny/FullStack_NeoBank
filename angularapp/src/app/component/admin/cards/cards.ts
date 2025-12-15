@@ -22,8 +22,8 @@ interface CardDetails {
 }
 
 interface CardReplacementRequest {
-  id: string;
-  originalCardId: string;
+  id?: number | string; // Can be number from backend or string from localStorage
+  originalCardId?: string;
   userId: string;
   userName: string;
   userAccountNumber: string;
@@ -189,9 +189,46 @@ export class Cards implements OnInit {
   loadRequests() {
     if (!isPlatformBrowser(this.platformId)) return;
     
-    // Load replacement requests
-    const savedReplaceRequests = localStorage.getItem('card_replacement_requests');
-    this.replacementRequests = savedReplaceRequests ? JSON.parse(savedReplaceRequests) : [];
+    // Load replacement requests from backend
+    this.http.get(`${environment.apiUrl}/card-replacement-requests/status/Pending`).subscribe({
+      next: (response: any) => {
+        console.log('Replacement requests loaded from backend:', response);
+        if (Array.isArray(response) && response.length > 0) {
+          this.replacementRequests = response.map((req: any) => ({
+            id: req.id, // This should be a number from backend
+            originalCardId: req.currentCardNumber,
+            userId: req.userId || req.accountNumber,
+            userName: req.userName,
+            userAccountNumber: req.accountNumber,
+            reason: req.reason,
+            status: req.status,
+            requestedDate: req.requestDate ? (typeof req.requestDate === 'string' ? req.requestDate : new Date(req.requestDate).toISOString()) : new Date().toISOString(),
+            processedDate: req.processedDate ? (typeof req.processedDate === 'string' ? req.processedDate : new Date(req.processedDate).toISOString()) : undefined,
+            processedBy: req.processedBy,
+            newCardNumber: req.newCardNumber
+          }));
+        } else {
+          this.replacementRequests = [];
+        }
+        // Also save to localStorage as backup
+        this.saveReplacementRequests();
+      },
+      error: (err: any) => {
+        console.error('Error loading replacement requests from backend:', err);
+        // Fallback to localStorage
+        const savedReplaceRequests = localStorage.getItem('card_replacement_requests');
+        if (savedReplaceRequests) {
+          try {
+            this.replacementRequests = JSON.parse(savedReplaceRequests);
+          } catch (parseError) {
+            console.error('Error parsing localStorage data:', parseError);
+            this.replacementRequests = [];
+          }
+        } else {
+          this.replacementRequests = [];
+        }
+      }
+    });
     
     // Load new card requests
     const savedNewCardRequests = localStorage.getItem('new_card_requests');
@@ -365,29 +402,46 @@ export class Cards implements OnInit {
 
   approveReplacementRequest(request: CardReplacementRequest) {
     if (confirm(`Approve card replacement request for ${request.userName}?`)) {
-      // First approve the request in the backend
-      this.http.put(`${environment.apiUrl}/card-replacement-requests/approve/${request.id}?adminName=Admin`, {}).subscribe({
+      // Ensure we have a valid numeric ID
+      if (!request.id || isNaN(Number(request.id))) {
+        console.error('Invalid request ID:', request.id);
+        alert('Invalid request ID. Please refresh the page and try again.');
+        return;
+      }
+
+      const requestId = Number(request.id);
+      const adminName = 'Admin';
+      
+      // Approve the request in the backend
+      this.http.put(`${environment.apiUrl}/card-replacement-requests/approve/${requestId}?adminName=${adminName}`, {}).subscribe({
         next: (response: any) => {
-          console.log('Card replacement request approved in MySQL:', response);
+          console.log('Card replacement request approved in backend:', response);
           
-          // Update local request
-          request.status = 'Approved';
-          request.processedDate = new Date().toISOString();
-          request.processedBy = 'Admin';
-          request.newCardNumber = response.newCardNumber;
-          
-          // Find and update the card in backend
-          const card = this.cards.find(c => c.userAccountNumber === request.userAccountNumber);
-          if (card) {
-            this.updateCardInBackend(card, response.newCardNumber);
+          if (response && response.id) {
+            // Update local request
+            request.status = 'Approved';
+            request.processedDate = response.processedDate || new Date().toISOString();
+            request.processedBy = response.processedBy || adminName;
+            request.newCardNumber = response.newCardNumber;
+            
+            // Reload cards to get updated card information
+            this.loadCards();
+            
+            // Reload requests to get updated list
+            this.loadRequests();
+            
+            alert(`Card replacement approved for ${request.userName}. New card number: ${response.newCardNumber || 'Generated'}`);
+          } else {
+            console.error('Invalid response from backend:', response);
+            alert('Card replacement approved, but response format was unexpected. Please refresh the page.');
+            this.loadRequests();
           }
-          
-          this.saveReplacementRequests();
-          alert(`Card replacement approved for ${request.userName}. New card number: ${response.newCardNumber}`);
         },
         error: (err: any) => {
           console.error('Error approving card replacement request:', err);
-          alert('Failed to approve card replacement request. Please try again.');
+          const errorMessage = err?.error?.message || err?.message || 'Unknown error';
+          console.error('Full error details:', err);
+          alert(`Failed to approve card replacement request: ${errorMessage}. Please check the console for details and try again.`);
         }
       });
     }
@@ -395,12 +449,44 @@ export class Cards implements OnInit {
 
   rejectReplacementRequest(request: CardReplacementRequest) {
     if (confirm(`Reject card replacement request for ${request.userName}?`)) {
-      request.status = 'Rejected';
-      request.processedDate = new Date().toISOString();
-      request.processedBy = 'Admin';
+      // Ensure we have a valid numeric ID
+      if (!request.id || isNaN(Number(request.id))) {
+        console.error('Invalid request ID:', request.id);
+        alert('Invalid request ID. Please refresh the page and try again.');
+        return;
+      }
+
+      const requestId = Number(request.id);
+      const adminName = 'Admin';
       
-      this.saveReplacementRequests();
-      alert(`Card replacement request rejected for ${request.userName}`);
+      // Reject the request in the backend
+      this.http.put(`${environment.apiUrl}/card-replacement-requests/reject/${requestId}?adminName=${adminName}`, {}).subscribe({
+        next: (response: any) => {
+          console.log('Card replacement request rejected in backend:', response);
+          
+          if (response && response.id) {
+            // Update local request
+            request.status = 'Rejected';
+            request.processedDate = response.processedDate || new Date().toISOString();
+            request.processedBy = response.processedBy || adminName;
+            
+            // Reload requests to get updated list
+            this.loadRequests();
+            
+            alert(`Card replacement request rejected for ${request.userName}`);
+          } else {
+            console.error('Invalid response from backend:', response);
+            alert('Card replacement request rejected, but response format was unexpected. Please refresh the page.');
+            this.loadRequests();
+          }
+        },
+        error: (err: any) => {
+          console.error('Error rejecting card replacement request:', err);
+          const errorMessage = err?.error?.message || err?.message || 'Unknown error';
+          console.error('Full error details:', err);
+          alert(`Failed to reject card replacement request: ${errorMessage}. Please check the console for details and try again.`);
+        }
+      });
     }
   }
 
@@ -498,6 +584,14 @@ export class Cards implements OnInit {
   }
 
   goBack() {
-    this.router.navigate(['admin/dashboard']);
+    // Check if accessed from manager dashboard
+    const navigationSource = sessionStorage.getItem('navigationSource');
+    if (navigationSource === 'MANAGER') {
+      sessionStorage.removeItem('navigationSource');
+      sessionStorage.removeItem('managerReturnPath');
+      this.router.navigate(['/manager/dashboard']);
+    } else {
+      this.router.navigate(['/admin/dashboard']);
+    }
   }
 }

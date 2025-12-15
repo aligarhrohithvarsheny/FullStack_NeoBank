@@ -5,6 +5,44 @@
   min-height: 100vh;
 }
 
+/* Account mapping styles */
+.account-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.account-number {
+  font-weight: 500;
+  color: #333;
+}
+
+.account-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.account-badge.applicant {
+  background: #e3f2fd;
+  color: #1976d2;
+}
+
+.account-badge.child {
+  background: #f3e5f5;
+  color: #7b1fa2;
+}
+
+.mapped-badge {
+  display: inline-block;
+  margin-left: 8px;
+  font-size: 1.1rem;
+  cursor: help;
+}
+
 .loans-container h2 {
   color: #0077cc;
   text-align: center;
@@ -179,6 +217,48 @@
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+/* EMI details button */
+.emi-details-btn {
+  background: linear-gradient(135deg, #0d6efd, #0b5ed7);
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.emi-details-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #0b5ed7, #0a58ca);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(13, 110, 253, 0.3);
+}
+
+.emi-details-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.view-form-btn {
+  background: linear-gradient(135deg, #6f42c1, #5a32a3);
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.view-form-btn:hover {
+  background: linear-gradient(135deg, #5a32a3, #4c2a8a);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(111, 66, 193, 0.3);
 }
 
 .approve-btn {
@@ -382,6 +462,11 @@
   background: linear-gradient(135deg, #6f42c1, #5a32a3);
   color: white;
   border-radius: 12px 12px 0 0;
+}
+
+/* Slightly different header color for EMI modal */
+.emi-header {
+  background: linear-gradient(135deg, #0d6efd, #0b5ed7);
 }
 
 .modal-header h3 {
@@ -595,6 +680,96 @@
   box-shadow: 0 4px 12px rgba(111, 66, 193, 0.3);
 }
 
+/* EMI summary block */
+.emi-summary {
+  margin-bottom: 20px;
+  padding: 15px 18px;
+  background: #f8f9fa;
+  border-radius: 10px;
+  border: 1px solid #e9ecef;
+}
+
+.emi-summary h4 {
+  margin: 0 0 12px 0;
+  font-size: 1.1rem;
+  color: #0d6efd;
+}
+
+.emi-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px 16px;
+}
+
+.emi-summary-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.emi-summary-item .label {
+  font-size: 0.8rem;
+  color: #6c757d;
+}
+
+.emi-summary-item .value {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #212529;
+}
+
+/* EMI table */
+.emi-table-container {
+  margin-top: 10px;
+  max-height: 400px;
+  overflow-y: auto;
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
+}
+
+.emi-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.emi-table th,
+.emi-table td {
+  padding: 10px 8px;
+  border-bottom: 1px solid #e9ecef;
+  text-align: left;
+}
+
+.emi-table th {
+  background: #f1f3f5;
+  font-weight: 600;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.emi-status {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.emi-paid {
+  background: #d4edda;
+  color: #155724;
+}
+
+.emi-pending {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.emi-overdue {
+  background: #f8d7da;
+  color: #721c24;
+}
+
 @media (max-width: 768px) {
   .modal-content {
     width: 95%;
@@ -607,5 +782,9 @@
   
   .detail-item.total {
     grid-column: 1;
+  }
+
+  .emi-summary-grid {
+    grid-template-columns: 1fr;
   }
 }

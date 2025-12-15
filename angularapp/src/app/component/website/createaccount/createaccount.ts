@@ -32,11 +32,14 @@ interface PendingAccount {
 })
 export class Createaccount implements OnInit {
   form!: FormGroup;
+  childForm!: FormGroup;
   submitted = false;
   submitError = '';
   successMessage = '';
   loading = false;
   termsAccepted = false;
+  hasChildAccount = false;
+  childAgeError = '';
   
   // Approval tracking
   showTracking = false;
@@ -269,8 +272,23 @@ export class Createaccount implements OnInit {
       city: [{value: '', disabled: true}, [Validators.required]], // Initially disabled
       password: ['', [Validators.required, Validators.minLength(6)]],
       confirmPassword: ['', [Validators.required]],
-      termsAccepted: [false, [Validators.requiredTrue]]
+      termsAccepted: [false, [Validators.requiredTrue]],
+      // Child account fields
+      childName: [''],
+      childEmail: [''],
+      childDob: [''],
+      childStudies: [''],
+      form60: [''],
+      panChildForm: [''],
+      childPassword: [''],
+      confirmChildPassword: ['']
     }, { validators: this.passwordsMatchValidator });
+
+    // Child form for validation
+    this.childForm = this.fb.group({
+      childPassword: [''],
+      confirmChildPassword: ['']
+    }, { validators: this.childPasswordsMatchValidator });
 
     // Listen for state changes to update cities
     this.form.get('state')?.valueChanges.subscribe(selectedState => {
@@ -412,6 +430,96 @@ export class Createaccount implements OnInit {
     const pw = group.get('password')?.value;
     const cpw = group.get('confirmPassword')?.value;
     return pw && cpw && pw !== cpw ? { passwordsMismatch: true } : null;
+  }
+
+  childPasswordsMatchValidator(group: AbstractControl): ValidationErrors | null {
+    const pw = group.get('childPassword')?.value;
+    const cpw = group.get('confirmChildPassword')?.value;
+    return pw && cpw && pw !== cpw ? { childPasswordsMismatch: true } : null;
+  }
+
+  onChildAccountToggle() {
+    if (this.hasChildAccount) {
+      // Add validators when child account is enabled
+      this.form.get('childName')?.setValidators([Validators.required, Validators.minLength(2)]);
+      this.form.get('childEmail')?.setValidators([Validators.required, Validators.email, this.gmailOnlyValidator]);
+      this.form.get('childDob')?.setValidators([Validators.required, this.childAgeValidator.bind(this)]);
+      this.form.get('childStudies')?.setValidators([Validators.required]);
+      this.form.get('form60')?.setValidators([Validators.required]);
+      this.form.get('panChildForm')?.setValidators([Validators.required]);
+      this.form.get('childPassword')?.setValidators([Validators.required, Validators.minLength(6)]);
+      this.form.get('confirmChildPassword')?.setValidators([Validators.required]);
+    } else {
+      // Remove validators when child account is disabled
+      this.form.get('childName')?.clearValidators();
+      this.form.get('childEmail')?.clearValidators();
+      this.form.get('childDob')?.clearValidators();
+      this.form.get('childStudies')?.clearValidators();
+      this.form.get('form60')?.clearValidators();
+      this.form.get('panChildForm')?.clearValidators();
+      this.form.get('childPassword')?.clearValidators();
+      this.form.get('confirmChildPassword')?.clearValidators();
+      // Clear values
+      this.form.get('childName')?.setValue('');
+      this.form.get('childEmail')?.setValue('');
+      this.form.get('childDob')?.setValue('');
+      this.form.get('childStudies')?.setValue('');
+      this.form.get('form60')?.setValue('');
+      this.form.get('panChildForm')?.setValue('');
+      this.form.get('childPassword')?.setValue('');
+      this.form.get('confirmChildPassword')?.setValue('');
+      this.childAgeError = '';
+    }
+    this.form.get('childName')?.updateValueAndValidity();
+    this.form.get('childEmail')?.updateValueAndValidity();
+    this.form.get('childDob')?.updateValueAndValidity();
+    this.form.get('childStudies')?.updateValueAndValidity();
+    this.form.get('form60')?.updateValueAndValidity();
+    this.form.get('panChildForm')?.updateValueAndValidity();
+    this.form.get('childPassword')?.updateValueAndValidity();
+    this.form.get('confirmChildPassword')?.updateValueAndValidity();
+  }
+
+  childAgeValidator(control: AbstractControl): ValidationErrors | null {
+    if (!control.value) return null;
+    const dob = new Date(control.value);
+    const today = new Date();
+    const age = today.getFullYear() - dob.getFullYear();
+    const monthDiff = today.getMonth() - dob.getMonth();
+    const dayDiff = today.getDate() - dob.getDate();
+    
+    const actualAge = monthDiff < 0 || (monthDiff === 0 && dayDiff < 0) ? age - 1 : age;
+    
+    if (actualAge >= 18) {
+      return { ageRestriction: true };
+    }
+    return null;
+  }
+
+  validateChildAge() {
+    const childDob = this.form.get('childDob')?.value;
+    if (!childDob) {
+      this.childAgeError = '';
+      return;
+    }
+    
+    const dob = new Date(childDob);
+    const today = new Date();
+    const age = today.getFullYear() - dob.getFullYear();
+    const monthDiff = today.getMonth() - dob.getMonth();
+    const dayDiff = today.getDate() - dob.getDate();
+    
+    const actualAge = monthDiff < 0 || (monthDiff === 0 && dayDiff < 0) ? age - 1 : age;
+    
+    if (actualAge >= 18) {
+      this.childAgeError = 'Child must be below 18 years of age.';
+      this.form.get('childDob')?.setErrors({ ageRestriction: true });
+    } else {
+      this.childAgeError = '';
+      if (this.form.get('childDob')?.hasError('ageRestriction')) {
+        this.form.get('childDob')?.setErrors(null);
+      }
+    }
   }
 
   // Check Aadhar uniqueness

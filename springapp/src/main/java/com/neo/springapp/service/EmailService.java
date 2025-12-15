@@ -1001,5 +1001,314 @@ public class EmailService {
                "NeoBank Customer Service Team\n\n" +
                "For any queries, contact us at: 1800 103 1906 | support@neobank.in";
     }
+
+    /**
+     * Send passbook PDF via email
+     */
+    public boolean sendPassbookEmail(String toEmail, String accountNumber, String userName, byte[] pdfBytes) {
+        initializeMailSender();
+        
+        try {
+            if (!mailAvailable || mailSender == null) {
+                System.out.println("==========================================");
+                System.out.println("PASSBOOK EMAIL (Mail not configured - Development Mode)");
+                System.out.println("To: " + toEmail);
+                System.out.println("Account Number: " + accountNumber);
+                System.out.println("User Name: " + userName);
+                System.out.println("PDF Size: " + (pdfBytes != null ? pdfBytes.length + " bytes" : "null"));
+                System.out.println("==========================================");
+                return true;
+            }
+            
+            System.out.println("Attempting to send passbook email with attachment...");
+            
+            Class<?> mimeMessageClass = Class.forName("javax.mail.internet.MimeMessage");
+            Class<?> mimeMessageHelperClass = Class.forName("org.springframework.mail.javamail.MimeMessageHelper");
+            Class<?> dataSourceClass = Class.forName("javax.activation.DataSource");
+            
+            Class<?> byteArrayDataSourceClass = null;
+            try {
+                byteArrayDataSourceClass = Class.forName("org.springframework.mail.javamail.ByteArrayDataSource");
+            } catch (ClassNotFoundException e) {
+                byteArrayDataSourceClass = Class.forName("javax.activation.ByteArrayDataSource");
+            }
+            
+            Method createMimeMessageMethod = mailSender.getClass().getMethod("createMimeMessage");
+            Object mimeMessage = createMimeMessageMethod.invoke(mailSender);
+            
+            Object helper = mimeMessageHelperClass.getConstructor(mimeMessageClass, boolean.class)
+                .newInstance(mimeMessage, true);
+            
+            Method setToMethod = mimeMessageHelperClass.getMethod("setTo", String.class);
+            Method setSubjectMethod = mimeMessageHelperClass.getMethod("setSubject", String.class);
+            Method setTextMethod = mimeMessageHelperClass.getMethod("setText", String.class, boolean.class);
+            Method setFromMethod = mimeMessageHelperClass.getMethod("setFrom", String.class);
+            Method addAttachmentMethod = mimeMessageHelperClass.getMethod("addAttachment", String.class, dataSourceClass);
+            
+            String fromEmail = getFromEmail();
+            setFromMethod.invoke(helper, fromEmail);
+            setToMethod.invoke(helper, toEmail);
+            setSubjectMethod.invoke(helper, "NeoBank - Account Passbook");
+            setTextMethod.invoke(helper, buildPassbookEmailBody(userName, accountNumber), true);
+            
+            Object dataSource = byteArrayDataSourceClass.getConstructor(byte[].class, String.class)
+                .newInstance(pdfBytes, "application/pdf");
+            
+            String fileName = "NeoBank_Passbook_" + accountNumber + "_" + 
+                            java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd")) + ".pdf";
+            addAttachmentMethod.invoke(helper, fileName, dataSource);
+            
+            Method sendMimeMessageMethod = mailSender.getClass().getMethod("send", mimeMessageClass);
+            sendMimeMessageMethod.invoke(mailSender, mimeMessage);
+            
+            System.out.println("✅ Passbook email sent successfully to: " + toEmail);
+            return true;
+        } catch (Exception e) {
+            System.err.println("Error sending passbook email: " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
+     * Build email body for passbook
+     */
+    private String buildPassbookEmailBody(String userName, String accountNumber) {
+        return "<html><body style='font-family: Arial, sans-serif; line-height: 1.6; color: #333;'>" +
+               "<div style='max-width: 600px; margin: 0 auto; padding: 20px;'>" +
+               "<div style='background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 8px 8px 0 0; text-align: center;'>" +
+               "<h2 style='margin: 0;'>🏦 NeoBank</h2>" +
+               "<p style='margin: 5px 0 0 0; font-size: 14px;'>Account Passbook</p>" +
+               "</div>" +
+               "<div style='background: #f8f9fa; padding: 20px; border: 1px solid #ddd; border-top: none; border-radius: 0 0 8px 8px;'>" +
+               "<p>Dear " + (userName != null ? userName : "Valued Customer") + ",</p>" +
+               "<p>Thank you for banking with NeoBank. Please find attached your account passbook for account number <strong>" + accountNumber + "</strong>.</p>" +
+               "<p>The passbook includes your account details, current balance, and other important information.</p>" +
+               "<div style='background: white; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #667eea;'>" +
+               "<p style='margin: 0; font-size: 12px; color: #666;'><strong>Important:</strong></p>" +
+               "<ul style='margin: 10px 0; padding-left: 20px; font-size: 12px; color: #666;'>" +
+               "<li>This is a computer-generated passbook and does not require signature</li>" +
+               "<li>Please keep this passbook secure and do not share with unauthorized persons</li>" +
+               "<li>For any queries, contact us at support@neobank.com or 1800 103 1906</li>" +
+               "</ul>" +
+               "</div>" +
+               "<p>If you have any questions or concerns about your account, please don't hesitate to contact our customer support team.</p>" +
+               "<p style='margin-top: 30px;'>Best regards,<br>" +
+               "<strong>NeoBank Customer Service Team</strong></p>" +
+               "<hr style='border: none; border-top: 1px solid #ddd; margin: 20px 0;'>" +
+               "<p style='font-size: 11px; color: #999; text-align: center;'>" +
+               "This is an automated email. Please do not reply to this message.<br>" +
+               "© " + java.time.Year.now() + " NeoBank India Limited. All rights reserved." +
+               "</p>" +
+               "</div>" +
+               "</div>" +
+               "</body></html>";
+    }
+
+    /**
+     * Send gold loan receipt PDF via email
+     */
+    public boolean sendGoldLoanReceiptEmail(String toEmail, String loanAccountNumber, String userName, byte[] pdfBytes) {
+        initializeMailSender();
+        
+        try {
+            if (!mailAvailable || mailSender == null) {
+                System.out.println("==========================================");
+                System.out.println("GOLD LOAN RECEIPT EMAIL (Mail not configured - Development Mode)");
+                System.out.println("To: " + toEmail);
+                System.out.println("Loan Account Number: " + loanAccountNumber);
+                System.out.println("User Name: " + userName);
+                System.out.println("PDF Size: " + (pdfBytes != null ? pdfBytes.length + " bytes" : "null"));
+                System.out.println("==========================================");
+                return true;
+            }
+            
+            Class<?> mimeMessageClass = Class.forName("javax.mail.internet.MimeMessage");
+            Class<?> mimeMessageHelperClass = Class.forName("org.springframework.mail.javamail.MimeMessageHelper");
+            Class<?> dataSourceClass = Class.forName("javax.activation.DataSource");
+            
+            Class<?> byteArrayDataSourceClass = null;
+            try {
+                byteArrayDataSourceClass = Class.forName("org.springframework.mail.javamail.ByteArrayDataSource");
+            } catch (ClassNotFoundException e) {
+                byteArrayDataSourceClass = Class.forName("javax.activation.ByteArrayDataSource");
+            }
+            
+            Method createMimeMessageMethod = mailSender.getClass().getMethod("createMimeMessage");
+            Object mimeMessage = createMimeMessageMethod.invoke(mailSender);
+            
+            Object helper = mimeMessageHelperClass.getConstructor(mimeMessageClass, boolean.class)
+                .newInstance(mimeMessage, true);
+            
+            Method setToMethod = mimeMessageHelperClass.getMethod("setTo", String.class);
+            Method setSubjectMethod = mimeMessageHelperClass.getMethod("setSubject", String.class);
+            Method setTextMethod = mimeMessageHelperClass.getMethod("setText", String.class, boolean.class);
+            Method setFromMethod = mimeMessageHelperClass.getMethod("setFrom", String.class);
+            Method addAttachmentMethod = mimeMessageHelperClass.getMethod("addAttachment", String.class, dataSourceClass);
+            
+            String fromEmail = getFromEmail();
+            setFromMethod.invoke(helper, fromEmail);
+            setToMethod.invoke(helper, toEmail);
+            setSubjectMethod.invoke(helper, "NeoBank - Gold Loan Receipt");
+            setTextMethod.invoke(helper, buildGoldLoanReceiptEmailBody(userName, loanAccountNumber), true);
+            
+            Object dataSource = byteArrayDataSourceClass.getConstructor(byte[].class, String.class)
+                .newInstance(pdfBytes, "application/pdf");
+            
+            String fileName = "Gold_Loan_Receipt_" + loanAccountNumber + "_" + 
+                            java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd")) + ".pdf";
+            addAttachmentMethod.invoke(helper, fileName, dataSource);
+            
+            Method sendMimeMessageMethod = mailSender.getClass().getMethod("send", mimeMessageClass);
+            sendMimeMessageMethod.invoke(mailSender, mimeMessage);
+            
+            System.out.println("✅ Gold loan receipt email sent successfully to: " + toEmail);
+            return true;
+        } catch (Exception e) {
+            System.err.println("Error sending gold loan receipt email: " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
+     * Build email body for gold loan receipt
+     */
+    private String buildGoldLoanReceiptEmailBody(String userName, String loanAccountNumber) {
+        return "<html><body style='font-family: Arial, sans-serif; line-height: 1.6; color: #333;'>" +
+               "<div style='max-width: 600px; margin: 0 auto; padding: 20px;'>" +
+               "<div style='background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%); color: white; padding: 20px; border-radius: 8px 8px 0 0; text-align: center;'>" +
+               "<h2 style='margin: 0;'>🏦 NeoBank</h2>" +
+               "<p style='margin: 5px 0 0 0; font-size: 14px;'>Gold Loan Receipt</p>" +
+               "</div>" +
+               "<div style='background: #f8f9fa; padding: 20px; border: 1px solid #ddd; border-top: none; border-radius: 0 0 8px 8px;'>" +
+               "<p>Dear " + (userName != null ? userName : "Valued Customer") + ",</p>" +
+               "<p>Congratulations! Your gold loan application has been approved.</p>" +
+               "<p>Please find attached your gold loan receipt for loan account number <strong>" + loanAccountNumber + "</strong>.</p>" +
+               "<p>The receipt includes all the details of your approved gold loan including loan amount, interest rate, tenure, and gold details.</p>" +
+               "<div style='background: white; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #ffc107;'>" +
+               "<p style='margin: 0; font-size: 12px; color: #666;'><strong>Important:</strong></p>" +
+               "<ul style='margin: 10px 0; padding-left: 20px; font-size: 12px; color: #666;'>" +
+               "<li>This is a computer-generated receipt and does not require signature</li>" +
+               "<li>The loan amount has been credited to your account</li>" +
+               "<li>Please keep this receipt secure and do not share with unauthorized persons</li>" +
+               "<li>For any queries, contact us at support@neobank.com or 1800 103 1906</li>" +
+               "</ul>" +
+               "</div>" +
+               "<p>If you have any questions or concerns about your loan, please don't hesitate to contact our customer support team.</p>" +
+               "<p style='margin-top: 30px;'>Best regards,<br>" +
+               "<strong>NeoBank Customer Service Team</strong></p>" +
+               "<hr style='border: none; border-top: 1px solid #ddd; margin: 20px 0;'>" +
+               "<p style='font-size: 11px; color: #999; text-align: center;'>" +
+               "This is an automated email. Please do not reply to this message.<br>" +
+               "© " + java.time.Year.now() + " NeoBank India Limited. All rights reserved." +
+               "</p>" +
+               "</div>" +
+               "</div>" +
+               "</body></html>";
+    }
+
+    /**
+     * Send personal loan receipt PDF via email
+     */
+    public boolean sendPersonalLoanReceiptEmail(String toEmail, String loanAccountNumber, String userName, byte[] pdfBytes) {
+        initializeMailSender();
+        
+        try {
+            if (!mailAvailable || mailSender == null) {
+                System.out.println("==========================================");
+                System.out.println("PERSONAL LOAN RECEIPT EMAIL (Mail not configured - Development Mode)");
+                System.out.println("To: " + toEmail);
+                System.out.println("Loan Account Number: " + loanAccountNumber);
+                System.out.println("User Name: " + userName);
+                System.out.println("PDF Size: " + (pdfBytes != null ? pdfBytes.length + " bytes" : "null"));
+                System.out.println("==========================================");
+                return true;
+            }
+            
+            Class<?> mimeMessageClass = Class.forName("javax.mail.internet.MimeMessage");
+            Class<?> mimeMessageHelperClass = Class.forName("org.springframework.mail.javamail.MimeMessageHelper");
+            Class<?> dataSourceClass = Class.forName("javax.activation.DataSource");
+            
+            Class<?> byteArrayDataSourceClass = null;
+            try {
+                byteArrayDataSourceClass = Class.forName("org.springframework.mail.javamail.ByteArrayDataSource");
+            } catch (ClassNotFoundException e) {
+                byteArrayDataSourceClass = Class.forName("javax.activation.ByteArrayDataSource");
+            }
+            
+            Method createMimeMessageMethod = mailSender.getClass().getMethod("createMimeMessage");
+            Object mimeMessage = createMimeMessageMethod.invoke(mailSender);
+            
+            Object helper = mimeMessageHelperClass.getConstructor(mimeMessageClass, boolean.class)
+                .newInstance(mimeMessage, true);
+            
+            Method setToMethod = mimeMessageHelperClass.getMethod("setTo", String.class);
+            Method setSubjectMethod = mimeMessageHelperClass.getMethod("setSubject", String.class);
+            Method setTextMethod = mimeMessageHelperClass.getMethod("setText", String.class, boolean.class);
+            Method setFromMethod = mimeMessageHelperClass.getMethod("setFrom", String.class);
+            Method addAttachmentMethod = mimeMessageHelperClass.getMethod("addAttachment", String.class, dataSourceClass);
+            
+            String fromEmail = getFromEmail();
+            setFromMethod.invoke(helper, fromEmail);
+            setToMethod.invoke(helper, toEmail);
+            setSubjectMethod.invoke(helper, "NeoBank - Personal Loan Receipt");
+            setTextMethod.invoke(helper, buildPersonalLoanReceiptEmailBody(userName, loanAccountNumber), true);
+            
+            Object dataSource = byteArrayDataSourceClass.getConstructor(byte[].class, String.class)
+                .newInstance(pdfBytes, "application/pdf");
+            
+            String fileName = "Personal_Loan_Receipt_" + loanAccountNumber + "_" + 
+                            java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd")) + ".pdf";
+            addAttachmentMethod.invoke(helper, fileName, dataSource);
+            
+            Method sendMimeMessageMethod = mailSender.getClass().getMethod("send", mimeMessageClass);
+            sendMimeMessageMethod.invoke(mailSender, mimeMessage);
+            
+            System.out.println("✅ Personal loan receipt email sent successfully to: " + toEmail);
+            return true;
+        } catch (Exception e) {
+            System.err.println("Error sending personal loan receipt email: " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    /**
+     * Build email body for personal loan receipt
+     */
+    private String buildPersonalLoanReceiptEmailBody(String userName, String loanAccountNumber) {
+        return "<html><body style='font-family: Arial, sans-serif; line-height: 1.6; color: #333;'>" +
+               "<div style='max-width: 600px; margin: 0 auto; padding: 20px;'>" +
+               "<div style='background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 8px 8px 0 0; text-align: center;'>" +
+               "<h2 style='margin: 0;'>🏦 NeoBank</h2>" +
+               "<p style='margin: 5px 0 0 0; font-size: 14px;'>Personal Loan Receipt</p>" +
+               "</div>" +
+               "<div style='background: #f8f9fa; padding: 20px; border: 1px solid #ddd; border-top: none; border-radius: 0 0 8px 8px;'>" +
+               "<p>Dear " + (userName != null ? userName : "Valued Customer") + ",</p>" +
+               "<p>Congratulations! Your personal loan application has been approved.</p>" +
+               "<p>Please find attached your personal loan receipt for loan account number <strong>" + loanAccountNumber + "</strong>.</p>" +
+               "<p>The receipt includes all the details of your approved loan including loan amount, interest rate, tenure, and other terms.</p>" +
+               "<div style='background: white; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #667eea;'>" +
+               "<p style='margin: 0; font-size: 12px; color: #666;'><strong>Important:</strong></p>" +
+               "<ul style='margin: 10px 0; padding-left: 20px; font-size: 12px; color: #666;'>" +
+               "<li>This is a computer-generated receipt and does not require signature</li>" +
+               "<li>The loan amount has been credited to your account</li>" +
+               "<li>Please keep this receipt secure and do not share with unauthorized persons</li>" +
+               "<li>For any queries, contact us at support@neobank.com or 1800 103 1906</li>" +
+               "</ul>" +
+               "</div>" +
+               "<p>If you have any questions or concerns about your loan, please don't hesitate to contact our customer support team.</p>" +
+               "<p style='margin-top: 30px;'>Best regards,<br>" +
+               "<strong>NeoBank Customer Service Team</strong></p>" +
+               "<hr style='border: none; border-top: 1px solid #ddd; margin: 20px 0;'>" +
+               "<p style='font-size: 11px; color: #999; text-align: center;'>" +
+               "This is an automated email. Please do not reply to this message.<br>" +
+               "© " + java.time.Year.now() + " NeoBank India Limited. All rights reserved." +
+               "</p>" +
+               "</div>" +
+               "</div>" +
+               "</body></html>";
+    }
 }
 

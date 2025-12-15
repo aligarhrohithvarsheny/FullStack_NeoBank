@@ -321,6 +321,13 @@ public class EmiService {
     }
 
     /**
+     * Get all EMIs (for admin/manager)
+     */
+    public List<EmiPayment> getAllEmis() {
+        return emiPaymentRepository.findAll();
+    }
+
+    /**
      * Helper method to get loan by ID
      */
     private Loan getLoanByLoanId(Long loanId) {

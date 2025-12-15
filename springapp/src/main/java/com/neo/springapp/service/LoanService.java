@@ -47,9 +47,19 @@ public class LoanService {
         return loanRepository.findAll();
     }
 
-    // Get loans by account number
+    // Get loans by account number (includes both applicant and child accounts for education loans)
     public List<Loan> getLoansByAccountNumber(String accountNumber) {
-        return loanRepository.findByAccountNumber(accountNumber);
+        // Get loans where user is the applicant
+        List<Loan> applicantLoans = loanRepository.findByAccountNumber(accountNumber);
+        
+        // Get loans where user is the child (for education loans)
+        List<Loan> childLoans = loanRepository.findByChildAccountNumber(accountNumber);
+        
+        // Combine both lists and remove duplicates
+        java.util.Set<Loan> allLoans = new java.util.HashSet<>(applicantLoans);
+        allLoans.addAll(childLoans);
+        
+        return new java.util.ArrayList<>(allLoans);
     }
 
     // Get loan by ID

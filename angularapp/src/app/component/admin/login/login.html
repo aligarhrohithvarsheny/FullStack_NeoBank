@@ -4,9 +4,25 @@
       <img src="/favicon.ico" alt="NeoBank Logo" class="brand-logo">
       NEOBANK
     </h1>
-    <h2> Admin Login</h2>
+    <h2> Admin / Manager Login</h2>
 
     <form (ngSubmit)="onSubmit()">
+      <!-- Role Selection -->
+      <div class="form-group">
+        <label>Access Role</label>
+        <select
+          id="role"
+          [(ngModel)]="selectedRole"
+          name="role"
+          required
+          class="role-select"
+          (change)="checkFingerprintCredentials()"
+        >
+          <option value="ADMIN">Admin</option>
+          <option value="MANAGER">Manager</option>
+        </select>
+      </div>
+
       <!-- Email -->
       <div class="form-group">
         <label>Email</label>
@@ -17,25 +33,95 @@
           name="email"
           required
           placeholder="Enter email"
+          (blur)="checkFingerprintCredentials()"
+          (input)="checkFingerprintCredentials()"
         />
+        <div class="credential-status" *ngIf="email && checkingCredentials">
+          <i class="fa fa-spinner fa-spin"></i> Checking credentials...
+        </div>
+        <div class="credential-status success" *ngIf="email && !checkingCredentials && hasFingerprintRegistered && selectedRole === 'ADMIN'">
+          <i class="fa fa-check-circle"></i> Fingerprint registered
+        </div>
+        <div class="credential-status warning" *ngIf="email && !checkingCredentials && !hasFingerprintRegistered && selectedRole === 'ADMIN'">
+          <i class="fa fa-exclamation-triangle"></i> No fingerprint registered
+        </div>
       </div>
 
-      <!-- Password -->
-      <div class="form-group">
-        <label>Password</label>
+      <!-- Password - Only for MANAGER or for ADMIN registration -->
+      <div class="form-group" *ngIf="selectedRole === 'MANAGER' || (selectedRole === 'ADMIN' && !hasFingerprintRegistered)">
+        <label>
+          Password
+          <span class="label-hint" *ngIf="selectedRole === 'ADMIN'">(Required for fingerprint registration only)</span>
+        </label>
         <input
           type="password"
           [(ngModel)]="password"
           name="password"
-          required
+          [required]="selectedRole === 'MANAGER' || (selectedRole === 'ADMIN' && !hasFingerprintRegistered)"
           placeholder="Enter password"
         />
       </div>
 
-      
+      <!-- Admin Fingerprint Notice -->
+      <div class="fingerprint-notice" *ngIf="selectedRole === 'ADMIN'">
+        <i class="fa fa-fingerprint"></i>
+        <p><strong>Fingerprint authentication is mandatory for Admin login.</strong></p>
+        <p>Please use fingerprint to login. Password login is disabled for security.</p>
+      </div>
 
-      <!-- Submit -->
-      <button type="submit">Login</button>
+      <!-- Error Message -->
+      <div *ngIf="errorMessage" class="error-message">
+        {{ errorMessage }}
+      </div>
+
+      <!-- Password Login Button - Only for MANAGER -->
+      <button 
+        type="submit" 
+        *ngIf="selectedRole === 'MANAGER'"
+        [disabled]="isLoading || isAuthenticatingFingerprint || isRegisteringFingerprint" 
+        class="login-btn">
+        <span *ngIf="!isLoading">Login with Password</span>
+        <span *ngIf="isLoading">Logging in...</span>
+      </button>
+
+      <!-- Divider - Only for MANAGER -->
+      <div class="divider" *ngIf="isFingerprintSupported && selectedRole === 'MANAGER'">
+        <span>OR</span>
+      </div>
+
+      <!-- Fingerprint Authentication - PRIMARY for ADMIN, OPTIONAL for MANAGER -->
+      <div class="fingerprint-section" *ngIf="isFingerprintSupported">
+        <button 
+          type="button" 
+          class="fingerprint-btn"
+          [class.fingerprint-btn-primary]="selectedRole === 'ADMIN'"
+          (click)="loginWithFingerprint()"
+          [disabled]="isLoading || isAuthenticatingFingerprint || isRegisteringFingerprint || !email || checkingCredentials">
+          <i class="fa fa-fingerprint"></i>
+          <span *ngIf="!isAuthenticatingFingerprint">
+            {{ selectedRole === 'ADMIN' ? 'Login with Fingerprint (Required)' : 'Login with Fingerprint' }}
+          </span>
+          <span *ngIf="isAuthenticatingFingerprint">Authenticating...</span>
+        </button>
+
+        <!-- Register Fingerprint Button - Only show if not registered -->
+        <button 
+          type="button" 
+          class="register-fingerprint-btn"
+          *ngIf="!hasFingerprintRegistered || selectedRole === 'ADMIN'"
+          (click)="registerFingerprint()"
+          [disabled]="isLoading || isAuthenticatingFingerprint || isRegisteringFingerprint || !email || !password || checkingCredentials">
+          <i class="fa fa-plus-circle"></i>
+          <span *ngIf="!isRegisteringFingerprint">Register Fingerprint</span>
+          <span *ngIf="isRegisteringFingerprint">Registering...</span>
+        </button>
+      </div>
+
+      <!-- WebAuthn Not Supported Message -->
+      <div class="webauthn-not-supported" *ngIf="!isFingerprintSupported">
+        <p><i class="fa fa-exclamation-circle"></i> Fingerprint authentication is required but not available in your browser.</p>
+        <p>Please use a modern browser with biometric support (Chrome, Edge, Firefox, Safari).</p>
+      </div>
     </form>
   </div>
 </div>

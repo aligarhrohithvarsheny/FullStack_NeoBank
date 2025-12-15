@@ -28,6 +28,12 @@ public class Loan {
     private Double currentBalance;
     private String pan; // PAN card number for CIBIL check
     
+    // For Education Loans: Child account number (if child has neobank account)
+    private String childAccountNumber; // Account number of child/student (for education loans)
+    
+    // For Personal Loans: Uploaded application form
+    private String personalLoanFormPath; // Path to uploaded Personal Loan application form
+    
     // CIBIL and credit information
     private Integer cibilScore; // CIBIL score (300-900)
     private Double creditLimit; // Available credit limit based on CIBIL

@@ -5,6 +5,15 @@ import { Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../../environment/environment';
 import { AlertService } from '../../../service/alert.service';
+import { 
+  College, 
+  INDIAN_STATES, 
+  getCollegesByState, 
+  getCollegesByCity, 
+  getCollegesByType, 
+  getAllColleges, 
+  getCitiesByState 
+} from '../../../data/colleges-data';
 
 interface LoanRequest {
   id: number;
@@ -29,6 +38,7 @@ interface LoanRequest {
   interestPaid?: number;
   remainingPrincipal?: number;
   remainingInterest?: number;
+  cibilScore?: number | null;
 }
 
 interface EmiPayment {
@@ -75,6 +85,131 @@ export class Loan implements OnInit {
   payingEmi: boolean = false;
   showEmiPaymentModal: boolean = false;
   selectedEmiForPayment: EmiPayment | null = null;
+  
+  // Bulk EMI payment
+  selectedEmis: Set<number> = new Set(); // Set of selected EMI IDs
+  payingBulkEmis: boolean = false;
+  showBulkPaymentModal: boolean = false;
+  
+  // Helper methods for bulk payment
+  toggleEmiSelection(emiId: number) {
+    if (this.selectedEmis.has(emiId)) {
+      this.selectedEmis.delete(emiId);
+    } else {
+      this.selectedEmis.add(emiId);
+    }
+  }
+  
+  selectAllPendingEmis() {
+    if (!this.selectedLoanForEmi) return;
+    const emis = this.getEmisForLoan(this.selectedLoanForEmi.id);
+    emis.forEach(emi => {
+      if (emi.status === 'Pending') {
+        this.selectedEmis.add(emi.id);
+      }
+    });
+  }
+  
+  deselectAllEmis() {
+    this.selectedEmis.clear();
+  }
+  
+  getSelectedEmisTotal(): number {
+    if (!this.selectedLoanForEmi) return 0;
+    const emis = this.getEmisForLoan(this.selectedLoanForEmi.id);
+    return Array.from(this.selectedEmis)
+      .map(id => emis.find(e => e.id === id))
+      .filter(emi => emi && emi.status === 'Pending')
+      .reduce((sum, emi) => sum + (emi?.totalAmount || 0), 0);
+  }
+  
+  getSelectedPendingEmis(): EmiPayment[] {
+    if (!this.selectedLoanForEmi) return [];
+    const emis = this.getEmisForLoan(this.selectedLoanForEmi.id);
+    return Array.from(this.selectedEmis)
+      .map(id => emis.find(e => e.id === id))
+      .filter(emi => emi && emi.status === 'Pending') as EmiPayment[];
+  }
+  
+  payBulkEmis() {
+    const selectedPendingEmis = this.getSelectedPendingEmis();
+    if (selectedPendingEmis.length === 0) {
+      this.alertService.error('No Selection', 'Please select at least one pending EMI to pay');
+      return;
+    }
+    
+    const totalAmount = this.getSelectedEmisTotal();
+    if (this.currentBalance < totalAmount) {
+      this.alertService.error('Insufficient Balance', 
+        `Your balance (₹${this.currentBalance.toFixed(2)}) is less than the total amount (₹${totalAmount.toFixed(2)})`);
+      return;
+    }
+    
+    if (!confirm(`Pay ${selectedPendingEmis.length} EMI(s) totaling ₹${totalAmount.toFixed(2)}?`)) {
+      return;
+    }
+    
+    this.showBulkPaymentModal = true;
+  }
+  
+  confirmBulkPayment() {
+    const selectedPendingEmis = this.getSelectedPendingEmis();
+    if (selectedPendingEmis.length === 0) return;
+    
+    this.payingBulkEmis = true;
+    let completed = 0;
+    let failed = 0;
+    const errors: string[] = [];
+    
+    // Pay EMIs sequentially
+    const payNext = (index: number) => {
+      if (index >= selectedPendingEmis.length) {
+        this.payingBulkEmis = false;
+        this.showBulkPaymentModal = false;
+        this.selectedEmis.clear();
+        
+        if (failed === 0) {
+          this.alertService.success('Bulk Payment Successful', 
+            `Successfully paid ${completed} EMI(s)!`);
+        } else {
+          this.alertService.error('Partial Payment', 
+            `Paid ${completed} EMI(s), ${failed} failed.\n${errors.join('\n')}`);
+        }
+        
+        // Reload data
+        if (this.selectedLoanForEmi) {
+          this.loadEmisForLoan(this.selectedLoanForEmi.id);
+        }
+        this.loadUserLoans();
+        this.loadAccountBalance();
+        return;
+      }
+      
+      const emi = selectedPendingEmis[index];
+      this.http.post(`${environment.apiUrl}/emis/pay/${emi.id}?accountNumber=${this.userAccountNumber}`, {}).subscribe({
+        next: (response: any) => {
+          if (response.success) {
+            completed++;
+          } else {
+            failed++;
+            errors.push(`EMI #${emi.emiNumber}: ${response.message}`);
+          }
+          payNext(index + 1);
+        },
+        error: (err: any) => {
+          failed++;
+          errors.push(`EMI #${emi.emiNumber}: ${err.error?.message || 'Payment failed'}`);
+          payNext(index + 1);
+        }
+      });
+    };
+    
+    payNext(0);
+  }
+  
+  closeBulkPaymentModal() {
+    this.showBulkPaymentModal = false;
+  }
 
   loanForm = {
     type: '',
@@ -83,6 +218,62 @@ export class Loan implements OnInit {
     interestRate: 0,
     pan: ''
   };
+  
+  // Education Loan Form
+  showEducationLoanForm: boolean = false;
+  childHasNeobankAccount: boolean = false;
+  childAccountAadhar: string = '';
+  childAccountNumber: string = '';
+  childAccountLoading: boolean = false;
+  childAccountVerified: boolean = false;
+  childAccountError: string = '';
+  educationLoanForm: any = {
+    // Child Details
+    childName: '',
+    childDateOfBirth: '',
+    childPlaceOfBirth: '',
+    // 10th Details
+    tenthSchoolName: '',
+    tenthBoard: '',
+    tenthPassingYear: null,
+    tenthPercentage: null,
+    // 12th Details
+    twelfthSchoolName: '',
+    twelfthBoard: '',
+    twelfthPassingYear: null,
+    twelfthPercentage: null,
+    // UG Details
+    ugCollegeName: '',
+    ugUniversity: '',
+    ugCourse: '',
+    ugAdmissionYear: null,
+    ugExpectedGraduationYear: null,
+    ugCurrentCGPA: null,
+    // College Details
+    collegeType: '',
+    collegeName: '',
+    collegeState: '',
+    collegeCity: '',
+    collegeAddress: '',
+    collegeCourse: '',
+    collegeDegree: '',
+    collegeAdmissionYear: null,
+    collegeCourseDuration: null,
+    collegeFeeAmount: null,
+    // College Account
+    collegeAccountNumber: '',
+    collegeAccountHolderName: '',
+    collegeBankName: '',
+    collegeBankBranch: '',
+    collegeIFSCCode: '',
+    // Documents
+    collegeApplicationFile: null
+  };
+  
+  // College Data
+  selectedState: string = '';
+  selectedCity: string = '';
+  filteredColleges: any[] = [];
 
   // CIBIL and credit information
   cibilInfo = {
@@ -107,10 +298,19 @@ export class Loan implements OnInit {
     principalPercentage: 0
   };
 
+  // Terms and Conditions
+  termsAccepted: boolean = false;
+  showTermsModal: boolean = false;
+
+  // Personal Loan Form
+  personalLoanFormFile: File | null = null;
+  personalLoanFormUploaded: boolean = false;
+
   ngOnInit() {
     // Only load in browser, not during SSR
     if (isPlatformBrowser(this.platformId)) {
       this.loadUserData();
+      this.loadUserProfileData();
     }
   }
 
@@ -255,11 +455,13 @@ export class Loan implements OnInit {
     
     this.loading = true;
     
-    // Load user's loans from MySQL database
+    // Load user's loans from MySQL database (includes both applicant and child loans)
     this.http.get(`${environment.apiUrl}/loans/account/${this.userAccountNumber}`).subscribe({
-      next: (loans: any) => {
-        console.log('User loans loaded from MySQL:', loans);
-        this.loans = loans.map((loan: any) => ({
+      next: (response: any) => {
+        // Handle both old format (array) and new format (object with loans array)
+        const loansData = Array.isArray(response) ? response : (response.loans || response);
+        console.log('User loans loaded from MySQL:', loansData);
+        this.loans = loansData.map((loan: any) => ({
           id: loan.id,
           type: loan.type,
           amount: loan.amount,
@@ -281,7 +483,8 @@ export class Loan implements OnInit {
           interestPaid: loan.interestPaid,
           remainingPrincipal: loan.remainingPrincipal,
           remainingInterest: loan.remainingInterest,
-          emiStartDate: loan.emiStartDate
+          emiStartDate: loan.emiStartDate,
+          cibilScore: loan.cibilScore || null
         }));
         
         // Load EMIs for approved loans
@@ -310,6 +513,630 @@ export class Loan implements OnInit {
     });
   }
 
+  // Check if education loan form should be shown
+  onLoanTypeChange() {
+    this.showEducationLoanForm = this.loanForm.type === 'Education Loan';
+    if (!this.showEducationLoanForm) {
+      this.resetEducationLoanForm();
+    }
+    // Reset personal loan form when switching loan types
+    if (this.loanForm.type !== 'Personal Loan') {
+      this.personalLoanFormFile = null;
+      this.personalLoanFormUploaded = false;
+    }
+  }
+
+  downloadPersonalLoanForm() {
+    // Generate Personal Loan Application Form PDF
+    const formContent = this.generatePersonalLoanForm();
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(formContent);
+      printWindow.document.close();
+      printWindow.onload = () => {
+        setTimeout(() => {
+          printWindow.print();
+        }, 250);
+      };
+    }
+  }
+
+  generatePersonalLoanForm(): string {
+    const currentDate = new Date().toLocaleDateString('en-IN');
+    return `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Personal Loan Application Form</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 20px;
+            padding: 20px;
+            background: #f8f9fa;
+        }
+        .form-container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            border-bottom: 3px solid #0077cc;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+        .bank-logo {
+            font-size: 32px;
+            font-weight: bold;
+            color: #0077cc;
+            margin-bottom: 10px;
+        }
+        .form-title {
+            font-size: 24px;
+            color: #333;
+            margin: 20px 0;
+        }
+        .section {
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        .section-title {
+            color: #0077cc;
+            border-bottom: 2px solid #0077cc;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 15px;
+        }
+        .form-field {
+            margin-bottom: 15px;
+        }
+        .form-field label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 5px;
+            color: #333;
+        }
+        .form-field input, .form-field textarea, .form-field select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .form-field textarea {
+            height: 60px;
+            resize: vertical;
+        }
+        .signature-section {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 2px solid #e9ecef;
+        }
+        .footer {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 2px solid #e9ecef;
+            text-align: center;
+            color: #666;
+            font-size: 12px;
+        }
+        @media print {
+            body { margin: 0; padding: 0; }
+            .form-container { box-shadow: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="form-container">
+        <div class="header">
+            <div class="bank-logo">🏦 NeoBank</div>
+            <div style="font-size: 20px; color: #1e40af; margin-bottom: 5px;">NeoBank India Limited</div>
+            <div style="font-size: 14px; color: #666; font-style: italic;">Relationship beyond banking</div>
+        </div>
+
+        <h2 class="form-title">PERSONAL LOAN APPLICATION FORM</h2>
+
+        <div class="section">
+            <h3 class="section-title">Personal Information</h3>
+            <div class="form-row">
+                <div class="form-field">
+                    <label>Full Name:</label>
+                    <input type="text" />
+                </div>
+                <div class="form-field">
+                    <label>Date of Birth:</label>
+                    <input type="date" />
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-field">
+                    <label>PAN Number:</label>
+                    <input type="text" maxlength="10" />
+                </div>
+                <div class="form-field">
+                    <label>Aadhar Number:</label>
+                    <input type="text" maxlength="12" />
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-field">
+                    <label>Mobile Number:</label>
+                    <input type="tel" />
+                </div>
+                <div class="form-field">
+                    <label>Email:</label>
+                    <input type="email" />
+                </div>
+            </div>
+            <div class="form-field">
+                <label>Address:</label>
+                <textarea></textarea>
+            </div>
+            <div class="form-row">
+                <div class="form-field">
+                    <label>City:</label>
+                    <input type="text" />
+                </div>
+                <div class="form-field">
+                    <label>State:</label>
+                    <input type="text" />
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-field">
+                    <label>Pincode:</label>
+                    <input type="text" />
+                </div>
+                <div class="form-field">
+                    <label>Account Number:</label>
+                    <input type="text" />
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h3 class="section-title">Loan Details</h3>
+            <div class="form-row">
+                <div class="form-field">
+                    <label>Loan Amount Requested (₹):</label>
+                    <input type="number" />
+                </div>
+                <div class="form-field">
+                    <label>Loan Tenure (Months):</label>
+                    <input type="number" />
+                </div>
+            </div>
+            <div class="form-field">
+                <label>Purpose of Loan:</label>
+                <select>
+                    <option value="">Select Purpose</option>
+                    <option value="Home Renovation">Home Renovation</option>
+                    <option value="Medical Emergency">Medical Emergency</option>
+                    <option value="Wedding">Wedding</option>
+                    <option value="Vacation">Vacation</option>
+                    <option value="Debt Consolidation">Debt Consolidation</option>
+                    <option value="Other">Other</option>
+                </select>
+            </div>
+            <div class="form-field">
+                <label>If Other, Please Specify:</label>
+                <textarea></textarea>
+            </div>
+        </div>
+
+        <div class="section">
+            <h3 class="section-title">Employment Information</h3>
+            <div class="form-row">
+                <div class="form-field">
+                    <label>Employment Type:</label>
+                    <select>
+                        <option value="">Select Type</option>
+                        <option value="Salaried">Salaried</option>
+                        <option value="Self-Employed">Self-Employed</option>
+                        <option value="Business">Business</option>
+                    </select>
+                </div>
+                <div class="form-field">
+                    <label>Monthly Income (₹):</label>
+                    <input type="number" />
+                </div>
+            </div>
+            <div class="form-field">
+                <label>Company/Business Name:</label>
+                <input type="text" />
+            </div>
+            <div class="form-field">
+                <label>Designation:</label>
+                <input type="text" />
+            </div>
+            <div class="form-row">
+                <div class="form-field">
+                    <label>Years of Experience:</label>
+                    <input type="number" />
+                </div>
+                <div class="form-field">
+                    <label>Work Address:</label>
+                    <input type="text" />
+                </div>
+            </div>
+        </div>
+
+        <div class="signature-section">
+            <div class="form-field">
+                <label>Applicant Signature:</label>
+                <div style="height: 60px; border-bottom: 1px solid #333; margin-top: 10px;"></div>
+            </div>
+            <div class="form-field">
+                <label>Date:</label>
+                <input type="date" value="${currentDate}" />
+            </div>
+        </div>
+
+        <div class="footer">
+            <p><strong>📍 Registered Office:</strong> NeoBank Tower, Financial District, Mumbai - 400001</p>
+            <p><strong>📞 Customer Care:</strong> 1800-NEOBANK | <strong>📧 Email:</strong> support@neobank.in</p>
+            <p><strong>📄 Please fill this form completely and upload it along with your loan application.</strong></p>
+        </div>
+    </div>
+</body>
+</html>`;
+  }
+
+  onPersonalLoanFormSelected(event: any) {
+    const file = event.target.files[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) { // 5MB limit
+        this.alertService.error('File Size Error', 'File size must be less than 5MB');
+        return;
+      }
+      this.personalLoanFormFile = file;
+      this.personalLoanFormUploaded = false;
+    }
+  }
+
+  removePersonalLoanForm() {
+    this.personalLoanFormFile = null;
+    this.personalLoanFormUploaded = false;
+  }
+
+  // Handle child account option change
+  onChildAccountOptionChange() {
+    if (!this.childHasNeobankAccount) {
+      this.clearChildAccountDetails();
+    }
+  }
+
+  // Fetch child account details by Aadhar and account number
+  fetchChildAccountDetails() {
+    if (!this.childAccountAadhar || !this.childAccountNumber) {
+      this.alertService.error('Validation Error', 'Please enter both Aadhar number and account number');
+      return;
+    }
+
+    // Validate Aadhar format (12 digits)
+    if (this.childAccountAadhar.length !== 12 || !/^\d+$/.test(this.childAccountAadhar)) {
+      this.alertService.error('Invalid Aadhar', 'Aadhar number must be 12 digits');
+      return;
+    }
+
+    this.childAccountLoading = true;
+    this.childAccountError = '';
+    this.childAccountVerified = false;
+
+    // Use secure verification endpoint that verifies both Aadhar and account number
+    const verifyUrl = `${environment.apiUrl}/accounts/verify?aadharNumber=${encodeURIComponent(this.childAccountAadhar)}&accountNumber=${encodeURIComponent(this.childAccountNumber)}`;
+    
+    this.http.get(verifyUrl).subscribe({
+      next: (response: any) => {
+        if (response.success && response.account) {
+          // Account verified - auto-fill child details
+          this.autoFillChildDetails(response.account);
+          this.childAccountVerified = true;
+          this.childAccountError = '';
+          this.alertService.success('Account Verified', 'Child account verified successfully! Details have been auto-filled.');
+        } else {
+          this.childAccountError = response.message || 'Verification failed. Please verify the details and try again.';
+          this.childAccountVerified = false;
+          this.alertService.error('Verification Failed', this.childAccountError);
+        }
+        this.childAccountLoading = false;
+      },
+      error: (err: any) => {
+        console.error('Error verifying child account:', err);
+        if (err.status === 404) {
+          this.childAccountError = 'Account not found. Please verify the account number.';
+        } else if (err.status === 400) {
+          this.childAccountError = err.error?.message || 'Aadhar number does not match the account number. Please verify and try again.';
+        } else {
+          this.childAccountError = 'Failed to verify account. Please try again.';
+        }
+        this.childAccountVerified = false;
+        this.childAccountLoading = false;
+        this.alertService.error('Verification Failed', this.childAccountError);
+      }
+    });
+  }
+
+  // Auto-fill child details from account
+  autoFillChildDetails(account: any) {
+    if (account.name) {
+      this.educationLoanForm.childName = account.name;
+    }
+    if (account.dob) {
+      // Convert DOB to YYYY-MM-DD format for date input
+      const dobDate = new Date(account.dob);
+      if (!isNaN(dobDate.getTime())) {
+        const year = dobDate.getFullYear();
+        const month = String(dobDate.getMonth() + 1).padStart(2, '0');
+        const day = String(dobDate.getDate()).padStart(2, '0');
+        this.educationLoanForm.childDateOfBirth = `${year}-${month}-${day}`;
+        // Trigger age calculation
+        this.calculateChildAge();
+      }
+    }
+    // Place of birth might not be in account, but we can try to get from address
+    if (account.address) {
+      // Extract city/place from address if available
+      const addressParts = account.address.split(',');
+      if (addressParts.length > 0) {
+        this.educationLoanForm.childPlaceOfBirth = addressParts[addressParts.length - 1].trim();
+      }
+    }
+  }
+
+  // Clear child account details
+  clearChildAccountDetails() {
+    this.childAccountAadhar = '';
+    this.childAccountNumber = '';
+    this.childAccountVerified = false;
+    this.childAccountError = '';
+    // Optionally clear the auto-filled fields
+    // this.educationLoanForm.childName = '';
+    // this.educationLoanForm.childDateOfBirth = '';
+    // this.educationLoanForm.childPlaceOfBirth = '';
+  }
+  
+  // Load user profile data
+  loadUserProfileData() {
+    if (!isPlatformBrowser(this.platformId)) return;
+    
+    const currentUser = sessionStorage.getItem('currentUser');
+    if (currentUser) {
+      const user = JSON.parse(currentUser);
+      this.educationLoanForm.applicantAccountNumber = user.accountNumber;
+      this.educationLoanForm.applicantName = user.name;
+      this.educationLoanForm.applicantEmail = user.email;
+      
+      // Load user details from API
+      this.http.get(`${environment.apiUrl}/users/account/${user.accountNumber}`).subscribe({
+        next: (userData: any) => {
+          if (userData.account) {
+            this.educationLoanForm.applicantPan = userData.account.pan || '';
+            this.educationLoanForm.applicantAadhar = userData.account.aadharNumber || '';
+            this.educationLoanForm.applicantMobile = userData.account.phone || '';
+          }
+        },
+        error: (err) => {
+          console.error('Error loading user profile:', err);
+        }
+      });
+    }
+  }
+  
+  // Calculate age from DOB
+  calculateChildAge(): number | null {
+    if (!this.educationLoanForm.childDateOfBirth) return null;
+    const dob = new Date(this.educationLoanForm.childDateOfBirth);
+    const today = new Date();
+    let age = today.getFullYear() - dob.getFullYear();
+    const monthDiff = today.getMonth() - dob.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
+      age--;
+    }
+    return age;
+  }
+  
+  // Validate child age (18-26)
+  isValidChildAge(): boolean {
+    const age = this.calculateChildAge();
+    return age !== null && age >= 18 && age <= 26;
+  }
+  
+  // Validate education loan form
+  validateEducationLoanForm(): boolean {
+    if (!this.educationLoanForm.childName || !this.educationLoanForm.childDateOfBirth || !this.educationLoanForm.childPlaceOfBirth) {
+      this.alertService.error('Validation Error', 'Please fill all child details');
+      return false;
+    }
+    
+    if (!this.isValidChildAge()) {
+      this.alertService.error('Age Validation', 'Child age must be between 18 and 26 years');
+      return false;
+    }
+    
+    if (!this.educationLoanForm.tenthSchoolName || !this.educationLoanForm.tenthBoard || !this.educationLoanForm.tenthPassingYear || !this.educationLoanForm.tenthPercentage) {
+      this.alertService.error('Validation Error', 'Please fill all 10th standard details');
+      return false;
+    }
+    
+    if (!this.educationLoanForm.twelfthSchoolName || !this.educationLoanForm.twelfthBoard || !this.educationLoanForm.twelfthPassingYear || !this.educationLoanForm.twelfthPercentage) {
+      this.alertService.error('Validation Error', 'Please fill all 12th standard details');
+      return false;
+    }
+    
+    if (!this.educationLoanForm.collegeType || !this.educationLoanForm.collegeName || !this.educationLoanForm.collegeState || !this.educationLoanForm.collegeCity) {
+      this.alertService.error('Validation Error', 'Please select college/university details');
+      return false;
+    }
+    
+    if (!this.educationLoanForm.collegeCourse || !this.educationLoanForm.collegeFeeAmount) {
+      this.alertService.error('Validation Error', 'Please fill college course and fee details');
+      return false;
+    }
+    
+    if (!this.educationLoanForm.collegeAccountNumber || !this.educationLoanForm.collegeBankName || !this.educationLoanForm.collegeIFSCCode) {
+      this.alertService.error('Validation Error', 'Please fill college account details');
+      return false;
+    }
+    
+    return true;
+  }
+  
+  // Filter colleges by state
+  onStateChange() {
+    this.selectedCity = '';
+    this.educationLoanForm.collegeCity = '';
+    this.filteredColleges = [];
+    if (this.selectedState) {
+      this.filteredColleges = getCollegesByState(this.selectedState);
+    }
+  }
+  
+  // Filter colleges by city
+  onCityChange() {
+    if (this.selectedState && this.selectedCity) {
+      this.filteredColleges = getCollegesByCity(this.selectedState, this.selectedCity);
+    } else if (this.selectedState) {
+      this.filteredColleges = getCollegesByState(this.selectedState);
+    }
+  }
+  
+  // Filter colleges by type
+  onCollegeTypeChange() {
+    if (this.educationLoanForm.collegeType) {
+      this.filteredColleges = getCollegesByType(this.educationLoanForm.collegeType as 'IIT' | 'IIM' | 'University' | 'College');
+    } else {
+      this.filteredColleges = getAllColleges();
+    }
+  }
+  
+  // Select college
+  selectCollege(college: College) {
+    this.educationLoanForm.collegeName = college.name;
+    this.educationLoanForm.collegeState = college.state;
+    this.educationLoanForm.collegeCity = college.city;
+    this.selectedState = college.state;
+    this.selectedCity = college.city;
+    this.filteredColleges = [];
+  }
+  
+  // Select college from dropdown
+  selectCollegeFromDropdown() {
+    if (this.educationLoanForm.collegeName) {
+      const college = this.filteredColleges.find(c => c.name === this.educationLoanForm.collegeName);
+      if (college) {
+        this.selectCollege(college);
+      }
+    }
+  }
+  
+  // Get max date of birth (18 years ago)
+  getMaxDateOfBirth(): string {
+    const date = new Date();
+    date.setFullYear(date.getFullYear() - 18);
+    return date.toISOString().split('T')[0];
+  }
+  
+  // Get min date of birth (26 years ago)
+  getMinDateOfBirth(): string {
+    const date = new Date();
+    date.setFullYear(date.getFullYear() - 26);
+    return date.toISOString().split('T')[0];
+  }
+  
+  // Get cities for selected state
+  getCitiesForState(): string[] {
+    return getCitiesByState(this.selectedState);
+  }
+  
+  // Get all states
+  getStates(): string[] {
+    return INDIAN_STATES;
+  }
+  
+  // Get current year for template
+  getCurrentYear(): number {
+    return new Date().getFullYear();
+  }
+  
+  // Get max year (current year + 10)
+  getMaxYear(): number {
+    return new Date().getFullYear() + 10;
+  }
+  
+  // Get max year for graduation (current year + 5)
+  getMaxGraduationYear(): number {
+    return new Date().getFullYear() + 5;
+  }
+  
+  // Reset education loan form
+  resetEducationLoanForm() {
+    this.childHasNeobankAccount = false;
+    this.clearChildAccountDetails();
+    this.educationLoanForm = {
+      childName: '',
+      childDateOfBirth: '',
+      childPlaceOfBirth: '',
+      tenthSchoolName: '',
+      tenthBoard: '',
+      tenthPassingYear: null,
+      tenthPercentage: null,
+      twelfthSchoolName: '',
+      twelfthBoard: '',
+      twelfthPassingYear: null,
+      twelfthPercentage: null,
+      ugCollegeName: '',
+      ugUniversity: '',
+      ugCourse: '',
+      ugAdmissionYear: null,
+      ugExpectedGraduationYear: null,
+      ugCurrentCGPA: null,
+      collegeType: '',
+      collegeName: '',
+      collegeState: '',
+      collegeCity: '',
+      collegeAddress: '',
+      collegeCourse: '',
+      collegeDegree: '',
+      collegeAdmissionYear: null,
+      collegeCourseDuration: null,
+      collegeFeeAmount: null,
+      collegeAccountNumber: '',
+      collegeAccountHolderName: '',
+      collegeBankName: '',
+      collegeBankBranch: '',
+      collegeIFSCCode: '',
+      collegeApplicationFile: null
+    };
+    this.selectedState = '';
+    this.selectedCity = '';
+    this.filteredColleges = [];
+  }
+  
+  // Handle file upload
+  onCollegeApplicationFileSelected(event: any) {
+    const file = event.target.files[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) { // 5MB limit
+        this.alertService.error('File Size Error', 'File size must be less than 5MB');
+        return;
+      }
+      this.educationLoanForm.collegeApplicationFile = file;
+    }
+  }
+  
   submitLoan() {
     // Validate form
     if (!this.loanForm.type || this.loanForm.amount <= 0 || this.loanForm.tenure <= 0 || this.loanForm.interestRate <= 0) {
@@ -321,6 +1148,25 @@ export class Loan implements OnInit {
     if (!this.loanForm.pan || this.loanForm.pan.trim() === '') {
       this.alertService.error('PAN Required', 'PAN number is required. Please check CIBIL first.');
       return;
+    }
+
+    // Validate Terms and Conditions
+    if (!this.termsAccepted) {
+      this.alertService.error('Terms Required', 'Please accept the Terms and Conditions to proceed');
+      return;
+    }
+
+    // Validate Personal Loan form upload
+    if (this.loanForm.type === 'Personal Loan' && !this.personalLoanFormFile) {
+      this.alertService.error('Form Required', 'Please download, fill, and upload the Personal Loan application form');
+      return;
+    }
+    
+    // If Education Loan, validate education loan form
+    if (this.loanForm.type === 'Education Loan') {
+      if (!this.validateEducationLoanForm()) {
+        return;
+      }
     }
 
     // Validate loan amount against credit limit
@@ -364,8 +1210,35 @@ export class Loan implements OnInit {
       applicationDate: new Date().toISOString()
     };
 
+    // For Personal Loan: Upload form file first
+    if (this.loanForm.type === 'Personal Loan' && this.personalLoanFormFile) {
+      const formData = new FormData();
+      formData.append('file', this.personalLoanFormFile);
+      formData.append('loanAccountNumber', loanAccountNumber);
+      formData.append('accountNumber', this.userAccountNumber);
+
+      // Upload the form file
+      this.http.post(`${environment.apiUrl}/loans/upload-personal-loan-form`, formData).subscribe({
+        next: (uploadResponse: any) => {
+          console.log('Personal Loan form uploaded:', uploadResponse);
+          this.personalLoanFormUploaded = true;
+          // Continue with loan submission
+          this.submitLoanToBackend(newLoan, loanAccountNumber, uploadResponse.filePath);
+        },
+        error: (uploadErr: any) => {
+          console.error('Error uploading Personal Loan form:', uploadErr);
+          this.alertService.error('Upload Failed', 'Failed to upload Personal Loan form. Please try again.');
+        }
+      });
+    } else {
+      // For other loan types, submit directly
+      this.submitLoanToBackend(newLoan, loanAccountNumber, null);
+    }
+  }
+
+  private submitLoanToBackend(newLoan: LoanRequest, loanAccountNumber: string, personalLoanFormPath: string | null) {
     // Create backend loan object without ID (backend will generate it)
-    const backendLoan = {
+    const backendLoan: any = {
       type: newLoan.type,
       amount: newLoan.amount,
       tenure: newLoan.tenure,
@@ -375,12 +1248,22 @@ export class Loan implements OnInit {
       userEmail: newLoan.userEmail,
       accountNumber: newLoan.accountNumber,
       currentBalance: newLoan.currentBalance,
-      loanAccountNumber: newLoan.loanAccountNumber,
+      loanAccountNumber: loanAccountNumber,
       applicationDate: newLoan.applicationDate,
       pan: this.loanForm.pan,
       cibilScore: this.cibilInfo.cibilScore,
       creditLimit: this.cibilInfo.creditLimit
     };
+
+    // For Personal Loan: Add uploaded form path
+    if (this.loanForm.type === 'Personal Loan' && personalLoanFormPath) {
+      backendLoan.personalLoanFormPath = personalLoanFormPath;
+    }
+
+    // For Education Loans: Add child account number if verified
+    if (this.loanForm.type === 'Education Loan' && this.childAccountVerified && this.childAccountNumber) {
+      backendLoan.childAccountNumber = this.childAccountNumber;
+    }
 
     // Submit to MySQL database
     this.http.post(`${environment.apiUrl}/loans`, backendLoan).subscribe({
@@ -395,6 +1278,10 @@ export class Loan implements OnInit {
         
         this.alertService.success('Loan Application Submitted', 'Loan request submitted successfully! Admin will review your application.');
         this.resetForm();
+        // Reset personal loan form
+        this.personalLoanFormFile = null;
+        this.personalLoanFormUploaded = false;
+        this.termsAccepted = false;
       },
       error: (err: any) => {
         console.error('Error creating loan request:', err);
@@ -427,6 +1314,9 @@ export class Loan implements OnInit {
 
   resetForm() {
     this.loanForm = { type: '', amount: 0, tenure: 0, interestRate: 0, pan: '' };
+    this.termsAccepted = false;
+    this.personalLoanFormFile = null;
+    this.personalLoanFormUploaded = false;
     // Don't reset CIBIL info as it's based on user's PAN
   }
 

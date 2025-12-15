@@ -53,6 +53,12 @@ public class PasswordService {
             String hashedInput = hashWithSalt(plainPassword, salt);
             boolean matches = hashedInput.equals(encryptedPassword);
             System.out.println("PasswordService: verifyPassword - Password match result: " + matches);
+            if (!matches) {
+                System.out.println("PasswordService: verifyPassword - Hash comparison failed");
+                System.out.println("   Expected (stored): " + encryptedPassword);
+                System.out.println("   Got (computed): " + hashedInput);
+                System.out.println("   Salt used: " + salt);
+            }
             return matches;
         } catch (Exception e) {
             System.out.println("PasswordService: verifyPassword - Exception occurred: " + e.getMessage());

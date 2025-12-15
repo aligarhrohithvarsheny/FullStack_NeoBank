@@ -71,13 +71,361 @@
 
     <div class="input-group">
       <label class="input-label">Loan Type</label>
-      <select class="input-field" [(ngModel)]="loanForm.type" name="type" required>
+      <select class="input-field" [(ngModel)]="loanForm.type" name="type" required (change)="onLoanTypeChange()">
         <option value="">Select Loan Type</option>
         <option value="Personal Loan">Personal Loan</option>
         <option value="Car Loan">Car Loan</option>
         <option value="Home Loan">Home Loan</option>
         <option value="Education Loan">Education Loan</option>
       </select>
+    </div>
+
+    <!-- Education Loan Form Section -->
+    <div *ngIf="showEducationLoanForm" class="education-loan-form-section">
+      <h3 class="section-title">🎓 Education Loan Details</h3>
+      
+      <!-- Child/Student Information -->
+      <div class="form-section">
+        <h4>👤 Child/Student Information (Age: 18-26 years)</h4>
+        
+        <!-- Neobank Account Selection -->
+        <div class="input-group" style="margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; border: 1px solid #e0e0e0;">
+          <label class="input-label" style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+            <input 
+              type="checkbox" 
+              [(ngModel)]="childHasNeobankAccount" 
+              name="childHasNeobankAccount"
+              (change)="onChildAccountOptionChange()"
+              style="width: 20px; height: 20px; cursor: pointer;">
+            <span style="font-weight: 600; color: #667eea;">Does the child have an account in NeoBank?</span>
+          </label>
+          <small class="input-hint" style="display: block; margin-top: 8px; color: #666;">
+            If yes, enter Aadhar number and account number to auto-fill child details securely.
+          </small>
+        </div>
+
+        <!-- Neobank Account Details (shown when checkbox is checked) -->
+        <div *ngIf="childHasNeobankAccount" class="neobank-account-section" style="margin-bottom: 20px; padding: 15px; background: #e8f4f8; border-radius: 8px; border: 1px solid #b3d9e6;">
+          <h5 style="margin-top: 0; color: #667eea; font-size: 16px;">🔐 Verify Child's NeoBank Account</h5>
+          <div class="form-row">
+            <div class="input-group">
+              <label class="input-label">Child's Aadhar Number <span class="required">*</span></label>
+              <input 
+                type="text" 
+                class="input-field" 
+                [(ngModel)]="childAccountAadhar" 
+                name="childAccountAadhar" 
+                placeholder="Enter 12-digit Aadhar number"
+                maxlength="12"
+                [disabled]="childAccountLoading || childAccountVerified"
+                required>
+            </div>
+            <div class="input-group">
+              <label class="input-label">Child's Account Number <span class="required">*</span></label>
+              <input 
+                type="text" 
+                class="input-field" 
+                [(ngModel)]="childAccountNumber" 
+                name="childAccountNumber" 
+                placeholder="Enter account number"
+                [disabled]="childAccountLoading || childAccountVerified"
+                required>
+            </div>
+          </div>
+          <div class="form-row" style="margin-top: 10px;">
+            <button 
+              type="button" 
+              class="check-cibil-btn" 
+              (click)="fetchChildAccountDetails()"
+              [disabled]="!childAccountAadhar || !childAccountNumber || childAccountLoading || childAccountVerified"
+              style="margin-top: 0;">
+              <span *ngIf="!childAccountLoading && !childAccountVerified">🔍 Verify & Auto-Fill</span>
+              <span *ngIf="childAccountLoading">⏳ Verifying...</span>
+              <span *ngIf="childAccountVerified">✓ Verified</span>
+            </button>
+            <button 
+              type="button" 
+              *ngIf="childAccountVerified"
+              class="check-cibil-btn" 
+              (click)="clearChildAccountDetails()"
+              style="margin-left: 10px; background: #dc3545; margin-top: 0;">
+              Clear
+            </button>
+          </div>
+          <div *ngIf="childAccountError" class="error-message" style="margin-top: 10px; padding: 10px; background: #fee; border: 1px solid #fcc; border-radius: 4px; color: #c33;">
+            ❌ {{ childAccountError }}
+          </div>
+          <div *ngIf="childAccountVerified && !childAccountError" class="success-message" style="margin-top: 10px; padding: 10px; background: #efe; border: 1px solid #cfc; border-radius: 4px; color: #3c3;">
+            ✓ Child account verified! Details have been auto-filled below.
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="input-group">
+            <label class="input-label">Child Name <span class="required">*</span></label>
+            <input type="text" class="input-field" [(ngModel)]="educationLoanForm.childName" name="childName" 
+                   [readonly]="childAccountVerified" [class.readonly]="childAccountVerified" required>
+          </div>
+          <div class="input-group">
+            <label class="input-label">Date of Birth <span class="required">*</span></label>
+            <input type="date" class="input-field" [(ngModel)]="educationLoanForm.childDateOfBirth" name="childDateOfBirth" 
+                   required (change)="calculateChildAge()" [max]="getMaxDateOfBirth()" [min]="getMinDateOfBirth()"
+                   [readonly]="childAccountVerified" [class.readonly]="childAccountVerified">
+            <small class="input-hint" *ngIf="calculateChildAge() !== null">
+              Age: {{ calculateChildAge() }} years
+              <span *ngIf="!isValidChildAge()" class="error-text"> (Must be 18-26 years)</span>
+            </small>
+          </div>
+        </div>
+        <div class="input-group">
+          <label class="input-label">Place of Birth <span class="required">*</span></label>
+          <input type="text" class="input-field" [(ngModel)]="educationLoanForm.childPlaceOfBirth" name="childPlaceOfBirth" 
+                 [readonly]="childAccountVerified" [class.readonly]="childAccountVerified" required>
+        </div>
+      </div>
+
+      <!-- Education Details - 10th -->
+      <div class="form-section">
+        <h4>📚 10th Standard Details</h4>
+        <div class="form-row">
+          <div class="input-group">
+            <label class="input-label">School Name <span class="required">*</span></label>
+            <input type="text" class="input-field" [(ngModel)]="educationLoanForm.tenthSchoolName" name="tenthSchoolName" required>
+          </div>
+          <div class="input-group">
+            <label class="input-label">Board <span class="required">*</span></label>
+            <select class="input-field" [(ngModel)]="educationLoanForm.tenthBoard" name="tenthBoard" required>
+              <option value="">Select Board</option>
+              <option value="CBSE">CBSE</option>
+              <option value="ICSE">ICSE</option>
+              <option value="State Board">State Board</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="input-group">
+            <label class="input-label">Passing Year <span class="required">*</span></label>
+            <input type="number" class="input-field" [(ngModel)]="educationLoanForm.tenthPassingYear" name="tenthPassingYear" 
+                   required min="1990" [max]="getCurrentYear()">
+          </div>
+          <div class="input-group">
+            <label class="input-label">Percentage <span class="required">*</span></label>
+            <input type="number" class="input-field" [(ngModel)]="educationLoanForm.tenthPercentage" name="tenthPercentage" 
+                   required min="0" max="100" step="0.01">
+          </div>
+        </div>
+      </div>
+
+      <!-- Education Details - 12th -->
+      <div class="form-section">
+        <h4>📚 12th Standard Details</h4>
+        <div class="form-row">
+          <div class="input-group">
+            <label class="input-label">School/College Name <span class="required">*</span></label>
+            <input type="text" class="input-field" [(ngModel)]="educationLoanForm.twelfthSchoolName" name="twelfthSchoolName" required>
+          </div>
+          <div class="input-group">
+            <label class="input-label">Board <span class="required">*</span></label>
+            <select class="input-field" [(ngModel)]="educationLoanForm.twelfthBoard" name="twelfthBoard" required>
+              <option value="">Select Board</option>
+              <option value="CBSE">CBSE</option>
+              <option value="ICSE">ICSE</option>
+              <option value="State Board">State Board</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="input-group">
+            <label class="input-label">Passing Year <span class="required">*</span></label>
+            <input type="number" class="input-field" [(ngModel)]="educationLoanForm.twelfthPassingYear" name="twelfthPassingYear" 
+                   required min="1990" [max]="getCurrentYear()">
+          </div>
+          <div class="input-group">
+            <label class="input-label">Percentage <span class="required">*</span></label>
+            <input type="number" class="input-field" [(ngModel)]="educationLoanForm.twelfthPercentage" name="twelfthPercentage" 
+                   required min="0" max="100" step="0.01">
+          </div>
+        </div>
+      </div>
+
+      <!-- Education Details - UG -->
+      <div class="form-section">
+        <h4>🎓 Undergraduate (UG) Details</h4>
+        <div class="form-row">
+          <div class="input-group">
+            <label class="input-label">College Name</label>
+            <input type="text" class="input-field" [(ngModel)]="educationLoanForm.ugCollegeName" name="ugCollegeName">
+          </div>
+          <div class="input-group">
+            <label class="input-label">University</label>
+            <input type="text" class="input-field" [(ngModel)]="educationLoanForm.ugUniversity" name="ugUniversity">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="input-group">
+            <label class="input-label">Course</label>
+            <input type="text" class="input-field" [(ngModel)]="educationLoanForm.ugCourse" name="ugCourse">
+          </div>
+          <div class="input-group">
+            <label class="input-label">Admission Year</label>
+            <input type="number" class="input-field" [(ngModel)]="educationLoanForm.ugAdmissionYear" name="ugAdmissionYear" 
+                   min="1990" [max]="getCurrentYear()">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="input-group">
+            <label class="input-label">Expected Graduation Year</label>
+            <input type="number" class="input-field" [(ngModel)]="educationLoanForm.ugExpectedGraduationYear" name="ugExpectedGraduationYear" 
+                   min="1990" [max]="getMaxYear()">
+          </div>
+          <div class="input-group">
+            <label class="input-label">Current CGPA</label>
+            <input type="number" class="input-field" [(ngModel)]="educationLoanForm.ugCurrentCGPA" name="ugCurrentCGPA" 
+                   min="0" max="10" step="0.01">
+          </div>
+        </div>
+      </div>
+
+      <!-- College/University Selection -->
+      <div class="form-section">
+        <h4>🏫 College/University for Loan</h4>
+        <div class="form-row">
+          <div class="input-group">
+            <label class="input-label">College Type <span class="required">*</span></label>
+            <select class="input-field" [(ngModel)]="educationLoanForm.collegeType" name="collegeType" 
+                    required (change)="onCollegeTypeChange()">
+              <option value="">Select Type</option>
+              <option value="IIT">IIT</option>
+              <option value="IIM">IIM</option>
+              <option value="University">University</option>
+              <option value="College">College</option>
+            </select>
+          </div>
+        </div>
+        
+        <div class="form-row">
+          <div class="input-group">
+            <label class="input-label">State <span class="required">*</span></label>
+            <select class="input-field" [(ngModel)]="selectedState" name="selectedState" 
+                    required (change)="onStateChange()">
+              <option value="">Select State</option>
+              <option *ngFor="let state of getStates()" [value]="state">{{ state }}</option>
+            </select>
+          </div>
+          <div class="input-group">
+            <label class="input-label">City <span class="required">*</span></label>
+            <select class="input-field" [(ngModel)]="selectedCity" name="selectedCity" 
+                    required (change)="onCityChange()" [disabled]="!selectedState">
+              <option value="">Select City</option>
+              <option *ngFor="let city of getCitiesForState()" [value]="city">{{ city }}</option>
+            </select>
+          </div>
+        </div>
+        
+        <!-- College Selection Dropdown -->
+        <div class="input-group" *ngIf="filteredColleges.length > 0">
+          <label class="input-label">Select College/University <span class="required">*</span></label>
+          <select class="input-field" [(ngModel)]="educationLoanForm.collegeName" name="collegeName" 
+                  required (change)="selectCollegeFromDropdown()">
+            <option value="">Select from list</option>
+            <option *ngFor="let college of filteredColleges" [value]="college.name">
+              {{ college.name }} - {{ college.city }}, {{ college.state }}
+            </option>
+          </select>
+        </div>
+        
+        <!-- Manual College Entry -->
+        <div class="input-group">
+          <label class="input-label">College/University Name <span class="required">*</span></label>
+          <input type="text" class="input-field" [(ngModel)]="educationLoanForm.collegeName" name="collegeNameManual" 
+                 required placeholder="Enter college name">
+        </div>
+        <div class="input-group">
+          <label class="input-label">College Address</label>
+          <textarea class="input-field" [(ngModel)]="educationLoanForm.collegeAddress" name="collegeAddress" 
+                    rows="2" placeholder="Enter college address"></textarea>
+        </div>
+        
+        <div class="form-row">
+          <div class="input-group">
+            <label class="input-label">Course <span class="required">*</span></label>
+            <input type="text" class="input-field" [(ngModel)]="educationLoanForm.collegeCourse" name="collegeCourse" required>
+          </div>
+          <div class="input-group">
+            <label class="input-label">Degree Type <span class="required">*</span></label>
+            <select class="input-field" [(ngModel)]="educationLoanForm.collegeDegree" name="collegeDegree" required>
+              <option value="">Select Degree</option>
+              <option value="UG">Undergraduate (UG)</option>
+              <option value="PG">Postgraduate (PG)</option>
+              <option value="PhD">PhD</option>
+              <option value="Diploma">Diploma</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+        </div>
+        
+        <div class="form-row">
+          <div class="input-group">
+            <label class="input-label">Admission Year <span class="required">*</span></label>
+            <input type="number" class="input-field" [(ngModel)]="educationLoanForm.collegeAdmissionYear" name="collegeAdmissionYear" 
+                   required min="1990" [max]="getMaxGraduationYear()">
+          </div>
+          <div class="input-group">
+            <label class="input-label">Course Duration (Years) <span class="required">*</span></label>
+            <input type="number" class="input-field" [(ngModel)]="educationLoanForm.collegeCourseDuration" name="collegeCourseDuration" 
+                   required min="1" max="10">
+          </div>
+        </div>
+        
+        <div class="input-group">
+          <label class="input-label">Total Course Fee (₹) <span class="required">*</span></label>
+          <input type="number" class="input-field" [(ngModel)]="educationLoanForm.collegeFeeAmount" name="collegeFeeAmount" 
+                 required min="0" step="0.01">
+        </div>
+      </div>
+
+      <!-- College Account Details -->
+      <div class="form-section">
+        <h4>🏦 College Account Details</h4>
+        <div class="form-row">
+          <div class="input-group">
+            <label class="input-label">Account Number <span class="required">*</span></label>
+            <input type="text" class="input-field" [(ngModel)]="educationLoanForm.collegeAccountNumber" name="collegeAccountNumber" required>
+          </div>
+          <div class="input-group">
+            <label class="input-label">Account Holder Name <span class="required">*</span></label>
+            <input type="text" class="input-field" [(ngModel)]="educationLoanForm.collegeAccountHolderName" name="collegeAccountHolderName" required>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="input-group">
+            <label class="input-label">Bank Name <span class="required">*</span></label>
+            <input type="text" class="input-field" [(ngModel)]="educationLoanForm.collegeBankName" name="collegeBankName" required>
+          </div>
+          <div class="input-group">
+            <label class="input-label">Bank Branch</label>
+            <input type="text" class="input-field" [(ngModel)]="educationLoanForm.collegeBankBranch" name="collegeBankBranch">
+          </div>
+        </div>
+        <div class="input-group">
+          <label class="input-label">IFSC Code <span class="required">*</span></label>
+          <input type="text" class="input-field" [(ngModel)]="educationLoanForm.collegeIFSCCode" name="collegeIFSCCode" 
+                 required pattern="[A-Z]{4}0[A-Z0-9]{6}" placeholder="ABCD0123456">
+        </div>
+      </div>
+
+      <!-- Document Upload -->
+      <div class="form-section">
+        <h4>📄 Documents</h4>
+        <div class="input-group">
+          <label class="input-label">College Application/Admission Letter</label>
+          <input type="file" class="input-field" (change)="onCollegeApplicationFileSelected($event)" 
+                 accept=".pdf,.jpg,.jpeg,.png">
+          <small class="input-hint">Upload college application or admission letter (PDF, JPG, PNG - Max 5MB)</small>
+        </div>
+      </div>
     </div>
 
     <div class="input-group">
@@ -126,8 +474,56 @@
       </small>
     </div>
 
+    <!-- Personal Loan Application Form Section -->
+    <div *ngIf="loanForm.type === 'Personal Loan'" class="personal-loan-form-section">
+      <h3 class="section-title">📄 Personal Loan Application Form</h3>
+      
+      <div class="form-section">
+        <div class="input-group">
+          <label class="input-label">Download Application Form</label>
+          <button type="button" class="download-form-btn" (click)="downloadPersonalLoanForm()">
+            📥 Download Application Form
+          </button>
+          <small class="input-hint">Download the Personal Loan application form, fill it, and upload it below.</small>
+        </div>
+        
+        <div class="input-group">
+          <label class="input-label">Upload Filled Application Form <span class="required">*</span></label>
+          <input 
+            type="file" 
+            class="input-field" 
+            (change)="onPersonalLoanFormSelected($event)" 
+            accept=".pdf,.jpg,.jpeg,.png"
+            [disabled]="personalLoanFormUploaded"
+          />
+          <small class="input-hint">Upload the filled Personal Loan application form (PDF, JPG, PNG - Max 5MB)</small>
+          <div *ngIf="personalLoanFormFile" class="file-info">
+            <span class="file-name">📄 {{ personalLoanFormFile.name }}</span>
+            <button type="button" class="remove-file-btn" (click)="removePersonalLoanForm()" *ngIf="!personalLoanFormUploaded">✕</button>
+          </div>
+          <div *ngIf="personalLoanFormUploaded" class="success-message">
+            ✓ Form uploaded successfully
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Terms and Conditions -->
+    <div class="form-group terms-section">
+      <label class="terms-checkbox-label">
+        <input 
+          type="checkbox" 
+          [(ngModel)]="termsAccepted" 
+          name="termsAccepted"
+          required
+          class="terms-checkbox"
+        />
+        <span>I accept the <a href="#" (click)="showTermsModal = true; $event.preventDefault()" class="terms-link">Terms and Conditions</a> <span class="required">*</span></span>
+      </label>
+    </div>
+
     <div class="form-actions">
-      <button class="submit-button" type="submit">Apply Loan</button>
+      <button class="submit-button" type="submit" [disabled]="loanForm.type === 'Personal Loan' && !personalLoanFormFile">Apply Loan</button>
       <button class="calculate-button" type="button" (click)="fillEMICalculator()">Calculate EMI</button>
     </div>
   </form>
@@ -235,6 +631,7 @@
           <th>Amount</th>
           <th>Tenure</th>
           <th>Interest Rate</th>
+          <th>CIBIL Score</th>
           <th>Status</th>
           <th>Applied Date</th>
           <th>Approved Date</th>
@@ -249,6 +646,20 @@
           <td>₹{{ loan.amount }}</td>
           <td>{{ loan.tenure }} months</td>
           <td>{{ loan.interestRate }}%</td>
+          <td>
+            <span *ngIf="loan.cibilScore" 
+                  [ngClass]="{
+                    'cibil-excellent': loan.cibilScore >= 750,
+                    'cibil-good': loan.cibilScore >= 700 && loan.cibilScore < 750,
+                    'cibil-fair': loan.cibilScore >= 650 && loan.cibilScore < 700,
+                    'cibil-average': loan.cibilScore >= 600 && loan.cibilScore < 650,
+                    'cibil-poor': loan.cibilScore < 600
+                  }"
+                  class="cibil-score-badge">
+              {{ loan.cibilScore }}
+            </span>
+            <span *ngIf="!loan.cibilScore" class="cibil-na">N/A</span>
+          </td>
           <td [class.pending]="loan.status === 'Pending'"
               [class.approved]="loan.status === 'Approved'"
               [class.rejected]="loan.status === 'Rejected'"
@@ -402,17 +813,53 @@
           </div>
         </div>
         
+        <!-- Bulk Payment Controls -->
+        <div class="bulk-payment-controls" *ngIf="getPendingEmiCount(selectedLoanForEmi.id) > 0">
+          <div class="bulk-controls-left">
+            <label class="select-all-checkbox">
+              <input type="checkbox" 
+                     [checked]="selectedEmis.size > 0 && selectedEmis.size === getPendingEmiCount(selectedLoanForEmi.id)"
+                     (change)="selectedEmis.size === getPendingEmiCount(selectedLoanForEmi.id) ? deselectAllEmis() : selectAllPendingEmis()">
+              <span>Select All Pending ({{ getPendingEmiCount(selectedLoanForEmi.id) }})</span>
+            </label>
+            <span class="selected-count" *ngIf="selectedEmis.size > 0">
+              {{ selectedEmis.size }} selected | Total: ₹{{ getSelectedEmisTotal() | number:'1.2-2' }}
+            </span>
+          </div>
+          <div class="bulk-controls-right">
+            <button class="pay-bulk-btn" 
+                    (click)="payBulkEmis()" 
+                    [disabled]="selectedEmis.size === 0 || payingBulkEmis || currentBalance < getSelectedEmisTotal()">
+              <span class="btn-icon">💳</span>
+              <span class="btn-text">Pay Selected ({{ selectedEmis.size }})</span>
+            </button>
+            <button class="clear-selection-btn" 
+                    (click)="deselectAllEmis()" 
+                    [disabled]="selectedEmis.size === 0">
+              Clear Selection
+            </button>
+          </div>
+        </div>
+        
         <div class="emi-cards-container">
           <div *ngFor="let emi of getEmisForLoan(selectedLoanForEmi.id)" 
                class="emi-card"
                [class.emi-paid]="emi.status === 'Paid'"
                [class.emi-pending]="emi.status === 'Pending'"
-               [class.emi-overdue]="emi.status === 'Overdue'">
+               [class.emi-overdue]="emi.status === 'Overdue'"
+               [class.emi-selected]="selectedEmis.has(emi.id)">
             
             <!-- Green Ticket for Paid EMIs -->
             <div class="paid-ticket" *ngIf="emi.status === 'Paid'">
               <div class="ticket-icon">✓</div>
               <div class="ticket-text">PAID</div>
+            </div>
+            
+            <!-- Selection Checkbox -->
+            <div class="emi-selection-checkbox" *ngIf="emi.status === 'Pending'">
+              <input type="checkbox" 
+                     [checked]="selectedEmis.has(emi.id)"
+                     (change)="toggleEmiSelection(emi.id)">
             </div>
             
             <div class="emi-card-header">
@@ -570,6 +1017,129 @@
           <span *ngIf="payingEmi">⏳ Processing...</span>
         </button>
       </div>
+    </div>
+  </div>
+
+  <!-- Bulk Payment Confirmation Modal -->
+  <div class="emi-payment-modal-overlay" *ngIf="showBulkPaymentModal" (click)="closeBulkPaymentModal()">
+    <div class="emi-payment-modal bulk-payment-modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>Confirm Bulk EMI Payment</h2>
+        <button class="modal-close-btn" (click)="closeBulkPaymentModal()">✕</button>
+      </div>
+      
+      <div class="modal-body">
+        <div class="payment-summary-card">
+          <div class="summary-header">
+            <div class="emi-number-large">Pay {{ getSelectedPendingEmis().length }} EMI(s)</div>
+            <div class="loan-account-info">{{ selectedLoanForEmi?.loanAccountNumber }}</div>
+          </div>
+          
+          <div class="bulk-payment-list">
+            <h3>Selected EMIs:</h3>
+            <div class="emi-list-item" *ngFor="let emi of getSelectedPendingEmis()">
+              <div class="emi-item-info">
+                <span class="emi-item-number">EMI #{{ emi.emiNumber }}</span>
+                <span class="emi-item-date">Due: {{ emi.dueDate | date:'dd MMM yyyy' }}</span>
+              </div>
+              <span class="emi-item-amount">₹{{ emi.totalAmount | number:'1.2-2' }}</span>
+            </div>
+          </div>
+          
+          <div class="amount-breakdown-section">
+            <h3>Payment Summary</h3>
+            <div class="breakdown-row total-row">
+              <span class="breakdown-label">Total Amount:</span>
+              <span class="breakdown-value total-amount">₹{{ getSelectedEmisTotal() | number:'1.2-2' }}</span>
+            </div>
+            <div class="breakdown-row">
+              <span class="breakdown-label">Current Balance:</span>
+              <span class="breakdown-value">₹{{ currentBalance | number:'1.2-2' }}</span>
+            </div>
+            <div class="breakdown-row">
+              <span class="breakdown-label">Balance After Payment:</span>
+              <span class="breakdown-value">₹{{ (currentBalance - getSelectedEmisTotal()) | number:'1.2-2' }}</span>
+            </div>
+          </div>
+          
+          <div class="payment-warning" *ngIf="currentBalance < getSelectedEmisTotal()">
+            <div class="warning-icon">⚠️</div>
+            <div class="warning-text">
+              <strong>Insufficient Balance!</strong><br>
+              Your current balance (₹{{ currentBalance | number:'1.2-2' }}) is less than the required amount (₹{{ getSelectedEmisTotal() | number:'1.2-2' }}).
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="modal-footer">
+        <button class="cancel-btn" (click)="closeBulkPaymentModal()" [disabled]="payingBulkEmis">
+          Cancel
+        </button>
+        <button class="confirm-pay-btn" 
+                (click)="confirmBulkPayment()" 
+                [disabled]="payingBulkEmis || currentBalance < getSelectedEmisTotal()">
+          <span *ngIf="!payingBulkEmis">💳 Confirm & Pay All</span>
+          <span *ngIf="payingBulkEmis">⏳ Processing...</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Terms and Conditions Modal -->
+<div *ngIf="showTermsModal" class="terms-modal-overlay" (click)="showTermsModal = false">
+  <div class="terms-modal" (click)="$event.stopPropagation()">
+    <div class="terms-modal-header">
+      <h3>Terms and Conditions</h3>
+      <button class="terms-modal-close" (click)="showTermsModal = false">×</button>
+    </div>
+    <div class="terms-modal-body">
+      <h4>1. Loan Application Terms</h4>
+      <ul>
+        <li>By applying for a loan, you confirm that all information provided is accurate and complete.</li>
+        <li>You authorize NeoBank to verify your credit history, employment, and financial information.</li>
+        <li>False or misleading information may result in rejection of your application or legal action.</li>
+      </ul>
+
+      <h4>2. Loan Approval and Disbursement</h4>
+      <ul>
+        <li>Loan approval is subject to credit assessment and verification of documents.</li>
+        <li>NeoBank reserves the right to approve or reject any loan application without assigning reasons.</li>
+        <li>Approved loan amount will be credited to your account within 2-3 business days.</li>
+      </ul>
+
+      <h4>3. Interest Rates and Charges</h4>
+      <ul>
+        <li>Interest rates are determined based on your credit profile and may vary.</li>
+        <li>Processing fees, prepayment charges, and other applicable charges will be communicated separately.</li>
+        <li>Interest rates are subject to change as per market conditions and RBI guidelines.</li>
+      </ul>
+
+      <h4>4. Repayment Obligations</h4>
+      <ul>
+        <li>You are responsible for timely payment of all EMIs as per the schedule.</li>
+        <li>Late payment charges and penalties will apply for overdue amounts.</li>
+        <li>Default in repayment may affect your credit score and may lead to legal action.</li>
+      </ul>
+
+      <h4>5. Personal Information</h4>
+      <ul>
+        <li>Your personal and financial information will be kept confidential as per banking regulations.</li>
+        <li>NeoBank may share information with credit bureaus and regulatory authorities as required.</li>
+        <li>You consent to receive communications via email, SMS, and phone regarding your loan.</li>
+      </ul>
+
+      <h4>6. General Terms</h4>
+      <ul>
+        <li>These terms are subject to change, and you will be notified of any material changes.</li>
+        <li>NeoBank reserves the right to modify loan terms, interest rates, and charges.</li>
+        <li>Disputes, if any, will be subject to the jurisdiction of courts in Mumbai, India.</li>
+      </ul>
+
+      <p style="margin-top: 20px; font-weight: 600; color: #0077cc;">
+        By accepting these terms, you acknowledge that you have read, understood, and agree to be bound by all the terms and conditions mentioned above.
+      </p>
     </div>
   </div>
 </div>

@@ -68,7 +68,12 @@
       <!-- Login Form -->
       <div *ngIf="currentPage === 'login'" class="form-content">
         <div class="login-options">
-          <button class="login-option active">USER/GMAIL ID</button>
+          <button class="login-option" [class.active]="!useGraphicalPassword" (click)="toggleGraphicalPassword()" *ngIf="useGraphicalPassword">
+            🔑 PASSWORD LOGIN
+          </button>
+          <button class="login-option" [class.active]="useGraphicalPassword" (click)="toggleGraphicalPassword()" *ngIf="!useGraphicalPassword">
+            🖼️ GRAPHICAL PASSWORD
+          </button>
           <button type="button" class="login-option qr-option" (click)="generateQrCode()" *ngIf="!showQrCode && !isQrLoginMode">
             📱 QR CODE LOGIN
           </button>
@@ -92,10 +97,69 @@
           <p class="qr-mode-subtext">Please enter your credentials to complete login</p>
         </div>
 
-        <form (ngSubmit)="login()" class="login-form" *ngIf="!showOtpInput && !showQrCode">
+        <!-- Graphical Password Login -->
+        <div *ngIf="useGraphicalPassword && !showOtpInput && !showQrCode" class="graphical-password-login">
           <div class="input-group">
             <label>USERID/GMAILID</label>
-            <input type="text" [(ngModel)]="loginUserId" name="loginUserId" placeholder="Enter an User or Gmail ID" required />
+            <input 
+              type="text" 
+              [(ngModel)]="loginUserId" 
+              name="loginUserId" 
+              placeholder="Enter an User or Gmail ID" 
+              required
+              (input)="checkFingerprintCredentials()" 
+              (blur)="checkFingerprintCredentials()"
+            />
+          </div>
+          
+          <app-graphical-password
+            mode="verify"
+            [requiredSelections]="5"
+            (passwordComplete)="onGraphicalPasswordComplete($event)"
+            (selectionChanged)="onGraphicalPasswordChanged($event)"
+          ></app-graphical-password>
+          
+          <button 
+            type="button" 
+            class="secure-login-btn" 
+            (click)="login()"
+            [disabled]="!loginUserId || graphicalPasswordSequence.length === 0"
+          >
+            <span class="lock-icon">🔒</span>
+            Secure Login with Graphical Password
+          </button>
+          
+          <!-- Error Message with Setup Button -->
+          <div class="error-message-with-action" *ngIf="errorMessage && showSetupButton">
+            <div class="error-content">
+              <span class="error-icon">⚠️</span>
+              <span class="error-text">{{ errorMessage }}</span>
+            </div>
+            <button 
+              type="button" 
+              class="setup-graphical-password-btn" 
+              (click)="openGraphicalPasswordSetup()"
+            >
+              <span class="setup-icon">🖼️</span>
+              Set Up Graphical Password
+            </button>
+            <p class="setup-hint">Or switch to regular password login above</p>
+          </div>
+        </div>
+
+        <!-- Regular Password Login -->
+        <form (ngSubmit)="login()" class="login-form" *ngIf="!useGraphicalPassword && !showOtpInput && !showQrCode">
+          <div class="input-group">
+            <label>USERID/GMAILID</label>
+            <input 
+              type="text" 
+              [(ngModel)]="loginUserId" 
+              name="loginUserId" 
+              placeholder="Enter an User or Gmail ID" 
+              required
+              (input)="checkFingerprintCredentials()" 
+              (blur)="checkFingerprintCredentials()"
+            />
           </div>
 
           <div class="input-group">
@@ -110,6 +174,28 @@
             <span class="lock-icon">🔒</span>
             Secure Login
           </button>
+          <!-- Fingerprint Login Option -->
+          <div class="fingerprint-login" *ngIf="isFingerprintSupported">
+            <div class="fingerprint-status">
+              <span *ngIf="checkingFingerprint">🔄 Checking fingerprint availability...</span>
+              <span *ngIf="!checkingFingerprint && hasFingerprintRegistered">✅ Fingerprint registered for this account</span>
+              <span *ngIf="!checkingFingerprint && !hasFingerprintRegistered">ℹ️ Use your device biometrics to login instantly.</span>
+            </div>
+            <button 
+              type="button" 
+              class="fingerprint-btn" 
+              (click)="loginWithFingerprint()"
+              [disabled]="isAuthenticatingFingerprint || checkingFingerprint || !loginUserId"
+            >
+              <span class="fp-icon">👆</span>
+              <span *ngIf="!isAuthenticatingFingerprint">Login with Fingerprint</span>
+              <span *ngIf="isAuthenticatingFingerprint">Waiting for fingerprint...</span>
+            </button>
+            <p class="fingerprint-hint">Opens the native Windows Hello / Touch ID / Android biometric prompt.</p>
+          </div>
+          <div class="fingerprint-login unsupported" *ngIf="!isFingerprintSupported">
+            <p>Fingerprint login requires a supported browser/device with platform biometrics.</p>
+          </div>
         </form>
 
         <!-- OTP Verification Form -->
@@ -326,6 +412,108 @@
           <p class="security-note">
             <span class="security-icon">🛡️</span>
             Your information is secure and encrypted. We use this data only for account verification.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Graphical Password Setup Modal -->
+  <div class="modal-overlay" *ngIf="showGraphicalPasswordSetup" (click)="skipGraphicalPasswordSetup()">
+    <div class="modal-content graphical-password-setup-modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>🖼️ Set Up Graphical Password</h3>
+        <button class="close-btn" (click)="skipGraphicalPasswordSetup()">×</button>
+      </div>
+      
+      <div class="modal-body">
+        <div class="setup-intro">
+          <p class="intro-text">
+            <strong>Enhance your account security!</strong> Set up a graphical password by selecting 5 images in your preferred sequence. 
+            This will be used for future logins instead of your regular password.
+            <span *ngIf="!isUserLoggedIn()" class="login-note">You'll need to enter your email and password to verify your identity.</span>
+          </p>
+          <div class="security-benefits">
+            <div class="benefit-item">
+              <span class="benefit-icon">🔒</span>
+              <span>More secure than text passwords</span>
+            </div>
+            <div class="benefit-item">
+              <span class="benefit-icon">🎨</span>
+              <span>Easy to remember with visual cues</span>
+            </div>
+            <div class="benefit-item">
+              <span class="benefit-icon">⚡</span>
+              <span>Faster login experience</span>
+            </div>
+          </div>
+        </div>
+        
+        <form (ngSubmit)="setupGraphicalPassword()" class="setup-form">
+          <div class="input-group" *ngIf="!isUserLoggedIn()">
+            <label>Email/User ID</label>
+            <input 
+              type="text" 
+              [(ngModel)]="loginUserId" 
+              name="loginUserId" 
+              placeholder="Enter your email or User ID" 
+              required 
+              class="email-input"
+            />
+            <div class="input-help">
+              <span class="help-text">Enter the email/User ID you use to login</span>
+            </div>
+          </div>
+          
+          <div class="input-group">
+            <label>Enter Your Password (for verification)</label>
+            <input 
+              type="password" 
+              [(ngModel)]="setupPassword" 
+              name="setupPassword" 
+              placeholder="Enter your current password" 
+              required 
+              class="password-input"
+            />
+            <div class="input-help">
+              <span class="help-text">We need to verify your identity before setting up graphical password</span>
+            </div>
+          </div>
+          
+          <div class="graphical-password-setup-section">
+            <app-graphical-password
+              mode="setup"
+              [requiredSelections]="5"
+              (passwordComplete)="onSetupGraphicalPasswordComplete($event)"
+              (selectionChanged)="onSetupGraphicalPasswordChanged($event)"
+            ></app-graphical-password>
+          </div>
+          
+          <div class="error-message" *ngIf="errorMessage">
+            <span class="error-icon">⚠️</span>
+            {{ errorMessage }}
+          </div>
+          
+          <div class="modal-actions">
+            <button type="button" class="skip-btn" (click)="skipGraphicalPasswordSetup()">
+              Skip for Now
+            </button>
+            <button 
+              type="submit" 
+              class="setup-submit-btn" 
+              [disabled]="settingUpGraphicalPassword || !setupPassword || setupGraphicalPasswordSequence.length < 5 || (!isUserLoggedIn() && !loginUserId)"
+            >
+              <span *ngIf="settingUpGraphicalPassword" class="loading-icon">⏳</span>
+              <span *ngIf="!settingUpGraphicalPassword">✓</span>
+              {{ settingUpGraphicalPassword ? 'Setting Up...' : 'Set Graphical Password' }}
+            </button>
+          </div>
+        </form>
+        
+        <div class="setup-footer">
+          <p class="security-note">
+            <span class="security-icon">🛡️</span>
+            Your graphical password is encrypted and stored securely. You can change it anytime from your profile settings.
           </p>
         </div>
       </div>

@@ -47,9 +47,21 @@ public class User {
     private String signatureReviewedBy; // Admin who reviewed the signature
     private String signatureRejectionReason; // Reason if rejected
 
+    // Graphical password field - stores the sequence of image IDs as JSON string
+    @Column(name = "graphical_password", columnDefinition = "TEXT")
+    private String graphicalPassword; // JSON array of image IDs: [1,5,3,7,2]
+
     @OneToOne(cascade = CascadeType.ALL)
     @JoinColumn(name = "account_id")
     private Account account;
+
+    // Parent-child relationship for child accounts
+    @ManyToOne
+    @JoinColumn(name = "parent_user_id")
+    private User parentUser; // Reference to parent user if this is a child account
+
+    @OneToMany(mappedBy = "parentUser", cascade = CascadeType.ALL)
+    private java.util.List<User> childUsers; // List of child users if this is a parent account
 
     // Constructors
     public User() {

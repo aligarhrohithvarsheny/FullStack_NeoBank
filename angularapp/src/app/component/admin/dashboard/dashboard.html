@@ -1,20 +1,639 @@
 <!-- Include Font Awesome -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
-<div class="dashboard-container">
-  <header>
+<div class="dashboard-wrapper">
+  <!-- Left Sidebar -->
+  <aside class="sidebar" [class.collapsed]="sidebarCollapsed">
+    <div class="sidebar-header">
+      <div class="logo-section">
+        <i class="fa fa-bank"></i>
+        <span class="logo-text" *ngIf="!sidebarCollapsed">NeoBank</span>
+      </div>
+      <button class="sidebar-toggle" (click)="sidebarCollapsed = !sidebarCollapsed">
+        <i class="fa" [ngClass]="sidebarCollapsed ? 'fa-angle-right' : 'fa-angle-left'"></i>
+      </button>
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="nav-section">
+        <div class="nav-section-title" *ngIf="!sidebarCollapsed">Main Menu</div>
+        <a class="nav-item" [class.active]="activeSection === 'dashboard'" (click)="setActiveSection('dashboard')">
+          <i class="fa fa-home"></i>
+          <span *ngIf="!sidebarCollapsed">Dashboard</span>
+        </a>
+        <a class="nav-item" [class.active]="activeSection === 'profile'" (click)="setActiveSection('profile')">
+          <i class="fa fa-user-shield"></i>
+          <span *ngIf="!sidebarCollapsed">Admin Profile</span>
+        </a>
+        <a class="nav-item" [class.active]="activeSection === 'users'" (click)="setActiveSection('users')" *ngIf="hasFeatureAccess('manage-users')">
+          <i class="fa fa-users"></i>
+          <span *ngIf="!sidebarCollapsed">Manage Users</span>
+        </a>
+        <a class="nav-item" [class.active]="activeSection === 'user-control'" (click)="setActiveSection('user-control')" *ngIf="hasFeatureAccess('user-control')">
+          <i class="fa fa-user-cog"></i>
+          <span *ngIf="!sidebarCollapsed">Full User Control</span>
+        </a>
+      </div>
+
+      <div class="nav-section">
+        <div class="nav-section-title" *ngIf="!sidebarCollapsed">Financial Operations</div>
+        <a class="nav-item" [class.active]="activeSection === 'deposit-withdraw'" (click)="setActiveSection('deposit-withdraw')" *ngIf="hasFeatureAccess('deposit-withdraw')">
+          <i class="fa fa-exchange-alt"></i>
+          <span *ngIf="!sidebarCollapsed">Deposit/Withdraw</span>
+        </a>
+        <a class="nav-item" [class.active]="activeSection === 'transactions'" (click)="setActiveSection('transactions')" *ngIf="hasFeatureAccess('transactions')">
+          <i class="fa fa-chart-line"></i>
+          <span *ngIf="!sidebarCollapsed">Transactions</span>
+        </a>
+        <a class="nav-item" [class.active]="activeSection === 'loans'" (click)="setActiveSection('loans')" *ngIf="hasFeatureAccess('loans')">
+          <i class="fa fa-coins"></i>
+          <span *ngIf="!sidebarCollapsed">Loan Requests</span>
+        </a>
+        <a class="nav-item" [class.active]="activeSection === 'gold-loans'" (click)="setActiveSection('gold-loans')" *ngIf="hasFeatureAccess('gold-loans')">
+          <i class="fa fa-gem"></i>
+          <span *ngIf="!sidebarCollapsed">Gold Loans</span>
+        </a>
+        <a class="nav-item" [class.active]="activeSection === 'investments'" (click)="setActiveSection('investments')">
+          <i class="fa fa-chart-line"></i>
+          <span *ngIf="!sidebarCollapsed">Investments</span>
+        </a>
+        <a class="nav-item" [class.active]="activeSection === 'fixed-deposits'" (click)="setActiveSection('fixed-deposits')">
+          <i class="fa fa-piggy-bank"></i>
+          <span *ngIf="!sidebarCollapsed">Fixed Deposits</span>
+        </a>
+        <a class="nav-item" [class.active]="activeSection === 'emi-management'" (click)="setActiveSection('emi-management')">
+          <i class="fa fa-calendar-check"></i>
+          <span *ngIf="!sidebarCollapsed">EMI Management</span>
+        </a>
+        <a class="nav-item" [class.active]="activeSection === 'cheques'" (click)="setActiveSection('cheques')" *ngIf="hasFeatureAccess('cheques')">
+          <i class="fa fa-file-invoice"></i>
+          <span *ngIf="!sidebarCollapsed">Cheque Management</span>
+        </a>
+      </div>
+
+      <div class="nav-section">
+        <div class="nav-section-title" *ngIf="!sidebarCollapsed">Services</div>
+        <a class="nav-item" [class.active]="activeSection === 'cards'" (click)="setActiveSection('cards')" *ngIf="hasFeatureAccess('cards')">
+          <i class="fa fa-credit-card"></i>
+          <span *ngIf="!sidebarCollapsed">Manage Cards</span>
+        </a>
+        <a class="nav-item" [class.active]="activeSection === 'kyc'" (click)="setActiveSection('kyc')" *ngIf="hasFeatureAccess('kyc')">
+          <i class="fa fa-id-card"></i>
+          <span *ngIf="!sidebarCollapsed">KYC Verification</span>
+        </a>
+        <a class="nav-item" [class.active]="activeSection === 'subsidy-claims'" (click)="setActiveSection('subsidy-claims')" *ngIf="hasFeatureAccess('subsidy-claims')">
+          <i class="fa fa-graduation-cap"></i>
+          <span *ngIf="!sidebarCollapsed">Subsidy Claims</span>
+        </a>
+        <a class="nav-item" [class.active]="activeSection === 'education-loans'" (click)="setActiveSection('education-loans')" *ngIf="hasFeatureAccess('education-loans')">
+          <i class="fa fa-university"></i>
+          <span *ngIf="!sidebarCollapsed">Education Loans</span>
+        </a>
+        <a class="nav-item" [class.active]="activeSection === 'chat'" (click)="setActiveSection('chat')" *ngIf="hasFeatureAccess('chat')">
+          <i class="fa fa-comments"></i>
+          <span *ngIf="!sidebarCollapsed">Customer Support</span>
+        </a>
+      </div>
+
+      <div class="nav-section">
+        <div class="nav-section-title" *ngIf="!sidebarCollapsed">Management</div>
+        <a class="nav-item" [class.active]="activeSection === 'tracking'" (click)="setActiveSection('tracking')" *ngIf="hasFeatureAccess('tracking')">
+          <i class="fa fa-search-location"></i>
+          <span *ngIf="!sidebarCollapsed">Account Tracking</span>
+        </a>
+        <a class="nav-item" [class.active]="activeSection === 'aadhar-verification'" (click)="setActiveSection('aadhar-verification')" *ngIf="hasFeatureAccess('aadhar-verification')">
+          <i class="fa fa-id-card"></i>
+          <span *ngIf="!sidebarCollapsed">Aadhar Verification</span>
+          <span class="nav-badge" *ngIf="!sidebarCollapsed && pendingAadharVerifications > 0">{{ pendingAadharVerifications }}</span>
+        </a>
+        <a class="nav-item" [class.active]="activeSection === 'gold-rate'" (click)="setActiveSection('gold-rate')" *ngIf="hasFeatureAccess('gold-rate')">
+          <i class="fa fa-coins"></i>
+          <span *ngIf="!sidebarCollapsed">Gold Rate</span>
+        </a>
+        <a class="nav-item" [class.active]="activeSection === 'login-history'" (click)="setActiveSection('login-history')" *ngIf="hasFeatureAccess('login-history')">
+          <i class="fa fa-history"></i>
+          <span *ngIf="!sidebarCollapsed">Login History</span>
+        </a>
+        <a class="nav-item" [class.active]="activeSection === 'update-history'" (click)="setActiveSection('update-history')" *ngIf="hasFeatureAccess('update-history')">
+          <i class="fa fa-edit"></i>
+          <span *ngIf="!sidebarCollapsed">Update History</span>
+          <span class="nav-badge" *ngIf="!sidebarCollapsed && userUpdateHistory.length > 0">{{ userUpdateHistory.length }}</span>
+        </a>
+        <a class="nav-item" [class.active]="activeSection === 'daily-report'" (click)="setActiveSection('daily-report')" *ngIf="hasFeatureAccess('daily-report')">
+          <i class="fa fa-calendar-day"></i>
+          <span *ngIf="!sidebarCollapsed">Daily Activity Report</span>
+        </a>
+        <a class="nav-item" [class.active]="activeSection === 'prediction-history'" (click)="setActiveSection('prediction-history')" *ngIf="hasFeatureAccess('loans')">
+          <i class="fa fa-brain"></i>
+          <span *ngIf="!sidebarCollapsed">Loan Prediction History</span>
+        </a>
+      </div>
+    </nav>
+
+    <div class="sidebar-footer">
+      <button class="logout-btn-sidebar" (click)="logout()">
+        <i class="fa fa-sign-out-alt"></i>
+        <span *ngIf="!sidebarCollapsed">Logout</span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- Main Content Area -->
+  <div class="main-content">
+    <header class="main-header">
+      <div class="header-left">
+        <button *ngIf="isFromManager" class="back-to-manager-btn" (click)="goBackToManager()" title="Back to Manager Dashboard">
+          <i class="fa fa-arrow-left"></i> Back to Manager
+        </button>
     <h2>Admin Dashboard</h2>
-    <button class="logout-btn" (click)="logout()">Logout</button>
+      </div>
+      <div class="header-right">
+        <span class="admin-name">{{ adminName }}</span>
+        <button class="mobile-menu-toggle" (click)="sidebarCollapsed = !sidebarCollapsed">
+          <i class="fa fa-bars"></i>
+        </button>
+      </div>
   </header>
 
+  <!-- Dashboard Overview Section -->
+  <div class="dashboard-overview section-content" *ngIf="activeSection === 'dashboard'">
+    <div class="overview-header">
+      <h2><i class="fa fa-chart-pie"></i> Dashboard Overview</h2>
+      <p class="overview-subtitle">Welcome back, {{ adminName }}! Here's your banking overview</p>
+    </div>
 
-  <!-- User Search Section -->
-  <div class="search-section">
+    <!-- Stats Cards Grid -->
+    <div class="stats-grid">
+      <div class="stat-card stat-card-primary">
+        <div class="stat-icon">
+          <i class="fa fa-users"></i>
+        </div>
+        <div class="stat-content">
+          <h3>{{ users.length }}</h3>
+          <p>Total Users</p>
+          <span class="stat-trend">
+            <i class="fa fa-arrow-up"></i> Active
+          </span>
+        </div>
+        <div class="stat-bg-pattern"></div>
+      </div>
+
+      <div class="stat-card stat-card-success">
+        <div class="stat-icon">
+          <i class="fa fa-wallet"></i>
+        </div>
+        <div class="stat-content">
+          <h3>₹{{ getTotalBalance() | number:'1.0-0' }}</h3>
+          <p>Total Balance</p>
+          <span class="stat-trend">
+            <i class="fa fa-chart-line"></i> All Accounts
+          </span>
+        </div>
+        <div class="stat-bg-pattern"></div>
+      </div>
+
+      <div class="stat-card stat-card-warning">
+        <div class="stat-icon">
+          <i class="fa fa-coins"></i>
+        </div>
+        <div class="stat-content">
+          <h3>{{ getPendingLoansCount() }}</h3>
+          <p>Pending Loans</p>
+          <span class="stat-trend">
+            <i class="fa fa-clock"></i> Awaiting Review
+          </span>
+        </div>
+        <div class="stat-bg-pattern"></div>
+      </div>
+
+      <div class="stat-card stat-card-info">
+        <div class="stat-icon">
+          <i class="fa fa-exchange-alt"></i>
+        </div>
+        <div class="stat-content">
+          <h3>{{ adminTransactionHistory.length }}</h3>
+          <p>Transactions Today</p>
+          <span class="stat-trend">
+            <i class="fa fa-sync"></i> Processed
+          </span>
+        </div>
+        <div class="stat-bg-pattern"></div>
+      </div>
+
+      <div class="stat-card stat-card-purple">
+        <div class="stat-icon">
+          <i class="fa fa-piggy-bank"></i>
+        </div>
+        <div class="stat-content">
+          <h3>{{ getActiveFDsCount() }}</h3>
+          <p>Active FDs</p>
+          <span class="stat-trend">
+            <i class="fa fa-check-circle"></i> Active
+          </span>
+        </div>
+        <div class="stat-bg-pattern"></div>
+      </div>
+
+      <div class="stat-card stat-card-danger">
+        <div class="stat-icon">
+          <i class="fa fa-file-invoice"></i>
+        </div>
+        <div class="stat-content">
+          <h3>{{ getPendingChequesCount() }}</h3>
+          <p>Pending Cheques</p>
+          <span class="stat-trend">
+            <i class="fa fa-exclamation-circle"></i> Action Required
+          </span>
+        </div>
+        <div class="stat-bg-pattern"></div>
+      </div>
+    </div>
+
+    <!-- Quick Actions Grid -->
+    <div class="quick-actions-grid">
+      <h3><i class="fa fa-bolt"></i> Quick Actions</h3>
+      <div class="actions-grid">
+        <div class="action-card" (click)="setActiveSection('users')" *ngIf="hasFeatureAccess('manage-users')">
+          <div class="action-icon">
+            <i class="fa fa-users"></i>
+          </div>
+          <h4>Manage Users</h4>
+          <p>View and manage all user accounts</p>
+        </div>
+        <div class="action-card" (click)="setActiveSection('deposit-withdraw')" *ngIf="hasFeatureAccess('deposit-withdraw')">
+          <div class="action-icon">
+            <i class="fa fa-exchange-alt"></i>
+          </div>
+          <h4>Deposit/Withdraw</h4>
+          <p>Process deposits and withdrawals</p>
+        </div>
+        <div class="action-card" (click)="setActiveSection('loans')" *ngIf="hasFeatureAccess('loans')">
+          <div class="action-icon">
+            <i class="fa fa-coins"></i>
+          </div>
+          <h4>Loan Requests</h4>
+          <p>Review and approve loan applications</p>
+        </div>
+        <div class="action-card" (click)="setActiveSection('fixed-deposits')">
+          <div class="action-icon">
+            <i class="fa fa-piggy-bank"></i>
+          </div>
+          <h4>Fixed Deposits</h4>
+          <p>Manage FD applications and approvals</p>
+        </div>
+        <div class="action-card" (click)="setActiveSection('cheques')" *ngIf="hasFeatureAccess('cheques')">
+          <div class="action-icon">
+            <i class="fa fa-file-invoice"></i>
+          </div>
+          <h4>Cheque Management</h4>
+          <p>Process cheque requests</p>
+        </div>
+        <div class="action-card" (click)="setActiveSection('kyc')" *ngIf="hasFeatureAccess('kyc')">
+          <div class="action-icon">
+            <i class="fa fa-id-card"></i>
+          </div>
+          <h4>KYC Verification</h4>
+          <p>Verify user KYC documents</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Recent Activity -->
+    <div class="recent-activity-section">
+      <h3><i class="fa fa-history"></i> Recent Activity</h3>
+      <div class="activity-list">
+        <div class="activity-item" *ngFor="let transaction of adminTransactionHistory.slice(0, 5)">
+          <div class="activity-icon" [ngClass]="transaction.type === 'Credit' ? 'activity-credit' : 'activity-debit'">
+            <i class="fa" [ngClass]="transaction.type === 'Credit' ? 'fa-arrow-down' : 'fa-arrow-up'"></i>
+          </div>
+          <div class="activity-content">
+            <h4>{{ transaction.description || transaction.merchant }}</h4>
+            <p>{{ transaction.accountNumber }} • {{ transaction.date | date:'short' }}</p>
+          </div>
+          <div class="activity-amount" [ngClass]="transaction.type === 'Credit' ? 'positive' : 'negative'">
+            {{ transaction.type === 'Credit' ? '+' : '-' }}₹{{ transaction.amount | number:'1.2-2' }}
+          </div>
+        </div>
+        <div class="activity-empty" *ngIf="adminTransactionHistory.length === 0">
+          <i class="fa fa-inbox"></i>
+          <p>No recent activity</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Powerful Search Engine Section -->
+  <div class="powerful-search-section">
     <div class="search-header">
-      <h3>Search Users</h3>
+      <h3>🔍 Universal Search Engine</h3>
+      <p class="search-subtitle">Search across accounts, loans, cheques, transactions, cards, and more</p>
       <button class="refresh-btn" (click)="refreshUsersData()" title="Refresh data from database">
         Refresh Data
       </button>
+    </div>
+    <div class="search-form">
+      <div class="search-input-group">
+        <i class="fa fa-search search-icon"></i>
+        <input 
+          type="text" 
+          [(ngModel)]="universalSearchQuery" 
+          placeholder="Search by: Account Number, Name, Phone, Aadhar, PAN, Loan Number, Cheque Number, Card Number, Transaction ID..."
+          class="universal-search-input"
+          (keyup.enter)="performUniversalSearch()"
+          (input)="onSearchInputChange()"
+        >
+        <button class="search-btn" (click)="performUniversalSearch()" [disabled]="isUniversalSearching">
+          <span *ngIf="!isUniversalSearching">🔍 Search</span>
+          <span *ngIf="isUniversalSearching">⏳ Searching...</span>
+        </button>
+        <button class="clear-search-btn" (click)="clearUniversalSearch()" *ngIf="universalSearchQuery">
+          ✕ Clear
+        </button>
+      </div>
+      <div class="search-hints">
+        <span class="hint-item">💡 Try: Account Number, Name, Phone, Aadhar, PAN</span>
+        <span class="hint-item">💡 Try: Loan Number, Cheque Number, Card Number</span>
+        <span class="hint-item">💡 Try: Transaction ID, Email, Username</span>
+      </div>
+    </div>
+
+    <!-- Universal Search Results -->
+    <div class="universal-search-results" *ngIf="universalSearchResults && universalSearchResults.totalCount > 0">
+      <div class="results-summary">
+        <h4>
+          <i class="fa fa-check-circle"></i> 
+          Found {{ universalSearchResults.totalCount }} result(s) for "{{ universalSearchQuery }}"
+        </h4>
+        <div class="results-breakdown">
+          <span class="badge accounts" *ngIf="universalSearchResults.accountCount > 0">
+            {{ universalSearchResults.accountCount }} Account(s)
+          </span>
+          <span class="badge users" *ngIf="universalSearchResults.userCount > 0">
+            {{ universalSearchResults.userCount }} User(s)
+          </span>
+          <span class="badge loans" *ngIf="universalSearchResults.loanCount > 0">
+            {{ universalSearchResults.loanCount }} Loan(s)
+          </span>
+          <span class="badge cheques" *ngIf="universalSearchResults.chequeCount > 0">
+            {{ universalSearchResults.chequeCount }} Cheque(s)
+          </span>
+          <span class="badge transactions" *ngIf="universalSearchResults.transactionCount > 0">
+            {{ universalSearchResults.transactionCount }} Transaction(s)
+          </span>
+          <span class="badge cards" *ngIf="universalSearchResults.cardCount > 0">
+            {{ universalSearchResults.cardCount }} Card(s)
+          </span>
+        </div>
+      </div>
+
+      <!-- Accounts Results -->
+      <div class="results-group" *ngIf="universalSearchResults.accounts && universalSearchResults.accounts.length > 0">
+        <h5 class="group-header">
+          <i class="fa fa-user-circle"></i> Accounts ({{ universalSearchResults.accounts.length }})
+        </h5>
+        <div class="results-grid">
+          <div *ngFor="let account of universalSearchResults.accounts" class="result-card account-card" (click)="viewAccountDetails(account.accountNumber)">
+            <div class="card-header">
+              <span class="card-type">Account</span>
+              <span class="match-type">{{ account.matchType }}</span>
+            </div>
+            <div class="card-body">
+              <div class="card-field">
+                <label>Name:</label>
+                <span class="value">{{ account.name || 'N/A' }}</span>
+              </div>
+              <div class="card-field">
+                <label>Account Number:</label>
+                <span class="value highlight">{{ account.accountNumber }}</span>
+              </div>
+              <div class="card-field">
+                <label>Phone:</label>
+                <span class="value">{{ account.phone || 'N/A' }}</span>
+              </div>
+              <div class="card-field">
+                <label>Balance:</label>
+                <span class="value amount">₹{{ account.balance | number:'1.2-2' }}</span>
+              </div>
+              <div class="card-field" *ngIf="account.aadharNumber">
+                <label>Aadhar:</label>
+                <span class="value">{{ account.aadharNumber }}</span>
+              </div>
+              <div class="card-field" *ngIf="account.pan">
+                <label>PAN:</label>
+                <span class="value">{{ account.pan }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Users Results -->
+      <div class="results-group" *ngIf="universalSearchResults.users && universalSearchResults.users.length > 0">
+        <h5 class="group-header">
+          <i class="fa fa-users"></i> Users ({{ universalSearchResults.users.length }})
+        </h5>
+        <div class="results-grid">
+          <div *ngFor="let user of universalSearchResults.users" class="result-card user-card" (click)="viewUserDetails(user.accountNumber)">
+            <div class="card-header">
+              <span class="card-type">User</span>
+              <span class="match-type">{{ user.matchType }}</span>
+            </div>
+            <div class="card-body">
+              <div class="card-field">
+                <label>Username:</label>
+                <span class="value">{{ user.username || 'N/A' }}</span>
+              </div>
+              <div class="card-field">
+                <label>Email:</label>
+                <span class="value">{{ user.email || 'N/A' }}</span>
+              </div>
+              <div class="card-field">
+                <label>Account Number:</label>
+                <span class="value highlight">{{ user.accountNumber }}</span>
+              </div>
+              <div class="card-field" *ngIf="user.name">
+                <label>Name:</label>
+                <span class="value">{{ user.name }}</span>
+              </div>
+              <div class="card-field" *ngIf="user.phone">
+                <label>Phone:</label>
+                <span class="value">{{ user.phone }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Loans Results -->
+      <div class="results-group" *ngIf="universalSearchResults.loans && universalSearchResults.loans.length > 0">
+        <h5 class="group-header">
+          <i class="fa fa-coins"></i> Loans ({{ universalSearchResults.loans.length }})
+        </h5>
+        <div class="results-grid">
+          <div *ngFor="let loan of universalSearchResults.loans" class="result-card loan-card" (click)="viewLoanDetails(loan.loanId)">
+            <div class="card-header">
+              <span class="card-type">Loan</span>
+              <span class="match-type">{{ loan.matchType }}</span>
+            </div>
+            <div class="card-body">
+              <div class="card-field">
+                <label>Loan Account:</label>
+                <span class="value highlight">{{ loan.loanAccountNumber }}</span>
+              </div>
+              <div class="card-field">
+                <label>Type:</label>
+                <span class="value">{{ loan.loanType }}</span>
+              </div>
+              <div class="card-field">
+                <label>Amount:</label>
+                <span class="value amount">₹{{ loan.amount | number:'1.2-2' }}</span>
+              </div>
+              <div class="card-field">
+                <label>Status:</label>
+                <span class="value status" [ngClass]="'status-' + loan.status.toLowerCase()">{{ loan.status }}</span>
+              </div>
+              <div class="card-field">
+                <label>Account Number:</label>
+                <span class="value">{{ loan.accountNumber }}</span>
+              </div>
+              <div class="card-field" *ngIf="loan.childAccountNumber">
+                <label>Child Account:</label>
+                <span class="value">{{ loan.childAccountNumber }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Cheques Results -->
+      <div class="results-group" *ngIf="universalSearchResults.cheques && universalSearchResults.cheques.length > 0">
+        <h5 class="group-header">
+          <i class="fa fa-money-check"></i> Cheques ({{ universalSearchResults.cheques.length }})
+        </h5>
+        <div class="results-grid">
+          <div *ngFor="let cheque of universalSearchResults.cheques" class="result-card cheque-card" (click)="viewChequeDetails(cheque.chequeNumber)">
+            <div class="card-header">
+              <span class="card-type">Cheque</span>
+              <span class="match-type">{{ cheque.matchType }}</span>
+            </div>
+            <div class="card-body">
+              <div class="card-field">
+                <label>Cheque Number:</label>
+                <span class="value highlight">{{ cheque.chequeNumber }}</span>
+              </div>
+              <div class="card-field">
+                <label>Account Number:</label>
+                <span class="value">{{ cheque.accountNumber }}</span>
+              </div>
+              <div class="card-field">
+                <label>Account Holder:</label>
+                <span class="value">{{ cheque.accountHolderName }}</span>
+              </div>
+              <div class="card-field" *ngIf="cheque.amount">
+                <label>Amount:</label>
+                <span class="value amount">₹{{ cheque.amount | number:'1.2-2' }}</span>
+              </div>
+              <div class="card-field">
+                <label>Status:</label>
+                <span class="value status" [ngClass]="'status-' + cheque.status.toLowerCase()">{{ cheque.status }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Transactions Results -->
+      <div class="results-group" *ngIf="universalSearchResults.transactions && universalSearchResults.transactions.length > 0">
+        <h5 class="group-header">
+          <i class="fa fa-exchange-alt"></i> Transactions ({{ universalSearchResults.transactions.length }})
+        </h5>
+        <div class="results-grid">
+          <div *ngFor="let transaction of universalSearchResults.transactions" class="result-card transaction-card">
+            <div class="card-header">
+              <span class="card-type">Transaction</span>
+              <span class="match-type">{{ transaction.matchType }}</span>
+            </div>
+            <div class="card-body">
+              <div class="card-field">
+                <label>Transaction ID:</label>
+                <span class="value highlight">#{{ transaction.transactionId }}</span>
+              </div>
+              <div class="card-field">
+                <label>Account Number:</label>
+                <span class="value">{{ transaction.accountNumber }}</span>
+              </div>
+              <div class="card-field">
+                <label>Amount:</label>
+                <span class="value amount" [ngClass]="transaction.transactionType === 'Credit' ? 'credit' : 'debit'">
+                  {{ transaction.transactionType === 'Credit' ? '+' : '-' }}₹{{ transaction.amount | number:'1.2-2' }}
+                </span>
+              </div>
+              <div class="card-field">
+                <label>Type:</label>
+                <span class="value">{{ transaction.transactionType }}</span>
+              </div>
+              <div class="card-field" *ngIf="transaction.description">
+                <label>Description:</label>
+                <span class="value">{{ transaction.description }}</span>
+              </div>
+              <div class="card-field">
+                <label>Status:</label>
+                <span class="value status" [ngClass]="'status-' + transaction.status.toLowerCase()">{{ transaction.status }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Cards Results -->
+      <div class="results-group" *ngIf="universalSearchResults.cards && universalSearchResults.cards.length > 0">
+        <h5 class="group-header">
+          <i class="fa fa-credit-card"></i> Cards ({{ universalSearchResults.cards.length }})
+        </h5>
+        <div class="results-grid">
+          <div *ngFor="let card of universalSearchResults.cards" class="result-card card-card" (click)="viewCardDetails(card.cardId)">
+            <div class="card-header">
+              <span class="card-type">Card</span>
+              <span class="match-type">{{ card.matchType }}</span>
+            </div>
+            <div class="card-body">
+              <div class="card-field">
+                <label>Card Number:</label>
+                <span class="value highlight">{{ card.cardNumber }}</span>
+              </div>
+              <div class="card-field">
+                <label>Account Number:</label>
+                <span class="value">{{ card.accountNumber }}</span>
+              </div>
+              <div class="card-field">
+                <label>Card Holder:</label>
+                <span class="value">{{ card.cardHolderName }}</span>
+              </div>
+              <div class="card-field">
+                <label>Card Type:</label>
+                <span class="value">{{ card.cardType }}</span>
+              </div>
+              <div class="card-field">
+                <label>Status:</label>
+                <span class="value status" [ngClass]="'status-' + card.status.toLowerCase()">{{ card.status }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="no-results" *ngIf="universalSearchQuery && universalSearchResults && universalSearchResults.totalCount === 0 && !isUniversalSearching">
+      <i class="fa fa-search"></i>
+      <p>No results found for "{{ universalSearchQuery }}"</p>
+      <p class="hint">Try searching with different keywords</p>
+    </div>
+  </div>
+
+  <!-- Original User Search Section (kept for backward compatibility) -->
+  <div class="search-section" *ngIf="!universalSearchQuery">
+    <div class="search-header">
+      <h3>Search Users</h3>
     </div>
     <div class="search-form">
       <div class="search-input-group">
@@ -217,19 +836,19 @@
   </div>
 
   <!-- Quick Actions Section -->
-  <div class="quick-actions">
+  <div class="quick-actions" *ngIf="hasFeatureAccess('deposit-withdraw')">
     <h3>Quick Actions</h3>
     
     <!-- Direct Deposit/Withdrawal Form -->
     <div class="transaction-form-section">
       <div class="form-row">
         <div class="form-group">
-          <label for="userSelect">Select User</label>
-          <select id="userSelect" [(ngModel)]="selectedUserId" class="form-select" (change)="onUserSelect()">
-            <option value="">-- Select User --</option>
-            <option *ngFor="let user of filteredUsers" [value]="user.id">
-              {{ user.name }} ({{ user.accountNumber }}) - ₹{{ user.balance | number:'1.2-2' }}
-            </option>
+          <label for="accountType">Account Type</label>
+          <select id="accountType" [(ngModel)]="accountType" class="form-select" (change)="onAccountNumberChange()">
+            <option value="regular">Regular Account</option>
+            <option value="loan">Loan Account</option>
+            <option value="goldloan">Gold Loan Account</option>
+            <option value="cheque">Cheque Account</option>
           </select>
         </div>
         
@@ -239,6 +858,40 @@
             <option value="deposit">Deposit Money</option>
             <option value="withdrawal">Withdraw Money</option>
           </select>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label for="accountNumber">Account Number <span class="required">*</span></label>
+          <div class="account-verify-container">
+            <input 
+              id="accountNumber"
+              type="text" 
+              [(ngModel)]="accountNumber" 
+              (ngModelChange)="onAccountNumberChange()"
+              (blur)="verifyAccountNumber()"
+              name="accountNumber" 
+              placeholder="Enter account number"
+              class="form-input"
+              [class.verified]="isAccountVerified"
+              [class.error]="accountVerificationError"
+              required>
+            <button 
+              type="button" 
+              class="verify-btn" 
+              (click)="verifyAccountNumber()"
+              [disabled]="!accountNumber || isVerifyingAccount">
+              <span *ngIf="!isVerifyingAccount">✓ Verify</span>
+              <span *ngIf="isVerifyingAccount">⏳ Verifying...</span>
+            </button>
+          </div>
+          <div *ngIf="isAccountVerified" class="verification-success">
+            ✓ Account verified: {{ verifiedAccountDetails?.accountHolderName }} ({{ verifiedAccountDetails?.accountType }})
+          </div>
+          <div *ngIf="accountVerificationError" class="verification-error">
+            ❌ {{ accountVerificationError }}
+          </div>
         </div>
       </div>
       
@@ -268,26 +921,30 @@
         </div>
       </div>
       
-      <!-- Selected User Info -->
-      <div class="selected-user-display" *ngIf="selectedUser">
-        <h4><i class="fa fa-user"></i> Selected User Details</h4>
+      <!-- Verified Account Info -->
+      <div class="selected-user-display" *ngIf="isAccountVerified && verifiedAccountDetails">
+        <h4><i class="fa fa-user"></i> Verified Account Details</h4>
         <div class="user-info-grid">
           <div class="info-item">
-            <span class="label">Name:</span>
-            <span class="value">{{ selectedUser.name }}</span>
+            <span class="label">Account Holder:</span>
+            <span class="value">{{ verifiedAccountDetails.accountHolderName }}</span>
           </div>
           <div class="info-item">
-            <span class="label">Account:</span>
-            <span class="value">{{ selectedUser.accountNumber }}</span>
+            <span class="label">Account Number:</span>
+            <span class="value">{{ verifiedAccountDetails.accountNumber }}</span>
           </div>
           <div class="info-item">
+            <span class="label">Account Type:</span>
+            <span class="value">{{ verifiedAccountDetails.accountType }}</span>
+          </div>
+          <div class="info-item" *ngIf="accountType !== 'cheque'">
             <span class="label">Current Balance:</span>
-            <span class="value">₹{{ selectedUser.balance | number:'1.2-2' }}</span>
+            <span class="value">₹{{ verifiedAccountDetails.balance | number:'1.2-2' }}</span>
           </div>
-          <div class="info-item" *ngIf="amount > 0">
+          <div class="info-item" *ngIf="amount > 0 && accountType !== 'cheque'">
             <span class="label">New Balance:</span>
             <span class="value" [ngClass]="operationType === 'deposit' ? 'positive' : 'negative'">
-              ₹{{ (selectedUser.balance + (operationType === 'deposit' ? amount : -amount)) | number:'1.2-2' }}
+              ₹{{ (verifiedAccountDetails.balance + (operationType === 'deposit' ? amount : -amount)) | number:'1.2-2' }}
             </span>
           </div>
         </div>
@@ -300,7 +957,7 @@
           class="btn-process" 
           [ngClass]="operationType === 'deposit' ? 'btn-deposit' : 'btn-withdrawal'"
           (click)="processDirectTransaction()"
-          [disabled]="!selectedUser || amount <= 0 || !description.trim()"
+          [disabled]="!isAccountVerified || amount <= 0 || !description.trim()"
         >
           <i class="fa" [ngClass]="operationType === 'deposit' ? 'fa-plus' : 'fa-minus'"></i>
           {{ operationType === 'deposit' ? 'Deposit' : 'Withdraw' }} ₹{{ amount | number:'1.2-2' }}
@@ -322,11 +979,124 @@
         {{ errorMessage }}
       </div>
     </div>
+
+    <!-- Pending Deposit Requests from users -->
+    <div class="deposit-requests-admin">
+      <div class="section-header">
+        <h4><i class="fa fa-inbox"></i> Deposit Requests</h4>
+        <button class="refresh-btn" (click)="loadDepositRequests()">Refresh</button>
+      </div>
+      <div *ngIf="isLoadingDepositRequests" class="loading-state">Loading deposit requests...</div>
+      <div *ngIf="!isLoadingDepositRequests && depositRequests.length === 0" class="empty-state">
+        No pending deposit requests.
+      </div>
+      <div class="deposit-request-grid" *ngIf="!isLoadingDepositRequests && depositRequests.length > 0">
+        <div class="deposit-card" *ngFor="let req of depositRequests">
+          <div class="card-header">
+            <div>
+              <h4>₹{{ req.amount | number:'1.2-2' }} • {{ req.method }}</h4>
+              <p class="muted">From: {{ req.userName }} ({{ req.accountNumber }})</p>
+              <p class="muted">Ref: {{ req.referenceNumber || 'N/A' }}</p>
+            </div>
+            <span class="status-badge">{{ req.status }}</span>
+          </div>
+          <div class="card-body">
+            <p><strong>Note:</strong> {{ req.note || 'N/A' }}</p>
+            <p><strong>Created:</strong> {{ req.createdAt | date:'dd/MM/yyyy, h:mm a' }}</p>
+          </div>
+          <div class="card-footer">
+            <button class="btn-deposit" (click)="approveDepositRequest(req)">
+              <i class="fa fa-check"></i> Approve & Credit
+            </button>
+            <button class="btn-withdrawal" (click)="rejectDepositRequest(req)">
+              <i class="fa fa-times"></i> Reject
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Transaction Receipt Modal -->
+  <div class="modal-overlay receipt-modal" *ngIf="showReceipt && receiptData" (click)="closeReceipt()">
+    <div class="modal-content receipt-content" (click)="$event.stopPropagation()">
+      <div class="receipt-header">
+        <div class="receipt-logo">
+          <h2>🏦 NeoBank</h2>
+          <p>Transaction Receipt</p>
+        </div>
+        <button class="close-btn" (click)="closeReceipt()">
+          <i class="fa fa-times"></i>
+        </button>
+      </div>
+      
+      <div class="receipt-body">
+        <div class="receipt-section">
+          <div class="receipt-field">
+            <span class="field-label">Transaction ID:</span>
+            <span class="field-value">{{ receiptData.transactionId }}</span>
+          </div>
+          <div class="receipt-field">
+            <span class="field-label">Date & Time:</span>
+            <span class="field-value">{{ receiptData.date }}</span>
+          </div>
+          <div class="receipt-field">
+            <span class="field-label">Account Number:</span>
+            <span class="field-value">{{ receiptData.accountNumber }}</span>
+          </div>
+          <div class="receipt-field">
+            <span class="field-label">Account Holder:</span>
+            <span class="field-value">{{ receiptData.accountHolderName }}</span>
+          </div>
+          <div class="receipt-field">
+            <span class="field-label">Account Type:</span>
+            <span class="field-value">{{ receiptData.accountType }}</span>
+          </div>
+          <div class="receipt-field">
+            <span class="field-label">Transaction Type:</span>
+            <span class="field-value" [ngClass]="receiptData.transactionType === 'Deposit' ? 'credit' : 'debit'">
+              {{ receiptData.transactionType }}
+            </span>
+          </div>
+          <div class="receipt-field">
+            <span class="field-label">Amount:</span>
+            <span class="field-value amount" [ngClass]="receiptData.transactionType === 'Deposit' ? 'credit' : 'debit'">
+              {{ receiptData.transactionType === 'Deposit' ? '+' : '-' }}₹{{ receiptData.amount | number:'1.2-2' }}
+            </span>
+          </div>
+          <div class="receipt-field" *ngIf="accountType !== 'cheque'">
+            <span class="field-label">Previous Balance:</span>
+            <span class="field-value">₹{{ receiptData.previousBalance | number:'1.2-2' }}</span>
+          </div>
+          <div class="receipt-field" *ngIf="accountType !== 'cheque'">
+            <span class="field-label">New Balance:</span>
+            <span class="field-value highlight">₹{{ receiptData.newBalance | number:'1.2-2' }}</span>
+          </div>
+          <div class="receipt-field">
+            <span class="field-label">Description:</span>
+            <span class="field-value">{{ receiptData.description }}</span>
+          </div>
+          <div class="receipt-field">
+            <span class="field-label">Processed By:</span>
+            <span class="field-value">{{ receiptData.adminName }}</span>
+          </div>
+        </div>
+      </div>
+      
+      <div class="receipt-footer">
+        <button class="btn-print" (click)="printReceipt()">
+          <i class="fa fa-print"></i> Print Receipt
+        </button>
+        <button class="btn-close" (click)="closeReceipt()">
+          Close
+        </button>
+      </div>
+    </div>
   </div>
 
 
   <!-- Deposit/Withdrawal Modal -->
-  <div class="modal-overlay" *ngIf="showDepositWithdrawal" (click)="closeDepositWithdrawal()">
+  <div class="modal-overlay" *ngIf="showDepositWithdrawal && hasFeatureAccess('deposit-withdraw')" (click)="closeDepositWithdrawal()">
     <div class="modal-content" (click)="$event.stopPropagation()">
       <div class="modal-header">
         <h3>
@@ -414,69 +1184,12 @@
     </div>
   </div>
 
-  <!-- Main Dashboard Cards -->
-  <div class="horizontal-dashboard">
-    <div class="dash-card" (click)="navigateTo('users')">
-      <i class="fa fa-users dash-icon"></i>
-      <h3>Manage Users</h3>
-      <p>Create, view, and update users</p>
-    </div>
-
-    <div class="dash-card" (click)="navigateTo('user-control')" style="background: linear-gradient(135deg, #dc3545 0%, #c82333 100%) !important; color: white !important;">
-      <i class="fa fa-user-cog dash-icon" style="color: white !important;"></i>
-      <h3 style="color: white !important;">🔐 Full User Control</h3>
-      <p style="color: rgba(255,255,255,0.9) !important;">Edit all user details & accounts</p>
-    </div>
-
-    <div class="dash-card" (click)="navigateTo('kyc')">
-      <i class="fa fa-id-card dash-icon"></i>
-      <h3>KYC Verification</h3>
-      <p>Approve or reject KYC requests</p>
-    </div>
-
-    <div class="dash-card" (click)="navigateTo('cards')">
-      <i class="fa fa-credit-card dash-icon"></i>
-      <h3>Manage Cards</h3>
-      <p>Issue, block, or update cards</p>
-    </div>
-
-    <div class="dash-card" (click)="navigateTo('loans')">
-      <i class="fa fa-coins dash-icon"></i>
-      <h3>Loan Requests</h3>
-      <p>Approve or reject loan applications</p>
-    </div>
-
-    <div class="dash-card" (click)="navigateTo('transactions')">
-      <i class="fa fa-chart-line dash-icon"></i>
-      <h3>Transactions</h3>
-      <p>View all user transactions</p>
-    </div>
-
-    <div class="dash-card foreclosure-card" (click)="navigateTo('loans')" style="background: linear-gradient(135deg, #6f42c1 0%, #5a32a3 100%) !important; color: white !important;">
-      <i class="fa fa-file-invoice-dollar dash-icon" style="color: white !important;"></i>
-      <h3 style="color: white !important;">🏦 Foreclose Loan</h3>
-      <p style="color: rgba(255,255,255,0.9) !important;">Process loan foreclosure</p>
-    </div>
-
-    <div class="dash-card" (click)="navigateTo('cheques')" style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%) !important; color: white !important;">
-      <i class="fa fa-file-invoice dash-icon" style="color: white !important;"></i>
-      <h3 style="color: white !important;">📝 Cheque Management</h3>
-      <p style="color: rgba(255,255,255,0.9) !important;">Draw and bounce cheques</p>
-    </div>
-
-    <div class="dash-card" (click)="toggleTrackingSection()" style="background: linear-gradient(135deg, #17a2b8 0%, #138496 100%) !important; color: white !important;">
-      <i class="fa fa-search-location dash-icon" style="color: white !important;"></i>
-      <h3 style="color: white !important;">📋 Account Tracking</h3>
-      <p style="color: rgba(255,255,255,0.9) !important;">Track account creation status</p>
-    </div>
-
-  </div>
 
   <!-- Account Tracking Section -->
-  <div class="tracking-section" *ngIf="showTrackingSection">
+    <div class="tracking-section" *ngIf="activeSection === 'tracking'">
     <div class="section-header">
       <h3><i class="fa fa-search-location"></i> Account Creation Tracking</h3>
-      <button class="close-btn" (click)="toggleTrackingSection()">
+      <button class="close-btn" (click)="setActiveSection('dashboard')">
         <i class="fa fa-times"></i>
       </button>
     </div>
@@ -587,5 +1300,1100 @@
         <span class="stat-value">{{ sentTrackings }}</span>
       </div>
     </div>
+  </div>
+
+  <!-- Aadhar Verification Section -->
+    <div class="aadhar-verification-section" *ngIf="activeSection === 'aadhar-verification'">
+    <div class="section-header">
+      <h3><i class="fa fa-id-card"></i> Aadhar Verification for New Accounts</h3>
+      <button class="close-btn" (click)="setActiveSection('dashboard')">
+        <i class="fa fa-times"></i>
+      </button>
+    </div>
+
+    <div class="verification-filters">
+      <div class="filter-group">
+        <input 
+          type="text" 
+          [(ngModel)]="aadharSearchQuery" 
+          placeholder="Search by Tracking ID, Aadhar, Mobile, or Email..."
+          class="search-input"
+        >
+      </div>
+      <div class="filter-group">
+        <button class="refresh-btn" (click)="loadPendingAadharVerifications()">
+          <i class="fa fa-sync-alt"></i> Refresh
+        </button>
+      </div>
+    </div>
+
+    <div class="verification-table-container">
+      <table class="verification-table">
+        <thead>
+          <tr>
+            <th>Sr. No.</th>
+            <th>Tracking ID</th>
+            <th>Aadhar Number</th>
+            <th>Mobile Number</th>
+            <th>User Email</th>
+            <th>Account Number</th>
+            <th>Status</th>
+            <th>Created At</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let tracking of filteredAadharVerifications; let i = index">
+            <td>{{ i + 1 }}</td>
+            <td><strong>{{ tracking.trackingId }}</strong></td>
+            <td>{{ tracking.aadharNumber }}</td>
+            <td>{{ tracking.mobileNumber || 'N/A' }}</td>
+            <td>{{ tracking.user?.email || 'N/A' }}</td>
+            <td>{{ tracking.user?.accountNumber || 'Not Assigned' }}</td>
+            <td>
+              <span [class]="getStatusBadgeClass(tracking.status)">
+                {{ getStatusLabel(tracking.status) }}
+              </span>
+            </td>
+            <td>{{ tracking.createdAt | date:'short' }}</td>
+            <td>
+              <div class="action-buttons">
+                <button 
+                  class="btn-verify-aadhar" 
+                  (click)="verifyAadhar(tracking)"
+                  [disabled]="verifyingAadhar === tracking.id"
+                  *ngIf="tracking.status === 'PENDING' || tracking.status === 'ADMIN_SEEN'"
+                >
+                  <i class="fa fa-check-circle"></i>
+                  <span *ngIf="verifyingAadhar !== tracking.id">Verify Aadhar</span>
+                  <span *ngIf="verifyingAadhar === tracking.id">Verifying...</span>
+                </button>
+                <span class="verified-badge" *ngIf="tracking.status === 'ADMIN_APPROVED'">
+                  <i class="fa fa-check"></i> Verified
+                </span>
+              </div>
+            </td>
+          </tr>
+          <tr *ngIf="filteredAadharVerifications.length === 0">
+            <td colspan="9" class="no-data">
+              <i class="fa fa-info-circle"></i>
+              No pending Aadhar verifications found
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="verification-stats">
+      <div class="stat-item">
+        <span class="stat-label">Total Pending:</span>
+        <span class="stat-value">{{ pendingAadharVerifications }}</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">Total Verified:</span>
+        <span class="stat-value">{{ totalAadharVerified }}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Gold Rate Management Section -->
+    <div class="gold-rate-section" *ngIf="activeSection === 'gold-rate'">
+    <div class="section-header">
+      <h3><i class="fa fa-coins"></i> Gold Rate Management</h3>
+      <button class="close-btn" (click)="setActiveSection('dashboard')">
+        <i class="fa fa-times"></i>
+      </button>
+    </div>
+
+    <div class="gold-rate-content">
+      <!-- Current Gold Rate Display -->
+      <div class="current-rate-card">
+        <h4>Current Gold Rate</h4>
+        <div class="rate-display" *ngIf="!isLoadingGoldRate && currentGoldRate">
+          <div class="rate-value">₹{{ currentGoldRate.ratePerGram | number:'1.2-2' }}</div>
+          <div class="rate-label">per gram (22K Gold)</div>
+          <div class="rate-meta" *ngIf="currentGoldRate.lastUpdated">
+            <span>Last updated: {{ formatDateTime(currentGoldRate.lastUpdated) }}</span>
+            <span *ngIf="currentGoldRate.updatedBy">by {{ currentGoldRate.updatedBy }}</span>
+          </div>
+        </div>
+        <div class="loading" *ngIf="isLoadingGoldRate">Loading...</div>
+      </div>
+
+      <!-- Update Gold Rate Form -->
+      <div class="update-rate-card">
+        <h4>Update Gold Rate</h4>
+        <form (ngSubmit)="updateGoldRate()">
+          <div class="form-group">
+            <label for="newGoldRate">New Gold Rate (₹ per gram):</label>
+            <input 
+              type="number" 
+              id="newGoldRate"
+              [(ngModel)]="newGoldRate" 
+              name="newGoldRate"
+              step="0.01"
+              min="0"
+              placeholder="Enter new gold rate"
+              class="form-control"
+              [disabled]="isLoadingGoldRate"
+              required
+            >
+            <small class="form-text">Current rate: ₹{{ currentGoldRate?.ratePerGram | number:'1.2-2' }}</small>
+          </div>
+          <button 
+            type="submit" 
+            class="btn btn-primary"
+            [disabled]="isLoadingGoldRate || !newGoldRate || newGoldRate <= 0"
+          >
+            <i class="fa fa-save"></i> Update Gold Rate
+          </button>
+        </form>
+      </div>
+
+      <!-- Gold Rate History -->
+      <div class="rate-history-card">
+        <h4>Rate Change History</h4>
+        <div class="history-table-container">
+          <table class="history-table" *ngIf="goldRateHistory.length > 0">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Time</th>
+                <th>Previous Rate</th>
+                <th>New Rate</th>
+                <th>Change</th>
+                <th>Updated By</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let record of goldRateHistory">
+                <td>{{ formatDate(record.rateDate) }}</td>
+                <td>{{ formatDateTime(record.changedAt) | slice:12:17 }}</td>
+                <td>₹{{ record.previousRate | number:'1.2-2' }}</td>
+                <td>₹{{ record.ratePerGram | number:'1.2-2' }}</td>
+                <td [class.positive]="record.ratePerGram > record.previousRate" 
+                    [class.negative]="record.ratePerGram < record.previousRate">
+                  {{ record.ratePerGram > record.previousRate ? '+' : '' }}
+                  ₹{{ (record.ratePerGram - record.previousRate) | number:'1.2-2' }}
+                </td>
+                <td>{{ record.changedBy }}</td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="no-history" *ngIf="goldRateHistory.length === 0">
+            <p>No rate change history available.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Gold Loan Management Section -->
+  <div class="gold-loan-section" *ngIf="showGoldLoanSection">
+    <div class="section-header">
+      <h3><i class="fa fa-gem"></i> Gold Loan Management</h3>
+      <button class="close-btn" (click)="toggleGoldLoanSection()">
+        <i class="fa fa-times"></i>
+      </button>
+    </div>
+
+    <div class="gold-loan-content">
+      <!-- Filter Section -->
+      <div class="filter-section">
+        <label>Filter by Status:</label>
+        <select [(ngModel)]="goldLoanStatusFilter" (change)="onGoldLoanFilterChange()" class="filter-select">
+          <option value="All">All Loans</option>
+          <option value="Pending">Pending</option>
+          <option value="Approved">Approved</option>
+          <option value="Rejected">Rejected</option>
+          <option value="Foreclosed">Foreclosed</option>
+          <option value="Paid">Paid</option>
+        </select>
+        <button class="refresh-btn" (click)="loadGoldLoans()" [disabled]="isLoadingGoldLoans">
+          <i class="fa fa-refresh"></i> Refresh
+        </button>
+      </div>
+
+      <!-- Loading State -->
+      <div class="loading" *ngIf="isLoadingGoldLoans">
+        <p>Loading gold loans...</p>
+      </div>
+
+      <!-- Gold Loans List -->
+      <div class="gold-loans-list" *ngIf="!isLoadingGoldLoans">
+        <div class="gold-loan-card" *ngFor="let loan of filteredGoldLoans">
+          <div class="loan-header-info">
+            <div>
+              <h4>{{ loan.userName || 'N/A' }}</h4>
+              <p class="loan-account">Loan Account: {{ loan.loanAccountNumber || 'N/A' }}</p>
+              <p class="user-account">User Account: {{ loan.accountNumber }}</p>
+            </div>
+            <span class="status-badge" [ngClass]="getGoldLoanStatusClass(loan.status)">
+              {{ loan.status }}
+            </span>
+          </div>
+
+          <div class="loan-details-grid">
+            <div class="detail-item">
+              <span class="label">Gold Weight:</span>
+              <span class="value">{{ loan.goldGrams }} grams</span>
+            </div>
+            <div class="detail-item">
+              <span class="label">Gold Rate:</span>
+              <span class="value">₹{{ loan.goldRatePerGram | number:'1.2-2' }}/gram</span>
+            </div>
+            <div class="detail-item">
+              <span class="label">Gold Value:</span>
+              <span class="value">₹{{ loan.goldValue | number:'1.2-2' }}</span>
+            </div>
+            <div class="detail-item highlight">
+              <span class="label">Loan Amount:</span>
+              <span class="value">₹{{ loan.loanAmount | number:'1.2-2' }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="label">Interest Rate:</span>
+              <span class="value">{{ loan.interestRate }}% p.a.</span>
+            </div>
+            <div class="detail-item">
+              <span class="label">Tenure:</span>
+              <span class="value">{{ loan.tenure }} months</span>
+            </div>
+            <div class="detail-item">
+              <span class="label">Applied Date:</span>
+              <span class="value">{{ formatDate(loan.applicationDate) }}</span>
+            </div>
+            <div class="detail-item" *ngIf="loan.approvalDate">
+              <span class="label">Approved Date:</span>
+              <span class="value">{{ formatDate(loan.approvalDate) }}</span>
+            </div>
+          </div>
+
+          <!-- Action Buttons -->
+          <div class="loan-actions">
+            <button 
+              *ngIf="loan.status === 'Pending'" 
+              class="btn-approve" 
+              (click)="viewGoldLoanDetails(loan)"
+              [disabled]="approvingLoan"
+            >
+              <i class="fa fa-check"></i> Approve
+            </button>
+            <button 
+              *ngIf="loan.status === 'Pending'" 
+              class="btn-reject" 
+              (click)="rejectGoldLoan(loan)"
+              [disabled]="approvingLoan"
+            >
+              <i class="fa fa-times"></i> Reject
+            </button>
+            <button 
+              *ngIf="loan.status === 'Approved'" 
+              class="btn-foreclosure" 
+              (click)="viewForeclosure(loan)"
+            >
+              <i class="fa fa-money-bill"></i> Foreclosure
+            </button>
+            <button 
+              *ngIf="loan.status === 'Approved'" 
+              class="btn-emi" 
+              (click)="viewEmiDetails(loan)"
+            >
+              <i class="fa fa-calendar"></i> EMI Details
+            </button>
+          </div>
+        </div>
+
+        <div class="no-loans" *ngIf="filteredGoldLoans.length === 0">
+          <p>No gold loans found with status: {{ goldLoanStatusFilter }}</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Gold Loan Approval Modal -->
+  <div class="modal-overlay" *ngIf="showGoldLoanModal" (click)="closeGoldLoanModal()">
+    <div class="modal-content" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>Approve Gold Loan</h3>
+        <button class="close-btn" (click)="closeGoldLoanModal()">×</button>
+      </div>
+      <div class="modal-body" *ngIf="selectedGoldLoan">
+        <div class="form-group">
+          <label>Gold Items Description *</label>
+          <input type="text" [(ngModel)]="goldDetailsForm.goldItems" placeholder="e.g., 2 bangles, 1 chain" required>
+        </div>
+        <div class="form-group">
+          <label>Gold Description</label>
+          <textarea [(ngModel)]="goldDetailsForm.goldDescription" rows="3" placeholder="Detailed description"></textarea>
+        </div>
+        <div class="form-group">
+          <label>Gold Purity *</label>
+          <select [(ngModel)]="goldDetailsForm.goldPurity">
+            <option value="22K">22 Karat (22K)</option>
+            <option value="18K">18 Karat (18K)</option>
+            <option value="24K">24 Karat (24K)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Verified Weight (grams) *</label>
+          <input type="number" [(ngModel)]="goldDetailsForm.verifiedGoldGrams" min="0" step="0.01" required>
+        </div>
+        <div class="form-group">
+          <label>Storage Location</label>
+          <input type="text" [(ngModel)]="goldDetailsForm.storageLocation" placeholder="e.g., Vault A-123">
+        </div>
+        <div class="form-group">
+          <label>Verification Notes</label>
+          <textarea [(ngModel)]="goldDetailsForm.verificationNotes" rows="3" placeholder="Verification notes"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-cancel" (click)="closeGoldLoanModal()">Cancel</button>
+        <button class="btn-submit" (click)="approveGoldLoan()" [disabled]="approvingLoan">
+          {{ approvingLoan ? 'Processing...' : 'Approve Loan' }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Foreclosure Modal -->
+  <div class="modal-overlay" *ngIf="showForeclosureModal" (click)="closeForeclosureModal()">
+    <div class="modal-content" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>Loan Foreclosure Details</h3>
+        <button class="close-btn" (click)="closeForeclosureModal()">×</button>
+      </div>
+      <div class="modal-body" *ngIf="foreclosureDetails">
+        <div class="foreclosure-details">
+          <div class="detail-row">
+            <span class="label">Months Elapsed:</span>
+            <span class="value">{{ foreclosureDetails.monthsElapsed }}</span>
+          </div>
+          <div class="detail-row">
+            <span class="label">Principal Paid:</span>
+            <span class="value">₹{{ foreclosureDetails.principalPaid | number:'1.2-2' }}</span>
+          </div>
+          <div class="detail-row">
+            <span class="label">Interest Paid:</span>
+            <span class="value">₹{{ foreclosureDetails.interestPaid | number:'1.2-2' }}</span>
+          </div>
+          <div class="detail-row">
+            <span class="label">Remaining Principal:</span>
+            <span class="value">₹{{ foreclosureDetails.remainingPrincipal | number:'1.2-2' }}</span>
+          </div>
+          <div class="detail-row">
+            <span class="label">Remaining Interest:</span>
+            <span class="value">₹{{ foreclosureDetails.remainingInterest | number:'1.2-2' }}</span>
+          </div>
+          <div class="detail-row">
+            <span class="label">Foreclosure Charges (4%):</span>
+            <span class="value">₹{{ foreclosureDetails.foreclosureCharges | number:'1.2-2' }}</span>
+          </div>
+          <div class="detail-row">
+            <span class="label">GST (18%):</span>
+            <span class="value">₹{{ foreclosureDetails.gst | number:'1.2-2' }}</span>
+          </div>
+          <div class="detail-row highlight">
+            <span class="label">Total Foreclosure Amount:</span>
+            <span class="value">₹{{ foreclosureDetails.totalForeclosureAmount | number:'1.2-2' }}</span>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-cancel" (click)="closeForeclosureModal()">Close</button>
+        <button class="btn-submit" (click)="processForeclosure()" [disabled]="processingForeclosure">
+          {{ processingForeclosure ? 'Processing...' : 'Process Foreclosure' }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- EMI Details Modal -->
+  <div class="modal-overlay" *ngIf="showEmiDetailsModal" (click)="closeEmiDetailsModal()">
+    <div class="modal-content large-modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>EMI Schedule & Details</h3>
+        <button class="close-btn" (click)="closeEmiDetailsModal()">×</button>
+      </div>
+      <div class="modal-body" *ngIf="selectedGoldLoan">
+        <!-- Loan Summary -->
+        <div class="emi-summary" *ngIf="selectedGoldLoan">
+          <h4>Loan Summary</h4>
+          <div class="summary-grid">
+            <div class="summary-item">
+              <span class="label">Loan Amount:</span>
+              <span class="value">₹{{ selectedGoldLoan.loanAmount | number:'1.2-2' }}</span>
+            </div>
+            <div class="summary-item">
+              <span class="label">Interest Rate:</span>
+              <span class="value">{{ selectedGoldLoan.interestRate }}% p.a.</span>
+            </div>
+            <div class="summary-item">
+              <span class="label">Tenure:</span>
+              <span class="value">{{ selectedGoldLoan.tenure }} months</span>
+            </div>
+            <div class="summary-item" *ngIf="emiSchedule.length > 0">
+              <span class="label">Monthly EMI:</span>
+              <span class="value highlight">₹{{ emiSchedule[0]?.totalAmount | number:'1.2-2' }}</span>
+            </div>
+            <div class="summary-item" *ngIf="selectedGoldLoan.emiStartDate">
+              <span class="label">EMI Start Date:</span>
+              <span class="value">{{ formatDate(selectedGoldLoan.emiStartDate) }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- EMI Schedule Table -->
+        <div class="emi-schedule-table" *ngIf="emiSchedule.length > 0">
+          <h4>EMI Schedule ({{ emiSchedule.length }} installments)</h4>
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>EMI #</th>
+                  <th>Due Date & Time</th>
+                  <th>Principal</th>
+                  <th>Interest</th>
+                  <th>Total EMI</th>
+                  <th>Remaining Principal</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let emi of emiSchedule" [ngClass]="{'paid': emi.status === 'Paid', 'pending': emi.status === 'Pending', 'overdue': emi.status === 'Overdue', 'upcoming': isUpcomingEmi(emi.dueDate)}">
+                  <td><strong>{{ emi.emiNumber }}</strong></td>
+                  <td>
+                    <div class="date-time">
+                      <div class="date">{{ formatDate(emi.dueDate) }}</div>
+                      <div class="time-info">{{ getTimeUntilDue(emi.dueDate) }}</div>
+                    </div>
+                  </td>
+                  <td>₹{{ emi.principalAmount | number:'1.2-2' }}</td>
+                  <td>₹{{ emi.interestAmount | number:'1.2-2' }}</td>
+                  <td><strong>₹{{ emi.totalAmount | number:'1.2-2' }}</strong></td>
+                  <td>₹{{ emi.remainingPrincipal | number:'1.2-2' }}</td>
+                  <td>
+                    <span class="status-badge" [ngClass]="'status-' + emi.status.toLowerCase()">
+                      {{ emi.status }}
+                    </span>
+                    <span *ngIf="emi.paymentDate" class="payment-date">
+                      Paid: {{ formatDateTime(emi.paymentDate) }}
+                    </span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="no-emi" *ngIf="emiSchedule.length === 0">
+          <p>No EMI schedule available for this loan. EMI schedule will be generated after loan approval.</p>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-cancel" (click)="closeEmiDetailsModal()">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- User Login History Section -->
+    <div class="login-history-section" *ngIf="activeSection === 'login-history'">
+    <div class="section-header">
+      <h3><i class="fa fa-history"></i> User Login History</h3>
+      <button class="close-btn" (click)="setActiveSection('dashboard')">
+        <i class="fa fa-times"></i>
+      </button>
+    </div>
+
+    <div class="login-history-content">
+      <!-- Filters and Search -->
+      <div class="filter-section">
+        <div class="filter-group">
+          <label>Filter by Status:</label>
+          <select [(ngModel)]="loginHistoryFilter" class="filter-select">
+            <option value="ALL">All Logins</option>
+            <option value="SUCCESS">Successful</option>
+            <option value="FAILED">Failed</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <input 
+            type="text" 
+            [(ngModel)]="loginHistorySearchQuery" 
+            placeholder="Search by name, email, account, IP, location..."
+            class="search-input"
+          >
+        </div>
+        <div class="filter-group">
+          <button class="refresh-btn" (click)="loadLoginHistory()" [disabled]="isLoadingLoginHistory">
+            <i class="fa fa-sync-alt"></i> Refresh
+          </button>
+        </div>
+      </div>
+
+      <!-- Loading -->
+      <div *ngIf="isLoadingLoginHistory" class="loading">
+        Loading login history...
+      </div>
+
+      <!-- Login History Table -->
+      <div *ngIf="!isLoadingLoginHistory" class="login-history-table-container">
+        <table class="login-history-table">
+          <thead>
+            <tr>
+              <th>User Name</th>
+              <th>Email</th>
+              <th>Account Number</th>
+              <th>Login Date</th>
+              <th>Login Time</th>
+              <th>Location</th>
+              <th>IP Address</th>
+              <th>Device Info</th>
+              <th>Login Method</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let login of getFilteredLoginHistory()">
+              <td>{{ login.userName }}</td>
+              <td>{{ login.userEmail }}</td>
+              <td>{{ login.accountNumber }}</td>
+              <td>{{ formatLoginDateTime(login.loginDate) | slice:0:12 }}</td>
+              <td>{{ formatLoginDateTime(login.loginTime) | slice:12:24 }}</td>
+              <td>{{ login.loginLocation || 'Unknown' }}</td>
+              <td>{{ login.ipAddress || 'Unknown' }}</td>
+              <td class="device-info" title="{{ login.deviceInfo }}">{{ (login.deviceInfo || 'Unknown') | slice:0:30 }}{{ (login.deviceInfo && login.deviceInfo.length > 30) ? '...' : '' }}</td>
+              <td>
+                <span class="method-badge" [ngClass]="'method-' + (login.loginMethod || 'PASSWORD').toLowerCase()">
+                  {{ login.loginMethod || 'PASSWORD' }}
+                </span>
+              </td>
+              <td>
+                <span class="status-badge" [ngClass]="'status-' + (login.status || 'SUCCESS').toLowerCase()">
+                  {{ login.status || 'SUCCESS' }}
+                </span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <div *ngIf="getFilteredLoginHistory().length === 0" class="no-history">
+          <p>No login history found.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+    <!-- User Update History Section -->
+    <div class="update-history-section" *ngIf="activeSection === 'update-history'">
+    <div class="section-header">
+      <h3><i class="fa fa-edit"></i> User Update History</h3>
+      <button class="close-btn" (click)="setActiveSection('dashboard')">
+        <i class="fa fa-times"></i>
+      </button>
+    </div>
+
+    <div class="update-history-content">
+      <!-- Filters and Search -->
+      <div class="filter-section">
+        <div class="filter-group">
+          <label>Filter by Date:</label>
+          <select [(ngModel)]="updateHistoryFilter" class="filter-select">
+            <option value="ALL">All Time</option>
+            <option value="TODAY">Today</option>
+            <option value="WEEK">Last 7 Days</option>
+            <option value="MONTH">Last 30 Days</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <input 
+            type="text" 
+            [(ngModel)]="updateHistorySearchQuery" 
+            placeholder="Search by user, admin, account, or field..."
+            class="search-input"
+          >
+        </div>
+        <div class="filter-group">
+          <button class="refresh-btn" (click)="loadUserUpdateHistory()">
+            <i class="fa fa-sync-alt"></i> Refresh
+          </button>
+        </div>
+      </div>
+
+      <!-- Update History List -->
+      <div class="update-history-list" *ngIf="getFilteredUpdateHistory().length > 0">
+        <div class="update-history-item" *ngFor="let history of getFilteredUpdateHistory()">
+          <div class="history-header">
+            <div class="history-main-info">
+              <h4>
+                <i class="fa fa-user"></i> {{ history.userName || 'N/A' }}
+                <span class="account-badge">{{ history.accountNumber }}</span>
+              </h4>
+              <p class="history-meta">
+                <i class="fa fa-user-shield"></i> Updated by: <strong>{{ history.adminName }}</strong>
+                <span class="separator">|</span>
+                <i class="fa fa-clock"></i> {{ formatLoginDateTime(history.timestamp) }}
+                <span class="separator">|</span>
+                <i class="fa fa-edit"></i> {{ history.changeCount }} change(s)
+              </p>
+            </div>
+          </div>
+          
+          <div class="history-changes">
+            <div class="change-item" *ngFor="let change of history.changes">
+              <div class="change-field">
+                <span class="field-name">{{ change.field }}:</span>
+              </div>
+              <div class="change-values">
+                <span class="old-value">
+                  <i class="fa fa-arrow-left"></i> {{ change.oldValue }}
+                </span>
+                <span class="arrow">→</span>
+                <span class="new-value">
+                  {{ change.newValue }} <i class="fa fa-arrow-right"></i>
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="no-history" *ngIf="getFilteredUpdateHistory().length === 0">
+        <i class="fa fa-info-circle"></i>
+        <p>No update history found.</p>
+      </div>
+    </div>
+  </div>
+
+    <!-- Daily Activity Report Section -->
+    <div class="daily-activity-section" *ngIf="activeSection === 'daily-report'">
+    <div class="section-header">
+      <h3><i class="fa fa-calendar-day"></i> Daily Activity Report</h3>
+      <button class="close-btn" (click)="setActiveSection('dashboard')">
+        <i class="fa fa-times"></i>
+      </button>
+    </div>
+
+    <div class="activity-report-content">
+      <!-- Date Selection and Filters -->
+      <div class="report-controls">
+        <div class="control-group">
+          <label>Select Date:</label>
+          <input 
+            type="date" 
+            [(ngModel)]="selectedDate" 
+            (change)="loadDailyActivities()"
+            class="date-input"
+          >
+        </div>
+        <div class="control-group">
+          <label>Filter by Category:</label>
+          <select [(ngModel)]="selectedActivityCategory" class="filter-select">
+            <option *ngFor="let cat of activityCategories" [value]="cat">
+              {{ cat === 'ALL' ? 'All Categories' : cat.replace('_', ' ') }}
+            </option>
+          </select>
+        </div>
+        <div class="control-group">
+          <button class="refresh-btn" (click)="loadDailyActivities()">
+            <i class="fa fa-sync-alt"></i> Refresh
+          </button>
+        </div>
+        <div class="control-group">
+          <button class="print-btn" (click)="printDailyActivityReport()">
+            <i class="fa fa-print"></i> Print Report
+          </button>
+        </div>
+      </div>
+
+      <!-- Activity Statistics -->
+      <div class="activity-stats" *ngIf="getFilteredDailyActivities().length > 0">
+        <div class="stat-item">
+          <span class="stat-label">Total Activities:</span>
+          <span class="stat-value">{{ getActivityStats().total }}</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">Updates:</span>
+          <span class="stat-value">{{ getActivityStats().updates }}</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">Deposits:</span>
+          <span class="stat-value">{{ getActivityStats().deposits }}</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">Withdrawals:</span>
+          <span class="stat-value">{{ getActivityStats().withdrawals }}</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">Loans:</span>
+          <span class="stat-value">{{ getActivityStats().loans }}</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">Gold Loans:</span>
+          <span class="stat-value">{{ getActivityStats().goldLoans }}</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">Cheques:</span>
+          <span class="stat-value">{{ getActivityStats().cheques }}</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">Subsidy Claims:</span>
+          <span class="stat-value">{{ getActivityStats().subsidyClaims }}</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">Accounts Opened:</span>
+          <span class="stat-value">{{ getActivityStats().accounts }}</span>
+        </div>
+      </div>
+
+      <!-- Activities List -->
+      <div class="activities-list" *ngIf="getFilteredDailyActivities().length > 0">
+        <div class="activity-item" *ngFor="let activity of getFilteredDailyActivities()">
+          <div class="activity-time">
+            <i class="fa fa-clock"></i>
+            {{ formatLoginDateTime(activity.timestamp) }}
+          </div>
+          <div class="activity-content">
+            <div class="activity-header">
+              <span class="activity-category" [ngClass]="'category-' + activity.type">
+                {{ activity.category }}
+              </span>
+              <span class="activity-admin">
+                <i class="fa fa-user-shield"></i> {{ activity.adminName }}
+              </span>
+            </div>
+            <div class="activity-description">
+              {{ activity.description }}
+            </div>
+            <div class="activity-details" *ngIf="activity.details">
+              <div class="detail-tag" *ngIf="activity.details.accountNumber">
+                Account: {{ activity.details.accountNumber }}
+              </div>
+              <div class="detail-tag" *ngIf="activity.details.amount">
+                Amount: ₹{{ activity.details.amount | number:'1.2-2' }}
+              </div>
+              <div class="detail-tag" *ngIf="activity.details.userName">
+                User: {{ activity.details.userName }}
+              </div>
+              <div class="detail-tag" *ngIf="activity.details.loanId || activity.details.loanAccountNumber">
+                Loan: {{ activity.details.loanId || activity.details.loanAccountNumber }}
+              </div>
+              <div class="detail-tag" *ngIf="activity.details.chequeNumber">
+                Cheque: {{ activity.details.chequeNumber }}
+              </div>
+              <div class="detail-tag" *ngIf="activity.details.status">
+                Status: {{ activity.details.status }}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="no-activities" *ngIf="getFilteredDailyActivities().length === 0">
+        <i class="fa fa-info-circle"></i>
+        <p>No activities found for {{ selectedDate | date:'longDate' }}.</p>
+        <p class="hint">Select a different date or check back later.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loan Prediction History Section -->
+  <div class="prediction-history-section" *ngIf="activeSection === 'prediction-history'">
+    <div class="section-header">
+      <h3><i class="fa fa-brain"></i> Loan Prediction History</h3>
+      <button class="close-btn" (click)="setActiveSection('dashboard')">
+        <i class="fa fa-times"></i>
+      </button>
+    </div>
+
+    <div class="prediction-content">
+      <!-- Statistics -->
+      <div class="prediction-stats" *ngIf="loanPredictions.length > 0">
+        <div class="stat-card">
+          <div class="stat-value">{{ getPredictionStats().all }}</div>
+          <div class="stat-label">Total Predictions</div>
+        </div>
+        <div class="stat-card approved">
+          <div class="stat-value">{{ getPredictionStats().approved }}</div>
+          <div class="stat-label">Approved</div>
+        </div>
+        <div class="stat-card rejected">
+          <div class="stat-value">{{ getPredictionStats().rejected }}</div>
+          <div class="stat-label">Rejected</div>
+        </div>
+        <div class="stat-card pending">
+          <div class="stat-value">{{ getPredictionStats().pending }}</div>
+          <div class="stat-label">Pending Review</div>
+        </div>
+      </div>
+
+      <!-- Filters -->
+      <div class="prediction-filters">
+        <div class="filter-group">
+          <label>Search:</label>
+          <input 
+            type="text" 
+            [(ngModel)]="predictionSearchQuery" 
+            placeholder="Search by name, account, PAN, loan type..."
+            class="filter-input"
+          />
+        </div>
+        <div class="filter-group">
+          <label>Result:</label>
+          <select [(ngModel)]="predictionFilter" class="filter-select">
+            <option value="ALL">All Results</option>
+            <option value="Approved">Approved</option>
+            <option value="Rejected">Rejected</option>
+            <option value="Pending Review">Pending Review</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label>Loan Type:</label>
+          <select [(ngModel)]="predictionLoanTypeFilter" class="filter-select">
+            <option value="ALL">All Types</option>
+            <option value="Personal Loan">Personal Loan</option>
+            <option value="Education Loan">Education Loan</option>
+            <option value="Home Loan">Home Loan</option>
+            <option value="Car Loan">Car Loan</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <button class="refresh-btn" (click)="loadLoanPredictions()" [disabled]="isLoadingPredictions">
+            <i class="fa fa-sync-alt"></i> Refresh
+          </button>
+        </div>
+      </div>
+
+      <!-- Loading State -->
+      <div *ngIf="isLoadingPredictions" class="loading-state">
+        <p>Loading predictions...</p>
+      </div>
+
+      <!-- Predictions Table -->
+      <div *ngIf="!isLoadingPredictions" class="predictions-table-container">
+        <table class="predictions-table" *ngIf="getFilteredPredictions().length > 0">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>User</th>
+              <th>Account</th>
+              <th>PAN</th>
+              <th>Loan Type</th>
+              <th>Amount</th>
+              <th>Tenure</th>
+              <th>CIBIL Score</th>
+              <th>Prediction</th>
+              <th>Probability</th>
+              <th>Interest Rate</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let prediction of getFilteredPredictions()">
+              <td>{{ prediction.predictionDate | date:'short' }}</td>
+              <td>{{ prediction.userName }}</td>
+              <td>{{ prediction.accountNumber }}</td>
+              <td>{{ prediction.pan }}</td>
+              <td>{{ prediction.loanType }}</td>
+              <td>₹{{ prediction.requestedAmount | number:'1.0-0' }}</td>
+              <td>{{ prediction.tenure }} months</td>
+              <td>
+                <span [ngClass]="{
+                  'score-excellent': prediction.cibilScore >= 750,
+                  'score-good': prediction.cibilScore >= 700 && prediction.cibilScore < 750,
+                  'score-fair': prediction.cibilScore >= 650 && prediction.cibilScore < 700,
+                  'score-average': prediction.cibilScore >= 600 && prediction.cibilScore < 650,
+                  'score-poor': prediction.cibilScore < 600
+                }">
+                  {{ prediction.cibilScore }}
+                </span>
+              </td>
+              <td>
+                <span [ngClass]="{
+                  'pred-approved': prediction.predictionResult === 'Approved',
+                  'pred-rejected': prediction.predictionResult === 'Rejected',
+                  'pred-pending': prediction.predictionResult === 'Pending Review'
+                }">
+                  {{ prediction.predictionResult }}
+                </span>
+              </td>
+              <td>{{ Math.round((prediction.approvalProbability || 0) * 100) }}%</td>
+              <td>{{ prediction.interestRate }}%</td>
+            </tr>
+          </tbody>
+        </table>
+        <div *ngIf="getFilteredPredictions().length === 0" class="no-data">
+          <p>No predictions found</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Investments Management Section -->
+  <div class="investments-section section-content" *ngIf="activeSection === 'investments'">
+    <div class="section-header">
+      <h2><i class="fa fa-chart-line"></i> Investments Management</h2>
+      <button class="refresh-btn" (click)="loadInvestments()" [disabled]="isLoadingInvestments">
+        <i class="fa fa-sync-alt"></i> Refresh
+      </button>
+    </div>
+
+    <div class="filters-bar">
+      <select [(ngModel)]="investmentStatusFilter" (change)="loadInvestments()">
+        <option value="PENDING">Pending</option>
+        <option value="APPROVED">Approved</option>
+        <option value="REJECTED">Rejected</option>
+        <option value="ACTIVE">Active</option>
+        <option value="ALL">All</option>
+      </select>
+      <input type="text" [(ngModel)]="investmentSearchQuery" placeholder="Search by name, account..." />
+    </div>
+
+    <div *ngIf="isLoadingInvestments" class="loading-state">Loading investments...</div>
+    <div *ngIf="!isLoadingInvestments && investments.length === 0" class="no-data">No investments found</div>
+
+    <table class="data-table" *ngIf="!isLoadingInvestments && investments.length > 0">
+      <thead>
+        <tr>
+          <th>User</th>
+          <th>Account</th>
+          <th>Fund Name</th>
+          <th>Category</th>
+          <th>Amount</th>
+          <th>Current Value</th>
+          <th>Status</th>
+          <th>Date</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let inv of investments">
+          <td>{{ inv.userName }}</td>
+          <td>{{ inv.accountNumber }}</td>
+          <td>{{ inv.fundName }}</td>
+          <td>{{ inv.fundCategory }}</td>
+          <td>₹{{ inv.investmentAmount | number:'1.2-2' }}</td>
+          <td>₹{{ inv.currentValue | number:'1.2-2' }}</td>
+          <td><span class="status-badge" [ngClass]="inv.status.toLowerCase()">{{ inv.status }}</span></td>
+          <td>{{ inv.investmentDate | date:'dd/MM/yyyy' }}</td>
+          <td>
+            <button *ngIf="inv.status === 'PENDING'" (click)="approveInvestment(inv)" class="btn-approve">Approve</button>
+            <button *ngIf="inv.status === 'PENDING'" (click)="rejectInvestment(inv)" class="btn-reject">Reject</button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Fixed Deposits Management Section -->
+  <div class="fixed-deposits-section section-content" *ngIf="activeSection === 'fixed-deposits'">
+    <div class="section-header">
+      <h2><i class="fa fa-piggy-bank"></i> Fixed Deposits Management</h2>
+      <button class="refresh-btn" (click)="loadFixedDeposits()" [disabled]="isLoadingFDs">
+        <i class="fa fa-sync-alt"></i> Refresh
+      </button>
+    </div>
+
+    <div class="filters-bar">
+      <select [(ngModel)]="fdStatusFilter" (change)="loadFixedDeposits()">
+        <option value="PENDING">Pending</option>
+        <option value="ACTIVE">Active</option>
+        <option value="MATURED">Matured</option>
+        <option value="REJECTED">Rejected</option>
+        <option value="ALL">All</option>
+      </select>
+      <input type="text" [(ngModel)]="fdSearchQuery" placeholder="Search by FD account, user..." />
+    </div>
+
+    <div *ngIf="isLoadingFDs" class="loading-state">Loading fixed deposits...</div>
+    <div *ngIf="!isLoadingFDs && fixedDeposits.length === 0" class="no-data">No fixed deposits found</div>
+
+    <table class="data-table" *ngIf="!isLoadingFDs && fixedDeposits.length > 0">
+      <thead>
+        <tr>
+          <th>User</th>
+          <th>Account</th>
+          <th>FD Account</th>
+          <th>Principal</th>
+          <th>Interest Rate</th>
+          <th>Tenure</th>
+          <th>Maturity Amount</th>
+          <th>Maturity Date</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let fd of fixedDeposits">
+          <td>{{ fd.userName }}</td>
+          <td>{{ fd.accountNumber }}</td>
+          <td>{{ fd.fdAccountNumber }}</td>
+          <td>₹{{ fd.principalAmount | number:'1.2-2' }}</td>
+          <td>{{ fd.interestRate }}%</td>
+          <td>{{ fd.tenure }} months</td>
+          <td>₹{{ fd.maturityAmount | number:'1.2-2' }}</td>
+          <td>{{ fd.maturityDate | date:'dd/MM/yyyy' }}</td>
+          <td><span class="status-badge" [ngClass]="fd.status.toLowerCase()">{{ fd.status }}</span></td>
+          <td>
+            <button *ngIf="fd.status === 'PENDING'" (click)="approveFixedDeposit(fd)" class="btn-approve">Approve</button>
+            <button *ngIf="fd.status === 'PENDING'" (click)="rejectFixedDeposit(fd)" class="btn-reject">Reject</button>
+            <button *ngIf="fd.status === 'ACTIVE' && isFDMatured(fd)" 
+                    (click)="processFDMaturity(fd)" class="btn-process">Process Maturity</button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- EMI Management Section -->
+  <div class="emi-management-section section-content" *ngIf="activeSection === 'emi-management'">
+    <div class="section-header">
+      <h2><i class="fa fa-calendar-check"></i> EMI Management</h2>
+      <button class="refresh-btn" (click)="loadAllEMIs()" [disabled]="isLoadingAllEMIs">
+        <i class="fa fa-sync-alt"></i> Refresh
+      </button>
+    </div>
+
+    <div class="filters-bar">
+      <select [(ngModel)]="emiStatusFilter" (change)="loadAllEMIs()">
+        <option value="ALL">All</option>
+        <option value="Pending">Pending</option>
+        <option value="Paid">Paid</option>
+        <option value="Overdue">Overdue</option>
+      </select>
+      <input type="text" [(ngModel)]="emiSearchQuery" placeholder="Search by account, loan..." />
+    </div>
+
+    <div *ngIf="isLoadingAllEMIs" class="loading-state">Loading EMIs...</div>
+    <div *ngIf="!isLoadingAllEMIs && allEmis.length === 0" class="no-data">No EMIs found</div>
+
+    <table class="data-table" *ngIf="!isLoadingAllEMIs && allEmis.length > 0">
+      <thead>
+        <tr>
+          <th>User Account</th>
+          <th>Loan Account</th>
+          <th>EMI #</th>
+          <th>Due Date</th>
+          <th>Amount</th>
+          <th>Principal</th>
+          <th>Interest</th>
+          <th>Status</th>
+          <th>Paid Date</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let emi of allEmis">
+          <td>{{ emi.accountNumber }}</td>
+          <td>{{ emi.loanAccountNumber }}</td>
+          <td>{{ emi.emiNumber }}</td>
+          <td [ngClass]="{'overdue': isEMIOverdue(emi)}">
+            {{ emi.dueDate | date:'dd/MM/yyyy' }}
+          </td>
+          <td>₹{{ emi.totalAmount | number:'1.2-2' }}</td>
+          <td>₹{{ emi.principalAmount | number:'1.2-2' }}</td>
+          <td>₹{{ emi.interestAmount | number:'1.2-2' }}</td>
+          <td><span class="status-badge" [ngClass]="emi.status.toLowerCase()">{{ emi.status }}</span></td>
+          <td>{{ emi.paymentDate ? (emi.paymentDate | date:'dd/MM/yyyy') : '-' }}</td>
+        </tr>
+      </tbody>
+    </table>
   </div>
 </div>

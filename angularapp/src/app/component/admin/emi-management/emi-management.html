@@ -1,0 +1,64 @@
+<div class="emi-management-page">
+  <div class="page-header">
+    <button class="back-btn" (click)="goBack()">
+      <i class="fa fa-arrow-left"></i> Back
+    </button>
+    <h1><i class="fa fa-calendar-check"></i> EMI Management</h1>
+    <button class="refresh-btn" (click)="loadAllEMIs()" [disabled]="isLoadingAllEMIs">
+      <i class="fa fa-sync-alt" [class.fa-spin]="isLoadingAllEMIs"></i> Refresh
+    </button>
+  </div>
+
+  <div class="filters-bar">
+    <select [(ngModel)]="emiStatusFilter" (change)="loadAllEMIs()">
+      <option value="ALL">All</option>
+      <option value="Pending">Pending</option>
+      <option value="Paid">Paid</option>
+      <option value="Overdue">Overdue</option>
+    </select>
+    <input type="text" [(ngModel)]="emiSearchQuery" placeholder="Search by account, loan..." />
+  </div>
+
+  <div *ngIf="isLoadingAllEMIs" class="loading-state">
+    <p>Loading EMIs...</p>
+  </div>
+
+  <div *ngIf="!isLoadingAllEMIs && getFilteredEMIs().length === 0" class="no-data">
+    <p>No EMIs found</p>
+  </div>
+
+  <table class="data-table" *ngIf="!isLoadingAllEMIs && getFilteredEMIs().length > 0">
+    <thead>
+      <tr>
+        <th>User Account</th>
+        <th>Loan Account</th>
+        <th>EMI #</th>
+        <th>Due Date</th>
+        <th>Amount</th>
+        <th>Principal</th>
+        <th>Interest</th>
+        <th>Remaining Principal</th>
+        <th>Status</th>
+        <th>Paid Date</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let emi of getFilteredEMIs()">
+        <td>{{ emi.accountNumber }}</td>
+        <td>{{ emi.loanAccountNumber }}</td>
+        <td>{{ emi.emiNumber }}</td>
+        <td [ngClass]="{'overdue': isEMIOverdue(emi)}">
+          {{ emi.dueDate | date:'dd/MM/yyyy' }}
+        </td>
+        <td>₹{{ emi.totalAmount | number:'1.2-2' }}</td>
+        <td>₹{{ emi.principalAmount | number:'1.2-2' }}</td>
+        <td>₹{{ emi.interestAmount | number:'1.2-2' }}</td>
+        <td>₹{{ emi.remainingPrincipal | number:'1.2-2' }}</td>
+        <td><span class="status-badge" [ngClass]="emi.status.toLowerCase()">{{ emi.status }}</span></td>
+        <td>{{ emi.paymentDate ? (emi.paymentDate | date:'dd/MM/yyyy') : '-' }}</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+

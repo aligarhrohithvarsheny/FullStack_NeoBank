@@ -1,0 +1,17 @@
+{
+  "name": "full-stack-neobank-root",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Root package for NeoBank project (Vercel serverless functions & shared tooling).",
+  "scripts": {
+    "dev": "echo \"Run Angular app from angularapp/ or Spring app from springapp/\""
+  },
+  "dependencies": {
+    "nodemailer": "^6.9.13",
+    "pdfkit": "^0.13.0"
+  }
+}
+
+
+
+

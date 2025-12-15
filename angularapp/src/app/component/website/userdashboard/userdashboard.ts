@@ -1,9 +1,12 @@
 import { Component, OnInit, OnDestroy, Inject, PLATFORM_ID } from '@angular/core';
 import { Router } from '@angular/router';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { AlertService } from '../../../service/alert.service';
 import { environment } from '../../../../environment/environment';
+import { Chat } from '../chat/chat';
+import { AIAssistant } from '../ai-assistant/ai-assistant';
 // import { UserService } from '../../service/user';
 // import { AccountService } from '../../service/account';
 // import { TransactionService } from '../../service/transaction';
@@ -11,7 +14,7 @@ import { environment } from '../../../../environment/environment';
 @Component({
   selector: 'app-userdashboard',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, FormsModule, Chat, AIAssistant],
   templateUrl: './userdashboard.html',
   styleUrls: ['./userdashboard.css']
 })
@@ -33,6 +36,62 @@ export class Userdashboard implements OnInit, OnDestroy {
   isGeneratingQr: boolean = false;
   html5QrCode: any = null;
   isScanning: boolean = false;
+  
+  // ML Loan Prediction properties
+  mlPredictionForm = {
+    pan: '',
+    loanType: '',
+    amount: 0,
+    tenure: 0
+  };
+  isPredicting: boolean = false;
+  predictionResult: any = null;
+
+  // Investments properties
+  investments: any[] = [];
+  isLoadingInvestments: boolean = false;
+  showInvestmentForm: boolean = false;
+  investmentForm = {
+    investmentType: 'Mutual Fund',
+    fundName: '',
+    fundCategory: '',
+    fundScheme: '',
+    investmentAmount: 0,
+    isSIP: false,
+    sipAmount: 0,
+    sipDuration: 0
+  };
+  isSubmittingInvestment: boolean = false;
+  
+  // Fixed Deposits properties
+  fixedDeposits: any[] = [];
+  isLoadingFDs: boolean = false;
+  showFDForm: boolean = false;
+  fdForm = {
+    principalAmount: 0,
+    interestRate: 7.5,
+    tenure: 12,
+    interestPayout: 'At Maturity'
+  };
+  isSubmittingFD: boolean = false;
+  
+  // EMI Monitoring properties
+  emis: any[] = [];
+  isLoadingEMIs: boolean = false;
+  emiSummary: any = null;
+
+  // Deposit Request properties
+  depositForm = {
+    amount: 0,
+    method: 'Cash',
+    referenceNumber: '',
+    note: ''
+  };
+  depositRequests: any[] = [];
+  isSubmittingDeposit: boolean = false;
+  isLoadingDepositRequests: boolean = false;
+  depositMessage: string = '';
+  depositError: string = '';
 
   constructor(
     private router: Router, 
@@ -54,6 +113,28 @@ export class Userdashboard implements OnInit, OnDestroy {
     if (isPlatformBrowser(this.platformId)) {
       this.loadUserProfile();
     }
+  }
+  
+  // Load investments, FDs, and EMIs when feature is selected
+  loadFeatureData() {
+    if (this.selectedFeature === 'investments') {
+      this.loadInvestments();
+    } else if (this.selectedFeature === 'fixed-deposits') {
+      this.loadFixedDeposits();
+    } else if (this.selectedFeature === 'emi-monitoring') {
+      this.loadEMIs();
+    } else if (this.selectedFeature === 'deposit-request') {
+       this.loadDepositRequests();
+    }
+  }
+  
+  selectFeature(feature: string) {
+    this.selectedFeature = feature;
+    if (feature === 'deposit-request') {
+      this.depositMessage = '';
+      this.depositError = '';
+    }
+    this.loadFeatureData();
   }
 
   loadUserProfile() {
@@ -138,9 +219,6 @@ export class Userdashboard implements OnInit, OnDestroy {
     });
   }
 
-  selectFeature(feature: string) {
-    this.selectedFeature = feature;
-  }
 
   goTo(page: string) {
     // ✅ use the `page` parameter, not Node path
@@ -164,7 +242,13 @@ export class Userdashboard implements OnInit, OnDestroy {
       'kycupdate': 'KYC Update',
       'loan': 'Loans',
       'cheque': 'Cheque Management',
-      'goldloan': 'Gold Loan'
+      'goldloan': 'Gold Loan',
+      'subsidy-claim': 'Subsidy Claim',
+      'ai-assistant': 'AI Financial Assistant',
+      'investments': 'Investments (Mutual Funds)',
+      'fixed-deposits': 'Fixed Deposits',
+      'emi-monitoring': 'EMI Monitoring',
+      'deposit-request': 'Deposit Request'
     };
     return titles[this.selectedFeature || ''] || '';
   }
@@ -177,7 +261,14 @@ export class Userdashboard implements OnInit, OnDestroy {
       'kycupdate': 'Update your personal information and verify your identity.',
       'loan': 'Apply for personal loans, check eligibility, and manage existing loans.',
       'cheque': 'Create, view, download, and cancel cheque leaves for your account.',
-      'goldloan': 'Apply for gold loan against your gold. Get 75% of gold value as loan.'
+      'goldloan': 'Apply for gold loan against your gold. Get 75% of gold value as loan.',
+      'subsidy-claim': 'Claim 3 years of interest subsidy on your approved education loans.',
+      'ai-assistant': 'Get AI-powered insights on your spending, loan suggestions, and charge alerts.',
+      'ml-loan-prediction': 'Get instant AI-powered loan approval prediction based on your PAN card and financial profile.',
+      'investments': 'Open and manage mutual fund investments. Track your portfolio performance.',
+      'fixed-deposits': 'Open fixed deposits and earn guaranteed returns. View maturity details.',
+      'emi-monitoring': 'Monitor all your EMI payments. View payment history and upcoming dues.',
+      'deposit-request': 'Submit a deposit slip to the branch/admin and track status.'
     };
     return descriptions[this.selectedFeature || ''] || '';
   }
@@ -190,7 +281,14 @@ export class Userdashboard implements OnInit, OnDestroy {
       'kycupdate': '📑',
       'loan': '💰',
       'cheque': '📝',
-      'goldloan': '🥇'
+      'goldloan': '🥇',
+      'subsidy-claim': '🎓',
+      'ai-assistant': '🤖',
+      'ml-loan-prediction': '🤖',
+      'investments': '📈',
+      'fixed-deposits': '🏦',
+      'emi-monitoring': '📊',
+      'deposit-request': '🏧'
     };
     return icons[this.selectedFeature || ''] || '';
   }
@@ -354,5 +452,400 @@ export class Userdashboard implements OnInit, OnDestroy {
 
   ngOnDestroy() {
     this.stopQrScanner();
+  }
+  
+  // ML Loan Prediction Methods
+  isFormValid(): boolean {
+    return !!(this.mlPredictionForm.pan && 
+              this.mlPredictionForm.loanType && 
+              this.mlPredictionForm.amount > 0 && 
+              this.mlPredictionForm.tenure > 0 &&
+              this.userAccountNumber);
+  }
+  
+  predictLoanApproval() {
+    if (!this.isFormValid()) {
+      this.alertService.error('Invalid Form', 'Please fill all required fields');
+      return;
+    }
+    
+    this.isPredicting = true;
+    this.predictionResult = null;
+    
+    const request = {
+      pan: this.mlPredictionForm.pan,
+      loanType: this.mlPredictionForm.loanType,
+      requestedAmount: this.mlPredictionForm.amount,
+      tenure: this.mlPredictionForm.tenure,
+      accountNumber: this.userAccountNumber
+    };
+    
+    this.http.post(`${environment.apiUrl}/loans/predict-approval`, request).subscribe({
+      next: (response: any) => {
+        if (response.success) {
+          this.predictionResult = response;
+          this.alertService.success('Prediction Complete', 
+            `Loan approval prediction: ${response.predictionResult} (${response.approvalPercentage}% probability)`);
+        } else {
+          this.alertService.error('Prediction Failed', response.message || 'Failed to predict loan approval');
+        }
+        this.isPredicting = false;
+      },
+      error: (err: any) => {
+        console.error('Error predicting loan approval:', err);
+        this.alertService.error('Prediction Error', 
+          err.error?.message || 'Failed to predict loan approval. Please try again.');
+        this.isPredicting = false;
+      }
+    });
+  }
+  
+  clearPrediction() {
+    this.predictionResult = null;
+    this.mlPredictionForm = {
+      pan: '',
+      loanType: '',
+      amount: 0,
+      tenure: 0
+    };
+  }
+  
+  getStatusIcon(status: string): string {
+    switch(status?.toLowerCase()) {
+      case 'approved': return '✅';
+      case 'rejected': return '❌';
+      case 'pending review': return '⏳';
+      default: return '📊';
+    }
+  }
+  
+  getPredictionResultClass(status: string): string {
+    if (!status) return '';
+    return status.toLowerCase().replace(/\s+/g, '-');
+  }
+  
+  // Expose Math to template
+  Math = Math;
+  
+  // Investment Methods
+  loadInvestments() {
+    if (!this.userAccountNumber) return;
+    
+    this.isLoadingInvestments = true;
+    this.http.get(`${environment.apiUrl}/investments/account/${this.userAccountNumber}`).subscribe({
+      next: (investments: any) => {
+        this.investments = investments || [];
+        this.isLoadingInvestments = false;
+      },
+      error: (err: any) => {
+        console.error('Error loading investments:', err);
+        this.alertService.error('Error', 'Failed to load investments');
+        this.isLoadingInvestments = false;
+      }
+    });
+  }
+  
+  openInvestmentForm() {
+    this.showInvestmentForm = true;
+    this.investmentForm = {
+      investmentType: 'Mutual Fund',
+      fundName: '',
+      fundCategory: '',
+      fundScheme: '',
+      investmentAmount: 0,
+      isSIP: false,
+      sipAmount: 0,
+      sipDuration: 0
+    };
+  }
+  
+  closeInvestmentForm() {
+    this.showInvestmentForm = false;
+  }
+  
+  submitInvestment() {
+    if (!this.userAccountNumber) {
+      this.alertService.error('Error', 'Account number not found');
+      return;
+    }
+    
+    if (this.investmentForm.investmentAmount <= 0) {
+      this.alertService.error('Validation Error', 'Investment amount must be greater than 0');
+      return;
+    }
+    
+    this.isSubmittingInvestment = true;
+    const investmentData = {
+      accountNumber: this.userAccountNumber,
+      investmentType: this.investmentForm.investmentType,
+      fundName: this.investmentForm.fundName,
+      fundCategory: this.investmentForm.fundCategory,
+      fundScheme: this.investmentForm.fundScheme,
+      investmentAmount: this.investmentForm.investmentAmount,
+      isSIP: this.investmentForm.isSIP,
+      sipAmount: this.investmentForm.isSIP ? this.investmentForm.sipAmount : null,
+      sipDuration: this.investmentForm.isSIP ? this.investmentForm.sipDuration : null
+    };
+    
+    this.http.post(`${environment.apiUrl}/investments`, investmentData).subscribe({
+      next: (response: any) => {
+        if (response.success) {
+          this.alertService.success('Success', 'Investment application submitted successfully');
+          this.closeInvestmentForm();
+          this.loadInvestments();
+          this.loadCurrentBalanceFromMySQL();
+        } else {
+          this.alertService.error('Error', response.message || 'Failed to submit investment');
+        }
+        this.isSubmittingInvestment = false;
+      },
+      error: (err: any) => {
+        console.error('Error submitting investment:', err);
+        this.alertService.error('Error', err.error?.message || 'Failed to submit investment');
+        this.isSubmittingInvestment = false;
+      }
+    });
+  }
+  
+  getInvestmentStatusClass(status: string): string {
+    switch(status?.toUpperCase()) {
+      case 'APPROVED': case 'ACTIVE': return 'status-approved';
+      case 'PENDING': return 'status-pending';
+      case 'REJECTED': return 'status-rejected';
+      case 'MATURED': case 'CLOSED': return 'status-closed';
+      default: return 'status-default';
+    }
+  }
+  
+  // Fixed Deposit Methods
+  loadFixedDeposits() {
+    if (!this.userAccountNumber) return;
+    
+    this.isLoadingFDs = true;
+    this.http.get(`${environment.apiUrl}/fixed-deposits/account/${this.userAccountNumber}`).subscribe({
+      next: (fds: any) => {
+        this.fixedDeposits = fds || [];
+        this.isLoadingFDs = false;
+      },
+      error: (err: any) => {
+        console.error('Error loading fixed deposits:', err);
+        this.alertService.error('Error', 'Failed to load fixed deposits');
+        this.isLoadingFDs = false;
+      }
+    });
+  }
+  
+  openFDForm() {
+    this.showFDForm = true;
+    this.fdForm = {
+      principalAmount: 0,
+      interestRate: 7.5,
+      tenure: 12,
+      interestPayout: 'At Maturity'
+    };
+  }
+  
+  closeFDForm() {
+    this.showFDForm = false;
+  }
+  
+  submitFD() {
+    if (!this.userAccountNumber) {
+      this.alertService.error('Error', 'Account number not found');
+      return;
+    }
+    
+    if (this.fdForm.principalAmount <= 0) {
+      this.alertService.error('Validation Error', 'Principal amount must be greater than 0');
+      return;
+    }
+    
+    if (this.fdForm.tenure < 6) {
+      this.alertService.error('Validation Error', 'Minimum tenure is 6 months');
+      return;
+    }
+    
+    this.isSubmittingFD = true;
+    const fdData = {
+      accountNumber: this.userAccountNumber,
+      principalAmount: this.fdForm.principalAmount,
+      interestRate: this.fdForm.interestRate,
+      tenure: this.fdForm.tenure,
+      interestPayout: this.fdForm.interestPayout
+    };
+    
+    this.http.post(`${environment.apiUrl}/fixed-deposits`, fdData).subscribe({
+      next: (response: any) => {
+        if (response.success) {
+          this.alertService.success('Success', 'Fixed Deposit application submitted successfully');
+          this.closeFDForm();
+          this.loadFixedDeposits();
+          this.loadCurrentBalanceFromMySQL();
+        } else {
+          this.alertService.error('Error', response.message || 'Failed to submit FD');
+        }
+        this.isSubmittingFD = false;
+      },
+      error: (err: any) => {
+        console.error('Error submitting FD:', err);
+        this.alertService.error('Error', err.error?.message || 'Failed to submit FD');
+        this.isSubmittingFD = false;
+      }
+    });
+  }
+  
+  getFDStatusClass(status: string): string {
+    switch(status?.toUpperCase()) {
+      case 'ACTIVE': return 'status-active';
+      case 'PENDING': return 'status-pending';
+      case 'REJECTED': return 'status-rejected';
+      case 'MATURED': return 'status-matured';
+      case 'CLOSED': case 'PREMATURE_CLOSED': return 'status-closed';
+      default: return 'status-default';
+    }
+  }
+  
+  // EMI Monitoring Methods
+  loadEMIs() {
+    if (!this.userAccountNumber) return;
+    
+    this.isLoadingEMIs = true;
+    this.http.get(`${environment.apiUrl}/emis/account/${this.userAccountNumber}`).subscribe({
+      next: (emis: any) => {
+        this.emis = emis || [];
+        this.isLoadingEMIs = false;
+        this.loadEMISummary();
+      },
+      error: (err: any) => {
+        console.error('Error loading EMIs:', err);
+        this.alertService.error('Error', 'Failed to load EMIs');
+        this.isLoadingEMIs = false;
+      }
+    });
+  }
+  
+  loadEMISummary() {
+    if (!this.userAccountNumber) return;
+    
+    this.http.get(`${environment.apiUrl}/emis/account/${this.userAccountNumber}/summary`).subscribe({
+      next: (summary: any) => {
+        this.emiSummary = summary;
+      },
+      error: (err: any) => {
+        console.error('Error loading EMI summary:', err);
+      }
+    });
+  }
+  
+  payEMI(emiId: number) {
+    if (!this.userAccountNumber) {
+      this.alertService.error('Error', 'Account number not found');
+      return;
+    }
+    
+    if (!confirm('Are you sure you want to pay this EMI?')) {
+      return;
+    }
+    
+    this.http.post(`${environment.apiUrl}/emis/${emiId}/pay?accountNumber=${this.userAccountNumber}`, {}).subscribe({
+      next: (response: any) => {
+        if (response.success) {
+          this.alertService.success('Success', 'EMI paid successfully');
+          this.loadEMIs();
+          this.loadCurrentBalanceFromMySQL();
+        } else {
+          this.alertService.error('Error', response.message || 'Failed to pay EMI');
+        }
+      },
+      error: (err: any) => {
+        console.error('Error paying EMI:', err);
+        this.alertService.error('Error', err.error?.message || 'Failed to pay EMI');
+      }
+    });
+  }
+  
+  getEMIStatusClass(status: string): string {
+    switch(status?.toUpperCase()) {
+      case 'PAID': return 'status-paid';
+      case 'PENDING': return 'status-pending';
+      case 'OVERDUE': return 'status-overdue';
+      default: return 'status-default';
+    }
+  }
+  
+  isEMIOverdue(emi: any): boolean {
+    if (emi.status !== 'Pending') return false;
+    const dueDate = new Date(emi.dueDate);
+    const today = new Date();
+    return dueDate < today;
+  }
+
+  // Deposit Request Methods
+  loadDepositRequests() {
+    if (!this.userAccountNumber) return;
+    this.isLoadingDepositRequests = true;
+    this.http.get(`${environment.apiUrl}/deposit-requests/account/${this.userAccountNumber}`).subscribe({
+      next: (requests: any) => {
+        this.depositRequests = requests || [];
+        this.isLoadingDepositRequests = false;
+      },
+      error: (err: any) => {
+        console.error('Error loading deposit requests:', err);
+        this.depositError = err.error?.message || 'Failed to load deposit requests';
+        this.isLoadingDepositRequests = false;
+      }
+    });
+  }
+
+  submitDepositRequest() {
+    this.depositMessage = '';
+    this.depositError = '';
+
+    if (!this.userAccountNumber) {
+      this.depositError = 'Account number not found';
+      return;
+    }
+
+    if (this.depositForm.amount <= 0) {
+      this.depositError = 'Amount must be greater than 0';
+      return;
+    }
+
+    this.isSubmittingDeposit = true;
+    const payload = {
+      accountNumber: this.userAccountNumber,
+      userName: this.username,
+      amount: this.depositForm.amount,
+      method: this.depositForm.method,
+      referenceNumber: this.depositForm.referenceNumber,
+      note: this.depositForm.note
+    };
+
+    this.http.post(`${environment.apiUrl}/deposit-requests`, payload).subscribe({
+      next: (response: any) => {
+        if (response.success) {
+          this.depositMessage = response.message || 'Deposit request submitted';
+          this.resetDepositForm();
+          this.loadDepositRequests();
+        } else {
+          this.depositError = response.message || 'Failed to submit deposit request';
+        }
+        this.isSubmittingDeposit = false;
+      },
+      error: (err: any) => {
+        console.error('Error submitting deposit request:', err);
+        this.depositError = err.error?.message || 'Failed to submit deposit request';
+        this.isSubmittingDeposit = false;
+      }
+    });
+  }
+
+  resetDepositForm() {
+    this.depositForm = {
+      amount: 0,
+      method: 'Cash',
+      referenceNumber: '',
+      note: ''
+    };
   }
 }

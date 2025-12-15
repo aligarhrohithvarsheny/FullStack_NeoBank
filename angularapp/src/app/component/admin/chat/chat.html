@@ -1,0 +1,237 @@
+<div class="admin-chat-container">
+  <div class="chat-header">
+    <h2>💬 Customer Support Chat</h2>
+    <p>Manage and respond to customer inquiries</p>
+  </div>
+
+  <div class="chat-layout">
+    <!-- Chat List Sidebar -->
+    <div class="chat-list">
+      <div class="chat-list-header">
+        <h3>Escalated Chats</h3>
+        <span class="badge">{{ escalatedChats.length }}</span>
+      </div>
+      
+      <div class="chat-items">
+        <div 
+          *ngFor="let chat of escalatedChats" 
+          class="chat-item"
+          [class.active]="chat.sessionId === selectedSessionId"
+          (click)="selectChat(chat.sessionId)"
+        >
+          <div class="chat-item-header">
+            <span class="user-name">{{ getUserName(chat.sessionId) }}</span>
+            <span class="chat-time">{{ formatTime(chat.timestamp) }}</span>
+          </div>
+          <div class="chat-preview">{{ getChatPreview(chat.sessionId) }}</div>
+        </div>
+        
+        <div *ngIf="escalatedChats.length === 0" class="no-chats">
+          <p>No escalated chats at the moment.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Chat Window -->
+    <div class="chat-window" *ngIf="selectedSessionId">
+      <div class="chat-window-header">
+        <div>
+          <h3>{{ getUserName(selectedSessionId) }}</h3>
+          <span class="session-id">Session: {{ selectedSessionId }}</span>
+        </div>
+        <button (click)="viewCustomerAccountDetails()" class="view-account-btn" title="View Customer Account Details">
+          👤 View Account Details
+        </button>
+      </div>
+
+      <div class="chat-messages" #chatContainer>
+        <div 
+          *ngFor="let msg of selectedChatMessages" 
+          class="message"
+          [class.user-message]="msg.sender === 'USER'"
+          [class.bot-message]="msg.sender === 'BOT'"
+          [class.admin-message]="msg.sender === 'ADMIN'"
+          [class.system-message]="msg.sender === 'SYSTEM'"
+        >
+          <div class="message-content">
+            <div class="message-header">
+              <span class="sender-name">
+                {{ msg.sender === 'USER' ? getUserName(msg.sessionId) : 
+                   (msg.sender === 'ADMIN' ? 'Admin' : 
+                   (msg.sender === 'SYSTEM' ? 'System' : 'Bot')) }}
+              </span>
+              <span class="message-time" *ngIf="msg.timestamp">
+                {{ formatTime(msg.timestamp) }}
+              </span>
+              <span class="message-time" *ngIf="!msg.timestamp" style="opacity: 0.5;">
+                Just now
+              </span>
+            </div>
+            <div class="message-text" [innerHTML]="formatMessage(msg.message)"></div>
+            <!-- Attachment Display -->
+            <div *ngIf="msg.attachmentUrl" class="message-attachment">
+              <div *ngIf="msg.attachmentType === 'IMAGE'">
+                <img [src]="getAttachmentUrl(msg.attachmentUrl)" [alt]="msg.attachmentName || 'Image'" class="attachment-image" />
+              </div>
+              <div *ngIf="msg.attachmentType === 'PDF' || msg.attachmentType === 'FILE'" class="attachment-file">
+                <a [href]="getAttachmentUrl(msg.attachmentUrl)" target="_blank" class="attachment-link">
+                  📄 {{ msg.attachmentName || 'Download File' }}
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div *ngIf="isLoading" class="message admin-message">
+          <div class="message-content">
+            <div class="typing-indicator">
+              <span></span>
+              <span></span>
+              <span></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="chat-input">
+        <!-- Selected File Display -->
+        <div *ngIf="selectedFile" class="selected-file">
+          <span class="file-name">📎 {{ selectedFile.name }}</span>
+          <button (click)="removeFile()" class="remove-file-btn">×</button>
+        </div>
+        
+        <div class="input-row">
+          <input 
+            type="file"
+            id="adminFileInput"
+            accept="image/*,.pdf"
+            (change)="onFileSelected($event)"
+            style="display: none;"
+          />
+          <button (click)="triggerFileInput()" class="attach-btn" title="Attach File">
+            📎
+          </button>
+          <input 
+            type="text" 
+            [(ngModel)]="newMessage" 
+            (keyup.enter)="sendMessage()"
+            placeholder="Type your response..."
+            [disabled]="isLoading"
+            class="message-input"
+          />
+          <button (click)="sendMessage()" [disabled]="(!newMessage.trim() && !selectedFile) || isLoading" class="send-btn">
+            Send
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- No Chat Selected -->
+    <div class="no-chat-selected" *ngIf="!selectedSessionId">
+      <div class="empty-state">
+        <span class="empty-icon">💬</span>
+        <h3>Select a chat to start</h3>
+        <p>Choose a chat from the list to view messages and respond to customers.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Customer Account Details Modal -->
+  <div class="account-details-modal" *ngIf="showAccountDetails" (click)="closeAccountDetails()">
+    <div class="account-details-content" (click)="$event.stopPropagation()">
+      <div class="account-details-header">
+        <h2>👤 Customer Account Details</h2>
+        <button (click)="closeAccountDetails()" class="close-btn">×</button>
+      </div>
+      
+      <div class="account-details-body" *ngIf="isLoadingCustomerDetails">
+        <div class="loading-spinner">Loading customer details...</div>
+      </div>
+      
+      <div class="account-details-body" *ngIf="!isLoadingCustomerDetails && customerDetails">
+        <!-- User Information -->
+        <div class="details-section">
+          <h3>👤 User Information</h3>
+          <div class="details-grid">
+            <div class="detail-item">
+              <span class="label">Username:</span>
+              <span class="value">{{ customerDetails.username || 'N/A' }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="label">Email:</span>
+              <span class="value">{{ customerDetails.email || 'N/A' }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="label">Account Number:</span>
+              <span class="value">{{ customerDetails.accountNumber || 'N/A' }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="label">Status:</span>
+              <span class="value">{{ customerDetails.status || 'N/A' }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="label">Join Date:</span>
+              <span class="value">{{ customerDetails.joinDate ? formatDate(customerDetails.joinDate) : 'N/A' }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Account Information -->
+        <div class="details-section" *ngIf="customerDetails.account">
+          <h3>🏦 Account Information</h3>
+          <div class="details-grid">
+            <div class="detail-item">
+              <span class="label">Account Holder:</span>
+              <span class="value">{{ customerDetails.account.name || 'N/A' }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="label">Phone:</span>
+              <span class="value">{{ customerDetails.account.phone || 'N/A' }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="label">Account Type:</span>
+              <span class="value">{{ customerDetails.account.accountType || 'N/A' }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="label">Balance:</span>
+              <span class="value">₹{{ (customerDetails.account.balance || 0).toFixed(2) }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="label">Address:</span>
+              <span class="value">{{ customerDetails.account.address || 'N/A' }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="label">Date of Birth:</span>
+              <span class="value">{{ customerDetails.account.dob || 'N/A' }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="label">Occupation:</span>
+              <span class="value">{{ customerDetails.account.occupation || 'N/A' }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="label">Income:</span>
+              <span class="value">₹{{ (customerDetails.account.income || 0).toFixed(2) }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="label">PAN:</span>
+              <span class="value">{{ customerDetails.account.pan || 'N/A' }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="label">Aadhar:</span>
+              <span class="value">{{ customerDetails.account.aadharNumber || 'N/A' }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="details-section" *ngIf="!customerDetails.account">
+          <p class="no-account-info">Account details not available</p>
+        </div>
+      </div>
+      
+      <div class="account-details-body" *ngIf="!isLoadingCustomerDetails && !customerDetails">
+        <p class="error-message">Unable to load customer details. Please try again.</p>
+      </div>
+    </div>
+  </div>
+</div>
+

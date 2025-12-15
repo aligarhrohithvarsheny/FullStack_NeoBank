@@ -1,7 +1,9 @@
 package com.neo.springapp.service;
 
 import com.neo.springapp.model.GoldRate;
+import com.neo.springapp.model.GoldRateHistory;
 import com.neo.springapp.repository.GoldRateRepository;
+import com.neo.springapp.repository.GoldRateHistoryRepository;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
@@ -13,9 +15,12 @@ import java.util.Optional;
 public class GoldRateService {
 
     private final GoldRateRepository goldRateRepository;
+    private final GoldRateHistoryRepository goldRateHistoryRepository;
 
-    public GoldRateService(GoldRateRepository goldRateRepository) {
+    public GoldRateService(GoldRateRepository goldRateRepository, 
+                          GoldRateHistoryRepository goldRateHistoryRepository) {
         this.goldRateRepository = goldRateRepository;
+        this.goldRateHistoryRepository = goldRateHistoryRepository;
     }
 
     // Get current gold rate (latest rate)
@@ -47,19 +52,44 @@ public class GoldRateService {
         LocalDate today = LocalDate.now();
         Optional<GoldRate> existingRate = goldRateRepository.findByDate(today);
         
+        Double previousRate = null;
         GoldRate goldRate;
         if (existingRate.isPresent()) {
             goldRate = existingRate.get();
+            previousRate = goldRate.getRatePerGram();
         } else {
             goldRate = new GoldRate();
             goldRate.setDate(today);
+            // Get previous rate from latest rate if available
+            Optional<GoldRate> latestRate = goldRateRepository.findFirstByOrderByDateDesc();
+            if (latestRate.isPresent() && !latestRate.get().getDate().equals(today)) {
+                previousRate = latestRate.get().getRatePerGram();
+            }
         }
+        
+        // Save history before updating
+        if (previousRate == null) {
+            previousRate = 0.0; // First time setting rate
+        }
+        
+        GoldRateHistory history = new GoldRateHistory();
+        history.setRatePerGram(ratePerGram);
+        history.setPreviousRate(previousRate);
+        history.setChangedBy(updatedBy);
+        history.setRateDate(today);
+        history.setChangedAt(LocalDateTime.now());
+        goldRateHistoryRepository.save(history);
         
         goldRate.setRatePerGram(ratePerGram);
         goldRate.setLastUpdated(LocalDateTime.now());
         goldRate.setUpdatedBy(updatedBy);
         
         return goldRateRepository.save(goldRate);
+    }
+    
+    // Get gold rate history
+    public List<GoldRateHistory> getGoldRateHistory() {
+        return goldRateHistoryRepository.findAllByOrderByChangedAtDesc();
     }
 
     // Get all gold rates

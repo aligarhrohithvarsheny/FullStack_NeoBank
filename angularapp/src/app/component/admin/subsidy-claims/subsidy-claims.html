@@ -1,0 +1,358 @@
+<div class="subsidy-claims-container">
+  <div class="header-section">
+    <h2>Education Loan Subsidy Claims</h2>
+    <button class="back-btn" (click)="goBack()">← Back to Dashboard</button>
+  </div>
+
+  <!-- Statistics Cards -->
+  <div class="stats-section">
+    <div class="stat-card">
+      <h3>Total Claims</h3>
+      <span class="stat-number">{{ claims.length }}</span>
+    </div>
+    <div class="stat-card pending">
+      <h3>Pending</h3>
+      <span class="stat-number">{{ pendingCount }}</span>
+    </div>
+    <div class="stat-card approved">
+      <h3>Approved</h3>
+      <span class="stat-number">{{ approvedCount }}</span>
+    </div>
+    <div class="stat-card credited">
+      <h3>Credited</h3>
+      <span class="stat-number">{{ creditedCount }}</span>
+    </div>
+    <div class="stat-card total-amount">
+      <h3>Total Credited</h3>
+      <span class="stat-number">{{ formatCurrency(totalSubsidyAmount) }}</span>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="filters-section">
+    <div class="search-box">
+      <input 
+        type="text" 
+        [(ngModel)]="searchTerm" 
+        (input)="onSearchChange()"
+        placeholder="Search by name, account number, loan number..."
+        class="search-input"
+      />
+    </div>
+    <div class="status-filter">
+      <label for="statusFilter">Filter by Status:</label>
+      <select 
+        id="statusFilter"
+        [(ngModel)]="statusFilter" 
+        (change)="onStatusFilterChange()"
+        class="filter-select"
+      >
+        <option value="All">All Claims</option>
+        <option value="Pending">Pending</option>
+        <option value="Approved">Approved</option>
+        <option value="Rejected">Rejected</option>
+        <option value="Credited">Credited</option>
+      </select>
+    </div>
+    <button class="refresh-btn" (click)="loadClaims()">🔄 Refresh</button>
+    <button class="export-btn" (click)="exportClaimsToCSV()">📊 Export CSV</button>
+  </div>
+
+  <!-- Loading indicator -->
+  <div *ngIf="isLoading" class="loading">Loading subsidy claims...</div>
+
+  <!-- Claims Table -->
+  <div *ngIf="!isLoading" class="table-container">
+    <table class="claims-table">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>User Name</th>
+          <th>Account Number</th>
+          <th>Loan Account</th>
+          <th>Loan Amount</th>
+          <th>Calculated Subsidy</th>
+          <th>Approved Amount</th>
+          <th>Status</th>
+          <th>Request Date</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let claim of filteredClaims">
+          <td>{{ claim.id }}</td>
+          <td>{{ claim.userName }}</td>
+          <td>{{ claim.accountNumber }}</td>
+          <td>{{ claim.loanAccountNumber }}</td>
+          <td>{{ formatCurrency(claim.loanAmount) }}</td>
+          <td>{{ formatCurrency(claim.calculatedSubsidyAmount) }}</td>
+          <td>{{ formatCurrency(claim.approvedSubsidyAmount) }}</td>
+          <td [ngClass]="getStatusClass(claim.status)">
+            <span class="status-badge">{{ claim.status }}</span>
+          </td>
+          <td>{{ formatDate(claim.requestDate) }}</td>
+          <td class="actions">
+            <div class="action-buttons">
+              <button (click)="viewClaimDetails(claim)" class="view-btn">View</button>
+              <button (click)="downloadSubsidyDetails(claim)" class="download-btn">📄 Download</button>
+              <button (click)="viewUserDetails(claim)" class="user-btn">User Details</button>
+              <button 
+                *ngIf="claim.status === 'Pending'"
+                (click)="approveClaim(claim)" 
+                class="approve-btn"
+              >
+                Approve
+              </button>
+              <button 
+                *ngIf="claim.status === 'Pending'"
+                (click)="rejectClaim(claim)" 
+                class="reject-btn"
+              >
+                Reject
+              </button>
+              <button 
+                *ngIf="claim.status === 'Approved' || claim.status === 'Pending'"
+                (click)="openEditAmountModal(claim)" 
+                class="edit-btn"
+              >
+                Edit Amount
+              </button>
+              <button 
+                *ngIf="claim.status === 'Approved'"
+                (click)="creditSubsidy(claim)" 
+                class="credit-btn"
+              >
+                Credit
+              </button>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+    <div *ngIf="filteredClaims.length === 0" class="no-results">
+      <p>No subsidy claims found matching your criteria.</p>
+    </div>
+  </div>
+</div>
+
+<!-- Claim Details Modal -->
+<div *ngIf="showDetailsModal && selectedClaim" class="modal-overlay" (click)="closeDetailsModal()">
+  <div class="modal-content" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3>Subsidy Claim Details</h3>
+      <button class="close-btn" (click)="closeDetailsModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="details-grid">
+        <div class="detail-item">
+          <label>Claim ID:</label>
+          <span>{{ selectedClaim.id }}</span>
+        </div>
+        <div class="detail-item">
+          <label>User Name:</label>
+          <span>{{ selectedClaim.userName }}</span>
+        </div>
+        <div class="detail-item">
+          <label>Email:</label>
+          <span>{{ selectedClaim.userEmail }}</span>
+        </div>
+        <div class="detail-item">
+          <label>Account Number:</label>
+          <span>{{ selectedClaim.accountNumber }}</span>
+        </div>
+        <div class="detail-item">
+          <label>Loan Account:</label>
+          <span>{{ selectedClaim.loanAccountNumber }}</span>
+        </div>
+        <div class="detail-item">
+          <label>Loan Type:</label>
+          <span>{{ selectedClaim.loanType }}</span>
+        </div>
+        <div class="detail-item">
+          <label>Loan Amount:</label>
+          <span>{{ formatCurrency(selectedClaim.loanAmount) }}</span>
+        </div>
+        <div class="detail-item">
+          <label>Interest Rate:</label>
+          <span>{{ selectedClaim.interestRate }}%</span>
+        </div>
+        <div class="detail-item">
+          <label>Loan Tenure:</label>
+          <span>{{ selectedClaim.loanTenure }} months</span>
+        </div>
+        <div class="detail-item">
+          <label>Calculated Subsidy (3 Years Interest):</label>
+          <span class="highlight">{{ formatCurrency(selectedClaim.calculatedSubsidyAmount) }}</span>
+        </div>
+        <div class="detail-item">
+          <label>Approved Amount:</label>
+          <span class="highlight">{{ formatCurrency(selectedClaim.approvedSubsidyAmount) }}</span>
+        </div>
+        <div class="detail-item">
+          <label>Status:</label>
+          <span [ngClass]="getStatusClass(selectedClaim.status)">{{ selectedClaim.status }}</span>
+        </div>
+        <div class="detail-item">
+          <label>Request Date:</label>
+          <span>{{ formatDate(selectedClaim.requestDate) }}</span>
+        </div>
+        <div class="detail-item" *ngIf="selectedClaim.processedDate">
+          <label>Processed Date:</label>
+          <span>{{ formatDate(selectedClaim.processedDate) }}</span>
+        </div>
+        <div class="detail-item" *ngIf="selectedClaim.processedBy">
+          <label>Processed By:</label>
+          <span>{{ selectedClaim.processedBy }}</span>
+        </div>
+        <div class="detail-item" *ngIf="selectedClaim.creditedDate">
+          <label>Credited Date:</label>
+          <span>{{ formatDate(selectedClaim.creditedDate) }}</span>
+        </div>
+        <div class="detail-item" *ngIf="selectedClaim.transactionId">
+          <label>Transaction ID:</label>
+          <span>{{ selectedClaim.transactionId }}</span>
+        </div>
+        <div class="detail-item full-width" *ngIf="selectedClaim.userNotes">
+          <label>User Notes:</label>
+          <span>{{ selectedClaim.userNotes }}</span>
+        </div>
+        <div class="detail-item full-width" *ngIf="selectedClaim.adminNotes">
+          <label>Admin Notes:</label>
+          <span>{{ selectedClaim.adminNotes }}</span>
+        </div>
+        <div class="detail-item full-width" *ngIf="selectedClaim.rejectionReason">
+          <label>Rejection Reason:</label>
+          <span class="error-text">{{ selectedClaim.rejectionReason }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Amount Modal -->
+<div *ngIf="showEditAmountModal && selectedClaim" class="modal-overlay" (click)="closeEditAmountModal()">
+  <div class="modal-content" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3>Edit Subsidy Amount</h3>
+      <button class="close-btn" (click)="closeEditAmountModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Calculated Amount (3 Years Interest):</label>
+        <input type="text" [value]="formatCurrency(selectedClaim.calculatedSubsidyAmount)" readonly class="readonly-input">
+      </div>
+      <div class="form-group">
+        <label>Approved Amount:</label>
+        <input 
+          type="number" 
+          [(ngModel)]="editedAmount" 
+          min="0" 
+          step="0.01"
+          class="form-input"
+          placeholder="Enter approved amount"
+        />
+      </div>
+      <div class="form-group">
+        <label>Admin Notes:</label>
+        <textarea 
+          [(ngModel)]="adminNotes" 
+          class="form-textarea"
+          placeholder="Enter admin notes (optional)"
+          rows="3"
+        ></textarea>
+      </div>
+      <div class="modal-actions">
+        <button (click)="saveEditedAmount()" class="save-btn" [disabled]="isLoading">
+          {{ isLoading ? 'Saving...' : 'Save' }}
+        </button>
+        <button (click)="closeEditAmountModal()" class="cancel-btn">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- User Details Modal -->
+<div *ngIf="showUserDetailsModal && selectedClaim" class="modal-overlay" (click)="closeUserDetailsModal()">
+  <div class="modal-content large-modal" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3>User Details - {{ selectedClaim.userName }}</h3>
+      <button class="close-btn" (click)="closeUserDetailsModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div *ngIf="userDetails" class="user-info-section">
+        <h4>Personal Information</h4>
+        <div class="details-grid">
+          <div class="detail-item">
+            <label>Name:</label>
+            <span>{{ userDetails.account?.name || userDetails.username || 'N/A' }}</span>
+          </div>
+          <div class="detail-item">
+            <label>Email:</label>
+            <span>{{ userDetails.email || 'N/A' }}</span>
+          </div>
+          <div class="detail-item">
+            <label>Account Number:</label>
+            <span>{{ userDetails.accountNumber || 'N/A' }}</span>
+          </div>
+          <div class="detail-item">
+            <label>Balance:</label>
+            <span>{{ formatCurrency(userDetails.account?.balance || 0) }}</span>
+          </div>
+          <div class="detail-item">
+            <label>Phone:</label>
+            <span>{{ userDetails.account?.phone || userDetails.phoneNumber || 'N/A' }}</span>
+          </div>
+          <div class="detail-item">
+            <label>PAN:</label>
+            <span>{{ userDetails.account?.pan || userDetails.pan || 'N/A' }}</span>
+          </div>
+        </div>
+      </div>
+      
+      <div *ngIf="userLoans.length > 0" class="loans-section">
+        <h4>User Loans ({{ userLoans.length }})</h4>
+        <table class="mini-table">
+          <thead>
+            <tr>
+              <th>Loan Account</th>
+              <th>Type</th>
+              <th>Amount</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let loan of userLoans">
+              <td>{{ loan.loanAccountNumber }}</td>
+              <td>{{ loan.type }}</td>
+              <td>{{ formatCurrency(loan.amount) }}</td>
+              <td>{{ loan.status }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      
+      <div *ngIf="userTransactions.length > 0" class="transactions-section">
+        <h4>Recent Transactions ({{ userTransactions.length }})</h4>
+        <table class="mini-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Type</th>
+              <th>Amount</th>
+              <th>Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let txn of userTransactions.slice(0, 10)">
+              <td>{{ formatDate(txn.date) }}</td>
+              <td>{{ txn.type }}</td>
+              <td>{{ formatCurrency(txn.amount) }}</td>
+              <td>{{ txn.description }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+

@@ -32,6 +32,14 @@
           </a>
         </li>
         <li class="nav-item">
+          <a (click)="selectFeature('deposit-request')" 
+             [class.active]="selectedFeature === 'deposit-request'"
+             class="nav-link">
+            <span class="nav-icon"></span>
+            <span class="nav-text">Deposit</span>
+          </a>
+        </li>
+        <li class="nav-item">
           <a (click)="selectFeature('card')" 
              [class.active]="selectedFeature === 'card'"
              class="nav-link">
@@ -77,6 +85,46 @@
              class="nav-link">
             <span class="nav-icon"></span>
             <span class="nav-text">Gold Loan</span>
+          </a>
+        </li>
+        <li class="nav-item">
+          <a (click)="selectFeature('subsidy-claim')" 
+             [class.active]="selectedFeature === 'subsidy-claim'"
+             class="nav-link">
+            <span class="nav-icon"></span>
+            <span class="nav-text">Subsidy Claim</span>
+          </a>
+        </li>
+        <li class="nav-item">
+          <a (click)="selectFeature('ai-assistant')" 
+             [class.active]="selectedFeature === 'ai-assistant'"
+             class="nav-link">
+            <span class="nav-icon"></span>
+            <span class="nav-text">🤖 AI Assistant</span>
+          </a>
+        </li>
+        <li class="nav-item">
+          <a (click)="selectFeature('investments')" 
+             [class.active]="selectedFeature === 'investments'"
+             class="nav-link">
+            <span class="nav-icon"></span>
+            <span class="nav-text">📈 Investments</span>
+          </a>
+        </li>
+        <li class="nav-item">
+          <a (click)="selectFeature('fixed-deposits')" 
+             [class.active]="selectedFeature === 'fixed-deposits'"
+             class="nav-link">
+            <span class="nav-icon"></span>
+            <span class="nav-text">🏦 Fixed Deposits</span>
+          </a>
+        </li>
+        <li class="nav-item">
+          <a (click)="selectFeature('emi-monitoring')" 
+             [class.active]="selectedFeature === 'emi-monitoring'"
+             class="nav-link">
+            <span class="nav-icon"></span>
+            <span class="nav-text">📊 EMI Monitoring</span>
           </a>
         </li>
       </ul>
@@ -155,6 +203,11 @@
               <h3>Transfer Funds</h3>
               <p>Send money to other accounts</p>
             </div>
+            <div class="feature-card" (click)="selectFeature('deposit-request')">
+              <span class="feature-icon">🏧</span>
+              <h3>Deposit</h3>
+              <p>Submit a deposit request</p>
+            </div>
             <div class="feature-card" (click)="selectFeature('card')">
               <span class="feature-icon">💳</span>
               <h3>Card Management</h3>
@@ -175,6 +228,11 @@
               <h3>Loans</h3>
               <p>Apply for loans</p>
             </div>
+            <div class="feature-card" (click)="selectFeature('ml-loan-prediction')">
+              <span class="feature-icon">🤖</span>
+              <h3>ML Loan Approval</h3>
+              <p>AI-powered loan approval prediction</p>
+            </div>
             <div class="feature-card" (click)="selectFeature('cheque')">
               <span class="feature-icon">📝</span>
               <h3>Cheque</h3>
@@ -185,25 +243,535 @@
               <h3>Gold Loan</h3>
               <p>Apply for gold loan</p>
             </div>
+            <div class="feature-card" (click)="selectFeature('investments')">
+              <span class="feature-icon">📈</span>
+              <h3>Investments</h3>
+              <p>Mutual funds & SIP</p>
+            </div>
+            <div class="feature-card" (click)="selectFeature('fixed-deposits')">
+              <span class="feature-icon">🏦</span>
+              <h3>Fixed Deposits</h3>
+              <p>Open FDs online</p>
+            </div>
+            <div class="feature-card" (click)="selectFeature('emi-monitoring')">
+              <span class="feature-icon">📊</span>
+              <h3>EMI Monitoring</h3>
+              <p>Track your EMIs</p>
+            </div>
           </div>
         </div>
       </div>
       
       <div *ngIf="selectedFeature" class="feature-content">
-        <div class="feature-header">
-          <h2>{{ getFeatureTitle() }}</h2>
-          <button (click)="goTo(selectedFeature)" class="action-btn">Open Full Page</button>
+        <!-- AI Assistant Component -->
+        <app-ai-assistant *ngIf="selectedFeature === 'ai-assistant'"></app-ai-assistant>
+        
+        <!-- ML Loan Prediction Component -->
+        <div *ngIf="selectedFeature === 'ml-loan-prediction'" class="ml-loan-prediction-section">
+          <div class="feature-header">
+            <h2>🤖 ML-Based Loan Approval Prediction</h2>
+            <p>Get instant AI-powered loan approval prediction based on your PAN card and financial profile</p>
+          </div>
+          
+          <div class="ml-prediction-form" *ngIf="!predictionResult">
+            <div class="form-group">
+              <label>PAN Card Number <span class="required">*</span></label>
+              <input 
+                type="text" 
+                [(ngModel)]="mlPredictionForm.pan" 
+                placeholder="Enter PAN number"
+                maxlength="10"
+                class="form-input"
+              />
+            </div>
+            
+            <div class="form-group">
+              <label>Loan Type <span class="required">*</span></label>
+              <select [(ngModel)]="mlPredictionForm.loanType" class="form-input">
+                <option value="">Select Loan Type</option>
+                <option value="Personal Loan">Personal Loan</option>
+                <option value="Education Loan">Education Loan</option>
+                <option value="Home Loan">Home Loan</option>
+                <option value="Car Loan">Car Loan</option>
+              </select>
+            </div>
+            
+            <div class="form-group">
+              <label>Requested Amount (₹) <span class="required">*</span></label>
+              <input 
+                type="number" 
+                [(ngModel)]="mlPredictionForm.amount" 
+                placeholder="Enter loan amount"
+                min="10000"
+                class="form-input"
+              />
+            </div>
+            
+            <div class="form-group">
+              <label>Tenure (Months) <span class="required">*</span></label>
+              <input 
+                type="number" 
+                [(ngModel)]="mlPredictionForm.tenure" 
+                placeholder="Enter tenure in months"
+                min="6"
+                max="360"
+                class="form-input"
+              />
+            </div>
+            
+            <button 
+              class="predict-btn" 
+              (click)="predictLoanApproval()"
+              [disabled]="isPredicting || !isFormValid()"
+            >
+              <span *ngIf="!isPredicting">🔮 Predict Loan Approval</span>
+              <span *ngIf="isPredicting">⏳ Predicting...</span>
+            </button>
+          </div>
+          
+          <div *ngIf="predictionResult" class="prediction-result">
+            <div class="result-header">
+              <h3>Prediction Result</h3>
+              <button class="close-btn" (click)="clearPrediction()">×</button>
+            </div>
+            
+            <div class="result-card" [ngClass]="getPredictionResultClass(predictionResult.predictionResult)">
+              <div class="result-status">
+                <span class="status-icon">{{ getStatusIcon(predictionResult.predictionResult) }}</span>
+                <h4>{{ predictionResult.predictionResult }}</h4>
+                <p class="probability">Approval Probability: {{ predictionResult.approvalPercentage || (predictionResult.approvalProbability ? Math.round(predictionResult.approvalProbability * 100) : 0) }}%</p>
+              </div>
+              
+              <div class="result-details">
+                <div class="detail-item">
+                  <span class="label">CIBIL Score:</span>
+                  <span class="value">{{ predictionResult.cibilScore || 'N/A' }}</span>
+                  <span class="category" *ngIf="predictionResult.scoreCategory">({{ predictionResult.scoreCategory }})</span>
+                </div>
+                <div class="detail-item">
+                  <span class="label">Interest Rate:</span>
+                  <span class="value">{{ predictionResult.interestRate || 'N/A' }}<ng-container *ngIf="predictionResult.interestRate">% p.a.</ng-container></span>
+                </div>
+                <div class="detail-item">
+                  <span class="label">Credit Limit:</span>
+                  <span class="value">₹{{ (predictionResult.creditLimit || 0) | number:'1.0-0' }}</span>
+                </div>
+              </div>
+              
+              <div *ngIf="predictionResult.rejectionReason" class="rejection-reason">
+                <h5>Rejection Reason:</h5>
+                <p>{{ predictionResult.rejectionReason }}</p>
+              </div>
+              
+              <div *ngIf="predictionResult.recommendations && predictionResult.recommendations.length > 0" class="recommendations">
+                <h5>💡 Recommendations:</h5>
+                <ul>
+                  <li *ngFor="let rec of predictionResult.recommendations">{{ rec }}</li>
+                </ul>
+              </div>
+            </div>
+          </div>
         </div>
-        <div class="feature-preview">
-          <p>{{ getFeatureDescription() }}</p>
-          <div class="preview-content">
-            <div class="preview-placeholder">
-              <span class="preview-icon">{{ getFeatureIcon() }}</span>
-              <p>Click "Open Full Page" to access {{ getFeatureTitle() }}</p>
+
+        <!-- Deposit Request Section -->
+        <div *ngIf="selectedFeature === 'deposit-request'" class="deposit-section">
+          <div class="feature-header">
+            <h2>🏧 Deposit Request</h2>
+            <button (click)="loadDepositRequests()" class="action-btn">Refresh</button>
+          </div>
+
+          <div class="deposit-form">
+            <div class="form-row">
+              <div class="form-group">
+                <label>Amount (₹) <span class="required">*</span></label>
+                <input type="number" [(ngModel)]="depositForm.amount" class="form-input" min="1" placeholder="Enter amount to deposit" />
+              </div>
+              <div class="form-group">
+                <label>Method</label>
+                <select [(ngModel)]="depositForm.method" class="form-input">
+                  <option value="Cash">Cash</option>
+                  <option value="Cheque">Cheque</option>
+                  <option value="UPI">UPI</option>
+                  <option value="Online Transfer">Online Transfer</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Reference Number</label>
+                <input type="text" [(ngModel)]="depositForm.referenceNumber" class="form-input" placeholder="Slip/UTR/Reference number (optional)" />
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group full-width">
+                <label>Note</label>
+                <textarea [(ngModel)]="depositForm.note" class="form-textarea" rows="3" placeholder="Any note for the cashier/admin"></textarea>
+              </div>
+            </div>
+            <div class="form-actions">
+              <button class="btn-primary" (click)="submitDepositRequest()" [disabled]="isSubmittingDeposit">
+                {{ isSubmittingDeposit ? 'Submitting...' : 'Submit Request' }}
+              </button>
+              <button class="btn-secondary" type="button" (click)="resetDepositForm()">Clear</button>
+            </div>
+            <div class="message success-message" *ngIf="depositMessage">{{ depositMessage }}</div>
+            <div class="message error-message" *ngIf="depositError">{{ depositError }}</div>
+          </div>
+
+          <div class="deposit-requests">
+            <h3>Recent Requests</h3>
+            <div *ngIf="isLoadingDepositRequests" class="loading-state">Loading deposit requests...</div>
+            <div *ngIf="!isLoadingDepositRequests && depositRequests.length === 0" class="empty-state">
+              <p>No deposit requests found.</p>
+            </div>
+            <div *ngIf="!isLoadingDepositRequests && depositRequests.length > 0" class="deposit-list">
+              <div *ngFor="let req of depositRequests" class="deposit-card" [ngClass]="req.status?.toLowerCase()">
+                <div class="card-header">
+                  <div>
+                    <h4>₹{{ req.amount | number:'1.2-2' }} • {{ req.method }}</h4>
+                    <p class="muted">Request ID: {{ req.requestId }}</p>
+                  </div>
+                  <span class="status-badge">{{ req.status }}</span>
+                </div>
+                <div class="card-body">
+                  <p><strong>Note:</strong> {{ req.note || 'N/A' }}</p>
+                  <p><strong>Reference:</strong> {{ req.referenceNumber || 'N/A' }}</p>
+                  <p><strong>Created:</strong> {{ req.createdAt | date:'dd/MM/yyyy, h:mm a' }}</p>
+                  <p *ngIf="req.processedAt"><strong>Processed:</strong> {{ req.processedAt | date:'dd/MM/yyyy, h:mm a' }}</p>
+                  <p *ngIf="req.processedBy"><strong>Processed By:</strong> {{ req.processedBy }}</p>
+                  <p *ngIf="req.rejectionReason" class="rejection">Reason: {{ req.rejectionReason }}</p>
+                  <p *ngIf="req.resultingBalance != null"><strong>New Balance:</strong> ₹{{ req.resultingBalance | number:'1.2-2' }}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Investments Section -->
+        <div *ngIf="selectedFeature === 'investments'" class="investments-section">
+          <div class="feature-header">
+            <h2>📈 Investments (Mutual Funds)</h2>
+            <button (click)="openInvestmentForm()" class="action-btn">+ New Investment</button>
+          </div>
+          
+          <div *ngIf="isLoadingInvestments" class="loading-state">Loading investments...</div>
+          
+          <div *ngIf="!isLoadingInvestments && investments.length === 0" class="empty-state">
+            <p>No investments found. Start investing today!</p>
+          </div>
+          
+          <div *ngIf="!isLoadingInvestments && investments.length > 0" class="investments-list">
+            <div *ngFor="let investment of investments" class="investment-card" [ngClass]="getInvestmentStatusClass(investment.status)">
+              <div class="card-header">
+                <h3>{{ investment.fundName || 'Mutual Fund' }}</h3>
+                <span class="status-badge" [ngClass]="getInvestmentStatusClass(investment.status)">
+                  {{ investment.status }}
+                </span>
+              </div>
+              <div class="card-body">
+                <div class="info-row">
+                  <span class="label">Type:</span>
+                  <span class="value">{{ investment.investmentType }}</span>
+                </div>
+                <div class="info-row">
+                  <span class="label">Category:</span>
+                  <span class="value">{{ investment.fundCategory || 'N/A' }}</span>
+                </div>
+                <div class="info-row">
+                  <span class="label">Investment Amount:</span>
+                  <span class="value">₹{{ investment.investmentAmount | number:'1.2-2' }}</span>
+                </div>
+                <div class="info-row">
+                  <span class="label">Current Value:</span>
+                  <span class="value">₹{{ investment.currentValue | number:'1.2-2' }}</span>
+                </div>
+                <div class="info-row" *ngIf="investment.units">
+                  <span class="label">Units:</span>
+                  <span class="value">{{ investment.units | number:'1.2-2' }}</span>
+                </div>
+                <div class="info-row" *ngIf="investment.returns">
+                  <span class="label">Returns:</span>
+                  <span class="value" [ngClass]="investment.returns >= 0 ? 'positive' : 'negative'">
+                    {{ investment.returns }}%
+                  </span>
+                </div>
+                <div class="info-row">
+                  <span class="label">Date:</span>
+                  <span class="value">{{ investment.investmentDate | date:'dd/MM/yyyy' }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Investment Form Modal -->
+          <div *ngIf="showInvestmentForm" class="modal-overlay" (click)="closeInvestmentForm()">
+            <div class="modal-content" (click)="$event.stopPropagation()">
+              <div class="modal-header">
+                <h3>New Investment Application</h3>
+                <button (click)="closeInvestmentForm()" class="close-btn">×</button>
+              </div>
+              <div class="modal-body">
+                <div class="form-group">
+                  <label>Fund Name *</label>
+                  <input type="text" [(ngModel)]="investmentForm.fundName" class="form-input" placeholder="e.g., HDFC Equity Fund" />
+                </div>
+                <div class="form-group">
+                  <label>Fund Category *</label>
+                  <select [(ngModel)]="investmentForm.fundCategory" class="form-input">
+                    <option value="">Select Category</option>
+                    <option value="Equity">Equity</option>
+                    <option value="Debt">Debt</option>
+                    <option value="Hybrid">Hybrid</option>
+                    <option value="Liquid">Liquid</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>Fund Scheme</label>
+                  <select [(ngModel)]="investmentForm.fundScheme" class="form-input">
+                    <option value="">Select Scheme</option>
+                    <option value="Growth">Growth</option>
+                    <option value="Dividend">Dividend</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>Investment Amount (₹) *</label>
+                  <input type="number" [(ngModel)]="investmentForm.investmentAmount" class="form-input" min="1000" />
+                </div>
+                <div class="form-group">
+                  <label>
+                    <input type="checkbox" [(ngModel)]="investmentForm.isSIP" />
+                    This is a SIP (Systematic Investment Plan)
+                  </label>
+                </div>
+                <div *ngIf="investmentForm.isSIP" class="form-group">
+                  <label>SIP Amount (₹) *</label>
+                  <input type="number" [(ngModel)]="investmentForm.sipAmount" class="form-input" min="500" />
+                </div>
+                <div *ngIf="investmentForm.isSIP" class="form-group">
+                  <label>SIP Duration (Months) *</label>
+                  <input type="number" [(ngModel)]="investmentForm.sipDuration" class="form-input" min="6" />
+                </div>
+              </div>
+              <div class="modal-footer">
+                <button (click)="closeInvestmentForm()" class="btn-secondary">Cancel</button>
+                <button (click)="submitInvestment()" [disabled]="isSubmittingInvestment" class="btn-primary">
+                  {{ isSubmittingInvestment ? 'Submitting...' : 'Submit Application' }}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Fixed Deposits Section -->
+        <div *ngIf="selectedFeature === 'fixed-deposits'" class="fixed-deposits-section">
+          <div class="feature-header">
+            <h2>🏦 Fixed Deposits</h2>
+            <button (click)="openFDForm()" class="action-btn">+ Open New FD</button>
+          </div>
+          
+          <div *ngIf="isLoadingFDs" class="loading-state">Loading fixed deposits...</div>
+          
+          <div *ngIf="!isLoadingFDs && fixedDeposits.length === 0" class="empty-state">
+            <p>No fixed deposits found. Open your first FD today!</p>
+          </div>
+          
+          <div *ngIf="!isLoadingFDs && fixedDeposits.length > 0" class="fds-list">
+            <div *ngFor="let fd of fixedDeposits" class="fd-card" [ngClass]="getFDStatusClass(fd.status)">
+              <div class="card-header">
+                <h3>FD Account: {{ fd.fdAccountNumber }}</h3>
+                <span class="status-badge" [ngClass]="getFDStatusClass(fd.status)">
+                  {{ fd.status }}
+                </span>
+              </div>
+              <div class="card-body">
+                <div class="info-row">
+                  <span class="label">Principal Amount:</span>
+                  <span class="value">₹{{ fd.principalAmount | number:'1.2-2' }}</span>
+                </div>
+                <div class="info-row">
+                  <span class="label">Interest Rate:</span>
+                  <span class="value">{{ fd.interestRate }}% p.a.</span>
+                </div>
+                <div class="info-row">
+                  <span class="label">Tenure:</span>
+                  <span class="value">{{ fd.tenure }} months</span>
+                </div>
+                <div class="info-row">
+                  <span class="label">Maturity Amount:</span>
+                  <span class="value highlight">₹{{ fd.maturityAmount | number:'1.2-2' }}</span>
+                </div>
+                <div class="info-row">
+                  <span class="label">Interest Amount:</span>
+                  <span class="value">₹{{ fd.interestAmount | number:'1.2-2' }}</span>
+                </div>
+                <div class="info-row">
+                  <span class="label">Start Date:</span>
+                  <span class="value">{{ fd.startDate | date:'dd/MM/yyyy' }}</span>
+                </div>
+                <div class="info-row">
+                  <span class="label">Maturity Date:</span>
+                  <span class="value">{{ fd.maturityDate | date:'dd/MM/yyyy' }}</span>
+                </div>
+                <div class="info-row">
+                  <span class="label">Interest Payout:</span>
+                  <span class="value">{{ fd.interestPayout }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- FD Form Modal -->
+          <div *ngIf="showFDForm" class="modal-overlay" (click)="closeFDForm()">
+            <div class="modal-content" (click)="$event.stopPropagation()">
+              <div class="modal-header">
+                <h3>Open New Fixed Deposit</h3>
+                <button (click)="closeFDForm()" class="close-btn">×</button>
+              </div>
+              <div class="modal-body">
+                <div class="form-group">
+                  <label>Principal Amount (₹) *</label>
+                  <input type="number" [(ngModel)]="fdForm.principalAmount" class="form-input" min="1000" />
+                </div>
+                <div class="form-group">
+                  <label>Interest Rate (%) *</label>
+                  <input type="number" [(ngModel)]="fdForm.interestRate" class="form-input" min="3" max="10" step="0.1" />
+                </div>
+                <div class="form-group">
+                  <label>Tenure (Months) *</label>
+                  <input type="number" [(ngModel)]="fdForm.tenure" class="form-input" min="6" max="120" />
+                </div>
+                <div class="form-group">
+                  <label>Interest Payout *</label>
+                  <select [(ngModel)]="fdForm.interestPayout" class="form-input">
+                    <option value="At Maturity">At Maturity</option>
+                    <option value="Monthly">Monthly</option>
+                    <option value="Quarterly">Quarterly</option>
+                  </select>
+                </div>
+                <div class="info-box">
+                  <p><strong>Estimated Maturity Amount:</strong> 
+                    ₹{{ (fdForm.principalAmount * Math.pow(1 + fdForm.interestRate/100, fdForm.tenure/12)) | number:'1.2-2' }}
+                  </p>
+                </div>
+              </div>
+              <div class="modal-footer">
+                <button (click)="closeFDForm()" class="btn-secondary">Cancel</button>
+                <button (click)="submitFD()" [disabled]="isSubmittingFD" class="btn-primary">
+                  {{ isSubmittingFD ? 'Submitting...' : 'Submit Application' }}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- EMI Monitoring Section -->
+        <div *ngIf="selectedFeature === 'emi-monitoring'" class="emi-monitoring-section">
+          <div class="feature-header">
+            <h2>📊 EMI Monitoring</h2>
+            <button (click)="loadEMIs()" class="action-btn">Refresh</button>
+          </div>
+          
+          <!-- EMI Summary -->
+          <div *ngIf="emiSummary" class="emi-summary-card">
+            <h3>EMI Summary</h3>
+            <div class="summary-grid">
+              <div class="summary-item">
+                <span class="summary-label">Total EMIs</span>
+                <span class="summary-value">{{ emiSummary.totalEmis }}</span>
+              </div>
+              <div class="summary-item">
+                <span class="summary-label">Paid</span>
+                <span class="summary-value success">{{ emiSummary.paidEmis }}</span>
+              </div>
+              <div class="summary-item">
+                <span class="summary-label">Pending</span>
+                <span class="summary-value warning">{{ emiSummary.pendingEmis }}</span>
+              </div>
+              <div class="summary-item">
+                <span class="summary-label">Overdue</span>
+                <span class="summary-value danger">{{ emiSummary.overdueEmis }}</span>
+              </div>
+              <div class="summary-item">
+                <span class="summary-label">Total Pending Amount</span>
+                <span class="summary-value">₹{{ emiSummary.totalPendingAmount | number:'1.2-2' }}</span>
+              </div>
+              <div class="summary-item">
+                <span class="summary-label">Next Due Amount</span>
+                <span class="summary-value">₹{{ emiSummary.nextDueAmount | number:'1.2-2' }}</span>
+              </div>
+            </div>
+          </div>
+          
+          <div *ngIf="isLoadingEMIs" class="loading-state">Loading EMIs...</div>
+          
+          <div *ngIf="!isLoadingEMIs && emis.length === 0" class="empty-state">
+            <p>No EMIs found.</p>
+          </div>
+          
+          <div *ngIf="!isLoadingEMIs && emis.length > 0" class="emis-list">
+            <div *ngFor="let emi of emis" class="emi-card" [ngClass]="getEMIStatusClass(emi.status)">
+              <div class="card-header">
+                <h3>EMI #{{ emi.emiNumber }} - {{ emi.loanAccountNumber }}</h3>
+                <span class="status-badge" [ngClass]="getEMIStatusClass(emi.status)">
+                  {{ emi.status }}
+                  <span *ngIf="isEMIOverdue(emi)" class="overdue-badge">OVERDUE</span>
+                </span>
+              </div>
+              <div class="card-body">
+                <div class="info-row">
+                  <span class="label">Due Date:</span>
+                  <span class="value" [ngClass]="isEMIOverdue(emi) ? 'overdue' : ''">
+                    {{ emi.dueDate | date:'dd/MM/yyyy' }}
+                  </span>
+                </div>
+                <div class="info-row">
+                  <span class="label">Total Amount:</span>
+                  <span class="value highlight">₹{{ emi.totalAmount | number:'1.2-2' }}</span>
+                </div>
+                <div class="info-row">
+                  <span class="label">Principal:</span>
+                  <span class="value">₹{{ emi.principalAmount | number:'1.2-2' }}</span>
+                </div>
+                <div class="info-row">
+                  <span class="label">Interest:</span>
+                  <span class="value">₹{{ emi.interestAmount | number:'1.2-2' }}</span>
+                </div>
+                <div class="info-row" *ngIf="emi.remainingPrincipal">
+                  <span class="label">Remaining Principal:</span>
+                  <span class="value">₹{{ emi.remainingPrincipal | number:'1.2-2' }}</span>
+                </div>
+                <div class="info-row" *ngIf="emi.paymentDate">
+                  <span class="label">Paid On:</span>
+                  <span class="value">{{ emi.paymentDate | date:'dd/MM/yyyy' }}</span>
+                </div>
+              </div>
+              <div class="card-footer" *ngIf="emi.status === 'Pending'">
+                <button (click)="payEMI(emi.id)" class="pay-emi-btn">Pay EMI</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Other Features -->
+        <div *ngIf="selectedFeature !== 'ai-assistant' && selectedFeature !== 'ml-loan-prediction' && selectedFeature !== 'investments' && selectedFeature !== 'fixed-deposits' && selectedFeature !== 'emi-monitoring' && selectedFeature !== 'deposit-request'">
+          <div class="feature-header">
+            <h2>{{ getFeatureTitle() }}</h2>
+            <button (click)="goTo(selectedFeature)" class="action-btn">Open Full Page</button>
+          </div>
+          <div class="feature-preview">
+            <p>{{ getFeatureDescription() }}</p>
+            <div class="preview-content">
+              <div class="preview-placeholder">
+                <span class="preview-icon">{{ getFeatureIcon() }}</span>
+                <p>Click "Open Full Page" to access {{ getFeatureTitle() }}</p>
+              </div>
             </div>
           </div>
         </div>
       </div>
     </div>
   </div>
+  
+  <!-- Chat Component -->
+  <app-chat></app-chat>
 </div>

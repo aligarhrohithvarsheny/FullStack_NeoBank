@@ -448,6 +448,9 @@
 /* Login Options */
 .login-options {
   margin-bottom: 20px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .login-option {
@@ -479,6 +482,401 @@
   background: linear-gradient(135deg, #059669 0%, #047857 100%);
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+/* Fingerprint login */
+.fingerprint-login {
+  margin-top: 16px;
+  padding: 14px;
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  border-radius: 10px;
+}
+
+.fingerprint-login.unsupported {
+  color: #475569;
+  background: #f1f5f9;
+}
+
+.fingerprint-status {
+  font-size: 13px;
+  color: #334155;
+  margin-bottom: 10px;
+}
+
+.fingerprint-btn {
+  width: 100%;
+  border: none;
+  background: linear-gradient(135deg, #1e3a8a 0%, #4338ca 100%);
+  color: #fff;
+  padding: 12px;
+  border-radius: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: transform 0.15s ease, box-shadow 0.2s ease;
+}
+
+.fingerprint-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px rgba(67, 56, 202, 0.2);
+}
+
+.fingerprint-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.fp-icon {
+  font-size: 18px;
+}
+
+.fingerprint-hint {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: #475569;
+}
+
+/* Graphical Password Login Section */
+.graphical-password-login {
+  padding: 20px 0;
+}
+
+.graphical-password-login .input-group {
+  margin-bottom: 25px;
+}
+
+/* Error Message with Setup Button */
+.error-message-with-action {
+  margin-top: 20px;
+  padding: 16px;
+  background: linear-gradient(135deg, #fef2f2, #fee2e2);
+  border: 2px solid #ef4444;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.error-content {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.error-icon {
+  font-size: 20px;
+}
+
+.error-text {
+  color: #dc2626;
+  font-size: 14px;
+  font-weight: 500;
+  flex: 1;
+}
+
+.setup-graphical-password-btn {
+  width: 100%;
+  padding: 12px 20px;
+  background: linear-gradient(135deg, #1e3a8a, #3b82f6);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: 0 4px 12px rgba(30, 58, 138, 0.3);
+}
+
+.setup-graphical-password-btn:hover {
+  background: linear-gradient(135deg, #1e40af, #2563eb);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(30, 58, 138, 0.4);
+}
+
+.setup-icon {
+  font-size: 18px;
+}
+
+.setup-hint {
+  margin: 0;
+  text-align: center;
+  font-size: 12px;
+  color: #64748b;
+  font-style: italic;
+}
+
+.password-note {
+  margin-top: 8px;
+}
+
+.password-note small {
+  color: #64748b;
+  font-size: 12px;
+  font-style: italic;
+}
+
+/* Graphical Password Setup Modal Styles */
+.graphical-password-setup-modal {
+  max-width: 700px;
+  width: 100%;
+  max-height: 90vh;
+  background: white;
+  border-radius: 15px;
+  border: 2px solid #1e3a8a;
+  box-shadow: 0 8px 25px rgba(30, 58, 138, 0.15);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.graphical-password-setup-modal .modal-header {
+  background: linear-gradient(135deg, #1e3a8a, #3b82f6);
+  color: white;
+  padding: 20px 24px;
+  border-radius: 13px 13px 0 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.graphical-password-setup-modal .modal-header h3 {
+  color: white;
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.graphical-password-setup-modal .close-btn {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  font-size: 24px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease;
+}
+
+.graphical-password-setup-modal .close-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.graphical-password-setup-modal .modal-body {
+  padding: 25px;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.setup-intro {
+  margin-bottom: 25px;
+  padding: 20px;
+  background: linear-gradient(135deg, #eff6ff, #dbeafe);
+  border: 2px solid #bfdbfe;
+  border-radius: 12px;
+}
+
+.intro-text {
+  color: #1e40af;
+  font-size: 15px;
+  line-height: 1.6;
+  margin-bottom: 15px;
+}
+
+.intro-text strong {
+  font-weight: 700;
+  font-size: 16px;
+}
+
+.login-note {
+  display: block;
+  margin-top: 8px;
+  font-size: 13px;
+  color: #1e40af;
+  font-weight: 500;
+}
+
+.email-input {
+  width: 100%;
+  padding: 12px 16px;
+  border: 2px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 14px;
+  transition: all 0.3s ease;
+  background: #f8fafc;
+  box-sizing: border-box;
+}
+
+.email-input:focus {
+  outline: none;
+  border-color: #1e3a8a;
+  background: white;
+  box-shadow: 0 0 0 3px rgba(30, 58, 138, 0.1);
+}
+
+.security-benefits {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.benefit-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #1e40af;
+  font-size: 14px;
+}
+
+.benefit-icon {
+  font-size: 18px;
+}
+
+.setup-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.graphical-password-setup-section {
+  margin: 20px 0;
+  padding: 20px;
+  background: #f8fafc;
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+}
+
+.password-input {
+  width: 100%;
+  padding: 12px 16px;
+  border: 2px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 14px;
+  transition: all 0.3s ease;
+  background: #f8fafc;
+  box-sizing: border-box;
+}
+
+.password-input:focus {
+  outline: none;
+  border-color: #1e3a8a;
+  background: white;
+  box-shadow: 0 0 0 3px rgba(30, 58, 138, 0.1);
+}
+
+.setup-form .error-message {
+  background: #fef2f2;
+  border: 2px solid #ef4444;
+  color: #dc2626;
+  padding: 12px 16px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.setup-form .modal-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 25px;
+}
+
+.skip-btn {
+  padding: 12px 24px;
+  border: 2px solid #6c757d;
+  background: white;
+  color: #6c757d;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 14px;
+}
+
+.skip-btn:hover {
+  background: #f8f9fa;
+  border-color: #5a6268;
+  color: #333;
+}
+
+.setup-submit-btn {
+  padding: 12px 24px;
+  background: linear-gradient(135deg, #1e3a8a, #3b82f6);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.setup-submit-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #1e40af, #2563eb);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(30, 58, 138, 0.3);
+}
+
+.setup-submit-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.setup-footer {
+  margin-top: 20px;
+  padding-top: 15px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.setup-footer .security-note {
+  color: #6b7280;
+  font-size: 12px;
+  text-align: center;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+/* Responsive styles for setup modal */
+@media (max-width: 768px) {
+  .graphical-password-setup-modal {
+    max-width: 95%;
+    max-height: 95vh;
+  }
+  
+  .graphical-password-setup-modal .modal-body {
+    padding: 20px;
+  }
+  
+  .setup-form .modal-actions {
+    flex-direction: column;
+  }
+  
+  .skip-btn,
+  .setup-submit-btn {
+    width: 100%;
+  }
 }
 
 /* QR Code Section */

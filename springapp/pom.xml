@@ -95,10 +95,21 @@
 			<artifactId>core</artifactId>
 			<version>3.5.2</version>
 		</dependency>
+		<!-- WebAuthn/FIDO2 Support -->
+		<dependency>
+			<groupId>com.webauthn4j</groupId>
+			<artifactId>webauthn4j-core</artifactId>
+			<version>0.30.0.RELEASE</version>
+		</dependency>
 		<dependency>
 			<groupId>com.google.zxing</groupId>
 			<artifactId>javase</artifactId>
 			<version>3.5.2</version>
+		</dependency>
+		<!-- WebSocket for real-time chat -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-websocket</artifactId>
 		</dependency>
 	</dependencies>
 

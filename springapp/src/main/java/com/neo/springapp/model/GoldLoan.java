@@ -100,5 +100,37 @@ public class GoldLoan {
             this.loanAmount = this.goldValue * 0.75; // 75% of gold value
         }
     }
+    
+    // Calculate loan amount based on verified gold value (75% of verified value)
+    public void calculateLoanAmountFromVerified() {
+        if (this.verifiedGoldValue != null) {
+            this.loanAmount = this.verifiedGoldValue * 0.75; // 75% of verified gold value
+        } else if (this.verifiedGoldGrams != null && this.goldRatePerGram != null) {
+            // Calculate from verified grams if verified value not set
+            this.verifiedGoldValue = this.verifiedGoldGrams * this.goldRatePerGram;
+            this.loanAmount = this.verifiedGoldValue * 0.75; // 75% of verified gold value
+        }
+    }
+    
+    // Calculate EMI automatically based on loan amount, interest rate, and tenure
+    public Double calculateEMI() {
+        if (this.loanAmount == null || this.loanAmount <= 0 || 
+            this.interestRate == null || this.tenure == null || this.tenure <= 0) {
+            return 0.0;
+        }
+        
+        Double principal = this.loanAmount;
+        Double annualRate = this.interestRate;
+        Integer tenureMonths = this.tenure;
+        Double monthlyRate = annualRate / (12 * 100);
+        
+        if (monthlyRate > 0) {
+            Double emi = (principal * monthlyRate * Math.pow(1 + monthlyRate, tenureMonths)) / 
+                         (Math.pow(1 + monthlyRate, tenureMonths) - 1);
+            return Math.round(emi * 100.0) / 100.0; // Round to 2 decimal places
+        } else {
+            return Math.round((principal / tenureMonths) * 100.0) / 100.0;
+        }
+    }
 }
 

@@ -80,4 +80,10 @@ public interface AccountRepository extends JpaRepository<Account, Long> {
     // Recent accounts
     @Query("SELECT a FROM Account a ORDER BY a.createdAt DESC")
     List<Account> findRecentAccounts(Pageable pageable);
+    
+    // Aadhar verification queries
+    @Query("SELECT a FROM Account a WHERE a.aadharVerified = false OR a.aadharVerificationStatus = 'PENDING'")
+    List<Account> findByAadharVerifiedFalseOrAadharVerificationStatus(String status);
+    
+    List<Account> findByAadharVerificationStatus(String status);
 }

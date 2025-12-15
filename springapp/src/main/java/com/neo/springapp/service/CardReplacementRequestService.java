@@ -81,10 +81,9 @@ public class CardReplacementRequestService {
             
             request.setNewCardNumber(newCardNumber);
             
-            // Update the user's card in the database
-            List<Card> userCards = cardRepository.findByAccountNumber(request.getAccountNumber());
-            if (!userCards.isEmpty()) {
-                Card userCard = userCards.get(0); // Get the first card for this account
+            // Update the user's card in the database - find by current card number
+            Card userCard = cardRepository.findByCardNumber(request.getCurrentCardNumber());
+            if (userCard != null) {
                 userCard.setCardNumber(newCardNumber);
                 userCard.setCvv(newCvv);
                 userCard.setExpiryDate(newExpiryDate);
@@ -95,7 +94,10 @@ public class CardReplacementRequestService {
                 cardRepository.save(userCard);
                 
                 System.out.println("✅ Card replaced for account: " + request.getAccountNumber() + 
-                                 " with new card number: " + newCardNumber);
+                                 " | Old card: " + request.getCurrentCardNumber() +
+                                 " | New card: " + newCardNumber);
+            } else {
+                System.out.println("⚠️ Card not found with number: " + request.getCurrentCardNumber());
             }
             
             return cardReplacementRequestRepository.save(request);

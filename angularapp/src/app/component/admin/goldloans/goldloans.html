@@ -110,24 +110,42 @@
             {{ loan.status }}
           </span>
         </div>
-        <div class="loan-actions" *ngIf="loan.status === 'Pending'">
-          <button
-            type="button"
-            class="action-btn approve-btn"
-            (click)="approveGoldLoan(loan, 'Approved')"
-            [disabled]="approving"
-          >
-            <span *ngIf="!approving">✓ Approve</span>
-            <span *ngIf="approving">Approving...</span>
-          </button>
-          <button
-            type="button"
-            class="action-btn reject-btn"
-            (click)="approveGoldLoan(loan, 'Rejected')"
-            [disabled]="approving"
-          >
-            ✗ Reject
-          </button>
+        <div class="loan-actions">
+          <div *ngIf="loan.status === 'Pending'">
+            <button
+              type="button"
+              class="action-btn approve-btn"
+              (click)="approveGoldLoan(loan, 'Approved')"
+              [disabled]="approving"
+            >
+              <span *ngIf="!approving">✓ Approve</span>
+              <span *ngIf="approving">Approving...</span>
+            </button>
+            <button
+              type="button"
+              class="action-btn reject-btn"
+              (click)="approveGoldLoan(loan, 'Rejected')"
+              [disabled]="approving"
+            >
+              ✗ Reject
+            </button>
+          </div>
+          <div *ngIf="loan.status === 'Approved'">
+            <button
+              type="button"
+              class="action-btn foreclosure-btn"
+              (click)="viewForeclosure(loan)"
+            >
+              💰 Foreclosure
+            </button>
+            <button
+              type="button"
+              class="action-btn emi-btn"
+              (click)="viewEmiDetails(loan)"
+            >
+              📅 EMI Details
+            </button>
+          </div>
         </div>
       </div>
 
@@ -295,8 +313,35 @@
               min="0"
               step="0.01"
               required
+              (input)="calculateLoanDetails()"
             />
             <small class="form-hint">Actual verified weight after testing</small>
+          </div>
+        </div>
+
+        <!-- Auto-calculated Loan Details -->
+        <div class="calculation-preview" *ngIf="goldDetailsForm.verifiedGoldGrams > 0 && currentGoldRate">
+          <h4>💰 Auto-Calculated Loan Details</h4>
+          <div class="calc-grid">
+            <div class="calc-item">
+              <span class="calc-label">Verified Gold Value:</span>
+              <span class="calc-value">₹{{ calculatedVerifiedValue | number:'1.2-2' }}</span>
+            </div>
+            <div class="calc-item highlight">
+              <span class="calc-label">Loan Amount (75%):</span>
+              <span class="calc-value">₹{{ calculatedLoanAmount | number:'1.2-2' }}</span>
+            </div>
+            <div class="calc-item" *ngIf="calculatedEMI > 0">
+              <span class="calc-label">Monthly EMI:</span>
+              <span class="calc-value">₹{{ calculatedEMI | number:'1.2-2' }}</span>
+            </div>
+            <div class="calc-item" *ngIf="calculatedTotalInterest > 0">
+              <span class="calc-label">Total Interest:</span>
+              <span class="calc-value">₹{{ calculatedTotalInterest | number:'1.2-2' }}</span>
+            </div>
+          </div>
+          <div class="calc-note">
+            <p><strong>Note:</strong> Loan amount will be automatically calculated as 75% of verified gold value and credited to user's account upon approval.</p>
           </div>
         </div>
 
@@ -334,6 +379,219 @@
           </button>
         </div>
       </form>
+    </div>
+  </div>
+</div>
+
+<!-- Foreclosure Modal -->
+<div class="modal-overlay" *ngIf="showForeclosureModal" (click)="closeForeclosureModal()">
+  <div class="modal-content" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3>💰 Loan Foreclosure Details</h3>
+      <button class="close-btn" (click)="closeForeclosureModal()">×</button>
+    </div>
+    <div class="modal-body" *ngIf="foreclosureDetails && selectedLoan">
+      <div class="foreclosure-summary">
+        <h4>Current Foreclosure Details</h4>
+        <div class="summary-grid">
+          <div class="summary-item">
+            <span class="label">Months Elapsed:</span>
+            <span class="value">{{ foreclosureDetails.monthsElapsed }}</span>
+          </div>
+          <div class="summary-item">
+            <span class="label">Principal Paid:</span>
+            <span class="value">₹{{ foreclosureDetails.principalPaid | number:'1.2-2' }}</span>
+          </div>
+          <div class="summary-item">
+            <span class="label">Interest Paid:</span>
+            <span class="value">₹{{ foreclosureDetails.interestPaid | number:'1.2-2' }}</span>
+          </div>
+          <div class="summary-item">
+            <span class="label">Remaining Principal:</span>
+            <span class="value">₹{{ foreclosureDetails.remainingPrincipal | number:'1.2-2' }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="edit-section">
+        <div class="edit-header">
+          <h4>✏️ Edit Foreclosure & Interest</h4>
+          <button 
+            type="button" 
+            class="edit-toggle-btn" 
+            (click)="toggleEditForeclosure()"
+            [class.active]="editingForeclosure"
+          >
+            {{ editingForeclosure ? 'Cancel Edit' : 'Edit' }}
+          </button>
+        </div>
+
+        <div class="edit-form" *ngIf="editingForeclosure">
+          <div class="form-group">
+            <label for="editedInterestRate">Interest Rate (% per annum) *</label>
+            <input
+              type="number"
+              id="editedInterestRate"
+              [(ngModel)]="editedInterestRate"
+              (input)="onInterestRateChange()"
+              min="0"
+              max="30"
+              step="0.1"
+              class="form-input"
+              required
+            />
+            <small class="form-hint">Current: {{ selectedLoan.interestRate }}%</small>
+          </div>
+
+          <div class="form-group">
+            <label for="editedForeclosureAmount">Foreclosure Amount (₹) *</label>
+            <input
+              type="number"
+              id="editedForeclosureAmount"
+              [(ngModel)]="editedForeclosureAmount"
+              (input)="onForeclosureAmountChange()"
+              min="0"
+              step="0.01"
+              class="form-input"
+              required
+            />
+            <small class="form-hint">Original: ₹{{ foreclosureDetails.totalForeclosureAmount | number:'1.2-2' }}</small>
+          </div>
+
+          <div class="calculated-amounts">
+            <h5>📊 Auto-Calculated Amounts</h5>
+            <div class="calc-grid">
+              <div class="calc-item">
+                <span class="calc-label">Interest Amount:</span>
+                <span class="calc-value">₹{{ calculatedInterestAmount | number:'1.2-2' }}</span>
+              </div>
+              <div class="calc-item highlight">
+                <span class="calc-label">Total Payable Amount:</span>
+                <span class="calc-value">₹{{ calculatedPayableAmount | number:'1.2-2' }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="readonly-details" *ngIf="!editingForeclosure">
+          <div class="detail-row">
+            <span class="label">Remaining Interest:</span>
+            <span class="value">₹{{ foreclosureDetails.remainingInterest | number:'1.2-2' }}</span>
+          </div>
+          <div class="detail-row">
+            <span class="label">Foreclosure Charges (4%):</span>
+            <span class="value">₹{{ foreclosureDetails.foreclosureCharges | number:'1.2-2' }}</span>
+          </div>
+          <div class="detail-row">
+            <span class="label">GST (18%):</span>
+            <span class="value">₹{{ foreclosureDetails.gst | number:'1.2-2' }}</span>
+          </div>
+          <div class="detail-row highlight">
+            <span class="label">Total Foreclosure Amount:</span>
+            <span class="value">₹{{ foreclosureDetails.totalForeclosureAmount | number:'1.2-2' }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" (click)="closeForeclosureModal()">Close</button>
+      <button 
+        *ngIf="editingForeclosure"
+        class="btn-save" 
+        (click)="saveForeclosureChanges()" 
+        [disabled]="processingForeclosure"
+      >
+        {{ processingForeclosure ? 'Processing...' : 'Save & Process Foreclosure' }}
+      </button>
+      <button 
+        *ngIf="!editingForeclosure"
+        class="btn-submit" 
+        (click)="processForeclosure()" 
+        [disabled]="processingForeclosure"
+      >
+        {{ processingForeclosure ? 'Processing...' : 'Process Foreclosure' }}
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- EMI Details Modal -->
+<div class="modal-overlay" *ngIf="showEmiDetailsModal" (click)="closeEmiDetailsModal()">
+  <div class="modal-content large-modal" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3>📅 EMI Schedule & Details</h3>
+      <button class="close-btn" (click)="closeEmiDetailsModal()">×</button>
+    </div>
+    <div class="modal-body" *ngIf="selectedLoan">
+      <div class="emi-summary">
+        <h4>Loan Summary</h4>
+        <div class="summary-grid">
+          <div class="summary-item">
+            <span class="label">Loan Amount:</span>
+            <span class="value">₹{{ selectedLoan.loanAmount | number:'1.2-2' }}</span>
+          </div>
+          <div class="summary-item">
+            <span class="label">Interest Rate:</span>
+            <span class="value">{{ selectedLoan.interestRate }}% p.a.</span>
+          </div>
+          <div class="summary-item">
+            <span class="label">Tenure:</span>
+            <span class="value">{{ selectedLoan.tenure }} months</span>
+          </div>
+          <div class="summary-item" *ngIf="emiSchedule.length > 0">
+            <span class="label">Monthly EMI:</span>
+            <span class="value highlight">₹{{ emiSchedule[0]?.totalAmount | number:'1.2-2' }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="emi-schedule-table" *ngIf="emiSchedule.length > 0">
+        <h4>EMI Schedule ({{ emiSchedule.length }} installments)</h4>
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>EMI #</th>
+                <th>Due Date & Time</th>
+                <th>Principal</th>
+                <th>Interest</th>
+                <th>Total EMI</th>
+                <th>Remaining Principal</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let emi of emiSchedule" [ngClass]="{'paid': emi.status === 'Paid', 'pending': emi.status === 'Pending', 'overdue': emi.status === 'Overdue', 'upcoming': isUpcomingEmi(emi.dueDate)}">
+                <td><strong>{{ emi.emiNumber }}</strong></td>
+                <td>
+                  <div class="date-time">
+                    <div class="date">{{ formatDate(emi.dueDate) }}</div>
+                    <div class="time-info">{{ getTimeUntilDue(emi.dueDate) }}</div>
+                  </div>
+                </td>
+                <td>₹{{ emi.principalAmount | number:'1.2-2' }}</td>
+                <td>₹{{ emi.interestAmount | number:'1.2-2' }}</td>
+                <td><strong>₹{{ emi.totalAmount | number:'1.2-2' }}</strong></td>
+                <td>₹{{ emi.remainingPrincipal | number:'1.2-2' }}</td>
+                <td>
+                  <span class="status-badge" [ngClass]="'status-' + emi.status.toLowerCase()">
+                    {{ emi.status }}
+                  </span>
+                  <span *ngIf="emi.paymentDate" class="payment-date">
+                    Paid: {{ formatDateTime(emi.paymentDate) }}
+                  </span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="no-emi" *ngIf="emiSchedule.length === 0">
+        <p>No EMI schedule available for this loan. EMI schedule will be generated after loan approval.</p>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" (click)="closeEmiDetailsModal()">Close</button>
     </div>
   </div>
 </div>

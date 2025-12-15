@@ -1,0 +1,66 @@
+<div class="investments-page">
+  <div class="page-header">
+    <button class="back-btn" (click)="goBack()">
+      <i class="fa fa-arrow-left"></i> Back
+    </button>
+    <h1><i class="fa fa-chart-line"></i> Investments Management</h1>
+    <button class="refresh-btn" (click)="loadInvestments()" [disabled]="isLoadingInvestments">
+      <i class="fa fa-sync-alt" [class.fa-spin]="isLoadingInvestments"></i> Refresh
+    </button>
+  </div>
+
+  <div class="filters-bar">
+    <select [(ngModel)]="investmentStatusFilter" (change)="loadInvestments()">
+      <option value="PENDING">Pending</option>
+      <option value="APPROVED">Approved</option>
+      <option value="REJECTED">Rejected</option>
+      <option value="ACTIVE">Active</option>
+      <option value="ALL">All</option>
+    </select>
+    <input type="text" [(ngModel)]="investmentSearchQuery" placeholder="Search by name, account, fund..." />
+  </div>
+
+  <div *ngIf="isLoadingInvestments" class="loading-state">
+    <p>Loading investments...</p>
+  </div>
+
+  <div *ngIf="!isLoadingInvestments && getFilteredInvestments().length === 0" class="no-data">
+    <p>No investments found</p>
+  </div>
+
+  <table class="data-table" *ngIf="!isLoadingInvestments && getFilteredInvestments().length > 0">
+    <thead>
+      <tr>
+        <th>User</th>
+        <th>Account</th>
+        <th>Fund Name</th>
+        <th>Category</th>
+        <th>Amount</th>
+        <th>Current Value</th>
+        <th>Units</th>
+        <th>Status</th>
+        <th>Date</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let inv of getFilteredInvestments()">
+        <td>{{ inv.userName }}</td>
+        <td>{{ inv.accountNumber }}</td>
+        <td>{{ inv.fundName || 'N/A' }}</td>
+        <td>{{ inv.fundCategory || 'N/A' }}</td>
+        <td>₹{{ inv.investmentAmount | number:'1.2-2' }}</td>
+        <td>₹{{ inv.currentValue | number:'1.2-2' }}</td>
+        <td>{{ inv.units | number:'1.2-2' }}</td>
+        <td><span class="status-badge" [ngClass]="inv.status.toLowerCase()">{{ inv.status }}</span></td>
+        <td>{{ inv.investmentDate | date:'dd/MM/yyyy' }}</td>
+        <td>
+          <button *ngIf="inv.status === 'PENDING'" (click)="approveInvestment(inv)" class="btn-approve">Approve</button>
+          <button *ngIf="inv.status === 'PENDING'" (click)="rejectInvestment(inv)" class="btn-reject">Reject</button>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+

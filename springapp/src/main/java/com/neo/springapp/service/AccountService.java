@@ -251,4 +251,50 @@ public class AccountService {
     public boolean isAccountNumberUnique(String accountNumber) {
         return accountRepository.findByAccountNumber(accountNumber) == null;
     }
+
+    /**
+     * Verify Aadhar for an account
+     */
+    public Account verifyAadhar(String aadharNumber, String verificationReference, String verifiedBy) {
+        Account account = getAccountByAadhar(aadharNumber);
+        if (account != null) {
+            account.setAadharVerified(true);
+            account.setAadharVerifiedDate(LocalDateTime.now());
+            account.setAadharVerificationReference(verificationReference != null ? verificationReference : "ADMIN_" + System.currentTimeMillis());
+            account.setAadharVerificationStatus("VERIFIED");
+            account.setLastUpdated(LocalDateTime.now());
+            return accountRepository.save(account);
+        }
+        return null;
+    }
+
+    /**
+     * Verify Aadhar by account number
+     */
+    public Account verifyAadharByAccountNumber(String accountNumber, String verificationReference, String verifiedBy) {
+        Account account = getAccountByNumber(accountNumber);
+        if (account != null) {
+            account.setAadharVerified(true);
+            account.setAadharVerifiedDate(LocalDateTime.now());
+            account.setAadharVerificationReference(verificationReference != null ? verificationReference : "ADMIN_" + System.currentTimeMillis());
+            account.setAadharVerificationStatus("VERIFIED");
+            account.setLastUpdated(LocalDateTime.now());
+            return accountRepository.save(account);
+        }
+        return null;
+    }
+
+    /**
+     * Get accounts pending Aadhar verification
+     */
+    public List<Account> getAccountsPendingAadharVerification() {
+        return accountRepository.findByAadharVerifiedFalseOrAadharVerificationStatus("PENDING");
+    }
+
+    /**
+     * Get accounts by Aadhar verification status
+     */
+    public List<Account> getAccountsByAadharVerificationStatus(String status) {
+        return accountRepository.findByAadharVerificationStatus(status);
+    }
 }

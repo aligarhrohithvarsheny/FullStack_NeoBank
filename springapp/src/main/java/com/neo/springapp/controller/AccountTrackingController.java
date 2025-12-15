@@ -2,6 +2,7 @@ package com.neo.springapp.controller;
 
 import com.neo.springapp.model.AccountTracking;
 import com.neo.springapp.service.AccountTrackingService;
+import com.neo.springapp.service.AccountService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
@@ -19,6 +20,9 @@ public class AccountTrackingController {
 
     @Autowired
     private AccountTrackingService accountTrackingService;
+
+    @Autowired
+    private AccountService accountService;
 
     /**
      * Get all tracking records with pagination
@@ -234,6 +238,52 @@ public class AccountTrackingController {
             @RequestParam(defaultValue = "10") int limit) {
         List<AccountTracking> tracking = accountTrackingService.getRecentTracking(limit);
         return ResponseEntity.ok(tracking);
+    }
+
+    /**
+     * Verify Aadhar for a tracking record
+     */
+    @PostMapping("/{id}/verify-aadhar")
+    public ResponseEntity<Map<String, Object>> verifyAadhar(
+            @PathVariable Long id,
+            @RequestParam(required = false) String verificationReference) {
+        try {
+            Optional<AccountTracking> trackingOpt = accountTrackingService.getTrackingById(id);
+            if (trackingOpt.isPresent()) {
+                AccountTracking tracking = trackingOpt.get();
+                // Verify Aadhar in Account
+                com.neo.springapp.model.Account account = accountService.verifyAadhar(
+                    tracking.getAadharNumber(),
+                    verificationReference,
+                    "Admin"
+                );
+                if (account != null) {
+                    // Update tracking status to approved
+                    accountTrackingService.updateTrackingStatus(id, "ADMIN_APPROVED", "Admin");
+                    Map<String, Object> response = new HashMap<>();
+                    response.put("success", true);
+                    response.put("message", "Aadhar verified successfully");
+                    response.put("account", account);
+                    response.put("tracking", accountTrackingService.getTrackingById(id).orElse(null));
+                    return ResponseEntity.ok(response);
+                } else {
+                    Map<String, Object> response = new HashMap<>();
+                    response.put("success", false);
+                    response.put("message", "Account not found for Aadhar: " + tracking.getAadharNumber());
+                    return ResponseEntity.badRequest().body(response);
+                }
+            } else {
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", false);
+                response.put("message", "Tracking record not found");
+                return ResponseEntity.notFound().build();
+            }
+        } catch (Exception e) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("message", "Failed to verify Aadhar: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(response);
+        }
     }
 }
 

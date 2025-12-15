@@ -16,9 +16,6 @@ public class OtpService {
     // OTP expiration time in milliseconds (5 minutes)
     private static final long OTP_EXPIRATION_TIME = 5 * 60 * 1000;
     
-    // OTP length
-    private static final int OTP_LENGTH = 6;
-    
     private final Random random = new Random();
     
     /**
@@ -33,8 +30,18 @@ public class OtpService {
      * Store OTP for an email address
      */
     public void storeOtp(String email, String otp) {
-        OtpData otpData = new OtpData(otp, System.currentTimeMillis());
-        otpStore.put(email, otpData);
+        // Normalize email to lowercase for consistent storage
+        String normalizedEmail = email != null ? email.toLowerCase().trim() : null;
+        
+        if (normalizedEmail == null || otp == null) {
+            System.out.println("❌ Cannot store OTP: Email or OTP is null");
+            return;
+        }
+        
+        OtpData otpData = new OtpData(otp.trim(), System.currentTimeMillis());
+        otpStore.put(normalizedEmail, otpData);
+        
+        System.out.println("✅ OTP stored for email: " + normalizedEmail + " (OTP: " + otp + ")");
         
         // Clean up expired OTPs periodically (simple approach)
         cleanupExpiredOtps();
@@ -44,30 +51,55 @@ public class OtpService {
      * Verify OTP for an email address
      */
     public boolean verifyOtp(String email, String otp) {
-        OtpData otpData = otpStore.get(email);
+        // Normalize email to lowercase for consistent lookup
+        String normalizedEmail = email != null ? email.toLowerCase().trim() : null;
+        
+        // Trim OTP to remove any whitespace
+        String trimmedOtp = otp != null ? otp.trim() : null;
+        
+        if (normalizedEmail == null || trimmedOtp == null) {
+            System.out.println("❌ OTP verification failed: Email or OTP is null");
+            return false;
+        }
+        
+        OtpData otpData = otpStore.get(normalizedEmail);
         
         if (otpData == null) {
-            System.out.println("No OTP found for email: " + email);
+            System.out.println("❌ No OTP found for email: " + normalizedEmail);
+            System.out.println("   Available emails in store: " + otpStore.keySet());
             return false;
         }
         
         // Check if OTP has expired
         long currentTime = System.currentTimeMillis();
-        if (currentTime - otpData.getTimestamp() > OTP_EXPIRATION_TIME) {
-            System.out.println("OTP expired for email: " + email);
-            otpStore.remove(email);
+        long timeElapsed = currentTime - otpData.getTimestamp();
+        if (timeElapsed > OTP_EXPIRATION_TIME) {
+            System.out.println("❌ OTP expired for email: " + normalizedEmail);
+            System.out.println("   Time elapsed: " + (timeElapsed / 1000) + " seconds (max: " + (OTP_EXPIRATION_TIME / 1000) + " seconds)");
+            otpStore.remove(normalizedEmail);
             return false;
         }
         
-        // Verify OTP
-        boolean isValid = otpData.getOtp().equals(otp);
+        // Verify OTP (compare trimmed values)
+        String storedOtp = otpData.getOtp();
+        boolean isValid = storedOtp.equals(trimmedOtp);
+        
+        // Debug logging
+        System.out.println("🔍 OTP Verification Debug:");
+        System.out.println("   Email: " + normalizedEmail);
+        System.out.println("   Stored OTP: " + storedOtp + " (length: " + storedOtp.length() + ")");
+        System.out.println("   Received OTP: " + trimmedOtp + " (length: " + trimmedOtp.length() + ")");
+        System.out.println("   Match: " + isValid);
+        System.out.println("   Time remaining: " + ((OTP_EXPIRATION_TIME - timeElapsed) / 1000) + " seconds");
         
         if (isValid) {
             // Remove OTP after successful verification
-            otpStore.remove(email);
-            System.out.println("OTP verified successfully for email: " + email);
+            otpStore.remove(normalizedEmail);
+            System.out.println("✅ OTP verified successfully for email: " + normalizedEmail);
         } else {
-            System.out.println("Invalid OTP for email: " + email);
+            System.out.println("❌ Invalid OTP for email: " + normalizedEmail);
+            System.out.println("   Expected: '" + storedOtp + "'");
+            System.out.println("   Received: '" + trimmedOtp + "'");
         }
         
         return isValid;

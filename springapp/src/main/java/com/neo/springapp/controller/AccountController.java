@@ -94,6 +94,55 @@ public class AccountController {
         return account != null ? ResponseEntity.ok(account) : ResponseEntity.notFound().build();
     }
 
+    /**
+     * Verify account by both Aadhar number and account number for security purposes
+     * Used in education loan application to verify child's account
+     */
+    @GetMapping("/verify")
+    public ResponseEntity<Map<String, Object>> verifyAccountByAadharAndNumber(
+            @RequestParam String aadharNumber,
+            @RequestParam String accountNumber) {
+        Map<String, Object> response = new HashMap<>();
+        
+        try {
+            // Get account by account number
+            Account account = accountService.getAccountByNumber(accountNumber);
+            
+            if (account == null) {
+                response.put("success", false);
+                response.put("message", "Account not found");
+                response.put("error", "ACCOUNT_NOT_FOUND");
+                return ResponseEntity.status(404).body(response);
+            }
+            
+            // Verify Aadhar matches
+            if (account.getAadharNumber() == null || account.getAadharNumber().isEmpty()) {
+                response.put("success", false);
+                response.put("message", "Aadhar number not found in account");
+                response.put("error", "AADHAR_NOT_FOUND");
+                return ResponseEntity.status(400).body(response);
+            }
+            
+            if (!account.getAadharNumber().equals(aadharNumber)) {
+                response.put("success", false);
+                response.put("message", "Aadhar number does not match the account number");
+                response.put("error", "AADHAR_MISMATCH");
+                return ResponseEntity.status(400).body(response);
+            }
+            
+            // Verification successful
+            response.put("success", true);
+            response.put("message", "Account verified successfully");
+            response.put("account", account);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "Failed to verify account: " + e.getMessage());
+            response.put("error", "VERIFICATION_ERROR");
+            return ResponseEntity.internalServerError().body(response);
+        }
+    }
+
     @PutMapping("/update/{id}")
     public ResponseEntity<Account> updateAccount(@PathVariable Long id, @RequestBody Account accountDetails) {
         Account updatedAccount = accountService.updateAccount(id, accountDetails);

@@ -1,0 +1,700 @@
+<!-- Include Font Awesome -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+<div class="dashboard-wrapper">
+  <!-- Left Sidebar -->
+  <aside class="sidebar" [class.collapsed]="sidebarCollapsed">
+    <div class="sidebar-header">
+      <div class="logo-section">
+        <i class="fa fa-bank"></i>
+        <span class="logo-text" *ngIf="!sidebarCollapsed">NeoBank</span>
+      </div>
+      <button class="sidebar-toggle" (click)="sidebarCollapsed = !sidebarCollapsed">
+        <i class="fa" [ngClass]="sidebarCollapsed ? 'fa-angle-right' : 'fa-angle-left'"></i>
+      </button>
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="nav-section">
+        <div class="nav-section-title" *ngIf="!sidebarCollapsed">Manager Menu</div>
+        <a class="nav-item" [class.active]="activeSection === 'dashboard'" (click)="setActiveSection('dashboard')">
+          <i class="fa fa-home"></i>
+          <span *ngIf="!sidebarCollapsed">Dashboard</span>
+        </a>
+        <a class="nav-item" [class.active]="activeSection === 'feature-access'" (click)="setActiveSection('feature-access')">
+          <i class="fa fa-shield-alt"></i>
+          <span *ngIf="!sidebarCollapsed">Feature Access Control</span>
+        </a>
+        <a class="nav-item" [class.active]="activeSection === 'create-admin'" (click)="setActiveSection('create-admin')">
+          <i class="fa fa-user-plus"></i>
+          <span *ngIf="!sidebarCollapsed">Create Admin Employee</span>
+        </a>
+        <a class="nav-item" [class.active]="activeSection === 'manager-features'" (click)="setActiveSection('manager-features')">
+          <i class="fa fa-tools"></i>
+          <span *ngIf="!sidebarCollapsed">Manager Features</span>
+          <span class="badge" *ngIf="!sidebarCollapsed && managerAccessibleFeatures.length > 0">{{ managerAccessibleFeatures.length }}</span>
+        </a>
+        <a class="nav-item" [class.active]="activeSection === 'blocked-admins'" (click)="setActiveSection('blocked-admins')">
+          <i class="fa fa-lock"></i>
+          <span *ngIf="!sidebarCollapsed">Blocked Admins</span>
+          <span class="badge" *ngIf="!sidebarCollapsed && blockedAdmins.length > 0">{{ blockedAdmins.length }}</span>
+        </a>
+        <a class="nav-item" [class.active]="activeSection === 'admin-management'" (click)="setActiveSection('admin-management')">
+          <i class="fa fa-user-shield"></i>
+          <span *ngIf="!sidebarCollapsed">Admin Management</span>
+        </a>
+      </div>
+    </nav>
+
+    <div class="sidebar-footer">
+      <button class="logout-btn-sidebar" (click)="logout()">
+        <i class="fa fa-sign-out-alt"></i>
+        <span *ngIf="!sidebarCollapsed">Logout</span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- Main Content Area -->
+  <div class="main-content">
+    <header class="main-header">
+      <div class="header-left">
+        <h2>Manager Dashboard</h2>
+      </div>
+      <div class="header-right">
+        <span class="admin-name">{{ managerName }}</span>
+        <button class="mobile-menu-toggle" (click)="sidebarCollapsed = !sidebarCollapsed">
+          <i class="fa fa-bars"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- Dashboard Home View -->
+    <div class="content-section" *ngIf="activeSection === 'dashboard'">
+      <div class="welcome-section">
+        <h1><i class="fa fa-user-shield"></i> Welcome, {{ managerName }}!</h1>
+        <p class="subtitle">Manage admin feature access and system settings</p>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-icon enabled">
+            <i class="fa fa-check-circle"></i>
+          </div>
+          <div class="stat-content">
+            <div class="stat-number">{{ getEnabledCount() }}</div>
+            <div class="stat-label">Enabled Features</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon disabled">
+            <i class="fa fa-times-circle"></i>
+          </div>
+          <div class="stat-content">
+            <div class="stat-number">{{ getDisabledCount() }}</div>
+            <div class="stat-label">Disabled Features</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon manager">
+            <i class="fa fa-tools"></i>
+          </div>
+          <div class="stat-content">
+            <div class="stat-number">{{ managerAccessibleFeatures.length }}</div>
+            <div class="stat-label">Manager Accessible</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon total">
+            <i class="fa fa-list"></i>
+          </div>
+          <div class="stat-content">
+            <div class="stat-number">{{ adminFeatures.length }}</div>
+            <div class="stat-label">Total Features</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="quick-actions">
+        <h3>Quick Actions</h3>
+        <div class="action-buttons">
+          <button class="action-btn" (click)="setActiveSection('feature-access')">
+            <i class="fa fa-shield-alt"></i>
+            Manage Feature Access
+          </button>
+          <button class="action-btn" (click)="toggleAllFeatures(true)">
+            <i class="fa fa-check-double"></i>
+            Enable All Features
+          </button>
+          <button class="action-btn" (click)="toggleAllFeatures(false)">
+            <i class="fa fa-ban"></i>
+            Disable All Features
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Feature Access Control Section -->
+    <div class="content-section" *ngIf="activeSection === 'feature-access'">
+      <div class="section-header-inline">
+        <h3><i class="fa fa-shield-alt"></i> Admin Feature Access Control</h3>
+        <p class="section-description">Select an admin and enable or disable features that they can access in their dashboard</p>
+      </div>
+
+      <!-- Admin Selection -->
+      <div class="admin-selection-section">
+        <h4><i class="fa fa-users"></i> Select Admin</h4>
+        <div class="admin-list" *ngIf="!isLoadingAdmins">
+          <div 
+            *ngFor="let admin of allAdmins" 
+            class="admin-card"
+            [class.selected]="selectedAdmin && selectedAdmin.email === admin.email"
+            (click)="selectAdmin(admin)"
+          >
+            <div class="admin-avatar">
+              <i class="fa fa-user"></i>
+            </div>
+            <div class="admin-info">
+              <h5>{{ admin.name || 'Admin' }}</h5>
+              <p class="admin-email">{{ admin.email }}</p>
+              <p class="admin-id" *ngIf="admin.employeeId">ID: {{ admin.employeeId }}</p>
+            </div>
+            <div class="admin-status">
+              <span class="status-badge" [ngClass]="admin.profileComplete ? 'complete' : 'incomplete'">
+                <i class="fa" [ngClass]="admin.profileComplete ? 'fa-check-circle' : 'fa-clock'"></i>
+                {{ admin.profileComplete ? 'Profile Complete' : 'Profile Incomplete' }}
+              </span>
+              <span class="status-badge locked" *ngIf="admin.accountLocked">
+                <i class="fa fa-lock"></i>
+                Account Locked
+              </span>
+            </div>
+            <div class="admin-actions-inline" (click)="$event.stopPropagation()">
+              <button class="btn-reset-password-small" (click)="openAdminPasswordResetModal(admin)" title="Reset Password">
+                <i class="fa fa-key"></i>
+                Reset Password
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="loading-message" *ngIf="isLoadingAdmins">
+          <i class="fa fa-spinner fa-spin"></i> Loading admins...
+        </div>
+        <div class="no-admins" *ngIf="!isLoadingAdmins && allAdmins.length === 0">
+          <i class="fa fa-user-slash"></i>
+          <p>No admin employees found. Create one in the "Create Admin Employee" section.</p>
+        </div>
+      </div>
+
+      <!-- Selected Admin Info -->
+      <div class="selected-admin-info" *ngIf="selectedAdmin">
+        <div class="info-card">
+          <h4><i class="fa fa-user-check"></i> Managing Features for: {{ selectedAdmin.name }}</h4>
+          <p class="admin-details">
+            <span><i class="fa fa-envelope"></i> {{ selectedAdmin.email }}</span>
+            <span *ngIf="selectedAdmin.employeeId"><i class="fa fa-id-card"></i> {{ selectedAdmin.employeeId }}</span>
+          </p>
+        </div>
+      </div>
+
+      <!-- Bulk Actions (only show when admin is selected) -->
+      <div class="bulk-actions" *ngIf="selectedAdmin">
+        <button class="btn-primary" (click)="toggleAllFeatures(true)">
+          <i class="fa fa-check-double"></i> Enable All
+        </button>
+        <button class="btn-secondary" (click)="toggleAllFeatures(false)">
+          <i class="fa fa-ban"></i> Disable All
+        </button>
+        <button class="btn-success" (click)="saveFeatureAccess()">
+          <i class="fa fa-save"></i> Save Changes for {{ selectedAdmin.name }}
+        </button>
+      </div>
+
+      <!-- Warning if no admin selected -->
+      <div class="warning-message" *ngIf="!selectedAdmin && !isLoadingAdmins && allAdmins.length > 0">
+        <i class="fa fa-exclamation-triangle"></i>
+        <p>Please select an admin from the list above to manage their feature access.</p>
+      </div>
+
+      <!-- Filters -->
+      <div class="filter-section">
+        <div class="filter-group">
+          <label>Filter by Category:</label>
+          <select [(ngModel)]="featureFilter" (change)="filterFeatures()" class="filter-select">
+            <option *ngFor="let cat of getCategories()" [value]="cat">{{ cat }}</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <input 
+            type="text" 
+            [(ngModel)]="featureSearchQuery" 
+            (input)="filterFeatures()"
+            placeholder="Search features..."
+            class="search-input"
+          >
+        </div>
+      </div>
+
+      <!-- Features List (only show when admin is selected) -->
+      <div class="features-grid" *ngIf="selectedAdmin">
+        <div 
+          *ngFor="let feature of filteredFeatures" 
+          class="feature-card"
+          [class.enabled]="feature.enabled"
+          [class.disabled]="!feature.enabled"
+        >
+          <div class="feature-header">
+            <div class="feature-icon">
+              <i [class]="'fa ' + feature.icon"></i>
+            </div>
+            <div class="feature-info">
+              <h4>{{ feature.name }}</h4>
+              <p class="feature-category">{{ feature.category }}</p>
+            </div>
+            <div class="feature-toggle">
+              <label class="toggle-switch">
+                <input 
+                  type="checkbox" 
+                  [checked]="feature.enabled"
+                  (change)="toggleFeature(feature)"
+                >
+                <span class="slider"></span>
+              </label>
+            </div>
+          </div>
+          <div class="feature-description">
+            <p>{{ feature.description }}</p>
+          </div>
+          <div class="feature-status">
+            <span class="status-badge" [ngClass]="feature.enabled ? 'enabled' : 'disabled'">
+              <i class="fa" [ngClass]="feature.enabled ? 'fa-check' : 'fa-times'"></i>
+              {{ feature.enabled ? 'Enabled' : 'Disabled' }}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div class="no-features" *ngIf="filteredFeatures.length === 0">
+        <i class="fa fa-search"></i>
+        <p>No features found matching your search criteria.</p>
+      </div>
+    </div>
+
+    <!-- Manager Features Section (Features disabled for admins that manager can use) -->
+    <div class="content-section" *ngIf="activeSection === 'manager-features'">
+      <div class="section-header-inline">
+        <h3><i class="fa fa-tools"></i> Manager Feature Access</h3>
+        <p class="section-description">These features are disabled for admins. As manager, you can access and use these features.</p>
+      </div>
+
+      <!-- Info Banner -->
+      <div class="info-banner" *ngIf="managerAccessibleFeatures.length > 0">
+        <i class="fa fa-info-circle"></i>
+        <p>You have access to <strong>{{ managerAccessibleFeatures.length }}</strong> feature(s) that are currently disabled for admins. Click on any feature to use it.</p>
+      </div>
+
+      <!-- No Features Message -->
+      <div class="no-features-message" *ngIf="managerAccessibleFeatures.length === 0">
+        <i class="fa fa-check-circle"></i>
+        <h4>All Features Enabled for Admins</h4>
+        <p>Currently, all features are enabled for admins. When you disable a feature for an admin, it will appear here for you to use.</p>
+      </div>
+
+      <!-- Filters -->
+      <div class="filter-section" *ngIf="managerAccessibleFeatures.length > 0">
+        <div class="filter-group">
+          <label>Filter by Category:</label>
+          <select [(ngModel)]="managerFeatureFilter" (change)="filterManagerFeatures()" class="filter-select">
+            <option value="ALL">All Categories</option>
+            <option *ngFor="let cat of getCategories()" [value]="cat">{{ cat }}</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <input 
+            type="text" 
+            [(ngModel)]="managerFeatureSearchQuery" 
+            (input)="filterManagerFeatures()"
+            placeholder="Search features..."
+            class="search-input"
+          >
+        </div>
+      </div>
+
+      <!-- Manager Accessible Features List -->
+      <div class="manager-features-grid" *ngIf="filteredManagerFeatures.length > 0">
+        <div 
+          *ngFor="let feature of filteredManagerFeatures" 
+          class="manager-feature-card"
+          (click)="navigateToFeature(feature.id)"
+        >
+          <div class="feature-header">
+            <div class="feature-icon manager-icon">
+              <i [class]="'fa ' + feature.icon"></i>
+            </div>
+            <div class="feature-info">
+              <h4>{{ feature.name }}</h4>
+              <p class="feature-category">{{ feature.category }}</p>
+            </div>
+            <div class="feature-action">
+              <i class="fa fa-arrow-right"></i>
+            </div>
+          </div>
+          <div class="feature-description">
+            <p>{{ feature.description }}</p>
+          </div>
+          <div class="feature-status">
+            <span class="status-badge manager-badge">
+              <i class="fa fa-tools"></i>
+              Manager Access Only
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div class="no-features" *ngIf="filteredManagerFeatures.length === 0 && managerAccessibleFeatures.length > 0">
+        <i class="fa fa-search"></i>
+        <p>No features found matching your search criteria.</p>
+      </div>
+    </div>
+
+    <!-- Create Admin Employee Section -->
+    <div class="content-section" *ngIf="activeSection === 'create-admin'">
+      <div class="section-header-inline">
+        <h3><i class="fa fa-user-plus"></i> Create Admin Employee</h3>
+        <p class="section-description">Create new admin employee accounts. Employees will need to complete their profile after first login.</p>
+      </div>
+
+      <div class="create-admin-form">
+        <form (ngSubmit)="createAdminEmployee()">
+          <div class="form-row">
+            <div class="form-group">
+              <label for="employeeName">Employee Name <span class="required">*</span></label>
+              <input 
+                type="text" 
+                id="employeeName"
+                [(ngModel)]="newAdmin.name"
+                name="employeeName"
+                placeholder="Enter employee full name"
+                class="form-input"
+                required
+              >
+            </div>
+            <div class="form-group">
+              <label for="employeeEmail">Email <span class="required">*</span></label>
+              <input 
+                type="email" 
+                id="employeeEmail"
+                [(ngModel)]="newAdmin.email"
+                name="employeeEmail"
+                placeholder="employee@neobank.com"
+                class="form-input"
+                required
+              >
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="employeePassword">Password <span class="required">*</span></label>
+              <input 
+                type="password" 
+                id="employeePassword"
+                [(ngModel)]="newAdmin.password"
+                name="employeePassword"
+                placeholder="Enter password"
+                class="form-input"
+                required
+                minlength="6"
+              >
+              <small class="form-hint">Minimum 6 characters</small>
+            </div>
+            <div class="form-group">
+              <label for="employeeId">Employee ID</label>
+              <input 
+                type="text" 
+                id="employeeId"
+                [(ngModel)]="newAdmin.employeeId"
+                name="employeeId"
+                placeholder="EMP001 (optional)"
+                class="form-input"
+              >
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" class="btn-primary" [disabled]="isCreatingAdmin">
+              <i class="fa fa-user-plus"></i>
+              <span *ngIf="!isCreatingAdmin">Create Admin Employee</span>
+              <span *ngIf="isCreatingAdmin">Creating...</span>
+            </button>
+            <button type="button" class="btn-secondary" (click)="clearAdminForm()">
+              <i class="fa fa-times"></i> Clear
+            </button>
+          </div>
+        </form>
+
+        <div class="success-message" *ngIf="adminCreationSuccess">
+          <i class="fa fa-check-circle"></i>
+          <div>
+            <p><strong>Admin employee created successfully!</strong></p>
+            <p>Email: {{ newAdmin.email }}</p>
+            <p>Password: {{ newAdmin.password }}</p>
+            <p class="note">Employee will need to complete their profile after first login.</p>
+          </div>
+        </div>
+
+        <div class="error-message" *ngIf="adminCreationError">
+          <i class="fa fa-exclamation-circle"></i>
+          {{ adminCreationError }}
+        </div>
+      </div>
+    </div>
+
+    <!-- Blocked Admins Section -->
+    <div class="content-section" *ngIf="activeSection === 'blocked-admins'">
+      <div class="section-header-inline">
+        <h3><i class="fa fa-lock"></i> Blocked Admin Accounts</h3>
+        <p class="section-description">Manage admin accounts that have been locked due to 3 failed login attempts. You can unblock accounts or reset passwords.</p>
+      </div>
+
+      <!-- Loading State -->
+      <div class="loading-message" *ngIf="isLoadingBlockedAdmins">
+        <i class="fa fa-spinner fa-spin"></i> Loading blocked admins...
+      </div>
+
+      <!-- No Blocked Admins -->
+      <div class="no-blocked-admins" *ngIf="!isLoadingBlockedAdmins && blockedAdmins.length === 0">
+        <i class="fa fa-check-circle"></i>
+        <h4>No Blocked Admins</h4>
+        <p>All admin accounts are currently active. Accounts will appear here after 3 failed login attempts.</p>
+      </div>
+
+      <!-- Blocked Admins List -->
+      <div class="blocked-admins-list" *ngIf="!isLoadingBlockedAdmins && blockedAdmins.length > 0">
+        <div *ngFor="let admin of blockedAdmins" class="blocked-admin-card">
+          <div class="admin-info-section">
+            <div class="admin-avatar blocked">
+              <i class="fa fa-user-lock"></i>
+            </div>
+            <div class="admin-details">
+              <h4>{{ admin.name || 'Admin' }}</h4>
+              <p class="admin-email"><i class="fa fa-envelope"></i> {{ admin.email }}</p>
+              <p class="admin-id" *ngIf="admin.employeeId"><i class="fa fa-id-card"></i> {{ admin.employeeId }}</p>
+              <p class="blocked-info">
+                <i class="fa fa-exclamation-triangle"></i>
+                Account locked due to 3 failed login attempts
+              </p>
+              <p class="failed-attempts" *ngIf="admin.failedLoginAttempts">
+                Failed attempts: {{ admin.failedLoginAttempts }}
+              </p>
+            </div>
+          </div>
+          <div class="admin-actions">
+            <button class="btn-unblock" (click)="unblockAdmin(admin)" [disabled]="isUnblocking">
+              <i class="fa fa-unlock"></i>
+              <span *ngIf="!isUnblocking">Unblock Account</span>
+              <span *ngIf="isUnblocking">Unblocking...</span>
+            </button>
+            <button class="btn-reset-password" (click)="openResetPasswordModal(admin)">
+              <i class="fa fa-key"></i>
+              Reset Password
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Reset Password Modal (for blocked admins) -->
+    <div class="modal-overlay" *ngIf="showResetPasswordModal" (click)="closeResetPasswordModal()">
+      <div class="modal-content" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h3><i class="fa fa-key"></i> Reset Password</h3>
+          <button class="modal-close" (click)="closeResetPasswordModal()">
+            <i class="fa fa-times"></i>
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="admin-info-box">
+            <p><strong>Admin:</strong> {{ selectedBlockedAdmin?.name || 'Admin' }}</p>
+            <p><strong>Email:</strong> {{ selectedBlockedAdmin?.email }}</p>
+          </div>
+          <form (ngSubmit)="resetAdminPassword()">
+            <div class="form-group">
+              <label for="newPasswordBlocked">New Password <span class="required">*</span></label>
+              <input 
+                type="password" 
+                id="newPasswordBlocked"
+                [(ngModel)]="newPassword"
+                name="newPasswordBlocked"
+                placeholder="Enter new password (min 6 characters)"
+                class="form-input"
+                required
+                minlength="6"
+              >
+            </div>
+            <div class="form-group">
+              <label for="confirmPasswordBlocked">Confirm Password <span class="required">*</span></label>
+              <input 
+                type="password" 
+                id="confirmPasswordBlocked"
+                [(ngModel)]="confirmPassword"
+                name="confirmPasswordBlocked"
+                placeholder="Confirm new password"
+                class="form-input"
+                required
+                minlength="6"
+              >
+            </div>
+            <div class="form-actions">
+              <button type="button" class="btn-secondary" (click)="closeResetPasswordModal()">
+                Cancel
+              </button>
+              <button type="submit" class="btn-primary" [disabled]="isResettingPassword">
+                <i class="fa fa-key"></i>
+                <span *ngIf="!isResettingPassword">Reset Password</span>
+                <span *ngIf="isResettingPassword">Resetting...</span>
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Reset Password Modal (for any admin) -->
+    <div class="modal-overlay" *ngIf="showAdminPasswordResetModal" (click)="closeAdminPasswordResetModal()">
+      <div class="modal-content" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h3><i class="fa fa-key"></i> Reset Admin Password</h3>
+          <button class="modal-close" (click)="closeAdminPasswordResetModal()">
+            <i class="fa fa-times"></i>
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="admin-info-box">
+            <p><strong>Admin:</strong> {{ selectedAdminForPasswordReset?.name || 'Admin' }}</p>
+            <p><strong>Email:</strong> {{ selectedAdminForPasswordReset?.email }}</p>
+            <p><strong>Employee ID:</strong> {{ selectedAdminForPasswordReset?.employeeId || 'N/A' }}</p>
+          </div>
+          <form (ngSubmit)="resetAnyAdminPassword()">
+            <div class="form-group">
+              <label for="newPasswordAdmin">New Password <span class="required">*</span></label>
+              <input 
+                type="password" 
+                id="newPasswordAdmin"
+                [(ngModel)]="newPassword"
+                name="newPasswordAdmin"
+                placeholder="Enter new password (min 6 characters)"
+                class="form-input"
+                required
+                minlength="6"
+              >
+            </div>
+            <div class="form-group">
+              <label for="confirmPasswordAdmin">Confirm Password <span class="required">*</span></label>
+              <input 
+                type="password" 
+                id="confirmPasswordAdmin"
+                [(ngModel)]="confirmPassword"
+                name="confirmPasswordAdmin"
+                placeholder="Confirm new password"
+                class="form-input"
+                required
+                minlength="6"
+              >
+            </div>
+            <div class="form-actions">
+              <button type="button" class="btn-secondary" (click)="closeAdminPasswordResetModal()">
+                Cancel
+              </button>
+              <button type="submit" class="btn-primary" [disabled]="isResettingPassword">
+                <i class="fa fa-key"></i>
+                <span *ngIf="!isResettingPassword">Reset Password</span>
+                <span *ngIf="isResettingPassword">Resetting...</span>
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Admin Management Section -->
+    <div class="content-section" *ngIf="activeSection === 'admin-management'">
+      <div class="section-header-inline">
+        <h3><i class="fa fa-user-shield"></i> Admin Management</h3>
+        <p class="section-description">View and manage admin accounts</p>
+      </div>
+
+      <!-- Manager Login Information -->
+      <div class="login-info-card">
+        <div class="card-header">
+          <h4><i class="fa fa-key"></i> Manager Login Information</h4>
+        </div>
+        <div class="card-body">
+          <div class="info-section">
+            <h5>Default Manager Account</h5>
+            <div class="credentials-box">
+              <div class="credential-item">
+                <span class="label">Email:</span>
+                <span class="value">manager@neobank.com</span>
+                <button class="copy-btn" (click)="copyToClipboard('manager@neobank.com')">
+                  <i class="fa fa-copy"></i>
+                </button>
+              </div>
+              <div class="credential-item">
+                <span class="label">Password:</span>
+                <span class="value">manager123</span>
+                <button class="copy-btn" (click)="copyToClipboard('manager123')">
+                  <i class="fa fa-copy"></i>
+                </button>
+              </div>
+              <div class="credential-item">
+                <span class="label">Role:</span>
+                <span class="value">MANAGER</span>
+              </div>
+            </div>
+            <div class="warning-box">
+              <i class="fa fa-exclamation-triangle"></i>
+              <p><strong>Important:</strong> Change the default password after first login for security!</p>
+            </div>
+          </div>
+
+          <div class="action-section">
+            <h5>Create Default Manager Account</h5>
+            <p>If no manager account exists, you can create a default one:</p>
+            <button class="btn-primary" (click)="createDefaultManager()">
+              <i class="fa fa-user-plus"></i> Create Default Manager
+            </button>
+          </div>
+
+          <div class="info-section">
+            <h5>How to Login as Manager</h5>
+            <ol class="steps-list">
+              <li>Navigate to: <code>/admin/login</code></li>
+              <li>Select <strong>"Manager"</strong> from the "Access Role" dropdown</li>
+              <li>Enter the email and password above</li>
+              <li>Click "Login"</li>
+              <li>You will be redirected to the Manager Dashboard</li>
+            </ol>
+          </div>
+
+          <div class="info-section">
+            <h5>Create Custom Manager Account</h5>
+            <p>To create a custom manager account, use the API endpoint:</p>
+            <div class="code-block">
+              <code>
+                POST /api/admins/create<br>
+                Body: {{ '{' }}<br>
+                &nbsp;&nbsp;"name": "Manager Name",<br>
+                &nbsp;&nbsp;"email": "manager@example.com",<br>
+                &nbsp;&nbsp;"password": "secure-password",<br>
+                &nbsp;&nbsp;"role": "MANAGER",<br>
+                &nbsp;&nbsp;"employeeId": "MGR001"<br>
+                {{ '}' }}
+              </code>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+

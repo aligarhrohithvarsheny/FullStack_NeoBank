@@ -2,9 +2,16 @@ export interface Admin {
   id?: number;
   name: string;
   email: string;
-  password: string;
+  password?: string; // Optional for updates
   role: string;
-  pan: string;
+  pan?: string;
+  employeeId?: string;
+  address?: string;
+  aadharNumber?: string;
+  mobileNumber?: string;
+  qualifications?: string;
+  createdAt?: string;
+  lastUpdated?: string;
 }
 
 // Admin creation/update DTOs
@@ -22,6 +29,11 @@ export interface UpdateAdminRequest {
   password?: string;
   role?: string;
   pan?: string;
+  employeeId?: string;
+  address?: string;
+  aadharNumber?: string;
+  mobileNumber?: string;
+  qualifications?: string;
 }
 
 // Admin authentication DTOs

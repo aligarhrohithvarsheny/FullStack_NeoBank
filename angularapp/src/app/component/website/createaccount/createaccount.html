@@ -281,6 +281,107 @@
       </div>
     </div>
 
+    <!-- Child Account Section -->
+    <div class="child-account-section">
+      <h3><i class="fa fa-child"></i> Child Account (Optional)</h3>
+      <p class="info-text">If you want to create a child account (age below 18), please fill in the details below.</p>
+      
+      <div class="form-group">
+        <label>
+          <input 
+            type="checkbox" 
+            [(ngModel)]="hasChildAccount"
+            [ngModelOptions]="{standalone: true}"
+            (change)="onChildAccountToggle()"
+          />
+          <span>Create child account</span>
+        </label>
+      </div>
+
+      <div *ngIf="hasChildAccount" class="child-account-fields">
+        <!-- Child Name -->
+        <div class="form-group">
+          <label>Child's Full Name</label>
+          <input type="text" formControlName="childName" placeholder="Enter child's name" />
+          <div *ngIf="submitted && f['childName'].errors" class="error">
+            <small *ngIf="f['childName'].errors['required']">Child's name is required.</small>
+            <small *ngIf="f['childName'].errors['minlength']">Name must be at least 2 characters.</small>
+          </div>
+        </div>
+
+        <!-- Child Email -->
+        <div class="form-group">
+          <label>Child's Email (Gmail only)</label>
+          <input type="email" formControlName="childEmail" placeholder="Enter child's Gmail" />
+          <div *ngIf="submitted && f['childEmail'].errors" class="error">
+            <small *ngIf="f['childEmail'].errors['required']">Child's email is required.</small>
+            <small *ngIf="f['childEmail'].errors['email']">Invalid email format.</small>
+            <small *ngIf="f['childEmail'].errors['gmailOnly']">Only Gmail addresses allowed.</small>
+          </div>
+        </div>
+
+        <!-- Child DOB -->
+        <div class="form-group">
+          <label>Child's Date of Birth</label>
+          <input type="date" formControlName="childDob" (change)="validateChildAge()" />
+          <div *ngIf="submitted && f['childDob'].errors" class="error">
+            <small *ngIf="f['childDob'].errors['required']">Child's date of birth is required.</small>
+            <small *ngIf="f['childDob'].errors['ageRestriction']">Child must be below 18 years of age.</small>
+          </div>
+          <div *ngIf="childAgeError" class="error">
+            <small>{{ childAgeError }}</small>
+          </div>
+        </div>
+
+        <!-- Child Studies -->
+        <div class="form-group">
+          <label>Child's Studies/Education</label>
+          <input type="text" formControlName="childStudies" placeholder="e.g., Class 10, Class 12, B.Tech, etc." />
+          <div *ngIf="submitted && f['childStudies'].errors" class="error">
+            <small>Child's studies/education is required.</small>
+          </div>
+        </div>
+
+        <!-- Form 60 -->
+        <div class="form-group">
+          <label>Form 60 Details</label>
+          <textarea formControlName="form60" placeholder="Enter Form 60 details for child account" rows="3"></textarea>
+          <div *ngIf="submitted && f['form60'].errors" class="error">
+            <small>Form 60 details are required for child accounts.</small>
+          </div>
+        </div>
+
+        <!-- PAN Child Form -->
+        <div class="form-group">
+          <label>PAN Child Form Details</label>
+          <textarea formControlName="panChildForm" placeholder="Enter PAN child form details" rows="3"></textarea>
+          <div *ngIf="submitted && f['panChildForm'].errors" class="error">
+            <small>PAN child form details are required for child accounts.</small>
+          </div>
+        </div>
+
+        <!-- Child Password -->
+        <div class="form-group">
+          <label>Child's Password</label>
+          <input type="password" formControlName="childPassword" placeholder="Enter password for child account" />
+          <div *ngIf="submitted && f['childPassword'].errors" class="error">
+            <small *ngIf="f['childPassword'].errors?.['required']">Child's password is required.</small>
+            <small *ngIf="f['childPassword'].errors?.['minlength']">Password must be at least 6 characters.</small>
+          </div>
+        </div>
+
+        <!-- Confirm Child Password -->
+        <div class="form-group">
+          <label>Confirm Child's Password</label>
+          <input type="password" formControlName="confirmChildPassword" placeholder="Re-enter child's password" />
+          <div *ngIf="submitted && (f['confirmChildPassword'].errors || childForm.errors?.['childPasswordsMismatch'])" class="error">
+            <small *ngIf="f['confirmChildPassword'].errors?.['required']">Confirm password is required.</small>
+            <small *ngIf="childForm.errors?.['childPasswordsMismatch']">Passwords do not match.</small>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Terms and Conditions -->
     <div class="form-group terms-group">
       <label class="terms-label">

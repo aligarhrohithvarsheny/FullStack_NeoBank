@@ -1,0 +1,228 @@
+<div class="ai-assistant-container">
+  <div class="ai-header">
+    <div class="ai-title-section">
+      <h2>🤖 AI Financial Assistant</h2>
+      <p class="subtitle">Smart insights based on your spending patterns</p>
+    </div>
+    <button class="refresh-btn" (click)="analyzeSpending()" [disabled]="loading">
+      <span *ngIf="!loading">🔄 Refresh Analysis</span>
+      <span *ngIf="loading">⏳ Analyzing...</span>
+    </button>
+  </div>
+
+  <!-- Loading State -->
+  <div *ngIf="loading" class="loading-container">
+    <div class="loading-spinner"></div>
+    <p>Analyzing your spending patterns...</p>
+  </div>
+
+  <!-- Error State -->
+  <div *ngIf="error && !loading" class="error-container">
+    <i class="fa fa-exclamation-circle"></i>
+    <p>{{ error }}</p>
+    <button class="retry-btn" (click)="analyzeSpending()">Retry</button>
+  </div>
+
+  <!-- Analysis Results -->
+  <div *ngIf="!loading && !error && analysisData" class="analysis-content">
+    <!-- Tabs -->
+    <div class="tabs">
+      <button 
+        class="tab-btn" 
+        [class.active]="activeTab === 'insights'"
+        (click)="setActiveTab('insights')">
+        💡 Insights
+      </button>
+      <button 
+        class="tab-btn" 
+        [class.active]="activeTab === 'metrics'"
+        (click)="setActiveTab('metrics')">
+        📊 Metrics
+      </button>
+      <button 
+        class="tab-btn" 
+        [class.active]="activeTab === 'loans'"
+        (click)="setActiveTab('loans')">
+        💰 Loan Suggestions
+      </button>
+      <button 
+        class="tab-btn" 
+        [class.active]="activeTab === 'charges'"
+        (click)="setActiveTab('charges')">
+        ⚠️ Charges
+      </button>
+      <button 
+        class="tab-btn" 
+        [class.active]="activeTab === 'categories'"
+        (click)="setActiveTab('categories')">
+        🏷️ Categories
+      </button>
+    </div>
+
+    <!-- Insights Tab -->
+    <div *ngIf="activeTab === 'insights'" class="tab-content">
+      <div class="insights-grid">
+        <div 
+          *ngFor="let insight of analysisData.insights" 
+          class="insight-card"
+          [ngClass]="getInsightClass(insight.type)">
+          <div class="insight-header">
+            <span class="insight-icon">{{ insight.icon }}</span>
+            <h3>{{ insight.title }}</h3>
+          </div>
+          <p class="insight-message">{{ insight.message }}</p>
+        </div>
+      </div>
+      <div *ngIf="!analysisData.insights || analysisData.insights.length === 0" class="no-data">
+        <p>No insights available at this time.</p>
+      </div>
+    </div>
+
+    <!-- Metrics Tab -->
+    <div *ngIf="activeTab === 'metrics'" class="tab-content">
+      <div class="metrics-grid" *ngIf="analysisData.spendingMetrics">
+        <div class="metric-card">
+          <div class="metric-icon">💸</div>
+          <div class="metric-info">
+            <label>Average Monthly Spending</label>
+            <h3>{{ formatCurrency(analysisData.spendingMetrics.avgMonthlySpending) }}</h3>
+          </div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-icon">💰</div>
+          <div class="metric-info">
+            <label>Average Monthly Income</label>
+            <h3>{{ formatCurrency(analysisData.spendingMetrics.avgMonthlyIncome) }}</h3>
+          </div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-icon">📈</div>
+          <div class="metric-info">
+            <label>Savings Rate</label>
+            <h3>{{ analysisData.spendingMetrics.savingsRate.toFixed(1) }}%</h3>
+          </div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-icon">💳</div>
+          <div class="metric-info">
+            <label>Current Balance</label>
+            <h3>{{ formatCurrency(analysisData.spendingMetrics.currentBalance) }}</h3>
+          </div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-icon">📅</div>
+          <div class="metric-info">
+            <label>Analysis Period</label>
+            <h3>{{ analysisData.spendingMetrics.analysisPeriod }}</h3>
+          </div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-icon">💵</div>
+          <div class="metric-info">
+            <label>Total Spending (3 months)</label>
+            <h3>{{ formatCurrency(analysisData.spendingMetrics.totalSpending) }}</h3>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Loan Suggestions Tab -->
+    <div *ngIf="activeTab === 'loans'" class="tab-content">
+      <div class="loans-grid" *ngIf="analysisData.loanSuggestions && analysisData.loanSuggestions.length > 0">
+        <div 
+          *ngFor="let loan of analysisData.loanSuggestions" 
+          class="loan-suggestion-card"
+          [ngClass]="getPriorityClass(loan.priority)">
+          <div class="loan-header">
+            <h3>{{ loan.loanType }}</h3>
+            <span class="priority-badge" [ngClass]="getPriorityClass(loan.priority)">
+              {{ loan.priority }} priority
+            </span>
+          </div>
+          <div class="loan-details">
+            <div class="loan-detail-item">
+              <label>Recommended Amount:</label>
+              <span class="amount">{{ formatCurrency(loan.recommendedAmount) }}</span>
+            </div>
+            <div class="loan-detail-item">
+              <label>Interest Rate:</label>
+              <span>{{ loan.interestRate }}% p.a.</span>
+            </div>
+            <div class="loan-detail-item">
+              <label>Tenure:</label>
+              <span>{{ loan.tenure }} months</span>
+            </div>
+            <div class="loan-detail-item reason">
+              <label>Why this loan?</label>
+              <p>{{ loan.reason }}</p>
+            </div>
+            <div class="loan-benefits" *ngIf="loan.benefits">
+              <label>Benefits:</label>
+              <ul>
+                <li *ngFor="let benefit of loan.benefits">{{ benefit }}</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div *ngIf="!analysisData.loanSuggestions || analysisData.loanSuggestions.length === 0" class="no-data">
+        <p>No loan suggestions available at this time.</p>
+      </div>
+    </div>
+
+    <!-- Charges Tab -->
+    <div *ngIf="activeTab === 'charges'" class="tab-content">
+      <div class="charges-grid" *ngIf="analysisData.chargeSuggestions && analysisData.chargeSuggestions.length > 0">
+        <div *ngFor="let charge of analysisData.chargeSuggestions" class="charge-card warning">
+          <div class="charge-header">
+            <h3>⚠️ {{ charge.chargeType }}</h3>
+            <span class="charge-amount">{{ formatCurrency(charge.amount) }}</span>
+          </div>
+          <div class="charge-details">
+            <div class="charge-detail-item">
+              <label>Reason:</label>
+              <p>{{ charge.reason }}</p>
+            </div>
+            <div class="charge-detail-item">
+              <label>Frequency:</label>
+              <span>{{ charge.frequency }}</span>
+            </div>
+            <div class="charge-detail-item action">
+              <label>Recommended Action:</label>
+              <p>{{ charge.action }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div *ngIf="!analysisData.chargeSuggestions || analysisData.chargeSuggestions.length === 0" class="no-data success">
+        <i class="fa fa-check-circle"></i>
+        <p>Great! No charges detected. Keep up the good financial habits!</p>
+      </div>
+    </div>
+
+    <!-- Categories Tab -->
+    <div *ngIf="activeTab === 'categories'" class="tab-content">
+      <div class="categories-container" *ngIf="analysisData.categorySpending">
+        <div 
+          *ngFor="let category of getCategoryEntries()" 
+          class="category-item">
+          <div class="category-header">
+            <span class="category-name">{{ category.name }}</span>
+            <span class="category-amount">{{ formatCurrency(category.amount) }}</span>
+          </div>
+          <div class="category-bar">
+            <div 
+              class="category-fill" 
+              [style.width.%]="category.percentage">
+            </div>
+          </div>
+          <div class="category-percentage">{{ category.percentage.toFixed(1) }}%</div>
+        </div>
+      </div>
+      <div *ngIf="!hasCategorySpending()" class="no-data">
+        <p>No spending categories available.</p>
+      </div>
+    </div>
+  </div>
+</div>
+

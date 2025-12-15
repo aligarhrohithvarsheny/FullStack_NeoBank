@@ -15,4 +15,8 @@ public interface AdminRepository extends JpaRepository<Admin, Long> {
     
     // Find admin by email only
     Admin findByEmail(String email);
+    
+    // Find all blocked admins (using custom query to handle Boolean wrapper type)
+    @Query("SELECT a FROM Admin a WHERE a.accountLocked = true")
+    java.util.List<Admin> findBlockedAdmins();
 }

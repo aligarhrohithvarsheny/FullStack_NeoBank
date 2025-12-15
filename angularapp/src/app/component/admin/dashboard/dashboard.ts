@@ -3,7 +3,7 @@ import { Router } from '@angular/router';
 import { isPlatformBrowser } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { AlertService } from '../../../service/alert.service';
 import { environment } from '../../../../environment/environment';
 
@@ -72,6 +72,23 @@ interface TransactionRecord {
   accountNumber: string;
 }
 
+interface DepositRequest {
+  id: number;
+  requestId: string;
+  accountNumber: string;
+  userName: string;
+  amount: number;
+  method: string;
+  referenceNumber?: string;
+  note?: string;
+  status: string;
+  processedBy?: string;
+  processedAt?: string;
+  rejectionReason?: string;
+  resultingBalance?: number;
+  createdAt?: string;
+}
+
 interface AccountTracking {
   id: number;
   trackingId: string;
@@ -109,6 +126,48 @@ export class Dashboard implements OnInit {
   successMessage: string = '';
   errorMessage: string = '';
 
+  // Account verification fields
+  accountNumber: string = '';
+  accountType: 'regular' | 'loan' | 'goldloan' | 'cheque' = 'regular';
+  isVerifyingAccount: boolean = false;
+  isAccountVerified: boolean = false;
+  accountVerificationError: string = '';
+  verifiedAccountDetails: any = null;
+
+  // Deposit Requests
+  depositRequests: DepositRequest[] = [];
+  isLoadingDepositRequests: boolean = false;
+
+  // Receipt fields
+  showReceipt: boolean = false;
+  receiptData: any = null;
+
+  // Transaction history
+  adminTransactionHistory: TransactionRecord[] = [];
+
+  // User update history
+  userUpdateHistory: any[] = [];
+  showUpdateHistory: boolean = false;
+  updateHistoryFilter: string = 'ALL'; // ALL, TODAY, WEEK, MONTH
+  updateHistorySearchQuery: string = '';
+
+  // Daily Activity Report
+  showDailyActivityReport: boolean = false;
+  selectedDate: string = new Date().toISOString().split('T')[0]; // Today's date
+  dailyActivities: any[] = [];
+  activityCategories: string[] = ['ALL', 'UPDATES', 'DEPOSITS', 'WITHDRAWALS', 'LOANS', 'GOLD_LOANS', 'CHEQUES', 'SUBSIDY_CLAIMS', 'ACCOUNTS', 'OTHER'];
+  selectedActivityCategory: string = 'ALL';
+
+  // Sidebar Navigation
+  activeSection: string = 'dashboard'; // Current active section
+  sidebarCollapsed: boolean = false; // For mobile responsiveness
+
+  // Feature Access Control
+  featureAccess: Map<string, boolean> = new Map(); // Store feature permissions
+  
+  // Navigation source tracking
+  isFromManager: boolean = false;
+
   // Search functionality
   searchQuery: string = '';
   searchResults: UserProfile[] = [];
@@ -118,13 +177,89 @@ export class Dashboard implements OnInit {
   userLoans: LoanDetails[] = [];
   userTransactions: TransactionDetails[] = [];
 
+  // Universal Search functionality
+  universalSearchQuery: string = '';
+  universalSearchResults: any = null;
+  isUniversalSearching: boolean = false;
+
   // Account Tracking
   accountTrackings: AccountTracking[] = [];
   selectedTracking: AccountTracking | null = null;
+
+  // Aadhar Verification
+  showAadharVerificationSection: boolean = false;
+  aadharSearchQuery: string = '';
+  verifyingAadhar: number | null = null;
   showTrackingSection: boolean = false;
   trackingSearchQuery: string = '';
   trackingStatusFilter: string = 'ALL';
   trackingStatusOptions = ['ALL', 'PENDING', 'ADMIN_SEEN', 'ADMIN_APPROVED', 'ADMIN_SENT'];
+
+  // Gold Rate Management
+  showGoldRateSection: boolean = false;
+  currentGoldRate: any = null;
+  newGoldRate: number = 0;
+  goldRateHistory: any[] = [];
+  isLoadingGoldRate: boolean = false;
+  adminName: string = 'Admin';
+
+  // Gold Loan Management
+  showGoldLoanSection: boolean = false;
+  goldLoans: any[] = [];
+  filteredGoldLoans: any[] = [];
+  selectedGoldLoan: any = null;
+  goldLoanStatusFilter: string = 'Pending';
+  isLoadingGoldLoans: boolean = false;
+  showGoldLoanModal: boolean = false;
+  showForeclosureModal: boolean = false;
+  showEmiDetailsModal: boolean = false;
+  foreclosureDetails: any = null;
+  emiSchedule: any[] = [];
+  approvingLoan: boolean = false;
+  processingForeclosure: boolean = false;
+  goldDetailsForm: any = {
+    goldItems: '',
+    goldDescription: '',
+    goldPurity: '22K',
+    verifiedGoldGrams: 0,
+    verificationNotes: '',
+    storageLocation: ''
+  };
+
+  // User Login History
+  showLoginHistorySection: boolean = false;
+  loginHistory: any[] = [];
+  isLoadingLoginHistory: boolean = false;
+  loginHistoryFilter: string = 'ALL'; // ALL, SUCCESS, FAILED
+  loginHistorySearchQuery: string = '';
+  
+  // Loan Prediction History
+  loanPredictions: any[] = [];
+  isLoadingPredictions: boolean = false;
+  predictionFilter: string = 'ALL'; // ALL, Approved, Rejected, Pending Review
+  predictionSearchQuery: string = '';
+  predictionLoanTypeFilter: string = 'ALL'; // ALL, Personal Loan, Education Loan, Home Loan, Car Loan
+
+  // Investments Management
+  investments: any[] = [];
+  isLoadingInvestments: boolean = false;
+  selectedInvestment: any = null;
+  investmentStatusFilter: string = 'PENDING';
+  investmentSearchQuery: string = '';
+
+  // Fixed Deposits Management
+  fixedDeposits: any[] = [];
+  isLoadingFDs: boolean = false;
+  selectedFD: any = null;
+  fdStatusFilter: string = 'PENDING';
+  fdSearchQuery: string = '';
+
+  // EMI Management
+  allEmis: any[] = [];
+  isLoadingAllEMIs: boolean = false;
+  selectedEMI: any = null;
+  emiStatusFilter: string = 'ALL';
+  emiSearchQuery: string = '';
 
   constructor(
     private router: Router,
@@ -136,9 +271,170 @@ export class Dashboard implements OnInit {
   ngOnInit() {
     // Only load users in the browser, not during SSR
     if (isPlatformBrowser(this.platformId)) {
+      // Check if profile is complete, redirect if not, and get admin name
+      const adminData = sessionStorage.getItem('admin');
+      if (adminData) {
+        try {
+          const admin = JSON.parse(adminData);
+          // Check profile completion
+          if (admin.profileComplete === false || admin.profileComplete === null) {
+            // Redirect to profile completion page
+            this.router.navigate(['/admin/complete-profile']);
+            return;
+          }
+          // Set admin name
+          this.adminName = admin.username || admin.name || 'Admin';
+        } catch (e) {
+          console.error('Error parsing admin data:', e);
+        }
+      }
+      
+      // Check if navigation is from manager dashboard
+      const navigationSource = sessionStorage.getItem('navigationSource');
+      if (navigationSource === 'MANAGER') {
+        this.isFromManager = true;
+      }
+      
+      // Check if there's a section to open from manager dashboard
+      const dashboardSection = sessionStorage.getItem('adminDashboardSection');
+      if (dashboardSection) {
+        sessionStorage.removeItem('adminDashboardSection');
+        // Set the active section after a short delay to ensure component is ready
+        setTimeout(() => {
+          this.setActiveSection(dashboardSection);
+        }, 100);
+      }
+      
+      // Load feature access permissions first
+      this.loadFeatureAccess();
+      
+      // Set up a listener for localStorage changes (when manager updates features in another tab)
+      window.addEventListener('storage', (e) => {
+        if (e.key === 'adminFeatureAccess') {
+          console.log('Feature access changed in localStorage, reloading...');
+          this.loadFeatureAccess();
+        }
+      });
+      
+      // Also listen for custom events (for same-tab updates)
+      window.addEventListener('featureAccessUpdated', (event: any) => {
+        console.log('Feature access updated event received, reloading...');
+        // Check if this update is for the current admin
+        const adminData = sessionStorage.getItem('admin');
+        if (adminData && event.detail) {
+          try {
+            const admin = JSON.parse(adminData);
+            if (admin.email === event.detail.adminEmail) {
+              console.log('Feature access updated for current admin, reloading...');
+              this.loadFeatureAccess();
+            }
+          } catch (e) {
+            console.error('Error parsing admin data:', e);
+          }
+        } else {
+          // Fallback: reload anyway
+          this.loadFeatureAccess();
+        }
+      });
+      
+      // Load pending Aadhar verifications on init
+      this.loadPendingAadharVerifications();
       this.loadUsers();
       this.loadAccountTrackings();
+      this.loadCurrentGoldRate();
+      this.loadLoginHistory();
+      this.loadAdminTransactionHistory();
+      this.loadUserUpdateHistory();
     }
+  }
+
+  loadFeatureAccess() {
+    if (!isPlatformBrowser(this.platformId)) return;
+    
+    // Clear existing feature access
+    this.featureAccess.clear();
+    
+    // Get current admin email from session
+    const adminData = sessionStorage.getItem('admin');
+    let adminEmail = '';
+    if (adminData) {
+      try {
+        const admin = JSON.parse(adminData);
+        adminEmail = admin.email || '';
+      } catch (e) {
+        console.error('Error parsing admin data:', e);
+      }
+    }
+    
+    if (!adminEmail) {
+      console.log('No admin email found, cannot load per-admin feature access');
+      return;
+    }
+    
+    // Load per-admin feature access from localStorage
+    const savedKey = `adminFeatureAccess_${adminEmail}`;
+    const savedFeatures = localStorage.getItem(savedKey);
+    
+    if (savedFeatures) {
+      try {
+        const features = JSON.parse(savedFeatures);
+        console.log(`Loading feature access for ${adminEmail} from localStorage:`, features);
+        features.forEach((feature: any) => {
+          this.featureAccess.set(feature.id, feature.enabled === true); // Ensure boolean
+          console.log(`Loaded feature: ${feature.id} = ${feature.enabled}`);
+        });
+        console.log(`Total features loaded: ${this.featureAccess.size}`);
+      } catch (e) {
+        console.error('Error loading feature access:', e);
+      }
+    } else {
+      console.log(`No saved feature access found for ${adminEmail} in localStorage`);
+    }
+    
+    // Also try to load from backend (this will override localStorage if backend has data)
+    this.http.get(`${environment.apiUrl}/admins/feature-access/${adminEmail}`).subscribe({
+      next: (response: any) => {
+        if (response && response.success && response.features && response.features.length > 0) {
+          console.log(`Loading feature access for ${adminEmail} from backend:`, response.features);
+          // Clear and reload from backend
+          this.featureAccess.clear();
+          response.features.forEach((feature: any) => {
+            this.featureAccess.set(feature.id, feature.enabled === true); // Ensure boolean
+          });
+          // Update localStorage with backend data
+          localStorage.setItem(savedKey, JSON.stringify(response.features));
+          console.log(`Total features loaded from backend: ${this.featureAccess.size}`);
+        } else {
+          console.log(`No features found in backend response for ${adminEmail}, using localStorage data`);
+        }
+      },
+      error: (err) => {
+        console.error('Error loading feature access from backend:', err);
+        // Use localStorage data if backend fails
+        console.log('Using localStorage data as fallback');
+      }
+    });
+  }
+
+  hasFeatureAccess(featureId: string): boolean {
+    // Check if feature is in the map
+    if (this.featureAccess.has(featureId)) {
+      const hasAccess = this.featureAccess.get(featureId)!;
+      console.log(`Feature ${featureId} access: ${hasAccess}`);
+      return hasAccess;
+    }
+    
+    // If feature is not in the map, check if we have any features loaded
+    // If we have features loaded but this one is missing, default to false (more secure)
+    // If no features are loaded at all, default to true (backward compatibility)
+    if (this.featureAccess.size > 0) {
+      console.warn(`Feature ${featureId} not found in featureAccess map, defaulting to false`);
+      return false; // If features are loaded but this one is missing, deny access
+    }
+    
+    // No features loaded yet, default to true for backward compatibility
+    console.log(`No features loaded yet, defaulting to true for ${featureId}`);
+    return true;
   }
 
   // Refresh users data from database
@@ -148,7 +444,312 @@ export class Dashboard implements OnInit {
   }
 
   navigateTo(path: string) {
+    // Preserve navigation source when navigating to other admin pages
+    if (this.isFromManager) {
+      sessionStorage.setItem('navigationSource', 'MANAGER');
+      sessionStorage.setItem('managerReturnPath', '/manager/dashboard');
+    }
     this.router.navigate([`/admin/${path}`]);
+  }
+
+  goBackToManager() {
+    // Clear navigation source and return to manager dashboard
+    sessionStorage.removeItem('navigationSource');
+    sessionStorage.removeItem('managerReturnPath');
+    this.router.navigate(['/manager/dashboard']);
+  }
+
+  setActiveSection(section: string) {
+    console.log('Setting active section:', section);
+    
+    // Check feature access before navigating
+    const featureAccessMap: { [key: string]: string } = {
+      'transactions': 'transactions',
+      'loans': 'loans',
+      'cheques': 'cheques',
+      'users': 'manage-users',
+      'user-control': 'user-control',
+      'cards': 'cards',
+      'kyc': 'kyc',
+      'subsidy-claims': 'subsidy-claims',
+      'education-loans': 'education-loans',
+      'chat': 'chat',
+      'gold-loans': 'gold-loans',
+      'deposit-withdraw': 'deposit-withdraw',
+      'tracking': 'tracking',
+      'aadhar-verification': 'aadhar-verification',
+      'gold-rate': 'gold-rate',
+      'login-history': 'login-history',
+      'update-history': 'update-history',
+      'daily-report': 'daily-report'
+    };
+    
+    const featureId = featureAccessMap[section];
+    if (featureId && !this.hasFeatureAccess(featureId)) {
+      this.alertService.error('Access Denied', 'This feature has been disabled by the manager.');
+      return;
+    }
+    
+    // Navigate to external pages for these sections
+    if (section === 'transactions') {
+      console.log('Navigating to transactions page');
+      this.navigateTo('transactions');
+      return;
+    } else if (section === 'loans') {
+      console.log('Navigating to loans page');
+      this.navigateTo('loans');
+      return;
+    } else if (section === 'cheques') {
+      console.log('Navigating to cheques page');
+      this.navigateTo('cheques');
+      return;
+    } else if (section === 'profile') {
+      this.navigateTo('profile');
+      return;
+    } else if (section === 'users') {
+      this.navigateTo('users');
+      return;
+    } else if (section === 'user-control') {
+      this.navigateTo('user-control');
+      return;
+    } else if (section === 'cards') {
+      this.navigateTo('cards');
+      return;
+    } else if (section === 'kyc') {
+      this.navigateTo('kyc');
+      return;
+    } else if (section === 'subsidy-claims') {
+      this.navigateTo('subsidy-claims');
+      return;
+    } else if (section === 'education-loans') {
+      this.navigateTo('education-loan-applications');
+      return;
+    } else if (section === 'chat') {
+      this.navigateTo('chat');
+      return;
+    } else if (section === 'gold-loans') {
+      this.navigateToGoldLoans();
+      return;
+    }
+    
+    // For sections that stay in dashboard
+    this.activeSection = section;
+    
+    // Handle toggle sections
+    if (section === 'tracking') {
+      this.showTrackingSection = true;
+      this.loadAccountTrackings();
+    } else if (section === 'aadhar-verification') {
+      this.showAadharVerificationSection = true;
+      this.loadPendingAadharVerifications();
+    } else if (section === 'gold-rate') {
+      this.showGoldRateSection = true;
+      this.loadCurrentGoldRate();
+    } else if (section === 'login-history') {
+      this.showLoginHistorySection = true;
+      this.loadLoginHistory();
+    } else if (section === 'update-history') {
+      this.showUpdateHistory = true;
+      this.loadUserUpdateHistory();
+    } else if (section === 'daily-report') {
+      this.showDailyActivityReport = true;
+      this.loadDailyActivities();
+    } else if (section === 'prediction-history') {
+      this.loadLoanPredictions();
+    } else if (section === 'investments') {
+      console.log('Navigating to investments page');
+      this.navigateTo('investments');
+      return;
+    } else if (section === 'fixed-deposits') {
+      console.log('Navigating to fixed deposits page');
+      this.navigateTo('fixed-deposits');
+      return;
+    } else if (section === 'emi-management') {
+      console.log('Navigating to EMI management page');
+      this.navigateTo('emi-management');
+      return;
+    } else if (section === 'deposit-withdraw') {
+      // Check feature access
+      if (!this.hasFeatureAccess('deposit-withdraw')) {
+        this.alertService.error('Access Denied', 'Deposit/Withdraw feature has been disabled by the manager.');
+        this.activeSection = 'dashboard';
+        return;
+      }
+      // Load deposit/withdraw form
+      this.loadDepositRequests();
+    }
+    
+    // Close other sections
+    if (section !== 'tracking') this.showTrackingSection = false;
+    if (section !== 'aadhar-verification') this.showAadharVerificationSection = false;
+    if (section !== 'gold-rate') this.showGoldRateSection = false;
+    if (section !== 'login-history') this.showLoginHistorySection = false;
+    if (section !== 'update-history') this.showUpdateHistory = false;
+    if (section !== 'daily-report') this.showDailyActivityReport = false;
+    if (section !== 'investments') this.selectedInvestment = null;
+    if (section !== 'fixed-deposits') this.selectedFD = null;
+    if (section !== 'emi-management') this.selectedEMI = null;
+  }
+  
+  // Investment Management Methods
+  loadInvestments() {
+    this.isLoadingInvestments = true;
+    this.http.get(`${environment.apiUrl}/investments`).subscribe({
+      next: (investments: any) => {
+        this.investments = investments || [];
+        this.isLoadingInvestments = false;
+        this.filterInvestments();
+      },
+      error: (err: any) => {
+        console.error('Error loading investments:', err);
+        this.alertService.error('Error', 'Failed to load investments');
+        this.isLoadingInvestments = false;
+      }
+    });
+  }
+  
+  filterInvestments() {
+    // Filtering is handled by status filter in template
+  }
+  
+  approveInvestment(investment: any) {
+    if (!confirm(`Approve investment of ₹${investment.investmentAmount} for ${investment.userName}?`)) return;
+    
+    this.http.put(`${environment.apiUrl}/investments/${investment.id}/approve?approvedBy=${this.adminName}`, {}).subscribe({
+      next: (response: any) => {
+        if (response.success) {
+          this.alertService.success('Success', 'Investment approved successfully');
+          this.loadInvestments();
+        } else {
+          this.alertService.error('Error', response.message || 'Failed to approve investment');
+        }
+      },
+      error: (err: any) => {
+        console.error('Error approving investment:', err);
+        this.alertService.error('Error', err.error?.message || 'Failed to approve investment');
+      }
+    });
+  }
+  
+  rejectInvestment(investment: any) {
+    const reason = prompt('Enter rejection reason:');
+    if (!reason) return;
+    
+    this.http.put(`${environment.apiUrl}/investments/${investment.id}/reject?rejectedBy=${this.adminName}&reason=${encodeURIComponent(reason)}`, {}).subscribe({
+      next: (response: any) => {
+        if (response.success) {
+          this.alertService.success('Success', 'Investment rejected');
+          this.loadInvestments();
+        } else {
+          this.alertService.error('Error', response.message || 'Failed to reject investment');
+        }
+      },
+      error: (err: any) => {
+        console.error('Error rejecting investment:', err);
+        this.alertService.error('Error', err.error?.message || 'Failed to reject investment');
+      }
+    });
+  }
+  
+  // Fixed Deposit Management Methods
+  loadFixedDeposits() {
+    this.isLoadingFDs = true;
+    this.http.get(`${environment.apiUrl}/fixed-deposits`).subscribe({
+      next: (fds: any) => {
+        this.fixedDeposits = fds || [];
+        this.isLoadingFDs = false;
+      },
+      error: (err: any) => {
+        console.error('Error loading fixed deposits:', err);
+        this.alertService.error('Error', 'Failed to load fixed deposits');
+        this.isLoadingFDs = false;
+      }
+    });
+  }
+  
+  approveFixedDeposit(fd: any) {
+    if (!confirm(`Approve FD of ₹${fd.principalAmount} for ${fd.userName}?`)) return;
+    
+    this.http.put(`${environment.apiUrl}/fixed-deposits/${fd.id}/approve?approvedBy=${this.adminName}`, {}).subscribe({
+      next: (response: any) => {
+        if (response.success) {
+          this.alertService.success('Success', 'Fixed Deposit approved successfully');
+          this.loadFixedDeposits();
+        } else {
+          this.alertService.error('Error', response.message || 'Failed to approve FD');
+        }
+      },
+      error: (err: any) => {
+        console.error('Error approving FD:', err);
+        this.alertService.error('Error', err.error?.message || 'Failed to approve FD');
+      }
+    });
+  }
+  
+  rejectFixedDeposit(fd: any) {
+    const reason = prompt('Enter rejection reason:');
+    if (!reason) return;
+    
+    this.http.put(`${environment.apiUrl}/fixed-deposits/${fd.id}/reject?rejectedBy=${this.adminName}&reason=${encodeURIComponent(reason)}`, {}).subscribe({
+      next: (response: any) => {
+        if (response.success) {
+          this.alertService.success('Success', 'Fixed Deposit rejected');
+          this.loadFixedDeposits();
+        } else {
+          this.alertService.error('Error', response.message || 'Failed to reject FD');
+        }
+      },
+      error: (err: any) => {
+        console.error('Error rejecting FD:', err);
+        this.alertService.error('Error', err.error?.message || 'Failed to reject FD');
+      }
+    });
+  }
+  
+  processFDMaturity(fd: any) {
+    if (!confirm(`Process maturity for FD ${fd.fdAccountNumber}? Maturity amount ₹${fd.maturityAmount} will be credited to account.`)) return;
+    
+    this.http.put(`${environment.apiUrl}/fixed-deposits/${fd.id}/process-maturity?processedBy=${this.adminName}`, {}).subscribe({
+      next: (response: any) => {
+        if (response.success) {
+          this.alertService.success('Success', 'FD maturity processed successfully');
+          this.loadFixedDeposits();
+        } else {
+          this.alertService.error('Error', response.message || 'Failed to process maturity');
+        }
+      },
+      error: (err: any) => {
+        console.error('Error processing FD maturity:', err);
+        this.alertService.error('Error', err.error?.message || 'Failed to process maturity');
+      }
+    });
+  }
+  
+  // EMI Management Methods
+  loadAllEMIs() {
+    this.isLoadingAllEMIs = true;
+    // Load all EMIs from all accounts
+    this.http.get(`${environment.apiUrl}/emis`).subscribe({
+      next: (emis: any) => {
+        this.allEmis = emis || [];
+        this.isLoadingAllEMIs = false;
+      },
+      error: (err: any) => {
+        console.error('Error loading EMIs:', err);
+        // Try loading overdue EMIs instead
+        this.http.get(`${environment.apiUrl}/emis/overdue`).subscribe({
+          next: (overdueEmis: any) => {
+            this.allEmis = overdueEmis || [];
+            this.isLoadingAllEMIs = false;
+          },
+          error: (err2: any) => {
+            console.error('Error loading overdue EMIs:', err2);
+            this.allEmis = [];
+            this.isLoadingAllEMIs = false;
+          }
+        });
+      }
+    });
   }
 
   logout() {
@@ -206,6 +807,11 @@ export class Dashboard implements OnInit {
 
   selectUser(user: UserProfile) {
     this.selectedUser = user;
+    // Check feature access before opening deposit/withdraw modal
+    if (!this.hasFeatureAccess('deposit-withdraw')) {
+      this.alertService.error('Access Denied', 'Deposit/Withdraw feature has been disabled by the manager.');
+      return;
+    }
     this.showDepositWithdrawal = true;
     this.resetForm();
   }
@@ -220,6 +826,13 @@ export class Dashboard implements OnInit {
     this.description = '';
     this.successMessage = '';
     this.errorMessage = '';
+    this.accountNumber = '';
+    this.accountType = 'regular';
+    this.isAccountVerified = false;
+    this.accountVerificationError = '';
+    this.verifiedAccountDetails = null;
+    this.showReceipt = false;
+    this.receiptData = null;
   }
 
   validateAmount(): boolean {
@@ -228,8 +841,9 @@ export class Dashboard implements OnInit {
       return false;
     }
 
-    if (this.operationType === 'withdrawal' && this.selectedUser) {
-      if (this.amount > this.selectedUser.balance) {
+    if (this.operationType === 'withdrawal') {
+      const currentBalance = this.verifiedAccountDetails?.balance || 0;
+      if (this.amount > currentBalance) {
         this.errorMessage = 'Insufficient balance for withdrawal';
         return false;
       }
@@ -244,6 +858,11 @@ export class Dashboard implements OnInit {
   }
 
   processTransaction() {
+    // Check feature access before processing
+    if (!this.hasFeatureAccess('deposit-withdraw')) {
+      this.alertService.error('Access Denied', 'Deposit/Withdraw feature has been disabled by the manager.');
+      return;
+    }
     // Use the same implementation as processDirectTransaction
     this.processDirectTransaction();
   }
@@ -259,21 +878,71 @@ export class Dashboard implements OnInit {
     }
   }
 
-  saveAdminTransaction(transaction: TransactionRecord) {
-    if (isPlatformBrowser(this.platformId)) {
-      const adminTransactionsKey = 'adminTransactions';
-      const existingTransactions = localStorage.getItem(adminTransactionsKey);
-      const transactions = existingTransactions ? JSON.parse(existingTransactions) : [];
-      
-      transactions.unshift(transaction);
-      localStorage.setItem(adminTransactionsKey, JSON.stringify(transactions));
-    }
-  }
-
   closeDepositWithdrawal() {
     this.showDepositWithdrawal = false;
     this.selectedUser = null;
     this.resetForm();
+  }
+
+  loadDepositRequests(status: string = 'PENDING') {
+    this.isLoadingDepositRequests = true;
+    let params = new HttpParams();
+    if (status) {
+      params = params.set('status', status);
+    }
+    this.http.get(`${environment.apiUrl}/deposit-requests`, { params }).subscribe({
+      next: (requests: any) => {
+        this.depositRequests = requests || [];
+        this.isLoadingDepositRequests = false;
+      },
+      error: (err: any) => {
+        console.error('Error loading deposit requests:', err);
+        this.isLoadingDepositRequests = false;
+      }
+    });
+  }
+
+  approveDepositRequest(request: DepositRequest) {
+    if (!confirm(`Approve deposit of ₹${request.amount} for ${request.userName}?`)) return;
+    const adminName = this.adminName || 'Admin';
+    this.http.put(`${environment.apiUrl}/deposit-requests/${request.id}/approve`, {}, {
+      params: { processedBy: adminName }
+    }).subscribe({
+      next: (response: any) => {
+        if (response.success) {
+          this.alertService.success('Approved', 'Deposit credited successfully');
+          this.loadDepositRequests();
+          this.loadUsers(); // refresh balances
+        } else {
+          this.alertService.error('Error', response.message || 'Failed to approve request');
+        }
+      },
+      error: (err: any) => {
+        console.error('Error approving deposit request:', err);
+        this.alertService.error('Error', err.error?.message || 'Failed to approve request');
+      }
+    });
+  }
+
+  rejectDepositRequest(request: DepositRequest) {
+    const reason = prompt('Enter rejection reason (optional):') || '';
+    const adminName = this.adminName || 'Admin';
+    this.http.put(`${environment.apiUrl}/deposit-requests/${request.id}/reject`, {}, {
+      params: { processedBy: adminName, reason }
+    }).subscribe({
+      next: (response: any) => {
+        if (response.success) {
+          this.alertService.success('Rejected', 'Deposit request rejected');
+          this.loadDepositRequests();
+        } else {
+          this.alertService.error('Error', response.message || 'Failed to reject request');
+        }
+      },
+      error: (err: any) => {
+        console.error('Error rejecting deposit request:', err);
+        this.alertService.error('Error', err.error?.message || 'Failed to reject request');
+      }
+    });
   }
 
   get filteredUsers() {
@@ -298,9 +967,235 @@ export class Dashboard implements OnInit {
     this.resetForm();
   }
 
+  // Verify account number based on account type
+  verifyAccountNumber() {
+    if (!this.accountNumber || this.accountNumber.trim() === '') {
+      this.isAccountVerified = false;
+      this.accountVerificationError = '';
+      this.verifiedAccountDetails = null;
+      return;
+    }
+
+    this.isVerifyingAccount = true;
+    this.accountVerificationError = '';
+    this.isAccountVerified = false;
+    this.verifiedAccountDetails = null;
+
+    const accountNum = this.accountNumber.trim();
+
+    switch (this.accountType) {
+      case 'regular':
+        this.verifyRegularAccount(accountNum);
+        break;
+      case 'loan':
+        this.verifyLoanAccount(accountNum);
+        break;
+      case 'goldloan':
+        this.verifyGoldLoanAccount(accountNum);
+        break;
+      case 'cheque':
+        this.verifyChequeAccount(accountNum);
+        break;
+    }
+  }
+
+  verifyRegularAccount(accountNumber: string) {
+    this.http.get(`${environment.apiUrl}/accounts/number/${accountNumber}`).subscribe({
+      next: (accountData: any) => {
+        this.verifiedAccountDetails = {
+          accountNumber: accountData.accountNumber,
+          accountHolderName: accountData.name,
+          balance: accountData.balance || 0,
+          accountType: 'Regular Account',
+          type: 'regular'
+        };
+        this.isAccountVerified = true;
+        this.isVerifyingAccount = false;
+        this.accountVerificationError = '';
+      },
+      error: (err: any) => {
+        console.error('Error verifying regular account:', err);
+        this.isAccountVerified = false;
+        this.isVerifyingAccount = false;
+        this.accountVerificationError = 'Account not found. Please check the account number.';
+        this.verifiedAccountDetails = null;
+      }
+    });
+  }
+
+  verifyLoanAccount(accountNumber: string) {
+    // First try to find by loan account number
+    this.http.get(`${environment.apiUrl}/loans`).subscribe({
+      next: (loans: any) => {
+        const loan = Array.isArray(loans) ? loans.find((l: any) => 
+          l.loanAccountNumber === accountNumber || l.accountNumber === accountNumber
+        ) : null;
+        
+        if (loan) {
+          this.verifiedAccountDetails = {
+            accountNumber: loan.loanAccountNumber || loan.accountNumber,
+            accountHolderName: loan.userName,
+            balance: loan.amount || 0,
+            accountType: `${loan.type || 'Loan'} Account`,
+            type: 'loan',
+            loanDetails: loan
+          };
+          this.isAccountVerified = true;
+          this.isVerifyingAccount = false;
+          this.accountVerificationError = '';
+        } else {
+          // Try by account number
+          this.http.get(`${environment.apiUrl}/loans/account/${accountNumber}`).subscribe({
+            next: (loans: any) => {
+              const loanList = Array.isArray(loans) ? loans : [];
+              if (loanList.length > 0) {
+                const firstLoan = loanList[0];
+                this.verifiedAccountDetails = {
+                  accountNumber: firstLoan.loanAccountNumber || accountNumber,
+                  accountHolderName: firstLoan.userName,
+                  balance: firstLoan.amount || 0,
+                  accountType: `${firstLoan.type || 'Loan'} Account`,
+                  type: 'loan',
+                  loanDetails: firstLoan
+                };
+                this.isAccountVerified = true;
+                this.isVerifyingAccount = false;
+                this.accountVerificationError = '';
+              } else {
+                this.isAccountVerified = false;
+                this.isVerifyingAccount = false;
+                this.accountVerificationError = 'Loan account not found. Please check the account number.';
+                this.verifiedAccountDetails = null;
+              }
+            },
+            error: () => {
+              this.isAccountVerified = false;
+              this.isVerifyingAccount = false;
+              this.accountVerificationError = 'Loan account not found. Please check the account number.';
+              this.verifiedAccountDetails = null;
+            }
+          });
+        }
+      },
+      error: () => {
+        this.isAccountVerified = false;
+        this.isVerifyingAccount = false;
+        this.accountVerificationError = 'Loan account not found. Please check the account number.';
+        this.verifiedAccountDetails = null;
+      }
+    });
+  }
+
+  verifyGoldLoanAccount(accountNumber: string) {
+    this.http.get(`${environment.apiUrl}/gold-loans`).subscribe({
+      next: (loans: any) => {
+        const loan = Array.isArray(loans) ? loans.find((l: any) => 
+          l.loanAccountNumber === accountNumber || l.accountNumber === accountNumber
+        ) : null;
+        
+        if (loan) {
+          this.verifiedAccountDetails = {
+            accountNumber: loan.loanAccountNumber || loan.accountNumber,
+            accountHolderName: loan.userName,
+            balance: loan.loanAmount || 0,
+            accountType: 'Gold Loan Account',
+            type: 'goldloan',
+            loanDetails: loan
+          };
+          this.isAccountVerified = true;
+          this.isVerifyingAccount = false;
+          this.accountVerificationError = '';
+        } else {
+          // Try by account number
+          this.http.get(`${environment.apiUrl}/gold-loans/account/${accountNumber}`).subscribe({
+            next: (loans: any) => {
+              const loanList = Array.isArray(loans) ? loans : [];
+              if (loanList.length > 0) {
+                const firstLoan = loanList[0];
+                this.verifiedAccountDetails = {
+                  accountNumber: firstLoan.loanAccountNumber || accountNumber,
+                  accountHolderName: firstLoan.userName,
+                  balance: firstLoan.loanAmount || 0,
+                  accountType: 'Gold Loan Account',
+                  type: 'goldloan',
+                  loanDetails: firstLoan
+                };
+                this.isAccountVerified = true;
+                this.isVerifyingAccount = false;
+                this.accountVerificationError = '';
+              } else {
+                this.isAccountVerified = false;
+                this.isVerifyingAccount = false;
+                this.accountVerificationError = 'Gold loan account not found. Please check the account number.';
+                this.verifiedAccountDetails = null;
+              }
+            },
+            error: () => {
+              this.isAccountVerified = false;
+              this.isVerifyingAccount = false;
+              this.accountVerificationError = 'Gold loan account not found. Please check the account number.';
+              this.verifiedAccountDetails = null;
+            }
+          });
+        }
+      },
+      error: () => {
+        this.isAccountVerified = false;
+        this.isVerifyingAccount = false;
+        this.accountVerificationError = 'Gold loan account not found. Please check the account number.';
+        this.verifiedAccountDetails = null;
+      }
+    });
+  }
+
+  verifyChequeAccount(accountNumber: string) {
+    this.http.get(`${environment.apiUrl}/cheques/account/${accountNumber}`).subscribe({
+      next: (cheques: any) => {
+        const chequeList = Array.isArray(cheques) ? cheques : [];
+        if (chequeList.length > 0) {
+          const firstCheque = chequeList[0];
+          this.verifiedAccountDetails = {
+            accountNumber: accountNumber,
+            accountHolderName: firstCheque.accountHolderName,
+            balance: 0, // Cheque accounts don't have balance
+            accountType: 'Cheque Account',
+            type: 'cheque',
+            chequeDetails: firstCheque
+          };
+          this.isAccountVerified = true;
+          this.isVerifyingAccount = false;
+          this.accountVerificationError = '';
+        } else {
+          this.isAccountVerified = false;
+          this.isVerifyingAccount = false;
+          this.accountVerificationError = 'Cheque account not found. Please check the account number.';
+          this.verifiedAccountDetails = null;
+        }
+      },
+      error: () => {
+        this.isAccountVerified = false;
+        this.isVerifyingAccount = false;
+        this.accountVerificationError = 'Cheque account not found. Please check the account number.';
+        this.verifiedAccountDetails = null;
+      }
+    });
+  }
+
+  onAccountNumberChange() {
+    // Reset verification when account number changes
+    this.isAccountVerified = false;
+    this.accountVerificationError = '';
+    this.verifiedAccountDetails = null;
+  }
+
   processDirectTransaction() {
-    if (!this.selectedUser) {
-      this.errorMessage = 'Please select a user';
+    // Check feature access before processing
+    if (!this.hasFeatureAccess('deposit-withdraw')) {
+      this.alertService.error('Access Denied', 'Deposit/Withdraw feature has been disabled by the manager.');
+      return;
+    }
+    if (!this.isAccountVerified || !this.verifiedAccountDetails) {
+      this.errorMessage = 'Please verify the account number first';
       return;
     }
 
@@ -318,16 +1213,23 @@ export class Dashboard implements OnInit {
     this.successMessage = processingMessage;
     this.errorMessage = '';
 
-    // Ensure selectedUser is not null
-    if (!this.selectedUser) {
-      this.errorMessage = 'Please select a user';
-      return;
+    const accountNumber = this.verifiedAccountDetails.accountNumber;
+    const userName = this.verifiedAccountDetails.accountHolderName;
+    const currentBalance = this.verifiedAccountDetails.balance || 0;
+
+    // Handle different account types
+    if (this.accountType === 'regular') {
+      this.processRegularAccountTransaction(accountNumber, userName, currentBalance);
+    } else if (this.accountType === 'loan') {
+      this.processLoanAccountTransaction(accountNumber, userName, currentBalance);
+    } else if (this.accountType === 'goldloan') {
+      this.processGoldLoanAccountTransaction(accountNumber, userName, currentBalance);
+    } else if (this.accountType === 'cheque') {
+      this.processChequeAccountTransaction(accountNumber, userName);
     }
+  }
 
-    const accountNumber = this.selectedUser.accountNumber;
-    const userName = this.selectedUser.name;
-
-    // Step 1: Update account balance in database
+  processRegularAccountTransaction(accountNumber: string, userName: string, currentBalance: number) {
     const balanceEndpoint = this.operationType === 'deposit' 
       ? `${environment.apiUrl}/accounts/balance/credit/${accountNumber}?amount=${this.amount}`
       : `${environment.apiUrl}/accounts/balance/debit/${accountNumber}?amount=${this.amount}`;
@@ -336,69 +1238,7 @@ export class Dashboard implements OnInit {
       next: (balanceResponse: any) => {
         console.log('Balance updated in database:', balanceResponse);
         const newBalance = balanceResponse.balance;
-
-        // Step 2: Create transaction record in database
-        const transactionData = {
-          transactionId: `TXN${Date.now()}`,
-          merchant: this.operationType === 'deposit' ? 'Admin Deposit' : 'Admin Withdrawal',
-          amount: this.amount,
-          type: this.operationType === 'deposit' ? 'Credit' : 'Debit',
-          description: this.description,
-          balance: newBalance,
-          date: new Date().toISOString(),
-          status: 'Completed',
-          userName: userName,
-          accountNumber: accountNumber
-        };
-
-        this.http.post(`${environment.apiUrl}/transactions`, transactionData).subscribe({
-          next: (transactionResponse: any) => {
-            console.log('Transaction saved to database:', transactionResponse);
-
-            // Update local user balance
-            if (this.selectedUser) {
-              this.selectedUser.balance = newBalance;
-
-              // Update users array
-              const userIndex = this.users.findIndex(u => u.id === this.selectedUser!.id);
-              if (userIndex !== -1 && this.selectedUser) {
-                this.users[userIndex] = { ...this.selectedUser } as UserProfile;
-              }
-
-              // Save to localStorage as backup
-              if (isPlatformBrowser(this.platformId)) {
-                localStorage.setItem('userProfiles', JSON.stringify(this.users));
-              }
-
-              // Show success message
-              this.successMessage = `${this.operationType === 'deposit' ? 'Deposit' : 'Withdrawal'} of ₹${this.amount} successful!`;
-              this.errorMessage = '';
-
-              // Refresh user data to get latest from database
-              this.refreshUsersData();
-
-              // Reset form after 3 seconds
-              setTimeout(() => {
-                this.clearForm();
-              }, 3000);
-            }
-          },
-          error: (txnErr: any) => {
-            console.error('Error saving transaction to database:', txnErr);
-            this.errorMessage = 'Transaction processed but failed to save transaction history. Balance updated successfully.';
-            this.successMessage = '';
-            
-            // Still update local balance since balance was updated
-            if (this.selectedUser) {
-              this.selectedUser.balance = newBalance;
-              const userIndex = this.users.findIndex(u => u.id === this.selectedUser!.id);
-              if (userIndex !== -1 && this.selectedUser) {
-                this.users[userIndex] = { ...this.selectedUser } as UserProfile;
-              }
-              this.refreshUsersData();
-            }
-          }
-        });
+        this.completeTransaction(accountNumber, userName, newBalance, 'regular');
       },
       error: (balanceErr: any) => {
         console.error('Error updating balance in database:', balanceErr);
@@ -409,6 +1249,726 @@ export class Dashboard implements OnInit {
     });
   }
 
+  processLoanAccountTransaction(accountNumber: string, userName: string, currentBalance: number) {
+    // For loan accounts, we need to update the loan balance or create a transaction
+    // Since loans have different structure, we'll create a transaction record
+    const newBalance = this.operationType === 'deposit' 
+      ? currentBalance + this.amount 
+      : currentBalance - this.amount;
+    
+    if (this.operationType === 'withdrawal' && newBalance < 0) {
+      this.errorMessage = 'Insufficient balance for withdrawal';
+      this.successMessage = '';
+      return;
+    }
+
+    this.completeTransaction(accountNumber, userName, newBalance, 'loan');
+  }
+
+  processGoldLoanAccountTransaction(accountNumber: string, userName: string, currentBalance: number) {
+    // Similar to loan accounts
+    const newBalance = this.operationType === 'deposit' 
+      ? currentBalance + this.amount 
+      : currentBalance - this.amount;
+    
+    if (this.operationType === 'withdrawal' && newBalance < 0) {
+      this.errorMessage = 'Insufficient balance for withdrawal';
+      this.successMessage = '';
+      return;
+    }
+
+    this.completeTransaction(accountNumber, userName, newBalance, 'goldloan');
+  }
+
+  processChequeAccountTransaction(accountNumber: string, userName: string) {
+    // Cheque accounts don't have balance, so we just create a transaction record
+    this.completeTransaction(accountNumber, userName, 0, 'cheque');
+  }
+
+  completeTransaction(accountNumber: string, userName: string, newBalance: number, accountType: string) {
+    const transactionId = `TXN${Date.now()}`;
+    
+    // Prepare transaction data for backend (without id and date - backend handles these)
+    const backendTransactionData = {
+      transactionId: transactionId,
+      merchant: this.operationType === 'deposit' ? 'Admin Deposit' : 'Admin Withdrawal',
+      amount: this.amount,
+      type: this.operationType === 'deposit' ? 'Credit' : 'Debit',
+      description: this.description,
+      balance: newBalance,
+      status: 'Completed',
+      userName: userName,
+      accountNumber: accountNumber
+    };
+
+    // Prepare transaction record for local storage (with id and date)
+    const transactionRecord: TransactionRecord = {
+      id: transactionId,
+      transactionId: transactionId,
+      merchant: backendTransactionData.merchant,
+      amount: this.amount,
+      type: backendTransactionData.type,
+      description: this.description,
+      balance: newBalance,
+      date: new Date().toISOString(),
+      status: 'Completed',
+      userName: userName,
+      accountNumber: accountNumber
+    };
+
+    this.http.post(`${environment.apiUrl}/transactions`, backendTransactionData).subscribe({
+      next: (transactionResponse: any) => {
+        console.log('Transaction saved to database:', transactionResponse);
+
+        // Generate receipt
+        this.generateReceipt(transactionId, accountNumber, userName, newBalance, accountType);
+
+        // Save to admin transaction history (use the record with id and date)
+        this.saveAdminTransaction(transactionRecord);
+
+        // Show success message
+        this.successMessage = `${this.operationType === 'deposit' ? 'Deposit' : 'Withdrawal'} of ₹${this.amount} successful!`;
+        this.errorMessage = '';
+
+        // Refresh user data
+        this.refreshUsersData();
+      },
+      error: (txnErr: any) => {
+        console.error('Error saving transaction to database:', txnErr);
+        console.error('Error details:', txnErr.error);
+        // Still generate receipt even if transaction save fails
+        this.generateReceipt(transactionId, accountNumber, userName, newBalance, accountType);
+        this.saveAdminTransaction(transactionRecord);
+        this.errorMessage = 'Transaction processed but failed to save transaction history.';
+        this.successMessage = `${this.operationType === 'deposit' ? 'Deposit' : 'Withdrawal'} completed!`;
+      }
+    });
+  }
+
+  generateReceipt(transactionId: string, accountNumber: string, userName: string, newBalance: number, accountType: string) {
+    this.receiptData = {
+      transactionId: transactionId,
+      accountNumber: accountNumber,
+      accountHolderName: userName,
+      accountType: this.verifiedAccountDetails.accountType,
+      transactionType: this.operationType === 'deposit' ? 'Deposit' : 'Withdrawal',
+      amount: this.amount,
+      description: this.description,
+      previousBalance: this.verifiedAccountDetails.balance || 0,
+      newBalance: newBalance,
+      date: new Date().toLocaleString('en-IN'),
+      adminName: this.adminName
+    };
+    this.showReceipt = true;
+  }
+
+  closeReceipt() {
+    this.showReceipt = false;
+    this.receiptData = null;
+    // Reset form after closing receipt
+    setTimeout(() => {
+      this.clearForm();
+    }, 500);
+  }
+
+  printReceipt() {
+    if (!isPlatformBrowser(this.platformId)) return;
+    window.print();
+  }
+
+  saveAdminTransaction(transaction: TransactionRecord) {
+    if (isPlatformBrowser(this.platformId)) {
+      const adminTransactionsKey = 'adminTransactions';
+      const existingTransactions = localStorage.getItem(adminTransactionsKey);
+      const transactions = existingTransactions ? JSON.parse(existingTransactions) : [];
+      
+      transactions.unshift(transaction);
+      localStorage.setItem(adminTransactionsKey, JSON.stringify(transactions));
+      
+      // Update local array
+      this.adminTransactionHistory = transactions;
+    }
+  }
+
+  loadAdminTransactionHistory() {
+    if (isPlatformBrowser(this.platformId)) {
+      const adminTransactionsKey = 'adminTransactions';
+      const existingTransactions = localStorage.getItem(adminTransactionsKey);
+      this.adminTransactionHistory = existingTransactions ? JSON.parse(existingTransactions) : [];
+    }
+  }
+
+  loadUserUpdateHistory() {
+    if (isPlatformBrowser(this.platformId)) {
+      const historyKey = 'adminUserUpdateHistory';
+      const existingHistory = localStorage.getItem(historyKey);
+      this.userUpdateHistory = existingHistory ? JSON.parse(existingHistory) : [];
+    }
+  }
+
+  toggleUpdateHistorySection() {
+    this.showUpdateHistory = !this.showUpdateHistory;
+    if (this.showUpdateHistory && this.userUpdateHistory.length === 0) {
+      this.loadUserUpdateHistory();
+    }
+  }
+
+  getFilteredUpdateHistory(): any[] {
+    let filtered = this.userUpdateHistory;
+
+    // Filter by date range
+    const now = new Date();
+    if (this.updateHistoryFilter === 'TODAY') {
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      filtered = filtered.filter(h => new Date(h.timestamp) >= today);
+    } else if (this.updateHistoryFilter === 'WEEK') {
+      const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      filtered = filtered.filter(h => new Date(h.timestamp) >= weekAgo);
+    } else if (this.updateHistoryFilter === 'MONTH') {
+      const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      filtered = filtered.filter(h => new Date(h.timestamp) >= monthAgo);
+    }
+
+    // Filter by search query
+    if (this.updateHistorySearchQuery && this.updateHistorySearchQuery.trim() !== '') {
+      const query = this.updateHistorySearchQuery.toLowerCase();
+      filtered = filtered.filter(h =>
+        (h.userName && h.userName.toLowerCase().includes(query)) ||
+        (h.userEmail && h.userEmail.toLowerCase().includes(query)) ||
+        (h.accountNumber && h.accountNumber.toLowerCase().includes(query)) ||
+        (h.adminName && h.adminName.toLowerCase().includes(query)) ||
+        (h.changes && h.changes.some((c: any) => 
+          c.field.toLowerCase().includes(query) ||
+          c.oldValue?.toLowerCase().includes(query) ||
+          c.newValue?.toLowerCase().includes(query)
+        ))
+      );
+    }
+
+    return filtered;
+  }
+
+  // Daily Activity Report Methods
+  toggleDailyActivityReport() {
+    this.showDailyActivityReport = !this.showDailyActivityReport;
+    if (this.showDailyActivityReport) {
+      this.loadDailyActivities();
+    }
+  }
+
+  loadDailyActivities() {
+    if (!isPlatformBrowser(this.platformId)) return;
+    
+    const selectedDateObj = new Date(this.selectedDate);
+    const startOfDay = new Date(selectedDateObj.setHours(0, 0, 0, 0));
+    const endOfDay = new Date(selectedDateObj.setHours(23, 59, 59, 999));
+    
+    const allActivities: any[] = [];
+    
+    // Load user updates
+    const updateHistory = localStorage.getItem('adminUserUpdateHistory');
+    if (updateHistory) {
+      const updates = JSON.parse(updateHistory);
+      updates.forEach((update: any) => {
+        const updateDate = new Date(update.timestamp);
+        if (updateDate >= startOfDay && updateDate <= endOfDay) {
+          allActivities.push({
+            id: update.id,
+            type: 'UPDATES',
+            category: 'User Profile Update',
+            timestamp: update.timestamp,
+            adminName: update.adminName,
+            description: `Updated user profile: ${update.userName} (${update.accountNumber}) - ${update.changeCount} field(s) changed`,
+            details: {
+              userName: update.userName,
+              accountNumber: update.accountNumber,
+              changes: update.changes
+            }
+          });
+        }
+      });
+    }
+    
+    // Load transactions (deposits/withdrawals)
+    const transactions = localStorage.getItem('adminTransactions');
+    if (transactions) {
+      const txns = JSON.parse(transactions);
+      txns.forEach((txn: any) => {
+        const txnDate = new Date(txn.date);
+        if (txnDate >= startOfDay && txnDate <= endOfDay) {
+          allActivities.push({
+            id: txn.id || txn.transactionId,
+            type: txn.type === 'Credit' ? 'DEPOSITS' : 'WITHDRAWALS',
+            category: txn.type === 'Credit' ? 'Money Deposit' : 'Money Withdrawal',
+            timestamp: txn.date,
+            adminName: this.adminName,
+            description: `${txn.type === 'Credit' ? 'Deposited' : 'Withdrew'} ₹${txn.amount} to/from account ${txn.accountNumber}`,
+            details: {
+              accountNumber: txn.accountNumber,
+              amount: txn.amount,
+              description: txn.description,
+              balance: txn.balance
+            }
+          });
+        }
+      });
+    }
+    
+    // Load from backend - loans, cheques, subsidy claims, accounts
+    this.loadActivitiesFromBackend(startOfDay, endOfDay, allActivities);
+  }
+
+  loadActivitiesFromBackend(startOfDay: Date, endOfDay: Date, allActivities: any[]) {
+    // Load loan approvals/rejections
+    this.http.get(`${environment.apiUrl}/loans`).subscribe({
+      next: (loans: any) => {
+        const loanList = Array.isArray(loans) ? loans : [];
+        loanList.forEach((loan: any) => {
+          if (loan.approvalDate) {
+            const approvalDate = new Date(loan.approvalDate);
+            if (approvalDate >= startOfDay && approvalDate <= endOfDay) {
+              allActivities.push({
+                id: `LOAN_${loan.id}`,
+                type: 'LOANS',
+                category: loan.status === 'Approved' ? 'Loan Approved' : 'Loan Rejected',
+                timestamp: loan.approvalDate,
+                adminName: loan.approvedBy || this.adminName,
+                description: `${loan.status === 'Approved' ? 'Approved' : 'Rejected'} ${loan.type || 'Loan'} of ₹${loan.amount} for ${loan.userName}`,
+                details: {
+                  loanId: loan.loanAccountNumber,
+                  loanType: loan.type,
+                  amount: loan.amount,
+                  userName: loan.userName,
+                  accountNumber: loan.accountNumber,
+                  status: loan.status
+                }
+              });
+            }
+          }
+        });
+        this.dailyActivities = [...allActivities].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      },
+      error: (err) => console.error('Error loading loans:', err)
+    });
+
+    // Load gold loan approvals/rejections
+    this.http.get(`${environment.apiUrl}/gold-loans`).subscribe({
+      next: (loans: any) => {
+        const loanList = Array.isArray(loans) ? loans : [];
+        loanList.forEach((loan: any) => {
+          if (loan.approvalDate) {
+            const approvalDate = new Date(loan.approvalDate);
+            if (approvalDate >= startOfDay && approvalDate <= endOfDay) {
+              allActivities.push({
+                id: `GOLD_LOAN_${loan.id}`,
+                type: 'GOLD_LOANS',
+                category: loan.status === 'Approved' ? 'Gold Loan Approved' : 'Gold Loan Rejected',
+                timestamp: loan.approvalDate,
+                adminName: loan.approvedBy || this.adminName,
+                description: `${loan.status === 'Approved' ? 'Approved' : 'Rejected'} Gold Loan of ₹${loan.loanAmount} for ${loan.userName}`,
+                details: {
+                  loanAccountNumber: loan.loanAccountNumber,
+                  amount: loan.loanAmount,
+                  userName: loan.userName,
+                  accountNumber: loan.accountNumber,
+                  status: loan.status
+                }
+              });
+            }
+          }
+        });
+        this.dailyActivities = [...allActivities].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      },
+      error: (err) => console.error('Error loading gold loans:', err)
+    });
+
+    // Load cheque operations
+    this.http.get(`${environment.apiUrl}/cheques`).subscribe({
+      next: (cheques: any) => {
+        const chequeList = Array.isArray(cheques) ? cheques : (cheques.content || []);
+        chequeList.forEach((cheque: any) => {
+          if (cheque.drawnDate) {
+            const drawnDate = new Date(cheque.drawnDate);
+            if (drawnDate >= startOfDay && drawnDate <= endOfDay) {
+              allActivities.push({
+                id: `CHEQUE_DRAW_${cheque.id}`,
+                type: 'CHEQUES',
+                category: 'Cheque Drawn',
+                timestamp: cheque.drawnDate,
+                adminName: cheque.drawnBy || this.adminName,
+                description: `Drew cheque ${cheque.chequeNumber} for ₹${cheque.amount || 0}`,
+                details: {
+                  chequeNumber: cheque.chequeNumber,
+                  accountNumber: cheque.accountNumber,
+                  amount: cheque.amount,
+                  accountHolderName: cheque.accountHolderName
+                }
+              });
+            }
+          }
+          if (cheque.bouncedDate) {
+            const bouncedDate = new Date(cheque.bouncedDate);
+            if (bouncedDate >= startOfDay && bouncedDate <= endOfDay) {
+              allActivities.push({
+                id: `CHEQUE_BOUNCE_${cheque.id}`,
+                type: 'CHEQUES',
+                category: 'Cheque Bounced',
+                timestamp: cheque.bouncedDate,
+                adminName: cheque.bouncedBy || this.adminName,
+                description: `Bounced cheque ${cheque.chequeNumber} - Reason: ${cheque.bounceReason || 'N/A'}`,
+                details: {
+                  chequeNumber: cheque.chequeNumber,
+                  accountNumber: cheque.accountNumber,
+                  bounceReason: cheque.bounceReason
+                }
+              });
+            }
+          }
+        });
+        this.dailyActivities = [...allActivities].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      },
+      error: (err) => console.error('Error loading cheques:', err)
+    });
+
+    // Load subsidy claims
+    this.http.get(`${environment.apiUrl}/education-loan-subsidy-claims`).subscribe({
+      next: (claims: any) => {
+        const claimList = Array.isArray(claims) ? claims : [];
+        claimList.forEach((claim: any) => {
+          if (claim.processedDate) {
+            const processedDate = new Date(claim.processedDate);
+            if (processedDate >= startOfDay && processedDate <= endOfDay) {
+              allActivities.push({
+                id: `SUBSIDY_${claim.id}`,
+                type: 'SUBSIDY_CLAIMS',
+                category: claim.status === 'Approved' ? 'Subsidy Claim Approved' : 'Subsidy Claim Rejected',
+                timestamp: claim.processedDate,
+                adminName: claim.processedBy || this.adminName,
+                description: `${claim.status === 'Approved' ? 'Approved' : 'Rejected'} subsidy claim of ₹${claim.approvedSubsidyAmount || claim.calculatedSubsidyAmount || 0} for ${claim.userName}`,
+                details: {
+                  claimId: claim.id,
+                  userName: claim.userName,
+                  accountNumber: claim.accountNumber,
+                  amount: claim.approvedSubsidyAmount || claim.calculatedSubsidyAmount,
+                  status: claim.status
+                }
+              });
+            }
+          }
+        });
+        this.dailyActivities = [...allActivities].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      },
+      error: (err) => console.error('Error loading subsidy claims:', err)
+    });
+
+    // Load account openings
+    this.http.get(`${environment.apiUrl}/accounts/all?page=0&size=1000&sortBy=createdAt&sortDir=desc`).subscribe({
+      next: (response: any) => {
+        const accounts = response.content || (Array.isArray(response) ? response : []);
+        accounts.forEach((account: any) => {
+          if (account.createdAt) {
+            const createdDate = new Date(account.createdAt);
+            if (createdDate >= startOfDay && createdDate <= endOfDay) {
+              allActivities.push({
+                id: `ACCOUNT_${account.id}`,
+                type: 'ACCOUNTS',
+                category: 'Account Opened',
+                timestamp: account.createdAt,
+                adminName: this.adminName,
+                description: `New account opened: ${account.accountNumber} - ${account.name || 'N/A'}`,
+                details: {
+                  accountNumber: account.accountNumber,
+                  name: account.name,
+                  accountType: account.accountType,
+                  balance: account.balance || 0
+                }
+              });
+            }
+          }
+        });
+        this.dailyActivities = [...allActivities].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      },
+      error: (err) => {
+        console.error('Error loading accounts:', err);
+        this.dailyActivities = [...allActivities].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      }
+    });
+  }
+
+  getFilteredDailyActivities(): any[] {
+    let filtered = this.dailyActivities;
+    
+    if (this.selectedActivityCategory !== 'ALL') {
+      filtered = filtered.filter(a => a.type === this.selectedActivityCategory);
+    }
+    
+    return filtered;
+  }
+
+  getActivityStats() {
+    const activities = this.getFilteredDailyActivities();
+    return {
+      total: activities.length,
+      updates: activities.filter(a => a.type === 'UPDATES').length,
+      deposits: activities.filter(a => a.type === 'DEPOSITS').length,
+      withdrawals: activities.filter(a => a.type === 'WITHDRAWALS').length,
+      loans: activities.filter(a => a.type === 'LOANS').length,
+      goldLoans: activities.filter(a => a.type === 'GOLD_LOANS').length,
+      cheques: activities.filter(a => a.type === 'CHEQUES').length,
+      subsidyClaims: activities.filter(a => a.type === 'SUBSIDY_CLAIMS').length,
+      accounts: activities.filter(a => a.type === 'ACCOUNTS').length
+    };
+  }
+
+  printDailyActivityReport() {
+    if (!isPlatformBrowser(this.platformId)) return;
+    
+    const htmlContent = this.generateDailyActivityReportHTML();
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(htmlContent);
+      printWindow.document.close();
+      printWindow.onload = () => {
+        setTimeout(() => {
+          printWindow.print();
+        }, 250);
+      };
+    }
+  }
+
+  generateDailyActivityReportHTML(): string {
+    const activities = this.getFilteredDailyActivities();
+    const stats = this.getActivityStats();
+    const reportDate = new Date(this.selectedDate).toLocaleDateString('en-IN', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+    const currentTime = new Date().toLocaleTimeString('en-IN');
+
+    return `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>NeoBank - Daily Activity Report</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f8f9fa;
+            color: #333;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            border-bottom: 3px solid #0077cc;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+        .bank-logo {
+            font-size: 32px;
+            font-weight: bold;
+            color: #0077cc;
+            margin-bottom: 10px;
+        }
+        .document-title {
+            text-align: center;
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+            margin: 30px 0;
+            padding: 15px;
+            background: linear-gradient(135deg, #e3f2fd, #bbdefb);
+            border-radius: 8px;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        .stat-card {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            border-left: 4px solid #0077cc;
+        }
+        .stat-number {
+            font-size: 24px;
+            font-weight: bold;
+            color: #0077cc;
+        }
+        .stat-label {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+        .activities-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        .activities-table th {
+            background: linear-gradient(135deg, #0077cc, #0056b3);
+            color: white;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+        }
+        .activities-table td {
+            padding: 10px 12px;
+            border-bottom: 1px solid #e9ecef;
+        }
+        .activities-table tr:hover {
+            background-color: #f8f9fa;
+        }
+        .activity-type {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .type-UPDATES { background: #e3f2fd; color: #1976d2; }
+        .type-DEPOSITS { background: #d1fae5; color: #065f46; }
+        .type-WITHDRAWALS { background: #fee2e2; color: #991b1b; }
+        .type-LOANS { background: #fef3c7; color: #92400e; }
+        .type-GOLD_LOANS { background: #fde68a; color: #78350f; }
+        .type-CHEQUES { background: #e0e7ff; color: #3730a3; }
+        .type-SUBSIDY_CLAIMS { background: #dbeafe; color: #1e40af; }
+        .type-ACCOUNTS { background: #f3e8ff; color: #6b21a8; }
+        .footer {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 2px solid #e9ecef;
+            text-align: center;
+            color: #666;
+            font-size: 12px;
+        }
+        @media print {
+            body { margin: 0; }
+            .container { box-shadow: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="bank-logo">🏦 NeoBank</div>
+            <div style="font-size: 24px; color: #1e40af; margin-bottom: 5px;">NeoBank India Limited</div>
+            <div style="font-size: 14px; color: #666; font-style: italic;">Relationship beyond banking</div>
+        </div>
+
+        <div class="document-title">
+            📊 DAILY ACTIVITY REPORT
+        </div>
+
+        <div style="margin-bottom: 20px; padding: 15px; background: #e3f2fd; border-radius: 8px;">
+            <p style="margin: 5px 0;"><strong>Report Date:</strong> ${reportDate}</p>
+            <p style="margin: 5px 0;"><strong>Generated By:</strong> ${this.adminName}</p>
+            <p style="margin: 5px 0;"><strong>Generated On:</strong> ${currentTime}</p>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-number">${stats.total}</div>
+                <div class="stat-label">Total Activities</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">${stats.updates}</div>
+                <div class="stat-label">User Updates</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">${stats.deposits}</div>
+                <div class="stat-label">Deposits</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">${stats.withdrawals}</div>
+                <div class="stat-label">Withdrawals</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">${stats.loans}</div>
+                <div class="stat-label">Loans</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">${stats.goldLoans}</div>
+                <div class="stat-label">Gold Loans</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">${stats.cheques}</div>
+                <div class="stat-label">Cheques</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">${stats.subsidyClaims}</div>
+                <div class="stat-label">Subsidy Claims</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">${stats.accounts}</div>
+                <div class="stat-label">Accounts Opened</div>
+            </div>
+        </div>
+
+        <table class="activities-table">
+            <thead>
+                <tr>
+                    <th>Time</th>
+                    <th>Category</th>
+                    <th>Activity</th>
+                    <th>Admin</th>
+                    <th>Details</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${activities.map(activity => `
+                <tr>
+                    <td>${new Date(activity.timestamp).toLocaleTimeString('en-IN')}</td>
+                    <td><span class="activity-type type-${activity.type}">${activity.category}</span></td>
+                    <td>${activity.description}</td>
+                    <td>${activity.adminName}</td>
+                    <td>${this.formatActivityDetails(activity)}</td>
+                </tr>
+                `).join('')}
+            </tbody>
+        </table>
+
+        <div class="footer">
+            <p><strong>📍 Registered Office:</strong> NeoBank Tower, Financial District, Mumbai - 400001</p>
+            <p><strong>📞 Customer Care:</strong> 1800-NEOBANK | <strong>📧 Email:</strong> support@neobank.in</p>
+            <p><strong>📄 This is a computer generated report and does not require signature.</strong></p>
+            <p>© ${new Date().getFullYear()} NeoBank. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>`;
+  }
+
+  formatActivityDetails(activity: any): string {
+    if (!activity.details) return 'N/A';
+    
+    const details = activity.details;
+    const parts: string[] = [];
+    
+    if (details.accountNumber) parts.push(`Account: ${details.accountNumber}`);
+    if (details.amount) parts.push(`Amount: ₹${details.amount}`);
+    if (details.userName) parts.push(`User: ${details.userName}`);
+    if (details.loanId || details.loanAccountNumber) parts.push(`Loan: ${details.loanId || details.loanAccountNumber}`);
+    if (details.chequeNumber) parts.push(`Cheque: ${details.chequeNumber}`);
+    if (details.status) parts.push(`Status: ${details.status}`);
+    
+    return parts.join(' | ') || 'N/A';
+  }
+
   clearForm() {
     this.selectedUserId = '';
     this.selectedUser = null;
@@ -416,6 +1976,13 @@ export class Dashboard implements OnInit {
     this.description = '';
     this.successMessage = '';
     this.errorMessage = '';
+    this.accountNumber = '';
+    this.accountType = 'regular';
+    this.isAccountVerified = false;
+    this.accountVerificationError = '';
+    this.verifiedAccountDetails = null;
+    this.showReceipt = false;
+    this.receiptData = null;
   }
 
   // Update user balance in MySQL database
@@ -520,6 +2087,63 @@ export class Dashboard implements OnInit {
         this.isSearching = false;
       }
     });
+  }
+
+  // Universal Search Methods
+  performUniversalSearch() {
+    if (!this.universalSearchQuery || !this.universalSearchQuery.trim()) {
+      this.universalSearchResults = null;
+      return;
+    }
+
+    this.isUniversalSearching = true;
+    const query = this.universalSearchQuery.trim();
+
+    this.http.get(`${environment.apiUrl}/admin/search?q=${encodeURIComponent(query)}`).subscribe({
+      next: (results: any) => {
+        this.universalSearchResults = results;
+        this.isUniversalSearching = false;
+        console.log('Universal search results:', results);
+      },
+      error: (err: any) => {
+        console.error('Error performing universal search:', err);
+        this.alertService.error('Search Error', 'Failed to perform search. Please try again.');
+        this.isUniversalSearching = false;
+        this.universalSearchResults = null;
+      }
+    });
+  }
+
+  onSearchInputChange() {
+    // Clear results when input changes
+    if (!this.universalSearchQuery || this.universalSearchQuery.trim().length < 2) {
+      this.universalSearchResults = null;
+    }
+  }
+
+  clearUniversalSearch() {
+    this.universalSearchQuery = '';
+    this.universalSearchResults = null;
+  }
+
+  viewAccountDetails(accountNumber: string) {
+    this.navigateTo('users');
+  }
+
+  viewUserDetails(accountNumber: string) {
+    this.navigateTo('users');
+  }
+
+  viewLoanDetails(loanId: number) {
+    this.navigateTo('loans');
+  }
+
+  viewChequeDetails(chequeNumber: string) {
+    this.navigateTo('cheques');
+  }
+
+  viewCardDetails(cardId: number) {
+    this.navigateTo('cards');
   }
 
   selectSearchedUser(user: UserProfile) {
@@ -1292,5 +2916,608 @@ export class Dashboard implements OnInit {
 
   get sentTrackings(): number {
     return this.accountTrackings.filter(t => t.status === 'ADMIN_SENT').length;
+  }
+
+  // Gold Rate Management Methods
+  toggleGoldRateSection() {
+    this.showGoldRateSection = !this.showGoldRateSection;
+    if (this.showGoldRateSection) {
+      this.loadCurrentGoldRate();
+      this.loadGoldRateHistory();
+    }
+  }
+
+  loadCurrentGoldRate() {
+    this.isLoadingGoldRate = true;
+    this.http.get<any>(`${environment.apiUrl}/gold-rates/current`).subscribe({
+      next: (rate) => {
+        this.currentGoldRate = rate;
+        this.newGoldRate = rate.ratePerGram || 0;
+        this.isLoadingGoldRate = false;
+      },
+      error: (err) => {
+        console.error('Error loading gold rate:', err);
+        this.isLoadingGoldRate = false;
+        this.alertService.error('Error', 'Failed to load current gold rate');
+      }
+    });
+  }
+
+  loadGoldRateHistory() {
+    this.http.get<any[]>(`${environment.apiUrl}/gold-rates/history`).subscribe({
+      next: (history) => {
+        this.goldRateHistory = history;
+      },
+      error: (err) => {
+        console.error('Error loading gold rate history:', err);
+        this.alertService.error('Error', 'Failed to load gold rate history');
+      }
+    });
+  }
+
+  updateGoldRate() {
+    if (!this.newGoldRate || this.newGoldRate <= 0) {
+      this.alertService.error('Error', 'Please enter a valid gold rate');
+      return;
+    }
+
+    if (this.newGoldRate === this.currentGoldRate?.ratePerGram) {
+      this.alertService.error('Error', 'New rate must be different from current rate');
+      return;
+    }
+
+    this.isLoadingGoldRate = true;
+    const params = new HttpParams()
+      .set('ratePerGram', this.newGoldRate.toString())
+      .set('updatedBy', this.adminName);
+    
+    this.http.put<any>(`${environment.apiUrl}/gold-rates/update`, {}, { params }).subscribe({
+      next: (response) => {
+        if (response.success) {
+          this.alertService.success('Success', 'Gold rate updated successfully');
+          this.loadCurrentGoldRate();
+          this.loadGoldRateHistory();
+        } else {
+          this.alertService.error('Error', response.message || 'Failed to update gold rate');
+          this.isLoadingGoldRate = false;
+        }
+      },
+      error: (err) => {
+        console.error('Error updating gold rate:', err);
+        this.alertService.error('Error', 'Failed to update gold rate. Please try again.');
+        this.isLoadingGoldRate = false;
+      }
+    });
+  }
+
+  formatDateTime(dateTime: string): string {
+    if (!dateTime) return '';
+    const date = new Date(dateTime);
+    return date.toLocaleString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  }
+
+  formatDate(date: string): string {
+    if (!date) return '';
+    const d = new Date(date);
+    return d.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  }
+
+  // Gold Loan Management Methods
+  navigateToGoldLoans() {
+    this.router.navigate(['/admin/gold-loans']);
+  }
+
+  toggleGoldLoanSection() {
+    this.showGoldLoanSection = !this.showGoldLoanSection;
+    if (this.showGoldLoanSection) {
+      this.loadGoldLoans();
+    }
+  }
+
+  loadGoldLoans() {
+    this.isLoadingGoldLoans = true;
+    this.http.get<any[]>(`${environment.apiUrl}/gold-loans`).subscribe({
+      next: (loans) => {
+        this.goldLoans = loans;
+        this.filterGoldLoans();
+        this.isLoadingGoldLoans = false;
+      },
+      error: (err) => {
+        console.error('Error loading gold loans:', err);
+        this.alertService.error('Error', 'Failed to load gold loans');
+        this.isLoadingGoldLoans = false;
+      }
+    });
+  }
+
+  filterGoldLoans() {
+    if (this.goldLoanStatusFilter === 'All') {
+      this.filteredGoldLoans = this.goldLoans;
+    } else {
+      this.filteredGoldLoans = this.goldLoans.filter(loan => loan.status === this.goldLoanStatusFilter);
+    }
+  }
+
+  onGoldLoanFilterChange() {
+    this.filterGoldLoans();
+  }
+
+  viewGoldLoanDetails(loan: any) {
+    this.selectedGoldLoan = loan;
+    this.goldDetailsForm.verifiedGoldGrams = loan.goldGrams || 0;
+    this.goldDetailsForm.goldPurity = loan.goldPurity || '22K';
+    this.showGoldLoanModal = true;
+  }
+
+  closeGoldLoanModal() {
+    this.showGoldLoanModal = false;
+    this.selectedGoldLoan = null;
+    this.goldDetailsForm = {
+      goldItems: '',
+      goldDescription: '',
+      goldPurity: '22K',
+      verifiedGoldGrams: 0,
+      verificationNotes: '',
+      storageLocation: ''
+    };
+  }
+
+  approveGoldLoan() {
+    if (!this.selectedGoldLoan || !this.selectedGoldLoan.id) return;
+
+    if (!this.goldDetailsForm.verifiedGoldGrams || this.goldDetailsForm.verifiedGoldGrams <= 0) {
+      this.alertService.error('Error', 'Please enter verified gold weight');
+      return;
+    }
+
+    this.approvingLoan = true;
+    this.http.put<any>(`${environment.apiUrl}/gold-loans/${this.selectedGoldLoan.id}/approve`, this.goldDetailsForm, {
+      params: {
+        status: 'Approved',
+        approvedBy: this.adminName
+      }
+    }).subscribe({
+      next: (response) => {
+        if (response.success) {
+          this.alertService.success('Success', 'Gold loan approved successfully');
+          this.closeGoldLoanModal();
+          this.loadGoldLoans();
+        } else {
+          this.alertService.error('Error', response.message || 'Failed to approve loan');
+          this.approvingLoan = false;
+        }
+      },
+      error: (err) => {
+        console.error('Error approving gold loan:', err);
+        this.alertService.error('Error', err.error?.message || 'Failed to approve loan');
+        this.approvingLoan = false;
+      }
+    });
+  }
+
+  rejectGoldLoan(loan: any) {
+    if (!confirm(`Are you sure you want to reject this gold loan application?`)) return;
+
+    this.approvingLoan = true;
+    this.http.put<any>(`${environment.apiUrl}/gold-loans/${loan.id}/approve`, {}, {
+      params: {
+        status: 'Rejected',
+        approvedBy: this.adminName
+      }
+    }).subscribe({
+      next: (response) => {
+        if (response.success) {
+          this.alertService.success('Success', 'Gold loan rejected');
+          this.loadGoldLoans();
+        } else {
+          this.alertService.error('Error', response.message || 'Failed to reject loan');
+        }
+        this.approvingLoan = false;
+      },
+      error: (err) => {
+        console.error('Error rejecting gold loan:', err);
+        this.alertService.error('Error', err.error?.message || 'Failed to reject loan');
+        this.approvingLoan = false;
+      }
+    });
+  }
+
+  viewForeclosure(loan: any) {
+    this.selectedGoldLoan = loan;
+    this.showForeclosureModal = true;
+    this.loadForeclosureDetails(loan);
+  }
+
+  loadForeclosureDetails(loan: any) {
+    if (!loan.loanAccountNumber) {
+      this.alertService.error('Error', 'Loan account number not found');
+      return;
+    }
+
+    this.http.get<any>(`${environment.apiUrl}/gold-loans/foreclosure/${loan.loanAccountNumber}`).subscribe({
+      next: (response) => {
+        if (response.success) {
+          this.foreclosureDetails = response;
+        } else {
+          this.alertService.error('Error', response.message || 'Failed to load foreclosure details');
+        }
+      },
+      error: (err) => {
+        console.error('Error loading foreclosure details:', err);
+        this.alertService.error('Error', err.error?.message || 'Failed to load foreclosure details');
+      }
+    });
+  }
+
+  processForeclosure() {
+    if (!this.selectedGoldLoan || !this.selectedGoldLoan.loanAccountNumber) return;
+    if (!confirm(`Are you sure you want to process foreclosure for this loan?`)) return;
+
+    this.processingForeclosure = true;
+    this.http.post<any>(`${environment.apiUrl}/gold-loans/foreclosure/${this.selectedGoldLoan.loanAccountNumber}`, {}).subscribe({
+      next: (response) => {
+        if (response.success) {
+          this.alertService.success('Success', 'Foreclosure processed successfully');
+          this.closeForeclosureModal();
+          this.loadGoldLoans();
+        } else {
+          this.alertService.error('Error', response.message || 'Failed to process foreclosure');
+        }
+        this.processingForeclosure = false;
+      },
+      error: (err) => {
+        console.error('Error processing foreclosure:', err);
+        this.alertService.error('Error', err.error?.message || 'Failed to process foreclosure');
+        this.processingForeclosure = false;
+      }
+    });
+  }
+
+  closeForeclosureModal() {
+    this.showForeclosureModal = false;
+    this.selectedGoldLoan = null;
+    this.foreclosureDetails = null;
+  }
+
+  viewEmiDetails(loan: any) {
+    this.selectedGoldLoan = loan;
+    this.showEmiDetailsModal = true;
+    this.loadEmiSchedule(loan);
+  }
+
+  loadEmiSchedule(loan: any) {
+    if (!loan.loanAccountNumber) {
+      this.alertService.error('Error', 'Loan account number not found');
+      return;
+    }
+
+    this.http.get<any[]>(`${environment.apiUrl}/gold-loans/emi-schedule/${loan.loanAccountNumber}`).subscribe({
+      next: (schedule) => {
+        this.emiSchedule = Array.isArray(schedule) ? schedule : [];
+      },
+      error: (err) => {
+        console.error('Error loading EMI schedule:', err);
+        this.alertService.error('Error', err.error?.message || 'Failed to load EMI schedule');
+        this.emiSchedule = [];
+      }
+    });
+  }
+
+  closeEmiDetailsModal() {
+    this.showEmiDetailsModal = false;
+    this.selectedGoldLoan = null;
+    this.emiSchedule = [];
+  }
+
+  isUpcomingEmi(dueDate: string): boolean {
+    if (!dueDate) return false;
+    const due = new Date(dueDate);
+    const today = new Date();
+    const daysUntilDue = Math.ceil((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    return daysUntilDue >= 0 && daysUntilDue <= 7;
+  }
+
+  getTimeUntilDue(dueDate: string): string {
+    if (!dueDate) return '';
+    const due = new Date(dueDate);
+    const today = new Date();
+    const daysUntilDue = Math.ceil((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    
+    if (daysUntilDue < 0) {
+      return `Overdue by ${Math.abs(daysUntilDue)} day${Math.abs(daysUntilDue) !== 1 ? 's' : ''}`;
+    } else if (daysUntilDue === 0) {
+      return 'Due today';
+    } else if (daysUntilDue === 1) {
+      return 'Due tomorrow';
+    } else if (daysUntilDue <= 7) {
+      return `Due in ${daysUntilDue} days`;
+    } else {
+      const monthsUntilDue = Math.floor(daysUntilDue / 30);
+      if (monthsUntilDue > 0) {
+        return `Due in ${monthsUntilDue} month${monthsUntilDue !== 1 ? 's' : ''}`;
+      }
+      return `Due in ${daysUntilDue} days`;
+    }
+  }
+
+  getGoldLoanStatusClass(status: string): string {
+    switch (status) {
+      case 'Approved': return 'status-approved';
+      case 'Pending': return 'status-pending';
+      case 'Rejected': return 'status-rejected';
+      case 'Foreclosed': return 'status-foreclosed';
+      case 'Paid': return 'status-paid';
+      default: return '';
+    }
+  }
+
+  // Aadhar Verification Methods
+  toggleAadharVerificationSection() {
+    this.showAadharVerificationSection = !this.showAadharVerificationSection;
+    if (this.showAadharVerificationSection && this.accountTrackings.length === 0) {
+      this.loadAccountTrackings();
+    }
+  }
+
+  loadPendingAadharVerifications() {
+    this.http.get<AccountTracking[]>(`${environment.apiUrl}/tracking/status/PENDING`).subscribe({
+      next: (response) => {
+        console.log('Pending Aadhar verifications loaded:', response);
+        // Filter to show only PENDING and ADMIN_SEEN statuses
+        this.accountTrackings = response.filter(t => 
+          t.status === 'PENDING' || t.status === 'ADMIN_SEEN'
+        );
+      },
+      error: (err) => {
+        console.error('Error loading pending Aadhar verifications:', err);
+        this.alertService.userError('Error', 'Failed to load pending verifications');
+        this.accountTrackings = [];
+      }
+    });
+  }
+
+  verifyAadhar(tracking: AccountTracking) {
+    if (!confirm(`Are you sure you want to verify Aadhar for ${tracking.aadharNumber}?`)) {
+      return;
+    }
+
+    this.verifyingAadhar = tracking.id;
+    this.http.post(`${environment.apiUrl}/tracking/${tracking.id}/verify-aadhar`, {}).subscribe({
+      next: (response: any) => {
+        console.log('Aadhar verified successfully:', response);
+        this.alertService.userSuccess('Success', 'Aadhar verified successfully!');
+        this.verifyingAadhar = null;
+        // Reload the list
+        this.loadPendingAadharVerifications();
+        this.loadAccountTrackings();
+      },
+      error: (err) => {
+        console.error('Error verifying Aadhar:', err);
+        this.alertService.userError('Error', err.error?.message || 'Failed to verify Aadhar');
+        this.verifyingAadhar = null;
+      }
+    });
+  }
+
+  get filteredAadharVerifications(): AccountTracking[] {
+    let filtered = this.accountTrackings.filter(t => 
+      t.status === 'PENDING' || t.status === 'ADMIN_SEEN'
+    );
+
+    if (this.aadharSearchQuery.trim()) {
+      const query = this.aadharSearchQuery.toLowerCase().trim();
+      filtered = filtered.filter(t =>
+        t.trackingId.toLowerCase().includes(query) ||
+        t.aadharNumber.toLowerCase().includes(query) ||
+        t.mobileNumber.toLowerCase().includes(query) ||
+        (t.user?.email && t.user.email.toLowerCase().includes(query))
+      );
+    }
+
+    return filtered;
+  }
+
+  get pendingAadharVerifications(): number {
+    return this.accountTrackings.filter(t => 
+      t.status === 'PENDING' || t.status === 'ADMIN_SEEN'
+    ).length;
+  }
+
+  get totalAadharVerified(): number {
+    return this.accountTrackings.filter(t => t.status === 'ADMIN_APPROVED').length;
+  }
+
+  // Load User Login History
+  loadLoginHistory() {
+    if (!isPlatformBrowser(this.platformId)) return;
+    
+    this.isLoadingLoginHistory = true;
+    this.http.get<any[]>(`${environment.apiUrl}/admins/login-history/recent?limit=100`).subscribe({
+      next: (history) => {
+        this.loginHistory = history || [];
+        this.isLoadingLoginHistory = false;
+      },
+      error: (err) => {
+        console.error('Error loading login history:', err);
+        this.isLoadingLoginHistory = false;
+        this.loginHistory = [];
+      }
+    });
+  }
+
+  // Toggle login history section
+  toggleLoginHistorySection() {
+    this.showLoginHistorySection = !this.showLoginHistorySection;
+    if (this.showLoginHistorySection && this.loginHistory.length === 0) {
+      this.loadLoginHistory();
+    }
+  }
+
+  // Format date time for display
+  formatLoginDateTime(dateTimeString: string): string {
+    if (!dateTimeString) return '-';
+    try {
+      const date = new Date(dateTimeString);
+      if (isNaN(date.getTime())) return dateTimeString;
+      
+      return date.toLocaleString('en-IN', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true
+      });
+    } catch (e) {
+      return dateTimeString;
+    }
+  }
+
+  // Get filtered login history
+  getFilteredLoginHistory(): any[] {
+    let filtered = this.loginHistory;
+    
+    // Filter by status
+    if (this.loginHistoryFilter !== 'ALL') {
+      filtered = filtered.filter(h => h.status === this.loginHistoryFilter);
+    }
+    
+    // Filter by search query
+    if (this.loginHistorySearchQuery && this.loginHistorySearchQuery.trim() !== '') {
+      const query = this.loginHistorySearchQuery.toLowerCase();
+      filtered = filtered.filter(h => 
+        (h.userName && h.userName.toLowerCase().includes(query)) ||
+        (h.userEmail && h.userEmail.toLowerCase().includes(query)) ||
+        (h.accountNumber && h.accountNumber.toLowerCase().includes(query)) ||
+        (h.ipAddress && h.ipAddress.toLowerCase().includes(query)) ||
+        (h.loginLocation && h.loginLocation.toLowerCase().includes(query))
+      );
+    }
+    
+    return filtered;
+  }
+  
+  // Load Loan Prediction History
+  loadLoanPredictions() {
+    if (!isPlatformBrowser(this.platformId)) return;
+    
+    this.isLoadingPredictions = true;
+    
+    this.http.get(`${environment.apiUrl}/loans/predictions/all`).subscribe({
+      next: (response: any) => {
+        if (response.success) {
+          this.loanPredictions = response.predictions || [];
+          console.log('Loan predictions loaded:', this.loanPredictions);
+        } else {
+          this.alertService.error('Error', response.message || 'Failed to load predictions');
+          this.loanPredictions = [];
+        }
+        this.isLoadingPredictions = false;
+      },
+      error: (err: any) => {
+        console.error('Error loading loan predictions:', err);
+        this.alertService.error('Error', 'Failed to load loan predictions');
+        this.loanPredictions = [];
+        this.isLoadingPredictions = false;
+      }
+    });
+  }
+  
+  // Filter predictions
+  getFilteredPredictions() {
+    let filtered = this.loanPredictions;
+    
+    // Filter by result
+    if (this.predictionFilter !== 'ALL') {
+      filtered = filtered.filter((p: any) => 
+        p.predictionResult === this.predictionFilter
+      );
+    }
+    
+    // Filter by loan type
+    if (this.predictionLoanTypeFilter !== 'ALL') {
+      filtered = filtered.filter((p: any) => 
+        p.loanType === this.predictionLoanTypeFilter
+      );
+    }
+    
+    // Filter by search query
+    if (this.predictionSearchQuery && this.predictionSearchQuery.trim() !== '') {
+      const query = this.predictionSearchQuery.toLowerCase();
+      filtered = filtered.filter((p: any) => 
+        (p.userName && p.userName.toLowerCase().includes(query)) ||
+        (p.accountNumber && p.accountNumber.toLowerCase().includes(query)) ||
+        (p.pan && p.pan.toLowerCase().includes(query)) ||
+        (p.loanType && p.loanType.toLowerCase().includes(query))
+      );
+    }
+    
+    return filtered;
+  }
+  
+  // Get prediction statistics
+  getPredictionStats() {
+    const all = this.loanPredictions.length;
+    const approved = this.loanPredictions.filter((p: any) => p.predictionResult === 'Approved').length;
+    const rejected = this.loanPredictions.filter((p: any) => p.predictionResult === 'Rejected').length;
+    const pending = this.loanPredictions.filter((p: any) => p.predictionResult === 'Pending Review').length;
+    
+    return { all, approved, rejected, pending };
+  }
+  
+  // Expose Math to template
+  Math = Math;
+  
+  // Helper methods for date comparisons in templates
+  isFDMatured(fd: any): boolean {
+    if (!fd || !fd.maturityDate || fd.isMatured) return false;
+    const maturityDate = new Date(fd.maturityDate);
+    const today = new Date();
+    return maturityDate <= today;
+  }
+  
+  isEMIOverdue(emi: any): boolean {
+    if (!emi || emi.status !== 'Pending' || !emi.dueDate) return false;
+    const dueDate = new Date(emi.dueDate);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    dueDate.setHours(0, 0, 0, 0);
+    return dueDate < today;
+  }
+
+  // Dashboard Overview Helper Methods
+  getTotalBalance(): number {
+    return this.users.reduce((total, user) => total + (user.balance || 0), 0);
+  }
+
+  getPendingLoansCount(): number {
+    // Count pending loans from loan predictions or loan requests
+    if (this.loanPredictions && this.loanPredictions.length > 0) {
+      return this.loanPredictions.filter((p: any) => 
+        p.predictionResult === 'Pending Review' || 
+        (p.status && p.status === 'PENDING')
+      ).length;
+    }
+    return 0;
+  }
+
+  getActiveFDsCount(): number {
+    return this.fixedDeposits ? this.fixedDeposits.filter((fd: any) => fd.status === 'ACTIVE').length : 0;
+  }
+
+  getPendingChequesCount(): number {
+    // This would need to be implemented based on your cheque data structure
+    return 0; // Placeholder - implement based on your cheque management
   }
 }

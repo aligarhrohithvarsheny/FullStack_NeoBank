@@ -52,14 +52,26 @@ export class UserControl implements OnInit {
   filteredUsers: FullUser[] = [];
   selectedUser: FullUser | null = null;
   editingUser: FullUser | null = null;
+  originalUser: FullUser | null = null; // Store original data for comparison
   loading: boolean = false;
   searchTerm: string = '';
   showAddUserForm: boolean = false;
   newUser: any = {};
+  adminName: string = 'Admin';
 
   ngOnInit() {
     if (!isPlatformBrowser(this.platformId)) return;
     this.loadAllUsers();
+    // Get admin name from session storage
+    const adminData = sessionStorage.getItem('admin');
+    if (adminData) {
+      try {
+        const admin = JSON.parse(adminData);
+        this.adminName = admin.username || admin.name || 'Admin';
+      } catch (e) {
+        console.error('Error parsing admin data:', e);
+      }
+    }
   }
 
   loadAllUsers() {
@@ -102,17 +114,112 @@ export class UserControl implements OnInit {
   }
 
   editUser(user: FullUser) {
-    this.editingUser = JSON.parse(JSON.stringify(user)); // Deep copy
+    this.editingUser = JSON.parse(JSON.stringify(user)); // Deep copy for editing
+    this.originalUser = JSON.parse(JSON.stringify(user)); // Deep copy for comparison
     this.selectedUser = null;
   }
 
   cancelEdit() {
     this.editingUser = null;
+    this.originalUser = null;
     this.selectedUser = null;
   }
 
   saveUser() {
-    if (!this.editingUser) return;
+    if (!this.editingUser || !this.originalUser) return;
+
+    // Track changes
+    const changes: any[] = [];
+    const timestamp = new Date().toISOString();
+
+    // Compare user fields
+    if (this.editingUser.username !== this.originalUser.username) {
+      changes.push({
+        field: 'Username',
+        oldValue: this.originalUser.username,
+        newValue: this.editingUser.username
+      });
+    }
+    if (this.editingUser.email !== this.originalUser.email) {
+      changes.push({
+        field: 'Email',
+        oldValue: this.originalUser.email,
+        newValue: this.editingUser.email
+      });
+    }
+    if (this.editingUser.status !== this.originalUser.status) {
+      changes.push({
+        field: 'User Status',
+        oldValue: this.originalUser.status,
+        newValue: this.editingUser.status
+      });
+    }
+    if (this.editingUser.accountNumber !== this.originalUser.accountNumber) {
+      changes.push({
+        field: 'Account Number',
+        oldValue: this.originalUser.accountNumber,
+        newValue: this.editingUser.accountNumber
+      });
+    }
+    if (this.editingUser.accountLocked !== this.originalUser.accountLocked) {
+      changes.push({
+        field: 'Account Locked',
+        oldValue: this.originalUser.accountLocked ? 'Yes' : 'No',
+        newValue: this.editingUser.accountLocked ? 'Yes' : 'No'
+      });
+    }
+    if (this.editingUser.failedLoginAttempts !== this.originalUser.failedLoginAttempts) {
+      changes.push({
+        field: 'Failed Login Attempts',
+        oldValue: this.originalUser.failedLoginAttempts?.toString() || '0',
+        newValue: this.editingUser.failedLoginAttempts?.toString() || '0'
+      });
+    }
+
+    // Compare account fields
+    const originalAccount = this.originalUser.account;
+    const editingAccount = this.editingUser.account;
+    
+    if (originalAccount && editingAccount) {
+      const accountFields = [
+        { key: 'name', label: 'Name' },
+        { key: 'phone', label: 'Phone' },
+        { key: 'address', label: 'Address' },
+        { key: 'dob', label: 'Date of Birth' },
+        { key: 'age', label: 'Age' },
+        { key: 'occupation', label: 'Occupation' },
+        { key: 'income', label: 'Income' },
+        { key: 'accountType', label: 'Account Type' },
+        { key: 'balance', label: 'Balance' },
+        { key: 'pan', label: 'PAN' },
+        { key: 'aadharNumber', label: 'Aadhar Number' },
+        { key: 'status', label: 'Account Status' }
+      ];
+
+      accountFields.forEach(field => {
+        const oldVal = originalAccount[field.key as keyof typeof originalAccount];
+        const newVal = editingAccount[field.key as keyof typeof editingAccount];
+        
+        // Handle balance as number comparison
+        if (field.key === 'balance') {
+          const oldBalance = (oldVal as number) || 0;
+          const newBalance = (newVal as number) || 0;
+          if (oldBalance !== newBalance) {
+            changes.push({
+              field: field.label,
+              oldValue: `₹${oldBalance.toFixed(2)}`,
+              newValue: `₹${newBalance.toFixed(2)}`
+            });
+          }
+        } else if (oldVal !== newVal) {
+          changes.push({
+            field: field.label,
+            oldValue: oldVal?.toString() || 'N/A',
+            newValue: newVal?.toString() || 'N/A'
+          });
+        }
+      });
+    }
 
     const updateData: any = {
       username: this.editingUser.username,
@@ -142,6 +249,10 @@ export class UserControl implements OnInit {
     this.http.put(`${environment.apiUrl}/users/admin/update-full/${this.editingUser.id}`, updateData).subscribe({
       next: (response: any) => {
         if (response.success) {
+          // Save update history if there are changes
+          if (changes.length > 0) {
+            this.saveUpdateHistory(this.editingUser!, changes, timestamp);
+          }
           alert('User updated successfully!');
           this.loadAllUsers();
           this.cancelEdit();
@@ -156,6 +267,37 @@ export class UserControl implements OnInit {
         this.loading = false;
       }
     });
+  }
+
+  saveUpdateHistory(user: FullUser, changes: any[], timestamp: string) {
+    if (!isPlatformBrowser(this.platformId)) return;
+
+    const updateHistory = {
+      id: `UH${Date.now()}`,
+      userId: user.id,
+      userName: user.username,
+      userEmail: user.email,
+      accountNumber: user.accountNumber,
+      adminName: this.adminName,
+      timestamp: timestamp,
+      changes: changes,
+      changeCount: changes.length
+    };
+
+    // Save to localStorage
+    const historyKey = 'adminUserUpdateHistory';
+    const existingHistory = localStorage.getItem(historyKey);
+    const history = existingHistory ? JSON.parse(existingHistory) : [];
+    
+    history.unshift(updateHistory);
+    
+    // Keep only last 1000 updates
+    if (history.length > 1000) {
+      history.splice(1000);
+    }
+    
+    localStorage.setItem(historyKey, JSON.stringify(history));
+    console.log('Update history saved:', updateHistory);
   }
 
   deleteUser(user: FullUser) {
@@ -184,7 +326,15 @@ export class UserControl implements OnInit {
   }
 
   goBack() {
-    this.router.navigate(['/admin/dashboard']);
+    // Check if accessed from manager dashboard
+    const navigationSource = sessionStorage.getItem('navigationSource');
+    if (navigationSource === 'MANAGER') {
+      sessionStorage.removeItem('navigationSource');
+      sessionStorage.removeItem('managerReturnPath');
+      this.router.navigate(['/manager/dashboard']);
+    } else {
+      this.router.navigate(['/admin/dashboard']);
+    }
   }
 
   toggleAddUserForm() {

@@ -16,6 +16,7 @@ public interface LoanRepository extends JpaRepository<Loan, Long> {
     
     // Basic queries
     List<Loan> findByAccountNumber(String accountNumber);
+    List<Loan> findByChildAccountNumber(String childAccountNumber);
     List<Loan> findByUserEmail(String userEmail);
     List<Loan> findByStatus(String status);
     Page<Loan> findByStatus(String status, Pageable pageable);

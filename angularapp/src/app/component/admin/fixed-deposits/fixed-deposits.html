@@ -1,0 +1,68 @@
+<div class="fixed-deposits-page">
+  <div class="page-header">
+    <button class="back-btn" (click)="goBack()">
+      <i class="fa fa-arrow-left"></i> Back
+    </button>
+    <h1><i class="fa fa-piggy-bank"></i> Fixed Deposits Management</h1>
+    <button class="refresh-btn" (click)="loadFixedDeposits()" [disabled]="isLoadingFDs">
+      <i class="fa fa-sync-alt" [class.fa-spin]="isLoadingFDs"></i> Refresh
+    </button>
+  </div>
+
+  <div class="filters-bar">
+    <select [(ngModel)]="fdStatusFilter" (change)="loadFixedDeposits()">
+      <option value="PENDING">Pending</option>
+      <option value="ACTIVE">Active</option>
+      <option value="MATURED">Matured</option>
+      <option value="REJECTED">Rejected</option>
+      <option value="ALL">All</option>
+    </select>
+    <input type="text" [(ngModel)]="fdSearchQuery" placeholder="Search by FD account, user..." />
+  </div>
+
+  <div *ngIf="isLoadingFDs" class="loading-state">
+    <p>Loading fixed deposits...</p>
+  </div>
+
+  <div *ngIf="!isLoadingFDs && getFilteredFDs().length === 0" class="no-data">
+    <p>No fixed deposits found</p>
+  </div>
+
+  <table class="data-table" *ngIf="!isLoadingFDs && getFilteredFDs().length > 0">
+    <thead>
+      <tr>
+        <th>User</th>
+        <th>Account</th>
+        <th>FD Account</th>
+        <th>Principal</th>
+        <th>Interest Rate</th>
+        <th>Tenure</th>
+        <th>Maturity Amount</th>
+        <th>Maturity Date</th>
+        <th>Status</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let fd of getFilteredFDs()">
+        <td>{{ fd.userName }}</td>
+        <td>{{ fd.accountNumber }}</td>
+        <td>{{ fd.fdAccountNumber }}</td>
+        <td>₹{{ fd.principalAmount | number:'1.2-2' }}</td>
+        <td>{{ fd.interestRate }}%</td>
+        <td>{{ fd.tenure }} months</td>
+        <td>₹{{ fd.maturityAmount | number:'1.2-2' }}</td>
+        <td>{{ fd.maturityDate | date:'dd/MM/yyyy' }}</td>
+        <td><span class="status-badge" [ngClass]="fd.status.toLowerCase()">{{ fd.status }}</span></td>
+        <td>
+          <button *ngIf="fd.status === 'PENDING'" (click)="approveFixedDeposit(fd)" class="btn-approve">Approve</button>
+          <button *ngIf="fd.status === 'PENDING'" (click)="rejectFixedDeposit(fd)" class="btn-reject">Reject</button>
+          <button *ngIf="fd.status === 'ACTIVE' && isFDMatured(fd)" 
+                  (click)="processFDMaturity(fd)" class="btn-process">Process Maturity</button>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+

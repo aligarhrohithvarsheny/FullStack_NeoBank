@@ -1,0 +1,375 @@
+<div class="education-loan-applications">
+  <div class="header">
+    <h1>🎓 Education Loan Applications</h1>
+    <div class="header-actions">
+      <input type="text" class="search-input" placeholder="Search by name, college, account..." 
+             [(ngModel)]="searchTerm" (input)="applyFilters()">
+      <select class="filter-select" [(ngModel)]="statusFilter" (change)="applyFilters()">
+        <option value="All">All Status</option>
+        <option value="Pending">Pending</option>
+        <option value="Under Review">Under Review</option>
+        <option value="Approved">Approved</option>
+        <option value="Rejected">Rejected</option>
+      </select>
+      <button class="refresh-btn" (click)="loadApplications()">🔄 Refresh</button>
+    </div>
+  </div>
+
+  <div *ngIf="isLoading" class="loading">Loading applications...</div>
+
+  <div *ngIf="!isLoading && filteredApplications.length === 0" class="no-data">
+    <p>No education loan applications found</p>
+  </div>
+
+  <div *ngIf="!isLoading && filteredApplications.length > 0" class="applications-table">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Applicant Account</th>
+          <th>Child Name</th>
+          <th>Child Account</th>
+          <th>Age</th>
+          <th>College</th>
+          <th>State/City</th>
+          <th>Course</th>
+          <th>Loan Amount</th>
+          <th>Status</th>
+          <th>Applied Date</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let app of filteredApplications">
+          <td>{{ app.id }}</td>
+          <td>
+            <div class="account-info">
+              <span class="account-number">{{ app.applicantAccountNumber || 'N/A' }}</span>
+              <span class="account-badge applicant">Applicant</span>
+            </div>
+          </td>
+          <td>{{ app.childName }}</td>
+          <td>
+            <div *ngIf="app.childAccountNumber" class="account-info">
+              <span class="account-number">{{ app.childAccountNumber }}</span>
+              <span class="account-badge child">Child</span>
+            </div>
+            <span *ngIf="!app.childAccountNumber">-</span>
+          </td>
+          <td>{{ app.childAge || 'N/A' }}</td>
+          <td>{{ app.collegeName }}</td>
+          <td>{{ app.collegeState }}/{{ app.collegeCity }}</td>
+          <td>{{ app.collegeCourse }}</td>
+          <td>{{ formatCurrency(app.requestedLoanAmount) }}</td>
+          <td>
+            <span class="status-badge" [ngClass]="getStatusClass(app.applicationStatus)">
+              {{ app.applicationStatus }}
+            </span>
+          </td>
+          <td>{{ formatDate(app.applicationDate) }}</td>
+          <td class="actions">
+            <button class="view-btn" (click)="viewApplication(app)">View</button>
+            <button class="edit-btn" (click)="openEditModal(app)">Edit</button>
+            <button class="status-btn" (click)="updateStatus(app.id!, 'Under Review')" 
+                    *ngIf="app.applicationStatus === 'Pending'">Review</button>
+            <button class="approve-btn" (click)="updateStatus(app.id!, 'Approved')" 
+                    *ngIf="app.applicationStatus === 'Under Review'">Approve</button>
+            <button class="reject-btn" (click)="rejectApplication(app.id!)" 
+                    *ngIf="app.applicationStatus !== 'Rejected'">Reject</button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- View Modal -->
+  <div *ngIf="selectedApplication && !showEditModal" class="modal-overlay" (click)="closeViewModal()">
+    <div class="modal-content" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>Education Loan Application Details</h2>
+        <button class="close-btn" (click)="closeViewModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="details-section">
+          <h3>👨‍👩‍👧‍👦 Applicant Information</h3>
+          <div class="details-grid">
+            <div class="detail-item">
+              <label>Applicant Account Number:</label>
+              <span>{{ selectedApplication.applicantAccountNumber }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Applicant Name:</label>
+              <span>{{ selectedApplication.applicantName }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Applicant Email:</label>
+              <span>{{ selectedApplication.applicantEmail }}</span>
+            </div>
+            <div class="detail-item" *ngIf="selectedApplication.childAccountNumber">
+              <label>Child Account Number:</label>
+              <span>{{ selectedApplication.childAccountNumber }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="details-section">
+          <h3>👤 Child/Student Information</h3>
+          <div class="details-grid">
+            <div class="detail-item">
+              <label>Name:</label>
+              <span>{{ selectedApplication.childName }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Date of Birth:</label>
+              <span>{{ formatDate(selectedApplication.childDateOfBirth) }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Age:</label>
+              <span>{{ selectedApplication.childAge }} years</span>
+            </div>
+            <div class="detail-item">
+              <label>Place of Birth:</label>
+              <span>{{ selectedApplication.childPlaceOfBirth }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="details-section">
+          <h3>📚 Education Details</h3>
+          <div class="education-details">
+            <div class="education-item">
+              <h4>10th Standard</h4>
+              <p><strong>School:</strong> {{ selectedApplication.tenthSchoolName }}</p>
+              <p><strong>Board:</strong> {{ selectedApplication.tenthBoard }}</p>
+              <p><strong>Year:</strong> {{ selectedApplication.tenthPassingYear }}</p>
+              <p><strong>Percentage:</strong> {{ selectedApplication.tenthPercentage }}%</p>
+            </div>
+            <div class="education-item">
+              <h4>12th Standard</h4>
+              <p><strong>School:</strong> {{ selectedApplication.twelfthSchoolName }}</p>
+              <p><strong>Board:</strong> {{ selectedApplication.twelfthBoard }}</p>
+              <p><strong>Year:</strong> {{ selectedApplication.twelfthPassingYear }}</p>
+              <p><strong>Percentage:</strong> {{ selectedApplication.twelfthPercentage }}%</p>
+            </div>
+            <div class="education-item" *ngIf="selectedApplication.ugCollegeName">
+              <h4>Undergraduate (UG)</h4>
+              <p><strong>College:</strong> {{ selectedApplication.ugCollegeName }}</p>
+              <p><strong>University:</strong> {{ selectedApplication.ugUniversity }}</p>
+              <p><strong>Course:</strong> {{ selectedApplication.ugCourse }}</p>
+              <p><strong>CGPA:</strong> {{ selectedApplication.ugCurrentCGPA }}</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="details-section">
+          <h3>🏫 College/University Details</h3>
+          <div class="details-grid">
+            <div class="detail-item">
+              <label>Type:</label>
+              <span>{{ selectedApplication.collegeType }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Name:</label>
+              <span>{{ selectedApplication.collegeName }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Location:</label>
+              <span>{{ selectedApplication.collegeCity }}, {{ selectedApplication.collegeState }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Course:</label>
+              <span>{{ selectedApplication.collegeCourse }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Degree:</label>
+              <span>{{ selectedApplication.collegeDegree }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Fee Amount:</label>
+              <span>{{ formatCurrency(selectedApplication.collegeFeeAmount) }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="details-section">
+          <h3>🏦 College Account Details</h3>
+          <div class="details-grid">
+            <div class="detail-item">
+              <label>Account Number:</label>
+              <span>{{ selectedApplication.collegeAccountNumber }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Bank Name:</label>
+              <span>{{ selectedApplication.collegeBankName }}</span>
+            </div>
+            <div class="detail-item">
+              <label>IFSC Code:</label>
+              <span>{{ selectedApplication.collegeIFSCCode }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="details-section">
+          <h3>📄 Documents</h3>
+          <div class="document-actions">
+            <button *ngIf="selectedApplication.collegeApplicationPath" 
+                    (click)="downloadDocument(selectedApplication.id!, 'college-application')">
+              📄 Download College Application
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="edit-btn" (click)="openEditModal(selectedApplication)">Edit Application</button>
+        <button class="close-btn" (click)="closeViewModal()">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit Modal -->
+  <div *ngIf="showEditModal && selectedApplication" class="modal-overlay" (click)="closeEditModal()">
+    <div class="modal-content edit-modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>Edit Education Loan Application</h2>
+        <button class="close-btn" (click)="closeEditModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <form (ngSubmit)="saveChanges()">
+          <!-- Child Details -->
+          <div class="form-section">
+            <h3>Child Details</h3>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Child Name</label>
+                <input type="text" [(ngModel)]="editForm.childName" name="childName">
+              </div>
+              <div class="form-group">
+                <label>Date of Birth</label>
+                <input type="date" [(ngModel)]="editForm.childDateOfBirth" name="childDateOfBirth">
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Place of Birth</label>
+              <input type="text" [(ngModel)]="editForm.childPlaceOfBirth" name="childPlaceOfBirth">
+            </div>
+          </div>
+
+          <!-- Education Details -->
+          <div class="form-section">
+            <h3>10th Standard</h3>
+            <div class="form-row">
+              <div class="form-group">
+                <label>School Name</label>
+                <input type="text" [(ngModel)]="editForm.tenthSchoolName" name="tenthSchoolName">
+              </div>
+              <div class="form-group">
+                <label>Board</label>
+                <input type="text" [(ngModel)]="editForm.tenthBoard" name="tenthBoard">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Passing Year</label>
+                <input type="number" [(ngModel)]="editForm.tenthPassingYear" name="tenthPassingYear">
+              </div>
+              <div class="form-group">
+                <label>Percentage</label>
+                <input type="number" [(ngModel)]="editForm.tenthPercentage" name="tenthPercentage" step="0.01">
+              </div>
+            </div>
+          </div>
+
+          <div class="form-section">
+            <h3>12th Standard</h3>
+            <div class="form-row">
+              <div class="form-group">
+                <label>School Name</label>
+                <input type="text" [(ngModel)]="editForm.twelfthSchoolName" name="twelfthSchoolName">
+              </div>
+              <div class="form-group">
+                <label>Board</label>
+                <input type="text" [(ngModel)]="editForm.twelfthBoard" name="twelfthBoard">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Passing Year</label>
+                <input type="number" [(ngModel)]="editForm.twelfthPassingYear" name="twelfthPassingYear">
+              </div>
+              <div class="form-group">
+                <label>Percentage</label>
+                <input type="number" [(ngModel)]="editForm.twelfthPercentage" name="twelfthPercentage" step="0.01">
+              </div>
+            </div>
+          </div>
+
+          <!-- College Details -->
+          <div class="form-section">
+            <h3>College Details</h3>
+            <div class="form-row">
+              <div class="form-group">
+                <label>College Name</label>
+                <input type="text" [(ngModel)]="editForm.collegeName" name="collegeName">
+              </div>
+              <div class="form-group">
+                <label>State</label>
+                <input type="text" [(ngModel)]="editForm.collegeState" name="collegeState">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>City</label>
+                <input type="text" [(ngModel)]="editForm.collegeCity" name="collegeCity">
+              </div>
+              <div class="form-group">
+                <label>Course</label>
+                <input type="text" [(ngModel)]="editForm.collegeCourse" name="collegeCourse">
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Fee Amount</label>
+              <input type="number" [(ngModel)]="editForm.collegeFeeAmount" name="collegeFeeAmount" step="0.01">
+            </div>
+          </div>
+
+          <!-- College Account -->
+          <div class="form-section">
+            <h3>College Account</h3>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Account Number</label>
+                <input type="text" [(ngModel)]="editForm.collegeAccountNumber" name="collegeAccountNumber">
+              </div>
+              <div class="form-group">
+                <label>Bank Name</label>
+                <input type="text" [(ngModel)]="editForm.collegeBankName" name="collegeBankName">
+              </div>
+            </div>
+            <div class="form-group">
+              <label>IFSC Code</label>
+              <input type="text" [(ngModel)]="editForm.collegeIFSCCode" name="collegeIFSCCode">
+            </div>
+          </div>
+
+          <!-- Admin Notes -->
+          <div class="form-section">
+            <h3>Admin Notes</h3>
+            <div class="form-group">
+              <textarea [(ngModel)]="editForm.adminNotes" name="adminNotes" rows="4" 
+                        placeholder="Enter admin notes..."></textarea>
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" class="save-btn" [disabled]="isLoading">
+              {{ isLoading ? 'Saving...' : 'Save Changes' }}
+            </button>
+            <button type="button" class="cancel-btn" (click)="closeEditModal()">Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+

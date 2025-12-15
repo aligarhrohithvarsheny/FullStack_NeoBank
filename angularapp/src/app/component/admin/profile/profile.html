@@ -1,0 +1,189 @@
+<div class="admin-profile-container">
+  <div class="profile-header">
+    <button class="back-btn" (click)="goBack()">← Back to Dashboard</button>
+    <h2>👤 Admin Profile</h2>
+    <button class="edit-btn" (click)="toggleEditMode()" *ngIf="!editMode">
+      ✏️ Edit Profile
+    </button>
+    <div class="action-buttons" *ngIf="editMode">
+      <button class="cancel-btn" (click)="toggleEditMode()" [disabled]="isSaving">
+        Cancel
+      </button>
+      <button class="save-btn" (click)="saveProfile()" [disabled]="isSaving">
+        <span *ngIf="!isSaving">💾 Save Changes</span>
+        <span *ngIf="isSaving">⏳ Saving...</span>
+      </button>
+    </div>
+  </div>
+
+  <div *ngIf="isLoading" class="loading-container">
+    <div class="loading-spinner"></div>
+    <p>Loading profile...</p>
+  </div>
+
+  <div *ngIf="!isLoading && admin" class="profile-content">
+    <!-- Profile Card -->
+    <div class="profile-card">
+      <div class="profile-avatar">
+        <div class="avatar-circle">
+          <i class="fa fa-user-shield"></i>
+        </div>
+        <h3>{{ admin.name || 'Admin' }}</h3>
+        <p class="role-badge">{{ admin.role || 'Administrator' }}</p>
+      </div>
+
+      <div class="profile-details">
+        <!-- Basic Information -->
+        <div class="details-section">
+          <h4>📋 Basic Information</h4>
+          <div class="details-grid">
+            <div class="detail-item">
+              <label>Name <span class="required">*</span></label>
+              <input 
+                *ngIf="editMode" 
+                type="text" 
+                [(ngModel)]="profileForm.name" 
+                class="form-input"
+                required>
+              <span *ngIf="!editMode" class="value">{{ admin.name || 'N/A' }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Email <span class="required">*</span></label>
+              <input 
+                *ngIf="editMode" 
+                type="email" 
+                [(ngModel)]="profileForm.email" 
+                class="form-input"
+                required>
+              <span *ngIf="!editMode" class="value">{{ admin.email || 'N/A' }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Employee ID</label>
+              <input 
+                *ngIf="editMode" 
+                type="text" 
+                [(ngModel)]="profileForm.employeeId" 
+                class="form-input"
+                placeholder="Enter Employee ID">
+              <span *ngIf="!editMode" class="value">{{ admin.employeeId || 'Not provided' }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Role</label>
+              <input 
+                *ngIf="editMode" 
+                type="text" 
+                [(ngModel)]="profileForm.role" 
+                class="form-input"
+                placeholder="Enter role">
+              <span *ngIf="!editMode" class="value">{{ admin.role || 'N/A' }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Contact Information -->
+        <div class="details-section">
+          <h4>📞 Contact Information</h4>
+          <div class="details-grid">
+            <div class="detail-item">
+              <label>Mobile Number</label>
+              <input 
+                *ngIf="editMode" 
+                type="text" 
+                [(ngModel)]="profileForm.mobileNumber" 
+                class="form-input"
+                placeholder="10-digit mobile number"
+                maxlength="10"
+                pattern="[0-9]{10}">
+              <span *ngIf="!editMode" class="value">{{ admin.mobileNumber || 'Not provided' }}</span>
+            </div>
+            <div class="detail-item full-width">
+              <label>Address</label>
+              <textarea 
+                *ngIf="editMode" 
+                [(ngModel)]="profileForm.address" 
+                class="form-textarea"
+                rows="3"
+                placeholder="Enter full address"></textarea>
+              <span *ngIf="!editMode" class="value">{{ admin.address || 'Not provided' }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Identification Information -->
+        <div class="details-section">
+          <h4>🆔 Identification Information</h4>
+          <div class="details-grid">
+            <div class="detail-item">
+              <label>Aadhar Number</label>
+              <input 
+                *ngIf="editMode" 
+                type="text" 
+                [(ngModel)]="profileForm.aadharNumber" 
+                class="form-input"
+                placeholder="12-digit Aadhar number"
+                maxlength="12"
+                pattern="[0-9]{12}">
+              <span *ngIf="!editMode" class="value">{{ admin.aadharNumber || 'Not provided' }}</span>
+            </div>
+            <div class="detail-item">
+              <label>PAN Number</label>
+              <input 
+                *ngIf="editMode" 
+                type="text" 
+                [(ngModel)]="profileForm.pan" 
+                class="form-input"
+                placeholder="10-character PAN"
+                maxlength="10"
+                style="text-transform: uppercase;">
+              <span *ngIf="!editMode" class="value">{{ admin.pan || 'Not provided' }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Qualifications -->
+        <div class="details-section">
+          <h4>🎓 Qualifications</h4>
+          <div class="detail-item full-width">
+            <label>Educational Qualifications</label>
+            <textarea 
+              *ngIf="editMode" 
+              [(ngModel)]="profileForm.qualifications" 
+              class="form-textarea"
+              rows="4"
+              placeholder="Enter your qualifications (e.g., MBA, B.Tech, CA, etc.)"></textarea>
+            <span *ngIf="!editMode" class="value">{{ admin.qualifications || 'Not provided' }}</span>
+          </div>
+        </div>
+
+        <!-- Account Information -->
+        <div class="details-section">
+          <h4>ℹ️ Account Information</h4>
+          <div class="details-grid">
+            <div class="detail-item">
+              <label>Admin ID</label>
+              <span class="value">{{ admin.id || 'N/A' }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Created At</label>
+              <span class="value">{{ formatDate(admin.createdAt) }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Last Updated</label>
+              <span class="value">{{ formatDate(admin.lastUpdated) }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div *ngIf="!isLoading && !admin" class="error-container">
+    <i class="fa fa-exclamation-circle"></i>
+    <p>Failed to load admin profile. Please try again.</p>
+    <button class="retry-btn" (click)="loadProfile()">Retry</button>
+  </div>
+</div>
+
+
+
+

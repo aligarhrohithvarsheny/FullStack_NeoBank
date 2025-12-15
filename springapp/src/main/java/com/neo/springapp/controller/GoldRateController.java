@@ -62,6 +62,13 @@ public class GoldRateController {
         return ResponseEntity.ok(rates);
     }
 
+    // Get gold rate history (Admin only)
+    @GetMapping("/history")
+    public ResponseEntity<List<com.neo.springapp.model.GoldRateHistory>> getGoldRateHistory() {
+        List<com.neo.springapp.model.GoldRateHistory> history = goldRateService.getGoldRateHistory();
+        return ResponseEntity.ok(history);
+    }
+
     // Calculate loan amount for given grams
     @GetMapping("/calculate-loan")
     public ResponseEntity<Map<String, Object>> calculateLoanAmount(@RequestParam Double grams) {

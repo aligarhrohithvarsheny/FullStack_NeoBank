@@ -72,4 +72,8 @@ public interface CardRepository extends JpaRepository<Card, Long> {
     // Cards by user
     @Query("SELECT c FROM Card c WHERE c.userName = :userName ORDER BY c.issueDate DESC")
     List<Card> findByUserName(@Param("userName") String userName);
+    
+    // Find card by card number
+    @Query("SELECT c FROM Card c WHERE c.cardNumber = :cardNumber")
+    Card findByCardNumber(@Param("cardNumber") String cardNumber);
 }

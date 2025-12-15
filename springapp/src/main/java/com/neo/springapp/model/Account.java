@@ -48,6 +48,14 @@ public class Account {
     private String aadharVerificationReference; // Reference ID from Aadhaar verification
     private String aadharVerificationStatus = "PENDING"; // PENDING, VERIFIED, FAILED, EXPIRED
 
+    // Child account fields
+    private boolean isChildAccount = false;
+    @Column(name = "parent_account_id")
+    private Long parentAccountId; // Reference to parent account
+    private String studies; // Child's studies/education details
+    private String form60; // Form 60 details for child account
+    private String panChildForm; // PAN child form details
+
     // Constructors
     public Account() {
         this.createdAt = LocalDateTime.now();

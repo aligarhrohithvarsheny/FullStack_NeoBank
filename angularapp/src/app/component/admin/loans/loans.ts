@@ -13,12 +13,14 @@ interface LoanRequest {
   amount: number;
   tenure: number;
   interestRate: number;
-  status: 'Pending' | 'Approved' | 'Rejected' | 'Foreclosed';
+  status: 'Pending' | 'Approved' | 'Rejected' | 'Foreclosed' | 'Paid';
   accountNumber: string;
+  childAccountNumber?: string; // For education loans with child account
   currentBalance: number;
   loanAccountNumber: string;
   applicationDate: string;
   approvalDate?: string;
+  personalLoanFormPath?: string; // Path to uploaded Personal Loan form
 }
 
 interface ForeclosureDetails {
@@ -47,7 +49,7 @@ export class Loans implements OnInit {
 
   loanRequests: LoanRequest[] = [];
   loading = false;
-  
+
   // Foreclosure properties
   showForeclosureModal = false;
   foreclosureLoanNumber = '';
@@ -55,6 +57,29 @@ export class Loans implements OnInit {
   processingForeclosure = false;
   foreclosureDetails: ForeclosureDetails | null = null;
   foreclosureError = '';
+
+  // EMI details (per‑month loan payment tracking)
+  showEmiModal = false;
+  selectedLoanForEmi: LoanRequest | null = null;
+  emis: {
+    id: number;
+    loanId: number;
+    loanAccountNumber: string;
+    accountNumber: string;
+    emiNumber: number;
+    dueDate: string;
+    principalAmount: number;
+    interestAmount: number;
+    totalAmount: number;
+    remainingPrincipal: number;
+    status: string;
+    paymentDate?: string;
+    balanceBeforePayment?: number;
+    balanceAfterPayment?: number;
+    transactionId?: string;
+  }[] = [];
+  loadingEmis = false;
+  emisError = '';
 
   ngOnInit() {
     // Only load in browser, not during SSR
@@ -84,10 +109,12 @@ export class Loans implements OnInit {
           interestRate: loan.interestRate,
           status: loan.status,
           accountNumber: loan.accountNumber,
+          childAccountNumber: loan.childAccountNumber,
           currentBalance: loan.currentBalance,
           loanAccountNumber: loan.loanAccountNumber,
           applicationDate: loan.applicationDate,
-          approvalDate: loan.approvalDate
+          approvalDate: loan.approvalDate,
+          personalLoanFormPath: loan.personalLoanFormPath
         }));
         
         // Also save to localStorage as backup
@@ -127,7 +154,15 @@ export class Loans implements OnInit {
 
   // Navigate back to admin dashboard
   goBack() {
+    // Check if accessed from manager dashboard
+    const navigationSource = sessionStorage.getItem('navigationSource');
+    if (navigationSource === 'MANAGER') {
+      sessionStorage.removeItem('navigationSource');
+      sessionStorage.removeItem('managerReturnPath');
+      this.router.navigate(['/manager/dashboard']);
+    } else {
     this.router.navigate(['/admin/dashboard']);
+    }
   }
 
   // Approve loan
@@ -205,6 +240,11 @@ export class Loans implements OnInit {
   // TrackBy function for ngFor performance
   trackByLoanId(index: number, loan: LoanRequest): number {
     return loan.id;
+  }
+
+  // TrackBy for EMI rows
+  trackByEmiId(index: number, emi: { id: number }): number {
+    return emi.id;
   }
 
   // Show loan approval notification with detailed information
@@ -356,5 +396,78 @@ export class Loans implements OnInit {
         console.error('Error processing foreclosure:', err);
       }
     });
+  }
+
+  // ---------- EMI schedule & payment details ----------
+
+  openEmiDetails(loan: LoanRequest) {
+    if (!isPlatformBrowser(this.platformId)) return;
+
+    this.selectedLoanForEmi = loan;
+    this.showEmiModal = true;
+    this.loadingEmis = true;
+    this.emisError = '';
+    this.emis = [];
+
+    // Fetch EMI schedule (monthly payments) for this loan from backend
+    this.http.get<any[]>(`${environment.apiUrl}/emis/loan/${loan.id}`).subscribe({
+      next: (emis) => {
+        this.emis = emis || [];
+        this.loadingEmis = false;
+      },
+      error: (err: any) => {
+        console.error('Error loading EMI details for loan', loan.id, err);
+        this.emisError = 'Failed to load EMI schedule. Please try again.';
+        this.loadingEmis = false;
+      }
+    });
+  }
+
+  closeEmiModal() {
+    this.showEmiModal = false;
+    this.selectedLoanForEmi = null;
+    this.emis = [];
+    this.loadingEmis = false;
+    this.emisError = '';
+  }
+
+  // Format date/time with proper timezone handling
+  formatDateTime(dateTimeString: string): string {
+    if (!dateTimeString) return '-';
+    try {
+      // Parse the date string (handles both ISO format and other formats)
+      const date = new Date(dateTimeString);
+      
+      // Check if date is valid
+      if (isNaN(date.getTime())) {
+        return dateTimeString; // Return original if invalid
+      }
+      
+      // Format to local timezone with proper date and time
+      return date.toLocaleString('en-IN', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true,
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+      });
+    } catch (e) {
+      console.error('Error formatting date:', e);
+      return dateTimeString; // Return original if error
+    }
+  }
+
+  // View Personal Loan Application Form
+  viewPersonalLoanForm(loan: LoanRequest) {
+    if (!loan.personalLoanFormPath || !loan.id) {
+      alert('Personal Loan form not available for this loan.');
+      return;
+    }
+
+    // Download the form file from backend
+    window.open(`${environment.apiUrl}/loans/download-personal-loan-form/${loan.id}`, '_blank');
   }
 }

@@ -133,7 +133,15 @@ export class Transactions implements OnInit {
   }
 
   backToDashboard() {
-    this.router.navigate(['admin/dashboard']);
+    // Check if accessed from manager dashboard
+    const navigationSource = sessionStorage.getItem('navigationSource');
+    if (navigationSource === 'MANAGER') {
+      sessionStorage.removeItem('navigationSource');
+      sessionStorage.removeItem('managerReturnPath');
+      this.router.navigate(['/manager/dashboard']);
+    } else {
+      this.router.navigate(['/admin/dashboard']);
+    }
   }
 
   saveTransactionsToStorage() {
