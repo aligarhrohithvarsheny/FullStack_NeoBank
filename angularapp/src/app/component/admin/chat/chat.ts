@@ -1,5 +1,5 @@
-import { Component, OnInit, OnDestroy, ViewChild, ElementRef } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, OnInit, OnDestroy, ViewChild, ElementRef, Inject, PLATFORM_ID } from '@angular/core';
+import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ChatService, ChatMessage } from '../../../service/chat.service';
 import { AlertService } from '../../../service/alert.service';
@@ -35,19 +35,23 @@ export class AdminChat implements OnInit, OnDestroy {
     private alertService: AlertService,
     private userService: UserService,
     private accountService: AccountService,
-    private router: Router
+    private router: Router,
+    @Inject(PLATFORM_ID) private platformId: Object
   ) {}
 
   ngOnInit() {
-    this.loadEscalatedChats();
-    
-    // Refresh escalated chats every 5 seconds
-    this.refreshInterval = setInterval(() => {
+    // Only make API calls in the browser, not during SSR
+    if (isPlatformBrowser(this.platformId)) {
       this.loadEscalatedChats();
-      if (this.selectedSessionId) {
-        this.loadChatHistory(this.selectedSessionId);
-      }
-    }, 5000);
+      
+      // Refresh escalated chats every 5 seconds
+      this.refreshInterval = setInterval(() => {
+        this.loadEscalatedChats();
+        if (this.selectedSessionId) {
+          this.loadChatHistory(this.selectedSessionId);
+        }
+      }, 5000);
+    }
   }
 
   ngOnDestroy() {
@@ -57,6 +61,9 @@ export class AdminChat implements OnInit, OnDestroy {
   }
 
   loadEscalatedChats() {
+    // Only make API calls in the browser
+    if (!isPlatformBrowser(this.platformId)) return;
+    
     this.chatService.getEscalatedChats().subscribe({
       next: (chats) => {
         // Group by sessionId and get latest message
@@ -81,6 +88,8 @@ export class AdminChat implements OnInit, OnDestroy {
   }
 
   selectChat(sessionId: string) {
+    if (!isPlatformBrowser(this.platformId)) return;
+    
     this.selectedSessionId = sessionId;
     this.loadChatHistory(sessionId);
     
@@ -98,6 +107,8 @@ export class AdminChat implements OnInit, OnDestroy {
   }
 
   loadChatHistory(sessionId: string) {
+    if (!isPlatformBrowser(this.platformId)) return;
+    
     this.chatService.getChatHistory(sessionId).subscribe({
       next: (messages) => {
         // Deduplicate messages by ID to prevent duplicates
@@ -114,6 +125,8 @@ export class AdminChat implements OnInit, OnDestroy {
   }
 
   sendMessage() {
+    if (!isPlatformBrowser(this.platformId)) return;
+    
     if ((!this.newMessage.trim() && !this.selectedFile) || this.isLoading || !this.selectedSessionId) {
       return;
     }
@@ -257,6 +270,8 @@ export class AdminChat implements OnInit, OnDestroy {
   }
 
   viewCustomerAccountDetails() {
+    if (!isPlatformBrowser(this.platformId)) return;
+    
     console.log('View Customer Account Details clicked');
     const userId = this.getCurrentCustomerUserId();
     console.log('Current customer userId:', userId);
