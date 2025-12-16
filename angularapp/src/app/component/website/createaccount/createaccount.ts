@@ -535,7 +535,7 @@ export class Createaccount implements OnInit {
     // Debounce: wait 500ms before making API call
     setTimeout(() => {
       if (this.form.get('aadhar')?.value === aadhar) {
-        this.http.get<{isUnique: boolean}>(`${environment.apiUrl}/accounts/validate/aadhar/${aadhar}`).subscribe({
+        this.http.get<{isUnique: boolean}>(`${environment.apiBaseUrl}/accounts/validate/aadhar/${aadhar}`).subscribe({
           next: (response) => {
             this.aadharExists = !response.isUnique;
             this.aadharChecking = false;
@@ -564,7 +564,7 @@ export class Createaccount implements OnInit {
     // Debounce: wait 500ms before making API call
     setTimeout(() => {
       if (this.form.get('pan')?.value?.toUpperCase() === pan) {
-        this.http.get<{isUnique: boolean}>(`${environment.apiUrl}/accounts/validate/pan/${pan}`).subscribe({
+        this.http.get<{isUnique: boolean}>(`${environment.apiBaseUrl}/accounts/validate/pan/${pan}`).subscribe({
           next: (response) => {
             this.panExists = !response.isUnique;
             this.panChecking = false;
@@ -593,7 +593,7 @@ export class Createaccount implements OnInit {
     // Debounce: wait 500ms before making API call
     setTimeout(() => {
       if (this.form.get('mobile')?.value === mobile) {
-        this.http.get<{isUnique: boolean}>(`${environment.apiUrl}/accounts/validate/phone/${mobile}`).subscribe({
+        this.http.get<{isUnique: boolean}>(`${environment.apiBaseUrl}/accounts/validate/phone/${mobile}`).subscribe({
           next: (response) => {
             this.mobileExists = !response.isUnique;
             this.mobileChecking = false;
@@ -724,7 +724,7 @@ export class Createaccount implements OnInit {
     };
 
     // Submit to backend using HttpClient directly
-    this.http.post(`${environment.apiUrl}/users/create`, userData).subscribe({
+    this.http.post(`${environment.apiBaseUrl}/users/create`, userData).subscribe({
       next: (response: any) => {
         console.log('User created successfully in MySQL:', response);
         
@@ -868,7 +868,7 @@ export class Createaccount implements OnInit {
     this.trackingResult = null;
 
     // Call backend API to get tracking status
-    this.http.get(`${environment.apiUrl}/tracking/track?aadharNumber=${this.trackingAadhar}&mobileNumber=${this.trackingMobile}`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/tracking/track?aadharNumber=${this.trackingAadhar}&mobileNumber=${this.trackingMobile}`).subscribe({
       next: (response: any) => {
         this.trackingLoading = false;
         if (response.success && response.tracking) {

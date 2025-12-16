@@ -97,7 +97,7 @@ export class Goldloan implements OnInit {
       this.userEmail = user.email;
       
       // Load current balance
-      this.http.get(`${environment.apiUrl}/accounts/balance/${this.userAccountNumber}`).subscribe({
+      this.http.get(`${environment.apiBaseUrl}/accounts/balance/${this.userAccountNumber}`).subscribe({
         next: (balanceData: any) => {
           this.currentBalance = balanceData.balance || 0;
         },
@@ -110,7 +110,7 @@ export class Goldloan implements OnInit {
 
   loadCurrentGoldRate() {
     this.loading = true;
-    this.http.get(`${environment.apiUrl}/gold-rates/current`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/gold-rates/current`).subscribe({
       next: (rate: any) => {
         this.currentGoldRate = rate;
         this.loading = false;
@@ -129,7 +129,7 @@ export class Goldloan implements OnInit {
     }
 
     this.calculating = true;
-    this.http.get(`${environment.apiUrl}/gold-loans/calculate?grams=${this.goldGrams}`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/gold-loans/calculate?grams=${this.goldGrams}`).subscribe({
       next: (response: any) => {
         this.calculatedLoan = response;
         this.calculating = false;
@@ -174,7 +174,7 @@ export class Goldloan implements OnInit {
       currentBalance: this.currentBalance
     };
 
-    this.http.post(`${environment.apiUrl}/gold-loans`, goldLoanData).subscribe({
+    this.http.post(`${environment.apiBaseUrl}/gold-loans`, goldLoanData).subscribe({
       next: (response: any) => {
         this.loading = false;
         if (response.success) {
@@ -198,7 +198,7 @@ export class Goldloan implements OnInit {
     if (!this.userAccountNumber) return;
     
     this.loadingLoans = true;
-    this.http.get(`${environment.apiUrl}/gold-loans/account/${this.userAccountNumber}`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/gold-loans/account/${this.userAccountNumber}`).subscribe({
       next: (loans: any) => {
         this.goldLoans = Array.isArray(loans) ? loans : [];
         this.loadingLoans = false;
@@ -257,7 +257,7 @@ export class Goldloan implements OnInit {
     const acceptedBy = this.userAccountNumber || this.userEmail;
 
     this.http.put(
-      `${environment.apiUrl}/gold-loans/${this.selectedLoanForTerms.id}/accept-terms?acceptedBy=${acceptedBy}`,
+      `${environment.apiBaseUrl}/gold-loans/${this.selectedLoanForTerms.id}/accept-terms?acceptedBy=${acceptedBy}`,
       {}
     ).subscribe({
       next: (response: any) => {

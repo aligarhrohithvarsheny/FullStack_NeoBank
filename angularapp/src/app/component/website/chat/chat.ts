@@ -285,7 +285,7 @@ export class Chat implements OnInit, OnDestroy {
     if (attachmentUrl.startsWith('http')) {
       return attachmentUrl;
     }
-    return `${environment.apiUrl}${attachmentUrl}`;
+    return `${environment.apiBaseUrl}${attachmentUrl}`;
   }
 }
 

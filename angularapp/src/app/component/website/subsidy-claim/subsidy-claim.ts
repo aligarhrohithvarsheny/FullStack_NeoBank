@@ -87,7 +87,7 @@ export class SubsidyClaim implements OnInit {
     if (!this.userAccountNumber) return;
     
     this.loading = true;
-    this.http.get<any>(`${environment.apiUrl}/loans/account/${this.userAccountNumber}`).subscribe({
+    this.http.get<any>(`${environment.apiBaseUrl}/loans/account/${this.userAccountNumber}`).subscribe({
       next: (response) => {
         // Handle both old format (array) and new format (object with loans array)
         const loansData = Array.isArray(response) ? response : (response.loans || response);

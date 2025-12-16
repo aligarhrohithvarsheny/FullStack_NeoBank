@@ -8,7 +8,7 @@ import { environment } from '../../environment/environment';
   providedIn: 'root'
 })
 export class CardReplacementRequestService {
-  private apiUrl = `${environment.apiUrl}/card-replacement-requests`;
+  private apiUrl = `${environment.apiBaseUrl}/api/card-replacement-requests`;
 
   constructor(private http: HttpClient) { }
 

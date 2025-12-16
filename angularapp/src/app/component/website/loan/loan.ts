@@ -186,7 +186,7 @@ export class Loan implements OnInit {
       }
       
       const emi = selectedPendingEmis[index];
-      this.http.post(`${environment.apiUrl}/emis/pay/${emi.id}?accountNumber=${this.userAccountNumber}`, {}).subscribe({
+      this.http.post(`${environment.apiBaseUrl}/emis/pay/${emi.id}?accountNumber=${this.userAccountNumber}`, {}).subscribe({
         next: (response: any) => {
           if (response.success) {
             completed++;
@@ -352,7 +352,7 @@ export class Loan implements OnInit {
     this.cibilInfo.error = '';
 
     // First get PAN
-    this.http.get(`${environment.apiUrl}/loans/user-pan/${this.userAccountNumber}`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/loans/user-pan/${this.userAccountNumber}`).subscribe({
       next: (response: any) => {
         if (response.success && response.pan) {
           this.loanForm.pan = response.pan;
@@ -379,7 +379,7 @@ export class Loan implements OnInit {
     this.cibilInfo.loading = true;
     this.cibilInfo.error = '';
 
-    this.http.get(`${environment.apiUrl}/loans/check-cibil-by-account/${this.userAccountNumber}`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/loans/check-cibil-by-account/${this.userAccountNumber}`).subscribe({
       next: (response: any) => {
         if (response.success) {
           this.cibilInfo.cibilScore = response.cibilScore || 0;
@@ -421,7 +421,7 @@ export class Loan implements OnInit {
     this.cibilInfo.loading = true;
     this.cibilInfo.error = '';
 
-    this.http.get(`${environment.apiUrl}/loans/check-cibil/${pan}`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/loans/check-cibil/${pan}`).subscribe({
       next: (response: any) => {
         if (response.success) {
           this.cibilInfo.cibilScore = response.cibilScore || 0;
@@ -456,7 +456,7 @@ export class Loan implements OnInit {
     this.loading = true;
     
     // Load user's loans from MySQL database (includes both applicant and child loans)
-    this.http.get(`${environment.apiUrl}/loans/account/${this.userAccountNumber}`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/loans/account/${this.userAccountNumber}`).subscribe({
       next: (response: any) => {
         // Handle both old format (array) and new format (object with loans array)
         const loansData = Array.isArray(response) ? response : (response.loans || response);
@@ -836,7 +836,7 @@ export class Loan implements OnInit {
     this.childAccountVerified = false;
 
     // Use secure verification endpoint that verifies both Aadhar and account number
-    const verifyUrl = `${environment.apiUrl}/accounts/verify?aadharNumber=${encodeURIComponent(this.childAccountAadhar)}&accountNumber=${encodeURIComponent(this.childAccountNumber)}`;
+    const verifyUrl = `${environment.apiBaseUrl}/accounts/verify?aadharNumber=${encodeURIComponent(this.childAccountAadhar)}&accountNumber=${encodeURIComponent(this.childAccountNumber)}`;
     
     this.http.get(verifyUrl).subscribe({
       next: (response: any) => {
@@ -920,7 +920,7 @@ export class Loan implements OnInit {
       this.educationLoanForm.applicantEmail = user.email;
       
       // Load user details from API
-      this.http.get(`${environment.apiUrl}/users/account/${user.accountNumber}`).subscribe({
+      this.http.get(`${environment.apiBaseUrl}/users/account/${user.accountNumber}`).subscribe({
         next: (userData: any) => {
           if (userData.account) {
             this.educationLoanForm.applicantPan = userData.account.pan || '';
@@ -1218,7 +1218,7 @@ export class Loan implements OnInit {
       formData.append('accountNumber', this.userAccountNumber);
 
       // Upload the form file
-      this.http.post(`${environment.apiUrl}/loans/upload-personal-loan-form`, formData).subscribe({
+      this.http.post(`${environment.apiBaseUrl}/loans/upload-personal-loan-form`, formData).subscribe({
         next: (uploadResponse: any) => {
           console.log('Personal Loan form uploaded:', uploadResponse);
           this.personalLoanFormUploaded = true;
@@ -1266,7 +1266,7 @@ export class Loan implements OnInit {
     }
 
     // Submit to MySQL database
-    this.http.post(`${environment.apiUrl}/loans`, backendLoan).subscribe({
+    this.http.post(`${environment.apiBaseUrl}/loans`, backendLoan).subscribe({
       next: (response: any) => {
         console.log('Loan request created successfully in MySQL:', response);
         
@@ -1399,7 +1399,7 @@ export class Loan implements OnInit {
       return;
     }
 
-    this.http.get(`${environment.apiUrl}/loans/foreclosure/pdf/${loan.loanAccountNumber}`, {
+    this.http.get(`${environment.apiBaseUrl}/loans/foreclosure/pdf/${loan.loanAccountNumber}`, {
       responseType: 'blob'
     }).subscribe({
       next: (blob: Blob) => {
@@ -1807,7 +1807,7 @@ export class Loan implements OnInit {
 
   // Load EMIs for a specific loan
   loadEmisForLoan(loanId: number) {
-    this.http.get(`${environment.apiUrl}/emis/loan/${loanId}`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/emis/loan/${loanId}`).subscribe({
       next: (emis: any) => {
         this.emiPayments.set(loanId, emis);
         console.log(`Loaded ${emis.length} EMIs for loan ${loanId}`);
@@ -1868,7 +1868,7 @@ export class Loan implements OnInit {
     const emi = this.selectedEmiForPayment;
     this.payingEmi = true;
     
-    this.http.post(`${environment.apiUrl}/emis/pay/${emi.id}?accountNumber=${this.userAccountNumber}`, {}).subscribe({
+    this.http.post(`${environment.apiBaseUrl}/emis/pay/${emi.id}?accountNumber=${this.userAccountNumber}`, {}).subscribe({
       next: (response: any) => {
         if (response.success) {
           // Close modal
@@ -1905,7 +1905,7 @@ export class Loan implements OnInit {
 
   // Download EMI receipt
   downloadEmiReceipt(emi: EmiPayment) {
-    this.http.get(`${environment.apiUrl}/emis/${emi.id}/receipt`, {
+    this.http.get(`${environment.apiBaseUrl}/emis/${emi.id}/receipt`, {
       responseType: 'blob'
     }).subscribe({
       next: (blob: Blob) => {
@@ -1928,7 +1928,7 @@ export class Loan implements OnInit {
   // Load account balance
   loadAccountBalance() {
     if (!this.userAccountNumber) return;
-    this.http.get(`${environment.apiUrl}/accounts/balance/${this.userAccountNumber}`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/accounts/balance/${this.userAccountNumber}`).subscribe({
       next: (response: any) => {
         if (response.balance !== undefined) {
           this.currentBalance = response.balance;

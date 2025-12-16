@@ -78,7 +78,7 @@ export class Kyc implements OnInit {
     
     // Load KYC requests from MySQL database
     console.log('Loading KYC requests from MySQL database...');
-    this.http.get(`${environment.apiUrl}/kyc/all?page=0&size=100`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/kyc/all?page=0&size=100`).subscribe({
       next: (response: any) => {
         console.log('KYC requests loaded from MySQL:', response);
         console.log('Response type:', typeof response);
@@ -163,7 +163,7 @@ export class Kyc implements OnInit {
   approve(request: KycRequest) {
     if (confirm(`Approve KYC for ${request.userName} (${request.userAccountNumber})?`)) {
       // Update KYC request in MySQL database
-      this.http.put(`${environment.apiUrl}/kyc/approve/${request.id}?adminName=Admin`, {}).subscribe({
+      this.http.put(`${environment.apiBaseUrl}/kyc/approve/${request.id}?adminName=Admin`, {}).subscribe({
         next: (response: any) => {
           console.log('KYC approved in MySQL:', response);
           
@@ -190,7 +190,7 @@ export class Kyc implements OnInit {
   downloadAadharDocument(kycId: string | undefined) {
     if (!kycId) return;
     
-    this.http.get(`${environment.apiUrl}/kyc/${kycId}/aadhar-document`, {
+    this.http.get(`${environment.apiBaseUrl}/kyc/${kycId}/aadhar-document`, {
       responseType: 'blob'
     }).subscribe({
       next: (blob: Blob) => {
@@ -217,7 +217,7 @@ export class Kyc implements OnInit {
   downloadPanDocument(kycId: string | undefined) {
     if (!kycId) return;
     
-    this.http.get(`${environment.apiUrl}/kyc/${kycId}/pan-document`, {
+    this.http.get(`${environment.apiBaseUrl}/kyc/${kycId}/pan-document`, {
       responseType: 'blob'
     }).subscribe({
       next: (blob: Blob) => {
@@ -244,7 +244,7 @@ export class Kyc implements OnInit {
   reject(request: KycRequest) {
     if (confirm(`Reject KYC for ${request.userName} (${request.userAccountNumber})?`)) {
       // Update KYC request in MySQL database
-      this.http.put(`${environment.apiUrl}/kyc/reject/${request.id}?adminName=Admin`, {}).subscribe({
+      this.http.put(`${environment.apiBaseUrl}/kyc/reject/${request.id}?adminName=Admin`, {}).subscribe({
         next: (response: any) => {
           console.log('KYC rejected in MySQL:', response);
           

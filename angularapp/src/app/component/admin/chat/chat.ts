@@ -192,7 +192,7 @@ export class AdminChat implements OnInit, OnDestroy {
     }
     // Extract filename from path
     const filename = attachmentUrl.split('/').pop() || '';
-    return `${environment.apiUrl}/chat/attachment/${filename}`;
+    return `${environment.apiBaseUrl}/api/chat/attachment/${filename}`;
   }
 
   scrollToBottom() {

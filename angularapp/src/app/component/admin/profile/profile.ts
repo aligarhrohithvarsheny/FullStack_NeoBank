@@ -71,7 +71,7 @@ export class AdminProfile implements OnInit {
     if (!this.adminEmail) return;
 
     this.isLoading = true;
-    this.http.get<Admin>(`${environment.apiUrl}/admins/profile/${this.adminEmail}`).subscribe({
+    this.http.get<Admin>(`${environment.apiBaseUrl}/admins/profile/${this.adminEmail}`).subscribe({
       next: (admin: Admin) => {
         this.admin = admin;
         this.profileForm = {
@@ -146,7 +146,7 @@ export class AdminProfile implements OnInit {
 
     this.isSaving = true;
 
-    this.http.put(`${environment.apiUrl}/admins/profile/${this.adminEmail}`, this.profileForm).subscribe({
+    this.http.put(`${environment.apiBaseUrl}/admins/profile/${this.adminEmail}`, this.profileForm).subscribe({
       next: (response: any) => {
         if (response.success) {
           this.alertService.success('Success', 'Profile updated successfully!');

@@ -23,7 +23,7 @@ export interface ChatMessage {
   providedIn: 'root'
 })
 export class ChatService {
-  private apiUrl = `${environment.apiUrl}/chat`;
+  private apiUrl = `${environment.apiBaseUrl}/api/chat`;
   private socket: any;
   private messageSubject = new Subject<ChatMessage>();
   public messages$ = this.messageSubject.asObservable();

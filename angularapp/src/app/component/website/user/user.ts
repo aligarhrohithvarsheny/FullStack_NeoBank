@@ -143,7 +143,7 @@ export class User implements OnInit, OnDestroy {
 
     if (this.loginUserId && this.loginPassword) {
       // Check if this is an admin login first
-      this.http.post(`${environment.apiUrl}/admins/login`, {
+      this.http.post(`${environment.apiBaseUrl}/api/admins/login`, {
         email: this.loginUserId,
         password: this.loginPassword
       }).subscribe({
@@ -179,7 +179,7 @@ export class User implements OnInit, OnDestroy {
     // Get device info
     const deviceInfo = navigator.userAgent || 'Unknown';
     
-    this.http.post(`${environment.apiUrl}/users/authenticate-graphical`, {
+    this.http.post(`${environment.apiBaseUrl}/api/users/authenticate-graphical`, {
       email: normalizedEmail,
       graphicalPassword: this.graphicalPasswordSequence,
       deviceInfo: deviceInfo
@@ -418,7 +418,7 @@ export class User implements OnInit, OnDestroy {
     this.settingUpGraphicalPassword = true;
     this.errorMessage = '';
     
-    this.http.post(`${environment.apiUrl}/users/set-graphical-password`, {
+    this.http.post(`${environment.apiBaseUrl}/api/users/set-graphical-password`, {
       email: userEmail,
       password: this.setupPassword,
       graphicalPassword: this.setupGraphicalPasswordSequence
@@ -499,7 +499,7 @@ export class User implements OnInit, OnDestroy {
     }
     
     // Authenticate user with MySQL database
-    this.http.post(`${environment.apiUrl}/users/authenticate`, {
+    this.http.post(`${environment.apiBaseUrl}/api/users/authenticate`, {
       email: normalizedEmail,
       password: this.loginPassword
     }).subscribe({
@@ -625,7 +625,7 @@ export class User implements OnInit, OnDestroy {
       loginMethod: loginMethod
     });
     
-    this.http.post(`${environment.apiUrl}/users/verify-otp`, {
+    this.http.post(`${environment.apiBaseUrl}/api/users/verify-otp`, {
       email: normalizedEmail,
       otp: trimmedOtp,
       loginMethod: loginMethod,
@@ -707,7 +707,7 @@ export class User implements OnInit, OnDestroy {
     this.errorMessage = '';
     this.successMessage = '';
 
-    this.http.post(`${environment.apiUrl}/users/resend-otp`, {
+    this.http.post(`${environment.apiBaseUrl}/api/users/resend-otp`, {
       email: this.loginUserId
     }).subscribe({
       next: (response: any) => {
@@ -769,7 +769,7 @@ export class User implements OnInit, OnDestroy {
 
     console.log('Creating new user account:', newUser);
     
-    this.http.post(`${environment.apiUrl}/users/create`, newUser).subscribe({
+    this.http.post(`${environment.apiBaseUrl}/api/users/create`, newUser).subscribe({
       next: (response: any) => {
         console.log('User account created successfully:', response);
         
@@ -844,7 +844,7 @@ export class User implements OnInit, OnDestroy {
 
     console.log('Attempting to unlock account:', unlockData);
 
-    this.http.post(`${environment.apiUrl}/users/unlock-account`, unlockData).subscribe({
+    this.http.post(`${environment.apiBaseUrl}/api/users/unlock-account`, unlockData).subscribe({
       next: (response: any) => {
         console.log('Account unlock response:', response);
         this.unlockingAccount = false;
@@ -931,7 +931,7 @@ export class User implements OnInit, OnDestroy {
     this.errorMessage = '';
     this.successMessage = '';
 
-    this.http.post(`${environment.apiUrl}/users/send-reset-otp`, {
+    this.http.post(`${environment.apiBaseUrl}/api/users/send-reset-otp`, {
       email: this.resetEmail
     }).subscribe({
       next: (response: any) => {
@@ -1013,8 +1013,8 @@ export class User implements OnInit, OnDestroy {
 
     // Determine which endpoint to call based on verification method
     const endpoint = this.resetVerificationMethod === 'email' 
-      ? `${environment.apiUrl}/users/reset-password-with-otp`
-      : `${environment.apiUrl}/users/reset-password`;
+      ? `${environment.apiBaseUrl}/api/users/reset-password-with-otp`
+      : `${environment.apiBaseUrl}/api/users/reset-password`;
 
     const resetData = this.resetVerificationMethod === 'email'
       ? {
@@ -1060,7 +1060,7 @@ export class User implements OnInit, OnDestroy {
   
   generateQrCode() {
     this.showQrCode = true;
-    this.http.post(`${environment.apiUrl}/users/generate-qr-login`, {}).subscribe({
+    this.http.post(`${environment.apiBaseUrl}/api/users/generate-qr-login`, {}).subscribe({
       next: (response: any) => {
         if (response.success) {
           this.qrCodeImage = response.qrCodeImage;
@@ -1098,7 +1098,7 @@ export class User implements OnInit, OnDestroy {
   checkQrStatus() {
     if (!this.qrToken) return;
     
-    this.http.get(`${environment.apiUrl}/users/check-qr-login-status/${this.qrToken}`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/api/users/check-qr-login-status/${this.qrToken}`).subscribe({
       next: (response: any) => {
         if (response.success) {
           this.qrStatus = response.status;
@@ -1161,7 +1161,7 @@ export class User implements OnInit, OnDestroy {
       loginData.otp = this.otpCode;
     }
     
-    this.http.post(`${environment.apiUrl}/users/complete-qr-login`, loginData).subscribe({
+    this.http.post(`${environment.apiBaseUrl}/api/users/complete-qr-login`, loginData).subscribe({
       next: (response: any) => {
         if (response.success && response.user) {
           // Login successful

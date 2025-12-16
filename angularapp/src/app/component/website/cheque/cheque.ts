@@ -89,7 +89,7 @@ export class ChequeComponent implements OnInit {
   loadCurrentBalance() {
     if (!this.userAccountNumber) return;
 
-    this.http.get(`${environment.apiUrl}/accounts/balance/${this.userAccountNumber}`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/accounts/balance/${this.userAccountNumber}`).subscribe({
       next: (balanceData: any) => {
         this.currentBalance = balanceData.balance || 0;
       },

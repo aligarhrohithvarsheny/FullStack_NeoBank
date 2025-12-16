@@ -392,7 +392,7 @@ export class Dashboard implements OnInit {
     }
     
     // Also try to load from backend (this will override localStorage if backend has data)
-    this.http.get(`${environment.apiUrl}/admins/feature-access/${adminEmail}`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/admins/feature-access/${adminEmail}`).subscribe({
       next: (response: any) => {
         if (response && response.success && response.features && response.features.length > 0) {
           console.log(`Loading feature access for ${adminEmail} from backend:`, response.features);
@@ -594,7 +594,7 @@ export class Dashboard implements OnInit {
   // Investment Management Methods
   loadInvestments() {
     this.isLoadingInvestments = true;
-    this.http.get(`${environment.apiUrl}/investments`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/investments`).subscribe({
       next: (investments: any) => {
         this.investments = investments || [];
         this.isLoadingInvestments = false;
@@ -615,7 +615,7 @@ export class Dashboard implements OnInit {
   approveInvestment(investment: any) {
     if (!confirm(`Approve investment of ₹${investment.investmentAmount} for ${investment.userName}?`)) return;
     
-    this.http.put(`${environment.apiUrl}/investments/${investment.id}/approve?approvedBy=${this.adminName}`, {}).subscribe({
+    this.http.put(`${environment.apiBaseUrl}/investments/${investment.id}/approve?approvedBy=${this.adminName}`, {}).subscribe({
       next: (response: any) => {
         if (response.success) {
           this.alertService.success('Success', 'Investment approved successfully');
@@ -635,7 +635,7 @@ export class Dashboard implements OnInit {
     const reason = prompt('Enter rejection reason:');
     if (!reason) return;
     
-    this.http.put(`${environment.apiUrl}/investments/${investment.id}/reject?rejectedBy=${this.adminName}&reason=${encodeURIComponent(reason)}`, {}).subscribe({
+    this.http.put(`${environment.apiBaseUrl}/investments/${investment.id}/reject?rejectedBy=${this.adminName}&reason=${encodeURIComponent(reason)}`, {}).subscribe({
       next: (response: any) => {
         if (response.success) {
           this.alertService.success('Success', 'Investment rejected');
@@ -654,7 +654,7 @@ export class Dashboard implements OnInit {
   // Fixed Deposit Management Methods
   loadFixedDeposits() {
     this.isLoadingFDs = true;
-    this.http.get(`${environment.apiUrl}/fixed-deposits`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/fixed-deposits`).subscribe({
       next: (fds: any) => {
         this.fixedDeposits = fds || [];
         this.isLoadingFDs = false;
@@ -670,7 +670,7 @@ export class Dashboard implements OnInit {
   approveFixedDeposit(fd: any) {
     if (!confirm(`Approve FD of ₹${fd.principalAmount} for ${fd.userName}?`)) return;
     
-    this.http.put(`${environment.apiUrl}/fixed-deposits/${fd.id}/approve?approvedBy=${this.adminName}`, {}).subscribe({
+    this.http.put(`${environment.apiBaseUrl}/fixed-deposits/${fd.id}/approve?approvedBy=${this.adminName}`, {}).subscribe({
       next: (response: any) => {
         if (response.success) {
           this.alertService.success('Success', 'Fixed Deposit approved successfully');
@@ -690,7 +690,7 @@ export class Dashboard implements OnInit {
     const reason = prompt('Enter rejection reason:');
     if (!reason) return;
     
-    this.http.put(`${environment.apiUrl}/fixed-deposits/${fd.id}/reject?rejectedBy=${this.adminName}&reason=${encodeURIComponent(reason)}`, {}).subscribe({
+    this.http.put(`${environment.apiBaseUrl}/fixed-deposits/${fd.id}/reject?rejectedBy=${this.adminName}&reason=${encodeURIComponent(reason)}`, {}).subscribe({
       next: (response: any) => {
         if (response.success) {
           this.alertService.success('Success', 'Fixed Deposit rejected');
@@ -709,7 +709,7 @@ export class Dashboard implements OnInit {
   processFDMaturity(fd: any) {
     if (!confirm(`Process maturity for FD ${fd.fdAccountNumber}? Maturity amount ₹${fd.maturityAmount} will be credited to account.`)) return;
     
-    this.http.put(`${environment.apiUrl}/fixed-deposits/${fd.id}/process-maturity?processedBy=${this.adminName}`, {}).subscribe({
+    this.http.put(`${environment.apiBaseUrl}/fixed-deposits/${fd.id}/process-maturity?processedBy=${this.adminName}`, {}).subscribe({
       next: (response: any) => {
         if (response.success) {
           this.alertService.success('Success', 'FD maturity processed successfully');
@@ -729,7 +729,7 @@ export class Dashboard implements OnInit {
   loadAllEMIs() {
     this.isLoadingAllEMIs = true;
     // Load all EMIs from all accounts
-    this.http.get(`${environment.apiUrl}/emis`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/emis`).subscribe({
       next: (emis: any) => {
         this.allEmis = emis || [];
         this.isLoadingAllEMIs = false;
@@ -737,7 +737,7 @@ export class Dashboard implements OnInit {
       error: (err: any) => {
         console.error('Error loading EMIs:', err);
         // Try loading overdue EMIs instead
-        this.http.get(`${environment.apiUrl}/emis/overdue`).subscribe({
+        this.http.get(`${environment.apiBaseUrl}/emis/overdue`).subscribe({
           next: (overdueEmis: any) => {
             this.allEmis = overdueEmis || [];
             this.isLoadingAllEMIs = false;
@@ -759,7 +759,7 @@ export class Dashboard implements OnInit {
 
   loadUsers() {
     // Load users from MySQL database
-    this.http.get(`${environment.apiUrl}/users`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/users`).subscribe({
       next: (usersData: any) => {
         console.log('Users loaded from MySQL:', usersData);
         this.users = usersData.map((user: any) => ({
@@ -890,7 +890,7 @@ export class Dashboard implements OnInit {
     if (status) {
       params = params.set('status', status);
     }
-    this.http.get(`${environment.apiUrl}/deposit-requests`, { params }).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/deposit-requests`, { params }).subscribe({
       next: (requests: any) => {
         this.depositRequests = requests || [];
         this.isLoadingDepositRequests = false;
@@ -905,7 +905,7 @@ export class Dashboard implements OnInit {
   approveDepositRequest(request: DepositRequest) {
     if (!confirm(`Approve deposit of ₹${request.amount} for ${request.userName}?`)) return;
     const adminName = this.adminName || 'Admin';
-    this.http.put(`${environment.apiUrl}/deposit-requests/${request.id}/approve`, {}, {
+    this.http.put(`${environment.apiBaseUrl}/deposit-requests/${request.id}/approve`, {}, {
       params: { processedBy: adminName }
     }).subscribe({
       next: (response: any) => {
@@ -927,7 +927,7 @@ export class Dashboard implements OnInit {
   rejectDepositRequest(request: DepositRequest) {
     const reason = prompt('Enter rejection reason (optional):') || '';
     const adminName = this.adminName || 'Admin';
-    this.http.put(`${environment.apiUrl}/deposit-requests/${request.id}/reject`, {}, {
+    this.http.put(`${environment.apiBaseUrl}/deposit-requests/${request.id}/reject`, {}, {
       params: { processedBy: adminName, reason }
     }).subscribe({
       next: (response: any) => {
@@ -1000,7 +1000,7 @@ export class Dashboard implements OnInit {
   }
 
   verifyRegularAccount(accountNumber: string) {
-    this.http.get(`${environment.apiUrl}/accounts/number/${accountNumber}`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/accounts/number/${accountNumber}`).subscribe({
       next: (accountData: any) => {
         this.verifiedAccountDetails = {
           accountNumber: accountData.accountNumber,
@@ -1025,7 +1025,7 @@ export class Dashboard implements OnInit {
 
   verifyLoanAccount(accountNumber: string) {
     // First try to find by loan account number
-    this.http.get(`${environment.apiUrl}/loans`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/loans`).subscribe({
       next: (loans: any) => {
         const loan = Array.isArray(loans) ? loans.find((l: any) => 
           l.loanAccountNumber === accountNumber || l.accountNumber === accountNumber
@@ -1045,7 +1045,7 @@ export class Dashboard implements OnInit {
           this.accountVerificationError = '';
         } else {
           // Try by account number
-          this.http.get(`${environment.apiUrl}/loans/account/${accountNumber}`).subscribe({
+          this.http.get(`${environment.apiBaseUrl}/loans/account/${accountNumber}`).subscribe({
             next: (loans: any) => {
               const loanList = Array.isArray(loans) ? loans : [];
               if (loanList.length > 0) {
@@ -1087,7 +1087,7 @@ export class Dashboard implements OnInit {
   }
 
   verifyGoldLoanAccount(accountNumber: string) {
-    this.http.get(`${environment.apiUrl}/gold-loans`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/gold-loans`).subscribe({
       next: (loans: any) => {
         const loan = Array.isArray(loans) ? loans.find((l: any) => 
           l.loanAccountNumber === accountNumber || l.accountNumber === accountNumber
@@ -1107,7 +1107,7 @@ export class Dashboard implements OnInit {
           this.accountVerificationError = '';
         } else {
           // Try by account number
-          this.http.get(`${environment.apiUrl}/gold-loans/account/${accountNumber}`).subscribe({
+          this.http.get(`${environment.apiBaseUrl}/gold-loans/account/${accountNumber}`).subscribe({
             next: (loans: any) => {
               const loanList = Array.isArray(loans) ? loans : [];
               if (loanList.length > 0) {
@@ -1149,7 +1149,7 @@ export class Dashboard implements OnInit {
   }
 
   verifyChequeAccount(accountNumber: string) {
-    this.http.get(`${environment.apiUrl}/cheques/account/${accountNumber}`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/cheques/account/${accountNumber}`).subscribe({
       next: (cheques: any) => {
         const chequeList = Array.isArray(cheques) ? cheques : [];
         if (chequeList.length > 0) {
@@ -1231,8 +1231,8 @@ export class Dashboard implements OnInit {
 
   processRegularAccountTransaction(accountNumber: string, userName: string, currentBalance: number) {
     const balanceEndpoint = this.operationType === 'deposit' 
-      ? `${environment.apiUrl}/accounts/balance/credit/${accountNumber}?amount=${this.amount}`
-      : `${environment.apiUrl}/accounts/balance/debit/${accountNumber}?amount=${this.amount}`;
+      ? `${environment.apiBaseUrl}/accounts/balance/credit/${accountNumber}?amount=${this.amount}`
+      : `${environment.apiBaseUrl}/accounts/balance/debit/${accountNumber}?amount=${this.amount}`;
 
     this.http.put(balanceEndpoint, {}).subscribe({
       next: (balanceResponse: any) => {
@@ -1316,7 +1316,7 @@ export class Dashboard implements OnInit {
       accountNumber: accountNumber
     };
 
-    this.http.post(`${environment.apiUrl}/transactions`, backendTransactionData).subscribe({
+    this.http.post(`${environment.apiBaseUrl}/transactions`, backendTransactionData).subscribe({
       next: (transactionResponse: any) => {
         console.log('Transaction saved to database:', transactionResponse);
 
@@ -1520,7 +1520,7 @@ export class Dashboard implements OnInit {
 
   loadActivitiesFromBackend(startOfDay: Date, endOfDay: Date, allActivities: any[]) {
     // Load loan approvals/rejections
-    this.http.get(`${environment.apiUrl}/loans`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/loans`).subscribe({
       next: (loans: any) => {
         const loanList = Array.isArray(loans) ? loans : [];
         loanList.forEach((loan: any) => {
@@ -1552,7 +1552,7 @@ export class Dashboard implements OnInit {
     });
 
     // Load gold loan approvals/rejections
-    this.http.get(`${environment.apiUrl}/gold-loans`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/gold-loans`).subscribe({
       next: (loans: any) => {
         const loanList = Array.isArray(loans) ? loans : [];
         loanList.forEach((loan: any) => {
@@ -1583,7 +1583,7 @@ export class Dashboard implements OnInit {
     });
 
     // Load cheque operations
-    this.http.get(`${environment.apiUrl}/cheques`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/cheques`).subscribe({
       next: (cheques: any) => {
         const chequeList = Array.isArray(cheques) ? cheques : (cheques.content || []);
         chequeList.forEach((cheque: any) => {
@@ -1631,7 +1631,7 @@ export class Dashboard implements OnInit {
     });
 
     // Load subsidy claims
-    this.http.get(`${environment.apiUrl}/education-loan-subsidy-claims`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/education-loan-subsidy-claims`).subscribe({
       next: (claims: any) => {
         const claimList = Array.isArray(claims) ? claims : [];
         claimList.forEach((claim: any) => {
@@ -1662,7 +1662,7 @@ export class Dashboard implements OnInit {
     });
 
     // Load account openings
-    this.http.get(`${environment.apiUrl}/accounts/all?page=0&size=1000&sortBy=createdAt&sortDir=desc`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/accounts/all?page=0&size=1000&sortBy=createdAt&sortDir=desc`).subscribe({
       next: (response: any) => {
         const accounts = response.content || (Array.isArray(response) ? response : []);
         accounts.forEach((account: any) => {
@@ -1988,7 +1988,7 @@ export class Dashboard implements OnInit {
   // Update user balance in MySQL database
   updateUserBalanceInDatabase(user: UserProfile) {
     // Find user by account number
-    this.http.get(`${environment.apiUrl}/users/account/${user.accountNumber}`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/users/account/${user.accountNumber}`).subscribe({
       next: (dbUser: any) => {
         if (dbUser) {
           const updatedUser = {
@@ -1999,7 +1999,7 @@ export class Dashboard implements OnInit {
             }
           };
           
-          this.http.put(`${environment.apiUrl}/users/update/${dbUser.id}`, updatedUser).subscribe({
+          this.http.put(`${environment.apiBaseUrl}/users/update/${dbUser.id}`, updatedUser).subscribe({
             next: (response: any) => {
               console.log('User balance updated in MySQL:', response);
             },
@@ -2060,7 +2060,7 @@ export class Dashboard implements OnInit {
 
   searchByCardLastFourDigits(lastFourDigits: string) {
     // Search for cards with matching last 4 digits
-    this.http.get(`${environment.apiUrl}/cards`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/cards`).subscribe({
       next: (cards: any) => {
         const matchingCards = cards.filter((card: any) => 
           card.cardNumber && card.cardNumber.endsWith(lastFourDigits)
@@ -2099,7 +2099,7 @@ export class Dashboard implements OnInit {
     this.isUniversalSearching = true;
     const query = this.universalSearchQuery.trim();
 
-    this.http.get(`${environment.apiUrl}/admin/search?q=${encodeURIComponent(query)}`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/admin/search?q=${encodeURIComponent(query)}`).subscribe({
       next: (results: any) => {
         this.universalSearchResults = results;
         this.isUniversalSearching = false;
@@ -2153,7 +2153,7 @@ export class Dashboard implements OnInit {
 
   loadUserCompleteDetails(user: UserProfile) {
     // Load user cards
-    this.http.get(`${environment.apiUrl}/cards/account/${user.accountNumber}`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/cards/account/${user.accountNumber}`).subscribe({
       next: (cards: any) => {
         this.userCards = cards || [];
       },
@@ -2164,7 +2164,7 @@ export class Dashboard implements OnInit {
     });
 
     // Load user loans
-    this.http.get(`${environment.apiUrl}/loans/account/${user.accountNumber}`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/loans/account/${user.accountNumber}`).subscribe({
       next: (loans: any) => {
         this.userLoans = loans || [];
       },
@@ -2175,7 +2175,7 @@ export class Dashboard implements OnInit {
     });
 
     // Load user transactions
-    this.http.get(`${environment.apiUrl}/transactions/account/${user.accountNumber}`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/transactions/account/${user.accountNumber}`).subscribe({
       next: (transactions: any) => {
         this.userTransactions = transactions || [];
       },
@@ -2740,7 +2740,7 @@ export class Dashboard implements OnInit {
 
   // Account Tracking Methods
   loadAccountTrackings() {
-    this.http.get(`${environment.apiUrl}/tracking?page=0&size=100&sortBy=createdAt&sortDir=desc`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/tracking?page=0&size=100&sortBy=createdAt&sortDir=desc`).subscribe({
       next: (response: any) => {
         console.log('Account trackings loaded:', response);
         if (response.content) {
@@ -2795,7 +2795,7 @@ export class Dashboard implements OnInit {
       return;
     }
 
-    this.http.get(`${environment.apiUrl}/tracking/track?aadharNumber=${aadhar}&mobileNumber=${mobile}`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/tracking/track?aadharNumber=${aadhar}&mobileNumber=${mobile}`).subscribe({
       next: (response: any) => {
         if (response.success && response.tracking) {
           const tracking = response.tracking;
@@ -2840,7 +2840,7 @@ export class Dashboard implements OnInit {
       currentStatus: tracking.status
     });
 
-    const url = `${environment.apiUrl}/tracking/${tracking.id}/status?status=${encodeURIComponent(newStatus)}&updatedBy=Admin`;
+    const url = `${environment.apiBaseUrl}/tracking/${tracking.id}/status?status=${encodeURIComponent(newStatus)}&updatedBy=Admin`;
     console.log('API URL:', url);
 
     this.http.put(url, {}).subscribe({
@@ -2929,7 +2929,7 @@ export class Dashboard implements OnInit {
 
   loadCurrentGoldRate() {
     this.isLoadingGoldRate = true;
-    this.http.get<any>(`${environment.apiUrl}/gold-rates/current`).subscribe({
+    this.http.get<any>(`${environment.apiBaseUrl}/gold-rates/current`).subscribe({
       next: (rate) => {
         this.currentGoldRate = rate;
         this.newGoldRate = rate.ratePerGram || 0;
@@ -2944,7 +2944,7 @@ export class Dashboard implements OnInit {
   }
 
   loadGoldRateHistory() {
-    this.http.get<any[]>(`${environment.apiUrl}/gold-rates/history`).subscribe({
+    this.http.get<any[]>(`${environment.apiBaseUrl}/gold-rates/history`).subscribe({
       next: (history) => {
         this.goldRateHistory = history;
       },
@@ -2971,7 +2971,7 @@ export class Dashboard implements OnInit {
       .set('ratePerGram', this.newGoldRate.toString())
       .set('updatedBy', this.adminName);
     
-    this.http.put<any>(`${environment.apiUrl}/gold-rates/update`, {}, { params }).subscribe({
+    this.http.put<any>(`${environment.apiBaseUrl}/gold-rates/update`, {}, { params }).subscribe({
       next: (response) => {
         if (response.success) {
           this.alertService.success('Success', 'Gold rate updated successfully');
@@ -3026,7 +3026,7 @@ export class Dashboard implements OnInit {
 
   loadGoldLoans() {
     this.isLoadingGoldLoans = true;
-    this.http.get<any[]>(`${environment.apiUrl}/gold-loans`).subscribe({
+    this.http.get<any[]>(`${environment.apiBaseUrl}/gold-loans`).subscribe({
       next: (loans) => {
         this.goldLoans = loans;
         this.filterGoldLoans();
@@ -3081,7 +3081,7 @@ export class Dashboard implements OnInit {
     }
 
     this.approvingLoan = true;
-    this.http.put<any>(`${environment.apiUrl}/gold-loans/${this.selectedGoldLoan.id}/approve`, this.goldDetailsForm, {
+    this.http.put<any>(`${environment.apiBaseUrl}/gold-loans/${this.selectedGoldLoan.id}/approve`, this.goldDetailsForm, {
       params: {
         status: 'Approved',
         approvedBy: this.adminName
@@ -3109,7 +3109,7 @@ export class Dashboard implements OnInit {
     if (!confirm(`Are you sure you want to reject this gold loan application?`)) return;
 
     this.approvingLoan = true;
-    this.http.put<any>(`${environment.apiUrl}/gold-loans/${loan.id}/approve`, {}, {
+    this.http.put<any>(`${environment.apiBaseUrl}/gold-loans/${loan.id}/approve`, {}, {
       params: {
         status: 'Rejected',
         approvedBy: this.adminName
@@ -3144,7 +3144,7 @@ export class Dashboard implements OnInit {
       return;
     }
 
-    this.http.get<any>(`${environment.apiUrl}/gold-loans/foreclosure/${loan.loanAccountNumber}`).subscribe({
+    this.http.get<any>(`${environment.apiBaseUrl}/gold-loans/foreclosure/${loan.loanAccountNumber}`).subscribe({
       next: (response) => {
         if (response.success) {
           this.foreclosureDetails = response;
@@ -3164,7 +3164,7 @@ export class Dashboard implements OnInit {
     if (!confirm(`Are you sure you want to process foreclosure for this loan?`)) return;
 
     this.processingForeclosure = true;
-    this.http.post<any>(`${environment.apiUrl}/gold-loans/foreclosure/${this.selectedGoldLoan.loanAccountNumber}`, {}).subscribe({
+    this.http.post<any>(`${environment.apiBaseUrl}/gold-loans/foreclosure/${this.selectedGoldLoan.loanAccountNumber}`, {}).subscribe({
       next: (response) => {
         if (response.success) {
           this.alertService.success('Success', 'Foreclosure processed successfully');
@@ -3201,7 +3201,7 @@ export class Dashboard implements OnInit {
       return;
     }
 
-    this.http.get<any[]>(`${environment.apiUrl}/gold-loans/emi-schedule/${loan.loanAccountNumber}`).subscribe({
+    this.http.get<any[]>(`${environment.apiBaseUrl}/gold-loans/emi-schedule/${loan.loanAccountNumber}`).subscribe({
       next: (schedule) => {
         this.emiSchedule = Array.isArray(schedule) ? schedule : [];
       },
@@ -3270,7 +3270,7 @@ export class Dashboard implements OnInit {
   }
 
   loadPendingAadharVerifications() {
-    this.http.get<AccountTracking[]>(`${environment.apiUrl}/tracking/status/PENDING`).subscribe({
+    this.http.get<AccountTracking[]>(`${environment.apiBaseUrl}/tracking/status/PENDING`).subscribe({
       next: (response) => {
         console.log('Pending Aadhar verifications loaded:', response);
         // Filter to show only PENDING and ADMIN_SEEN statuses
@@ -3292,7 +3292,7 @@ export class Dashboard implements OnInit {
     }
 
     this.verifyingAadhar = tracking.id;
-    this.http.post(`${environment.apiUrl}/tracking/${tracking.id}/verify-aadhar`, {}).subscribe({
+    this.http.post(`${environment.apiBaseUrl}/tracking/${tracking.id}/verify-aadhar`, {}).subscribe({
       next: (response: any) => {
         console.log('Aadhar verified successfully:', response);
         this.alertService.userSuccess('Success', 'Aadhar verified successfully!');
@@ -3342,7 +3342,7 @@ export class Dashboard implements OnInit {
     if (!isPlatformBrowser(this.platformId)) return;
     
     this.isLoadingLoginHistory = true;
-    this.http.get<any[]>(`${environment.apiUrl}/admins/login-history/recent?limit=100`).subscribe({
+    this.http.get<any[]>(`${environment.apiBaseUrl}/admins/login-history/recent?limit=100`).subscribe({
       next: (history) => {
         this.loginHistory = history || [];
         this.isLoadingLoginHistory = false;
@@ -3414,7 +3414,7 @@ export class Dashboard implements OnInit {
     
     this.isLoadingPredictions = true;
     
-    this.http.get(`${environment.apiUrl}/loans/predictions/all`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/loans/predictions/all`).subscribe({
       next: (response: any) => {
         if (response.success) {
           this.loanPredictions = response.predictions || [];

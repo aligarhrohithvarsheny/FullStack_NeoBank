@@ -104,7 +104,7 @@ export class Login {
     this.errorMessage = '';
 
     // Try manager login (only for MANAGER role)
-    this.http.post(`${environment.apiUrl}/admins/login`, {
+    this.http.post(`${environment.apiBaseUrl}/api/admins/login`, {
       email: this.email,
       password: this.password,
       role: this.selectedRole
@@ -162,7 +162,7 @@ export class Login {
         }
 
         // For other errors, check if it's a user trying to login
-        this.http.post(`${environment.apiUrl}/users/authenticate`, {
+        this.http.post(`${environment.apiBaseUrl}/api/users/authenticate`, {
           email: this.email,
           password: this.password
         }).subscribe({
@@ -294,7 +294,7 @@ export class Login {
     }
 
     // Verify password first
-    this.http.post(`${environment.apiUrl}/admins/login`, {
+    this.http.post(`${environment.apiBaseUrl}/api/admins/login`, {
       email: this.email,
       password: this.password,
       role: this.selectedRole

@@ -15,7 +15,7 @@ import { environment } from '../../environment/environment';
   providedIn: 'root'
 })
 export class SubsidyClaimService {
-  private apiUrl = `${environment.apiUrl}/education-loan-subsidy-claims`;
+  private apiUrl = `${environment.apiBaseUrl}/api/education-loan-subsidy-claims`;
 
   constructor(private http: HttpClient) { }
 

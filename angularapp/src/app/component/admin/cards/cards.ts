@@ -93,7 +93,7 @@ export class Cards implements OnInit {
     
     // Load cards from MySQL database
     console.log('Loading cards from MySQL database...');
-    this.http.get(`${environment.apiUrl}/cards?page=0&size=100`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/cards?page=0&size=100`).subscribe({
       next: (response: any) => {
         console.log('Cards loaded from MySQL:', response);
         console.log('Response type:', typeof response);
@@ -190,7 +190,7 @@ export class Cards implements OnInit {
     if (!isPlatformBrowser(this.platformId)) return;
     
     // Load replacement requests from backend
-    this.http.get(`${environment.apiUrl}/card-replacement-requests/status/Pending`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/card-replacement-requests/status/Pending`).subscribe({
       next: (response: any) => {
         console.log('Replacement requests loaded from backend:', response);
         if (Array.isArray(response) && response.length > 0) {
@@ -294,7 +294,7 @@ export class Cards implements OnInit {
     };
 
     // Submit new card to MySQL database
-    this.http.post(`${environment.apiUrl}/cards`, newCard).subscribe({
+    this.http.post(`${environment.apiBaseUrl}/cards`, newCard).subscribe({
       next: (response: any) => {
         console.log('Card created in MySQL:', response);
         
@@ -362,7 +362,7 @@ export class Cards implements OnInit {
     const expiryYear = String(new Date().getFullYear() + Math.floor(1 + Math.random() * 5));
 
     // Update card in backend
-    this.http.put(`${environment.apiUrl}/cards/${card.id}/replace`, {
+    this.http.put(`${environment.apiBaseUrl}/cards/${card.id}/replace`, {
       cardNumber: newCardNumber,
       cvv: newCvv,
       expiryDate: `${expiryMonth}/${expiryYear.slice(-2)}`,
@@ -413,7 +413,7 @@ export class Cards implements OnInit {
       const adminName = 'Admin';
       
       // Approve the request in the backend
-      this.http.put(`${environment.apiUrl}/card-replacement-requests/approve/${requestId}?adminName=${adminName}`, {}).subscribe({
+      this.http.put(`${environment.apiBaseUrl}/card-replacement-requests/approve/${requestId}?adminName=${adminName}`, {}).subscribe({
         next: (response: any) => {
           console.log('Card replacement request approved in backend:', response);
           
@@ -460,7 +460,7 @@ export class Cards implements OnInit {
       const adminName = 'Admin';
       
       // Reject the request in the backend
-      this.http.put(`${environment.apiUrl}/card-replacement-requests/reject/${requestId}?adminName=${adminName}`, {}).subscribe({
+      this.http.put(`${environment.apiBaseUrl}/card-replacement-requests/reject/${requestId}?adminName=${adminName}`, {}).subscribe({
         next: (response: any) => {
           console.log('Card replacement request rejected in backend:', response);
           

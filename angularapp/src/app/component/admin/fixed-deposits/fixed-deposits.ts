@@ -46,7 +46,7 @@ export class FixedDeposits implements OnInit {
 
   loadFixedDeposits() {
     this.isLoadingFDs = true;
-    this.http.get(`${environment.apiUrl}/fixed-deposits`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/fixed-deposits`).subscribe({
       next: (fds: any) => {
         this.fixedDeposits = fds || [];
         this.isLoadingFDs = false;
@@ -81,7 +81,7 @@ export class FixedDeposits implements OnInit {
   approveFixedDeposit(fd: any) {
     if (!confirm(`Approve FD of ₹${fd.principalAmount} for ${fd.userName}?`)) return;
     
-    this.http.put(`${environment.apiUrl}/fixed-deposits/${fd.id}/approve?approvedBy=${this.adminName}`, {}).subscribe({
+    this.http.put(`${environment.apiBaseUrl}/fixed-deposits/${fd.id}/approve?approvedBy=${this.adminName}`, {}).subscribe({
       next: (response: any) => {
         if (response.success) {
           this.alertService.success('Success', 'Fixed Deposit approved successfully');
@@ -101,7 +101,7 @@ export class FixedDeposits implements OnInit {
     const reason = prompt('Enter rejection reason:');
     if (!reason) return;
     
-    this.http.put(`${environment.apiUrl}/fixed-deposits/${fd.id}/reject?rejectedBy=${this.adminName}&reason=${encodeURIComponent(reason)}`, {}).subscribe({
+    this.http.put(`${environment.apiBaseUrl}/fixed-deposits/${fd.id}/reject?rejectedBy=${this.adminName}&reason=${encodeURIComponent(reason)}`, {}).subscribe({
       next: (response: any) => {
         if (response.success) {
           this.alertService.success('Success', 'Fixed Deposit rejected');
@@ -127,7 +127,7 @@ export class FixedDeposits implements OnInit {
   processFDMaturity(fd: any) {
     if (!confirm(`Process maturity for FD ${fd.fdAccountNumber}? Maturity amount ₹${fd.maturityAmount} will be credited to account.`)) return;
     
-    this.http.put(`${environment.apiUrl}/fixed-deposits/${fd.id}/process-maturity?processedBy=${this.adminName}`, {}).subscribe({
+    this.http.put(`${environment.apiBaseUrl}/fixed-deposits/${fd.id}/process-maturity?processedBy=${this.adminName}`, {}).subscribe({
       next: (response: any) => {
         if (response.success) {
           this.alertService.success('Success', 'FD maturity processed successfully');

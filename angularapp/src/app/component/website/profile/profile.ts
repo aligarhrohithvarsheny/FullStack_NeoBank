@@ -96,7 +96,7 @@ export class Profile implements OnInit {
     this.generatingPassbook = true;
     
     // Download passbook PDF
-    this.http.get(`${environment.apiUrl}/users/${this.currentUserId}/passbook`, { 
+    this.http.get(`${environment.apiBaseUrl}/users/${this.currentUserId}/passbook`, { 
       responseType: 'blob' 
     }).subscribe({
       next: (blob: Blob) => {
@@ -179,7 +179,7 @@ export class Profile implements OnInit {
       this.currentUserId = user.id;
       
       // Load full user profile from MySQL database
-      this.http.get(`${environment.apiUrl}/users/${user.id}`).subscribe({
+      this.http.get(`${environment.apiBaseUrl}/users/${user.id}`).subscribe({
         next: (userData: any) => {
           console.log('User profile loaded from MySQL:', userData);
           this.userProfile = {
@@ -296,7 +296,7 @@ export class Profile implements OnInit {
     }
     
     // Load current balance from MySQL database
-    this.http.get(`${environment.apiUrl}/accounts/balance/${this.userProfile.accountNumber}`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/accounts/balance/${this.userProfile.accountNumber}`).subscribe({
       next: (balanceData: any) => {
         console.log('Balance loaded from MySQL:', balanceData);
         this.currentBalance = balanceData.balance || 0;
@@ -386,7 +386,7 @@ export class Profile implements OnInit {
     this.emailError = '';
 
     // Call the backend API to update email
-    this.http.put(`${environment.apiUrl}/users/update-email/${this.currentUserId}`, { email: this.newEmail }).subscribe({
+    this.http.put(`${environment.apiBaseUrl}/users/update-email/${this.currentUserId}`, { email: this.newEmail }).subscribe({
       next: (response: any) => {
         if (response.success) {
           this.userProfile.email = this.newEmail;
@@ -418,7 +418,7 @@ export class Profile implements OnInit {
   loadAadharVerificationStatus() {
     if (!this.userProfile.accountNumber) return;
     
-    this.http.get(`${environment.apiUrl}/accounts/aadhar/status/${this.userProfile.accountNumber}`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/accounts/aadhar/status/${this.userProfile.accountNumber}`).subscribe({
       next: (status: any) => {
         if (status.success) {
           this.userProfile.aadharVerified = status.aadharVerified;
@@ -446,7 +446,7 @@ export class Profile implements OnInit {
 
     this.aadharVerifying = true;
     
-    this.http.post(`${environment.apiUrl}/accounts/aadhar/verify/${this.userProfile.accountNumber}`, {}).subscribe({
+    this.http.post(`${environment.apiBaseUrl}/accounts/aadhar/verify/${this.userProfile.accountNumber}`, {}).subscribe({
       next: (response: any) => {
         if (response.success) {
           this.alertService.info(
@@ -496,7 +496,7 @@ export class Profile implements OnInit {
     if (this.userProfile.name) params.set('name', this.userProfile.name);
     if (this.userProfile.dateOfBirth) params.set('dob', this.userProfile.dateOfBirth);
 
-    this.http.post(`${environment.apiUrl}/accounts/aadhar/callback?${params.toString()}`, {}).subscribe({
+    this.http.post(`${environment.apiBaseUrl}/accounts/aadhar/callback?${params.toString()}`, {}).subscribe({
       next: (response: any) => {
         if (response.success) {
           this.alertService.success('Aadhaar Verified', 'Your Aadhaar has been verified successfully!');
@@ -572,7 +572,7 @@ export class Profile implements OnInit {
     const formData = new FormData();
     formData.append('profilePhoto', this.profilePhoto);
 
-    this.http.post(`${environment.apiUrl}/users/${this.currentUserId}/upload-profile-photo`, formData).subscribe({
+    this.http.post(`${environment.apiBaseUrl}/users/${this.currentUserId}/upload-profile-photo`, formData).subscribe({
       next: (response: any) => {
         if (response.success) {
           this.alertService.userSuccess('Success', 'Profile photo uploaded successfully!');
@@ -594,7 +594,7 @@ export class Profile implements OnInit {
   loadProfilePhoto() {
     if (!this.currentUserId) return;
     
-    this.http.get(`${environment.apiUrl}/users/${this.currentUserId}/profile-photo`, { responseType: 'blob' }).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/users/${this.currentUserId}/profile-photo`, { responseType: 'blob' }).subscribe({
       next: (blob: Blob) => {
         const reader = new FileReader();
         reader.onload = (e: any) => {
@@ -648,7 +648,7 @@ export class Profile implements OnInit {
     const formData = new FormData();
     formData.append('signature', this.signature);
 
-    this.http.post(`${environment.apiUrl}/users/${this.currentUserId}/upload-signature`, formData).subscribe({
+    this.http.post(`${environment.apiBaseUrl}/users/${this.currentUserId}/upload-signature`, formData).subscribe({
       next: (response: any) => {
         if (response.success) {
           this.alertService.userSuccess('Success', 'Signature uploaded successfully! Waiting for admin approval.');
@@ -672,7 +672,7 @@ export class Profile implements OnInit {
     if (!this.currentUserId) return;
     
     // Load signature status only (not the image)
-    this.http.get(`${environment.apiUrl}/users/${this.currentUserId}`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/users/${this.currentUserId}`).subscribe({
       next: (userData: any) => {
         this.signatureStatus = userData.signatureStatus || '';
         this.signatureRejectionReason = userData.signatureRejectionReason || '';
@@ -687,7 +687,7 @@ export class Profile implements OnInit {
   loadSignatureImage() {
     if (!this.currentUserId) return;
     
-    this.http.get(`${environment.apiUrl}/users/${this.currentUserId}/signature`, { responseType: 'blob' }).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/users/${this.currentUserId}/signature`, { responseType: 'blob' }).subscribe({
       next: (blob: Blob) => {
         const reader = new FileReader();
         reader.onload = (e: any) => {

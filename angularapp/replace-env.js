@@ -8,39 +8,40 @@ let envContent = fs.readFileSync(envFilePath, 'utf8');
 // Get the backend URL from environment variable
 const backendUrl = process.env.BACKEND_API_URL || process.env.NG_APP_API_URL;
 
-let finalUrl;
+let finalBaseUrl;
 
-if (!backendUrl || backendUrl === 'YOUR_BACKEND_URL') {
-  console.warn('⚠️  WARNING: BACKEND_API_URL environment variable not set!');
-  console.warn('⚠️  Using relative path "/api" as fallback.');
-  console.warn('⚠️  This will only work if you have a proxy/rewrite configured in Vercel.');
-  console.warn('');
-  console.warn('📝 To configure your backend URL:');
-  console.warn('   1. Go to: Vercel Dashboard > Your Project > Settings > Environment Variables');
-  console.warn('   2. Add: BACKEND_API_URL = https://your-backend-url.com/api');
-  console.warn('   3. Example: https://your-backend.railway.app/api');
-  console.warn('   4. Redeploy your application');
-  console.warn('');
-  // Use relative path as fallback (requires Vercel proxy/rewrite configuration)
-  finalUrl = '/api';
+if (!backendUrl || backendUrl === 'YOUR_BACKEND_URL' || backendUrl === 'https://your-backend-url.com') {
+  console.error('❌ ERROR: BACKEND_API_URL environment variable not set!');
+  console.error('❌ This will cause API calls to fail.');
+  console.error('');
+  console.error('📝 To configure your backend URL:');
+  console.error('   1. Go to: Vercel Dashboard > Your Project > Settings > Environment Variables');
+  console.error('   2. Add: BACKEND_API_URL = https://your-actual-backend-url.com');
+  console.error('   3. Example: https://your-backend.railway.app');
+  console.error('   4. IMPORTANT: Do NOT include /api in the URL');
+  console.error('   5. Redeploy your application');
+  console.error('');
+  process.exit(1);
 } else {
-  // Ensure the URL ends with /api
-  finalUrl = backendUrl.endsWith('/api') ? backendUrl : `${backendUrl}/api`;
-  console.log(`✅ Using backend URL from environment variable: ${finalUrl}`);
+  // Remove trailing slashes and /api if present
+  finalBaseUrl = backendUrl.replace(/\/+$/, '').replace(/\/api$/, '');
+  console.log(`✅ Using backend base URL from environment variable: ${finalBaseUrl}`);
 }
 
-// Replace the apiUrl value in the environment file
-// Match: apiUrl: '/api' or apiUrl: 'http://...'
-const apiUrlRegex = /apiUrl:\s*['"`]([^'"`]+)['"`]/;
-if (apiUrlRegex.test(envContent)) {
-  envContent = envContent.replace(apiUrlRegex, `apiUrl: '${finalUrl}'`);
-  console.log(`✅ Updated apiUrl to: ${finalUrl}`);
+// Replace the apiBaseUrl value in the environment file
+// Match: apiBaseUrl: 'https://your-backend-url.com' or apiBaseUrl: 'http://...'
+const apiBaseUrlRegex = /apiBaseUrl:\s*['"`]([^'"`]+)['"`]/;
+if (apiBaseUrlRegex.test(envContent)) {
+  envContent = envContent.replace(apiBaseUrlRegex, `apiBaseUrl: '${finalBaseUrl}'`);
+  console.log(`✅ Updated apiBaseUrl to: ${finalBaseUrl}`);
 } else {
-  console.warn('⚠️  Could not find apiUrl in environment file');
+  console.error('❌ Could not find apiBaseUrl in environment file');
+  process.exit(1);
 }
 
 // Write back the file
 fs.writeFileSync(envFilePath, envContent, 'utf8');
 
-console.log(`✅ Environment file updated with backend URL: ${finalUrl}`);
+console.log(`✅ Environment file updated with backend base URL: ${finalBaseUrl}`);
+console.log(`✅ API calls will use: ${finalBaseUrl}/api/...`);
 

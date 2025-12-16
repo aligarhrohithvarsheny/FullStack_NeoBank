@@ -76,7 +76,7 @@ export class UserControl implements OnInit {
 
   loadAllUsers() {
     this.loading = true;
-    this.http.get<FullUser[]>(`${environment.apiUrl}/users/admin/all`).subscribe({
+    this.http.get<FullUser[]>(`${environment.apiBaseUrl}/users/admin/all`).subscribe({
       next: (users) => {
         this.users = users;
         this.filteredUsers = users;
@@ -246,7 +246,7 @@ export class UserControl implements OnInit {
     }
 
     this.loading = true;
-    this.http.put(`${environment.apiUrl}/users/admin/update-full/${this.editingUser.id}`, updateData).subscribe({
+    this.http.put(`${environment.apiBaseUrl}/users/admin/update-full/${this.editingUser.id}`, updateData).subscribe({
       next: (response: any) => {
         if (response.success) {
           // Save update history if there are changes
@@ -306,7 +306,7 @@ export class UserControl implements OnInit {
     }
 
     this.loading = true;
-    this.http.delete(`${environment.apiUrl}/users/admin/delete/${user.id}`).subscribe({
+    this.http.delete(`${environment.apiBaseUrl}/users/admin/delete/${user.id}`).subscribe({
       next: (response: any) => {
         if (response.success) {
           alert('User deleted successfully!');
@@ -369,7 +369,7 @@ export class UserControl implements OnInit {
     }
 
     this.loading = true;
-    this.http.post(`${environment.apiUrl}/users/create`, this.newUser).subscribe({
+    this.http.post(`${environment.apiBaseUrl}/users/create`, this.newUser).subscribe({
       next: (response: any) => {
         if (response.success) {
           alert('User created successfully!');

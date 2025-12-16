@@ -8,7 +8,7 @@ import { environment } from '../../environment/environment';
   providedIn: 'root'
 })
 export class KycService {
-  private apiUrl = `${environment.apiUrl}/kyc`;
+  private apiUrl = `${environment.apiBaseUrl}/api/kyc`;
 
   constructor(private http: HttpClient) { }
 

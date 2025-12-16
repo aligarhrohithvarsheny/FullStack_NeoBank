@@ -124,7 +124,7 @@ export class SubsidyClaims implements OnInit {
 
   loadUserDetails(accountNumber: string) {
     // Load user details
-    this.http.get(`${environment.apiUrl}/users/account/${accountNumber}`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/users/account/${accountNumber}`).subscribe({
       next: (user: any) => {
         this.userDetails = user;
       },
@@ -134,7 +134,7 @@ export class SubsidyClaims implements OnInit {
     });
 
     // Load user loans
-    this.http.get(`${environment.apiUrl}/loans/account/${accountNumber}`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/loans/account/${accountNumber}`).subscribe({
       next: (loans: any) => {
         this.userLoans = loans || [];
       },
@@ -144,7 +144,7 @@ export class SubsidyClaims implements OnInit {
     });
 
     // Load user transactions
-    this.http.get(`${environment.apiUrl}/transactions/account/${accountNumber}`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/transactions/account/${accountNumber}`).subscribe({
       next: (transactions: any) => {
         this.userTransactions = transactions || [];
       },

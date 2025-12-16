@@ -153,7 +153,7 @@ export class Users implements OnInit {
 
   // Load users from MySQL database
   loadUsersFromDatabase() {
-    this.http.get(`${environment.apiUrl}/users`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/users`).subscribe({
       next: (users: any) => {
         console.log('Users loaded from MySQL:', users);
         console.log('First user structure:', users[0]);
@@ -195,7 +195,7 @@ export class Users implements OnInit {
 
   // Load KYC requests from MySQL database
   loadKycRequestsFromDatabase() {
-    this.http.get(`${environment.apiUrl}/kyc/all?page=0&size=100`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/kyc/all?page=0&size=100`).subscribe({
       next: (response: any) => {
         console.log('KYC requests loaded from MySQL:', response);
         if (response.content) {
@@ -248,7 +248,7 @@ export class Users implements OnInit {
   // Update user in MySQL database
   updateUserInDatabase(user: PendingUser) {
     // First, find the user in the database by email
-    this.http.get(`${environment.apiUrl}/users/email/${user.email}`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/users/email/${user.email}`).subscribe({
       next: (dbUser: any) => {
         if (dbUser) {
           // Update the user with account number and status
@@ -264,7 +264,7 @@ export class Users implements OnInit {
           };
           
           // Update user in database using the new approval endpoint
-          this.http.put(`${environment.apiUrl}/users/approve/${dbUser.id}`, {}).subscribe({
+          this.http.put(`${environment.apiBaseUrl}/users/approve/${dbUser.id}`, {}).subscribe({
             next: (response: any) => {
               console.log('User approved and saved to MySQL:', response);
               
@@ -297,7 +297,7 @@ export class Users implements OnInit {
     
     approvedUsers.forEach(user => {
       // Check if user already has a card by trying to get cards for their account
-      this.http.get(`${environment.apiUrl}/cards/account/${user.assignedAccountNumber}`).subscribe({
+      this.http.get(`${environment.apiBaseUrl}/cards/account/${user.assignedAccountNumber}`).subscribe({
         next: (cards: any) => {
           if (!cards || cards.length === 0) {
             // User doesn't have a card, create one
@@ -338,7 +338,7 @@ export class Users implements OnInit {
     console.log('Creating card for user:', user.name, 'Account:', user.assignedAccountNumber);
     console.log('Card data being sent:', newCard);
     
-    this.http.post(`${environment.apiUrl}/cards`, newCard).subscribe({
+    this.http.post(`${environment.apiBaseUrl}/cards`, newCard).subscribe({
       next: (response: any) => {
         console.log('Card created automatically for approved user:', response);
         alert(`Card created successfully for ${user.name}!`);
@@ -366,7 +366,7 @@ export class Users implements OnInit {
 
   // Close user account in MySQL database
   closeUserInDatabase(user: PendingUser) {
-    this.http.get(`${environment.apiUrl}/users/email/${user.email}`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/users/email/${user.email}`).subscribe({
       next: (dbUser: any) => {
         if (dbUser) {
           const updatedUser = {
@@ -378,7 +378,7 @@ export class Users implements OnInit {
             }
           };
           
-          this.http.put(`${environment.apiUrl}/users/update/${dbUser.id}`, updatedUser).subscribe({
+          this.http.put(`${environment.apiBaseUrl}/users/update/${dbUser.id}`, updatedUser).subscribe({
             next: (response: any) => {
               console.log('User account closed and saved to MySQL:', response);
             },
@@ -527,7 +527,7 @@ export class Users implements OnInit {
 
   // Signature Management Methods
   loadPendingSignatures() {
-    this.http.get(`${environment.apiUrl}/users/pending-signatures`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/users/pending-signatures`).subscribe({
       next: (users: any) => {
         this.pendingSignatures = users.filter((u: any) => u.signatureStatus === 'PENDING');
         console.log('Pending signatures loaded:', this.pendingSignatures);
@@ -545,7 +545,7 @@ export class Users implements OnInit {
     this.rejectionReason = '';
     
     // Load signature image
-    this.http.get(`${environment.apiUrl}/users/${userId}/signature`, { responseType: 'blob' }).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/users/${userId}/signature`, { responseType: 'blob' }).subscribe({
       next: (blob: Blob) => {
         const reader = new FileReader();
         reader.onload = (e: any) => {
@@ -565,7 +565,7 @@ export class Users implements OnInit {
     });
 
     // Load profile photo
-    this.http.get(`${environment.apiUrl}/users/${userId}/profile-photo`, { responseType: 'blob' }).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/users/${userId}/profile-photo`, { responseType: 'blob' }).subscribe({
       next: (blob: Blob) => {
         const reader = new FileReader();
         reader.onload = (e: any) => {
@@ -583,7 +583,7 @@ export class Users implements OnInit {
   approveSignature() {
     if (!this.selectedSignature) return;
 
-    this.http.put(`${environment.apiUrl}/users/${this.selectedSignature.id}/approve-signature`, null, {
+    this.http.put(`${environment.apiBaseUrl}/users/${this.selectedSignature.id}/approve-signature`, null, {
       params: { adminName: this.adminName }
     }).subscribe({
       next: (response: any) => {
@@ -612,7 +612,7 @@ export class Users implements OnInit {
       return;
     }
 
-    this.http.put(`${environment.apiUrl}/users/${this.selectedSignature.id}/reject-signature`, null, {
+    this.http.put(`${environment.apiBaseUrl}/users/${this.selectedSignature.id}/reject-signature`, null, {
       params: { 
         adminName: this.adminName,
         rejectionReason: this.rejectionReason

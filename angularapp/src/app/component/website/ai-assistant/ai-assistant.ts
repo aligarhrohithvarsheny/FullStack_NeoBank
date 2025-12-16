@@ -50,7 +50,7 @@ export class AIAssistant implements OnInit {
     this.loading = true;
     this.error = '';
 
-    this.http.get(`${environment.apiUrl}/ai/analyze/${this.userAccountNumber}`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/ai/analyze/${this.userAccountNumber}`).subscribe({
       next: (data: any) => {
         this.analysisData = data;
         this.loading = false;

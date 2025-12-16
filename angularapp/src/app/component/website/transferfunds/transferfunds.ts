@@ -174,7 +174,7 @@ export class Transferfunds implements OnInit {
 
   loadUserDataFromMySQL(userId: string) {
     // Load user data from MySQL database
-    this.http.get(`${environment.apiUrl}/users/${userId}`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/users/${userId}`).subscribe({
       next: (userData: any) => {
         console.log('User data loaded from MySQL:', userData);
         
@@ -228,7 +228,7 @@ export class Transferfunds implements OnInit {
     console.log('Loading balance from MySQL for account:', this.userProfile.accountNumber);
     
     // Load current balance from MySQL database
-    this.http.get(`${environment.apiUrl}/accounts/balance/${this.userProfile.accountNumber}`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/accounts/balance/${this.userProfile.accountNumber}`).subscribe({
       next: (balanceData: any) => {
         console.log('Balance loaded from MySQL:', balanceData);
         this.currentBalance = balanceData.balance || 0;
@@ -285,12 +285,12 @@ export class Transferfunds implements OnInit {
     this.isAccountVerified = false;
 
     // First try to get account details
-    this.http.get(`${environment.apiUrl}/accounts/number/${this.recipientAccountNumber}`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/accounts/number/${this.recipientAccountNumber}`).subscribe({
       next: (accountData: any) => {
         console.log('Account found:', accountData);
         
         // If account exists, try to get user details for name
-        this.http.get(`${environment.apiUrl}/users/account/${this.recipientAccountNumber}`).subscribe({
+        this.http.get(`${environment.apiBaseUrl}/users/account/${this.recipientAccountNumber}`).subscribe({
           next: (userData: any) => {
             console.log('User data found:', userData);
             
@@ -433,7 +433,7 @@ export class Transferfunds implements OnInit {
     };
 
     // Send transfer request to backend
-    this.http.post(`${environment.apiUrl}/transfers`, transferData).subscribe({
+    this.http.post(`${environment.apiBaseUrl}/transfers`, transferData).subscribe({
       next: (response: any) => {
         console.log('Transfer successful:', response);
         
@@ -588,7 +588,7 @@ Time: ${timestamp}`;
     console.log('Checking account in database...');
     
     // First check if account exists
-    this.http.get(`${environment.apiUrl}/accounts/number/${this.userProfile.accountNumber}`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/accounts/number/${this.userProfile.accountNumber}`).subscribe({
       next: (accountData: any) => {
         console.log('Account found in database:', accountData);
         if (accountData.balance === 0 || accountData.balance === null) {
@@ -607,7 +607,7 @@ Time: ${timestamp}`;
   }
 
   updateAccountBalance(amount: number) {
-    this.http.put(`${environment.apiUrl}/accounts/balance/update/${this.userProfile.accountNumber}?amount=${amount}`, {}).subscribe({
+    this.http.put(`${environment.apiBaseUrl}/accounts/balance/update/${this.userProfile.accountNumber}?amount=${amount}`, {}).subscribe({
       next: (response: any) => {
         console.log('Balance updated successfully:', response);
         this.currentBalance = response.balance;
@@ -627,7 +627,7 @@ Time: ${timestamp}`;
       status: 'ACTIVE'
     };
 
-    this.http.post(`${environment.apiUrl}/accounts/create`, accountData).subscribe({
+    this.http.post(`${environment.apiBaseUrl}/accounts/create`, accountData).subscribe({
       next: (response: any) => {
         console.log('Account created with 2 lakhs balance:', response);
         this.currentBalance = response.balance;
@@ -668,7 +668,7 @@ Time: ${timestamp}`;
       `Are you sure you want to cancel the transfer of ₹${transfer.amount.toLocaleString()} to ${transfer.recipientName}?`,
       () => {
 
-    this.http.put(`${environment.apiUrl}/transfers/${transfer.id}/cancel`, {}).subscribe({
+    this.http.put(`${environment.apiBaseUrl}/transfers/${transfer.id}/cancel`, {}).subscribe({
       next: (response: any) => {
         console.log('Transfer cancelled successfully:', response);
         
@@ -701,7 +701,7 @@ Time: ${timestamp}`;
     console.log('Downloading receipt for transfer:', transfer);
     console.log('Transfer ID:', transfer.id);
     
-    this.http.get(`${environment.apiUrl}/transfers/${transfer.id}/receipt`, {
+    this.http.get(`${environment.apiBaseUrl}/transfers/${transfer.id}/receipt`, {
       responseType: 'blob'
     }).subscribe({
       next: (blob: Blob) => {

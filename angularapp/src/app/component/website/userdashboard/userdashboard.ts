@@ -175,7 +175,7 @@ export class Userdashboard implements OnInit, OnDestroy {
 
   loadUserDataFromMySQL(userId: string) {
     // Load user data from MySQL database
-    this.http.get(`${environment.apiUrl}/users/${userId}`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/users/${userId}`).subscribe({
       next: (userData: any) => {
         console.log('User data loaded from MySQL:', userData);
         
@@ -204,7 +204,7 @@ export class Userdashboard implements OnInit, OnDestroy {
     }
     
     // Load current balance from MySQL database
-    this.http.get(`${environment.apiUrl}/accounts/balance/${this.userAccountNumber}`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/accounts/balance/${this.userAccountNumber}`).subscribe({
       next: (balanceData: any) => {
         console.log('Balance loaded from MySQL:', balanceData);
         this.currentBalance = balanceData.balance || 0;
@@ -315,8 +315,8 @@ export class Userdashboard implements OnInit, OnDestroy {
     // URL encode account number to handle special characters
     const encodedAccountNumber = encodeURIComponent(this.userAccountNumber);
     const url = amount && amount > 0 
-      ? `${environment.apiUrl}/qrcode/upi/receive/${encodedAccountNumber}/${amount}`
-      : `${environment.apiUrl}/qrcode/upi/receive/${encodedAccountNumber}`;
+      ? `${environment.apiBaseUrl}/qrcode/upi/receive/${encodedAccountNumber}/${amount}`
+      : `${environment.apiBaseUrl}/qrcode/upi/receive/${encodedAccountNumber}`;
 
     console.log('Requesting QR code from URL:', url);
 
@@ -480,7 +480,7 @@ export class Userdashboard implements OnInit, OnDestroy {
       accountNumber: this.userAccountNumber
     };
     
-    this.http.post(`${environment.apiUrl}/loans/predict-approval`, request).subscribe({
+    this.http.post(`${environment.apiBaseUrl}/loans/predict-approval`, request).subscribe({
       next: (response: any) => {
         if (response.success) {
           this.predictionResult = response;
@@ -532,7 +532,7 @@ export class Userdashboard implements OnInit, OnDestroy {
     if (!this.userAccountNumber) return;
     
     this.isLoadingInvestments = true;
-    this.http.get(`${environment.apiUrl}/investments/account/${this.userAccountNumber}`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/investments/account/${this.userAccountNumber}`).subscribe({
       next: (investments: any) => {
         this.investments = investments || [];
         this.isLoadingInvestments = false;
@@ -587,7 +587,7 @@ export class Userdashboard implements OnInit, OnDestroy {
       sipDuration: this.investmentForm.isSIP ? this.investmentForm.sipDuration : null
     };
     
-    this.http.post(`${environment.apiUrl}/investments`, investmentData).subscribe({
+    this.http.post(`${environment.apiBaseUrl}/investments`, investmentData).subscribe({
       next: (response: any) => {
         if (response.success) {
           this.alertService.success('Success', 'Investment application submitted successfully');
@@ -622,7 +622,7 @@ export class Userdashboard implements OnInit, OnDestroy {
     if (!this.userAccountNumber) return;
     
     this.isLoadingFDs = true;
-    this.http.get(`${environment.apiUrl}/fixed-deposits/account/${this.userAccountNumber}`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/fixed-deposits/account/${this.userAccountNumber}`).subscribe({
       next: (fds: any) => {
         this.fixedDeposits = fds || [];
         this.isLoadingFDs = false;
@@ -674,7 +674,7 @@ export class Userdashboard implements OnInit, OnDestroy {
       interestPayout: this.fdForm.interestPayout
     };
     
-    this.http.post(`${environment.apiUrl}/fixed-deposits`, fdData).subscribe({
+    this.http.post(`${environment.apiBaseUrl}/fixed-deposits`, fdData).subscribe({
       next: (response: any) => {
         if (response.success) {
           this.alertService.success('Success', 'Fixed Deposit application submitted successfully');
@@ -710,7 +710,7 @@ export class Userdashboard implements OnInit, OnDestroy {
     if (!this.userAccountNumber) return;
     
     this.isLoadingEMIs = true;
-    this.http.get(`${environment.apiUrl}/emis/account/${this.userAccountNumber}`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/emis/account/${this.userAccountNumber}`).subscribe({
       next: (emis: any) => {
         this.emis = emis || [];
         this.isLoadingEMIs = false;
@@ -727,7 +727,7 @@ export class Userdashboard implements OnInit, OnDestroy {
   loadEMISummary() {
     if (!this.userAccountNumber) return;
     
-    this.http.get(`${environment.apiUrl}/emis/account/${this.userAccountNumber}/summary`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/emis/account/${this.userAccountNumber}/summary`).subscribe({
       next: (summary: any) => {
         this.emiSummary = summary;
       },
@@ -747,7 +747,7 @@ export class Userdashboard implements OnInit, OnDestroy {
       return;
     }
     
-    this.http.post(`${environment.apiUrl}/emis/${emiId}/pay?accountNumber=${this.userAccountNumber}`, {}).subscribe({
+    this.http.post(`${environment.apiBaseUrl}/emis/${emiId}/pay?accountNumber=${this.userAccountNumber}`, {}).subscribe({
       next: (response: any) => {
         if (response.success) {
           this.alertService.success('Success', 'EMI paid successfully');
@@ -784,7 +784,7 @@ export class Userdashboard implements OnInit, OnDestroy {
   loadDepositRequests() {
     if (!this.userAccountNumber) return;
     this.isLoadingDepositRequests = true;
-    this.http.get(`${environment.apiUrl}/deposit-requests/account/${this.userAccountNumber}`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/deposit-requests/account/${this.userAccountNumber}`).subscribe({
       next: (requests: any) => {
         this.depositRequests = requests || [];
         this.isLoadingDepositRequests = false;
@@ -821,7 +821,7 @@ export class Userdashboard implements OnInit, OnDestroy {
       note: this.depositForm.note
     };
 
-    this.http.post(`${environment.apiUrl}/deposit-requests`, payload).subscribe({
+    this.http.post(`${environment.apiBaseUrl}/deposit-requests`, payload).subscribe({
       next: (response: any) => {
         if (response.success) {
           this.depositMessage = response.message || 'Deposit request submitted';

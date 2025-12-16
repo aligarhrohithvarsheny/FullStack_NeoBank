@@ -83,7 +83,7 @@ export class Card implements OnInit {
       const user = JSON.parse(currentUser);
       
       // Load full user profile from MySQL database
-      this.http.get(`${environment.apiUrl}/users/${user.id}`).subscribe({
+      this.http.get(`${environment.apiBaseUrl}/users/${user.id}`).subscribe({
         next: (userData: any) => {
           console.log('User profile loaded from MySQL:', userData);
           this.userProfile = {
@@ -168,7 +168,7 @@ export class Card implements OnInit {
     
     // Load card from MySQL database
     console.log('Loading card for account:', this.userProfile.accountNumber);
-    this.http.get(`${environment.apiUrl}/cards/account/${this.userProfile.accountNumber}`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/cards/account/${this.userProfile.accountNumber}`).subscribe({
       next: (cards: any) => {
         console.log('Cards loaded from MySQL:', cards);
         console.log('Number of cards found:', cards?.length || 0);
@@ -209,7 +209,7 @@ export class Card implements OnInit {
     
     // First check if card already exists in database
     console.log('Checking if card already exists for account:', this.userProfile.accountNumber);
-    this.http.get(`${environment.apiUrl}/cards/account/${this.userProfile.accountNumber}`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/cards/account/${this.userProfile.accountNumber}`).subscribe({
       next: (existingCards: any) => {
         if (existingCards && existingCards.length > 0) {
           console.log('Card already exists, using existing card');
@@ -267,7 +267,7 @@ export class Card implements OnInit {
     
     // Create card in MySQL database
     console.log('Creating new card in MySQL for account:', this.userProfile.accountNumber);
-    this.http.post(`${environment.apiUrl}/cards`, newCard).subscribe({
+    this.http.post(`${environment.apiBaseUrl}/cards`, newCard).subscribe({
       next: (response: any) => {
         console.log('Card created successfully in MySQL:', response);
         
@@ -381,12 +381,12 @@ export class Card implements OnInit {
     }
     
     // First get the card from backend to get the correct Long ID
-    this.http.get(`${environment.apiUrl}/cards/account/${this.userProfile.accountNumber}`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/cards/account/${this.userProfile.accountNumber}`).subscribe({
       next: (cards: any) => {
         if (cards && cards.length > 0) {
           const backendCard = cards[0]; // Get the first card
           // Update card PIN in MySQL database using correct endpoint
-          this.http.put(`${environment.apiUrl}/cards/${backendCard.id}/pin?pin=${this.newPin}`, {}).subscribe({
+          this.http.put(`${environment.apiBaseUrl}/cards/${backendCard.id}/pin?pin=${this.newPin}`, {}).subscribe({
             next: (response: any) => {
               console.log('Card PIN updated in MySQL:', response);
               this.card!.pinSet = true;
@@ -433,12 +433,12 @@ export class Card implements OnInit {
       'Are you sure you want to reset your PIN? This will disable your current PIN and set a new one.',
       () => {
       // First get the card from backend to get the correct Long ID
-      this.http.get(`${environment.apiUrl}/cards/account/${this.userProfile!.accountNumber}`).subscribe({
+      this.http.get(`${environment.apiBaseUrl}/cards/account/${this.userProfile!.accountNumber}`).subscribe({
         next: (cards: any) => {
           if (cards && cards.length > 0) {
             const backendCard = cards[0]; // Get the first card
             // Reset card PIN in MySQL database using correct endpoint
-            this.http.put(`${environment.apiUrl}/cards/${backendCard.id}/reset-pin?pin=${this.newPin}`, {}).subscribe({
+            this.http.put(`${environment.apiBaseUrl}/cards/${backendCard.id}/reset-pin?pin=${this.newPin}`, {}).subscribe({
               next: (response: any) => {
                 console.log('Card PIN reset in MySQL:', response);
                 this.card!.pinSet = true;
@@ -477,11 +477,11 @@ export class Card implements OnInit {
       'Are you sure you want to block this card? This action can be reversed by admin.',
       () => {
       // First get the card from backend to get the correct Long ID
-      this.http.get(`${environment.apiUrl}/cards/account/${this.userProfile!.accountNumber}`).subscribe({
+      this.http.get(`${environment.apiBaseUrl}/cards/account/${this.userProfile!.accountNumber}`).subscribe({
         next: (cards: any) => {
           if (cards && cards.length > 0) {
             const backendCard = cards[0]; // Get the first card
-            this.http.put(`${environment.apiUrl}/cards/${backendCard.id}/block`, {}).subscribe({
+            this.http.put(`${environment.apiBaseUrl}/cards/${backendCard.id}/block`, {}).subscribe({
               next: (response: any) => {
                 console.log('Card blocked in MySQL:', response);
                 this.card!.status = 'Blocked';
@@ -515,11 +515,11 @@ export class Card implements OnInit {
       'Are you sure you want to deactivate this card? This action cannot be undone.',
       () => {
       // First get the card from backend to get the correct Long ID
-      this.http.get(`${environment.apiUrl}/cards/account/${this.userProfile!.accountNumber}`).subscribe({
+      this.http.get(`${environment.apiBaseUrl}/cards/account/${this.userProfile!.accountNumber}`).subscribe({
         next: (cards: any) => {
           if (cards && cards.length > 0) {
             const backendCard = cards[0]; // Get the first card
-            this.http.put(`${environment.apiUrl}/cards/${backendCard.id}/deactivate`, {}).subscribe({
+            this.http.put(`${environment.apiBaseUrl}/cards/${backendCard.id}/deactivate`, {}).subscribe({
               next: (response: any) => {
                 console.log('Card deactivated in MySQL:', response);
                 this.card!.status = 'Deactivated';
@@ -570,7 +570,7 @@ export class Card implements OnInit {
     };
     
     // Submit replacement request to MySQL database
-    this.http.post(`${environment.apiUrl}/card-replacement-requests/create`, replacementRequest).subscribe({
+    this.http.post(`${environment.apiBaseUrl}/card-replacement-requests/create`, replacementRequest).subscribe({
       next: (response: any) => {
         console.log('Card replacement request created in MySQL:', response);
         
@@ -611,7 +611,7 @@ export class Card implements OnInit {
     };
     
     // Submit new card request to MySQL database
-    this.http.post(`${environment.apiUrl}/new-card-requests/create`, newCardRequest).subscribe({
+    this.http.post(`${environment.apiBaseUrl}/new-card-requests/create`, newCardRequest).subscribe({
       next: (response: any) => {
         console.log('New card request created in MySQL:', response);
         

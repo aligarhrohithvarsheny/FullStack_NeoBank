@@ -87,7 +87,7 @@ export class Kycupdate implements OnInit {
     }
     
     // Check if user has existing KYC requests
-    this.http.get(`${environment.apiUrl}/kyc/check-existing/${this.userProfile.accountNumber}`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/kyc/check-existing/${this.userProfile.accountNumber}`).subscribe({
       next: (response: any) => {
         console.log('Check existing KYC requests response:', response);
         this.requiresOtp = response.requiresOtp || response.hasExisting || false;
@@ -150,7 +150,7 @@ export class Kycupdate implements OnInit {
     if (!this.userProfile || !this.userProfile.accountNumber) return;
     
     // Load user account details to get existing PAN
-    this.http.get<any>(`${environment.apiUrl}/users/account/${this.userProfile.accountNumber}`).subscribe({
+    this.http.get<any>(`${environment.apiBaseUrl}/users/account/${this.userProfile.accountNumber}`).subscribe({
       next: (userData: any) => {
         // Get PAN from account
         const existingPan = userData.account?.pan || userData.pan || this.userProfile?.pan || '';
@@ -174,7 +174,7 @@ export class Kycupdate implements OnInit {
     if (!this.userProfile || !this.userProfile.accountNumber) return;
     
     // Try to get PAN from most recent approved KYC
-    this.http.get<any[]>(`${environment.apiUrl}/kyc/account/${this.userProfile.accountNumber}/all`).subscribe({
+    this.http.get<any[]>(`${environment.apiBaseUrl}/kyc/account/${this.userProfile.accountNumber}/all`).subscribe({
       next: (kycRequests: any[]) => {
         if (kycRequests && Array.isArray(kycRequests)) {
           // Find the most recent approved KYC
@@ -197,7 +197,7 @@ export class Kycupdate implements OnInit {
     // First try to load from backend
     if (this.userProfile && this.userProfile.accountNumber) {
       // Fetch all existing KYC requests from backend by account number
-      this.http.get<any[]>(`${environment.apiUrl}/kyc/account/${this.userProfile.accountNumber}/all`).subscribe({
+      this.http.get<any[]>(`${environment.apiBaseUrl}/kyc/account/${this.userProfile.accountNumber}/all`).subscribe({
         next: (kycRequests: any[]) => {
           if (kycRequests && Array.isArray(kycRequests) && kycRequests.length > 0) {
             // Get the most recent request (should be sorted by submittedDate desc from backend)
@@ -228,7 +228,7 @@ export class Kycupdate implements OnInit {
     
     if (this.userProfile && this.userProfile.accountNumber) {
       // Fetch all KYC requests history from backend
-      this.http.get<any[]>(`${environment.apiUrl}/kyc/account/${this.userProfile.accountNumber}/all`).subscribe({
+      this.http.get<any[]>(`${environment.apiBaseUrl}/kyc/account/${this.userProfile.accountNumber}/all`).subscribe({
         next: (kycRequests: any[]) => {
           if (kycRequests && Array.isArray(kycRequests)) {
             // Sort by submittedDate descending (most recent first)
@@ -276,7 +276,7 @@ export class Kycupdate implements OnInit {
     this.otpError = '';
     this.otpSuccessMessage = '';
 
-    this.http.post(`${environment.apiUrl}/kyc/send-otp`, {
+    this.http.post(`${environment.apiBaseUrl}/kyc/send-otp`, {
       userEmail: this.userProfile.email,
       userAccountNumber: this.userProfile.accountNumber
     }).subscribe({
@@ -388,7 +388,7 @@ export class Kycupdate implements OnInit {
       formData.append('panDocument', this.panDocument);
     }
 
-    this.http.post(`${environment.apiUrl}/kyc/upload-documents`, formData).subscribe({
+    this.http.post(`${environment.apiBaseUrl}/kyc/upload-documents`, formData).subscribe({
       next: (response: any) => {
         if (response.success) {
           this.documentUploadSuccess = 'Documents uploaded successfully!';
@@ -463,7 +463,7 @@ export class Kycupdate implements OnInit {
     }
 
     // Submit KYC request to MySQL database
-    this.http.post(`${environment.apiUrl}/kyc/create`, requestData).subscribe({
+    this.http.post(`${environment.apiBaseUrl}/kyc/create`, requestData).subscribe({
       next: (response: any) => {
         console.log('KYC request created in MySQL:', response);
         

@@ -92,7 +92,7 @@ export class Transaction implements OnInit {
     }
     
     // Load transactions from MySQL database
-    this.http.get(`${environment.apiUrl}/transactions/account/${this.userAccountNumber}?page=0&size=100`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/transactions/account/${this.userAccountNumber}?page=0&size=100`).subscribe({
       next: (response: any) => {
         console.log('Transactions response from MySQL:', response);
         
@@ -160,7 +160,7 @@ export class Transaction implements OnInit {
     };
 
     // Submit to MySQL database
-    this.http.post(`${environment.apiUrl}/transactions`, transactionData).subscribe({
+    this.http.post(`${environment.apiBaseUrl}/transactions`, transactionData).subscribe({
       next: (response: any) => {
         console.log('Transaction created successfully in MySQL:', response);
         this.currentBalance = transactionData.balance;
@@ -375,7 +375,7 @@ export class Transaction implements OnInit {
     this.sendingEmail = true;
     this.error = '';
 
-    this.http.post(`${environment.apiUrl}/transactions/send-statement/${this.userAccountNumber}`, {})
+    this.http.post(`${environment.apiBaseUrl}/transactions/send-statement/${this.userAccountNumber}`, {})
       .subscribe({
         next: (response: any) => {
           this.sendingEmail = false;

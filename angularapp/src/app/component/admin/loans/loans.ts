@@ -96,7 +96,7 @@ export class Loans implements OnInit {
     console.log('Loading loan applications...');
     
     // Load loans from MySQL database
-    this.http.get(`${environment.apiUrl}/loans`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/loans`).subscribe({
       next: (loans: any) => {
         console.log('Loans loaded from MySQL:', loans);
         this.loanRequests = loans.map((loan: any) => ({
@@ -178,7 +178,7 @@ export class Loans implements OnInit {
     };
     
     // Update loan in MySQL database using enhanced approval endpoint
-    this.http.put(`${environment.apiUrl}/loans/${loan.id}/approve?status=Approved`, {}).subscribe({
+    this.http.put(`${environment.apiBaseUrl}/loans/${loan.id}/approve?status=Approved`, {}).subscribe({
       next: (response: any) => {
         console.log('Loan approved in MySQL:', response);
         
@@ -218,7 +218,7 @@ export class Loans implements OnInit {
     };
     
     // Update loan in MySQL database
-    this.http.put(`${environment.apiUrl}/loans/${loan.id}/approve?status=Rejected`, {}).subscribe({
+    this.http.put(`${environment.apiBaseUrl}/loans/${loan.id}/approve?status=Rejected`, {}).subscribe({
       next: (response: any) => {
         console.log('Loan rejected in MySQL:', response);
         
@@ -327,7 +327,7 @@ export class Loans implements OnInit {
     this.foreclosureError = '';
     this.foreclosureDetails = null;
 
-    this.http.get(`${environment.apiUrl}/loans/foreclosure/calculate/${this.foreclosureLoanNumber.trim()}`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/loans/foreclosure/calculate/${this.foreclosureLoanNumber.trim()}`).subscribe({
       next: (response: any) => {
         this.calculatingForeclosure = false;
         if (response.success) {
@@ -375,7 +375,7 @@ export class Loans implements OnInit {
     this.processingForeclosure = true;
     this.foreclosureError = '';
 
-    this.http.post(`${environment.apiUrl}/loans/foreclose/${this.foreclosureLoanNumber.trim()}`, {}).subscribe({
+    this.http.post(`${environment.apiBaseUrl}/loans/foreclose/${this.foreclosureLoanNumber.trim()}`, {}).subscribe({
       next: (response: any) => {
         this.processingForeclosure = false;
         if (response.success) {
@@ -410,7 +410,7 @@ export class Loans implements OnInit {
     this.emis = [];
 
     // Fetch EMI schedule (monthly payments) for this loan from backend
-    this.http.get<any[]>(`${environment.apiUrl}/emis/loan/${loan.id}`).subscribe({
+    this.http.get<any[]>(`${environment.apiBaseUrl}/emis/loan/${loan.id}`).subscribe({
       next: (emis) => {
         this.emis = emis || [];
         this.loadingEmis = false;
@@ -468,6 +468,6 @@ export class Loans implements OnInit {
     }
 
     // Download the form file from backend
-    window.open(`${environment.apiUrl}/loans/download-personal-loan-form/${loan.id}`, '_blank');
+    window.open(`${environment.apiBaseUrl}/loans/download-personal-loan-form/${loan.id}`, '_blank');
   }
 }

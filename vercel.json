@@ -7,7 +7,7 @@
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "https://YOUR_BACKEND_URL_HERE/api/$1"
+      "destination": "https://placeholder-backend-url.com/api/$1"
     },
     {
       "source": "/(.*)",

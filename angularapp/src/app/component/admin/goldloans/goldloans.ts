@@ -126,7 +126,7 @@ export class AdminGoldLoans implements OnInit {
     this.loading = true;
     this.error = '';
     
-    this.http.get(`${environment.apiUrl}/gold-loans`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/gold-loans`).subscribe({
       next: (loans: any) => {
         this.goldLoans = Array.isArray(loans) ? loans : [];
         this.filterLoans();
@@ -153,7 +153,7 @@ export class AdminGoldLoans implements OnInit {
   }
 
   loadCurrentGoldRate() {
-    this.http.get(`${environment.apiUrl}/gold-rates/current`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/gold-rates/current`).subscribe({
       next: (rate: any) => {
         this.currentGoldRate = rate;
         this.newGoldRate = rate.ratePerGram;
@@ -171,7 +171,7 @@ export class AdminGoldLoans implements OnInit {
     }
 
     this.updatingRate = true;
-    this.http.put(`${environment.apiUrl}/gold-rates/update?ratePerGram=${this.newGoldRate}&updatedBy=${this.adminName}`, {}).subscribe({
+    this.http.put(`${environment.apiBaseUrl}/gold-rates/update?ratePerGram=${this.newGoldRate}&updatedBy=${this.adminName}`, {}).subscribe({
       next: (response: any) => {
         if (response.success) {
           this.alertService.success('Gold Rate Updated', `Gold rate updated to ₹${this.newGoldRate} per gram`);
@@ -249,7 +249,7 @@ export class AdminGoldLoans implements OnInit {
     const requestBody = status === 'Approved' && goldDetails ? goldDetails : {};
 
     this.http.put(
-      `${environment.apiUrl}/gold-loans/${loan.id}/approve?status=${status}&approvedBy=${this.adminName}`,
+      `${environment.apiBaseUrl}/gold-loans/${loan.id}/approve?status=${status}&approvedBy=${this.adminName}`,
       requestBody
     ).subscribe({
       next: (response: any) => {
@@ -363,7 +363,7 @@ export class AdminGoldLoans implements OnInit {
   }
 
   loadForeclosureDetails(loan: GoldLoan) {
-    this.http.get<any>(`${environment.apiUrl}/gold-loans/foreclosure/${loan.loanAccountNumber}`).subscribe({
+    this.http.get<any>(`${environment.apiBaseUrl}/gold-loans/foreclosure/${loan.loanAccountNumber}`).subscribe({
       next: (response) => {
         if (response.success) {
           this.foreclosureDetails = response;
@@ -466,7 +466,7 @@ export class AdminGoldLoans implements OnInit {
   }
 
   updateLoanInterestRate(loanId: number, newInterestRate: number) {
-    this.http.put<any>(`${environment.apiUrl}/gold-loans/${loanId}/interest-rate`, null, {
+    this.http.put<any>(`${environment.apiBaseUrl}/gold-loans/${loanId}/interest-rate`, null, {
       params: { interestRate: newInterestRate.toString() }
     }).subscribe({
       next: (response) => {
@@ -490,7 +490,7 @@ export class AdminGoldLoans implements OnInit {
       interestRate: this.editedInterestRate
     } : {};
 
-    this.http.post<any>(`${environment.apiUrl}/gold-loans/foreclosure/${this.selectedLoan.loanAccountNumber}`, requestBody).subscribe({
+    this.http.post<any>(`${environment.apiBaseUrl}/gold-loans/foreclosure/${this.selectedLoan.loanAccountNumber}`, requestBody).subscribe({
       next: (response) => {
         if (response.success) {
           this.alertService.success('Success', 'Foreclosure processed successfully');
@@ -530,7 +530,7 @@ export class AdminGoldLoans implements OnInit {
   }
 
   loadEmiSchedule(loan: GoldLoan) {
-    this.http.get<any[]>(`${environment.apiUrl}/gold-loans/emi-schedule/${loan.loanAccountNumber}`).subscribe({
+    this.http.get<any[]>(`${environment.apiBaseUrl}/gold-loans/emi-schedule/${loan.loanAccountNumber}`).subscribe({
       next: (schedule) => {
         this.emiSchedule = Array.isArray(schedule) ? schedule : [];
       },

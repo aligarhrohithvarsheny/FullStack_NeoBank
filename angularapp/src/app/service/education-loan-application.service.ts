@@ -8,7 +8,7 @@ import { environment } from '../../environment/environment';
   providedIn: 'root'
 })
 export class EducationLoanApplicationService {
-  private apiUrl = `${environment.apiUrl}/education-loan-applications`;
+  private apiUrl = `${environment.apiBaseUrl}/api/education-loan-applications`;
 
   constructor(private http: HttpClient) { }
 

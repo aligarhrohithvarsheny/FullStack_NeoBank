@@ -25,7 +25,7 @@ export class WebAuthnService {
    */
   registerCredential(email: string, name: string): Observable<any> {
     // Step 1: Get registration challenge from server
-    return this.http.post(`${environment.apiUrl}/webauthn/register/challenge`, { email }).pipe(
+    return this.http.post(`${environment.apiBaseUrl}/api/webauthn/register/challenge`, { email }).pipe(
       switchMap((challenge: any) => {
         if (!challenge.success) {
           throw new Error(challenge.message || 'Failed to get registration challenge');
@@ -94,7 +94,7 @@ export class WebAuthnService {
               attestationObject: attestationObject,
             };
 
-            return this.http.post(`${environment.apiUrl}/webauthn/register`, {
+            return this.http.post(`${environment.apiBaseUrl}/api/webauthn/register`, {
               email: email,
               credential: credentialData,
             });
@@ -109,7 +109,7 @@ export class WebAuthnService {
    */
   authenticate(email: string): Observable<any> {
     // Step 1: Get authentication challenge from server
-    return this.http.post(`${environment.apiUrl}/webauthn/authenticate/challenge`, { email }).pipe(
+    return this.http.post(`${environment.apiBaseUrl}/api/webauthn/authenticate/challenge`, { email }).pipe(
       switchMap((challenge: any) => {
         if (!challenge.success) {
           throw new Error(challenge.message || 'Failed to get authentication challenge');
@@ -185,7 +185,7 @@ export class WebAuthnService {
               counter: counter,
             };
 
-            return this.http.post(`${environment.apiUrl}/webauthn/authenticate`, {
+            return this.http.post(`${environment.apiBaseUrl}/api/webauthn/authenticate`, {
               email: email,
               credential: authenticationData,
             });
@@ -199,14 +199,14 @@ export class WebAuthnService {
    * Get registered credentials for an admin
    */
   getCredentials(email: string): Observable<any> {
-    return this.http.get(`${environment.apiUrl}/webauthn/credentials/${email}`);
+    return this.http.get(`${environment.apiBaseUrl}/api/webauthn/credentials/${email}`);
   }
 
   /**
    * Delete a credential
    */
   deleteCredential(email: string, credentialId: string): Observable<any> {
-    return this.http.delete(`${environment.apiUrl}/webauthn/credentials/${email}/${credentialId}`);
+    return this.http.delete(`${environment.apiBaseUrl}/api/webauthn/credentials/${email}/${credentialId}`);
   }
 
   /**
