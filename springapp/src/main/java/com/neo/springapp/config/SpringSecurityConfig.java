@@ -2,6 +2,7 @@ package com.neo.springapp.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -42,11 +43,11 @@ public class SpringSecurityConfig {
             
             // Configure authorization rules
             .authorizeHttpRequests(auth -> auth
+                // Explicitly permit all OPTIONS requests (preflight CORS requests)
+                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 // Permit all requests to API endpoints
                 .requestMatchers("/api/**").permitAll()
-                // Permit all OPTIONS requests (preflight)
-                .requestMatchers("/**").permitAll()
-                // Allow all other requests (you can add authentication later if needed)
+                // Permit all other requests
                 .anyRequest().permitAll()
             )
             
