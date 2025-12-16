@@ -1,91 +1,21 @@
 package com.neo.springapp.config;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.lang.NonNull;
-import org.springframework.web.servlet.config.annotation.CorsRegistry;
-import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import jakarta.persistence.Query;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
 
 @Configuration
-public class SecurityConfig implements WebMvcConfigurer {
+public class SecurityConfig {
 
     @PersistenceContext
     private EntityManager entityManager;
 
-    // Read CORS origins from environment variable (comma-separated)
-    @Value("${spring.web.cors.allowed-origins:}")
-    private String corsAllowedOrigins;
-
-    
-    @Override
-    public void addCorsMappings(@NonNull CorsRegistry registry) {
-        // Build allowed origin patterns
-        String[] allowedOrigins = buildAllowedOrigins();
-        
-        registry.addMapping("/api/**")
-                .allowedOriginPatterns(allowedOrigins)
-                .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH")
-                .allowedHeaders("*")
-                .exposedHeaders("*")
-                .allowCredentials(true)
-                .maxAge(3600);
-        
-        // Also allow root path for health checks
-        registry.addMapping("/**")
-                .allowedOriginPatterns(
-                    "http://localhost:*",
-                    "http://127.0.0.1:*"
-                )
-                .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH")
-                .allowedHeaders("*")
-                .allowCredentials(true)
-                .maxAge(3600);
-    }
-
-    /**
-     * Build allowed origin patterns from environment variable and defaults
-     */
-    private String[] buildAllowedOrigins() {
-        // Default origins for local development
-        java.util.List<String> origins = new java.util.ArrayList<>(Arrays.asList(
-            "http://localhost:*",
-            "http://127.0.0.1:*",
-            "https://*.vercel.app",
-            "https://*.railway.app",
-            "https://*.onrender.com",
-            "https://*.up.railway.app"
-        ));
-
-        // Add origins from environment variable if provided
-        if (corsAllowedOrigins != null && !corsAllowedOrigins.trim().isEmpty()) {
-            String[] envOrigins = corsAllowedOrigins.split(",");
-            for (String origin : envOrigins) {
-                String trimmed = origin.trim();
-                if (!trimmed.isEmpty()) {
-                    // If it's a wildcard pattern, add as-is, otherwise add both with and without wildcard
-                    if (trimmed.contains("*")) {
-                        origins.add(trimmed);
-                    } else {
-                        origins.add(trimmed);
-                        // Also add wildcard pattern for subdomains
-                        if (trimmed.startsWith("https://")) {
-                            String domain = trimmed.substring(8); // Remove https://
-                            origins.add("https://*." + domain);
-                        }
-                    }
-                }
-            }
-        }
-
-        return origins.toArray(new String[0]);
-    }
+    // Note: CORS configuration has been moved to CorsConfig.java
+    // to provide a dedicated, production-ready CORS setup
 
     
     public static class SecurityHeaders {
