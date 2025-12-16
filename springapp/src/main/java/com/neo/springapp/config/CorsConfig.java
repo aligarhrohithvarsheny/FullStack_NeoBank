@@ -11,6 +11,10 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
  * This configuration allows cross-origin requests from the Angular frontend
  * deployed on Vercel and handles preflight OPTIONS requests.
  * 
+ * Note: This works in conjunction with SpringSecurityConfig.java.
+ * Spring Security's CORS filter (in SecurityFilterChain) processes CORS first,
+ * and this WebMvcConfigurer CORS configuration provides additional MVC-level CORS support.
+ * 
  * Location: springapp/src/main/java/com/neo/springapp/config/CorsConfig.java
  */
 @Configuration
