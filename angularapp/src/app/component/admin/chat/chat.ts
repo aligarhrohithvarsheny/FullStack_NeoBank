@@ -42,15 +42,15 @@ export class AdminChat implements OnInit, OnDestroy {
   ngOnInit() {
     // Only make API calls in the browser, not during SSR
     if (isPlatformBrowser(this.platformId)) {
+    this.loadEscalatedChats();
+    
+    // Refresh escalated chats every 5 seconds
+    this.refreshInterval = setInterval(() => {
       this.loadEscalatedChats();
-      
-      // Refresh escalated chats every 5 seconds
-      this.refreshInterval = setInterval(() => {
-        this.loadEscalatedChats();
-        if (this.selectedSessionId) {
-          this.loadChatHistory(this.selectedSessionId);
-        }
-      }, 5000);
+      if (this.selectedSessionId) {
+        this.loadChatHistory(this.selectedSessionId);
+      }
+    }, 5000);
     }
   }
 

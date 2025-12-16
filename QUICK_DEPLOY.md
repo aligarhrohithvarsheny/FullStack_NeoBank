@@ -177,3 +177,4 @@ Update backend `SPRING_WEB_CORS_ALLOWED_ORIGINS` with frontend URL
 Visit your frontend URL to see it in action.
 
 
+
