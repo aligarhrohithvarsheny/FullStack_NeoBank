@@ -63,6 +63,7 @@ public class SpringSecurityConfig {
      * CORS Configuration Source
      * 
      * This bean provides CORS configuration that integrates with Spring Security.
+     * It matches the global CorsConfig to ensure consistency.
      * It allows:
      * - Origin: https://full-stack-neo-bank22.vercel.app
      * - Methods: GET, POST, PUT, DELETE, OPTIONS
@@ -73,27 +74,18 @@ public class SpringSecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         
-        // Allow the Vercel frontend domain
+        // Allow the Vercel frontend domain (must match CorsConfig)
         configuration.setAllowedOrigins(Arrays.asList(
             "https://full-stack-neo-bank22.vercel.app"
         ));
         
-        // Allow localhost for local development
-        configuration.setAllowedOriginPatterns(Arrays.asList(
-            "http://localhost:*",
-            "http://127.0.0.1:*"
-        ));
-        
         // Allow all required HTTP methods including OPTIONS for preflight
         configuration.setAllowedMethods(Arrays.asList(
-            "GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"
+            "GET", "POST", "PUT", "DELETE", "OPTIONS"
         ));
         
         // Allow all headers (required for preflight requests)
         configuration.setAllowedHeaders(Arrays.asList("*"));
-        
-        // Expose all headers in response
-        configuration.setExposedHeaders(Arrays.asList("*"));
         
         // Enable credentials (cookies, authorization headers, etc.)
         configuration.setAllowCredentials(true);
