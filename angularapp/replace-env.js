@@ -29,13 +29,15 @@ if (!backendUrl || backendUrl === 'YOUR_BACKEND_URL' || backendUrl === 'https://
 }
 
 // Replace the apiBaseUrl value in the environment file
-// Match: apiBaseUrl: 'https://your-backend-url.com' or apiBaseUrl: 'http://...'
-const apiBaseUrlRegex = /apiBaseUrl:\s*['"`]([^'"`]+)['"`]/;
+// Match: apiBaseUrl: '' or apiBaseUrl: 'https://...' or apiBaseUrl: "..." or apiBaseUrl: `...`
+// This regex handles empty strings and any quoted value
+const apiBaseUrlRegex = /apiBaseUrl:\s*['"`]([^'"`]*)['"`]/;
 if (apiBaseUrlRegex.test(envContent)) {
   envContent = envContent.replace(apiBaseUrlRegex, `apiBaseUrl: '${finalBaseUrl}'`);
   console.log(`✅ Updated apiBaseUrl to: ${finalBaseUrl}`);
 } else {
   console.error('❌ Could not find apiBaseUrl in environment file');
+  console.error('❌ Expected format: apiBaseUrl: \'\'');
   process.exit(1);
 }
 
