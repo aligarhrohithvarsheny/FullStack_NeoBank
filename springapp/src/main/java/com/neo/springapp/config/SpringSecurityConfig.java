@@ -13,45 +13,20 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.Arrays;
 
-/**
- * Spring Security Configuration using SecurityFilterChain
- * 
- * This configuration:
- * - Allows CORS requests from https://full-stack-neo-bank22.vercel.app
- * - Explicitly allows OPTIONS requests for preflight
- * - Disables CSRF for API endpoints
- * - Permits all requests to /api/** endpoints
- * - Enables CORS inside SecurityFilterChain
- * 
- * Location: springapp/src/main/java/com/neo/springapp/config/SpringSecurityConfig.java
- */
 @Configuration
 @EnableWebSecurity
 public class SpringSecurityConfig {
 
-    /**
-     * Configure SecurityFilterChain to allow CORS and handle preflight requests
-     */
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-            // Disable CSRF for API endpoints (not needed for stateless APIs)
             .csrf(csrf -> csrf.disable())
-            
-            // Configure CORS using the CORS configuration source
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-            
-            // Configure authorization rules
             .authorizeHttpRequests(auth -> auth
-                // Explicitly permit all OPTIONS requests (preflight CORS requests)
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                // Permit all requests to API endpoints
                 .requestMatchers("/api/**").permitAll()
-                // Permit all other requests
                 .anyRequest().permitAll()
             )
-            
-            // Use stateless session (no session creation)
             .sessionManagement(session -> 
                 session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
             );
@@ -59,41 +34,24 @@ public class SpringSecurityConfig {
         return http.build();
     }
 
-    /**
-     * CORS Configuration Source
-     * 
-     * This bean provides CORS configuration that integrates with Spring Security.
-     * It matches the global CorsConfig to ensure consistency.
-     * It allows:
-     * - Origin: https://full-stack-neo-bank22.vercel.app
-     * - Methods: GET, POST, PUT, DELETE, OPTIONS
-     * - All headers
-     * - Credentials enabled
-     */
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         
-        // Allow the Vercel frontend domain (must match CorsConfig)
         configuration.setAllowedOrigins(Arrays.asList(
             "https://full-stack-neo-bank22.vercel.app"
         ));
         
-        // Allow all required HTTP methods including OPTIONS for preflight
         configuration.setAllowedMethods(Arrays.asList(
             "GET", "POST", "PUT", "DELETE", "OPTIONS"
         ));
         
-        // Allow all headers (required for preflight requests)
         configuration.setAllowedHeaders(Arrays.asList("*"));
         
-        // Enable credentials (cookies, authorization headers, etc.)
         configuration.setAllowCredentials(true);
         
-        // Cache preflight requests for 1 hour (3600 seconds)
         configuration.setMaxAge(3600L);
         
-        // Apply CORS configuration to all paths
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         

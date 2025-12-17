@@ -13,6 +13,7 @@ public class CorsConfig implements WebMvcConfigurer {
             .allowedOrigins("https://full-stack-neo-bank22.vercel.app")
             .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
             .allowedHeaders("*")
-            .allowCredentials(true);
+            .allowCredentials(true)
+            .maxAge(3600);
     }
 }
