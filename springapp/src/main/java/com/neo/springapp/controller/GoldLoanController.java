@@ -22,7 +22,6 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/gold-loans")
-@CrossOrigin(origins = "http://localhost:4200")
 public class GoldLoanController {
 
     @Autowired

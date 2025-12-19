@@ -11,7 +11,6 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/fixed-deposits")
-@CrossOrigin(origins = {"http://localhost:4200", "http://localhost:3000"})
 public class FixedDepositController {
 
     @Autowired

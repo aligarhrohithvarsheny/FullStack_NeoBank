@@ -16,7 +16,6 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/cheques")
-@CrossOrigin(origins = "http://localhost:4200")
 public class ChequeController {
 
     private final ChequeService chequeService;

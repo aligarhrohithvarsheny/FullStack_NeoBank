@@ -13,7 +13,6 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/gold-rates")
-@CrossOrigin(origins = "http://localhost:4200")
 public class GoldRateController {
 
     @Autowired

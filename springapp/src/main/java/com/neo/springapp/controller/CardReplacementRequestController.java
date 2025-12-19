@@ -14,7 +14,6 @@ import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/card-replacement-requests")
-@CrossOrigin(origins = "http://localhost:4200")
 public class CardReplacementRequestController {
 
     @Autowired

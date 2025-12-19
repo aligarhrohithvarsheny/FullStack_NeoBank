@@ -9,6 +9,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Configuration
 public class CorsConfig {
@@ -20,19 +21,18 @@ public class CorsConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         
-        // Parse allowed origins from environment variable or use default
         if (allowedOrigins != null && !allowedOrigins.trim().isEmpty()) {
-            List<String> origins = Arrays.asList(allowedOrigins.split(","));
+            List<String> origins = Arrays.stream(allowedOrigins.split(","))
+                .map(String::trim)
+                .filter(origin -> !origin.isEmpty())
+                .collect(Collectors.toList());
             configuration.setAllowedOrigins(origins);
         } else {
-            // Fallback for development (should not be used in production)
-            configuration.setAllowedOrigins(Arrays.asList(
-                "https://full-stack-neo-bank22.vercel.app"
-            ));
+            configuration.setAllowedOrigins(List.of());
         }
         
         configuration.setAllowedMethods(Arrays.asList(
-            "GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"
+            "GET", "POST", "PUT", "DELETE", "OPTIONS"
         ));
         
         configuration.setAllowedHeaders(Arrays.asList("*"));

@@ -11,7 +11,6 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/deposit-requests")
-@CrossOrigin(origins = "http://localhost:4200")
 public class DepositRequestController {
 
     private final DepositRequestService depositRequestService;

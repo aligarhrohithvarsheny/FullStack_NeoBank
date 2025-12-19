@@ -12,7 +12,6 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/emis")
-@CrossOrigin(origins = {"http://localhost:4200", "http://localhost:3000"})
 public class EmiController {
 
     @Autowired

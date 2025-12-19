@@ -9,7 +9,6 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/ai")
-@CrossOrigin(origins = {"http://localhost:4200", "http://localhost:3000"})
 public class AIAnalysisController {
 
     @Autowired

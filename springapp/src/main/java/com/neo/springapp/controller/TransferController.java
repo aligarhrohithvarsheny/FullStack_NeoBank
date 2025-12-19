@@ -19,7 +19,6 @@ import java.util.HashMap;
 
 @RestController
 @RequestMapping("/api/transfers")
-@CrossOrigin(origins = "http://localhost:4200")
 public class TransferController {
 
     private final TransferService transferService;

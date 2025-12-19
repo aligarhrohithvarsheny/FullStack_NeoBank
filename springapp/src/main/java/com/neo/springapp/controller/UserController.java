@@ -28,7 +28,6 @@ import java.util.Arrays;
 
 @RestController
 @RequestMapping("/api/users")
-@CrossOrigin(origins = {"http://localhost:4200", "http://localhost:3000"})
 public class UserController {
 
     @Autowired
