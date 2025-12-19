@@ -10,6 +10,7 @@ import com.neo.springapp.service.OtpService;
 import com.neo.springapp.service.EmailService;
 import com.neo.springapp.service.QrCodeService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
