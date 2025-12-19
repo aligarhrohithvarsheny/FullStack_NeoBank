@@ -3,6 +3,7 @@ package com.neo.springapp.controller;
 import com.neo.springapp.model.Account;
 import com.neo.springapp.service.AccountService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -19,6 +20,9 @@ public class AccountController {
 
     @Autowired
     private AccountService accountService;
+
+    @Value("${spring.web.cors.allowed-origins:}")
+    private String allowedOrigins;
 
     // Basic CRUD operations
     @PostMapping("/create")
@@ -403,7 +407,9 @@ public class AccountController {
             
             // Create verification URL (in production, this would be UIDAI's e-KYC API URL)
             // For demo purposes, we'll use a callback URL that simulates the verification
-            String baseUrl = "http://localhost:4200"; // Frontend URL
+            String baseUrl = (allowedOrigins != null && !allowedOrigins.trim().isEmpty()) 
+                ? allowedOrigins.split(",")[0].trim() 
+                : "";
             String callbackUrl = baseUrl + "/website/profile?aadhar_callback=" + verificationRef;
             
             // In production, this would redirect to UIDAI's Aadhaar verification portal

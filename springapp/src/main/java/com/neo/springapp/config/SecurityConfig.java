@@ -131,29 +131,6 @@ public class SecurityConfig {
         public static final String PRODUCTION = "production";
         public static final String TESTING = "testing";
         
-        
-        public static String[] getCorsOrigins(String environment) {
-            switch (environment.toLowerCase()) {
-                case DEVELOPMENT:
-                    return new String[]{
-                        "http://localhost:4200",
-                        "http://127.0.0.1:4200",
-                        "http://localhost:3000"
-                    };
-                case PRODUCTION:
-                    return new String[]{
-                        "https://yourdomain.com",
-                        "https://www.yourdomain.com"
-                    };
-                case TESTING:
-                    return new String[]{
-                        "http://localhost:4200",
-                        "http://localhost:8080"
-                    };
-                default:
-                    return new String[]{"http://localhost:4200"};
-            }
-        }
     }
 
     

@@ -32,6 +32,9 @@ public class UserController {
 
     @Autowired
     private UserService userService;
+
+    @Value("${spring.web.cors.allowed-origins:}")
+    private String allowedOrigins;
     
     @Autowired
     private AccountService accountService;
@@ -1351,9 +1354,11 @@ public class UserController {
         try {
             String token = qrCodeService.generateQrSession();
             
-            // Generate login URL (adjust based on your frontend URL)
-            String loginUrl = "http://localhost:4200/website/user?qrToken=" + token;
-            // For production, use: "https://yourdomain.com/website/user?qrToken=" + token;
+            // Generate login URL from environment variable
+            String frontendUrl = (allowedOrigins != null && !allowedOrigins.trim().isEmpty()) 
+                ? allowedOrigins.split(",")[0].trim() 
+                : "";
+            String loginUrl = frontendUrl + "/website/user?qrToken=" + token;
             
             String qrCodeImage = qrCodeService.generateQrCodeImage(token, loginUrl);
             
