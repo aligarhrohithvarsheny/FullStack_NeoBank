@@ -1228,14 +1228,15 @@ public class UserController {
                 return ResponseEntity.badRequest().body(response);
             }
             
-            email = email.trim();
+            // Create final variable for lambda (email is trimmed and validated)
+            final String finalEmail = email.trim();
             
             // Step 2: Validate email format
-            if (!email.matches("^[A-Za-z0-9+_.-]+@(.+)$")) {
+            if (!finalEmail.matches("^[A-Za-z0-9+_.-]+@(.+)$")) {
                 Map<String, Object> response = new HashMap<>();
                 response.put("success", false);
                 response.put("message", "Invalid email format");
-                System.out.println("[SEND-RESET-OTP] Validation failed: Invalid email format for: " + email);
+                System.out.println("[SEND-RESET-OTP] Validation failed: Invalid email format for: " + finalEmail);
                 return ResponseEntity.badRequest().body(response);
             }
             
@@ -1245,7 +1246,7 @@ public class UserController {
             Optional<User> userOpt;
             try {
                 long dbStartTime = System.currentTimeMillis();
-                userOpt = userService.findByEmail(email);
+                userOpt = userService.findByEmail(finalEmail);
                 long dbTime = System.currentTimeMillis() - dbStartTime;
                 System.out.println("[SEND-RESET-OTP] Database query completed in " + dbTime + "ms");
                 
@@ -1265,7 +1266,7 @@ public class UserController {
                 Map<String, Object> response = new HashMap<>();
                 response.put("success", false);
                 response.put("message", "User not found with this email address");
-                System.out.println("[SEND-RESET-OTP] User not found for email: " + email);
+                System.out.println("[SEND-RESET-OTP] User not found for email: " + finalEmail);
                 return ResponseEntity.badRequest().body(response);
             }
             
@@ -1273,8 +1274,11 @@ public class UserController {
             
             // Step 4: Generate and store OTP (fast, in-memory operation)
             String otp = otpService.generateOtp();
-            otpService.storeOtp(email, otp);
-            System.out.println("[SEND-RESET-OTP] OTP generated and stored for email: " + email);
+            otpService.storeOtp(finalEmail, otp);
+            System.out.println("[SEND-RESET-OTP] OTP generated and stored for email: " + finalEmail);
+            
+            // Create final variable for lambda (OTP is generated and stored)
+            final String finalOtp = otp;
             
             // Step 5: Send email ASYNCHRONOUSLY (truly non-blocking)
             // Return success immediately, send email in background without waiting
@@ -1282,9 +1286,9 @@ public class UserController {
             
             CompletableFuture.runAsync(() -> {
                 try {
-                    System.out.println("[SEND-RESET-OTP-ASYNC] Starting email send for: " + email);
+                    System.out.println("[SEND-RESET-OTP-ASYNC] Starting email send for: " + finalEmail);
                     long emailStartTime = System.currentTimeMillis();
-                    boolean emailSent = emailService.sendPasswordResetOtpEmail(email, otp);
+                    boolean emailSent = emailService.sendPasswordResetOtpEmail(finalEmail, finalOtp);
                     long emailTime = System.currentTimeMillis() - emailStartTime;
                     System.out.println("[SEND-RESET-OTP-ASYNC] Email send completed in " + emailTime + "ms. Success: " + emailSent);
                     
