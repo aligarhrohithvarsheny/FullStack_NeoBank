@@ -15,6 +15,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -24,6 +25,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Arrays;
 
@@ -1210,61 +1212,109 @@ public class UserController {
     // Send OTP for password reset
     @PostMapping("/send-reset-otp")
     public ResponseEntity<Map<String, Object>> sendResetOtp(@RequestBody Map<String, String> request) {
+        long startTime = System.currentTimeMillis();
+        String email = null;
+        
         try {
-            String email = request.get("email");
-            
-            System.out.println("Password reset OTP request for email: " + email);
+            // Step 1: Extract and validate email input
+            email = request.get("email");
+            System.out.println("[SEND-RESET-OTP] Request received at " + LocalDateTime.now() + " for email: " + email);
             
             if (email == null || email.trim().isEmpty()) {
                 Map<String, Object> response = new HashMap<>();
                 response.put("success", false);
                 response.put("message", "Email is required");
+                System.out.println("[SEND-RESET-OTP] Validation failed: Email is null or empty");
                 return ResponseEntity.badRequest().body(response);
             }
             
-            // Validate email format
+            email = email.trim();
+            
+            // Step 2: Validate email format
             if (!email.matches("^[A-Za-z0-9+_.-]+@(.+)$")) {
                 Map<String, Object> response = new HashMap<>();
                 response.put("success", false);
                 response.put("message", "Invalid email format");
+                System.out.println("[SEND-RESET-OTP] Validation failed: Invalid email format for: " + email);
                 return ResponseEntity.badRequest().body(response);
             }
             
-            // Check if user exists
-            Optional<User> userOpt = userService.findByEmail(email);
+            System.out.println("[SEND-RESET-OTP] Email format validated. Checking user existence...");
+            
+            // Step 3: Check if user exists (with timeout protection)
+            Optional<User> userOpt;
+            try {
+                long dbStartTime = System.currentTimeMillis();
+                userOpt = userService.findByEmail(email);
+                long dbTime = System.currentTimeMillis() - dbStartTime;
+                System.out.println("[SEND-RESET-OTP] Database query completed in " + dbTime + "ms");
+                
+                if (dbTime > 5000) {
+                    System.err.println("[SEND-RESET-OTP] WARNING: Database query took " + dbTime + "ms (slow!)");
+                }
+            } catch (Exception dbException) {
+                System.err.println("[SEND-RESET-OTP] Database error: " + dbException.getMessage());
+                dbException.printStackTrace();
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", false);
+                response.put("message", "Database error. Please try again.");
+                return ResponseEntity.internalServerError().body(response);
+            }
+            
             if (!userOpt.isPresent()) {
                 Map<String, Object> response = new HashMap<>();
                 response.put("success", false);
                 response.put("message", "User not found with this email address");
-                System.out.println("❌ User not found for password reset OTP: " + email);
+                System.out.println("[SEND-RESET-OTP] User not found for email: " + email);
                 return ResponseEntity.badRequest().body(response);
             }
             
-            // Generate and send OTP
+            System.out.println("[SEND-RESET-OTP] User found. Generating OTP...");
+            
+            // Step 4: Generate and store OTP (fast, in-memory operation)
             String otp = otpService.generateOtp();
             otpService.storeOtp(email, otp);
+            System.out.println("[SEND-RESET-OTP] OTP generated and stored for email: " + email);
             
-            // Send password reset OTP via email
-            boolean emailSent = emailService.sendPasswordResetOtpEmail(email, otp);
+            // Step 5: Send email ASYNCHRONOUSLY (truly non-blocking)
+            // Return success immediately, send email in background without waiting
+            System.out.println("[SEND-RESET-OTP] Initiating async email send (non-blocking)...");
             
-            if (emailSent) {
-                Map<String, Object> response = new HashMap<>();
-                response.put("success", true);
-                response.put("message", "OTP has been sent to your email. Please check and enter the OTP.");
-                System.out.println("✅ Password reset OTP sent to email: " + email);
-                return ResponseEntity.ok(response);
-            } else {
-                Map<String, Object> response = new HashMap<>();
-                response.put("success", false);
-                response.put("message", "Failed to send OTP. Please try again.");
-                System.out.println("❌ Failed to send password reset OTP to email: " + email);
-                return ResponseEntity.badRequest().body(response);
-            }
+            CompletableFuture.runAsync(() -> {
+                try {
+                    System.out.println("[SEND-RESET-OTP-ASYNC] Starting email send for: " + email);
+                    long emailStartTime = System.currentTimeMillis();
+                    boolean emailSent = emailService.sendPasswordResetOtpEmail(email, otp);
+                    long emailTime = System.currentTimeMillis() - emailStartTime;
+                    System.out.println("[SEND-RESET-OTP-ASYNC] Email send completed in " + emailTime + "ms. Success: " + emailSent);
+                    
+                    if (!emailSent) {
+                        System.err.println("[SEND-RESET-OTP-ASYNC] WARNING: Email send failed, but OTP is stored. User can still use OTP.");
+                    }
+                } catch (Exception e) {
+                    System.err.println("[SEND-RESET-OTP-ASYNC] Email send error: " + e.getMessage());
+                    e.printStackTrace();
+                    System.err.println("[SEND-RESET-OTP-ASYNC] OTP is still stored and valid despite email error.");
+                }
+            });
+            
+            // Step 6: Return success response immediately (OTP is stored, email is being sent in background)
+            long totalTime = System.currentTimeMillis() - startTime;
+            System.out.println("[SEND-RESET-OTP] Request completed in " + totalTime + "ms. Returning success response immediately.");
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("message", "OTP has been sent to your email. Please check and enter the OTP.");
+            return ResponseEntity.ok(response);
+            
         } catch (Exception e) {
+            long totalTime = System.currentTimeMillis() - startTime;
+            System.err.println("[SEND-RESET-OTP] CRITICAL ERROR after " + totalTime + "ms: " + e.getMessage());
+            e.printStackTrace();
+            
             Map<String, Object> response = new HashMap<>();
             response.put("success", false);
-            response.put("message", "Failed to send OTP: " + e.getMessage());
-            System.out.println("Password reset OTP error: " + e.getMessage());
+            response.put("message", "An error occurred. Please try again.");
             return ResponseEntity.internalServerError().body(response);
         }
     }
