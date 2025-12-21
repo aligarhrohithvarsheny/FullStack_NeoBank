@@ -470,7 +470,7 @@ export class ManagerDashboard implements OnInit {
       return;
     }
 
-    this.http.post(`${environment.apiBaseUrl}/admins/create-default-manager`, {}).subscribe({
+    this.http.post(`${environment.apiBaseUrl}/api/admins/create-default-manager`, {}).subscribe({
       next: (response: any) => {
         if (response.success) {
           this.alertService.success('Success', 'Default manager account created successfully!\n\nLogin Details:\nEmail: manager@neobank.com\nPassword: manager123');
