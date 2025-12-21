@@ -5,7 +5,9 @@ import com.neo.springapp.service.AdminService;
 import com.neo.springapp.service.UserLoginHistoryService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -213,14 +215,32 @@ public class AdminController {
         }
     }
 
-    @PostMapping("/login")
+    @PostMapping(value = "/login", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<Map<String, Object>> loginAdmin(@RequestBody Map<String, String> credentials) {
+        long startTime = System.currentTimeMillis();
+        
         try {
+            // Log incoming request details
+            System.out.println("==========================================");
+            System.out.println("[ADMIN-LOGIN] Request received at " + java.time.LocalDateTime.now());
+            System.out.println("[ADMIN-LOGIN] Request body: " + credentials);
+            System.out.println("[ADMIN-LOGIN] Request body keys: " + (credentials != null ? credentials.keySet() : "null"));
+            System.out.println("==========================================");
+            
+            // Validate request body is not null
+            if (credentials == null) {
+                System.err.println("[ADMIN-LOGIN] ERROR: Request body is null");
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", false);
+                response.put("message", "Request body is required. Please send JSON with email and password.");
+                return ResponseEntity.badRequest().body(response);
+            }
+            
             String email = credentials.get("email");
             String password = credentials.get("password");
-            String requestedRole = credentials.get("role"); // ADMIN or MANAGER
+            String requestedRole = credentials.get("role"); // ADMIN or MANAGER (optional)
             
-            System.out.println("🔐 Login attempt - Email: " + email + ", Role: " + requestedRole);
+            System.out.println("[ADMIN-LOGIN] Extracted - Email: " + email + ", Password: " + (password != null ? "***" : "null") + ", Role: " + requestedRole);
             
             if (email == null || password == null || email.isEmpty() || password.isEmpty()) {
                 Map<String, Object> response = new HashMap<>();
@@ -308,12 +328,33 @@ public class AdminController {
                 System.out.println("❌ Login failed - admin not found for: " + email);
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
             }
+        } catch (HttpMessageNotReadableException e) {
+            long totalTime = System.currentTimeMillis() - startTime;
+            System.err.println("==========================================");
+            System.err.println("[ADMIN-LOGIN] HttpMessageNotReadableException after " + totalTime + "ms");
+            System.err.println("[ADMIN-LOGIN] Error message: " + e.getMessage());
+            System.err.println("[ADMIN-LOGIN] Root cause: " + (e.getRootCause() != null ? e.getRootCause().getMessage() : "null"));
+            System.err.println("[ADMIN-LOGIN] Most specific cause: " + (e.getMostSpecificCause() != null ? e.getMostSpecificCause().getMessage() : "null"));
+            e.printStackTrace();
+            System.err.println("==========================================");
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("message", "Invalid request format. Please ensure Content-Type is application/json and request body is valid JSON.");
+            response.put("error", "Request body could not be parsed. Expected JSON format: {\"email\":\"...\",\"password\":\"...\"}");
+            return ResponseEntity.badRequest().body(response);
         } catch (Exception e) {
+            long totalTime = System.currentTimeMillis() - startTime;
+            System.err.println("==========================================");
+            System.err.println("[ADMIN-LOGIN] Exception after " + totalTime + "ms");
+            System.err.println("[ADMIN-LOGIN] Error type: " + e.getClass().getName());
+            System.err.println("[ADMIN-LOGIN] Error message: " + e.getMessage());
+            e.printStackTrace();
+            System.err.println("==========================================");
+            
             Map<String, Object> response = new HashMap<>();
             response.put("success", false);
             response.put("message", "An error occurred during login: " + e.getMessage());
-            System.out.println("Login error: " + e.getMessage());
-            e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
     }
