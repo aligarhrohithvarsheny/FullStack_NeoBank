@@ -1,5 +1,6 @@
 package com.neo.springapp.service;
 
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -7,31 +8,42 @@ import java.security.SecureRandom;
 import java.util.Base64;
 import java.nio.charset.StandardCharsets;
 
+/**
+ * Password Service using BCrypt for passwords and SHA-256 for PINs
+ * 
+ * - Uses BCryptPasswordEncoder for password encryption (production-ready)
+ * - Uses SHA-256 with salt for PIN encryption (4-digit PINs)
+ * - BCrypt format: $2a$10$... (starts with $2a$ or $2b$)
+ */
 @Service
 public class PasswordService {
     
+    private final BCryptPasswordEncoder bcryptEncoder;
     private final SecureRandom random = new SecureRandom();
     
     public PasswordService() {
-        // Initialize with secure random
+        // Initialize BCryptPasswordEncoder with strength 10 (default is 10)
+        this.bcryptEncoder = new BCryptPasswordEncoder(10);
     }
     
     /**
-     * Encrypt a plain text password using SHA-256 with salt
+     * Encrypt a plain text password using BCrypt
      * @param plainPassword the plain text password to encrypt
-     * @return the encrypted password hash
+     * @return the BCrypt encrypted password hash (format: $2a$10$...)
      */
     public String encryptPassword(String plainPassword) {
         if (plainPassword == null || plainPassword.trim().isEmpty()) {
             throw new IllegalArgumentException("Password cannot be null or empty");
         }
-        return hashWithSalt(plainPassword);
+        String encoded = bcryptEncoder.encode(plainPassword);
+        System.out.println("🔐 Password encrypted using BCrypt (length: " + encoded.length() + ")");
+        return encoded;
     }
     
     /**
-     * Verify a plain text password against an encrypted password
+     * Verify a plain text password against a BCrypt encrypted password
      * @param plainPassword the plain text password to verify
-     * @param encryptedPassword the encrypted password hash to verify against
+     * @param encryptedPassword the BCrypt encrypted password hash to verify against
      * @return true if the password matches, false otherwise
      */
     public boolean verifyPassword(String plainPassword, String encryptedPassword) {
@@ -39,27 +51,18 @@ public class PasswordService {
             System.out.println("PasswordService: verifyPassword - null password or encrypted password");
             return false;
         }
+        
         try {
-            // Extract salt from encrypted password
-            String[] parts = encryptedPassword.split(":");
-            if (parts.length != 2) {
-                System.out.println("PasswordService: verifyPassword - Invalid password format. Expected 'salt:hash' but got " + parts.length + " parts");
-                System.out.println("PasswordService: Encrypted password length: " + encryptedPassword.length() + ", Contains colon: " + encryptedPassword.contains(":"));
-                return false;
+            // Check if it's BCrypt format (starts with $2a$, $2b$, or $2y$)
+            if (isBCryptFormat(encryptedPassword)) {
+                boolean matches = bcryptEncoder.matches(plainPassword, encryptedPassword);
+                System.out.println("PasswordService: BCrypt verification result: " + matches);
+                return matches;
+            } else {
+                // Legacy SHA-256 format (for migration purposes)
+                System.out.println("PasswordService: Legacy SHA-256 format detected, attempting verification...");
+                return verifyLegacyPassword(plainPassword, encryptedPassword);
             }
-            String salt = parts[0];
-            
-            // Hash the plain password with the extracted salt
-            String hashedInput = hashWithSalt(plainPassword, salt);
-            boolean matches = hashedInput.equals(encryptedPassword);
-            System.out.println("PasswordService: verifyPassword - Password match result: " + matches);
-            if (!matches) {
-                System.out.println("PasswordService: verifyPassword - Hash comparison failed");
-                System.out.println("   Expected (stored): " + encryptedPassword);
-                System.out.println("   Got (computed): " + hashedInput);
-                System.out.println("   Salt used: " + salt);
-            }
-            return matches;
         } catch (Exception e) {
             System.out.println("PasswordService: verifyPassword - Exception occurred: " + e.getMessage());
             e.printStackTrace();
@@ -69,6 +72,7 @@ public class PasswordService {
     
     /**
      * Encrypt a PIN using SHA-256 with salt (for card PINs)
+     * PINs use SHA-256 because they are 4-digit numbers and need consistent format
      * @param plainPin the plain text PIN to encrypt
      * @return the encrypted PIN hash
      */
@@ -114,7 +118,7 @@ public class PasswordService {
     }
     
     /**
-     * Check if a password is already encrypted (contains salt separator)
+     * Check if a password is already encrypted (BCrypt or legacy format)
      * @param password the password to check
      * @return true if the password appears to be encrypted, false otherwise
      */
@@ -122,12 +126,48 @@ public class PasswordService {
         if (password == null || password.trim().isEmpty()) {
             return false;
         }
-        // Our encrypted passwords contain a colon separator between salt and hash
+        // BCrypt format: starts with $2a$, $2b$, or $2y$ and is 60 characters long
+        if (isBCryptFormat(password)) {
+            return true;
+        }
+        // Legacy SHA-256 format: contains colon separator and is longer than 20 chars
         return password.contains(":") && password.length() > 20;
     }
     
     /**
-     * Hash a password with a random salt
+     * Check if password is in BCrypt format
+     */
+    private boolean isBCryptFormat(String password) {
+        return password != null && 
+               password.length() == 60 && 
+               (password.startsWith("$2a$") || password.startsWith("$2b$") || password.startsWith("$2y$"));
+    }
+    
+    /**
+     * Verify legacy SHA-256 password (for migration purposes)
+     */
+    private boolean verifyLegacyPassword(String plainPassword, String encryptedPassword) {
+        try {
+            // Extract salt from encrypted password
+            String[] parts = encryptedPassword.split(":");
+            if (parts.length != 2) {
+                return false;
+            }
+            String salt = parts[0];
+            
+            // Hash the plain password with the extracted salt
+            String hashedInput = hashWithSalt(plainPassword, salt);
+            boolean matches = hashedInput.equals(encryptedPassword);
+            System.out.println("PasswordService: Legacy SHA-256 verification result: " + matches);
+            return matches;
+        } catch (Exception e) {
+            System.out.println("PasswordService: verifyLegacyPassword - Exception: " + e.getMessage());
+            return false;
+        }
+    }
+    
+    /**
+     * Hash a PIN/password with a random salt (SHA-256 for PINs)
      * @param password the password to hash
      * @return the salted hash in format "salt:hash"
      */
@@ -138,7 +178,7 @@ public class PasswordService {
     }
     
     /**
-     * Hash a password with a specific salt
+     * Hash a password/PIN with a specific salt (SHA-256)
      * @param password the password to hash
      * @param salt the salt to use
      * @return the salted hash in format "salt:hash"

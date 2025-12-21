@@ -369,7 +369,7 @@ export class UserControl implements OnInit {
     }
 
     this.loading = true;
-    this.http.post(`${environment.apiBaseUrl}/users/create`, this.newUser).subscribe({
+    this.http.post(`${environment.apiBaseUrl}/api/users/create`, this.newUser).subscribe({
       next: (response: any) => {
         if (response.success) {
           alert('User created successfully!');
