@@ -19,8 +19,14 @@ public class SpringSecurityConfig {
             .csrf(csrf -> csrf.disable())
             .cors(Customizer.withDefaults())
             .authorizeHttpRequests(auth -> auth
+                // Allow OPTIONS for CORS preflight (must be first)
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                // Explicitly allow all HTTP methods for admin and manager endpoints
+                .requestMatchers("/api/admins/**").permitAll()
+                .requestMatchers("/api/managers/**").permitAll()
+                // Allow all HTTP methods for all other API endpoints
                 .requestMatchers("/api/**").permitAll()
+                // Allow all other requests
                 .anyRequest().permitAll()
             )
             .sessionManagement(session -> 
