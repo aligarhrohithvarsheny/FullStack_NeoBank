@@ -44,7 +44,7 @@ export class EmiManagement implements OnInit {
       error: (err: any) => {
         console.error('Error loading EMIs:', err);
         // Try loading overdue EMIs instead
-        this.http.get(`${environment.apiBaseUrl}/emis/overdue`).subscribe({
+        this.http.get(`${environment.apiBaseUrl}/api/emis/overdue`).subscribe({
           next: (overdueEmis: any) => {
             this.allEmis = overdueEmis || [];
             this.isLoadingAllEMIs = false;

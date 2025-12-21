@@ -66,7 +66,7 @@ export class CompleteProfile implements OnInit {
     if (!this.adminEmail) return;
 
     this.isLoading = true;
-    this.http.get(`${environment.apiBaseUrl}/admins/profile/${this.adminEmail}`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/api/admins/profile/${this.adminEmail}`).subscribe({
       next: (admin: any) => {
         this.admin = admin;
         this.profileForm = {
@@ -121,11 +121,11 @@ export class CompleteProfile implements OnInit {
     this.isSaving = true;
 
     // Update profile and mark as complete
-    this.http.put(`${environment.apiBaseUrl}/admins/profile/${this.adminEmail}`, this.profileForm).subscribe({
+    this.http.put(`${environment.apiBaseUrl}/api/admins/profile/${this.adminEmail}`, this.profileForm).subscribe({
       next: (response: any) => {
         if (response.success) {
           // Mark profile as complete
-          this.http.put(`${environment.apiBaseUrl}/admins/profile-complete/${this.adminEmail}`, {}).subscribe({
+          this.http.put(`${environment.apiBaseUrl}/api/admins/profile-complete/${this.adminEmail}`, {}).subscribe({
             next: (completeResponse: any) => {
               if (completeResponse.success) {
                 this.alertService.success('Success', 'Profile completed successfully! Redirecting to dashboard...');

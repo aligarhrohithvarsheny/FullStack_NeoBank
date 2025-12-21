@@ -392,7 +392,7 @@ export class Dashboard implements OnInit {
     }
     
     // Also try to load from backend (this will override localStorage if backend has data)
-    this.http.get(`${environment.apiBaseUrl}/admins/feature-access/${adminEmail}`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/api/admins/feature-access/${adminEmail}`).subscribe({
       next: (response: any) => {
         if (response && response.success && response.features && response.features.length > 0) {
           console.log(`Loading feature access for ${adminEmail} from backend:`, response.features);
@@ -594,7 +594,7 @@ export class Dashboard implements OnInit {
   // Investment Management Methods
   loadInvestments() {
     this.isLoadingInvestments = true;
-    this.http.get(`${environment.apiBaseUrl}/investments`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/api/investments`).subscribe({
       next: (investments: any) => {
         this.investments = investments || [];
         this.isLoadingInvestments = false;
@@ -615,7 +615,7 @@ export class Dashboard implements OnInit {
   approveInvestment(investment: any) {
     if (!confirm(`Approve investment of ₹${investment.investmentAmount} for ${investment.userName}?`)) return;
     
-    this.http.put(`${environment.apiBaseUrl}/investments/${investment.id}/approve?approvedBy=${this.adminName}`, {}).subscribe({
+    this.http.put(`${environment.apiBaseUrl}/api/investments/${investment.id}/approve?approvedBy=${this.adminName}`, {}).subscribe({
       next: (response: any) => {
         if (response.success) {
           this.alertService.success('Success', 'Investment approved successfully');
@@ -635,7 +635,7 @@ export class Dashboard implements OnInit {
     const reason = prompt('Enter rejection reason:');
     if (!reason) return;
     
-    this.http.put(`${environment.apiBaseUrl}/investments/${investment.id}/reject?rejectedBy=${this.adminName}&reason=${encodeURIComponent(reason)}`, {}).subscribe({
+    this.http.put(`${environment.apiBaseUrl}/api/investments/${investment.id}/reject?rejectedBy=${this.adminName}&reason=${encodeURIComponent(reason)}`, {}).subscribe({
       next: (response: any) => {
         if (response.success) {
           this.alertService.success('Success', 'Investment rejected');
@@ -654,7 +654,7 @@ export class Dashboard implements OnInit {
   // Fixed Deposit Management Methods
   loadFixedDeposits() {
     this.isLoadingFDs = true;
-    this.http.get(`${environment.apiBaseUrl}/fixed-deposits`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/api/fixed-deposits`).subscribe({
       next: (fds: any) => {
         this.fixedDeposits = fds || [];
         this.isLoadingFDs = false;
@@ -670,7 +670,7 @@ export class Dashboard implements OnInit {
   approveFixedDeposit(fd: any) {
     if (!confirm(`Approve FD of ₹${fd.principalAmount} for ${fd.userName}?`)) return;
     
-    this.http.put(`${environment.apiBaseUrl}/fixed-deposits/${fd.id}/approve?approvedBy=${this.adminName}`, {}).subscribe({
+    this.http.put(`${environment.apiBaseUrl}/api/fixed-deposits/${fd.id}/approve?approvedBy=${this.adminName}`, {}).subscribe({
       next: (response: any) => {
         if (response.success) {
           this.alertService.success('Success', 'Fixed Deposit approved successfully');
@@ -690,7 +690,7 @@ export class Dashboard implements OnInit {
     const reason = prompt('Enter rejection reason:');
     if (!reason) return;
     
-    this.http.put(`${environment.apiBaseUrl}/fixed-deposits/${fd.id}/reject?rejectedBy=${this.adminName}&reason=${encodeURIComponent(reason)}`, {}).subscribe({
+    this.http.put(`${environment.apiBaseUrl}/api/fixed-deposits/${fd.id}/reject?rejectedBy=${this.adminName}&reason=${encodeURIComponent(reason)}`, {}).subscribe({
       next: (response: any) => {
         if (response.success) {
           this.alertService.success('Success', 'Fixed Deposit rejected');
@@ -709,7 +709,7 @@ export class Dashboard implements OnInit {
   processFDMaturity(fd: any) {
     if (!confirm(`Process maturity for FD ${fd.fdAccountNumber}? Maturity amount ₹${fd.maturityAmount} will be credited to account.`)) return;
     
-    this.http.put(`${environment.apiBaseUrl}/fixed-deposits/${fd.id}/process-maturity?processedBy=${this.adminName}`, {}).subscribe({
+    this.http.put(`${environment.apiBaseUrl}/api/fixed-deposits/${fd.id}/process-maturity?processedBy=${this.adminName}`, {}).subscribe({
       next: (response: any) => {
         if (response.success) {
           this.alertService.success('Success', 'FD maturity processed successfully');
@@ -729,7 +729,7 @@ export class Dashboard implements OnInit {
   loadAllEMIs() {
     this.isLoadingAllEMIs = true;
     // Load all EMIs from all accounts
-    this.http.get(`${environment.apiBaseUrl}/emis`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/api/emis`).subscribe({
       next: (emis: any) => {
         this.allEmis = emis || [];
         this.isLoadingAllEMIs = false;
@@ -737,7 +737,7 @@ export class Dashboard implements OnInit {
       error: (err: any) => {
         console.error('Error loading EMIs:', err);
         // Try loading overdue EMIs instead
-        this.http.get(`${environment.apiBaseUrl}/emis/overdue`).subscribe({
+        this.http.get(`${environment.apiBaseUrl}/api/emis/overdue`).subscribe({
           next: (overdueEmis: any) => {
             this.allEmis = overdueEmis || [];
             this.isLoadingAllEMIs = false;
@@ -759,7 +759,7 @@ export class Dashboard implements OnInit {
 
   loadUsers() {
     // Load users from MySQL database
-    this.http.get(`${environment.apiBaseUrl}/users`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/api/users`).subscribe({
       next: (usersData: any) => {
         console.log('Users loaded from MySQL:', usersData);
         this.users = usersData.map((user: any) => ({
@@ -890,7 +890,7 @@ export class Dashboard implements OnInit {
     if (status) {
       params = params.set('status', status);
     }
-    this.http.get(`${environment.apiBaseUrl}/deposit-requests`, { params }).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/api/deposit-requests`, { params }).subscribe({
       next: (requests: any) => {
         this.depositRequests = requests || [];
         this.isLoadingDepositRequests = false;
@@ -905,7 +905,7 @@ export class Dashboard implements OnInit {
   approveDepositRequest(request: DepositRequest) {
     if (!confirm(`Approve deposit of ₹${request.amount} for ${request.userName}?`)) return;
     const adminName = this.adminName || 'Admin';
-    this.http.put(`${environment.apiBaseUrl}/deposit-requests/${request.id}/approve`, {}, {
+    this.http.put(`${environment.apiBaseUrl}/api/deposit-requests/${request.id}/approve`, {}, {
       params: { processedBy: adminName }
     }).subscribe({
       next: (response: any) => {
@@ -927,7 +927,7 @@ export class Dashboard implements OnInit {
   rejectDepositRequest(request: DepositRequest) {
     const reason = prompt('Enter rejection reason (optional):') || '';
     const adminName = this.adminName || 'Admin';
-    this.http.put(`${environment.apiBaseUrl}/deposit-requests/${request.id}/reject`, {}, {
+    this.http.put(`${environment.apiBaseUrl}/api/deposit-requests/${request.id}/reject`, {}, {
       params: { processedBy: adminName, reason }
     }).subscribe({
       next: (response: any) => {
@@ -1000,7 +1000,7 @@ export class Dashboard implements OnInit {
   }
 
   verifyRegularAccount(accountNumber: string) {
-    this.http.get(`${environment.apiBaseUrl}/accounts/number/${accountNumber}`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/api/accounts/number/${accountNumber}`).subscribe({
       next: (accountData: any) => {
         this.verifiedAccountDetails = {
           accountNumber: accountData.accountNumber,
@@ -1025,7 +1025,7 @@ export class Dashboard implements OnInit {
 
   verifyLoanAccount(accountNumber: string) {
     // First try to find by loan account number
-    this.http.get(`${environment.apiBaseUrl}/loans`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/api/loans`).subscribe({
       next: (loans: any) => {
         const loan = Array.isArray(loans) ? loans.find((l: any) => 
           l.loanAccountNumber === accountNumber || l.accountNumber === accountNumber
@@ -1045,7 +1045,7 @@ export class Dashboard implements OnInit {
           this.accountVerificationError = '';
         } else {
           // Try by account number
-          this.http.get(`${environment.apiBaseUrl}/loans/account/${accountNumber}`).subscribe({
+          this.http.get(`${environment.apiBaseUrl}/api/loans/account/${accountNumber}`).subscribe({
             next: (loans: any) => {
               const loanList = Array.isArray(loans) ? loans : [];
               if (loanList.length > 0) {
@@ -1149,7 +1149,7 @@ export class Dashboard implements OnInit {
   }
 
   verifyChequeAccount(accountNumber: string) {
-    this.http.get(`${environment.apiBaseUrl}/cheques/account/${accountNumber}`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/api/cheques/account/${accountNumber}`).subscribe({
       next: (cheques: any) => {
         const chequeList = Array.isArray(cheques) ? cheques : [];
         if (chequeList.length > 0) {
@@ -1231,8 +1231,8 @@ export class Dashboard implements OnInit {
 
   processRegularAccountTransaction(accountNumber: string, userName: string, currentBalance: number) {
     const balanceEndpoint = this.operationType === 'deposit' 
-      ? `${environment.apiBaseUrl}/accounts/balance/credit/${accountNumber}?amount=${this.amount}`
-      : `${environment.apiBaseUrl}/accounts/balance/debit/${accountNumber}?amount=${this.amount}`;
+      ? `${environment.apiBaseUrl}/api/accounts/balance/credit/${accountNumber}?amount=${this.amount}`
+      : `${environment.apiBaseUrl}/api/accounts/balance/debit/${accountNumber}?amount=${this.amount}`;
 
     this.http.put(balanceEndpoint, {}).subscribe({
       next: (balanceResponse: any) => {
@@ -1520,7 +1520,7 @@ export class Dashboard implements OnInit {
 
   loadActivitiesFromBackend(startOfDay: Date, endOfDay: Date, allActivities: any[]) {
     // Load loan approvals/rejections
-    this.http.get(`${environment.apiBaseUrl}/loans`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/api/loans`).subscribe({
       next: (loans: any) => {
         const loanList = Array.isArray(loans) ? loans : [];
         loanList.forEach((loan: any) => {
@@ -2840,7 +2840,7 @@ export class Dashboard implements OnInit {
       currentStatus: tracking.status
     });
 
-    const url = `${environment.apiBaseUrl}/tracking/${tracking.id}/status?status=${encodeURIComponent(newStatus)}&updatedBy=Admin`;
+    const url = `${environment.apiBaseUrl}/api/tracking/${tracking.id}/status?status=${encodeURIComponent(newStatus)}&updatedBy=Admin`;
     console.log('API URL:', url);
 
     this.http.put(url, {}).subscribe({
@@ -3342,7 +3342,7 @@ export class Dashboard implements OnInit {
     if (!isPlatformBrowser(this.platformId)) return;
     
     this.isLoadingLoginHistory = true;
-    this.http.get<any[]>(`${environment.apiBaseUrl}/admins/login-history/recent?limit=100`).subscribe({
+    this.http.get<any[]>(`${environment.apiBaseUrl}/api/admins/login-history/recent?limit=100`).subscribe({
       next: (history) => {
         this.loginHistory = history || [];
         this.isLoadingLoginHistory = false;

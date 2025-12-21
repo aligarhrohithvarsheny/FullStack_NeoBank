@@ -410,7 +410,7 @@ export class Loans implements OnInit {
     this.emis = [];
 
     // Fetch EMI schedule (monthly payments) for this loan from backend
-    this.http.get<any[]>(`${environment.apiBaseUrl}/emis/loan/${loan.id}`).subscribe({
+    this.http.get<any[]>(`${environment.apiBaseUrl}/api/emis/loan/${loan.id}`).subscribe({
       next: (emis) => {
         this.emis = emis || [];
         this.loadingEmis = false;

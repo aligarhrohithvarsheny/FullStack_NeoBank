@@ -129,7 +129,7 @@ export class ManagerDashboard implements OnInit {
 
   loadBlockedAdmins() {
     this.isLoadingBlockedAdmins = true;
-    this.http.get(`${environment.apiBaseUrl}/admins/blocked`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/api/admins/blocked`).subscribe({
       next: (admins: any) => {
         this.blockedAdmins = admins || [];
         this.isLoadingBlockedAdmins = false;
@@ -148,7 +148,7 @@ export class ManagerDashboard implements OnInit {
     }
 
     this.isUnblocking = true;
-    this.http.post(`${environment.apiBaseUrl}/admins/unblock/${admin.id}`, {}).subscribe({
+    this.http.post(`${environment.apiBaseUrl}/api/admins/unblock/${admin.id}`, {}).subscribe({
       next: (response: any) => {
         if (response.success) {
           this.alertService.success('Success', `Admin ${admin.name || admin.email} has been unblocked successfully`);
@@ -209,7 +209,7 @@ export class ManagerDashboard implements OnInit {
     }
 
     this.isResettingPassword = true;
-    this.http.post(`${environment.apiBaseUrl}/admins/reset-password/${this.selectedAdminForPasswordReset.id}`, {
+    this.http.post(`${environment.apiBaseUrl}/api/admins/reset-password/${this.selectedAdminForPasswordReset.id}`, {
       newPassword: this.newPassword
     }).subscribe({
       next: (response: any) => {
@@ -244,7 +244,7 @@ export class ManagerDashboard implements OnInit {
     }
 
     this.isResettingPassword = true;
-    this.http.post(`${environment.apiBaseUrl}/admins/reset-password/${this.selectedBlockedAdmin.id}`, {
+    this.http.post(`${environment.apiBaseUrl}/api/admins/reset-password/${this.selectedBlockedAdmin.id}`, {
       newPassword: this.newPassword
     }).subscribe({
       next: (response: any) => {
@@ -292,7 +292,7 @@ export class ManagerDashboard implements OnInit {
     
     // Also check from backend if available
     this.allAdmins.forEach(admin => {
-      this.http.get(`${environment.apiBaseUrl}/admins/feature-access/${admin.email}`).subscribe({
+      this.http.get(`${environment.apiBaseUrl}/api/admins/feature-access/${admin.email}`).subscribe({
         next: (response: any) => {
           if (response && response.success && response.features) {
             response.features.forEach((feature: any) => {
@@ -385,7 +385,7 @@ export class ManagerDashboard implements OnInit {
 
   loadAllAdmins() {
     this.isLoadingAdmins = true;
-    this.http.get(`${environment.apiBaseUrl}/admins/all`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/api/admins/all`).subscribe({
       next: (admins: any) => {
         this.allAdmins = admins || [];
         this.isLoadingAdmins = false;
@@ -441,7 +441,7 @@ export class ManagerDashboard implements OnInit {
     }
     
     // Also try to load from backend
-    this.http.get(`${environment.apiBaseUrl}/admins/feature-access/${adminEmail}`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/api/admins/feature-access/${adminEmail}`).subscribe({
       next: (response: any) => {
         if (response && response.success && response.features && response.features.length > 0) {
           response.features.forEach((feature: any) => {
@@ -550,7 +550,7 @@ export class ManagerDashboard implements OnInit {
     }));
     
     // Also save to backend
-    this.http.post(`${environment.apiBaseUrl}/admins/feature-access/${adminEmail}`, {
+    this.http.post(`${environment.apiBaseUrl}/api/admins/feature-access/${adminEmail}`, {
       features: featuresToSave
     }).subscribe({
       next: (response: any) => {
@@ -645,7 +645,7 @@ export class ManagerDashboard implements OnInit {
     this.adminCreationError = '';
     this.adminCreationSuccess = false;
 
-    this.http.post(`${environment.apiBaseUrl}/admins/create`, this.newAdmin).subscribe({
+    this.http.post(`${environment.apiBaseUrl}/api/admins/create`, this.newAdmin).subscribe({
       next: (response: any) => {
         this.isCreatingAdmin = false;
         this.adminCreationSuccess = true;
@@ -694,7 +694,7 @@ export class ManagerDashboard implements OnInit {
   // Load Investments, FDs, and EMIs
   loadInvestments() {
     this.isLoadingInvestments = true;
-    this.http.get(`${environment.apiBaseUrl}/investments`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/api/investments`).subscribe({
       next: (investments: any) => {
         this.investments = investments || [];
         this.isLoadingInvestments = false;
@@ -708,7 +708,7 @@ export class ManagerDashboard implements OnInit {
 
   loadFixedDeposits() {
     this.isLoadingFDs = true;
-    this.http.get(`${environment.apiBaseUrl}/fixed-deposits`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/api/fixed-deposits`).subscribe({
       next: (fds: any) => {
         this.fixedDeposits = fds || [];
         this.isLoadingFDs = false;
@@ -722,7 +722,7 @@ export class ManagerDashboard implements OnInit {
 
   loadAllEMIs() {
     this.isLoadingEMIs = true;
-    this.http.get(`${environment.apiBaseUrl}/emis/overdue`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/api/emis/overdue`).subscribe({
       next: (emis: any) => {
         this.allEmis = emis || [];
         this.isLoadingEMIs = false;
@@ -736,7 +736,7 @@ export class ManagerDashboard implements OnInit {
   }
 
   updateInvestment(investmentId: number, updates: any) {
-    this.http.put(`${environment.apiBaseUrl}/investments/${investmentId}`, updates).subscribe({
+    this.http.put(`${environment.apiBaseUrl}/api/investments/${investmentId}`, updates).subscribe({
       next: (response: any) => {
         if (response.success) {
           this.alertService.success('Success', 'Investment updated successfully');
@@ -753,7 +753,7 @@ export class ManagerDashboard implements OnInit {
   }
 
   updateFixedDeposit(fdId: number, updates: any) {
-    this.http.put(`${environment.apiBaseUrl}/fixed-deposits/${fdId}`, updates).subscribe({
+    this.http.put(`${environment.apiBaseUrl}/api/fixed-deposits/${fdId}`, updates).subscribe({
       next: (response: any) => {
         if (response.success) {
           this.alertService.success('Success', 'Fixed Deposit updated successfully');

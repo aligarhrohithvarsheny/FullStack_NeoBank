@@ -86,7 +86,7 @@ export class Investments implements OnInit {
   approveInvestment(investment: any) {
     if (!confirm(`Approve investment of ₹${investment.investmentAmount} for ${investment.userName}?`)) return;
     
-    this.http.put(`${environment.apiBaseUrl}/investments/${investment.id}/approve?approvedBy=${this.adminName}`, {}).subscribe({
+    this.http.put(`${environment.apiBaseUrl}/api/investments/${investment.id}/approve?approvedBy=${this.adminName}`, {}).subscribe({
       next: (response: any) => {
         if (response.success) {
           this.alertService.success('Success', 'Investment approved successfully');
@@ -106,7 +106,7 @@ export class Investments implements OnInit {
     const reason = prompt('Enter rejection reason:');
     if (!reason) return;
     
-    this.http.put(`${environment.apiBaseUrl}/investments/${investment.id}/reject?rejectedBy=${this.adminName}&reason=${encodeURIComponent(reason)}`, {}).subscribe({
+    this.http.put(`${environment.apiBaseUrl}/api/investments/${investment.id}/reject?rejectedBy=${this.adminName}&reason=${encodeURIComponent(reason)}`, {}).subscribe({
       next: (response: any) => {
         if (response.success) {
           this.alertService.success('Success', 'Investment rejected');
