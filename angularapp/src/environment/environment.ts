@@ -1,5 +1,5 @@
 export const environment = {
   production: false,
-  // Local development - Spring Boot backend running on localhost:8080
-  apiBaseUrl: 'http://localhost:8080'
+  // Shared backend endpoint (Render deployment)
+  apiBaseUrl: 'https://fullstack-neobank.onrender.com'
 };

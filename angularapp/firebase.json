@@ -1,6 +1,6 @@
 {
   "hosting": {
-    "public": "dist/angularapp/browser/website/landing",
+    "public": "dist/angularapp/browser",
     "ignore": [
       "firebase.json",
       "**/.*",
@@ -9,7 +9,7 @@
     "rewrites": [
       {
         "source": "**",
-        "destination": "/index.html"
+        "destination": "/index.csr.html"
       }
     ]
   }
