@@ -1,0 +1,300 @@
+<div class="insurance-page">
+  <div class="page-header">
+    <div class="page-header-left">
+      <button class="back-btn" type="button" (click)="goBackToDashboard()">← Back to Dashboard</button>
+      <h1 class="page-title">Insurance Services</h1>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button [class.active]="activeTab === 'policies'" (click)="setTab('policies')">Available Policies</button>
+    <button [class.active]="activeTab === 'my-policies'" (click)="setTab('my-policies')">My Policies</button>
+    <button [class.active]="activeTab === 'claims'" (click)="setTab('claims')">Claims</button>
+    <button [class.active]="activeTab === 'payments'" (click)="setTab('payments')">Premium Payments</button>
+  </div>
+
+  <!-- Available Policies -->
+  <section *ngIf="activeTab === 'policies'" class="tab-content">
+    <h2>Available Insurance Policies</h2>
+    <div class="emi-calculator">
+      <h3>EMI Premium Calculator</h3>
+      <div class="calculator-grid">
+        <label>
+          Coverage Amount (₹)
+          <input type="number" [(ngModel)]="premiumCalculator.coverageAmount" (input)="calculatePremium()">
+        </label>
+        <label>
+          Duration (months)
+          <input type="number" [(ngModel)]="premiumCalculator.durationMonths" (input)="calculatePremium()">
+        </label>
+        <label>
+          Annual Rate (%)
+          <input type="number" step="0.1" [(ngModel)]="premiumCalculator.annualRate" (input)="calculatePremium()">
+        </label>
+      </div>
+      <div class="calculator-result" *ngIf="calculatedMonthlyPremium">
+        Estimated Monthly Premium: <strong>₹{{ calculatedMonthlyPremium }}</strong>
+      </div>
+    </div>
+
+    <div *ngIf="availablePolicies.length === 0" class="empty-state">
+      No policies available at the moment.
+    </div>
+
+    <div class="policy-list" *ngIf="visiblePolicies.length > 0">
+      <div class="policy-card" *ngFor="let policy of visiblePolicies">
+        <h3>{{ policy.name }} ({{ policy.type }})</h3>
+        <p class="policy-number">Policy ID: {{ policy.policyNumber }}</p>
+        <p>Coverage Amount: ₹{{ policy.coverageAmount }}</p>
+        <p>Premium: ₹{{ policy.premiumAmount }} / {{ policy.premiumType }}</p>
+        <p>Duration: {{ policy.durationMonths }} months</p>
+        <p *ngIf="policy.benefits"><strong>Benefits:</strong> {{ policy.benefits }}</p>
+        <p *ngIf="policy.eligibility"><strong>Eligibility:</strong> {{ policy.eligibility }}</p>
+        <div class="policy-actions">
+          <button *ngIf="!hasApplied(policy)" (click)="selectedPolicyId = policy.id; updatePremiumQuote()">Apply</button>
+          <button *ngIf="hasApplied(policy)" disabled>
+            Applied ({{ getApplicationForPolicy(policy)?.status || 'Pending' }})
+          </button>
+          <button *ngIf="hasApplied(policy)" (click)="setTab('my-policies')">Manage My Policy</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="application-form" *ngIf="selectedPolicyId">
+      <h3>Apply for Selected Policy</h3>
+      <div class="selected-policy-banner" *ngIf="selectedPolicy">
+        <div class="sp-title">{{ selectedPolicy.name }} ({{ selectedPolicy.type }})</div>
+        <div class="sp-meta">
+          Coverage: <strong>₹{{ selectedPolicy.coverageAmount }}</strong> · Base Premium: <strong>₹{{ selectedPolicy.premiumAmount }}</strong>
+        </div>
+      </div>
+      <form (ngSubmit)="applyForPolicy()">
+        <div class="form-grid">
+          <label>
+            Nominee Name
+            <input type="text" [(ngModel)]="nomineeName" name="nomineeName" required>
+          </label>
+          <label>
+            Nominee Relation
+            <input type="text" [(ngModel)]="nomineeRelation" name="nomineeRelation">
+          </label>
+          <label>
+            Premium Type
+            <select [(ngModel)]="premiumType" name="premiumType" (change)="updatePremiumQuote()">
+              <option value="MONTHLY">Monthly</option>
+              <option value="YEARLY">Yearly</option>
+            </select>
+          </label>
+          <label>
+            KYC Document (path or reference)
+            <input type="text" [(ngModel)]="kycDocumentPath" name="kycDocumentPath" placeholder="Uploaded file path or reference ID">
+          </label>
+          <label>
+            Proposer Age
+            <input type="number" [(ngModel)]="proposerAge" name="proposerAge" min="18" max="100" (input)="updatePremiumQuote()">
+          </label>
+          <label>
+            Health Conditions (select)
+            <select multiple [(ngModel)]="selectedHealthConditions" name="selectedHealthConditions" (change)="updatePremiumQuote()">
+              <option *ngFor="let d of healthConditionOptions" [ngValue]="d">{{ d }}</option>
+            </select>
+            <small class="hint">Hold Ctrl/⌘ to select multiple. Choose “None” if no diseases.</small>
+          </label>
+          <label>
+            Other Condition (optional)
+            <input type="text" [(ngModel)]="otherHealthCondition" name="otherHealthCondition" placeholder="Type any other condition" (input)="updatePremiumQuote()">
+          </label>
+          <label>
+            Lifestyle (alcohol/smoking/exercise)
+            <input type="text" [(ngModel)]="lifestyleHabits" name="lifestyleHabits" placeholder="e.g. Non-smoker, occasional alcohol">
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" [(ngModel)]="hasExistingEmis" name="hasExistingEmis" (change)="updatePremiumQuote()">
+            I have existing EMIs/loans
+          </label>
+        </div>
+
+        <div class="quote-card" *ngIf="premiumQuote">
+          <div class="quote-title">Premium Quote (Estimated)</div>
+          <div class="quote-grid">
+            <div>Base Premium</div><div>₹{{ premiumQuote.base }}</div>
+            <div>Age Add-on</div><div>₹{{ premiumQuote.addAge }}</div>
+            <div>Disease Add-on</div><div>₹{{ premiumQuote.addDisease }}</div>
+            <div>EMI Risk Add-on</div><div>₹{{ premiumQuote.addEmi }}</div>
+            <div class="quote-total">Total</div><div class="quote-total">₹{{ premiumQuote.total }}</div>
+          </div>
+          <small class="hint">Final premium may change after admin review.</small>
+        </div>
+
+        <button type="submit" [disabled]="isApplying">Submit Application</button>
+      </form>
+    </div>
+  </section>
+
+  <!-- My Policies -->
+  <section *ngIf="activeTab === 'my-policies'" class="tab-content">
+    <h2>My Insurance Policies</h2>
+    <div class="account-summary">
+      <p><strong>Account:</strong> {{ userAccountNumber }}</p>
+      <p><strong>Policies Held:</strong> {{ applications.length }}</p>
+    </div>
+    <div *ngIf="applications.length === 0" class="empty-state">
+      You have not applied for any insurance policies yet.
+    </div>
+    <div class="table-wrap" *ngIf="applications.length > 0">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Application #</th>
+          <th>Policy</th>
+          <th>Status</th>
+          <th>Premium Type</th>
+          <th>Premium (Calculated)</th>
+          <th>Payment</th>
+          <th>Auto Debit</th>
+          <th>Applied At</th>
+          <th>Certificate</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let app of applications">
+          <td>{{ app.applicationNumber }}</td>
+          <td>{{ app.policy?.name }} ({{ app.policy?.policyNumber }})</td>
+          <td>{{ app.status }}</td>
+          <td>{{ app.premiumType }}</td>
+          <td>₹{{ app.premiumAmountCalculated || app.policy?.premiumAmount || '-' }}</td>
+          <td>{{ app.paymentStatus || '-' }}</td>
+          <td>
+            <span *ngIf="app.autoDebitApproved">Approved</span>
+            <span *ngIf="!app.autoDebitApproved && app.autoDebitRequested">Requested</span>
+            <span *ngIf="!app.autoDebitApproved && !app.autoDebitRequested">Off</span>
+          </td>
+          <td>{{ app.appliedAt | date:'short' }}</td>
+          <td>
+            <button type="button" (click)="downloadCertificate(app.id)">Download PDF</button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+  </section>
+
+  <!-- Claims -->
+  <section *ngIf="activeTab === 'claims'" class="tab-content">
+    <h2>Claims</h2>
+
+    <div class="claim-form">
+      <h3>Raise a Claim</h3>
+      <form (ngSubmit)="submitClaim()">
+        <div class="form-grid">
+          <label>
+            Policy (Application)
+            <select [(ngModel)]="selectedApplicationIdForClaim" name="claimApplicationId" required>
+              <option [ngValue]="null">Select</option>
+              <option *ngFor="let app of applications" [ngValue]="app.id" [disabled]="app.status !== 'ACTIVE'">
+                {{ app.policy?.name }} - {{ app.applicationNumber }} ({{ app.status }})
+              </option>
+            </select>
+          </label>
+          <label>
+            Claim Amount (₹)
+            <input type="number" [(ngModel)]="claimAmount" name="claimAmount" required min="1">
+          </label>
+          <label>
+            Documents (path or reference)
+            <input type="text" [(ngModel)]="claimDocumentsPath" name="claimDocumentsPath" placeholder="Uploaded file path or reference ID">
+          </label>
+        </div>
+        <button type="submit" [disabled]="isSubmittingClaim">Submit Claim</button>
+      </form>
+    </div>
+
+    <div *ngIf="claims.length === 0" class="empty-state">
+      No claims found.
+    </div>
+    <div class="table-wrap" *ngIf="claims.length > 0">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Claim #</th>
+          <th>Policy</th>
+          <th>Amount (₹)</th>
+          <th>Status</th>
+          <th>Admin Remark</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let claim of claims">
+          <td>{{ claim.claimNumber }}</td>
+          <td>{{ claim.application?.policy?.name }}</td>
+          <td>{{ claim.claimAmount }}</td>
+          <td>{{ claim.status }}</td>
+          <td>{{ claim.adminRemark }}</td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+  </section>
+
+  <!-- Payments -->
+  <section *ngIf="activeTab === 'payments'" class="tab-content">
+    <h2>Premium Payments</h2>
+
+    <div class="payment-form">
+      <h3>Pay Premium</h3>
+      <form (ngSubmit)="payPremium()">
+        <div class="form-grid">
+          <label>
+            Policy (Application)
+            <select [(ngModel)]="selectedApplicationIdForPayment" name="paymentApplicationId" required>
+              <option [ngValue]="null">Select</option>
+              <option *ngFor="let app of applications" [ngValue]="app.id" [disabled]="app.status === 'REJECTED' || app.status === 'EXPIRED'">
+                {{ app.policy?.name }} - {{ app.applicationNumber }} ({{ app.status }})
+              </option>
+            </select>
+          </label>
+          <label>
+            Amount (₹)
+            <input type="number" [(ngModel)]="premiumAmount" name="premiumAmount" required min="1">
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" [(ngModel)]="enableAutoDebit" name="enableAutoDebit">
+            Request auto-debit (requires admin approval)
+          </label>
+        </div>
+        <button type="submit" [disabled]="isPayingPremium">Pay Premium</button>
+      </form>
+    </div>
+
+    <div *ngIf="payments.length === 0" class="empty-state">
+      No premium payments yet.
+    </div>
+    <div class="table-wrap" *ngIf="payments.length > 0">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Payment Ref</th>
+          <th>Policy</th>
+          <th>Amount (₹)</th>
+          <th>Status</th>
+          <th>Paid On</th>
+          <th>Next Due</th>
+          <th>Auto Debit</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let p of payments">
+          <td>{{ p.paymentReference }}</td>
+          <td>{{ p.application?.policy?.name }}</td>
+          <td>{{ p.amount }}</td>
+          <td>{{ p.status }}</td>
+          <td>{{ p.paymentDate | date:'short' }}</td>
+          <td>{{ p.nextDueDate | date:'shortDate' }}</td>
+          <td>{{ p.autoDebitEnabled ? 'Enabled' : 'Off (Pending/Not approved)' }}</td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+  </section>
+</div>
+

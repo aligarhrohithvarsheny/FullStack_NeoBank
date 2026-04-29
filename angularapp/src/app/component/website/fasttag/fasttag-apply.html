@@ -1,0 +1,45 @@
+<div class="kyc-container fasttag-apply">
+  <div class="topbar">
+    <button class="back-btn" (click)="goBack()">← Back</button>
+    <h2>Apply for FASTag</h2>
+  </div>
+  <div class="form-row">
+    <label>Vehicle details</label>
+    <input [(ngModel)]="vehicleDetails" placeholder="Make/Model" />
+  </div>
+  <div class="form-row">
+    <label>Vehicle number</label>
+    <input [(ngModel)]="vehicleNumber" placeholder="KA01AB1234" />
+  </div>
+  <div class="form-row">
+    <label>Aadhar number</label>
+    <input [(ngModel)]="aadharNumber" placeholder="Aadhar" />
+  </div>
+  <div class="form-row">
+    <label>PAN number</label>
+    <input [(ngModel)]="panNumber" placeholder="PAN" />
+  </div>
+  <div class="form-row">
+    <label>DOB</label>
+    <input type="date" [(ngModel)]="dob" />
+  </div>
+  <div class="form-row">
+    <label>Vehicle type</label>
+    <select [(ngModel)]="vehicleType">
+      <option>Car</option>
+      <option>Bike</option>
+      <option>Truck</option>
+    </select>
+  </div>
+  <div class="form-row">
+    <label>Amount</label>
+    <input type="number" [(ngModel)]="amount" />
+  </div>
+  <div class="form-row">
+    <label>Bank / Neo bank</label>
+    <input [(ngModel)]="bank" placeholder="Neo bank name" />
+  </div>
+  <div class="actions">
+    <button (click)="submit()">Apply FASTag</button>
+  </div>
+</div>

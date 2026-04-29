@@ -1,0 +1,573 @@
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+<div class="ai-security-wrapper">
+  <!-- Header -->
+  <header class="security-header">
+    <div class="header-left">
+      <button class="back-btn" (click)="goBack()">
+        <i class="fa fa-arrow-left"></i> Back to Dashboard
+      </button>
+      <div class="header-title">
+        <i class="fa fa-shield-alt security-icon"></i>
+        <div>
+          <h1>AI Security Command Center</h1>
+          <p class="subtitle">Advanced AI-Powered Threat Detection &amp; Analysis Across All Channels</p>
+        </div>
+      </div>
+    </div>
+    <div class="header-right">
+      <span class="ai-badge"><i class="fa fa-brain"></i> AI Engine v1.0</span>
+      <span class="status-indicator online"><i class="fa fa-circle"></i> Active</span>
+      <button class="refresh-btn" (click)="loadDashboard()" title="Refresh dashboard">
+        <i class="fa fa-sync-alt"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- Loading State -->
+  <div class="loading-container" *ngIf="isLoading">
+    <div class="ai-loader">
+      <i class="fa fa-brain fa-spin"></i>
+      <p>AI Security Engine Initializing...</p>
+    </div>
+  </div>
+
+  <!-- Main Content -->
+  <div class="security-content" *ngIf="!isLoading && dashboard">
+
+    <!-- Navigation Tabs -->
+    <div class="tab-nav">
+      <button [class.active]="activeTab === 'overview'" (click)="setTab('overview')">
+        <i class="fa fa-tachometer-alt"></i> Overview
+      </button>
+      <button [class.active]="activeTab === 'events'" (click)="setTab('events')">
+        <i class="fa fa-exclamation-triangle"></i> Security Events
+        <span class="tab-badge" *ngIf="dashboard.summary.activeThreats > 0">{{ dashboard.summary.activeThreats }}</span>
+      </button>
+      <button [class.active]="activeTab === 'threats'" (click)="setTab('threats')">
+        <i class="fa fa-crosshairs"></i> Threat Intelligence
+      </button>
+      <button [class.active]="activeTab === 'rules'" (click)="setTab('rules')">
+        <i class="fa fa-cogs"></i> Security Rules
+      </button>
+      <button [class.active]="activeTab === 'ai-info'" (click)="setTab('ai-info')">
+        <i class="fa fa-brain"></i> AI Engine
+      </button>
+    </div>
+
+    <!-- ======================== OVERVIEW TAB ======================== -->
+    <div class="tab-content" *ngIf="activeTab === 'overview'">
+
+      <!-- Key Metrics Cards -->
+      <div class="metrics-grid">
+        <div class="metric-card critical">
+          <div class="metric-icon"><i class="fa fa-skull-crossbones"></i></div>
+          <div class="metric-data">
+            <span class="metric-value">{{ dashboard.summary.criticalEvents24h }}</span>
+            <span class="metric-label">Critical (24h)</span>
+          </div>
+        </div>
+        <div class="metric-card high">
+          <div class="metric-icon"><i class="fa fa-exclamation-triangle"></i></div>
+          <div class="metric-data">
+            <span class="metric-value">{{ dashboard.summary.highEvents24h }}</span>
+            <span class="metric-label">High Severity (24h)</span>
+          </div>
+        </div>
+        <div class="metric-card active-threats">
+          <div class="metric-icon"><i class="fa fa-crosshairs"></i></div>
+          <div class="metric-data">
+            <span class="metric-value">{{ dashboard.summary.activeThreats }}</span>
+            <span class="metric-label">Active Threats</span>
+          </div>
+        </div>
+        <div class="metric-card blocked">
+          <div class="metric-icon"><i class="fa fa-ban"></i></div>
+          <div class="metric-data">
+            <span class="metric-value">{{ dashboard.summary.blockedThreats }}</span>
+            <span class="metric-label">Blocked</span>
+          </div>
+        </div>
+        <div class="metric-card resolved">
+          <div class="metric-icon"><i class="fa fa-check-circle"></i></div>
+          <div class="metric-data">
+            <span class="metric-value">{{ dashboard.summary.resolvedThreats }}</span>
+            <span class="metric-label">Resolved</span>
+          </div>
+        </div>
+        <div class="metric-card events-total">
+          <div class="metric-icon"><i class="fa fa-chart-bar"></i></div>
+          <div class="metric-data">
+            <span class="metric-value">{{ dashboard.summary.totalEvents24h }}</span>
+            <span class="metric-label">Events (24h)</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Risk Score Gauge -->
+      <div class="section-row">
+        <div class="section-card risk-gauge-card">
+          <h3><i class="fa fa-tachometer-alt"></i> Average Risk Score (24h)</h3>
+          <div class="risk-gauge">
+            <div class="gauge-circle" [style.border-color]="getRiskColor(dashboard.summary.avgRiskScore || 0)">
+              <span class="gauge-value" [style.color]="getRiskColor(dashboard.summary.avgRiskScore || 0)">
+                {{ (dashboard.summary.avgRiskScore || 0) | number:'1.0-0' }}
+              </span>
+              <span class="gauge-label">/ 100</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Channel Distribution -->
+        <div class="section-card">
+          <h3><i class="fa fa-sitemap"></i> Threats by Channel (7d)</h3>
+          <div class="channel-bars">
+            <div class="channel-bar" *ngFor="let ch of getObjectKeys(dashboard.channelDistribution)">
+              <div class="channel-label">
+                <i class="fa" [ngClass]="getChannelIcon(ch)"></i>
+                <span>{{ ch }}</span>
+              </div>
+              <div class="bar-track">
+                <div class="bar-fill" [style.width.%]="(dashboard.channelDistribution[ch] / (dashboard.summary.totalEvents7d || 1)) * 100" [style.background]="getRiskColor(50)"></div>
+              </div>
+              <span class="bar-count">{{ dashboard.channelDistribution[ch] }}</span>
+            </div>
+            <div *ngIf="getObjectKeys(dashboard.channelDistribution).length === 0" class="no-data">
+              <i class="fa fa-shield-alt"></i> No channel events recorded yet
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Event Type Distribution & Severity -->
+      <div class="section-row">
+        <div class="section-card">
+          <h3><i class="fa fa-th-list"></i> Event Types (7d)</h3>
+          <div class="type-list">
+            <div class="type-item" *ngFor="let t of getObjectKeys(dashboard.eventTypeDistribution)">
+              <span class="type-name">{{ t.replace('_', ' ') }}</span>
+              <span class="type-count">{{ dashboard.eventTypeDistribution[t] }}</span>
+            </div>
+            <div *ngIf="getObjectKeys(dashboard.eventTypeDistribution).length === 0" class="no-data">
+              <i class="fa fa-shield-alt"></i> No events recorded yet
+            </div>
+          </div>
+        </div>
+        <div class="section-card">
+          <h3><i class="fa fa-signal"></i> Severity Breakdown (7d)</h3>
+          <div class="severity-grid">
+            <div class="severity-item" *ngFor="let s of getObjectKeys(dashboard.severityDistribution)">
+              <div class="severity-badge" [ngClass]="getSeverityClass(s)">{{ s }}</div>
+              <div class="severity-count">{{ dashboard.severityDistribution[s] }}</div>
+            </div>
+            <div *ngIf="getObjectKeys(dashboard.severityDistribution).length === 0" class="no-data">
+              <i class="fa fa-shield-alt"></i> No severity data yet
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Risk Level Counts & Daily Trend -->
+      <div class="section-row">
+        <div class="section-card">
+          <h3><i class="fa fa-users"></i> Entity Risk Levels</h3>
+          <div class="risk-level-cards">
+            <div class="rl-card low">
+              <span class="rl-count">{{ dashboard.riskLevelCounts['LOW'] || 0 }}</span>
+              <span class="rl-label">Low</span>
+            </div>
+            <div class="rl-card medium">
+              <span class="rl-count">{{ dashboard.riskLevelCounts['MEDIUM'] || 0 }}</span>
+              <span class="rl-label">Medium</span>
+            </div>
+            <div class="rl-card high">
+              <span class="rl-count">{{ dashboard.riskLevelCounts['HIGH'] || 0 }}</span>
+              <span class="rl-label">High</span>
+            </div>
+            <div class="rl-card critical">
+              <span class="rl-count">{{ dashboard.riskLevelCounts['CRITICAL'] || 0 }}</span>
+              <span class="rl-label">Critical</span>
+            </div>
+          </div>
+        </div>
+        <div class="section-card">
+          <h3><i class="fa fa-chart-line"></i> Daily Trend (30d)</h3>
+          <div class="trend-chart">
+            <div class="trend-bars">
+              <div class="trend-bar" *ngFor="let point of dashboard.dailyTrend"
+                   [style.height.%]="((point.count / (dashboard.summary.totalEvents30d || 1)) * 100 * dashboard.dailyTrend.length) | number:'1.0-0'"
+                   [title]="point.date + ': ' + point.count + ' events'">
+              </div>
+            </div>
+            <div *ngIf="dashboard.dailyTrend.length === 0" class="no-data">
+              <i class="fa fa-chart-bar"></i> Trend data will appear after events are recorded
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- High Risk Entities & Watchlist -->
+      <div class="section-row">
+        <div class="section-card">
+          <h3><i class="fa fa-user-slash"></i> High-Risk Entities</h3>
+          <div class="entity-list">
+            <div class="entity-item" *ngFor="let e of dashboard.highRiskEntities">
+              <div class="entity-info">
+                <span class="entity-id">{{ e.entityId }}</span>
+                <span class="entity-type">{{ e.entityType }}</span>
+              </div>
+              <div class="entity-score" [style.color]="getRiskColor(e.overallRiskScore)">
+                {{ e.overallRiskScore | number:'1.0-0' }}
+              </div>
+              <div class="entity-badge" [ngClass]="getSeverityClass(e.riskLevel)">{{ e.riskLevel }}</div>
+            </div>
+            <div *ngIf="dashboard.highRiskEntities.length === 0" class="no-data">
+              <i class="fa fa-check-circle"></i> No high-risk entities
+            </div>
+          </div>
+        </div>
+        <div class="section-card">
+          <h3><i class="fa fa-eye"></i> Watchlisted Entities</h3>
+          <div class="entity-list">
+            <div class="entity-item" *ngFor="let w of dashboard.watchlistedEntities">
+              <div class="entity-info">
+                <span class="entity-id">{{ w.entityId }}</span>
+                <span class="entity-reason">{{ w.watchlistReason }}</span>
+              </div>
+              <button class="remove-watchlist-btn" (click)="removeFromWatchlist(w)">
+                <i class="fa fa-times"></i>
+              </button>
+            </div>
+            <div *ngIf="dashboard.watchlistedEntities.length === 0" class="no-data">
+              <i class="fa fa-eye-slash"></i> No watchlisted entities
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======================== EVENTS TAB ======================== -->
+    <div class="tab-content" *ngIf="activeTab === 'events'">
+      <!-- Filters -->
+      <div class="filter-bar">
+        <select [(ngModel)]="eventFilters.eventType" (change)="filterEvents()">
+          <option value="">All Event Types</option>
+          <option *ngFor="let t of eventTypes" [value]="t">{{ t.replace('_', ' ') }}</option>
+        </select>
+        <select [(ngModel)]="eventFilters.channel" (change)="filterEvents()">
+          <option value="">All Channels</option>
+          <option *ngFor="let c of channels" [value]="c">{{ c }}</option>
+        </select>
+        <select [(ngModel)]="eventFilters.severity" (change)="filterEvents()">
+          <option value="">All Severities</option>
+          <option *ngFor="let s of severities" [value]="s">{{ s }}</option>
+        </select>
+        <select [(ngModel)]="eventFilters.status" (change)="filterEvents()">
+          <option value="">All Statuses</option>
+          <option *ngFor="let s of statuses" [value]="s">{{ s }}</option>
+        </select>
+        <button class="clear-filters-btn" (click)="clearFilters()">
+          <i class="fa fa-times"></i> Clear
+        </button>
+        <span class="event-count">{{ eventTotalElements }} events</span>
+      </div>
+
+      <!-- Events Table -->
+      <div class="events-table-container" *ngIf="!isLoadingEvents">
+        <table class="events-table">
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Type</th>
+              <th>Channel</th>
+              <th>Severity</th>
+              <th>Risk</th>
+              <th>Entity</th>
+              <th>Title</th>
+              <th>Status</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let event of events" (click)="selectEvent(event)" class="event-row">
+              <td>{{ formatDate(event.createdAt) }}</td>
+              <td><span class="event-type-tag">{{ event.eventType }}</span></td>
+              <td><i class="fa" [ngClass]="getChannelIcon(event.channel)"></i> {{ event.channel }}</td>
+              <td><span class="severity-badge" [ngClass]="getSeverityClass(event.severity)">{{ event.severity }}</span></td>
+              <td><span class="risk-score" [style.color]="getRiskColor(event.riskScore)">{{ event.riskScore | number:'1.0-0' }}</span></td>
+              <td>{{ event.sourceEntityId }}</td>
+              <td>{{ event.title }}</td>
+              <td><span class="status-badge" [ngClass]="getStatusClass(event.status)">{{ event.status }}</span></td>
+              <td><button class="view-btn" (click)="selectEvent(event); $event.stopPropagation()"><i class="fa fa-eye"></i></button></td>
+            </tr>
+          </tbody>
+        </table>
+        <div *ngIf="events.length === 0" class="no-data-large">
+          <i class="fa fa-shield-alt"></i>
+          <p>No security events found with current filters</p>
+        </div>
+      </div>
+
+      <div class="loading-spinner" *ngIf="isLoadingEvents">
+        <i class="fa fa-spinner fa-spin"></i> Loading events...
+      </div>
+
+      <!-- Pagination -->
+      <div class="pagination" *ngIf="eventTotalPages > 1">
+        <button (click)="goToEventPage(0)" [disabled]="eventPage === 0"><i class="fa fa-angle-double-left"></i></button>
+        <button (click)="goToEventPage(eventPage - 1)" [disabled]="eventPage === 0"><i class="fa fa-angle-left"></i></button>
+        <span>Page {{ eventPage + 1 }} of {{ eventTotalPages }}</span>
+        <button (click)="goToEventPage(eventPage + 1)" [disabled]="eventPage >= eventTotalPages - 1"><i class="fa fa-angle-right"></i></button>
+        <button (click)="goToEventPage(eventTotalPages - 1)" [disabled]="eventPage >= eventTotalPages - 1"><i class="fa fa-angle-double-right"></i></button>
+      </div>
+
+      <!-- Event Detail Modal -->
+      <div class="modal-overlay" *ngIf="selectedEvent" (click)="closeEventDetail()">
+        <div class="modal-content event-detail-modal" (click)="$event.stopPropagation()">
+          <div class="modal-header">
+            <h3><i class="fa fa-exclamation-triangle"></i> Security Event Detail</h3>
+            <button class="close-btn" (click)="closeEventDetail()"><i class="fa fa-times"></i></button>
+          </div>
+          <div class="modal-body">
+            <div class="detail-grid">
+              <div class="detail-item"><label>ID</label><span>#{{ selectedEvent.id }}</span></div>
+              <div class="detail-item"><label>Type</label><span class="event-type-tag">{{ selectedEvent.eventType }}</span></div>
+              <div class="detail-item"><label>Channel</label><span><i class="fa" [ngClass]="getChannelIcon(selectedEvent.channel)"></i> {{ selectedEvent.channel }}</span></div>
+              <div class="detail-item"><label>Severity</label><span class="severity-badge" [ngClass]="getSeverityClass(selectedEvent.severity)">{{ selectedEvent.severity }}</span></div>
+              <div class="detail-item"><label>Risk Score</label><span class="risk-score-lg" [style.color]="getRiskColor(selectedEvent.riskScore)">{{ selectedEvent.riskScore | number:'1.0-0' }}</span></div>
+              <div class="detail-item"><label>AI Confidence</label><span>{{ (selectedEvent.aiConfidence * 100) | number:'1.0-0' }}%</span></div>
+              <div class="detail-item"><label>Entity</label><span>{{ selectedEvent.sourceEntityId }} ({{ selectedEvent.sourceEntityType }})</span></div>
+              <div class="detail-item"><label>Status</label><span class="status-badge" [ngClass]="getStatusClass(selectedEvent.status)">{{ selectedEvent.status }}</span></div>
+              <div class="detail-item"><label>Action Taken</label><span>{{ selectedEvent.actionTaken }}</span></div>
+              <div class="detail-item"><label>IP Address</label><span>{{ selectedEvent.clientIp }}</span></div>
+              <div class="detail-item"><label>Location</label><span>{{ selectedEvent.location || 'Unknown' }}</span></div>
+              <div class="detail-item"><label>Device</label><span>{{ selectedEvent.deviceFingerprint || '-' }}</span></div>
+              <div class="detail-item full-width"><label>Title</label><span>{{ selectedEvent.title }}</span></div>
+              <div class="detail-item full-width"><label>Description</label><span>{{ selectedEvent.description }}</span></div>
+              <div class="detail-item full-width" *ngIf="selectedEvent.resolvedBy"><label>Resolved By</label><span>{{ selectedEvent.resolvedBy }} at {{ formatDate(selectedEvent.resolvedAt) }}</span></div>
+              <div class="detail-item full-width" *ngIf="selectedEvent.resolutionNotes"><label>Resolution Notes</label><span>{{ selectedEvent.resolutionNotes }}</span></div>
+            </div>
+
+            <div class="resolve-section" *ngIf="selectedEvent.status !== 'RESOLVED' && selectedEvent.status !== 'FALSE_POSITIVE'">
+              <h4>Resolve This Event</h4>
+              <textarea [(ngModel)]="resolveNotes" placeholder="Enter resolution notes..." rows="3"></textarea>
+              <div class="resolve-actions">
+                <button class="resolve-btn resolved" (click)="resolveEvent('RESOLVED')"><i class="fa fa-check"></i> Resolve</button>
+                <button class="resolve-btn blocked" (click)="resolveEvent('BLOCKED')"><i class="fa fa-ban"></i> Block</button>
+                <button class="resolve-btn false-positive" (click)="resolveEvent('FALSE_POSITIVE')"><i class="fa fa-flag"></i> False Positive</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======================== THREATS TAB ======================== -->
+    <div class="tab-content" *ngIf="activeTab === 'threats'">
+      <div class="section-row">
+        <!-- Threat Lookup -->
+        <div class="section-card">
+          <h3><i class="fa fa-search"></i> Threat Intelligence Lookup</h3>
+          <div class="lookup-form">
+            <input type="text" [(ngModel)]="threatLookupId" placeholder="Enter email, account number, or entity ID..." />
+            <button (click)="lookupThreat()"><i class="fa fa-search"></i> Analyze</button>
+          </div>
+
+          <div class="threat-result" *ngIf="threatLookupResult">
+            <div class="threat-header">
+              <div class="threat-entity">
+                <h4>{{ threatLookupResult.entityId }}</h4>
+                <span class="entity-type-badge">{{ threatLookupResult.entityType }}</span>
+              </div>
+              <div class="threat-overall-score" [style.color]="getRiskColor(threatLookupResult.overallRiskScore)">
+                {{ threatLookupResult.overallRiskScore | number:'1.0-0' }}
+                <small>/100</small>
+              </div>
+            </div>
+
+            <div class="score-dimensions">
+              <div class="score-dim">
+                <label>Login Risk</label>
+                <div class="score-bar"><div class="score-fill" [style.width.%]="threatLookupResult.loginRiskScore" [style.background]="getRiskColor(threatLookupResult.loginRiskScore)"></div></div>
+                <span>{{ threatLookupResult.loginRiskScore | number:'1.0-0' }}</span>
+              </div>
+              <div class="score-dim">
+                <label>Transaction Risk</label>
+                <div class="score-bar"><div class="score-fill" [style.width.%]="threatLookupResult.transactionRiskScore" [style.background]="getRiskColor(threatLookupResult.transactionRiskScore)"></div></div>
+                <span>{{ threatLookupResult.transactionRiskScore | number:'1.0-0' }}</span>
+              </div>
+              <div class="score-dim">
+                <label>Behavioral Risk</label>
+                <div class="score-bar"><div class="score-fill" [style.width.%]="threatLookupResult.behavioralRiskScore" [style.background]="getRiskColor(threatLookupResult.behavioralRiskScore)"></div></div>
+                <span>{{ threatLookupResult.behavioralRiskScore | number:'1.0-0' }}</span>
+              </div>
+              <div class="score-dim">
+                <label>Device Risk</label>
+                <div class="score-bar"><div class="score-fill" [style.width.%]="threatLookupResult.deviceRiskScore" [style.background]="getRiskColor(threatLookupResult.deviceRiskScore)"></div></div>
+                <span>{{ threatLookupResult.deviceRiskScore | number:'1.0-0' }}</span>
+              </div>
+              <div class="score-dim">
+                <label>Network Risk</label>
+                <div class="score-bar"><div class="score-fill" [style.width.%]="threatLookupResult.networkRiskScore" [style.background]="getRiskColor(threatLookupResult.networkRiskScore)"></div></div>
+                <span>{{ threatLookupResult.networkRiskScore | number:'1.0-0' }}</span>
+              </div>
+            </div>
+
+            <div class="threat-meta">
+              <span><i class="fa fa-bolt"></i> {{ threatLookupResult.totalEvents }} events</span>
+              <span><i class="fa fa-check"></i> {{ threatLookupResult.falsePositives }} false positives</span>
+              <span><i class="fa fa-skull"></i> {{ threatLookupResult.confirmedThreats }} confirmed</span>
+              <span><i class="fa fa-clock"></i> {{ formatDate(threatLookupResult.lastEvaluatedAt) }}</span>
+            </div>
+          </div>
+
+          <!-- Known Devices -->
+          <div class="devices-section" *ngIf="threatDevices.length > 0">
+            <h4><i class="fa fa-fingerprint"></i> Known Devices</h4>
+            <div class="device-card" *ngFor="let d of threatDevices">
+              <div class="device-info">
+                <span class="device-type"><i class="fa" [ngClass]="d.deviceType === 'Mobile' ? 'fa-mobile-alt' : d.deviceType === 'Tablet' ? 'fa-tablet-alt' : 'fa-desktop'"></i> {{ d.deviceType }}</span>
+                <span>{{ d.browser }} / {{ d.os }}</span>
+                <span class="device-ip">{{ d.ipAddress }}</span>
+                <span class="device-last-seen">Last: {{ formatDate(d.lastSeenAt) }}</span>
+                <span>Logins: {{ d.loginCount }}</span>
+              </div>
+              <div class="device-actions">
+                <span class="trust-badge" [class.trusted]="d.isTrusted" [class.untrusted]="!d.isTrusted">
+                  {{ d.isTrusted ? 'Trusted' : 'Untrusted' }}
+                </span>
+                <button class="trust-toggle-btn" (click)="toggleDeviceTrust(d)">
+                  {{ d.isTrusted ? 'Untrust' : 'Trust' }}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Watchlist Management -->
+        <div class="section-card">
+          <h3><i class="fa fa-eye"></i> Watchlist Management</h3>
+          <div class="watchlist-form">
+            <input type="text" [(ngModel)]="watchlistEntityId" placeholder="Entity ID (email/account)..." />
+            <input type="text" [(ngModel)]="watchlistReason" placeholder="Reason for watchlisting..." />
+            <button (click)="addToWatchlist()"><i class="fa fa-plus"></i> Add to Watchlist</button>
+          </div>
+
+          <div class="watchlist-list">
+            <div class="watchlist-item" *ngFor="let w of dashboard?.watchlistedEntities || []">
+              <div class="wl-info">
+                <span class="wl-entity">{{ w.entityId }}</span>
+                <span class="wl-reason">{{ w.watchlistReason }}</span>
+                <span class="wl-score" [style.color]="getRiskColor(w.overallRiskScore)">Score: {{ w.overallRiskScore | number:'1.0-0' }}</span>
+              </div>
+              <button class="remove-btn" (click)="removeFromWatchlist(w)"><i class="fa fa-trash"></i></button>
+            </div>
+            <div *ngIf="!dashboard?.watchlistedEntities?.length" class="no-data">
+              <i class="fa fa-eye-slash"></i> No watchlisted entities
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======================== RULES TAB ======================== -->
+    <div class="tab-content" *ngIf="activeTab === 'rules'">
+      <div class="section-card full-width-card">
+        <h3><i class="fa fa-cogs"></i> AI Security Rules Engine</h3>
+        <p class="rules-subtitle">Configure the AI detection rules that govern threat analysis across all channels</p>
+
+        <div class="loading-spinner" *ngIf="isLoadingRules">
+          <i class="fa fa-spinner fa-spin"></i> Loading rules...
+        </div>
+
+        <table class="rules-table" *ngIf="!isLoadingRules">
+          <thead>
+            <tr>
+              <th>Status</th>
+              <th>Rule Name</th>
+              <th>Category</th>
+              <th>Channel</th>
+              <th>Action</th>
+              <th>Severity</th>
+              <th>Priority</th>
+              <th>Hits</th>
+              <th>Toggle</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let rule of rules" [class.disabled-rule]="!rule.isActive">
+              <td><span class="rule-status" [class.active]="rule.isActive" [class.inactive]="!rule.isActive">{{ rule.isActive ? 'Active' : 'Disabled' }}</span></td>
+              <td><strong>{{ rule.ruleName }}</strong><br><small>{{ rule.description }}</small></td>
+              <td>{{ rule.ruleCategory }}</td>
+              <td>{{ rule.channel }}</td>
+              <td><span class="action-badge" [ngClass]="'action-' + rule.actionType.toLowerCase()">{{ rule.actionType }}</span></td>
+              <td><span class="severity-badge" [ngClass]="getSeverityClass(rule.severity)">{{ rule.severity }}</span></td>
+              <td>{{ rule.priority }}</td>
+              <td>{{ rule.hitCount }}</td>
+              <td>
+                <label class="toggle-switch">
+                  <input type="checkbox" [checked]="rule.isActive" (change)="toggleRule(rule)">
+                  <span class="toggle-slider"></span>
+                </label>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ======================== AI INFO TAB ======================== -->
+    <div class="tab-content" *ngIf="activeTab === 'ai-info'">
+      <div class="ai-info-grid">
+        <div class="section-card ai-engine-card">
+          <div class="ai-engine-header">
+            <i class="fa fa-brain ai-brain-icon"></i>
+            <div>
+              <h3>{{ dashboard.aiInfo.engine }}</h3>
+              <span class="version-badge">{{ dashboard.aiInfo.modelVersion }}</span>
+            </div>
+          </div>
+          <p class="ai-description">
+            Advanced AI-powered security engine providing real-time threat detection, risk scoring,
+            and adaptive security across all NeoBank channels. Utilizes statistical anomaly detection,
+            behavioral analysis, device fingerprinting, and multi-dimensional risk scoring.
+          </p>
+        </div>
+
+        <div class="section-card">
+          <h3><i class="fa fa-bolt"></i> AI Capabilities</h3>
+          <div class="capabilities-grid">
+            <div class="capability-item" *ngFor="let cap of dashboard.aiInfo.capabilities">
+              <i class="fa fa-check-circle"></i>
+              <span>{{ cap }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="section-card">
+          <h3><i class="fa fa-broadcast-tower"></i> Protected Channels</h3>
+          <div class="channels-grid">
+            <div class="channel-item" *ngFor="let ch of dashboard.aiInfo.channels">
+              <i class="fa" [ngClass]="getChannelIcon(ch)"></i>
+              <span>{{ ch }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="section-card">
+          <h3><i class="fa fa-layer-group"></i> Security Architecture</h3>
+          <div class="architecture-layers">
+            <div class="arch-layer"><span class="layer-num">1</span><span>Real-time Event Ingestion</span></div>
+            <div class="arch-layer"><span class="layer-num">2</span><span>Multi-dimensional Risk Scoring (EMA)</span></div>
+            <div class="arch-layer"><span class="layer-num">3</span><span>Statistical Anomaly Detection (2σ deviation)</span></div>
+            <div class="arch-layer"><span class="layer-num">4</span><span>Behavioral Biometric Analysis</span></div>
+            <div class="arch-layer"><span class="layer-num">5</span><span>Device Fingerprint Trust Engine</span></div>
+            <div class="arch-layer"><span class="layer-num">6</span><span>Impossible Travel Detection</span></div>
+            <div class="arch-layer"><span class="layer-num">7</span><span>Configurable Rules Engine</span></div>
+            <div class="arch-layer"><span class="layer-num">8</span><span>Adaptive Response (Alert → MFA → Block)</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

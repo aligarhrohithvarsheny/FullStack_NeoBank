@@ -1,0 +1,136 @@
+package com.neo.springapp.model;
+
+import jakarta.persistence.*;
+import lombok.Data;
+import java.time.LocalDateTime;
+
+@Entity
+@Data
+@Table(name = "users")
+public class User {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    private String username;
+    private String password;
+    
+    @Column(unique = true, nullable = false)
+    private String email;
+    
+    private LocalDateTime joinDate;
+    private String status = "PENDING"; // PENDING, APPROVED, CLOSED
+    private boolean passwordSet = false; // Security: tracks if user has set password after approval
+
+    @Column(unique = true)
+    private String accountNumber;
+    
+    // Account lock fields
+    private int failedLoginAttempts = 0;
+    private boolean accountLocked = false;
+    private LocalDateTime lastFailedLoginTime;
+
+    // Profile photo and signature fields
+    @Lob
+    @Column(name = "profile_photo", columnDefinition = "LONGBLOB")
+    private byte[] profilePhoto; // Profile photo (JPEG, PNG, PDF - max 5MB)
+    
+    private String profilePhotoType; // "image/jpeg", "image/png", "application/pdf"
+    private String profilePhotoName; // Original filename
+    
+    @Lob
+    @Column(name = "signature", columnDefinition = "LONGBLOB")
+    private byte[] signature; // Signature (PDF, IMAGE, PNG, JPEG)
+    
+    private String signatureType; // "image/jpeg", "image/png", "application/pdf"
+    private String signatureName; // Original filename
+    private String signatureStatus = "PENDING"; // PENDING, APPROVED, REJECTED
+    private LocalDateTime signatureSubmittedDate;
+    private LocalDateTime signatureReviewedDate;
+    private String signatureReviewedBy; // Admin who reviewed the signature
+    private String signatureRejectionReason; // Reason if rejected
+
+    // Graphical password field - stores the sequence of image IDs as JSON string
+    @Column(name = "graphical_password", columnDefinition = "TEXT")
+    private String graphicalPassword; // JSON array of image IDs: [1,5,3,7,2]
+
+    // UPI fields
+    @Column(name = "upi_id", unique = true)
+    private String upiId;
+
+    @Column(name = "upi_enabled")
+    private Boolean upiEnabled = false;
+
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    @Column(name = "transaction_pin")
+    private String transactionPin;
+
+    @Column(name = "transaction_pin_set")
+    private Boolean transactionPinSet = false;
+
+    @OneToOne(cascade = CascadeType.ALL)
+    @JoinColumn(name = "account_id")
+    private Account account;
+
+    // Parent-child relationship for child accounts
+    @ManyToOne
+    @JoinColumn(name = "parent_user_id")
+    private User parentUser; // Reference to parent user if this is a child account
+
+    @OneToMany(mappedBy = "parentUser", cascade = CascadeType.ALL)
+    private java.util.List<User> childUsers; // List of child users if this is a parent account
+
+    // Constructors
+    public User() {
+        this.joinDate = LocalDateTime.now();
+    }
+
+    public User(String username, String password, String email) {
+        this();
+        this.username = username;
+        this.password = password;
+        this.email = email;
+    }
+
+    // Convenience methods to access account fields
+    public String getName() {
+        return account != null ? account.getName() : null;
+    }
+
+    public String getPhone() {
+        return account != null ? account.getPhone() : null;
+    }
+
+    public String getAddress() {
+        return account != null ? account.getAddress() : null;
+    }
+
+    public String getDob() {
+        return account != null ? account.getDob() : null;
+    }
+
+    public String getOccupation() {
+        return account != null ? account.getOccupation() : null;
+    }
+
+    public Double getIncome() {
+        return account != null ? account.getIncome() : null;
+    }
+
+    public String getPan() {
+        return account != null ? account.getPan() : null;
+    }
+
+    public String getAadhar() {
+        return account != null ? account.getAadharNumber() : null;
+    }
+
+    public String getAccountType() {
+        return account != null ? account.getAccountType() : null;
+    }
+
+    public Double getBalance() {
+        return account != null ? account.getBalance() : null;
+    }
+}

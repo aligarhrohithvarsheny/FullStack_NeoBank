@@ -1,0 +1,312 @@
+<div class="admin-profile-container">
+  <div class="profile-header">
+    <button class="back-btn" (click)="goBack()">← Back to Dashboard</button>
+    <h2>👤 Admin Profile</h2>
+    <button class="edit-btn" (click)="toggleEditMode()" *ngIf="!editMode">
+      ✏️ Edit Profile
+    </button>
+    <div class="action-buttons" *ngIf="editMode">
+      <button class="cancel-btn" (click)="toggleEditMode()" [disabled]="isSaving">
+        Cancel
+      </button>
+      <button class="save-btn" (click)="saveProfile()" [disabled]="isSaving">
+        <span *ngIf="!isSaving">💾 Save Changes</span>
+        <span *ngIf="isSaving">⏳ Saving...</span>
+      </button>
+    </div>
+  </div>
+
+  <div *ngIf="isLoading" class="loading-container">
+    <div class="loading-spinner"></div>
+    <p>Loading profile...</p>
+  </div>
+
+  <div *ngIf="!isLoading && admin" class="profile-content">
+    <!-- Profile Card -->
+    <div class="profile-card">
+      <div class="profile-avatar">
+        <div class="avatar-circle" *ngIf="getProfilePhotoUrl() as photoUrl; else noPhoto">
+          <img class="avatar-img" [src]="photoUrl" alt="Profile photo">
+        </div>
+        <ng-template #noPhoto>
+          <div class="avatar-circle">
+            <i class="fa fa-user-shield"></i>
+          </div>
+        </ng-template>
+        <div class="photo-actions">
+          <input #photoInput type="file" accept="image/jpeg,image/png,image/webp" (change)="onProfilePhotoSelected($event)" hidden>
+          <button class="upload-photo-btn" type="button" (click)="photoInput.click()" [disabled]="isUploadingPhoto">
+            <span *ngIf="!isUploadingPhoto">📷 Upload Photo</span>
+            <span *ngIf="isUploadingPhoto">⏳ Uploading...</span>
+          </button>
+        </div>
+        <h3>{{ admin.name || 'Admin' }}</h3>
+        <p class="role-badge">{{ admin.role || 'Administrator' }}</p>
+      </div>
+
+      <div class="profile-details">
+        <!-- Basic Information -->
+        <div class="details-section">
+          <h4>📋 Basic Information</h4>
+          <div class="details-grid">
+            <div class="detail-item">
+              <label>Name <span class="required">*</span></label>
+              <input 
+                *ngIf="editMode" 
+                type="text" 
+                [(ngModel)]="profileForm.name" 
+                class="form-input"
+                required>
+              <span *ngIf="!editMode" class="value">{{ admin.name || 'N/A' }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Email <span class="required">*</span></label>
+              <input 
+                *ngIf="editMode" 
+                type="email" 
+                [(ngModel)]="profileForm.email" 
+                class="form-input"
+                required>
+              <span *ngIf="!editMode" class="value">{{ admin.email || 'N/A' }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Employee ID</label>
+              <input 
+                *ngIf="editMode" 
+                type="text" 
+                [(ngModel)]="profileForm.employeeId" 
+                class="form-input"
+                placeholder="Enter Employee ID">
+              <span *ngIf="!editMode" class="value">{{ admin.employeeId || 'Not provided' }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Role</label>
+              <input 
+                *ngIf="editMode" 
+                type="text" 
+                [(ngModel)]="profileForm.role" 
+                class="form-input"
+                placeholder="Enter role">
+              <span *ngIf="!editMode" class="value">{{ admin.role || 'N/A' }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Date of Joining</label>
+              <input
+                *ngIf="editMode"
+                type="date"
+                [(ngModel)]="profileForm.dateOfJoining"
+                class="form-input">
+              <span *ngIf="!editMode" class="value">{{ admin.dateOfJoining ? formatDate(admin.dateOfJoining) : formatDate(admin.createdAt) }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Contact Information -->
+        <div class="details-section">
+          <h4>📞 Contact Information</h4>
+          <div class="details-grid">
+            <div class="detail-item">
+              <label>Mobile Number</label>
+              <input 
+                *ngIf="editMode" 
+                type="text" 
+                [(ngModel)]="profileForm.mobileNumber" 
+                class="form-input"
+                placeholder="10-digit mobile number"
+                maxlength="10"
+                pattern="[0-9]{10}">
+              <span *ngIf="!editMode" class="value">{{ admin.mobileNumber || 'Not provided' }}</span>
+            </div>
+            <div class="detail-item full-width">
+              <label>Address</label>
+              <textarea 
+                *ngIf="editMode" 
+                [(ngModel)]="profileForm.address" 
+                class="form-textarea"
+                rows="3"
+                placeholder="Enter full address"></textarea>
+              <span *ngIf="!editMode" class="value">{{ admin.address || 'Not provided' }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Identification Information -->
+        <div class="details-section">
+          <h4>🆔 Identification Information</h4>
+          <div class="details-grid">
+            <div class="detail-item">
+              <label>Aadhar Number</label>
+              <input 
+                *ngIf="editMode" 
+                type="text" 
+                [(ngModel)]="profileForm.aadharNumber" 
+                class="form-input"
+                placeholder="12-digit Aadhar number"
+                maxlength="12"
+                pattern="[0-9]{12}">
+              <span *ngIf="!editMode" class="value">{{ admin.aadharNumber || 'Not provided' }}</span>
+            </div>
+            <div class="detail-item">
+              <label>PAN Number</label>
+              <input 
+                *ngIf="editMode" 
+                type="text" 
+                [(ngModel)]="profileForm.pan" 
+                class="form-input"
+                placeholder="10-character PAN"
+                maxlength="10"
+                style="text-transform: uppercase;">
+              <span *ngIf="!editMode" class="value">{{ admin.pan || 'Not provided' }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Qualifications -->
+        <div class="details-section">
+          <h4>🎓 Qualifications</h4>
+          <div class="detail-item full-width">
+            <label>Educational Qualifications</label>
+            <textarea 
+              *ngIf="editMode" 
+              [(ngModel)]="profileForm.qualifications" 
+              class="form-textarea"
+              rows="4"
+              placeholder="Enter your qualifications (e.g., MBA, B.Tech, CA, etc.)"></textarea>
+            <span *ngIf="!editMode" class="value">{{ admin.qualifications || 'Not provided' }}</span>
+          </div>
+        </div>
+
+        <!-- Branch Account (NeoBank A/C - where all charges & interest are deposited) -->
+        <div class="details-section">
+          <h4>🏦 Branch Account (NeoBank A/C)</h4>
+          <p class="note">Map your branch account where all user charges (bank, loan, CIBIL, debit card) and loan interest are deposited. You can also set this from Manager Dashboard → Branch Account.</p>
+          <p class="note" style="margin-top: 8px;"><strong>Verify to add:</strong> When adding a bank account, the <strong>Branch Account Name</strong> must match the Neo Bank name (e.g. NeoBank, Neo Bank, Neo Bank Main Branch). Only then will the account be verified and added.</p>
+          <div class="details-grid">
+            <div class="detail-item">
+              <label>Branch Account Number</label>
+              <input 
+                *ngIf="editMode" 
+                type="text" 
+                [(ngModel)]="profileForm.branchAccountNumber" 
+                class="form-input"
+                placeholder="e.g. NEOBANK000001 or your branch account">
+              <span *ngIf="!editMode" class="value">{{ admin.branchAccountNumber || 'Not set' }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Branch Account Name</label>
+              <input 
+                *ngIf="editMode" 
+                type="text" 
+                [(ngModel)]="profileForm.branchAccountName" 
+                class="form-input"
+                placeholder="e.g. NeoBank Main Branch">
+              <span *ngIf="!editMode" class="value">{{ admin.branchAccountName || 'Not set' }}</span>
+            </div>
+            <div class="detail-item">
+              <label>IFSC (optional)</label>
+              <input 
+                *ngIf="editMode" 
+                type="text" 
+                [(ngModel)]="profileForm.branchAccountIfsc" 
+                class="form-input"
+                placeholder="e.g. NEOB0001234">
+              <span *ngIf="!editMode" class="value">{{ admin.branchAccountIfsc || 'Not set' }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Salary Account (Admin salary will be credited here) -->
+        <div class="details-section">
+          <h4>💼 Salary Account (Admin)</h4>
+          <p class="note">Daily salary (₹850) will be transferred from Manager Branch Account to this account when your attendance is verified by ID card.</p>
+          <div class="details-grid">
+            <div class="detail-item">
+              <label>Salary Account Number</label>
+              <input 
+                *ngIf="editMode" 
+                type="text" 
+                [(ngModel)]="profileForm.salaryAccountNumber" 
+                class="form-input"
+                placeholder="Enter your NeoBank salary account number">
+              <span *ngIf="!editMode" class="value">{{ admin.salaryAccountNumber || 'Not set' }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Account Information -->
+        <div class="details-section">
+          <h4>ℹ️ Account Information</h4>
+          <div class="details-grid">
+            <div class="detail-item">
+              <label>Admin ID</label>
+              <span class="value">{{ admin.id || 'N/A' }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Created At</label>
+              <span class="value">{{ formatDate(admin.createdAt) }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Last Updated</label>
+              <span class="value">{{ formatDate(admin.lastUpdated) }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- NeoBank ID Card Information -->
+        <div class="details-section">
+          <h4>🏦 NeoBank Admin ID Card</h4>
+          <p class="note" *ngIf="admin.idCardNumber">
+            Your official NeoBank admin ID card has been generated by the manager. Please use this card for branch access and verification.
+          </p>
+          <p class="note" *ngIf="!admin.idCardNumber">
+            Your NeoBank admin ID card has not been generated yet. Please contact your manager to generate it.
+          </p>
+          <div class="details-grid">
+            <div class="detail-item">
+              <label>ID Card Number</label>
+              <span class="value">{{ admin.idCardNumber || 'Not generated' }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Designation on Card</label>
+              <span class="value">{{ admin.idCardDesignation || admin.role || 'N/A' }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Department on Card</label>
+              <span class="value">{{ admin.idCardDepartment || 'N/A' }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Generated Time</label>
+              <span class="value">
+                {{ admin.idCardGeneratedAt ? (formatDate(admin.idCardGeneratedAt)) : 'N/A' }}
+              </span>
+            </div>
+            <div class="detail-item">
+              <label>Generated Count</label>
+              <span class="value">{{ admin.idCardGeneratedCount || 0 }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Last Updated By</label>
+              <span class="value">{{ admin.idCardLastUpdatedBy || 'N/A' }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Valid Till</label>
+              <span class="value">
+                {{ admin.idCardValidTill ? (formatDate(admin.idCardValidTill)) : 'N/A' }}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div *ngIf="!isLoading && !admin" class="error-container">
+    <i class="fa fa-exclamation-circle"></i>
+    <p>Failed to load admin profile. Please try again.</p>
+    <button class="retry-btn" (click)="loadProfile()">Retry</button>
+  </div>
+</div>
+
+
+
+

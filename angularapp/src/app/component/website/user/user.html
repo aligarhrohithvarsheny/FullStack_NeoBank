@@ -1,0 +1,784 @@
+<div class="jpm-login-page">
+  <!-- Left Section - Form Area -->
+  <div class="jpm-left-section">
+    <div class="jpm-form-wrapper">
+      <!-- NeoBank Logo & Branding -->
+      <div class="jpm-brand">
+        <h1 class="jpm-logo-text">NeoBank</h1>
+        <span class="jpm-sub-brand">PRIVATE BANK</span>
+      </div>
+
+      <!-- ═══════════ UNIFIED LOGIN (Default View) ═══════════ -->
+      <div *ngIf="currentPage === 'login' && !showOtpInput" class="jpm-form-section">
+        <!-- Account Type Hint -->
+        <p class="jpm-account-hint">
+          Savings, Current or Salary — sign in with your Account Number / Email
+        </p>
+
+        <div class="jpm-field">
+          <label class="jpm-label">Username</label>
+          <input
+            type="text"
+            class="jpm-input"
+            [(ngModel)]="unifiedAccountNumber"
+            name="unifiedAccountNumber"
+            placeholder=""
+            (keyup.enter)="unifiedLogin()"
+          />
+        </div>
+
+        <div class="jpm-remember">
+          <label class="jpm-checkbox-label">
+            <input type="checkbox" [(ngModel)]="rememberUsername" name="rememberUsername" />
+            <span>Remember username</span>
+          </label>
+        </div>
+
+        <div class="jpm-field">
+          <label class="jpm-label">Password</label>
+          <div class="jpm-password-wrapper">
+            <input
+              [type]="showPassword ? 'text' : 'password'"
+              class="jpm-input jpm-password-input"
+              [(ngModel)]="unifiedPassword"
+              name="unifiedPassword"
+              (keyup.enter)="unifiedLogin()"
+            />
+            <button type="button" class="jpm-show-btn" (click)="togglePasswordVisibility()">
+              {{ showPassword ? 'Hide' : 'Show' }}
+            </button>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          class="jpm-signin-btn"
+          (click)="unifiedLogin()"
+          [disabled]="isUnifiedLoggingIn"
+        >
+          {{ isUnifiedLoggingIn ? 'Signing in...' : 'Sign in' }}
+        </button>
+
+        <!-- Error/Success Messages -->
+        <div class="jpm-message-section" *ngIf="errorMessage || successMessage">
+          <div class="jpm-error" *ngIf="errorMessage">{{ errorMessage }}</div>
+          <div class="jpm-success" *ngIf="successMessage">{{ successMessage }}</div>
+        </div>
+
+        <!-- Account Unlock -->
+        <div *ngIf="showUnlockButton" class="jpm-unlock-link">
+          <a href="javascript:void(0)" (click)="showUnlockModal = true">Unlock Account</a>
+        </div>
+
+        <!-- More Login Options -->
+        <div class="jpm-more-options">
+          <a href="javascript:void(0)" (click)="showForgotPasswordModal()" class="jpm-link">Forgot Password?</a>
+          <span class="jpm-separator">|</span>
+          <a href="javascript:void(0)" (click)="switchToSignup()" class="jpm-link">Create Account</a>
+        </div>
+
+        <!-- Advanced Login Options -->
+        <div class="jpm-advanced-options">
+          <a href="javascript:void(0)" (click)="switchToSalarySignup()" class="jpm-link-small">Open Salary Account</a>
+          <span class="jpm-separator-small">|</span>
+          <a href="javascript:void(0)" (click)="switchToCurrentTeamLogin()" class="jpm-link-small">Team Login</a>
+        </div>
+      </div>
+
+      <!-- ═══════════ OTP VERIFICATION ═══════════ -->
+      <div *ngIf="showOtpInput" class="jpm-form-section">
+        <h3 class="jpm-section-title">Enter OTP</h3>
+        <p class="jpm-hint">We've sent a 6-digit OTP to your email. Enter it below to complete login.</p>
+
+        <form (ngSubmit)="verifyOtp()" class="jpm-otp-form">
+          <div class="jpm-field">
+            <label class="jpm-label">OTP Code</label>
+            <input
+              type="text"
+              class="jpm-input"
+              [(ngModel)]="otpCode"
+              name="otpCode"
+              placeholder="Enter 6-digit OTP"
+              maxlength="6"
+              pattern="[0-9]{6}"
+              autocomplete="off"
+            />
+          </div>
+
+          <div class="jpm-otp-actions">
+            <button type="button" class="jpm-cancel-btn" (click)="cancelOtpVerification()" [disabled]="verifyingOtp">Cancel</button>
+            <button type="submit" class="jpm-signin-btn" [disabled]="verifyingOtp || !otpCode || otpCode.length !== 6">
+              {{ verifyingOtp ? 'Verifying...' : 'Verify OTP' }}
+            </button>
+          </div>
+
+          <div class="jpm-resend">
+            <a href="javascript:void(0)" (click)="resendOtp()" class="jpm-link" [class.disabled]="resendingOtp">
+              {{ resendingOtp ? 'Sending...' : 'Resend OTP' }}
+            </a>
+          </div>
+        </form>
+
+        <div class="jpm-message-section" *ngIf="errorMessage || successMessage">
+          <div class="jpm-error" *ngIf="errorMessage">{{ errorMessage }}</div>
+          <div class="jpm-success" *ngIf="successMessage">{{ successMessage }}</div>
+        </div>
+      </div>
+
+      <!-- ═══════════ SIGNUP FORM (3-Step with Email OTP) ═══════════ -->
+      <div *ngIf="currentPage === 'signup'" class="jpm-form-section">
+        <h3 class="jpm-section-title">Create Savings Account</h3>
+
+        <!-- Step Indicators -->
+        <div class="jpm-signup-steps">
+          <div class="jpm-step-indicator" [class.active]="signupStep >= 1" [class.completed]="signupStep > 1">
+            <span class="jpm-step-num">1</span>
+            <span class="jpm-step-text">Your Details</span>
+          </div>
+          <div class="jpm-step-line" [class.active]="signupStep > 1"></div>
+          <div class="jpm-step-indicator" [class.active]="signupStep >= 2" [class.completed]="signupStep > 2">
+            <span class="jpm-step-num">2</span>
+            <span class="jpm-step-text">Verify Email</span>
+          </div>
+          <div class="jpm-step-line" [class.active]="signupStep > 2"></div>
+          <div class="jpm-step-indicator" [class.active]="signupStep >= 3">
+            <span class="jpm-step-num">3</span>
+            <span class="jpm-step-text">Set Password</span>
+          </div>
+        </div>
+
+        <!-- STEP 1: Enter Name, Email, Phone -->
+        <div *ngIf="signupStep === 1">
+          <p class="jpm-hint">Enter your details to get started with your Savings Account</p>
+          <div class="jpm-field">
+            <label class="jpm-label">Full Name</label>
+            <input type="text" class="jpm-input" [(ngModel)]="signupName" name="signupName" placeholder="Enter your full name" required />
+          </div>
+          <div class="jpm-field">
+            <label class="jpm-label">Email Address</label>
+            <input type="email" class="jpm-input" [(ngModel)]="signupEmail" name="signupEmail" placeholder="Enter your email" required />
+          </div>
+          <div class="jpm-field">
+            <label class="jpm-label">Mobile Number</label>
+            <input type="tel" class="jpm-input" [(ngModel)]="signupMobile" name="signupMobile" placeholder="Enter 10-digit mobile number" maxlength="10" required />
+          </div>
+          <button type="button" class="jpm-signin-btn" (click)="sendSignupOtp()" [disabled]="signupOtpSending">
+            {{ signupOtpSending ? 'Sending OTP...' : 'Verify Email & Continue' }}
+          </button>
+        </div>
+
+        <!-- STEP 2: Email OTP Verification -->
+        <div *ngIf="signupStep === 2">
+          <p class="jpm-hint">We've sent a 6-digit OTP to <strong>{{ signupEmail }}</strong>. Enter it below to verify your email.</p>
+          <div class="jpm-field">
+            <label class="jpm-label">Enter OTP</label>
+            <input type="text" class="jpm-input" [(ngModel)]="signupOtp" name="signupOtp" placeholder="Enter 6-digit OTP" maxlength="6" (keyup.enter)="verifySignupOtp()" />
+          </div>
+          <button type="button" class="jpm-signin-btn" (click)="verifySignupOtp()" [disabled]="signupOtpVerifying">
+            {{ signupOtpVerifying ? 'Verifying...' : 'Verify OTP' }}
+          </button>
+          <div class="jpm-more-options" style="margin-top: 12px;">
+            <a href="javascript:void(0)" (click)="resendSignupOtp()" class="jpm-link" [class.disabled]="signupResending">
+              {{ signupResending ? 'Resending...' : 'Resend OTP' }}
+            </a>
+            <span class="jpm-separator">|</span>
+            <a href="javascript:void(0)" (click)="signupStep = 1" class="jpm-link">Change Email</a>
+          </div>
+        </div>
+
+        <!-- STEP 3: Set Password & Create Account -->
+        <div *ngIf="signupStep === 3">
+          <p class="jpm-hint">Email verified! Set your password to complete Savings Account signup.</p>
+          <div class="jpm-verified-badge">
+            <i class="fa fa-check-circle"></i> {{ signupEmail }} — Verified
+          </div>
+          <div class="jpm-field">
+            <label class="jpm-label">Full Name</label>
+            <input type="text" class="jpm-input" [value]="signupName" disabled />
+          </div>
+          <div class="jpm-field">
+            <label class="jpm-label">Mobile Number</label>
+            <input type="tel" class="jpm-input" [value]="signupMobile" disabled />
+          </div>
+          <form (ngSubmit)="createAccount()">
+            <div class="jpm-field">
+              <label class="jpm-label">Create Password</label>
+              <input type="password" class="jpm-input" [(ngModel)]="signupPassword" name="signupPassword" required />
+            </div>
+            <div class="jpm-field">
+              <label class="jpm-label">Confirm Password</label>
+              <input type="password" class="jpm-input" [(ngModel)]="confirmPassword" name="confirmPassword" required />
+            </div>
+            <div class="jpm-remember">
+              <label class="jpm-checkbox-label">
+                <input type="checkbox" [(ngModel)]="termsAccepted" name="termsAccepted" required />
+                <span>I agree to the Terms & Conditions and Privacy Policy</span>
+              </label>
+            </div>
+            <button type="submit" class="jpm-signin-btn">Create Savings Account</button>
+          </form>
+        </div>
+
+        <div class="jpm-message-section" *ngIf="errorMessage || successMessage">
+          <div class="jpm-error" *ngIf="errorMessage">{{ errorMessage }}</div>
+          <div class="jpm-success" *ngIf="successMessage">{{ successMessage }}</div>
+        </div>
+
+        <div class="jpm-more-options">
+          <a href="javascript:void(0)" (click)="switchToLogin()" class="jpm-link">Already have an account? Sign in</a>
+        </div>
+      </div>
+
+      <!-- ═══════════ SALARY LOGIN ═══════════ -->
+      <div *ngIf="currentPage === 'salary-login'" class="jpm-form-section">
+        <h3 class="jpm-section-title">Salary Account Login</h3>
+        <p class="jpm-hint">Login with your salary account number and password</p>
+
+        <form (ngSubmit)="salaryLogin()">
+          <div class="jpm-field">
+            <label class="jpm-label">Account Number</label>
+            <input type="text" class="jpm-input" [(ngModel)]="salaryAccountNumber" name="salaryAccountNumber" placeholder="e.g. 50XXXXXXXX" required />
+          </div>
+          <div class="jpm-field">
+            <label class="jpm-label">Password</label>
+            <input type="password" class="jpm-input" [(ngModel)]="salaryPassword" name="salaryPassword" required />
+          </div>
+          <button type="submit" class="jpm-signin-btn" [disabled]="salaryLoggingIn">
+            {{ salaryLoggingIn ? 'Signing in...' : 'Sign in' }}
+          </button>
+        </form>
+
+        <div class="jpm-message-section" *ngIf="errorMessage || successMessage">
+          <div class="jpm-error" *ngIf="errorMessage" [class.jpm-error-locked]="errorMessage.includes('locked')">
+            <i class="fa fa-lock" *ngIf="errorMessage.includes('locked')" style="margin-right: 6px;"></i>{{ errorMessage }}
+          </div>
+          <div class="jpm-success" *ngIf="successMessage">{{ successMessage }}</div>
+        </div>
+
+        <div class="jpm-more-options">
+          <a href="javascript:void(0)" (click)="switchToSalarySignup()" class="jpm-link">First time? Sign up</a>
+          <span class="jpm-separator">|</span>
+          <a href="javascript:void(0)" (click)="switchToLogin()" class="jpm-link">Back to Sign in</a>
+        </div>
+      </div>
+
+      <!-- ═══════════ SALARY SIGNUP ═══════════ -->
+      <div *ngIf="currentPage === 'salary-signup'" class="jpm-form-section">
+        <h3 class="jpm-section-title">Salary Account Signup</h3>
+        <p class="jpm-hint">Verify your Customer ID and set a password</p>
+
+        <div *ngIf="!salaryVerified">
+          <div class="jpm-field">
+            <label class="jpm-label">Customer ID</label>
+            <input type="text" class="jpm-input" [(ngModel)]="salaryCustomerId" name="salaryCustomerId" placeholder="e.g. CUSTXXXXX" (keyup.enter)="verifyCustomerId()" />
+          </div>
+          <button type="button" class="jpm-signin-btn" (click)="verifyCustomerId()">Verify Customer ID</button>
+        </div>
+
+        <div *ngIf="salaryVerified">
+          <div class="jpm-verified-card">
+            <p><strong>Employee:</strong> {{ salaryEmployeeName }}</p>
+            <p><strong>Account:</strong> {{ salaryExistingAccountNumber }}</p>
+          </div>
+          <form (ngSubmit)="salarySignup()">
+            <div class="jpm-field">
+              <label class="jpm-label">Create Password</label>
+              <input type="password" class="jpm-input" [(ngModel)]="salarySignupPassword" name="salarySignupPassword" required />
+            </div>
+            <div class="jpm-field">
+              <label class="jpm-label">Confirm Password</label>
+              <input type="password" class="jpm-input" [(ngModel)]="salaryConfirmPassword" name="salaryConfirmPassword" required />
+            </div>
+            <button type="submit" class="jpm-signin-btn" [disabled]="salarySigningUp">
+              {{ salarySigningUp ? 'Setting Password...' : 'Set Password & Register' }}
+            </button>
+          </form>
+        </div>
+
+        <div class="jpm-message-section" *ngIf="errorMessage || successMessage">
+          <div class="jpm-error" *ngIf="errorMessage">{{ errorMessage }}</div>
+          <div class="jpm-success" *ngIf="successMessage">{{ successMessage }}</div>
+        </div>
+
+        <div class="jpm-more-options">
+          <a href="javascript:void(0)" (click)="switchToSalaryLogin()" class="jpm-link">Already registered? Sign in</a>
+          <span class="jpm-separator">|</span>
+          <a href="javascript:void(0)" (click)="switchToLogin()" class="jpm-link">Back to Sign in</a>
+        </div>
+      </div>
+
+      <!-- ═══════════ CURRENT ACCOUNT LOGIN ═══════════ -->
+      <div *ngIf="currentPage === 'current-login'" class="jpm-form-section">
+        <h3 class="jpm-section-title">Current Account Login</h3>
+        <p class="jpm-hint">Login with your current account number and password</p>
+
+        <form (ngSubmit)="currentAccLogin()">
+          <div class="jpm-field">
+            <label class="jpm-label">Account Number</label>
+            <input type="text" class="jpm-input" [(ngModel)]="currentAccNumber" name="currentAccNumber" placeholder="e.g. 60XXXXXXXX" required />
+          </div>
+          <div class="jpm-field">
+            <label class="jpm-label">Password</label>
+            <input type="password" class="jpm-input" [(ngModel)]="currentAccPassword" name="currentAccPassword" required />
+          </div>
+          <button type="submit" class="jpm-signin-btn" [disabled]="currentAccLoggingIn">
+            {{ currentAccLoggingIn ? 'Signing in...' : 'Sign in' }}
+          </button>
+        </form>
+
+        <div class="jpm-message-section" *ngIf="errorMessage || successMessage">
+          <div class="jpm-error" *ngIf="errorMessage">{{ errorMessage }}</div>
+          <div class="jpm-success" *ngIf="successMessage">{{ successMessage }}</div>
+        </div>
+
+        <div class="jpm-more-options">
+          <a href="javascript:void(0)" (click)="switchToCurrentSignup()" class="jpm-link">First time? Sign up</a>
+          <span class="jpm-separator">|</span>
+          <a href="javascript:void(0)" (click)="switchToCurrentTeamLogin()" class="jpm-link">Team Login</a>
+          <span class="jpm-separator">|</span>
+          <a href="javascript:void(0)" (click)="switchToLogin()" class="jpm-link">Back to Sign in</a>
+        </div>
+      </div>
+
+      <!-- ═══════════ CURRENT ACCOUNT TEAM LOGIN ═══════════ -->
+      <div *ngIf="currentPage === 'current-team-login'" class="jpm-form-section">
+        <h3 class="jpm-section-title">Team Member Login</h3>
+        <p class="jpm-hint">Login with your team email and password</p>
+
+        <form (ngSubmit)="currentAccTeamLogin()">
+          <div class="jpm-field">
+            <label class="jpm-label">Email Address</label>
+            <input type="email" class="jpm-input" [(ngModel)]="teamLoginEmail" name="teamLoginEmail" required />
+          </div>
+          <div class="jpm-field">
+            <label class="jpm-label">Password</label>
+            <input type="password" class="jpm-input" [(ngModel)]="teamLoginPassword" name="teamLoginPassword" required />
+          </div>
+          <button type="submit" class="jpm-signin-btn" [disabled]="teamLoggingIn">
+            {{ teamLoggingIn ? 'Signing in...' : 'Team Sign in' }}
+          </button>
+        </form>
+
+        <div class="jpm-message-section" *ngIf="errorMessage || successMessage">
+          <div class="jpm-error" *ngIf="errorMessage">{{ errorMessage }}</div>
+          <div class="jpm-success" *ngIf="successMessage">{{ successMessage }}</div>
+        </div>
+
+        <div class="jpm-more-options">
+          <a href="javascript:void(0)" (click)="switchToCurrentLogin()" class="jpm-link">Business Owner Login</a>
+          <span class="jpm-separator">|</span>
+          <a href="javascript:void(0)" (click)="switchToLogin()" class="jpm-link">Back to Sign in</a>
+        </div>
+      </div>
+
+      <!-- ═══════════ CURRENT ACCOUNT SIGNUP ═══════════ -->
+      <div *ngIf="currentPage === 'current-signup'" class="jpm-form-section">
+        <h3 class="jpm-section-title">Current Account Signup</h3>
+        <p class="jpm-hint">Verify your Customer ID and set a password</p>
+
+        <div *ngIf="!currentAccVerified">
+          <div class="jpm-field">
+            <label class="jpm-label">Customer ID</label>
+            <input type="text" class="jpm-input" [(ngModel)]="currentAccCustomerId" name="currentAccCustomerId" placeholder="e.g. CUSTXXXXX" (keyup.enter)="verifyCurrentCustomerId()" />
+          </div>
+          <button type="button" class="jpm-signin-btn" (click)="verifyCurrentCustomerId()">Verify Customer ID</button>
+        </div>
+
+        <div *ngIf="currentAccVerified">
+          <div class="jpm-verified-card">
+            <p><strong>Owner:</strong> {{ currentAccOwnerName }}</p>
+            <p><strong>Business:</strong> {{ currentAccBusinessName }}</p>
+            <p><strong>Account:</strong> {{ currentAccExistingAccountNumber }}</p>
+          </div>
+          <form (ngSubmit)="currentAccSignup()">
+            <div class="jpm-field">
+              <label class="jpm-label">Create Password</label>
+              <input type="password" class="jpm-input" [(ngModel)]="currentAccSignupPassword" name="currentAccSignupPassword" required />
+            </div>
+            <div class="jpm-field">
+              <label class="jpm-label">Confirm Password</label>
+              <input type="password" class="jpm-input" [(ngModel)]="currentAccConfirmPassword" name="currentAccConfirmPassword" required />
+            </div>
+            <button type="submit" class="jpm-signin-btn" [disabled]="currentAccSigningUp">
+              {{ currentAccSigningUp ? 'Setting Password...' : 'Set Password & Register' }}
+            </button>
+          </form>
+        </div>
+
+        <div class="jpm-message-section" *ngIf="errorMessage || successMessage">
+          <div class="jpm-error" *ngIf="errorMessage">{{ errorMessage }}</div>
+          <div class="jpm-success" *ngIf="successMessage">{{ successMessage }}</div>
+        </div>
+
+        <div class="jpm-more-options">
+          <a href="javascript:void(0)" (click)="switchToCurrentLogin()" class="jpm-link">Already registered? Sign in</a>
+          <span class="jpm-separator">|</span>
+          <a href="javascript:void(0)" (click)="switchToLogin()" class="jpm-link">Back to Sign in</a>
+        </div>
+      </div>
+
+      <!-- ═══════════ QR Login Mode ═══════════ -->
+      <div *ngIf="isQrLoginMode" class="jpm-qr-mode-banner">
+        <p>QR Code Login Mode — Enter your credentials to complete login</p>
+      </div>
+
+    </div>
+
+    <!-- Footer Links (like JPM) -->
+    <div class="jpm-footer">
+      <div class="jpm-footer-links">
+        <a href="javascript:void(0)" class="jpm-footer-link">Language</a>
+        <span class="jpm-footer-sep">|</span>
+        <a href="javascript:void(0)" class="jpm-footer-link">Cookies Policy</a>
+        <span class="jpm-footer-sep">|</span>
+        <a href="javascript:void(0)" class="jpm-footer-link">Privacy Policy</a>
+        <span class="jpm-footer-sep">|</span>
+        <a href="javascript:void(0)" class="jpm-footer-link">NeoBank Private Bank</a>
+      </div>
+      <p class="jpm-footer-security">System Requirement & Security Precautions</p>
+      <p class="jpm-footer-copy">&copy; 2026 "NeoBank Private Bank" is the marketing name of the private banking activities of NeoBank, N.A. & its affiliates worldwide</p>
+    </div>
+  </div>
+
+  <!-- Right Section - Decorative Image (like JPM marble columns) -->
+  <div class="jpm-right-section">
+    <div class="jpm-image-overlay"></div>
+  </div>
+
+  <!-- Account Unlock Modal -->
+  <div class="modal-overlay" *ngIf="showUnlockModal" (click)="closeUnlockModal()">
+    <div class="unlock-modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3><span class="unlock-icon">🔓</span> Unlock Account</h3>
+        <button class="close-btn" (click)="closeUnlockModal()">×</button>
+      </div>
+      
+      <div class="modal-body">
+        <p class="unlock-instructions">
+          Your account has been locked due to multiple failed login attempts. 
+          To unlock your account, please provide the following information:
+        </p>
+        
+        <form (ngSubmit)="unlockAccount()" class="unlock-form">
+          <div class="input-group">
+            <label>Email Address</label>
+            <input type="email" [(ngModel)]="unlockEmail" name="unlockEmail" 
+                   placeholder="Enter your registered email" required />
+          </div>
+          
+          <div class="input-group">
+            <label>First 4 Digits of Aadhar Number</label>
+            <input type="text" [(ngModel)]="unlockAadharFirst4" name="unlockAadharFirst4" 
+                   placeholder="Enter first 4 digits" maxlength="4" pattern="[0-9]{4}" required />
+            <div class="input-help">
+              <span class="help-text">Enter only the first 4 digits of your Aadhar number</span>
+            </div>
+          </div>
+          
+          <div class="input-group">
+            <label>Date of Birth</label>
+            <input type="date" [(ngModel)]="unlockDob" name="unlockDob" required />
+            <div class="input-help">
+              <span class="help-text">Enter date of birth as registered in your account</span>
+            </div>
+          </div>
+          
+          <div class="unlock-actions">
+            <button type="button" class="cancel-btn" (click)="closeUnlockModal()">Cancel</button>
+            <button type="submit" class="unlock-submit-btn" [disabled]="unlockingAccount">
+              <span *ngIf="unlockingAccount" class="loading-icon">⏳</span>
+              <span *ngIf="!unlockingAccount" class="unlock-icon">🔓</span>
+              {{ unlockingAccount ? 'Unlocking...' : 'Unlock Account' }}
+            </button>
+          </div>
+        </form>
+        
+        <div class="unlock-footer">
+          <p class="security-note">
+            <span class="security-icon">🛡️</span>
+            Your information is secure and encrypted. We use this data only for account verification.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Graphical Password Setup Modal -->
+  <div class="modal-overlay" *ngIf="showGraphicalPasswordSetup" (click)="skipGraphicalPasswordSetup()">
+    <div class="modal-content graphical-password-setup-modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>🖼️ Set Up Graphical Password</h3>
+        <button class="close-btn" (click)="skipGraphicalPasswordSetup()">×</button>
+      </div>
+      
+      <div class="modal-body">
+        <div class="setup-intro">
+          <p class="intro-text">
+            <strong>Enhance your account security!</strong> Set up a graphical password by selecting 5 images in your preferred sequence. 
+            This will be used for future logins instead of your regular password.
+            <span *ngIf="!isUserLoggedIn()" class="login-note">You'll need to enter your email and password to verify your identity.</span>
+          </p>
+          <div class="security-benefits">
+            <div class="benefit-item">
+              <span class="benefit-icon">🔒</span>
+              <span>More secure than text passwords</span>
+            </div>
+            <div class="benefit-item">
+              <span class="benefit-icon">🎨</span>
+              <span>Easy to remember with visual cues</span>
+            </div>
+            <div class="benefit-item">
+              <span class="benefit-icon">⚡</span>
+              <span>Faster login experience</span>
+            </div>
+          </div>
+        </div>
+        
+        <form (ngSubmit)="setupGraphicalPassword()" class="setup-form">
+          <div class="input-group" *ngIf="!isUserLoggedIn()">
+            <label>Email/User ID</label>
+            <input 
+              type="text" 
+              [(ngModel)]="loginUserId" 
+              name="loginUserId" 
+              placeholder="Enter your email or User ID" 
+              required 
+              class="email-input"
+            />
+            <div class="input-help">
+              <span class="help-text">Enter the email/User ID you use to login</span>
+            </div>
+          </div>
+          
+          <div class="input-group">
+            <label>Enter Your Password (for verification)</label>
+            <input 
+              type="password" 
+              [(ngModel)]="setupPassword" 
+              name="setupPassword" 
+              placeholder="Enter your current password" 
+              required 
+              class="password-input"
+            />
+            <div class="input-help">
+              <span class="help-text">We need to verify your identity before setting up graphical password</span>
+            </div>
+          </div>
+          
+          <div class="graphical-password-setup-section">
+            <app-graphical-password
+              mode="setup"
+              [requiredSelections]="5"
+              (passwordComplete)="onSetupGraphicalPasswordComplete($event)"
+              (selectionChanged)="onSetupGraphicalPasswordChanged($event)"
+            ></app-graphical-password>
+          </div>
+          
+          <div class="error-message" *ngIf="errorMessage">
+            <span class="error-icon">⚠️</span>
+            {{ errorMessage }}
+          </div>
+          
+          <div class="modal-actions">
+            <button type="button" class="skip-btn" (click)="skipGraphicalPasswordSetup()">
+              Skip for Now
+            </button>
+            <button 
+              type="submit" 
+              class="setup-submit-btn" 
+              [disabled]="settingUpGraphicalPassword || !setupPassword || setupGraphicalPasswordSequence.length < 5 || (!isUserLoggedIn() && !loginUserId)"
+            >
+              <span *ngIf="settingUpGraphicalPassword" class="loading-icon">⏳</span>
+              <span *ngIf="!settingUpGraphicalPassword">✓</span>
+              {{ settingUpGraphicalPassword ? 'Setting Up...' : 'Set Graphical Password' }}
+            </button>
+          </div>
+        </form>
+        
+        <div class="setup-footer">
+          <p class="security-note">
+            <span class="security-icon">🛡️</span>
+            Your graphical password is encrypted and stored securely. You can change it anytime from your profile settings.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Forgot Password Modal -->
+  <div class="modal-overlay" *ngIf="showForgotPasswordModalFlag" (click)="closeForgotPasswordModal()">
+    <div class="modal-content forgot-password-modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>🔐 Reset Password</h3>
+        <button class="close-btn" (click)="closeForgotPasswordModal()">×</button>
+      </div>
+      
+      <div class="modal-body">
+        <!-- Success Screen -->
+        <div *ngIf="showResetSuccessScreen" class="success-screen">
+          <div class="success-icon-container">
+            <div class="success-icon"></div>
+          </div>
+          <h3 class="success-title">Password Reset Successful!</h3>
+          <p class="success-message">
+            Your password has been successfully reset. You can now login with your new password.
+          </p>
+          <div class="success-actions">
+            <button type="button" class="success-btn" (click)="closeSuccessScreen()">
+              <span class="login-icon"></span>
+              Continue to Login
+            </button>
+          </div>
+        </div>
+
+        <!-- Reset Form -->
+        <div *ngIf="!showResetSuccessScreen">
+          <p class="instruction-text">
+            Choose a verification method to reset your password.
+          </p>
+          
+          <!-- Verification Method Selection -->
+          <div class="verification-method-selection">
+            <label class="method-label">Verification Method:</label>
+            <div class="method-options">
+              <label class="method-option">
+                <input 
+                  type="radio" 
+                  name="resetVerificationMethod" 
+                  [(ngModel)]="resetVerificationMethod" 
+                  value="email" 
+                  (change)="onVerificationMethodChange()"
+                />
+                <span class="method-text">Email OTP</span>
+              </label>
+              <label class="method-option">
+                <input 
+                  type="radio" 
+                  name="resetVerificationMethod" 
+                  [(ngModel)]="resetVerificationMethod" 
+                  value="aadhar" 
+                  (change)="onVerificationMethodChange()"
+                />
+                <span class="method-text">Aadhar Verification</span>
+              </label>
+            </div>
+          </div>
+          
+          <form (ngSubmit)="resetPassword()" class="reset-form">
+            <div class="form-row">
+              <div class="input-group">
+                <label>Email Address</label>
+                <input type="email" [(ngModel)]="resetEmail" name="resetEmail" placeholder="Enter your email address" required />
+              </div>
+            </div>
+            
+            <!-- Email OTP Verification -->
+            <div *ngIf="resetVerificationMethod === 'email'" class="email-otp-section">
+              <div class="form-row" *ngIf="!showResetOtpInput">
+                <div class="input-group">
+                  <button type="button" class="send-otp-btn" (click)="sendResetOtp()" [disabled]="sendingResetOtp || !resetEmail">
+                    <span *ngIf="sendingResetOtp" class="loading-icon">⏳</span>
+                    <span *ngIf="!sendingResetOtp">📧</span>
+                    {{ sendingResetOtp ? 'Sending OTP...' : 'Send OTP to Email' }}
+                  </button>
+                  <div class="input-help">
+                    <span class="help-text">Click the button to receive an OTP via email</span>
+                  </div>
+                </div>
+              </div>
+              
+              <div class="form-row" *ngIf="showResetOtpInput">
+                <div class="input-group">
+                  <label>Enter OTP</label>
+                  <input 
+                    type="text" 
+                    [(ngModel)]="resetOtp" 
+                    name="resetOtp" 
+                    placeholder="Enter 6-digit OTP" 
+                    maxlength="6" 
+                    pattern="[0-9]{6}" 
+                    required 
+                    class="otp-input"
+                  />
+                  <div class="input-help">
+                    <span class="help-text">Enter the 6-digit OTP sent to your email</span>
+                    <button type="button" class="resend-otp-link" (click)="resendResetOtp()" [disabled]="sendingResetOtp">
+                      {{ sendingResetOtp ? 'Sending...' : 'Resend OTP' }}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Aadhar Verification -->
+            <div *ngIf="resetVerificationMethod === 'aadhar'" class="aadhar-verification-section">
+              <div class="form-row">
+                <div class="input-group">
+                  <label>First 4 digits of Aadhar Number</label>
+                  <input 
+                    type="text" 
+                    [(ngModel)]="resetAadharFirst4" 
+                    name="resetAadharFirst4" 
+                    placeholder="Enter first 4 digits" 
+                    maxlength="4" 
+                    pattern="[0-9]{4}" 
+                    required 
+                  />
+                  <div class="input-help">
+                    <span class="help-text">Enter only the first 4 digits of your 12-digit Aadhar number</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div class="form-row">
+              <div class="input-group">
+                <label>New Password</label>
+                <input type="password" [(ngModel)]="newPassword" name="newPassword" placeholder="Enter new password" required />
+              </div>
+            </div>
+            
+            <div class="form-row">
+              <div class="input-group">
+                <label>Confirm New Password</label>
+                <input type="password" [(ngModel)]="confirmNewPassword" name="confirmNewPassword" placeholder="Confirm new password" required />
+              </div>
+            </div>
+            
+            <!-- Success Message -->
+            <div *ngIf="successMessage && !errorMessage" class="success-message">
+              <span class="success-icon">✓</span>
+              {{ successMessage }}
+            </div>
+            
+            <!-- Error Message -->
+            <div *ngIf="errorMessage" class="error-message">
+              <span class="error-icon">❌</span>
+              {{ errorMessage }}
+            </div>
+            
+            <div class="modal-actions">
+              <button type="button" class="cancel-btn" (click)="closeForgotPasswordModal()">Cancel</button>
+              <button 
+                type="submit" 
+                class="reset-submit-btn" 
+                [disabled]="resettingPassword || (resetVerificationMethod === 'email' && !showResetOtpInput)"
+              >
+                <span *ngIf="resettingPassword" class="loading-icon">⏳</span>
+                <span *ngIf="!resettingPassword">✓</span>
+                {{ resettingPassword ? 'Resetting...' : 'Reset Password' }}
+              </button>
+            </div>
+          </form>
+        </div>
+        
+        <div class="reset-footer">
+          <p class="security-note">
+            <span class="security-icon">🛡️</span>
+            Your information is secure and encrypted. We use this data only for password reset verification.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

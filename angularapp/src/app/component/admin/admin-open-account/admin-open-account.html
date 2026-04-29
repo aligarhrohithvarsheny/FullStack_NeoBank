@@ -1,0 +1,972 @@
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+<div class="admin-open-account-wrapper">
+  <!-- Header -->
+  <div class="page-header">
+    <div class="header-left">
+      <button class="back-btn" (click)="goBack()">
+        <i class="fa fa-arrow-left"></i>
+      </button>
+      <div class="header-title">
+        <h1><i class="fa fa-user-plus"></i> Open Account (Without Video KYC)</h1>
+        <p>Open Savings, Current & Salary accounts directly - Admin verified</p>
+      </div>
+    </div>
+    <div class="header-right">
+      <span class="admin-badge"><i class="fa fa-user-shield"></i> {{ adminName }}</span>
+    </div>
+  </div>
+
+  <!-- Alert -->
+  <div class="alert-box" *ngIf="showAlert" [ngClass]="alertType === 'success' ? 'alert-success' : 'alert-error'">
+    <i [ngClass]="alertType === 'success' ? 'fa fa-check-circle' : 'fa fa-exclamation-circle'"></i>
+    <span>{{ alertMessage }}</span>
+    <button class="alert-close" (click)="showAlert = false"><i class="fa fa-times"></i></button>
+  </div>
+
+  <!-- Stats Cards -->
+  <div class="stats-grid">
+    <div class="stat-card stat-total">
+      <div class="stat-icon"><i class="fa fa-file-alt"></i></div>
+      <div class="stat-info">
+        <h3>{{ stats.totalApplications }}</h3>
+        <p>Total Applications</p>
+      </div>
+    </div>
+    <div class="stat-card stat-pending">
+      <div class="stat-icon"><i class="fa fa-clock"></i></div>
+      <div class="stat-info">
+        <h3>{{ stats.pendingCount }}</h3>
+        <p>Pending</p>
+      </div>
+    </div>
+    <div class="stat-card stat-verified">
+      <div class="stat-icon"><i class="fa fa-user-check"></i></div>
+      <div class="stat-info">
+        <h3>{{ stats.adminVerifiedCount }}</h3>
+        <p>Admin Verified</p>
+      </div>
+    </div>
+    <div class="stat-card stat-approved">
+      <div class="stat-icon"><i class="fa fa-check-double"></i></div>
+      <div class="stat-info">
+        <h3>{{ stats.managerApprovedCount }}</h3>
+        <p>Manager Approved</p>
+      </div>
+    </div>
+    <div class="stat-card stat-savings">
+      <div class="stat-icon"><i class="fa fa-piggy-bank"></i></div>
+      <div class="stat-info">
+        <h3>{{ stats.savingsCount }}</h3>
+        <p>Savings</p>
+      </div>
+    </div>
+    <div class="stat-card stat-current">
+      <div class="stat-icon"><i class="fa fa-building"></i></div>
+      <div class="stat-info">
+        <h3>{{ stats.currentCount }}</h3>
+        <p>Current</p>
+      </div>
+    </div>
+    <div class="stat-card stat-salary">
+      <div class="stat-icon"><i class="fa fa-briefcase"></i></div>
+      <div class="stat-info">
+        <h3>{{ stats.salaryCount }}</h3>
+        <p>Salary</p>
+      </div>
+    </div>
+    <div class="stat-card stat-rejected">
+      <div class="stat-icon"><i class="fa fa-times-circle"></i></div>
+      <div class="stat-info">
+        <h3>{{ stats.rejectedCount }}</h3>
+        <p>Rejected</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab Navigation -->
+  <div class="tab-nav">
+    <button [class.active]="activeTab === 'open-account'" (click)="setActiveTab('open-account')">
+      <i class="fa fa-plus-circle"></i> Open Account
+    </button>
+    <button [class.active]="activeTab === 'view-applications'" (click)="setActiveTab('view-applications')">
+      <i class="fa fa-list"></i> All Applications
+    </button>
+    <button [class.active]="activeTab === 'approve-applications'" (click)="setActiveTab('approve-applications')">
+      <i class="fa fa-user-check"></i> Admin Verify
+      <span class="badge" *ngIf="pendingApplications.length > 0">{{ pendingApplications.length }}</span>
+    </button>
+    <button *ngIf="isManager" [class.active]="activeTab === 'manager-approval'" (click)="setActiveTab('manager-approval')">
+      <i class="fa fa-stamp"></i> Manager Approval
+      <span class="badge" *ngIf="awaitingManagerApps.length > 0">{{ awaitingManagerApps.length }}</span>
+    </button>
+  </div>
+
+  <!-- ==================== OPEN ACCOUNT TAB ==================== -->
+  <div class="tab-content" *ngIf="activeTab === 'open-account'">
+    <div class="form-card">
+      <h2><i class="fa fa-user-plus"></i> Open New Account (Without Video KYC)</h2>
+      <p class="form-subtitle">Admin verifies all details in person - No video call required</p>
+
+      <!-- Account Type Selector -->
+      <div class="account-type-selector">
+        <label>Select Account Type:</label>
+        <div class="type-buttons">
+          <button [class.active]="selectedAccountType === 'Savings'" [class.blocked]="isAccountTypeBlocked('Savings')" [disabled]="isAccountTypeBlocked('Savings')" (click)="selectedAccountType = 'Savings'; onAccountTypeChange()">
+            <i class="fa fa-piggy-bank"></i> Savings Account
+            <span class="blocked-badge" *ngIf="isAccountTypeBlocked('Savings')"><i class="fa fa-ban"></i> Already Exists</span>
+          </button>
+          <button [class.active]="selectedAccountType === 'Current'" [class.blocked]="isAccountTypeBlocked('Current')" [disabled]="isAccountTypeBlocked('Current')" (click)="selectedAccountType = 'Current'; onAccountTypeChange()">
+            <i class="fa fa-building"></i> Current Account
+            <span class="blocked-badge" *ngIf="isAccountTypeBlocked('Current')"><i class="fa fa-ban"></i> Already Exists</span>
+          </button>
+          <button [class.active]="selectedAccountType === 'Salary'" [class.blocked]="isAccountTypeBlocked('Salary')" [disabled]="isAccountTypeBlocked('Salary')" (click)="selectedAccountType = 'Salary'; onAccountTypeChange()">
+            <i class="fa fa-briefcase"></i> Salary Account
+            <span class="blocked-badge" *ngIf="isAccountTypeBlocked('Salary')"><i class="fa fa-ban"></i> Already Exists</span>
+          </button>
+        </div>
+        <!-- All types blocked -->
+        <div class="all-blocked-warning" *ngIf="existingCheckDone && allowedAccountTypes.length === 0">
+          <i class="fa fa-exclamation-triangle"></i>
+          <span>This customer already has all account types (Savings, Current, Salary). No new account can be opened.</span>
+        </div>
+      </div>
+
+      <!-- Existing Accounts Panel -->
+      <div class="existing-accounts-panel" *ngIf="existingCheckDone && existingAccounts.length > 0">
+        <div class="existing-header">
+          <i class="fa fa-info-circle"></i>
+          <h3>Existing Accounts Found for this Aadhaar</h3>
+        </div>
+        <div class="existing-accounts-grid">
+          <div class="existing-account-card" *ngFor="let acc of existingAccounts" [ngClass]="'card-' + acc.type.toLowerCase()">
+            <div class="existing-card-header">
+              <span class="existing-type-badge">{{ acc.type }}</span>
+              <span class="existing-status" [ngClass]="{
+                'status-active': acc.status === 'ACTIVE' || acc.status === 'Active' || acc.status === 'MANAGER_APPROVED',
+                'status-closed': acc.status === 'CLOSED' || acc.status === 'Closed',
+                'status-frozen': acc.status === 'FROZEN' || acc.status === 'Frozen',
+                'status-pending': acc.status === 'PENDING' || acc.status === 'DOCUMENTS_UPLOADED' || acc.status === 'ADMIN_VERIFIED'
+              }">{{ acc.status }}</span>
+            </div>
+            <div class="existing-card-body">
+              <div class="existing-detail"><span>Account #:</span><strong>{{ acc.accountNumber }}</strong></div>
+              <div class="existing-detail" *ngIf="acc.customerId"><span>Customer ID:</span><strong>{{ acc.customerId }}</strong></div>
+              <div class="existing-detail" *ngIf="acc.businessName"><span>Business:</span><strong>{{ acc.businessName }}</strong></div>
+              <div class="existing-detail" *ngIf="acc.companyName"><span>Company:</span><strong>{{ acc.companyName }}</strong></div>
+              <div class="existing-detail" *ngIf="acc.applicationNumber"><span>Application #:</span><strong>{{ acc.applicationNumber }}</strong></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Checking spinner -->
+      <div class="checking-existing" *ngIf="isCheckingExisting">
+        <i class="fa fa-spinner fa-spin"></i> Checking for existing accounts...
+      </div>
+
+      <div class="form-grid">
+        <!-- Personal Details Section -->
+        <div class="form-section">
+          <h3><i class="fa fa-user"></i> Personal Details</h3>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Full Name *</label>
+              <input type="text" [(ngModel)]="newApplication.fullName" placeholder="Enter full name">
+            </div>
+            <div class="form-group">
+              <label>Date of Birth</label>
+              <input type="date" [(ngModel)]="newApplication.dateOfBirth">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Age</label>
+              <input type="number" [(ngModel)]="newApplication.age" placeholder="Age" min="18" max="100">
+            </div>
+            <div class="form-group">
+              <label>Gender</label>
+              <select [(ngModel)]="newApplication.gender">
+                <option value="">Select Gender</option>
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Occupation</label>
+              <input type="text" [(ngModel)]="newApplication.occupation" placeholder="Enter occupation">
+            </div>
+            <div class="form-group">
+              <label>Annual Income</label>
+              <input type="number" [(ngModel)]="newApplication.income" placeholder="Annual income in ₹">
+            </div>
+          </div>
+        </div>
+
+        <!-- Contact Details Section -->
+        <div class="form-section">
+          <h3><i class="fa fa-phone"></i> Contact Details</h3>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Mobile Number *</label>
+              <input type="text" [(ngModel)]="newApplication.phone" placeholder="10-digit mobile number" maxlength="10">
+            </div>
+            <div class="form-group">
+              <label>Email ID</label>
+              <input type="email" [(ngModel)]="newApplication.email" placeholder="Enter email address">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group full-width">
+              <label>Address</label>
+              <textarea [(ngModel)]="newApplication.address" placeholder="Enter full address" rows="2"></textarea>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>City</label>
+              <input type="text" [(ngModel)]="newApplication.city" placeholder="Enter city">
+            </div>
+            <div class="form-group">
+              <label>State</label>
+              <input type="text" [(ngModel)]="newApplication.state" placeholder="Enter state">
+            </div>
+            <div class="form-group">
+              <label>Pincode</label>
+              <input type="text" [(ngModel)]="newApplication.pincode" placeholder="6-digit pincode" maxlength="6">
+            </div>
+          </div>
+        </div>
+
+        <!-- Identity Documents Section -->
+        <div class="form-section">
+          <h3><i class="fa fa-id-card"></i> Identity Documents (KYC)</h3>
+          <div class="kyc-notice">
+            <i class="fa fa-info-circle"></i>
+            <span>Video KYC is <strong>not required</strong>. Admin verifies documents in person at the branch.</span>
+          </div>
+          <!-- Auto-fill status message -->
+          <div *ngIf="lookupMessage" class="autofill-status" [ngClass]="{'autofill-success': lookupType === 'success', 'autofill-info': lookupType === 'info', 'autofill-error': lookupType === 'error'}">
+            <i class="fa" [ngClass]="{'fa-check-circle': lookupType === 'success', 'fa-info-circle': lookupType === 'info', 'fa-exclamation-circle': lookupType === 'error'}"></i>
+            <span>{{ lookupMessage }}</span>
+            <button *ngIf="autoFilled" class="btn-clear-autofill" (click)="clearAutoFill()"><i class="fa fa-times"></i> Clear & Reset</button>
+          </div>
+          <div *ngIf="isLookingUp" class="autofill-status autofill-info">
+            <i class="fa fa-spinner fa-spin"></i>
+            <span>Looking up customer data...</span>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Aadhaar Number *</label>
+              <input type="text" [(ngModel)]="newApplication.aadharNumber" (input)="onAadharInput()" placeholder="12-digit Aadhaar number" maxlength="12">
+              <small class="field-hint" *ngIf="!autoFilled">Enter 12-digit Aadhaar to auto-fill from uploaded data</small>
+            </div>
+            <div class="form-group">
+              <label>PAN Number *</label>
+              <input type="text" [(ngModel)]="newApplication.panNumber" (input)="onPanInput()" placeholder="e.g., ABCDE1234F" maxlength="10" style="text-transform: uppercase;">
+              <small class="field-hint" *ngIf="!autoFilled">Or enter 10-char PAN to auto-fill</small>
+            </div>
+          </div>
+        </div>
+
+        <!-- Business Details Section (Current Account Only) -->
+        <div class="form-section" *ngIf="selectedAccountType === 'Current'">
+          <h3><i class="fa fa-briefcase"></i> Business Details</h3>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Business Name *</label>
+              <input type="text" [(ngModel)]="newApplication.businessName" placeholder="Enter business name">
+            </div>
+            <div class="form-group">
+              <label>Business Type</label>
+              <select [(ngModel)]="newApplication.businessType">
+                <option value="Proprietor">Proprietor</option>
+                <option value="Partnership">Partnership</option>
+                <option value="Pvt Ltd">Pvt Ltd</option>
+                <option value="Startup">Startup</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Business Registration Number</label>
+              <input type="text" [(ngModel)]="newApplication.businessRegistrationNumber" placeholder="Enter registration number">
+            </div>
+            <div class="form-group">
+              <label>GST Number</label>
+              <input type="text" [(ngModel)]="newApplication.gstNumber" placeholder="e.g., 22AAAAA0000A1Z5" maxlength="15">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group full-width">
+              <label>Business / Shop Address</label>
+              <textarea [(ngModel)]="newApplication.shopAddress" placeholder="Enter business address" rows="2"></textarea>
+            </div>
+          </div>
+        </div>
+
+        <!-- Salary Details Section (Salary Account Only) -->
+        <div class="form-section" *ngIf="selectedAccountType === 'Salary'">
+          <h3><i class="fa fa-building"></i> Employment Details</h3>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Company Name *</label>
+              <input type="text" [(ngModel)]="newApplication.companyName" placeholder="Enter company name">
+            </div>
+            <div class="form-group">
+              <label>Company ID</label>
+              <input type="text" [(ngModel)]="newApplication.companyId" placeholder="Enter company ID">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Designation</label>
+              <input type="text" [(ngModel)]="newApplication.designation" placeholder="Enter designation">
+            </div>
+            <div class="form-group">
+              <label>Monthly Salary</label>
+              <input type="number" [(ngModel)]="newApplication.monthlySalary" placeholder="Monthly salary in ₹">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Salary Credit Date</label>
+              <input type="number" [(ngModel)]="newApplication.salaryCreditDate" placeholder="Day of month (1-31)" min="1" max="31">
+            </div>
+            <div class="form-group">
+              <label>HR Contact Number</label>
+              <input type="text" [(ngModel)]="newApplication.hrContactNumber" placeholder="HR phone number" maxlength="10">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group full-width">
+              <label>Employer Address</label>
+              <textarea [(ngModel)]="newApplication.employerAddress" placeholder="Enter employer address" rows="2"></textarea>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bank Details Section -->
+        <div class="form-section">
+          <h3><i class="fa fa-university"></i> Bank Details</h3>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Account Type</label>
+              <input type="text" [value]="selectedAccountType + ' Account'" disabled>
+            </div>
+            <div class="form-group">
+              <label>Branch Name</label>
+              <input type="text" [(ngModel)]="newApplication.branchName">
+            </div>
+            <div class="form-group">
+              <label>IFSC Code</label>
+              <input type="text" [(ngModel)]="newApplication.ifscCode">
+            </div>
+          </div>
+        </div>
+
+        <!-- Declaration Section -->
+        <div class="form-section declaration-section">
+          <h3><i class="fa fa-file-contract"></i> Declaration</h3>
+          <div class="declaration-content">
+            <p>I/We hereby declare that the information provided in this application is true, correct, and complete. The applicant has been verified in person by the bank officer at the branch. No video KYC is required for this application.</p>
+            <div class="declaration-check">
+              <input type="checkbox" id="declaration" [(ngModel)]="newApplication.declarationAccepted">
+              <label for="declaration">I confirm that all details have been verified and the declaration is accepted</label>
+            </div>
+            <div class="officer-signature">
+              <label>Bank Officer: <strong>{{ adminName }}</strong></label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button class="btn btn-primary btn-lg" (click)="submitApplication()" [disabled]="isLoading || (existingCheckDone && allowedAccountTypes.length === 0)">
+          <i class="fa fa-check-circle"></i> {{ isLoading ? 'Creating Application...' : 'Submit Application' }}
+        </button>
+        <button class="btn btn-secondary" (click)="newApplication = getEmptyApplication()">
+          <i class="fa fa-undo"></i> Reset Form
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== VIEW APPLICATIONS TAB ==================== -->
+  <div class="tab-content" *ngIf="activeTab === 'view-applications' && !showDetailView">
+    <div class="section-card">
+      <div class="section-header">
+        <h2><i class="fa fa-list"></i> All Account Applications</h2>
+        <div class="section-controls">
+          <div class="search-box">
+            <i class="fa fa-search"></i>
+            <input type="text" [(ngModel)]="searchTerm" (input)="filterApplications()" placeholder="Search by name, application #, mobile...">
+          </div>
+          <select [(ngModel)]="statusFilter" (change)="filterApplications()">
+            <option value="ALL">All Status</option>
+            <option value="PENDING">Pending</option>
+            <option value="DOCUMENTS_UPLOADED">Docs Uploaded</option>
+            <option value="ADMIN_VERIFIED">Admin Verified</option>
+            <option value="MANAGER_APPROVED">Approved</option>
+            <option value="MANAGER_REJECTED">Rejected</option>
+            <option value="ACTIVE">Active</option>
+          </select>
+          <select [(ngModel)]="typeFilter" (change)="filterApplications()">
+            <option value="ALL">All Types</option>
+            <option value="Savings">Savings</option>
+            <option value="Current">Current</option>
+            <option value="Salary">Salary</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Application #</th>
+              <th>Applicant Name</th>
+              <th>Account Type</th>
+              <th>Phone</th>
+              <th>PAN</th>
+              <th>Status</th>
+              <th>Created</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let app of filteredApplications">
+              <td><span class="app-number">{{ app.applicationNumber }}</span></td>
+              <td>
+                <div class="applicant-info">
+                  <strong>{{ app.fullName }}</strong>
+                  <small>{{ app.email }}</small>
+                </div>
+              </td>
+              <td><span class="type-badge type-{{ app.accountType.toLowerCase() }}">{{ app.accountType }}</span></td>
+              <td>{{ app.phone }}</td>
+              <td>{{ app.panNumber }}</td>
+              <td><span class="status-badge" [ngClass]="getStatusClass(app.status)">{{ getStatusLabel(app.status) }}</span></td>
+              <td>{{ formatDate(app.createdAt) }}</td>
+              <td>
+                <div class="action-btns">
+                  <button class="btn-icon btn-view" (click)="viewApplicationDetails(app)" title="View Details"><i class="fa fa-eye"></i></button>
+                  <button class="btn-icon btn-download" (click)="downloadApplication(app)" [disabled]="isDownloading" title="Download Application PDF"><i class="fa fa-download"></i></button>
+                </div>
+              </td>
+            </tr>
+            <tr *ngIf="filteredApplications.length === 0">
+              <td colspan="8" class="no-data">
+                <i class="fa fa-inbox"></i>
+                <p>No applications found</p>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== ADMIN VERIFY TAB ==================== -->
+  <div class="tab-content" *ngIf="activeTab === 'approve-applications' && !showDetailView">
+    <div class="section-card">
+      <div class="section-header">
+        <h2><i class="fa fa-user-check"></i> Pending Admin Verification</h2>
+        <p class="section-subtitle">Review and verify applications before sending to manager for approval</p>
+      </div>
+
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Application #</th>
+              <th>Applicant Name</th>
+              <th>Type</th>
+              <th>Phone</th>
+              <th>Aadhaar</th>
+              <th>PAN</th>
+              <th>Created By</th>
+              <th>Created Date</th>
+              <th>Docs</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let app of pendingApplications">
+              <td><span class="app-number">{{ app.applicationNumber }}</span></td>
+              <td><strong>{{ app.fullName }}</strong></td>
+              <td><span class="type-badge type-{{ app.accountType.toLowerCase() }}">{{ app.accountType }}</span></td>
+              <td>{{ app.phone }}</td>
+              <td>{{ app.aadharNumber }}</td>
+              <td>{{ app.panNumber }}</td>
+              <td>{{ app.createdBy || 'N/A' }}</td>
+              <td>{{ app.createdAt ? formatDate(app.createdAt) : 'N/A' }}</td>
+              <td>
+                <span *ngIf="app.signedApplicationPath" class="doc-status uploaded" title="Signed doc uploaded"><i class="fa fa-check-circle" style="color:#10b981;"></i></span>
+                <span *ngIf="!app.signedApplicationPath" class="doc-status pending" title="Signed doc missing"><i class="fa fa-times-circle" style="color:#ef4444;"></i></span>
+              </td>
+              <td><span class="status-badge" [ngClass]="getStatusClass(app.status)">{{ getStatusLabel(app.status) }}</span></td>
+              <td>
+                <div class="action-btns">
+                  <button class="btn-icon btn-view" (click)="viewApplicationDetails(app)" title="View & Verify"><i class="fa fa-eye"></i></button>
+                  <button class="btn-icon btn-download" (click)="downloadApplication(app)" title="Download PDF"><i class="fa fa-download"></i></button>
+                </div>
+              </td>
+            </tr>
+            <tr *ngIf="pendingApplications.length === 0">
+              <td colspan="11" class="no-data">
+                <i class="fa fa-check-circle" style="color: #10b981;"></i>
+                <p>No pending applications</p>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MANAGER APPROVAL TAB ==================== -->
+  <div class="tab-content" *ngIf="activeTab === 'manager-approval' && !showDetailView">
+    <div class="section-card">
+      <div class="section-header">
+        <h2><i class="fa fa-stamp"></i> Awaiting Manager Approval</h2>
+        <p class="section-subtitle">Applications verified by admin, pending manager's final approval and account activation</p>
+      </div>
+
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Application #</th>
+              <th>Applicant Name</th>
+              <th>Type</th>
+              <th>Verified By</th>
+              <th>Verified Date</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let app of awaitingManagerApps">
+              <td><span class="app-number">{{ app.applicationNumber }}</span></td>
+              <td><strong>{{ app.fullName }}</strong></td>
+              <td><span class="type-badge type-{{ app.accountType.toLowerCase() }}">{{ app.accountType }}</span></td>
+              <td>{{ app.adminVerifiedBy }}</td>
+              <td>{{ formatDate(app.adminVerifiedDate) }}</td>
+              <td><span class="status-badge status-verified">Admin Verified</span></td>
+              <td>
+                <div class="action-btns">
+                  <button class="btn-icon btn-view" (click)="viewApplicationDetails(app)" title="Review & Approve"><i class="fa fa-eye"></i></button>
+                  <button class="btn-icon btn-download" (click)="downloadApplication(app)" title="Download PDF"><i class="fa fa-download"></i></button>
+                </div>
+              </td>
+            </tr>
+            <tr *ngIf="awaitingManagerApps.length === 0">
+              <td colspan="7" class="no-data">
+                <i class="fa fa-check-circle" style="color: #10b981;"></i>
+                <p>No applications awaiting manager approval</p>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== APPLICATION DETAIL VIEW ==================== -->
+  <div class="tab-content" *ngIf="showDetailView && selectedApplication">
+    <div class="detail-card">
+      <div class="detail-header">
+        <div class="detail-header-left">
+          <button class="back-btn" (click)="closeDetailView()"><i class="fa fa-arrow-left"></i></button>
+          <div>
+            <h2>Application: {{ selectedApplication.applicationNumber }}</h2>
+            <span class="status-badge lg" [ngClass]="getStatusClass(selectedApplication.status)">{{ getStatusLabel(selectedApplication.status) }}</span>
+          </div>
+        </div>
+        <div class="detail-header-right">
+          <button class="btn btn-edit" *ngIf="canEditApplication() && !isEditMode" (click)="enterEditMode()">
+            <i class="fa fa-edit"></i> Edit Details
+          </button>
+          <button class="btn btn-success btn-save-edit" *ngIf="isEditMode" (click)="saveEditedApplication()" [disabled]="isLoading">
+            <i class="fa fa-save"></i> {{ isLoading ? 'Saving...' : 'Save Changes' }}
+          </button>
+          <button class="btn btn-secondary" *ngIf="isEditMode" (click)="cancelEditMode()">
+            <i class="fa fa-times"></i> Cancel
+          </button>
+          <button class="btn btn-outline" (click)="downloadApplication(selectedApplication)" [disabled]="isDownloading">
+            <i class="fa fa-download"></i> {{ isDownloading ? 'Downloading...' : 'Download Application PDF' }}
+          </button>
+        </div>
+      </div>
+
+      <!-- Application Details Grid -->
+      <div class="detail-grid" *ngIf="!isEditMode">
+        <!-- Personal Details -->
+        <div class="detail-section">
+          <h3><i class="fa fa-user"></i> Personal Details</h3>
+          <div class="detail-row"><span class="detail-label">Full Name:</span><span class="detail-value">{{ selectedApplication.fullName }}</span></div>
+          <div class="detail-row"><span class="detail-label">Date of Birth:</span><span class="detail-value">{{ selectedApplication.dateOfBirth || 'N/A' }}</span></div>
+          <div class="detail-row"><span class="detail-label">Age:</span><span class="detail-value">{{ selectedApplication.age || 'N/A' }}</span></div>
+          <div class="detail-row"><span class="detail-label">Gender:</span><span class="detail-value">{{ selectedApplication.gender || 'N/A' }}</span></div>
+          <div class="detail-row"><span class="detail-label">Occupation:</span><span class="detail-value">{{ selectedApplication.occupation || 'N/A' }}</span></div>
+          <div class="detail-row"><span class="detail-label">Income:</span><span class="detail-value">{{ formatCurrency(selectedApplication.income) }}</span></div>
+        </div>
+
+        <!-- Contact Details -->
+        <div class="detail-section">
+          <h3><i class="fa fa-phone"></i> Contact Details</h3>
+          <div class="detail-row"><span class="detail-label">Mobile:</span><span class="detail-value">{{ selectedApplication.phone }}</span></div>
+          <div class="detail-row"><span class="detail-label">Email:</span><span class="detail-value">{{ selectedApplication.email || 'N/A' }}</span></div>
+          <div class="detail-row"><span class="detail-label">Address:</span><span class="detail-value">{{ selectedApplication.address || 'N/A' }}</span></div>
+          <div class="detail-row"><span class="detail-label">City:</span><span class="detail-value">{{ selectedApplication.city || 'N/A' }}</span></div>
+          <div class="detail-row"><span class="detail-label">State:</span><span class="detail-value">{{ selectedApplication.state || 'N/A' }}</span></div>
+          <div class="detail-row"><span class="detail-label">Pincode:</span><span class="detail-value">{{ selectedApplication.pincode || 'N/A' }}</span></div>
+        </div>
+
+        <!-- Identity Documents -->
+        <div class="detail-section">
+          <h3><i class="fa fa-id-card"></i> Identity Documents</h3>
+          <div class="detail-row"><span class="detail-label">Aadhaar:</span><span class="detail-value">{{ selectedApplication.aadharNumber }}</span></div>
+          <div class="detail-row"><span class="detail-label">PAN:</span><span class="detail-value">{{ selectedApplication.panNumber }}</span></div>
+          <div class="detail-row"><span class="detail-label">KYC Method:</span><span class="detail-value highlight">Admin In-Person Verification (No Video KYC)</span></div>
+        </div>
+
+        <!-- Bank Details -->
+        <div class="detail-section">
+          <h3><i class="fa fa-university"></i> Bank Details</h3>
+          <div class="detail-row"><span class="detail-label">Account Type:</span><span class="detail-value"><span class="type-badge type-{{ selectedApplication.accountType.toLowerCase() }}">{{ selectedApplication.accountType }}</span></span></div>
+          <div class="detail-row"><span class="detail-label">Branch:</span><span class="detail-value">{{ selectedApplication.branchName }}</span></div>
+          <div class="detail-row"><span class="detail-label">IFSC:</span><span class="detail-value">{{ selectedApplication.ifscCode }}</span></div>
+          <div class="detail-row" *ngIf="selectedApplication.accountNumber"><span class="detail-label">Account Number:</span><span class="detail-value account-number">{{ selectedApplication.accountNumber }}</span></div>
+          <div class="detail-row" *ngIf="selectedApplication.customerId"><span class="detail-label">Customer ID:</span><span class="detail-value">{{ selectedApplication.customerId }}</span></div>
+        </div>
+
+        <!-- Business Details (Current) -->
+        <div class="detail-section" *ngIf="selectedApplication.accountType === 'Current'">
+          <h3><i class="fa fa-briefcase"></i> Business Details</h3>
+          <div class="detail-row"><span class="detail-label">Business Name:</span><span class="detail-value">{{ selectedApplication.businessName }}</span></div>
+          <div class="detail-row"><span class="detail-label">Business Type:</span><span class="detail-value">{{ selectedApplication.businessType }}</span></div>
+          <div class="detail-row"><span class="detail-label">Registration #:</span><span class="detail-value">{{ selectedApplication.businessRegistrationNumber || 'N/A' }}</span></div>
+          <div class="detail-row"><span class="detail-label">GST Number:</span><span class="detail-value">{{ selectedApplication.gstNumber || 'N/A' }}</span></div>
+          <div class="detail-row"><span class="detail-label">Shop Address:</span><span class="detail-value">{{ selectedApplication.shopAddress || 'N/A' }}</span></div>
+        </div>
+
+        <!-- Salary Details (Salary) -->
+        <div class="detail-section" *ngIf="selectedApplication.accountType === 'Salary'">
+          <h3><i class="fa fa-building"></i> Employment Details</h3>
+          <div class="detail-row"><span class="detail-label">Company:</span><span class="detail-value">{{ selectedApplication.companyName }}</span></div>
+          <div class="detail-row"><span class="detail-label">Company ID:</span><span class="detail-value">{{ selectedApplication.companyId || 'N/A' }}</span></div>
+          <div class="detail-row"><span class="detail-label">Designation:</span><span class="detail-value">{{ selectedApplication.designation || 'N/A' }}</span></div>
+          <div class="detail-row"><span class="detail-label">Monthly Salary:</span><span class="detail-value">{{ formatCurrency(selectedApplication.monthlySalary) }}</span></div>
+          <div class="detail-row"><span class="detail-label">Salary Credit Date:</span><span class="detail-value">{{ selectedApplication.salaryCreditDate || 'N/A' }}</span></div>
+          <div class="detail-row"><span class="detail-label">HR Contact:</span><span class="detail-value">{{ selectedApplication.hrContactNumber || 'N/A' }}</span></div>
+        </div>
+
+        <!-- Verification Status -->
+        <div class="detail-section verification-status">
+          <h3><i class="fa fa-shield-alt"></i> Verification & Approval Status</h3>
+          <div class="detail-row"><span class="detail-label">Admin Verified:</span><span class="detail-value" [class.verified]="selectedApplication.adminVerified">{{ selectedApplication.adminVerified ? '✓ Yes' : '✗ Pending' }}</span></div>
+          <div class="detail-row" *ngIf="selectedApplication.adminVerifiedBy"><span class="detail-label">Verified By:</span><span class="detail-value">{{ selectedApplication.adminVerifiedBy }}</span></div>
+          <div class="detail-row" *ngIf="selectedApplication.adminVerifiedDate"><span class="detail-label">Verified Date:</span><span class="detail-value">{{ formatDate(selectedApplication.adminVerifiedDate) }}</span></div>
+          <div class="detail-row" *ngIf="selectedApplication.adminRemarks"><span class="detail-label">Admin Remarks:</span><span class="detail-value">{{ selectedApplication.adminRemarks }}</span></div>
+          <div class="detail-row"><span class="detail-label">Manager Approved:</span><span class="detail-value" [class.verified]="selectedApplication.managerApproved">{{ selectedApplication.managerApproved ? '✓ Yes' : '✗ Pending' }}</span></div>
+          <div class="detail-row" *ngIf="selectedApplication.managerApprovedBy"><span class="detail-label">Manager:</span><span class="detail-value">{{ selectedApplication.managerApprovedBy }}</span></div>
+          <div class="detail-row" *ngIf="selectedApplication.managerApprovedDate"><span class="detail-label">Approval Date:</span><span class="detail-value">{{ formatDate(selectedApplication.managerApprovedDate) }}</span></div>
+          <div class="detail-row" *ngIf="selectedApplication.managerRemarks"><span class="detail-label">Manager Remarks:</span><span class="detail-value">{{ selectedApplication.managerRemarks }}</span></div>
+          <div class="detail-row"><span class="detail-label">Created By:</span><span class="detail-value">{{ selectedApplication.createdBy }}</span></div>
+          <div class="detail-row"><span class="detail-label">Created At:</span><span class="detail-value">{{ formatDate(selectedApplication.createdAt) }}</span></div>
+        </div>
+      </div>
+
+      <!-- ==================== EDIT MODE FORM ==================== -->
+      <div class="edit-mode-form" *ngIf="isEditMode && editApplication">
+        <div class="edit-mode-banner">
+          <i class="fa fa-edit"></i> Editing Application Details — Make changes and click Save
+        </div>
+
+        <div class="form-grid">
+          <!-- Personal Details -->
+          <div class="form-section">
+            <h3><i class="fa fa-user"></i> Personal Details</h3>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Full Name *</label>
+                <input type="text" [(ngModel)]="editApplication.fullName" placeholder="Enter full name">
+              </div>
+              <div class="form-group">
+                <label>Date of Birth</label>
+                <input type="date" [(ngModel)]="editApplication.dateOfBirth">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Age</label>
+                <input type="number" [(ngModel)]="editApplication.age" placeholder="Age" min="18" max="100">
+              </div>
+              <div class="form-group">
+                <label>Gender</label>
+                <select [(ngModel)]="editApplication.gender">
+                  <option value="">Select Gender</option>
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Occupation</label>
+                <input type="text" [(ngModel)]="editApplication.occupation" placeholder="Enter occupation">
+              </div>
+              <div class="form-group">
+                <label>Annual Income</label>
+                <input type="number" [(ngModel)]="editApplication.income" placeholder="Annual income in ₹">
+              </div>
+            </div>
+          </div>
+
+          <!-- Contact Details -->
+          <div class="form-section">
+            <h3><i class="fa fa-phone"></i> Contact Details</h3>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Mobile Number *</label>
+                <input type="text" [(ngModel)]="editApplication.phone" placeholder="10-digit mobile number" maxlength="10">
+              </div>
+              <div class="form-group">
+                <label>Email ID</label>
+                <input type="email" [(ngModel)]="editApplication.email" placeholder="Enter email address">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group full-width">
+                <label>Address</label>
+                <textarea [(ngModel)]="editApplication.address" placeholder="Enter full address" rows="2"></textarea>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>City</label>
+                <input type="text" [(ngModel)]="editApplication.city" placeholder="Enter city">
+              </div>
+              <div class="form-group">
+                <label>State</label>
+                <input type="text" [(ngModel)]="editApplication.state" placeholder="Enter state">
+              </div>
+              <div class="form-group">
+                <label>Pincode</label>
+                <input type="text" [(ngModel)]="editApplication.pincode" placeholder="6-digit pincode" maxlength="6">
+              </div>
+            </div>
+          </div>
+
+          <!-- Identity Documents -->
+          <div class="form-section">
+            <h3><i class="fa fa-id-card"></i> Identity Documents</h3>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Aadhaar Number *</label>
+                <input type="text" [(ngModel)]="editApplication.aadharNumber" placeholder="12-digit Aadhaar number" maxlength="12">
+              </div>
+              <div class="form-group">
+                <label>PAN Number *</label>
+                <input type="text" [(ngModel)]="editApplication.panNumber" placeholder="e.g., ABCDE1234F" maxlength="10" style="text-transform: uppercase;">
+              </div>
+            </div>
+          </div>
+
+          <!-- Bank Details -->
+          <div class="form-section">
+            <h3><i class="fa fa-university"></i> Bank Details</h3>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Account Type</label>
+                <input type="text" [value]="editApplication.accountType + ' Account'" disabled>
+              </div>
+              <div class="form-group">
+                <label>Branch Name</label>
+                <input type="text" [(ngModel)]="editApplication.branchName">
+              </div>
+              <div class="form-group">
+                <label>IFSC Code</label>
+                <input type="text" [(ngModel)]="editApplication.ifscCode">
+              </div>
+            </div>
+          </div>
+
+          <!-- Business Details (Current Account) -->
+          <div class="form-section" *ngIf="editApplication.accountType === 'Current'">
+            <h3><i class="fa fa-briefcase"></i> Business Details</h3>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Business Name *</label>
+                <input type="text" [(ngModel)]="editApplication.businessName" placeholder="Enter business name">
+              </div>
+              <div class="form-group">
+                <label>Business Type</label>
+                <select [(ngModel)]="editApplication.businessType">
+                  <option value="Proprietor">Proprietor</option>
+                  <option value="Partnership">Partnership</option>
+                  <option value="Pvt Ltd">Pvt Ltd</option>
+                  <option value="Startup">Startup</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Business Registration Number</label>
+                <input type="text" [(ngModel)]="editApplication.businessRegistrationNumber" placeholder="Enter registration number">
+              </div>
+              <div class="form-group">
+                <label>GST Number</label>
+                <input type="text" [(ngModel)]="editApplication.gstNumber" placeholder="e.g., 22AAAAA0000A1Z5" maxlength="15">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group full-width">
+                <label>Business / Shop Address</label>
+                <textarea [(ngModel)]="editApplication.shopAddress" placeholder="Enter business address" rows="2"></textarea>
+              </div>
+            </div>
+          </div>
+
+          <!-- Salary Details (Salary Account) -->
+          <div class="form-section" *ngIf="editApplication.accountType === 'Salary'">
+            <h3><i class="fa fa-building"></i> Employment Details</h3>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Company Name *</label>
+                <input type="text" [(ngModel)]="editApplication.companyName" placeholder="Enter company name">
+              </div>
+              <div class="form-group">
+                <label>Company ID</label>
+                <input type="text" [(ngModel)]="editApplication.companyId" placeholder="Enter company ID">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Designation</label>
+                <input type="text" [(ngModel)]="editApplication.designation" placeholder="Enter designation">
+              </div>
+              <div class="form-group">
+                <label>Monthly Salary</label>
+                <input type="number" [(ngModel)]="editApplication.monthlySalary" placeholder="Monthly salary in ₹">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Salary Credit Date</label>
+                <input type="number" [(ngModel)]="editApplication.salaryCreditDate" placeholder="Day of month (1-31)" min="1" max="31">
+              </div>
+              <div class="form-group">
+                <label>HR Contact Number</label>
+                <input type="text" [(ngModel)]="editApplication.hrContactNumber" placeholder="HR phone number" maxlength="10">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group full-width">
+                <label>Employer Address</label>
+                <textarea [(ngModel)]="editApplication.employerAddress" placeholder="Enter employer address" rows="2"></textarea>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Documents Section -->
+      <div class="detail-section documents-section">
+        <h3><i class="fa fa-paperclip"></i> Documents</h3>
+        <div class="document-row">
+          <div class="document-item">
+            <span class="doc-label"><i class="fa fa-file-pdf"></i> Application PDF:</span>
+            <span *ngIf="selectedApplication.applicationPdfPath" class="doc-status uploaded"><i class="fa fa-check"></i> Generated</span>
+            <span *ngIf="!selectedApplication.applicationPdfPath" class="doc-status pending">Not generated yet</span>
+            <button *ngIf="selectedApplication.applicationPdfPath" class="btn-view-doc" (click)="downloadApplication(selectedApplication)" title="Download Application PDF">
+              <i class="fa fa-download"></i> Download
+            </button>
+          </div>
+          <div class="document-item">
+            <span class="doc-label"><i class="fa fa-signature"></i> Signed Application:</span>
+            <span *ngIf="selectedApplication.signedApplicationPath" class="doc-status uploaded"><i class="fa fa-check"></i> Uploaded</span>
+            <span *ngIf="!selectedApplication.signedApplicationPath" class="doc-status pending">Not uploaded</span>
+            <button *ngIf="selectedApplication.signedApplicationPath" class="btn-view-doc" (click)="viewSignedDocument()" title="View Signed Document">
+              <i class="fa fa-eye"></i> View
+            </button>
+          </div>
+          <div class="document-item">
+            <span class="doc-label"><i class="fa fa-folder-open"></i> Additional Documents:</span>
+            <span *ngIf="selectedApplication.additionalDocumentsPath" class="doc-status uploaded"><i class="fa fa-check"></i> Uploaded</span>
+            <span *ngIf="!selectedApplication.additionalDocumentsPath" class="doc-status pending">Not uploaded</span>
+            <button *ngIf="selectedApplication.additionalDocumentsPath" class="btn-view-doc" (click)="viewAdditionalDocuments()" title="View Additional Documents">
+              <i class="fa fa-eye"></i> View
+            </button>
+          </div>
+        </div>
+
+        <!-- Upload signed document -->
+        <div class="upload-section" *ngIf="selectedApplication.status !== 'MANAGER_APPROVED' && selectedApplication.status !== 'ACTIVE'">
+          <div class="upload-row">
+            <div class="upload-group">
+              <label>Upload Signed Application (PDF)</label>
+              <input type="file" accept=".pdf,.jpg,.jpeg,.png" (change)="onSignedFileSelect($event)">
+              <button class="btn btn-sm btn-primary" (click)="uploadSignedApplication()" [disabled]="!signedFile || isLoading">
+                <i class="fa fa-upload"></i> Upload Signed Copy
+              </button>
+            </div>
+            <div class="upload-group">
+              <label>Upload Additional Documents</label>
+              <input type="file" accept=".pdf,.jpg,.jpeg,.png" (change)="onAdditionalFileSelect($event)">
+              <button class="btn btn-sm btn-primary" (click)="uploadAdditionalDocuments()" [disabled]="!additionalFile || isLoading">
+                <i class="fa fa-upload"></i> Upload Documents
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="detail-actions">
+        <!-- Admin Verify Button -->
+        <div class="action-group" *ngIf="selectedApplication.status === 'PENDING' || selectedApplication.status === 'DOCUMENTS_UPLOADED'">
+          <h4><i class="fa fa-user-check"></i> Admin Verification</h4>
+
+          <!-- Missing Fields Warning -->
+          <div class="missing-fields-warning" *ngIf="!canAdminVerify()">
+            <div class="warning-header"><i class="fa fa-exclamation-triangle"></i> Cannot verify — the following fields/uploads are missing:</div>
+            <ul class="missing-list">
+              <li *ngFor="let field of getMissingFields()">{{ field }}</li>
+            </ul>
+          </div>
+
+          <div class="action-form">
+            <textarea [(ngModel)]="verifyRemarks" placeholder="Verification remarks (optional)" rows="2"></textarea>
+            <button class="btn btn-success" (click)="adminVerify()" [disabled]="isLoading || !canAdminVerify()">
+              <i class="fa fa-check-circle"></i> {{ isLoading ? 'Verifying...' : 'Verify & Send to Manager' }}
+            </button>
+          </div>
+        </div>
+
+        <!-- Manager Approve/Reject Buttons -->
+        <div class="action-group" *ngIf="selectedApplication.status === 'ADMIN_VERIFIED'">
+          <h4><i class="fa fa-stamp"></i> Manager Approval</h4>
+          <div class="action-form">
+            <textarea [(ngModel)]="approvalRemarks" placeholder="Approval/rejection remarks" rows="2"></textarea>
+            <div class="action-buttons">
+              <button class="btn btn-success" (click)="managerApprove()" [disabled]="isLoading">
+                <i class="fa fa-check-double"></i> {{ isLoading ? 'Processing...' : 'Approve & Create Account' }}
+              </button>
+              <button class="btn btn-danger" (click)="managerReject()" [disabled]="isLoading">
+                <i class="fa fa-times-circle"></i> Reject Application
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

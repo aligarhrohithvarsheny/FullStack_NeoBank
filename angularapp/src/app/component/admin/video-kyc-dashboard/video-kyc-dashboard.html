@@ -1,0 +1,542 @@
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+<div class="vkyc-dashboard">
+  <!-- Header -->
+  <div class="vkyc-header">
+    <div class="header-left">
+      <button class="back-btn" (click)="goBack()"><i class="fa fa-arrow-left"></i></button>
+      <h1><i class="fa fa-video"></i> Video KYC Management</h1>
+    </div>
+    <div class="header-stats">
+      <div class="stat-chip pending"><i class="fa fa-clock"></i> {{ stats.pending || 0 }} Pending</div>
+      <div class="stat-chip scheduled"><i class="fa fa-calendar-check"></i> {{ stats.scheduled || 0 }} Scheduled</div>
+      <div class="stat-chip review"><i class="fa fa-eye"></i> {{ stats.underReview || 0 }} Under Review</div>
+      <div class="stat-chip approved"><i class="fa fa-check"></i> {{ stats.approved || 0 }} Approved</div>
+      <div class="stat-chip rejected"><i class="fa fa-times"></i> {{ stats.rejected || 0 }} Rejected</div>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="vkyc-tabs">
+    <button [class.active]="activeTab === 'queue'" (click)="switchTab('queue')">
+      <i class="fa fa-list"></i> KYC Queue
+    </button>
+    <button [class.active]="activeTab === 'all'" (click)="switchTab('all')">
+      <i class="fa fa-th-list"></i> All Sessions
+    </button>
+    <button [class.active]="activeTab === 'slots'" (click)="switchTab('slots')">
+      <i class="fa fa-calendar-alt"></i> Slot Management
+    </button>
+    <button [class.active]="activeTab === 'verify'" (click)="switchTab('verify')">
+      <i class="fa fa-search"></i> Verify
+    </button>
+    <button [class.active]="activeTab === 'stats'" (click)="switchTab('stats')">
+      <i class="fa fa-chart-bar"></i> Statistics
+    </button>
+  </div>
+
+  <!-- Messages -->
+  <div *ngIf="error" class="alert alert-error">
+    <i class="fa fa-exclamation-circle"></i> {{ error }}
+    <button (click)="error = ''"><i class="fa fa-times"></i></button>
+  </div>
+  <div *ngIf="successMsg" class="alert alert-success">
+    <i class="fa fa-check-circle"></i> {{ successMsg }}
+    <button (click)="successMsg = ''"><i class="fa fa-times"></i></button>
+  </div>
+
+  <!-- Loading -->
+  <div *ngIf="loading" class="loading-bar"><div class="loading-bar-inner"></div></div>
+
+  <!-- ==================== QUEUE TAB ==================== -->
+  <div *ngIf="activeTab === 'queue'" class="tab-content">
+    <div class="split-layout" [class.has-detail]="selectedSession">
+      
+      <!-- Queue List -->
+      <div class="list-panel">
+        <h3><i class="fa fa-users"></i> Pending Verifications ({{ kycQueue.length }})</h3>
+        <div *ngIf="kycQueue.length === 0" class="empty-state">
+          <i class="fa fa-inbox fa-3x"></i>
+          <p>No pending Video KYC sessions</p>
+        </div>
+        <div class="session-list">
+          <div *ngFor="let session of kycQueue" class="session-card" 
+               [class.selected]="selectedSession?.id === session.id"
+               (click)="selectSession(session)">
+            <div class="session-card-header">
+              <span class="customer-name">{{ session.fullName }}</span>
+              <span class="status-badge" [ngClass]="getStatusClass(session.kycStatus)">{{ session.kycStatus }}</span>
+            </div>
+            <div class="session-card-body">
+              <span><i class="fa fa-phone"></i> {{ session.mobileNumber }}</span>
+              <span><i class="fa fa-id-badge"></i> {{ session.customerId }}</span>
+              <span><i class="fa fa-clock"></i> {{ session.createdAt | date:'short' }}</span>
+              <span *ngIf="session.slotDate"><i class="fa fa-calendar"></i> {{ session.slotDate }} {{ session.slotTime }}</span>
+              <span *ngIf="session.verificationNumber" class="mono"><i class="fa fa-hashtag"></i> {{ session.verificationNumber }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Pagination -->
+        <div class="pagination" *ngIf="totalPages > 1">
+          <button (click)="prevPage()" [disabled]="currentPage === 0"><i class="fa fa-chevron-left"></i></button>
+          <span>{{ currentPage + 1 }} / {{ totalPages }}</span>
+          <button (click)="nextPage()" [disabled]="currentPage >= totalPages - 1"><i class="fa fa-chevron-right"></i></button>
+        </div>
+      </div>
+
+      <!-- Detail Panel -->
+      <div class="detail-panel" *ngIf="selectedSession">
+        <div class="detail-header">
+          <h3>{{ selectedSession.fullName }}</h3>
+          <span class="status-badge large" [ngClass]="getStatusClass(selectedSession.kycStatus)">{{ selectedSession.kycStatus }}</span>
+        </div>
+
+        <!-- Admin Video Section -->
+        <div class="admin-video-section" *ngIf="videoActive">
+          <div class="video-container-admin">
+            <video #adminVideo autoplay playsinline muted class="admin-video-feed"></video>
+            <div class="video-overlay-admin">
+              <span class="live-badge"><i class="fa fa-circle"></i> LIVE</span>
+              <span class="room-id">Room: {{ selectedSession.roomId }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Customer Details -->
+        <div class="detail-section">
+          <h4><i class="fa fa-user"></i> Customer Information</h4>
+          <div class="detail-grid">
+            <div class="detail-item">
+              <label>Customer ID</label>
+              <span>{{ selectedSession.customerId }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Temp Account</label>
+              <span>{{ selectedSession.temporaryAccountNumber }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Mobile</label>
+              <span>{{ selectedSession.mobileNumber }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Email</label>
+              <span>{{ selectedSession.email }}</span>
+            </div>
+            <div class="detail-item">
+              <label>City</label>
+              <span>{{ selectedSession.addressCity }}</span>
+            </div>
+            <div class="detail-item">
+              <label>State</label>
+              <span>{{ selectedSession.addressState }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Account Type</label>
+              <span>{{ selectedSession.accountType }}</span>
+            </div>
+            <div class="detail-item">
+              <label>Room ID</label>
+              <span class="mono">{{ selectedSession.roomId }}</span>
+            </div>
+            <div class="detail-item" *ngIf="selectedSession.finalAccountNumber">
+              <label>Final Account</label>
+              <span class="highlight">{{ selectedSession.finalAccountNumber }}</span>
+            </div>
+            <div class="detail-item" *ngIf="selectedSession.ifscCode">
+              <label>IFSC</label>
+              <span class="highlight">{{ selectedSession.ifscCode }}</span>
+            </div>
+            <div class="detail-item" *ngIf="selectedSession.verificationNumber">
+              <label>Verification #</label>
+              <span class="highlight mono">{{ selectedSession.verificationNumber }}</span>
+            </div>
+            <div class="detail-item" *ngIf="selectedSession.slotDate">
+              <label>Slot Date</label>
+              <span>{{ selectedSession.slotDate }}</span>
+            </div>
+            <div class="detail-item" *ngIf="selectedSession.slotTime">
+              <label>Slot Time</label>
+              <span>{{ selectedSession.slotTime }} - {{ selectedSession.slotEndTime }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Verification Status -->
+        <div class="detail-section">
+          <h4><i class="fa fa-tasks"></i> Verification Checklist</h4>
+          <div class="checklist">
+            <div class="check-item" [class.done]="selectedSession.otpVerified">
+              <i class="fa" [ngClass]="selectedSession.otpVerified ? 'fa-check-circle' : 'fa-circle'"></i>
+              OTP Verified
+            </div>
+            <div class="check-item" [class.done]="selectedSession.faceSnapshot">
+              <i class="fa" [ngClass]="selectedSession.faceSnapshot ? 'fa-check-circle' : 'fa-circle'"></i>
+              Face Snapshot
+            </div>
+            <div class="check-item" [class.done]="selectedSession.idSnapshot">
+              <i class="fa" [ngClass]="selectedSession.idSnapshot ? 'fa-check-circle' : 'fa-circle'"></i>
+              ID Snapshot
+            </div>
+            <div class="check-item" [class.done]="selectedSession.livenessCheckPassed">
+              <i class="fa" [ngClass]="selectedSession.livenessCheckPassed ? 'fa-check-circle' : 'fa-circle'"></i>
+              Liveness Check
+            </div>
+          </div>
+        </div>
+
+        <!-- Documents -->
+        <div class="detail-section">
+          <h4><i class="fa fa-file-alt"></i> Documents</h4>
+          <div class="doc-buttons">
+            <button class="doc-btn" (click)="viewDocument('aadhar')" [disabled]="!selectedSession.aadharDocument">
+              <i class="fa fa-id-card"></i> View Aadhaar
+            </button>
+            <button class="doc-btn" (click)="viewDocument('pan')" [disabled]="!selectedSession.panDocument">
+              <i class="fa fa-address-card"></i> View PAN
+            </button>
+            <button class="doc-btn" (click)="viewDocument('face')" [disabled]="!selectedSession.faceSnapshot">
+              <i class="fa fa-camera"></i> Face Snapshot
+            </button>
+            <button class="doc-btn" (click)="viewDocument('id')" [disabled]="!selectedSession.idSnapshot">
+              <i class="fa fa-image"></i> ID Snapshot
+            </button>
+          </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="detail-section action-section" *ngIf="selectedSession.kycStatus !== 'Approved'">
+          <h4><i class="fa fa-gavel"></i> Actions</h4>
+          <div class="action-buttons">
+            <button *ngIf="!videoActive && selectedSession.sessionActive" class="action-btn join" 
+                    (click)="joinVideoSession()" [disabled]="actionLoading">
+              <i class="fa fa-video"></i> Join Video
+            </button>
+            <button *ngIf="videoActive" class="action-btn end-video" (click)="stopAdminVideo()">
+              <i class="fa fa-phone-slash"></i> End Video
+            </button>
+            <button class="action-btn approve" (click)="approveKyc()" [disabled]="actionLoading">
+              <i class="fa fa-check"></i> Approve
+            </button>
+            <button class="action-btn reject" (click)="openRejectModal()" [disabled]="actionLoading">
+              <i class="fa fa-times"></i> Reject
+            </button>
+            <button *ngIf="selectedSession.kycStatus === 'Rejected'" class="action-btn reopen" 
+                    (click)="reopenSession()" [disabled]="actionLoading">
+              <i class="fa fa-redo"></i> Reopen
+            </button>
+          </div>
+        </div>
+
+        <!-- Audit Logs -->
+        <div class="detail-section" *ngIf="auditLogs.length > 0">
+          <h4><i class="fa fa-history"></i> Audit Trail</h4>
+          <div class="audit-list">
+            <div *ngFor="let log of auditLogs" class="audit-item">
+              <div class="audit-action">{{ getActionLabel(log.action) }}</div>
+              <div class="audit-meta">
+                <span><i class="fa fa-user"></i> {{ log.adminName }}</span>
+                <span><i class="fa fa-clock"></i> {{ log.createdAt | date:'medium' }}</span>
+              </div>
+              <div class="audit-details" *ngIf="log.details">{{ log.details }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== ALL SESSIONS TAB ==================== -->
+  <div *ngIf="activeTab === 'all'" class="tab-content">
+    <!-- Filters -->
+    <div class="filter-bar">
+      <div class="search-box">
+        <i class="fa fa-search"></i>
+        <input type="text" [(ngModel)]="searchQuery" placeholder="Search by name, mobile, customer ID..." 
+               (keyup.enter)="onSearch()" />
+        <button (click)="onSearch()">Search</button>
+      </div>
+      <select [(ngModel)]="statusFilter" (change)="onFilterChange()">
+        <option value="all">All Status</option>
+        <option value="Registered">Registered</option>
+        <option value="Documents Uploaded">Documents Uploaded</option>
+        <option value="Scheduled">Scheduled</option>
+        <option value="Under Review">Under Review</option>
+        <option value="Approved">Approved</option>
+        <option value="Rejected">Rejected</option>
+      </select>
+    </div>
+
+    <!-- Sessions Table -->
+    <div class="sessions-table-wrapper">
+      <table class="sessions-table">
+        <thead>
+          <tr>
+            <th>Customer ID</th>
+            <th>Name</th>
+            <th>Mobile</th>
+            <th>Type</th>
+            <th>Status</th>
+            <th>Verification #</th>
+            <th>Slot</th>
+            <th>Date</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let session of filteredSessions" (click)="selectSession(session); switchTab('queue')">
+            <td class="mono">{{ session.customerId }}</td>
+            <td>{{ session.fullName }}</td>
+            <td>{{ session.mobileNumber }}</td>
+            <td>{{ session.accountType }}</td>
+            <td><span class="status-badge small" [ngClass]="getStatusClass(session.kycStatus)">{{ session.kycStatus }}</span></td>
+            <td class="mono">{{ session.verificationNumber || '—' }}</td>
+            <td>{{ session.slotDate ? session.slotDate + ' ' + session.slotTime : '—' }}</td>
+            <td>{{ session.createdAt | date:'short' }}</td>
+            <td>
+              <button class="view-btn" (click)="selectSession(session); switchTab('queue'); $event.stopPropagation()">
+                <i class="fa fa-eye"></i> View
+              </button>
+            </td>
+          </tr>
+          <tr *ngIf="filteredSessions.length === 0">
+            <td colspan="9" class="empty-row">No sessions found</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Pagination -->
+    <div class="pagination" *ngIf="totalPages > 1">
+      <button (click)="prevPage()" [disabled]="currentPage === 0"><i class="fa fa-chevron-left"></i></button>
+      <span>{{ currentPage + 1 }} / {{ totalPages }}</span>
+      <button (click)="nextPage()" [disabled]="currentPage >= totalPages - 1"><i class="fa fa-chevron-right"></i></button>
+    </div>
+  </div>
+
+  <!-- ==================== STATS TAB ==================== -->
+  <div *ngIf="activeTab === 'stats'" class="tab-content">
+    <div class="stats-grid">
+      <div class="stats-card total">
+        <i class="fa fa-layer-group fa-2x"></i>
+        <div class="stats-number">{{ stats.total || 0 }}</div>
+        <div class="stats-label">Total Sessions</div>
+      </div>
+      <div class="stats-card pending">
+        <i class="fa fa-clock fa-2x"></i>
+        <div class="stats-number">{{ stats.pending || 0 }}</div>
+        <div class="stats-label">Pending</div>
+      </div>
+      <div class="stats-card scheduled">
+        <i class="fa fa-calendar-check fa-2x"></i>
+        <div class="stats-number">{{ stats.scheduled || 0 }}</div>
+        <div class="stats-label">Scheduled</div>
+      </div>
+      <div class="stats-card review">
+        <i class="fa fa-eye fa-2x"></i>
+        <div class="stats-number">{{ stats.underReview || 0 }}</div>
+        <div class="stats-label">Under Review</div>
+      </div>
+      <div class="stats-card approved">
+        <i class="fa fa-check-circle fa-2x"></i>
+        <div class="stats-number">{{ stats.approved || 0 }}</div>
+        <div class="stats-label">Approved</div>
+      </div>
+      <div class="stats-card rejected">
+        <i class="fa fa-times-circle fa-2x"></i>
+        <div class="stats-number">{{ stats.rejected || 0 }}</div>
+        <div class="stats-label">Rejected</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== SLOT MANAGEMENT TAB ==================== -->
+  <div *ngIf="activeTab === 'slots'" class="tab-content">
+    <!-- Create Slot Form -->
+    <div class="slot-create-section">
+      <h3><i class="fa fa-plus-circle"></i> Create New Slot</h3>
+      <div *ngIf="slotError" class="alert alert-error">
+        <i class="fa fa-exclamation-circle"></i> {{ slotError }}
+        <button (click)="slotError = ''"><i class="fa fa-times"></i></button>
+      </div>
+      <div *ngIf="slotSuccess" class="alert alert-success">
+        <i class="fa fa-check-circle"></i> {{ slotSuccess }}
+        <button (click)="slotSuccess = ''"><i class="fa fa-times"></i></button>
+      </div>
+      <div class="slot-form">
+        <div class="form-group">
+          <label><i class="fa fa-calendar"></i> Date</label>
+          <input type="date" [(ngModel)]="newSlotDate" />
+        </div>
+        <div class="form-group">
+          <label><i class="fa fa-clock"></i> Start Time</label>
+          <input type="time" [(ngModel)]="newSlotTime" />
+        </div>
+        <div class="form-group">
+          <label><i class="fa fa-clock"></i> End Time</label>
+          <input type="time" [(ngModel)]="newSlotEndTime" />
+        </div>
+        <div class="form-group">
+          <label><i class="fa fa-users"></i> Max Bookings</label>
+          <input type="number" [(ngModel)]="newSlotMaxBookings" min="1" max="50" />
+        </div>
+        <button class="action-btn approve" (click)="createSlot()" [disabled]="slotLoading">
+          <i class="fa" [ngClass]="slotLoading ? 'fa-spinner fa-spin' : 'fa-plus'"></i>
+          Create Slot
+        </button>
+        <button class="action-btn" style="margin-left: 10px; background: #6366f1; color: white;" (click)="generateDefaultSlots()" [disabled]="slotLoading">
+          <i class="fa" [ngClass]="slotLoading ? 'fa-spinner fa-spin' : 'fa-calendar-plus'"></i>
+          Generate 7-Day Slots
+        </button>
+      </div>
+    </div>
+
+    <!-- Existing Slots List -->
+    <div class="slot-list-section">
+      <h3><i class="fa fa-calendar-alt"></i> All Slots ({{ allSlots.length }})</h3>
+      <div *ngIf="allSlots.length === 0" class="empty-state">
+        <i class="fa fa-calendar-times fa-3x"></i>
+        <p>No slots created yet</p>
+      </div>
+      <div class="sessions-table-wrapper" *ngIf="allSlots.length > 0">
+        <table class="sessions-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Date</th>
+              <th>Time</th>
+              <th>End Time</th>
+              <th>Bookings</th>
+              <th>Status</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let slot of allSlots">
+              <td class="mono">{{ slot.id }}</td>
+              <td>{{ slot.slotDate }}</td>
+              <td>{{ slot.slotTime }}</td>
+              <td>{{ slot.slotEndTime }}</td>
+              <td>
+                <span class="booking-count" [class.full]="slot.currentBookings >= slot.maxBookings">
+                  {{ slot.currentBookings }}/{{ slot.maxBookings }}
+                </span>
+              </td>
+              <td>
+                <span class="status-badge small" [ngClass]="slot.isActive ? 'badge-approved' : 'badge-rejected'">
+                  {{ slot.isActive ? 'Active' : 'Cancelled' }}
+                </span>
+              </td>
+              <td>
+                <button class="action-btn reject small-btn" (click)="cancelSlot(slot.id)" 
+                        *ngIf="slot.isActive" [disabled]="slotLoading">
+                  <i class="fa fa-ban"></i> Cancel
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== VERIFICATION LOOKUP TAB ==================== -->
+  <div *ngIf="activeTab === 'verify'" class="tab-content">
+    <div class="verify-section">
+      <h3><i class="fa fa-search"></i> Verification Number Lookup</h3>
+      <div *ngIf="verificationError" class="alert alert-error">
+        <i class="fa fa-exclamation-circle"></i> {{ verificationError }}
+        <button (click)="verificationError = ''"><i class="fa fa-times"></i></button>
+      </div>
+      <div class="verify-search-box">
+        <i class="fa fa-hashtag"></i>
+        <input type="text" [(ngModel)]="verificationNumber" placeholder="Enter verification number (e.g. VKYC20250322001)..." 
+               (keyup.enter)="lookupVerification()" />
+        <button (click)="lookupVerification()" [disabled]="verificationLoading || !verificationNumber.trim()">
+          <i class="fa" [ngClass]="verificationLoading ? 'fa-spinner fa-spin' : 'fa-search'"></i> Search
+        </button>
+      </div>
+
+      <!-- Verification Result -->
+      <div *ngIf="verificationResult" class="verify-result-card">
+        <div class="verify-result-header">
+          <h4><i class="fa fa-user-check"></i> {{ verificationResult.fullName }}</h4>
+          <span class="status-badge large" [ngClass]="getStatusClass(verificationResult.kycStatus)">{{ verificationResult.kycStatus }}</span>
+        </div>
+        <div class="detail-grid">
+          <div class="detail-item">
+            <label>Verification #</label>
+            <span class="highlight mono">{{ verificationResult.verificationNumber }}</span>
+          </div>
+          <div class="detail-item">
+            <label>Customer ID</label>
+            <span>{{ verificationResult.customerId }}</span>
+          </div>
+          <div class="detail-item">
+            <label>Mobile</label>
+            <span>{{ verificationResult.mobileNumber }}</span>
+          </div>
+          <div class="detail-item">
+            <label>Account Type</label>
+            <span>{{ verificationResult.accountType }}</span>
+          </div>
+          <div class="detail-item" *ngIf="verificationResult.slotDate">
+            <label>Slot Date</label>
+            <span>{{ verificationResult.slotDate }}</span>
+          </div>
+          <div class="detail-item" *ngIf="verificationResult.slotTime">
+            <label>Slot Time</label>
+            <span>{{ verificationResult.slotTime }} - {{ verificationResult.slotEndTime }}</span>
+          </div>
+          <div class="detail-item">
+            <label>Created</label>
+            <span>{{ verificationResult.createdAt }}</span>
+          </div>
+          <div class="detail-item" *ngIf="verificationResult.finalAccountNumber">
+            <label>Final Account</label>
+            <span class="highlight">{{ verificationResult.finalAccountNumber }}</span>
+          </div>
+        </div>
+        <div class="verify-action">
+          <button class="action-btn join" (click)="selectSession(verificationResult); switchTab('queue')">
+            <i class="fa fa-eye"></i> View Full Details
+          </button>
+        </div>
+      </div>
+
+      <div *ngIf="!verificationResult && !verificationLoading && verificationNumber.trim()" class="empty-state small-empty">
+        <i class="fa fa-search fa-2x"></i>
+        <p>Enter a verification number and click search</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== REJECT MODAL ==================== -->
+  <div class="modal-overlay" *ngIf="showRejectModal" (click)="cancelReject()">
+    <div class="modal-content" (click)="$event.stopPropagation()">
+      <h3><i class="fa fa-times-circle"></i> Reject KYC Session</h3>
+      <p>Please provide a reason for rejecting this KYC session.</p>
+      <textarea [(ngModel)]="rejectionReason" placeholder="Enter rejection reason..." rows="4"></textarea>
+      <div class="modal-actions">
+        <button class="btn-cancel" (click)="cancelReject()">Cancel</button>
+        <button class="btn-confirm-reject" (click)="confirmReject()" [disabled]="!rejectionReason.trim() || actionLoading">
+          <i class="fa" [ngClass]="actionLoading ? 'fa-spinner fa-spin' : 'fa-times'"></i>
+          Confirm Reject
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== DOCUMENT VIEWER MODAL ==================== -->
+  <div class="modal-overlay" *ngIf="showDocViewer" (click)="closeDocViewer()">
+    <div class="doc-viewer-content" (click)="$event.stopPropagation()">
+      <div class="doc-viewer-header">
+        <h3>{{ docViewerTitle }}</h3>
+        <button (click)="closeDocViewer()"><i class="fa fa-times"></i></button>
+      </div>
+      <div class="doc-viewer-body">
+        <img [src]="docViewerUrl" [alt]="docViewerTitle" />
+      </div>
+    </div>
+  </div>
+</div>

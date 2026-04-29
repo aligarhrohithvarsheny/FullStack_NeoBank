@@ -1,0 +1,1891 @@
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+<div class="current-accounts-wrapper">
+  <!-- Header -->
+  <div class="page-header">
+    <div class="header-left">
+      <button class="back-btn" (click)="goBack()">
+        <i class="fa fa-arrow-left"></i>
+      </button>
+      <div class="header-title">
+        <h1><i class="fa fa-building"></i> Current Account Management</h1>
+        <p>Manage business current accounts</p>
+      </div>
+    </div>
+    <div class="header-right">
+      <span class="admin-badge"><i class="fa fa-user-shield"></i> {{ adminName }}</span>
+    </div>
+  </div>
+
+  <!-- Alert -->
+  <div class="alert-box" *ngIf="showAlert" [ngClass]="alertType === 'success' ? 'alert-success' : 'alert-error'">
+    <i [ngClass]="alertType === 'success' ? 'fa fa-check-circle' : 'fa fa-exclamation-circle'"></i>
+    <span>{{ alertMessage }}</span>
+    <button class="alert-close" (click)="showAlert = false"><i class="fa fa-times"></i></button>
+  </div>
+
+  <!-- Stats Cards -->
+  <div class="stats-grid">
+    <div class="stat-card stat-total">
+      <div class="stat-icon"><i class="fa fa-building"></i></div>
+      <div class="stat-info">
+        <h3>{{ stats.totalAccounts }}</h3>
+        <p>Total Accounts</p>
+      </div>
+    </div>
+    <div class="stat-card stat-pending">
+      <div class="stat-icon"><i class="fa fa-clock"></i></div>
+      <div class="stat-info">
+        <h3>{{ stats.pendingAccounts }}</h3>
+        <p>Pending Approval</p>
+      </div>
+    </div>
+    <div class="stat-card stat-active">
+      <div class="stat-icon"><i class="fa fa-check-circle"></i></div>
+      <div class="stat-info">
+        <h3>{{ stats.activeAccounts }}</h3>
+        <p>Active Accounts</p>
+      </div>
+    </div>
+    <div class="stat-card stat-balance">
+      <div class="stat-icon"><i class="fa fa-indian-rupee-sign"></i></div>
+      <div class="stat-info">
+        <h3>{{ formatCurrency(stats.totalActiveBalance) }}</h3>
+        <p>Total Balance</p>
+      </div>
+    </div>
+    <div class="stat-card stat-frozen">
+      <div class="stat-icon"><i class="fa fa-snowflake"></i></div>
+      <div class="stat-info">
+        <h3>{{ stats.frozenAccounts }}</h3>
+        <p>Frozen Accounts</p>
+      </div>
+    </div>
+    <div class="stat-card stat-overdraft">
+      <div class="stat-icon"><i class="fa fa-exclamation-triangle"></i></div>
+      <div class="stat-info">
+        <h3>{{ stats.overdrawnAccounts }}</h3>
+        <p>Overdrawn</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab Navigation -->
+  <div class="tab-nav">
+    <button [class.active]="activeTab === 'open-account'" (click)="setActiveTab('open-account')">
+      <i class="fa fa-plus-circle"></i> Open Account
+    </button>
+    <button [class.active]="activeTab === 'view-accounts'" (click)="setActiveTab('view-accounts')">
+      <i class="fa fa-list"></i> View Accounts
+    </button>
+    <button [class.active]="activeTab === 'approve-accounts'" (click)="setActiveTab('approve-accounts')">
+      <i class="fa fa-check-double"></i> Approve Accounts
+      <span class="badge" *ngIf="pendingAccounts.length > 0">{{ pendingAccounts.length }}</span>
+    </button>
+    <button [class.active]="activeTab === 'kyc-verification'" (click)="setActiveTab('kyc-verification')">
+      <i class="fa fa-id-card"></i> Business KYC
+      <span class="badge" *ngIf="pendingKycAccounts.length > 0">{{ pendingKycAccounts.length }}</span>
+    </button>
+    <button [class.active]="activeTab === 'transaction-monitoring'" (click)="setActiveTab('transaction-monitoring')">
+      <i class="fa fa-chart-line"></i> Transaction Monitoring
+    </button>
+    <button [class.active]="activeTab === 'cheque-requests'" (click)="setActiveTab('cheque-requests')">
+      <i class="fa fa-money-check"></i> Cheque Requests
+      <span class="badge" *ngIf="pendingChequeRequests.length > 0">{{ pendingChequeRequests.length }}</span>
+    </button>
+    <button [class.active]="activeTab === 'link-savings'" (click)="setActiveTab('link-savings')">
+      <i class="fa fa-link"></i> Link Savings
+    </button>
+    <button [class.active]="activeTab === 'soundbox'" (click)="setActiveTab('soundbox')">
+      <i class="fa fa-volume-up"></i> Soundbox
+      <span class="badge" *ngIf="pendingSoundboxRequests.length > 0">{{ pendingSoundboxRequests.length }}</span>
+    </button>
+    <button [class.active]="activeTab === 'upi-payments'" (click)="setActiveTab('upi-payments')">
+      <i class="fa fa-qrcode"></i> UPI Payments
+    </button>
+  </div>
+
+  <!-- ==================== OPEN ACCOUNT TAB ==================== -->
+  <div class="tab-content" *ngIf="activeTab === 'open-account'">
+    <div class="form-card">
+      <h2><i class="fa fa-plus-circle"></i> Open New Current Account</h2>
+      <p class="form-subtitle">Fill in business customer details to open a current account</p>
+
+      <div class="form-grid">
+        <!-- Business Details Section -->
+        <div class="form-section">
+          <h3><i class="fa fa-briefcase"></i> Business Details</h3>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Business Name *</label>
+              <input type="text" [(ngModel)]="newAccount.businessName" placeholder="Enter business name">
+            </div>
+            <div class="form-group">
+              <label>Business Type *</label>
+              <select [(ngModel)]="newAccount.businessType">
+                <option value="Proprietor">Proprietor</option>
+                <option value="Partnership">Partnership</option>
+                <option value="Pvt Ltd">Pvt Ltd</option>
+                <option value="Startup">Startup</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Business Registration Number</label>
+              <input type="text" [(ngModel)]="newAccount.businessRegistrationNumber" placeholder="Enter registration number">
+            </div>
+            <div class="form-group">
+              <label>GST Number</label>
+              <input type="text" [(ngModel)]="newAccount.gstNumber" placeholder="e.g., 22AAAAA0000A1Z5" maxlength="15">
+            </div>
+          </div>
+        </div>
+
+        <!-- Owner Details Section -->
+        <div class="form-section">
+          <h3><i class="fa fa-user"></i> Owner Details</h3>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Owner Name *</label>
+              <input type="text" [(ngModel)]="newAccount.ownerName" placeholder="Enter owner full name">
+            </div>
+            <div class="form-group">
+              <label>Mobile Number *</label>
+              <input type="text" [(ngModel)]="newAccount.mobile" placeholder="10-digit mobile number" maxlength="10">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Email ID *</label>
+              <input type="email" [(ngModel)]="newAccount.email" placeholder="Enter email address">
+            </div>
+            <div class="form-group">
+              <label>Aadhaar Number *</label>
+              <input type="text" [(ngModel)]="newAccount.aadharNumber" placeholder="12-digit Aadhaar number" maxlength="12">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>PAN Number *</label>
+              <input type="text" [(ngModel)]="newAccount.panNumber" placeholder="e.g., ABCDE1234F" maxlength="10" style="text-transform: uppercase;">
+            </div>
+          </div>
+        </div>
+
+        <!-- Business Address Section -->
+        <div class="form-section">
+          <h3><i class="fa fa-map-marker-alt"></i> Business Address</h3>
+          <div class="form-row">
+            <div class="form-group full-width">
+              <label>Shop / Office Address</label>
+              <textarea [(ngModel)]="newAccount.shopAddress" placeholder="Enter complete business address" rows="2"></textarea>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>City</label>
+              <input type="text" [(ngModel)]="newAccount.city" placeholder="Enter city">
+            </div>
+            <div class="form-group">
+              <label>State</label>
+              <input type="text" [(ngModel)]="newAccount.state" placeholder="Enter state">
+            </div>
+            <div class="form-group">
+              <label>Pincode</label>
+              <input type="text" [(ngModel)]="newAccount.pincode" placeholder="6-digit pincode" maxlength="6">
+            </div>
+          </div>
+        </div>
+
+        <!-- Bank Details Section -->
+        <div class="form-section">
+          <h3><i class="fa fa-university"></i> Bank Details</h3>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Account Type</label>
+              <input type="text" value="Current Account" disabled>
+            </div>
+            <div class="form-group">
+              <label>Branch Name</label>
+              <input type="text" [(ngModel)]="newAccount.branchName" placeholder="Branch name">
+            </div>
+            <div class="form-group">
+              <label>IFSC Code</label>
+              <input type="text" [(ngModel)]="newAccount.ifscCode" placeholder="IFSC code">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button class="btn btn-primary btn-lg" (click)="submitNewAccount()" [disabled]="isLoading">
+          <i class="fa fa-check-circle"></i> {{ isLoading ? 'Creating...' : 'Create Current Account' }}
+        </button>
+        <button class="btn btn-secondary" (click)="newAccount = getEmptyAccount()">
+          <i class="fa fa-undo"></i> Reset Form
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== VIEW ACCOUNTS TAB ==================== -->
+  <div class="tab-content" *ngIf="activeTab === 'view-accounts' && !showDetailView">
+    <div class="section-card">
+      <div class="section-header">
+        <h2><i class="fa fa-list"></i> All Current Accounts</h2>
+        <div class="section-controls">
+          <div class="search-box">
+            <i class="fa fa-search"></i>
+            <input type="text" [(ngModel)]="searchTerm" (input)="filterAccounts()" placeholder="Search by name, account, GST...">
+          </div>
+          <select [(ngModel)]="statusFilter" (change)="filterAccounts()">
+            <option value="ALL">All Status</option>
+            <option value="PENDING">Pending</option>
+            <option value="ACTIVE">Active</option>
+            <option value="FROZEN">Frozen</option>
+            <option value="REJECTED">Rejected</option>
+            <option value="CLOSED">Closed</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Business Name</th>
+              <th>Account Number</th>
+              <th>Owner</th>
+              <th>Business Type</th>
+              <th>Balance</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let account of filteredAccounts">
+              <td>
+                <div class="business-info">
+                  <strong>{{ account.businessName }}</strong>
+                  <small>GST: {{ account.gstNumber || 'N/A' }}</small>
+                </div>
+              </td>
+              <td><span class="account-number">{{ account.accountNumber }}</span></td>
+              <td>{{ account.ownerName }}</td>
+              <td><span class="type-badge">{{ account.businessType }}</span></td>
+              <td [class.negative-balance]="(account.balance || 0) < 0">{{ formatCurrency(account.balance) }}</td>
+              <td><span class="status-badge" [ngClass]="getStatusClass(account.status)">{{ account.status }}</span></td>
+              <td>
+                <div class="action-btns">
+                  <button class="btn-icon btn-view" (click)="viewAccountDetails(account)" title="View Details"><i class="fa fa-eye"></i></button>
+                  <button class="btn-icon btn-txn" (click)="openTransactionModal(account)" *ngIf="account.status === 'ACTIVE'" title="Process Transaction"><i class="fa fa-exchange-alt"></i></button>
+                  <button class="btn-icon btn-transfer" (click)="openTransferModal(account)" *ngIf="account.status === 'ACTIVE'" title="Transfer"><i class="fa fa-paper-plane"></i></button>
+                  <button class="btn-icon btn-freeze" (click)="openFreezeModal(account)" *ngIf="account.status === 'ACTIVE'" title="Freeze"><i class="fa fa-snowflake"></i></button>
+                  <button class="btn-icon btn-unfreeze" (click)="unfreezeAccount(account)" *ngIf="account.status === 'FROZEN'" title="Unfreeze"><i class="fa fa-fire"></i></button>
+                  <button class="btn-icon btn-overdraft" (click)="openOverdraftModal(account)" *ngIf="account.status === 'ACTIVE' && !account.overdraftEnabled" title="Approve Overdraft"><i class="fa fa-hand-holding-usd"></i></button>
+                </div>
+              </td>
+            </tr>
+            <tr *ngIf="filteredAccounts.length === 0">
+              <td colspan="7" class="no-data">
+                <i class="fa fa-inbox"></i>
+                <p>No current accounts found</p>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== ACCOUNT DETAIL VIEW ==================== -->
+  <div class="tab-content" *ngIf="showDetailView && selectedAccount">
+    <div class="detail-view">
+      <div class="detail-header">
+        <button class="back-btn" (click)="closeDetailView()"><i class="fa fa-arrow-left"></i> Back to List</button>
+        <h2><i class="fa fa-building"></i> {{ selectedAccount.businessName }}</h2>
+        <span class="status-badge" [ngClass]="getStatusClass(selectedAccount.status)">{{ selectedAccount.status }}</span>
+        <div class="detail-header-actions">
+          <button class="btn btn-primary btn-sm" *ngIf="!isEditMode" (click)="enableEditMode()">
+            <i class="fa fa-edit"></i> Edit Account
+          </button>
+          <button class="btn btn-success btn-sm" *ngIf="isEditMode" (click)="saveEdit()" [disabled]="isLoading">
+            <i class="fa fa-save"></i> Save Changes
+          </button>
+          <button class="btn btn-secondary btn-sm" *ngIf="isEditMode" (click)="cancelEditMode()">
+            <i class="fa fa-times"></i> Cancel
+          </button>
+          <button class="btn btn-sm" [ngClass]="showEditHistory ? 'btn-warning' : 'btn-secondary'" (click)="toggleEditHistory()">
+            <i class="fa fa-history"></i> Edit History
+            <span class="badge" *ngIf="editHistory.length > 0">{{ editHistory.length }}</span>
+          </button>
+          <button class="btn btn-sm btn-link-savings" (click)="openLinkModal(selectedAccount)" *ngIf="selectedAccount.status === 'ACTIVE' && !accountLinkStatus[$any(selectedAccount.accountNumber)]">
+            <i class="fa fa-link"></i> Link Savings
+          </button>
+          <span class="status-badge status-active" *ngIf="selectedAccount.status === 'ACTIVE' && accountLinkStatus[$any(selectedAccount.accountNumber)]" style="padding: 6px 12px; font-size: 12px;">
+            <i class="fa fa-check-circle"></i> Already Linked
+          </span>
+        </div>
+      </div>
+
+      <!-- ===== ACCOUNT SWITCH TAB ===== -->
+      <div class="account-switch-bar" *ngIf="linkedAccounts.length > 0">
+        <div class="switch-tabs">
+          <button class="switch-tab" [class.active]="activeAccountType === 'current'" (click)="switchToCurrentAccount()">
+            <i class="fa fa-building"></i> Current Account
+          </button>
+          <button class="switch-tab" *ngFor="let link of linkedAccounts"
+                  [class.active]="activeAccountType === 'savings' && switchedSavingsAccountNumber === link.savingsAccountNumber"
+                  (click)="switchToSavingsAccount(link.savingsAccountNumber)">
+            <i class="fa fa-piggy-bank"></i> Savings ({{ link.savingsAccountNumber }})
+          </button>
+        </div>
+      </div>
+
+      <!-- ===== SAVINGS ACCOUNT VIEW (switched) ===== -->
+      <div class="detail-cards-grid" *ngIf="activeAccountType === 'savings' && switchedSavingsAccount && !isEditMode">
+        <div class="detail-card">
+          <h3><i class="fa fa-piggy-bank"></i> Savings Account Information</h3>
+          <div class="detail-row"><span>Account Holder</span><strong>{{ switchedSavingsAccount.name }}</strong></div>
+          <div class="detail-row"><span>Account Number</span><strong>{{ switchedSavingsAccount.accountNumber }}</strong></div>
+          <div class="detail-row"><span>Customer ID</span><strong>{{ switchedSavingsAccount.customerId }}</strong></div>
+          <div class="detail-row"><span>Account Type</span><strong>{{ switchedSavingsAccount.accountType }}</strong></div>
+          <div class="detail-row"><span>Phone</span><strong>{{ switchedSavingsAccount.phone }}</strong></div>
+          <div class="detail-row"><span>Status</span><strong>{{ switchedSavingsAccount.status }}</strong></div>
+        </div>
+        <div class="detail-card balance-card">
+          <h3><i class="fa fa-wallet"></i> Savings Balance</h3>
+          <div class="balance-amount">{{ formatCurrency(switchedSavingsAccount.balance) }}</div>
+        </div>
+        <div class="detail-card">
+          <h3><i class="fa fa-link"></i> Linked To</h3>
+          <div class="detail-row"><span>Current Account</span><strong>{{ selectedAccount.accountNumber }}</strong></div>
+          <div class="detail-row"><span>Business Name</span><strong>{{ selectedAccount.businessName }}</strong></div>
+          <div class="detail-row"><span>Current Balance</span><strong>{{ formatCurrency(selectedAccount.balance) }}</strong></div>
+        </div>
+      </div>
+
+      <!-- ===== READ-ONLY VIEW (Current Account) ===== -->
+      <div class="detail-cards-grid" *ngIf="!isEditMode && activeAccountType === 'current'">
+        <!-- Account Info Card -->
+        <div class="detail-card">
+          <h3><i class="fa fa-info-circle"></i> Account Information</h3>
+          <div class="detail-row"><span>Account Number</span><strong>{{ selectedAccount.accountNumber }}</strong></div>
+          <div class="detail-row"><span>Customer ID</span><strong>{{ selectedAccount.customerId }}</strong></div>
+          <div class="detail-row"><span>IFSC Code</span><strong>{{ selectedAccount.ifscCode }}</strong></div>
+          <div class="detail-row"><span>Branch</span><strong>{{ selectedAccount.branchName }}</strong></div>
+          <div class="detail-row"><span>Account Type</span><strong>Current Account</strong></div>
+          <div class="detail-row"><span>Opened On</span><strong>{{ formatDate(selectedAccount.createdAt) }}</strong></div>
+        </div>
+
+        <!-- Balance Card -->
+        <div class="detail-card balance-card">
+          <h3><i class="fa fa-wallet"></i> Balance & Overdraft</h3>
+          <div class="balance-amount" [class.negative-balance]="(selectedAccount.balance || 0) < 0">
+            {{ formatCurrency(selectedAccount.balance) }}
+          </div>
+          <div class="detail-row"><span>Min Balance</span><strong>{{ formatCurrency(selectedAccount.minimumBalance) }}</strong></div>
+          <div class="detail-row"><span>Overdraft</span><strong>{{ selectedAccount.overdraftEnabled ? 'Enabled' : 'Disabled' }}</strong></div>
+          <div class="detail-row" *ngIf="selectedAccount.overdraftEnabled"><span>Overdraft Limit</span><strong>{{ formatCurrency(selectedAccount.overdraftLimit) }}</strong></div>
+          <div class="summary-row" *ngIf="transactionSummary">
+            <div class="summary-item credit"><span>Total Credits</span><strong>{{ formatCurrency(transactionSummary.totalCredits) }}</strong></div>
+            <div class="summary-item debit"><span>Total Debits</span><strong>{{ formatCurrency(transactionSummary.totalDebits) }}</strong></div>
+            <div class="summary-item today"><span>Today's Txns</span><strong>{{ transactionSummary.todayTransactions }}</strong></div>
+          </div>
+        </div>
+
+        <!-- Business Details Card -->
+        <div class="detail-card">
+          <h3><i class="fa fa-briefcase"></i> Business Details</h3>
+          <div class="detail-row"><span>Business Name</span><strong>{{ selectedAccount.businessName }}</strong></div>
+          <div class="detail-row"><span>Business Type</span><strong>{{ selectedAccount.businessType }}</strong></div>
+          <div class="detail-row"><span>Registration No.</span><strong>{{ selectedAccount.businessRegistrationNumber || 'N/A' }}</strong></div>
+          <div class="detail-row"><span>GST Number</span><strong>{{ selectedAccount.gstNumber || 'N/A' }}</strong></div>
+        </div>
+
+        <!-- Owner Details Card -->
+        <div class="detail-card">
+          <h3><i class="fa fa-user"></i> Owner Details</h3>
+          <div class="detail-row"><span>Owner Name</span><strong>{{ selectedAccount.ownerName }}</strong></div>
+          <div class="detail-row"><span>Mobile</span><strong>{{ selectedAccount.mobile }}</strong></div>
+          <div class="detail-row"><span>Email</span><strong>{{ selectedAccount.email }}</strong></div>
+          <div class="detail-row"><span>Aadhaar</span><strong>{{ selectedAccount.aadharNumber }}</strong></div>
+          <div class="detail-row"><span>PAN</span><strong>{{ selectedAccount.panNumber }}</strong></div>
+        </div>
+
+        <!-- Address Card -->
+        <div class="detail-card">
+          <h3><i class="fa fa-map-marker-alt"></i> Business Address</h3>
+          <div class="detail-row"><span>Address</span><strong>{{ selectedAccount.shopAddress || 'N/A' }}</strong></div>
+          <div class="detail-row"><span>City</span><strong>{{ selectedAccount.city || 'N/A' }}</strong></div>
+          <div class="detail-row"><span>State</span><strong>{{ selectedAccount.state || 'N/A' }}</strong></div>
+          <div class="detail-row"><span>Pincode</span><strong>{{ selectedAccount.pincode || 'N/A' }}</strong></div>
+        </div>
+
+        <!-- KYC Status Card -->
+        <div class="detail-card">
+          <h3><i class="fa fa-id-card"></i> KYC Status</h3>
+          <div class="detail-row">
+            <span>KYC Verified</span>
+            <strong [class.kyc-yes]="selectedAccount.kycVerified" [class.kyc-no]="!selectedAccount.kycVerified">
+              {{ selectedAccount.kycVerified ? 'Yes' : 'No' }}
+            </strong>
+          </div>
+          <div class="detail-row" *ngIf="selectedAccount.kycVerified"><span>Verified By</span><strong>{{ selectedAccount.kycVerifiedBy }}</strong></div>
+          <div class="detail-row" *ngIf="selectedAccount.kycVerified"><span>Verified Date</span><strong>{{ formatDate(selectedAccount.kycVerifiedDate) }}</strong></div>
+        </div>
+
+        <!-- Linked Accounts Card -->
+        <div class="detail-card linked-accounts-card" *ngIf="linkedAccounts.length > 0">
+          <h3><i class="fa fa-link"></i> Linked Savings Accounts</h3>
+          <div class="linked-account-item" *ngFor="let link of linkedAccounts">
+            <div class="linked-account-info">
+              <div class="linked-account-number">
+                <i class="fa fa-piggy-bank"></i>
+                <span>{{ link.savingsAccountNumber }}</span>
+              </div>
+              <div class="linked-account-meta">
+                <small>Customer ID: {{ link.savingsCustomerId }}</small>
+                <small>Linked by: {{ link.linkedBy }}</small>
+                <small>{{ formatDate(link.linkedAt) }}</small>
+              </div>
+              <div *ngIf="linkedSavingsDetails[link.savingsAccountNumber] as details" class="linked-account-balance">
+                <span>{{ details.name }}</span>
+                <strong>{{ formatCurrency(details.balance) }}</strong>
+              </div>
+            </div>
+            <div class="linked-account-actions">
+              <button class="btn btn-primary btn-sm" (click)="switchToSavingsAccount(link.savingsAccountNumber)">
+                <i class="fa fa-exchange-alt"></i> Switch
+              </button>
+              <button class="btn btn-danger btn-sm" (click)="unlinkAccount(link.id!)">
+                <i class="fa fa-unlink"></i> Unlink
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== EDIT MODE VIEW ===== -->
+      <div class="edit-mode-container" *ngIf="isEditMode">
+        <div class="edit-mode-banner">
+          <i class="fa fa-edit"></i>
+          <span>Edit Mode Active — Modify account details below. A PDF document upload will be required upon saving.</span>
+        </div>
+
+        <div class="form-grid">
+          <!-- Business Details Section -->
+          <div class="form-section">
+            <h3><i class="fa fa-briefcase"></i> Business Details</h3>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Business Name</label>
+                <input type="text" [(ngModel)]="editAccount.businessName">
+              </div>
+              <div class="form-group">
+                <label>Business Type</label>
+                <select [(ngModel)]="editAccount.businessType">
+                  <option value="Proprietor">Proprietor</option>
+                  <option value="Partnership">Partnership</option>
+                  <option value="Pvt Ltd">Pvt Ltd</option>
+                  <option value="Startup">Startup</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Registration Number</label>
+                <input type="text" [(ngModel)]="editAccount.businessRegistrationNumber">
+              </div>
+              <div class="form-group">
+                <label>GST Number</label>
+                <input type="text" [(ngModel)]="editAccount.gstNumber" maxlength="15">
+              </div>
+            </div>
+          </div>
+
+          <!-- Owner Details Section -->
+          <div class="form-section">
+            <h3><i class="fa fa-user"></i> Owner Details</h3>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Owner Name</label>
+                <input type="text" [(ngModel)]="editAccount.ownerName">
+              </div>
+              <div class="form-group">
+                <label>Mobile Number</label>
+                <input type="text" [(ngModel)]="editAccount.mobile" maxlength="10">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Email ID</label>
+                <input type="email" [(ngModel)]="editAccount.email">
+              </div>
+              <div class="form-group">
+                <label>Aadhaar Number</label>
+                <input type="text" [(ngModel)]="editAccount.aadharNumber" maxlength="12">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>PAN Number</label>
+                <input type="text" [(ngModel)]="editAccount.panNumber" maxlength="10" style="text-transform: uppercase;">
+              </div>
+            </div>
+          </div>
+
+          <!-- Business Address Section -->
+          <div class="form-section">
+            <h3><i class="fa fa-map-marker-alt"></i> Business Address</h3>
+            <div class="form-row">
+              <div class="form-group full-width">
+                <label>Shop / Office Address</label>
+                <textarea [(ngModel)]="editAccount.shopAddress" rows="2"></textarea>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>City</label>
+                <input type="text" [(ngModel)]="editAccount.city">
+              </div>
+              <div class="form-group">
+                <label>State</label>
+                <input type="text" [(ngModel)]="editAccount.state">
+              </div>
+              <div class="form-group">
+                <label>Pincode</label>
+                <input type="text" [(ngModel)]="editAccount.pincode" maxlength="6">
+              </div>
+            </div>
+          </div>
+
+          <!-- Bank Details Section -->
+          <div class="form-section">
+            <h3><i class="fa fa-university"></i> Bank Details</h3>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Branch Name</label>
+                <input type="text" [(ngModel)]="editAccount.branchName">
+              </div>
+              <div class="form-group">
+                <label>IFSC Code</label>
+                <input type="text" [(ngModel)]="editAccount.ifscCode">
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== EDIT HISTORY SECTION ===== -->
+      <div class="edit-history-section" *ngIf="showEditHistory">
+        <div class="section-card" style="margin-top: 20px;">
+          <h3><i class="fa fa-history"></i> Edit History / Audit Trail</h3>
+          <div class="table-container" *ngIf="editHistory.length > 0">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Date & Time</th>
+                  <th>Edited By</th>
+                  <th>Changes Made</th>
+                  <th>Document</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let history of editHistory">
+                  <td>{{ formatDateTime(history.editedAt) }}</td>
+                  <td><strong>{{ history.editedBy }}</strong></td>
+                  <td>
+                    <div class="changes-description">{{ history.changesDescription }}</div>
+                  </td>
+                  <td>
+                    <a *ngIf="history.documentPath" [href]="getDocumentUrl(history.documentPath)" target="_blank" class="btn btn-sm btn-primary">
+                      <i class="fa fa-file-pdf"></i> {{ history.documentName || 'View PDF' }}
+                    </a>
+                    <span *ngIf="!history.documentPath" class="no-doc-text">No document</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="no-data-card" *ngIf="editHistory.length === 0">
+            <i class="fa fa-check-circle"></i>
+            <p>No edit history available</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Transactions Table -->
+      <div class="section-card" style="margin-top: 20px;" *ngIf="!isEditMode">
+        <h3><i class="fa fa-history"></i> Recent Transactions</h3>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Transaction ID</th>
+              <th>Description</th>
+              <th>Debit</th>
+              <th>Credit</th>
+              <th>Balance</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let txn of selectedAccountTransactions">
+              <td>{{ formatDateTime(txn.date) }}</td>
+              <td><span class="txn-id">{{ txn.txnId }}</span></td>
+              <td>{{ txn.description || txn.txnType }}</td>
+              <td class="amount-debit">{{ txn.txnType === 'Debit' || txn.txnType === 'Transfer' ? formatCurrency(txn.amount) : '' }}</td>
+              <td class="amount-credit">{{ txn.txnType === 'Credit' ? formatCurrency(txn.amount) : '' }}</td>
+              <td>{{ formatCurrency(txn.balance) }}</td>
+              <td><span class="status-badge status-active">{{ txn.status }}</span></td>
+            </tr>
+            <tr *ngIf="selectedAccountTransactions.length === 0">
+              <td colspan="7" class="no-data"><i class="fa fa-inbox"></i><p>No transactions yet</p></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Quick Actions -->
+      <div class="quick-actions" *ngIf="selectedAccount.status === 'ACTIVE'">
+        <button class="btn btn-primary" (click)="openTransactionModal(selectedAccount)"><i class="fa fa-exchange-alt"></i> Process Transaction</button>
+        <button class="btn btn-success" (click)="openTransferModal(selectedAccount)"><i class="fa fa-paper-plane"></i> Transfer Funds</button>
+        <button class="btn btn-warning" (click)="openOverdraftModal(selectedAccount)" *ngIf="!selectedAccount.overdraftEnabled"><i class="fa fa-hand-holding-usd"></i> Approve Overdraft</button>
+        <button class="btn btn-danger" (click)="openFreezeModal(selectedAccount)"><i class="fa fa-snowflake"></i> Freeze Account</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== APPROVE ACCOUNTS TAB ==================== -->
+  <div class="tab-content" *ngIf="activeTab === 'approve-accounts'">
+    <div class="section-card">
+      <h2><i class="fa fa-check-double"></i> Pending Account Approvals</h2>
+      <div class="approval-list">
+        <div class="approval-card" *ngFor="let account of pendingAccounts">
+          <div class="approval-header">
+            <div class="business-icon"><i class="fa fa-building"></i></div>
+            <div class="approval-info">
+              <h3>{{ account.businessName }}</h3>
+              <p>{{ account.businessType }} | Owner: {{ account.ownerName }}</p>
+              <p class="small-text">Applied: {{ formatDate(account.createdAt) }}</p>
+            </div>
+          </div>
+          <div class="approval-details">
+            <div class="detail-item"><span>Mobile</span><strong>{{ account.mobile }}</strong></div>
+            <div class="detail-item"><span>Email</span><strong>{{ account.email }}</strong></div>
+            <div class="detail-item"><span>GST</span><strong>{{ account.gstNumber || 'N/A' }}</strong></div>
+            <div class="detail-item"><span>PAN</span><strong>{{ account.panNumber }}</strong></div>
+            <div class="detail-item"><span>Aadhaar</span><strong>{{ account.aadharNumber }}</strong></div>
+            <div class="detail-item"><span>Address</span><strong>{{ account.city }}, {{ account.state }}</strong></div>
+          </div>
+          <div class="approval-actions">
+            <button class="btn btn-success" (click)="approveAccount(account)"><i class="fa fa-check"></i> Approve</button>
+            <button class="btn btn-danger" (click)="rejectAccount(account)"><i class="fa fa-times"></i> Reject</button>
+            <button class="btn btn-secondary" (click)="viewAccountDetails(account)"><i class="fa fa-eye"></i> View Details</button>
+          </div>
+        </div>
+        <div class="no-data-card" *ngIf="pendingAccounts.length === 0">
+          <i class="fa fa-check-circle"></i>
+          <p>No pending approvals</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== KYC VERIFICATION TAB ==================== -->
+  <div class="tab-content" *ngIf="activeTab === 'kyc-verification'">
+    <div class="section-card">
+      <h2><i class="fa fa-id-card"></i> Business KYC Verification</h2>
+      <p class="section-subtitle">Verify KYC documents for active business accounts</p>
+
+      <div class="kyc-info-box">
+        <h4><i class="fa fa-info-circle"></i> Required Documents</h4>
+        <ul>
+          <li><i class="fa fa-file-alt"></i> GST Certificate</li>
+          <li><i class="fa fa-file-alt"></i> Business Registration Certificate</li>
+          <li><i class="fa fa-credit-card"></i> PAN Card</li>
+          <li><i class="fa fa-home"></i> Address Proof</li>
+        </ul>
+      </div>
+
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Business Name</th>
+              <th>Account Number</th>
+              <th>Owner</th>
+              <th>GST Number</th>
+              <th>PAN</th>
+              <th>KYC Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let account of pendingKycAccounts">
+              <td><strong>{{ account.businessName }}</strong></td>
+              <td>{{ account.accountNumber }}</td>
+              <td>{{ account.ownerName }}</td>
+              <td>{{ account.gstNumber || 'N/A' }}</td>
+              <td>{{ account.panNumber }}</td>
+              <td><span class="status-badge status-pending">Pending</span></td>
+              <td>
+                <button class="btn btn-success btn-sm" (click)="verifyKyc(account)"><i class="fa fa-check"></i> Verify KYC</button>
+                <button class="btn btn-secondary btn-sm" (click)="viewAccountDetails(account)"><i class="fa fa-eye"></i> View</button>
+              </td>
+            </tr>
+            <tr *ngIf="pendingKycAccounts.length === 0">
+              <td colspan="7" class="no-data">
+                <i class="fa fa-check-circle"></i>
+                <p>All accounts have verified KYC</p>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== TRANSACTION MONITORING TAB ==================== -->
+  <div class="tab-content" *ngIf="activeTab === 'transaction-monitoring'">
+    <div class="section-card">
+      <div class="section-header">
+        <h2><i class="fa fa-chart-line"></i> Transaction Monitoring</h2>
+        <div class="section-controls">
+          <div class="search-box">
+            <i class="fa fa-search"></i>
+            <input type="text" [(ngModel)]="monitorSearchTerm" (input)="filterTransactions()" placeholder="Search transactions...">
+          </div>
+        </div>
+      </div>
+
+      <!-- Charges Info -->
+      <div class="charges-info">
+        <h4><i class="fa fa-tag"></i> Current Account Charges</h4>
+        <div class="charges-grid">
+          <div class="charge-item">
+            <span>Account Maintenance</span>
+            <strong>₹500/month</strong>
+          </div>
+          <div class="charge-item">
+            <span>Cheque Book</span>
+            <strong>₹100</strong>
+          </div>
+          <div class="charge-item">
+            <span>RTGS Transfer</span>
+            <strong>₹10</strong>
+          </div>
+          <div class="charge-item">
+            <span>NEFT Transfer</span>
+            <strong>₹5</strong>
+          </div>
+        </div>
+      </div>
+
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Transaction ID</th>
+              <th>Account</th>
+              <th>Description</th>
+              <th>Type</th>
+              <th>Debit</th>
+              <th>Credit</th>
+              <th>Balance</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let txn of filteredTransactions">
+              <td>{{ formatDateTime(txn.date) }}</td>
+              <td><span class="txn-id">{{ txn.txnId }}</span></td>
+              <td>{{ txn.accountNumber }}</td>
+              <td>{{ txn.description || txn.txnType }}</td>
+              <td><span class="type-badge">{{ txn.txnType }}</span></td>
+              <td class="amount-debit">{{ txn.txnType !== 'Credit' ? formatCurrency(txn.amount) : '' }}</td>
+              <td class="amount-credit">{{ txn.txnType === 'Credit' ? formatCurrency(txn.amount) : '' }}</td>
+              <td [class.negative-balance]="(txn.balance || 0) < 0">{{ formatCurrency(txn.balance) }}</td>
+              <td><span class="status-badge status-active">{{ txn.status }}</span></td>
+            </tr>
+            <tr *ngIf="filteredTransactions.length === 0">
+              <td colspan="9" class="no-data">
+                <i class="fa fa-inbox"></i>
+                <p>No transactions found</p>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== CHEQUE REQUESTS TAB ==================== -->
+  <div class="tab-content" *ngIf="activeTab === 'cheque-requests'">
+    <div class="section-card">
+      <div class="section-header">
+        <h2><i class="fa fa-money-check"></i> Cheque Book Requests</h2>
+        <button class="btn btn-secondary btn-sm" (click)="loadPendingChequeRequests()">
+          <i class="fa fa-sync"></i> Refresh
+        </button>
+      </div>
+
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Request ID</th>
+              <th>Account Number</th>
+              <th>Leaves</th>
+              <th>Delivery Address</th>
+              <th>Status</th>
+              <th>Requested On</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let req of pendingChequeRequests">
+              <td><span class="txn-id">{{ req.requestId }}</span></td>
+              <td><span class="account-number">{{ req.accountNumber }}</span></td>
+              <td>{{ req.leaves }}</td>
+              <td>{{ req.deliveryAddress || 'N/A' }}</td>
+              <td><span class="status-badge" [ngClass]="getStatusClass(req.status)">{{ req.status }}</span></td>
+              <td>{{ formatDate(req.requestedAt) }}</td>
+              <td>
+                <button class="btn btn-success btn-sm" *ngIf="req.status === 'PENDING'" (click)="approveChequeRequest(req)">
+                  <i class="fa fa-check"></i> Approve
+                </button>
+                <span *ngIf="req.status !== 'PENDING'" class="approved-text">
+                  <i class="fa fa-check-circle"></i> {{ req.status }}
+                </span>
+              </td>
+            </tr>
+            <tr *ngIf="pendingChequeRequests.length === 0">
+              <td colspan="7" class="no-data">
+                <i class="fa fa-check-circle"></i>
+                <p>No cheque book requests</p>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== LINK SAVINGS ACCOUNT TAB ==================== -->
+  <div class="tab-content" *ngIf="activeTab === 'link-savings'">
+    <div class="section-card">
+      <div class="section-header">
+        <h2><i class="fa fa-link"></i> Link Savings Account</h2>
+        <p class="section-subtitle">Link a savings account to a current account for unified management</p>
+      </div>
+
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Business Name</th>
+              <th>Account Number</th>
+              <th>Owner</th>
+              <th>Status</th>
+              <th>Balance</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let account of filteredAccounts">
+              <td>
+                <div class="business-info">
+                  <strong>{{ account.businessName }}</strong>
+                </div>
+              </td>
+              <td><span class="account-number">{{ account.accountNumber }}</span></td>
+              <td>{{ account.ownerName }}</td>
+              <td><span class="status-badge" [ngClass]="getStatusClass(account.status)">{{ account.status }}</span></td>
+              <td>{{ formatCurrency(account.balance) }}</td>
+              <td>
+                <button class="btn btn-primary btn-sm" *ngIf="account.status === 'ACTIVE' && !accountLinkStatus[$any(account.accountNumber)]" (click)="openLinkModal(account)">
+                  <i class="fa fa-link"></i> Link Savings
+                </button>
+                <span class="status-badge status-active" *ngIf="account.status === 'ACTIVE' && accountLinkStatus[$any(account.accountNumber)]">
+                  <i class="fa fa-check-circle"></i> Already Linked
+                </span>
+                <button class="btn btn-secondary btn-sm" (click)="viewAccountDetails(account)">
+                  <i class="fa fa-eye"></i> View Details
+                </button>
+              </td>
+            </tr>
+            <tr *ngIf="filteredAccounts.length === 0">
+              <td colspan="6" class="no-data">
+                <i class="fa fa-inbox"></i>
+                <p>No active current accounts found</p>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODALS ==================== -->
+
+  <!-- Link Savings Account Modal -->
+  <div class="modal-overlay" *ngIf="showLinkModal" (click)="closeLinkModal()">
+    <div class="modal-content modal-lg" (click)="$event.stopPropagation()">
+      <div class="modal-header modal-header-link">
+        <h3><i class="fa fa-link"></i> Link Savings Account</h3>
+        <button class="modal-close" (click)="closeLinkModal()"><i class="fa fa-times"></i></button>
+      </div>
+      <div class="modal-body">
+        <div class="link-info-box">
+          <i class="fa fa-info-circle"></i>
+          <p>Linking a savings account to current account <strong>{{ linkCurrentAccountNumber }}</strong>. Verify the savings account details before linking.</p>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label><i class="fa fa-hashtag"></i> Savings Account Number *</label>
+            <input type="text" [(ngModel)]="linkSavingsAccountNumber" placeholder="Enter savings account number" [disabled]="linkVerified">
+          </div>
+          <div class="form-group">
+            <label><i class="fa fa-id-badge"></i> Customer ID *</label>
+            <input type="text" [(ngModel)]="linkSavingsCustomerId" placeholder="Enter customer ID" [disabled]="linkVerified">
+          </div>
+        </div>
+
+        <div class="link-actions-row">
+          <button class="btn btn-warning" (click)="verifySavingsAccount()" [disabled]="isLoading || linkVerified" *ngIf="!linkVerified">
+            <i class="fa fa-search"></i> {{ isLoading ? 'Verifying...' : 'Verify Account' }}
+          </button>
+          <button class="btn btn-secondary" *ngIf="linkVerified" (click)="linkVerified = false; linkVerifiedName = ''; linkVerifiedBalance = 0;">
+            <i class="fa fa-undo"></i> Re-verify
+          </button>
+        </div>
+
+        <div class="verified-account-card" *ngIf="linkVerified">
+          <div class="verified-icon"><i class="fa fa-check-circle"></i></div>
+          <div class="verified-info">
+            <h4>Account Verified</h4>
+            <div class="verified-row"><span>Account Holder:</span><strong>{{ linkVerifiedName }}</strong></div>
+            <div class="verified-row"><span>Account Number:</span><strong>{{ linkSavingsAccountNumber }}</strong></div>
+            <div class="verified-row"><span>Customer ID:</span><strong>{{ linkSavingsCustomerId }}</strong></div>
+            <div class="verified-row"><span>Balance:</span><strong>{{ formatCurrency(linkVerifiedBalance) }}</strong></div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-success" (click)="confirmLinkSavingsAccount()" [disabled]="!linkVerified || isLoading">
+          <i class="fa fa-link"></i> {{ isLoading ? 'Linking...' : 'Link Account' }}
+        </button>
+        <button class="btn btn-secondary" (click)="closeLinkModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Freeze Account Modal -->
+  <div class="modal-overlay" *ngIf="showFreezeModal" (click)="closeFreezeModal()">
+    <div class="modal-content" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3><i class="fa fa-snowflake"></i> Freeze Account</h3>
+        <button class="modal-close" (click)="closeFreezeModal()"><i class="fa fa-times"></i></button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Reason for Freezing *</label>
+          <textarea [(ngModel)]="freezeReason" placeholder="Enter reason for freezing this account" rows="3"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-danger" (click)="confirmFreezeAccount()"><i class="fa fa-snowflake"></i> Confirm Freeze</button>
+        <button class="btn btn-secondary" (click)="closeFreezeModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Overdraft Modal -->
+  <div class="modal-overlay" *ngIf="showOverdraftModal" (click)="closeOverdraftModal()">
+    <div class="modal-content" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3><i class="fa fa-hand-holding-usd"></i> Approve Overdraft Facility</h3>
+        <button class="modal-close" (click)="closeOverdraftModal()"><i class="fa fa-times"></i></button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-info">Business can withdraw more than their balance up to the overdraft limit.</p>
+        <div class="form-group">
+          <label>Overdraft Limit (₹) *</label>
+          <input type="number" [(ngModel)]="overdraftLimit" placeholder="Enter overdraft limit" min="1000">
+        </div>
+        <div class="overdraft-example">
+          <p><strong>Example:</strong></p>
+          <p>Balance: ₹10,000 | Withdraw: ₹30,000</p>
+          <p>Remaining Balance: <span class="negative-balance">-₹20,000</span></p>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" (click)="confirmOverdraft()"><i class="fa fa-check"></i> Approve Overdraft</button>
+        <button class="btn btn-secondary" (click)="closeOverdraftModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Transaction Processing Modal -->
+  <div class="modal-overlay" *ngIf="showTransactionModal" (click)="closeTransactionModal()">
+    <div class="modal-content" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3><i class="fa fa-exchange-alt"></i> Process Transaction</h3>
+        <button class="modal-close" (click)="closeTransactionModal()"><i class="fa fa-times"></i></button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Account Number</label>
+          <input type="text" [value]="txnAccountNumber" disabled>
+        </div>
+        <div class="form-group">
+          <label>Transaction Type *</label>
+          <select [(ngModel)]="txnType">
+            <option value="Credit">Credit (Deposit)</option>
+            <option value="Debit">Debit (Withdrawal)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Amount (₹) *</label>
+          <input type="number" [(ngModel)]="txnAmount" placeholder="Enter amount" min="1">
+        </div>
+        <div class="form-group">
+          <label>Description</label>
+          <input type="text" [(ngModel)]="txnDescription" placeholder="Enter transaction description">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" (click)="processTransaction()"><i class="fa fa-check"></i> Process</button>
+        <button class="btn btn-secondary" (click)="closeTransactionModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Transfer Modal -->
+  <div class="modal-overlay" *ngIf="showTransferModal" (click)="closeTransferModal()">
+    <div class="modal-content modal-lg" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3><i class="fa fa-paper-plane"></i> Transfer Funds</h3>
+        <button class="modal-close" (click)="closeTransferModal()"><i class="fa fa-times"></i></button>
+      </div>
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="form-group">
+            <label>From Account</label>
+            <input type="text" [value]="transferFromAccount" disabled>
+          </div>
+          <div class="form-group">
+            <label>Transfer Type *</label>
+            <select [(ngModel)]="transferType">
+              <option value="NEFT">NEFT (₹5 charge)</option>
+              <option value="RTGS">RTGS (₹10 charge)</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Recipient Account Number *</label>
+            <input type="text" [(ngModel)]="transferToAccount" placeholder="Enter recipient account number">
+          </div>
+          <div class="form-group">
+            <label>Recipient Name *</label>
+            <input type="text" [(ngModel)]="transferRecipientName" placeholder="Enter recipient name">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Amount (₹) *</label>
+            <input type="number" [(ngModel)]="transferAmount" placeholder="Enter transfer amount" min="1">
+          </div>
+          <div class="form-group">
+            <label>Description</label>
+            <input type="text" [(ngModel)]="transferDescription" placeholder="Enter description">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" (click)="processTransfer()"><i class="fa fa-paper-plane"></i> Transfer</button>
+        <button class="btn btn-secondary" (click)="closeTransferModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== EDIT DOCUMENT UPLOAD MODAL ==================== -->
+  <div class="modal-overlay" *ngIf="showEditDocumentModal" (click)="closeEditDocumentModal()">
+    <div class="modal-content" (click)="$event.stopPropagation()">
+      <div class="modal-header modal-header-edit">
+        <h3><i class="fa fa-file-upload"></i> Upload Supporting Document</h3>
+        <button class="modal-close" (click)="closeEditDocumentModal()"><i class="fa fa-times"></i></button>
+      </div>
+      <div class="modal-body">
+        <div class="upload-info-box">
+          <i class="fa fa-info-circle"></i>
+          <p>You are about to save changes to the current account. Please upload a supporting PDF document for the edit audit trail. You may also skip this step.</p>
+        </div>
+        <div class="form-group">
+          <label><i class="fa fa-file-pdf"></i> Select PDF Document (Max 10 MB)</label>
+          <div class="file-upload-area" (click)="editDocInput.click()">
+            <input type="file" #editDocInput accept=".pdf" (change)="onEditDocumentSelected($event)" hidden>
+            <div class="upload-placeholder" *ngIf="!editDocumentFileName">
+              <i class="fa fa-cloud-upload-alt"></i>
+              <p>Click to browse or drag and drop a PDF file</p>
+            </div>
+            <div class="upload-selected" *ngIf="editDocumentFileName">
+              <i class="fa fa-file-pdf"></i>
+              <p>{{ editDocumentFileName }}</p>
+              <span class="change-link">Click to change</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-success" (click)="confirmSaveEdit()" [disabled]="!editDocumentFile || isLoading">
+          <i class="fa fa-upload"></i> Upload & Save
+        </button>
+        <button class="btn btn-warning" (click)="skipDocumentAndSave()" [disabled]="isLoading">
+          <i class="fa fa-forward"></i> Skip & Save
+        </button>
+        <button class="btn btn-secondary" (click)="closeEditDocumentModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== SOUNDBOX MANAGEMENT TAB ==================== -->
+  <div class="tab-content" *ngIf="activeTab === 'soundbox'">
+
+    <!-- Admin Soundbox Stats -->
+    <div class="sb-admin-stats" *ngIf="soundboxStats">
+      <div class="stats-grid">
+        <div class="stat-card stat-purple">
+          <div class="stat-icon"><i class="fa fa-volume-up"></i></div>
+          <div class="stat-info">
+            <span class="stat-value">{{ soundboxStats.totalDevices }}</span>
+            <span class="stat-label">Total Soundboxes</span>
+          </div>
+        </div>
+        <div class="stat-card stat-green">
+          <div class="stat-icon"><i class="fa fa-check-circle"></i></div>
+          <div class="stat-info">
+            <span class="stat-value">{{ soundboxStats.activeDevices }}</span>
+            <span class="stat-label">Active Devices</span>
+          </div>
+        </div>
+        <div class="stat-card stat-amber">
+          <div class="stat-icon"><i class="fa fa-clock"></i></div>
+          <div class="stat-info">
+            <span class="stat-value">{{ soundboxStats.pendingRequests }}</span>
+            <span class="stat-label">Pending Requests</span>
+          </div>
+        </div>
+        <div class="stat-card stat-blue">
+          <div class="stat-icon"><i class="fa fa-exchange-alt"></i></div>
+          <div class="stat-info">
+            <span class="stat-value">{{ soundboxStats.totalTransactions }}</span>
+            <span class="stat-label">Total Transactions</span>
+          </div>
+        </div>
+        <div class="stat-card stat-green">
+          <div class="stat-icon"><i class="fa fa-rupee-sign"></i></div>
+          <div class="stat-info">
+            <span class="stat-value">₹{{ soundboxStats.todayRevenue | number:'1.0-0' }}</span>
+            <span class="stat-label">Today's Revenue</span>
+          </div>
+        </div>
+        <div class="stat-card stat-purple">
+          <div class="stat-icon"><i class="fa fa-coins"></i></div>
+          <div class="stat-info">
+            <span class="stat-value">₹{{ soundboxStats.deviceChargesRevenue | number:'1.0-0' }}</span>
+            <span class="stat-label">Device Charges Revenue</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pending Soundbox Requests -->
+    <div class="section-card" *ngIf="pendingSoundboxRequests.length > 0">
+      <h3 class="section-title"><i class="fa fa-inbox"></i> Pending Soundbox Requests ({{ pendingSoundboxRequests.length }})</h3>
+      <div class="table-responsive">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Request ID</th>
+              <th>Account</th>
+              <th>Business</th>
+              <th>Owner</th>
+              <th>Mobile</th>
+              <th>Address</th>
+              <th>Requested</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let req of pendingSoundboxRequests">
+              <td><code>{{ req.requestId }}</code></td>
+              <td><code>{{ req.accountNumber }}</code></td>
+              <td>{{ req.businessName }}</td>
+              <td>{{ req.ownerName }}</td>
+              <td>{{ req.mobile }}</td>
+              <td>{{ req.deliveryAddress }}, {{ req.city }}, {{ req.state }} - {{ req.pincode }}</td>
+              <td>{{ req.requestedAt | date:'medium' }}</td>
+              <td>
+                <button class="btn btn-sm btn-approve" (click)="openSbApproveModal(req)">
+                  <i class="fa fa-check"></i> Approve
+                </button>
+                <button class="btn btn-sm btn-reject" (click)="openSbRejectModal(req)">
+                  <i class="fa fa-times"></i> Reject
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="section-card empty-state" *ngIf="pendingSoundboxRequests.length === 0">
+      <i class="fa fa-check-circle"></i>
+      <p>No pending soundbox requests</p>
+    </div>
+
+    <!-- All Devices -->
+    <div class="section-card">
+      <div class="section-header-row">
+        <h3 class="section-title"><i class="fa fa-microchip"></i> Soundbox Devices</h3>
+        <select [(ngModel)]="sbDeviceFilter" class="filter-select">
+          <option value="ALL">All Devices</option>
+          <option value="ACTIVE">Active</option>
+          <option value="INACTIVE">Inactive</option>
+        </select>
+      </div>
+      <div class="table-responsive" *ngIf="getFilteredSbDevices().length > 0">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Device ID</th>
+              <th>Account</th>
+              <th>Business</th>
+              <th>Status</th>
+              <th>Voice</th>
+              <th>Language</th>
+              <th>UPI IDs</th>
+              <th>Monthly</th>
+              <th>Activated</th>
+              <th>Last Active</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let device of getFilteredSbDevices()">
+              <td><code>{{ device.deviceId }}</code></td>
+              <td><code>{{ device.accountNumber }}</code></td>
+              <td>{{ device.businessName }}</td>
+              <td>
+                <span class="status-badge" [class.active]="device.status === 'ACTIVE'" [class.inactive]="device.status !== 'ACTIVE'">
+                  {{ device.status }}
+                </span>
+              </td>
+              <td>
+                <i class="fa" [class.fa-volume-up]="device.voiceEnabled" [class.fa-volume-mute]="!device.voiceEnabled"
+                   [style.color]="device.voiceEnabled ? '#4ade80' : '#f87171'"></i>
+              </td>
+              <td>{{ device.voiceLanguage }}</td>
+              <td>{{ device.linkedUpi || 'None' }}</td>
+              <td>₹{{ device.monthlyCharge }}</td>
+              <td>{{ device.activatedAt | date:'mediumDate' }}</td>
+              <td>{{ device.lastActiveAt | date:'short' }}</td>
+              <td>
+                <button class="btn btn-sm btn-toggle" (click)="toggleSoundboxDevice(device)">
+                  <i class="fa" [class.fa-pause]="device.status === 'ACTIVE'" [class.fa-play]="device.status !== 'ACTIVE'"></i>
+                </button>
+                <button class="btn btn-sm btn-edit" (click)="openSbChargesModal(device)">
+                  <i class="fa fa-tag"></i>
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="empty-state" *ngIf="getFilteredSbDevices().length === 0">
+        <p>No devices found</p>
+      </div>
+    </div>
+
+    <!-- ==================== QR Code Generator ==================== -->
+    <div class="section-card qr-generator-section">
+      <h3 class="section-title"><i class="fa fa-qrcode"></i> Generate UPI QR Code</h3>
+      <p style="color:#94a3b8; font-size:0.85rem; margin-bottom:16px;">Generate a QR code linked to a soundbox device's UPI ID. UPI ID name must match the account holder name.</p>
+
+      <div class="qr-form-grid">
+        <!-- Account Number -->
+        <div class="form-group">
+          <label><i class="fa fa-university"></i> Account Number</label>
+          <input type="text" [(ngModel)]="qrAccountNumber" class="form-input" placeholder="Enter account number..."
+                 (blur)="qrVerificationStatus = ''; qrVerifiedName = ''" />
+        </div>
+
+        <!-- UPI ID -->
+        <div class="form-group">
+          <label><i class="fa fa-at"></i> UPI ID</label>
+          <div class="upi-verify-row">
+            <input type="text" [(ngModel)]="qrUpiId" class="form-input" placeholder="e.g. 9876543210@neobank"
+                   (input)="qrVerificationStatus = ''; qrVerifiedName = ''" />
+            <button class="btn btn-sm btn-verify" (click)="verifyQrUpiId()"
+                    [disabled]="!qrUpiId.trim() || !qrAccountNumber.trim() || qrVerificationStatus === 'verifying'">
+              <i class="fa" [class.fa-spinner]="qrVerificationStatus === 'verifying'"
+                 [class.fa-spin]="qrVerificationStatus === 'verifying'"
+                 [class.fa-shield-alt]="qrVerificationStatus !== 'verifying'"></i>
+              {{ qrVerificationStatus === 'verifying' ? 'Verifying...' : 'Verify' }}
+            </button>
+          </div>
+
+          <!-- Verification Status -->
+          <div class="upi-verify-status" *ngIf="qrVerificationStatus === 'verified'">
+            <i class="fa fa-check-circle" style="color:#4ade80;"></i>
+            <span style="color:#4ade80; font-weight:600;">Verified: {{ qrVerifiedName }}</span>
+          </div>
+          <div class="upi-verify-status" *ngIf="qrVerificationStatus === 'failed'">
+            <i class="fa fa-times-circle" style="color:#f87171;"></i>
+            <span style="color:#f87171;">{{ qrVerificationError }}</span>
+          </div>
+          <div class="upi-verify-status" *ngIf="qrVerificationStatus === 'mismatch'">
+            <i class="fa fa-exclamation-triangle" style="color:#fbbf24;"></i>
+            <span style="color:#fbbf24;">{{ qrVerificationError }}</span>
+          </div>
+        </div>
+
+        <!-- Amount Type -->
+        <div class="form-group">
+          <label><i class="fa fa-rupee-sign"></i> Amount Type</label>
+          <div class="amount-type-toggle">
+            <button class="amt-type-btn" [class.active]="!qrIsCustomAmount" (click)="qrIsCustomAmount = false; qrAmount = null">
+              <i class="fa fa-infinity"></i> Open Amount (Any)
+            </button>
+            <button class="amt-type-btn" [class.active]="qrIsCustomAmount" (click)="qrIsCustomAmount = true">
+              <i class="fa fa-hand-holding-usd"></i> Fixed Amount
+            </button>
+          </div>
+        </div>
+
+        <!-- Custom Amount Input -->
+        <div class="form-group" *ngIf="qrIsCustomAmount">
+          <label><i class="fa fa-coins"></i> Enter Amount (₹)</label>
+          <input type="number" [(ngModel)]="qrAmount" class="form-input" placeholder="Enter amount..." min="1" />
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="qr-action-row">
+        <button class="btn btn-primary btn-generate-qr" (click)="generateSoundboxQrCode()"
+                [disabled]="isGeneratingQr || qrVerificationStatus !== 'verified' || !qrAccountNumber.trim() || !qrUpiId.trim() || (qrIsCustomAmount && (!qrAmount || qrAmount <= 0))">
+          <i class="fa" [class.fa-spinner]="isGeneratingQr" [class.fa-spin]="isGeneratingQr"
+             [class.fa-qrcode]="!isGeneratingQr"></i>
+          {{ isGeneratingQr ? 'Generating...' : 'Generate QR Code' }}
+        </button>
+        <button class="btn btn-secondary" (click)="resetQrForm()">
+          <i class="fa fa-undo"></i> Reset
+        </button>
+      </div>
+    </div>
+
+    <!-- Transaction Monitor -->
+    <div class="section-card">
+      <h3 class="section-title"><i class="fa fa-search-dollar"></i> Soundbox Transaction Monitor</h3>
+      <div class="search-row">
+        <input type="text" [(ngModel)]="soundboxTxnAccountNumber" placeholder="Enter account number..."
+               class="search-input" (keyup.enter)="loadSoundboxTransactionsForAccount()" />
+        <button class="btn btn-primary" (click)="loadSoundboxTransactionsForAccount()">
+          <i class="fa fa-search"></i> Search
+        </button>
+      </div>
+      <div class="table-responsive" *ngIf="soundboxTransactions.length > 0">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Txn ID</th>
+              <th>Account</th>
+              <th>Amount</th>
+              <th>Payer</th>
+              <th>Method</th>
+              <th>Status</th>
+              <th>Voice Played</th>
+              <th>Voice Message</th>
+              <th>Date</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let txn of soundboxTransactions">
+              <td><code>{{ txn.txnId }}</code></td>
+              <td><code>{{ txn.accountNumber }}</code></td>
+              <td class="amount-credit">+₹{{ txn.amount | number:'1.2-2' }}</td>
+              <td>{{ txn.payerName || '-' }}</td>
+              <td><span class="method-badge">{{ txn.paymentMethod }}</span></td>
+              <td>
+                <span class="status-badge" [class.active]="txn.status === 'SUCCESS'">{{ txn.status }}</span>
+              </td>
+              <td>
+                <i class="fa" [class.fa-check-circle]="txn.voicePlayed" [class.fa-times-circle]="!txn.voicePlayed"
+                   [style.color]="txn.voicePlayed ? '#4ade80' : '#f87171'"></i>
+              </td>
+              <td class="voice-msg">{{ txn.voiceMessage || '-' }}</td>
+              <td>{{ txn.createdAt | date:'short' }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- All Requests History -->
+    <div class="section-card">
+      <h3 class="section-title"><i class="fa fa-history"></i> All Soundbox Requests</h3>
+      <div class="table-responsive" *ngIf="soundboxRequests.length > 0">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Request ID</th>
+              <th>Account</th>
+              <th>Business</th>
+              <th>Status</th>
+              <th>Device ID</th>
+              <th>Processed By</th>
+              <th>Processed At</th>
+              <th>Remarks</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let req of soundboxRequests">
+              <td><code>{{ req.requestId }}</code></td>
+              <td><code>{{ req.accountNumber }}</code></td>
+              <td>{{ req.businessName }}</td>
+              <td>
+                <span class="status-badge"
+                      [class.active]="req.status === 'APPROVED'"
+                      [class.pending]="req.status === 'PENDING'"
+                      [class.rejected]="req.status === 'REJECTED'">
+                  {{ req.status }}
+                </span>
+              </td>
+              <td>{{ req.assignedDeviceId || '-' }}</td>
+              <td>{{ req.processedBy || '-' }}</td>
+              <td>{{ req.processedAt | date:'medium' }}</td>
+              <td>{{ req.adminRemarks || '-' }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== UPI PAYMENTS MANAGEMENT TAB ==================== -->
+  <div class="tab-content" *ngIf="activeTab === 'upi-payments'">
+
+    <!-- Loading -->
+    <div *ngIf="isLoadingUpiData" style="text-align:center; padding:40px; color:#64748B;">
+      <i class="fa fa-spinner fa-spin"></i> Loading UPI data...
+    </div>
+
+    <div *ngIf="!isLoadingUpiData">
+
+      <!-- UPI Section Header -->
+      <div class="section-card" style="margin-bottom:20px;">
+        <h2 style="color:#e2e8f0; font-size:1.3rem; font-weight:700; margin-bottom:6px;">
+          <i class="fa fa-qrcode" style="color:#818cf8; margin-right:8px;"></i> UPI Payments Management
+        </h2>
+        <p style="color:#94a3b8; font-size:0.9rem;">Monitor UPI QR code payments, track transaction volumes, and manage merchant UPI accounts</p>
+      </div>
+
+      <!-- UPI Admin Stats -->
+      <div class="stats-grid">
+        <div class="stat-card stat-purple">
+          <div class="stat-icon"><i class="fa fa-qrcode"></i></div>
+          <div class="stat-info">
+            <span class="stat-value">{{ adminUpiStats?.activeAccounts || 0 }}</span>
+            <span class="stat-label">Active UPI Accounts</span>
+          </div>
+        </div>
+        <div class="stat-card stat-green">
+          <div class="stat-icon"><i class="fa fa-check-circle"></i></div>
+          <div class="stat-info">
+            <span class="stat-value">{{ adminUpiStats?.totalPayments || 0 }}</span>
+            <span class="stat-label">Total Payments</span>
+          </div>
+        </div>
+        <div class="stat-card stat-balance">
+          <div class="stat-icon"><i class="fa fa-rupee-sign"></i></div>
+          <div class="stat-info">
+            <span class="stat-value">₹{{ (adminUpiStats?.totalVolume || 0) | number:'1.0-0' }}</span>
+            <span class="stat-label">Total UPI Volume</span>
+          </div>
+        </div>
+        <div class="stat-card stat-active">
+          <div class="stat-icon"><i class="fa fa-calendar-day"></i></div>
+          <div class="stat-info">
+            <span class="stat-value">₹{{ (adminUpiStats?.todayVolume || 0) | number:'1.0-0' }}</span>
+            <span class="stat-label">Today's Volume</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Search by Account -->
+      <div class="section-card">
+        <h3 class="section-title"><i class="fa fa-search"></i> Search UPI Payments by Account</h3>
+        <div class="search-row">
+          <input type="text" [(ngModel)]="upiAccountSearch" class="form-input" placeholder="Enter account number..." style="max-width:300px;" />
+          <button class="btn btn-primary" (click)="searchUpiByAccount()" [disabled]="!upiAccountSearch.trim()">
+            <i class="fa fa-search"></i> Search
+          </button>
+        </div>
+        <div class="table-responsive" *ngIf="upiAccountPayments.length > 0" style="margin-top:16px;">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Txn ID</th>
+                <th>Amount</th>
+                <th>Payer</th>
+                <th>Payer UPI</th>
+                <th>Status</th>
+                <th>Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let txn of upiAccountPayments">
+                <td><code>{{ txn.txnId }}</code></td>
+                <td style="font-weight:700; color:#16A34A;">+₹{{ txn.amount | number:'1.2-2' }}</td>
+                <td>{{ txn.payerName || 'Unknown' }}</td>
+                <td>{{ txn.payerUpi || '-' }}</td>
+                <td><span class="status-badge active">{{ txn.status }}</span></td>
+                <td>{{ txn.createdAt | date:'short' }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Search by Transaction ID -->
+      <div class="section-card">
+        <h3 class="section-title"><i class="fa fa-hashtag"></i> Search by Transaction ID</h3>
+        <div class="search-row">
+          <input type="text" [(ngModel)]="upiTxnSearch" class="form-input" placeholder="Enter transaction ID (e.g. UPI1234567890)..." style="max-width:350px;" />
+          <button class="btn btn-primary" (click)="searchByTxnId()" [disabled]="!upiTxnSearch.trim() || isSearchingTxn">
+            <i class="fa" [class.fa-spinner]="isSearchingTxn" [class.fa-spin]="isSearchingTxn" [class.fa-search]="!isSearchingTxn"></i>
+            {{ isSearchingTxn ? 'Searching...' : 'Search' }}
+          </button>
+        </div>
+
+        <!-- Transaction Not Found -->
+        <div *ngIf="txnSearchDone && !txnSearchResult?.found" style="text-align:center; padding:24px; color:#f87171; margin-top:16px;">
+          <i class="fa fa-exclamation-circle" style="font-size:28px; display:block; margin-bottom:8px;"></i>
+          <p>No transaction found with that ID</p>
+        </div>
+
+        <!-- Transaction Found - Details -->
+        <div *ngIf="txnSearchResult?.found" class="txn-detail-panel" style="margin-top:16px;">
+          <!-- Transaction Info Card -->
+          <div class="txn-info-card">
+            <div class="txn-info-header">
+              <h4><i class="fa fa-receipt"></i> Transaction Details</h4>
+              <span class="status-badge active">{{ txnSearchResult.payment?.status }}</span>
+            </div>
+            <div class="txn-info-grid">
+              <div class="txn-info-item">
+                <span class="txn-info-label">Transaction ID</span>
+                <span class="txn-info-value"><code>{{ txnSearchResult.payment?.txnId }}</code></span>
+              </div>
+              <div class="txn-info-item">
+                <span class="txn-info-label">Amount</span>
+                <span class="txn-info-value" style="color:#16A34A; font-weight:700; font-size:1.1rem;">₹{{ txnSearchResult.payment?.amount | number:'1.2-2' }}</span>
+              </div>
+              <div class="txn-info-item">
+                <span class="txn-info-label">Payment Method</span>
+                <span class="txn-info-value">{{ txnSearchResult.payment?.paymentMethod || 'UPI' }}</span>
+              </div>
+              <div class="txn-info-item">
+                <span class="txn-info-label">Type</span>
+                <span class="txn-info-value">{{ txnSearchResult.payment?.txnType || 'CREDIT' }}</span>
+              </div>
+              <div class="txn-info-item">
+                <span class="txn-info-label">Note</span>
+                <span class="txn-info-value">{{ txnSearchResult.payment?.note || '-' }}</span>
+              </div>
+              <div class="txn-info-item">
+                <span class="txn-info-label">Date & Time</span>
+                <span class="txn-info-value">{{ txnSearchResult.payment?.createdAt | date:'medium' }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Customer Details - Two Columns -->
+          <div class="txn-customer-grid">
+            <!-- Receiver (Merchant) Details -->
+            <div class="txn-customer-card" *ngIf="txnSearchResult.receiverDetails">
+              <div class="txn-customer-header receiver">
+                <i class="fa fa-store"></i>
+                <h4>Receiver (Merchant)</h4>
+              </div>
+              <div class="txn-customer-body">
+                <div class="txn-cust-item">
+                  <span class="txn-cust-label">Owner Name</span>
+                  <span class="txn-cust-value">{{ txnSearchResult.receiverDetails.ownerName }}</span>
+                </div>
+                <div class="txn-cust-item">
+                  <span class="txn-cust-label">Business Name</span>
+                  <span class="txn-cust-value">{{ txnSearchResult.receiverDetails.businessName || '-' }}</span>
+                </div>
+                <div class="txn-cust-item">
+                  <span class="txn-cust-label">Account Number</span>
+                  <span class="txn-cust-value"><code>{{ txnSearchResult.receiverDetails.accountNumber }}</code></span>
+                </div>
+                <div class="txn-cust-item">
+                  <span class="txn-cust-label">UPI ID</span>
+                  <span class="txn-cust-value">{{ txnSearchResult.receiverDetails.upiId || '-' }}</span>
+                </div>
+                <div class="txn-cust-item">
+                  <span class="txn-cust-label">Mobile</span>
+                  <span class="txn-cust-value">{{ txnSearchResult.receiverDetails.mobile || '-' }}</span>
+                </div>
+                <div class="txn-cust-item">
+                  <span class="txn-cust-label">Account Status</span>
+                  <span class="txn-cust-value">
+                    <span class="status-badge" [class.active]="txnSearchResult.receiverDetails.status === 'ACTIVE'">{{ txnSearchResult.receiverDetails.status }}</span>
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Payer Details -->
+            <div class="txn-customer-card" *ngIf="txnSearchResult.payerDetails">
+              <div class="txn-customer-header payer">
+                <i class="fa fa-user"></i>
+                <h4>Payer (Customer)</h4>
+              </div>
+              <div class="txn-customer-body">
+                <div class="txn-cust-item">
+                  <span class="txn-cust-label">Owner Name</span>
+                  <span class="txn-cust-value">{{ txnSearchResult.payerDetails.ownerName }}</span>
+                </div>
+                <div class="txn-cust-item">
+                  <span class="txn-cust-label">Business Name</span>
+                  <span class="txn-cust-value">{{ txnSearchResult.payerDetails.businessName || '-' }}</span>
+                </div>
+                <div class="txn-cust-item">
+                  <span class="txn-cust-label">Account Number</span>
+                  <span class="txn-cust-value"><code>{{ txnSearchResult.payerDetails.accountNumber }}</code></span>
+                </div>
+                <div class="txn-cust-item">
+                  <span class="txn-cust-label">UPI ID</span>
+                  <span class="txn-cust-value">{{ txnSearchResult.payerDetails.upiId || '-' }}</span>
+                </div>
+                <div class="txn-cust-item">
+                  <span class="txn-cust-label">Mobile</span>
+                  <span class="txn-cust-value">{{ txnSearchResult.payerDetails.mobile || '-' }}</span>
+                </div>
+                <div class="txn-cust-item">
+                  <span class="txn-cust-label">Account Status</span>
+                  <span class="txn-cust-value">
+                    <span class="status-badge" [class.active]="txnSearchResult.payerDetails.status === 'ACTIVE'">{{ txnSearchResult.payerDetails.status }}</span>
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Payer Info from Payment (when no NeoBank account) -->
+            <div class="txn-customer-card" *ngIf="!txnSearchResult.payerDetails && txnSearchResult.payment?.payerName">
+              <div class="txn-customer-header payer">
+                <i class="fa fa-user"></i>
+                <h4>Payer (External)</h4>
+              </div>
+              <div class="txn-customer-body">
+                <div class="txn-cust-item">
+                  <span class="txn-cust-label">Payer Name</span>
+                  <span class="txn-cust-value">{{ txnSearchResult.payment.payerName }}</span>
+                </div>
+                <div class="txn-cust-item">
+                  <span class="txn-cust-label">Payer UPI</span>
+                  <span class="txn-cust-value">{{ txnSearchResult.payment.payerUpi || '-' }}</span>
+                </div>
+                <div class="txn-cust-item">
+                  <span class="txn-cust-label">Type</span>
+                  <span class="txn-cust-value">External Customer (Non-NeoBank)</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recent UPI Payments Table -->
+      <div class="section-card">
+        <div class="section-header-row">
+          <h3 class="section-title"><i class="fa fa-list"></i> Recent UPI Payments</h3>
+          <input type="text" [(ngModel)]="upiSearchTerm" (input)="filterUpiPayments()" class="form-input" placeholder="Search payments..." style="max-width:250px;" />
+        </div>
+        <div class="table-responsive" *ngIf="filteredUpiPayments.length > 0">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Txn ID</th>
+                <th>Account</th>
+                <th>Business</th>
+                <th>Amount</th>
+                <th>Payer</th>
+                <th>Payer UPI</th>
+                <th>UPI ID</th>
+                <th>Status</th>
+                <th>Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let payment of filteredUpiPayments">
+                <td><code>{{ payment.txnId }}</code></td>
+                <td><code>{{ payment.accountNumber }}</code></td>
+                <td>{{ payment.businessName || '-' }}</td>
+                <td style="font-weight:700; color:#16A34A;">+₹{{ payment.amount | number:'1.2-2' }}</td>
+                <td>{{ payment.payerName || 'Unknown' }}</td>
+                <td>{{ payment.payerUpi || '-' }}</td>
+                <td>{{ payment.upiId || '-' }}</td>
+                <td><span class="status-badge active">{{ payment.status }}</span></td>
+                <td>{{ payment.createdAt | date:'short' }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div *ngIf="filteredUpiPayments.length === 0" style="text-align:center; padding:48px 20px;">
+          <i class="fa fa-qrcode" style="font-size:48px; display:block; margin-bottom:14px; color:#6366f1;"></i>
+          <h3 style="color:#e2e8f0; font-size:1.1rem; font-weight:600; margin-bottom:8px;">No UPI Payments Yet</h3>
+          <p style="color:#94A3B8; font-size:0.9rem; max-width:400px; margin:0 auto;">UPI payment transactions will appear here once current account holders activate UPI and start receiving payments via QR codes.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== SOUNDBOX APPROVE MODAL ==================== -->
+  <div class="modal-overlay" *ngIf="showSbApproveModal" (click)="closeSbApproveModal()">
+    <div class="modal-content" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3><i class="fa fa-check-circle"></i> Approve Soundbox Request</h3>
+        <button class="modal-close" (click)="closeSbApproveModal()"><i class="fa fa-times"></i></button>
+      </div>
+      <div class="modal-body">
+        <div class="sb-approve-info" *ngIf="selectedSbRequest">
+          <p><strong>Business:</strong> {{ selectedSbRequest.businessName }}</p>
+          <p><strong>Owner:</strong> {{ selectedSbRequest.ownerName }}</p>
+          <p><strong>Account:</strong> {{ selectedSbRequest.accountNumber }}</p>
+          <p><strong>Delivery:</strong> {{ selectedSbRequest.deliveryAddress }}, {{ selectedSbRequest.city }}</p>
+        </div>
+        <div class="form-group">
+          <label><i class="fa fa-microchip"></i> Assign Device ID</label>
+          <input type="text" [(ngModel)]="sbApproveDeviceId" class="form-input" placeholder="Device ID" />
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label><i class="fa fa-calendar"></i> Monthly Charge (₹)</label>
+            <input type="number" [(ngModel)]="sbApproveMonthlyCharge" class="form-input" />
+          </div>
+          <div class="form-group">
+            <label><i class="fa fa-tag"></i> Device Charge (₹)</label>
+            <input type="number" [(ngModel)]="sbApproveDeviceCharge" class="form-input" />
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-success" (click)="approveSoundboxRequest()" [disabled]="!sbApproveDeviceId.trim()">
+          <i class="fa fa-check"></i> Approve & Assign Device
+        </button>
+        <button class="btn btn-secondary" (click)="closeSbApproveModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== SOUNDBOX REJECT MODAL ==================== -->
+  <div class="modal-overlay" *ngIf="showSbRejectModal" (click)="closeSbRejectModal()">
+    <div class="modal-content" (click)="$event.stopPropagation()">
+      <div class="modal-header modal-header-danger">
+        <h3><i class="fa fa-times-circle"></i> Reject Soundbox Request</h3>
+        <button class="modal-close" (click)="closeSbRejectModal()"><i class="fa fa-times"></i></button>
+      </div>
+      <div class="modal-body">
+        <div class="sb-approve-info" *ngIf="selectedSbRequest">
+          <p><strong>Business:</strong> {{ selectedSbRequest.businessName }}</p>
+          <p><strong>Account:</strong> {{ selectedSbRequest.accountNumber }}</p>
+        </div>
+        <div class="form-group">
+          <label><i class="fa fa-comment"></i> Rejection Remarks</label>
+          <textarea [(ngModel)]="sbRejectRemarks" class="form-input" rows="3" placeholder="Reason for rejection..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-danger" (click)="rejectSoundboxRequest()">
+          <i class="fa fa-times"></i> Reject Request
+        </button>
+        <button class="btn btn-secondary" (click)="closeSbRejectModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== SOUNDBOX CHARGES MODAL ==================== -->
+  <div class="modal-overlay" *ngIf="showSbChargesModal" (click)="closeSbChargesModal()">
+    <div class="modal-content" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3><i class="fa fa-tag"></i> Update Soundbox Charges</h3>
+        <button class="modal-close" (click)="closeSbChargesModal()"><i class="fa fa-times"></i></button>
+      </div>
+      <div class="modal-body">
+        <div class="sb-approve-info" *ngIf="selectedSbDevice">
+          <p><strong>Device:</strong> {{ selectedSbDevice.deviceId }}</p>
+          <p><strong>Business:</strong> {{ selectedSbDevice.businessName }}</p>
+          <p><strong>Account:</strong> {{ selectedSbDevice.accountNumber }}</p>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Monthly Charge (₹)</label>
+            <input type="number" [(ngModel)]="sbNewMonthlyCharge" class="form-input" />
+          </div>
+          <div class="form-group">
+            <label>Device Charge (₹)</label>
+            <input type="number" [(ngModel)]="sbNewDeviceCharge" class="form-input" />
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" (click)="updateSoundboxCharges()">
+          <i class="fa fa-save"></i> Update Charges
+        </button>
+        <button class="btn btn-secondary" (click)="closeSbChargesModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== QR CODE RESULT MODAL ==================== -->
+  <div class="modal-overlay" *ngIf="showQrResultModal" (click)="closeQrResultModal()">
+    <div class="modal-content qr-result-modal" (click)="$event.stopPropagation()">
+      <div class="modal-header" style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);">
+        <h3><i class="fa fa-qrcode"></i> Generated QR Code</h3>
+        <button class="modal-close" (click)="closeQrResultModal()"><i class="fa fa-times"></i></button>
+      </div>
+      <div class="modal-body" style="text-align:center; padding:24px;">
+        <div class="qr-image-container">
+          <img [src]="'data:image/png;base64,' + qrGeneratedImage" alt="UPI QR Code" class="qr-code-image" />
+        </div>
+        <div class="qr-details">
+          <p class="qr-business-name">{{ qrGeneratedBusinessName }}</p>
+          <p class="qr-upi-label"><i class="fa fa-at"></i> {{ qrGeneratedUpiId }}</p>
+          <p class="qr-amount-label" *ngIf="qrGeneratedAmount">
+            <i class="fa fa-rupee-sign"></i> ₹{{ qrGeneratedAmount | number:'1.2-2' }}
+          </p>
+          <p class="qr-amount-label qr-open-amount" *ngIf="!qrGeneratedAmount">
+            <i class="fa fa-infinity"></i> Open Amount — Payer enters any amount
+          </p>
+        </div>
+        <div class="qr-action-buttons">
+          <button class="btn btn-primary" (click)="downloadQrCode()">
+            <i class="fa fa-download"></i> Download QR
+          </button>
+          <button class="btn btn-secondary" (click)="closeQrResultModal()">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>

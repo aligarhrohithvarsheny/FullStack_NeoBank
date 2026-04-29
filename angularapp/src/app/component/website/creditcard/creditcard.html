@@ -1,0 +1,516 @@
+<section>
+  <div class="back-button">
+    <button (click)="goBack()">⬅ Back to Dashboard</button>
+    <button (click)="refreshCardData()" class="refresh-btn">Refresh Card Data</button>
+    <button (click)="openApplyForm()" class="apply-credit-btn" *ngIf="creditCards.length === 0">
+      Apply for Credit Card
+    </button>
+  </div>
+
+  <!-- User Info Display -->
+  <div *ngIf="userProfile" class="user-info">
+    <h3>Account Information</h3>
+    <p><strong>Account Number:</strong> {{ userProfile.accountNumber }}</p>
+    <p><strong>Name:</strong> {{ userProfile.name }}</p>
+    <p><strong>Email:</strong> {{ userProfile.email }}</p>
+  </div>
+
+  <!-- Loading State -->
+  <div *ngIf="isLoading" class="loading-state">
+    <p>Loading credit card information...</p>
+  </div>
+
+  <!-- No Credit Card State -->
+  <div *ngIf="!isLoading && creditCards.length === 0" class="no-card-state">
+    <div class="no-card-message">
+      <h3>No Credit Card Found</h3>
+      <p>You don't have a credit card yet. Apply now to get started!</p>
+      <button (click)="openApplyForm()" class="apply-credit-btn-large">
+        Apply for Credit Card
+      </button>
+    </div>
+  </div>
+
+  <!-- Card Display -->
+  <div *ngIf="!isLoading && selectedCard" class="card-container">
+    <!-- Card Selector if multiple cards -->
+    <div *ngIf="creditCards.length > 1" class="card-selector">
+      <label>Select Credit Card:</label>
+      <select [(ngModel)]="selectedCard" (change)="loadCardDetails()">
+        <option *ngFor="let card of creditCards" [ngValue]="card">
+          {{ formatCardNumber(card.cardNumber) }} - {{ card.userName }}
+        </option>
+      </select>
+    </div>
+
+    <div class="card" [ngClass]="statusClass" [class.flipped]="isCardFlipped" (click)="flipCard()">
+      <!-- Front view -->
+      <div class="view front">
+        <div class="debit">Credit Card</div>
+        <div class="bank">NeoBank</div>
+        <div class="number">{{ fullNumber }}</div>
+        <div class="valid">
+          <span>VALID THRU</span>
+          <span>{{ selectedCard.expiryDate }}</span>
+        </div>
+        <div class="cardHolder">{{ selectedCard.userName }}</div>
+        <div class="status-indicator">
+          <span class="status-badge">{{ selectedCard.status }}</span>
+        </div>
+      </div>
+
+      <!-- Back view -->
+      <div class="view back">
+        <div class="blackbar"></div>
+        <div class="cvvtext">
+          <h5>CVV</h5>
+          <div class="whiteBar"></div>
+          <div class="cvv">{{ maskedCVV }}</div>
+        </div>
+        <div class="text">
+          Use responsibly. Cardholder agrees to terms.
+        </div>
+      </div>
+    </div>
+
+    <!-- Card Details -->
+    <div class="card-details">
+      <h4>Credit Card Information</h4>
+      <div class="detail-grid">
+        <div class="detail-item">
+          <span class="label">Card Number:</span>
+          <span class="value">{{ fullNumber }}</span>
+        </div>
+        <div class="detail-item">
+          <span class="label">Card Type:</span>
+          <span class="value">Credit Card</span>
+        </div>
+        <div class="detail-item">
+          <span class="label">Expiry Date:</span>
+          <span class="value">{{ selectedCard.expiryDate }}</span>
+        </div>
+        <div class="detail-item">
+          <span class="label">CVV:</span>
+          <span class="value">{{ maskedCVV }}</span>
+          <button (click)="toggleCVV()" class="cvv-toggle-btn">
+            {{ showCVV ? 'Hide CVV' : 'Show CVV' }}
+          </button>
+        </div>
+        <div class="detail-item">
+          <span class="label">Status:</span>
+          <span class="value status-value" [ngClass]="statusClass">{{ selectedCard.status }}</span>
+        </div>
+        <div class="detail-item">
+          <span class="label">PIN Status:</span>
+          <span class="value">{{ selectedCard.pinSet ? 'Set' : 'Not Set' }}</span>
+        </div>
+        <div class="detail-item">
+          <span class="label">Approved Limit:</span>
+          <span class="value amount">₹{{ selectedCard.approvedLimit | number:'1.2-2' }}</span>
+        </div>
+        <div class="detail-item">
+          <span class="label">Current Balance:</span>
+          <span class="value amount">₹{{ selectedCard.currentBalance | number:'1.2-2' }}</span>
+        </div>
+        <div class="detail-item">
+          <span class="label">Available Limit:</span>
+          <span class="value amount">₹{{ selectedCard.availableLimit | number:'1.2-2' }}</span>
+        </div>
+        <div class="detail-item">
+          <span class="label">Usage:</span>
+          <span class="value">{{ selectedCard.usageLimit | number:'1.2-2' }}%</span>
+        </div>
+        <div class="detail-item" *ngIf="selectedCard.overdueAmount > 0">
+          <span class="label">Overdue:</span>
+          <span class="value amount overdue">₹{{ selectedCard.overdueAmount | number:'1.2-2' }}</span>
+        </div>
+        <div class="detail-item" *ngIf="selectedCard.fine > 0">
+          <span class="label">Fine:</span>
+          <span class="value amount">₹{{ selectedCard.fine | number:'1.2-2' }}</span>
+        </div>
+        <div class="detail-item" *ngIf="selectedCard.penalty > 0">
+          <span class="label">Penalty:</span>
+          <span class="value amount">₹{{ selectedCard.penalty | number:'1.2-2' }}</span>
+        </div>
+        <div class="detail-item">
+          <span class="label">Applied Date:</span>
+          <span class="value">{{ selectedCard.appliedDate | date:'medium' }}</span>
+        </div>
+        <div class="detail-item">
+          <span class="label">Approval Date:</span>
+          <span class="value">{{ selectedCard.approvalDate | date:'medium' }}</span>
+        </div>
+        <div class="detail-item" *ngIf="selectedCard.lastPaidDate">
+          <span class="label">Last Paid Date:</span>
+          <span class="value">{{ selectedCard.lastPaidDate | date:'medium' }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Card Actions -->
+  <div class="card-actions" *ngIf="selectedCard">
+    <h4 class="actions-title">Credit Card Management Actions</h4>
+    <div class="actions-grid">
+      <div class="action-group">
+        <h5 class="group-title">Card Details</h5>
+        <button (click)="toggleDetails()" class="toggle-btn">
+          {{ showDetails ? 'Hide Card Details' : 'Show Card Details' }}
+        </button>
+      </div>
+
+      <div class="action-group">
+        <h5 class="group-title">PIN Management</h5>
+        <button (click)="showPinForm = !showPinForm" class="pin-btn" [disabled]="selectedCard.pinSet">
+          {{ selectedCard.pinSet ? 'PIN Already Set' : 'Set PIN' }}
+        </button>
+        
+        <div *ngIf="showPinForm" class="pin-form">
+          <input 
+            type="password" 
+            placeholder="Enter 4-digit PIN" 
+            [(ngModel)]="pinForm.newPin" 
+            maxlength="4"
+            class="pin-input"
+          >
+          <input 
+            type="password" 
+            placeholder="Confirm PIN" 
+            [(ngModel)]="pinForm.confirmPin" 
+            maxlength="4"
+            class="pin-input"
+          >
+          <button (click)="setPin()" class="set-pin-btn">Set PIN</button>
+          <button (click)="showPinForm = false" class="cancel-btn">Cancel</button>
+        </div>
+      </div>
+
+      <div class="action-group">
+        <h5 class="group-title">Bill Payment</h5>
+        <button (click)="getStatement()" class="statement-btn">
+          Get Statement
+        </button>
+      </div>
+
+      <div class="action-group">
+        <h5 class="group-title">Card Control</h5>
+        <button (click)="blockCard()" class="block-btn" [disabled]="selectedCard.status === 'Blocked'">
+          {{ selectedCard.status === 'Blocked' ? 'Card Blocked' : 'Block Card' }}
+        </button>
+        <button (click)="toggleCardStatus()" class="toggle-status-btn" [ngClass]="{'active': selectedCard.status === 'Active', 'inactive': selectedCard.status !== 'Active'}">
+          {{ selectedCard.status === 'Active' ? 'Turn Off' : 'Turn On' }}
+        </button>
+      </div>
+
+      <div class="action-group">
+        <h5 class="group-title">Limit Management</h5>
+        <button (click)="showLimitModal = true" class="limit-btn">
+          Change Limit
+        </button>
+        <div *ngIf="showLimitModal" class="limit-form">
+          <label>Current Limit: ₹{{ selectedCard.approvedLimit | number:'1.2-2' }}</label>
+          <label>Change Amount (Enter amount to add or subtract):</label>
+          <input 
+            type="number" 
+            [(ngModel)]="limitChangeAmount" 
+            placeholder="Enter amount"
+            min="0"
+            class="limit-input"
+          >
+          <div class="limit-preview" *ngIf="limitChangeAmount && limitChangeAmount > 0">
+            <p class="preview-text">
+              <span *ngIf="limitChangeAmount < selectedCard.approvedLimit">
+                New limit after decrease: ₹{{ (selectedCard.approvedLimit - limitChangeAmount) | number:'1.2-2' }}
+              </span>
+              <span>
+                New limit after increase: ₹{{ (selectedCard.approvedLimit + limitChangeAmount) | number:'1.2-2' }}
+              </span>
+            </p>
+          </div>
+          <div class="limit-buttons">
+            <button (click)="changeLimit('increase')" class="increase-btn" [disabled]="!limitChangeAmount || limitChangeAmount <= 0">
+              Increase Limit
+            </button>
+            <button (click)="changeLimit('decrease')" class="decrease-btn" [disabled]="!limitChangeAmount || limitChangeAmount <= 0 || limitChangeAmount >= selectedCard.approvedLimit">
+              Decrease Limit
+            </button>
+          </div>
+          <button (click)="showLimitModal = false; limitChangeAmount = 0" class="cancel-btn">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Transactions Section -->
+  <div class="transactions-section" *ngIf="selectedCard">
+    <h4>Recent Transactions</h4>
+    <table class="data-table" *ngIf="transactions.length > 0">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Type</th>
+          <th>Merchant</th>
+          <th>Amount</th>
+          <th>Balance After</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let transaction of transactions">
+          <td>{{ transaction.transactionDate | date:'dd/MM/yyyy HH:mm' }}</td>
+          <td>{{ transaction.transactionType }}</td>
+          <td>{{ transaction.merchant || transaction.description || '-' }}</td>
+          <td>₹{{ transaction.amount | number:'1.2-2' }}</td>
+          <td>₹{{ transaction.balanceAfter | number:'1.2-2' }}</td>
+          <td><span class="status-badge" [ngClass]="transaction.status.toLowerCase()">{{ transaction.status }}</span></td>
+        </tr>
+      </tbody>
+    </table>
+    <p *ngIf="transactions.length === 0" class="no-data">No transactions found</p>
+  </div>
+
+  <!-- Bills Section -->
+  <div class="bills-section" *ngIf="selectedCard">
+    <h4>Bills</h4>
+    <table class="data-table" *ngIf="bills.length > 0">
+      <thead>
+        <tr>
+          <th>Bill Date</th>
+          <th>Due Date</th>
+          <th>Total Amount</th>
+          <th>Minimum Due</th>
+          <th>Paid Amount</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let bill of bills">
+          <td>{{ bill.billGenerationDate | date:'dd/MM/yyyy' }}</td>
+          <td [ngClass]="{'overdue': bill.status === 'Overdue'}">{{ bill.dueDate | date:'dd/MM/yyyy' }}</td>
+          <td>₹{{ bill.totalAmount | number:'1.2-2' }}</td>
+          <td>₹{{ bill.minimumDue | number:'1.2-2' }}</td>
+          <td>₹{{ bill.paidAmount | number:'1.2-2' }}</td>
+          <td><span class="status-badge" [ngClass]="bill.status.toLowerCase()">{{ bill.status }}</span></td>
+          <td>
+            <button class="pay-btn" (click)="openBillPayment(bill)" *ngIf="bill.status !== 'Paid'">
+              Pay Bill
+            </button>
+            <span *ngIf="bill.status === 'Paid'">Paid on {{ bill.paidDate | date:'dd/MM/yyyy' }}</span>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+    <p *ngIf="bills.length === 0" class="no-data">No bills found</p>
+  </div>
+
+  <!-- Apply Credit Card Modal -->
+  <div *ngIf="showApplyForm" class="modal-overlay" (click)="closeApplyForm()">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <h3>Apply for Credit Card</h3>
+      <p>Please review terms and provide PAN and optional income to get a limit estimate.</p>
+      <label>PAN Card Number <span style="color: #666; font-size: 0.85rem;">(10 characters: ABCDE1234F)</span></label>
+      <input type="text" [(ngModel)]="panInput" placeholder="Enter PAN (e.g., ABCDE1234F)" maxlength="10" 
+             style="text-transform: uppercase;" (input)="panInput = panInput.toUpperCase()" />
+      <label>Annual Income (optional)</label>
+      <input type="number" [(ngModel)]="incomeInput" placeholder="Annual income" />
+      <div class="modal-actions">
+        <button (click)="previewCreditPrediction()" class="preview-btn">Preview Terms & Estimate</button>
+        <button (click)="closeApplyForm()" class="cancel-btn">Cancel</button>
+      </div>
+      <div *ngIf="showTermsModal" class="terms">
+        <h4>Credit Card Prediction & Offer</h4>
+        <div class="prediction-details">
+          <div class="prediction-card">
+            <h5>Credit Score Prediction</h5>
+            <div class="prediction-item">
+              <span class="label">Predicted CIBIL Score:</span>
+              <span class="value cibil-score" [ngClass]="{
+                'excellent': (predictedCibil ?? 0) >= 800,
+                'good': (predictedCibil ?? 0) >= 700 && (predictedCibil ?? 0) < 800,
+                'fair': (predictedCibil ?? 0) >= 650 && (predictedCibil ?? 0) < 700,
+                'poor': (predictedCibil ?? 0) < 650
+              }">{{ predictedCibil ?? 'N/A' }}</span>
+            </div>
+            <div class="prediction-item">
+              <span class="label">Eligibility Status:</span>
+              <span class="value eligibility-badge" [ngClass]="{
+                'approved': eligibility === 'Approved',
+                'review': eligibility === 'Under Review',
+                'rejected': eligibility === 'Rejected'
+              }">{{ eligibility || 'N/A' }}</span>
+            </div>
+          </div>
+
+          <div class="prediction-card">
+            <h5>Credit Limit Details</h5>
+            <div class="prediction-item">
+              <span class="label">PAN-Based Limit:</span>
+              <span class="value amount">₹{{ (panBasedLimit ?? 0) | number:'1.2-2' }}</span>
+            </div>
+            <div class="prediction-item">
+              <span class="label">CIBIL-Based Limit:</span>
+              <span class="value amount">₹{{ (suggestedLimit ?? 0) | number:'1.2-2' }}</span>
+            </div>
+            <div class="prediction-item highlight">
+              <span class="label">Final Suggested Limit:</span>
+              <span class="value amount highlight">₹{{ (suggestedLimit ?? 0) | number:'1.2-2' }}</span>
+            </div>
+          </div>
+
+          <div class="prediction-card">
+            <h5>Card Details</h5>
+            <div class="prediction-item">
+              <span class="label">Card Type:</span>
+              <span class="value card-type-badge" [ngClass]="{
+                'platinum': cardType === 'Platinum',
+                'gold': cardType === 'Gold',
+                'silver': cardType === 'Silver',
+                'standard': cardType === 'Standard'
+              }">{{ cardType || 'N/A' }}</span>
+            </div>
+            <div class="prediction-item">
+              <span class="label">Interest Rate (p.a.):</span>
+              <span class="value">{{ interestRate ?? 'N/A' }}%</span>
+            </div>
+            <div class="prediction-item">
+              <span class="label">Annual Fee:</span>
+              <span class="value amount">₹{{ (annualFee ?? 0) | number:'1.2-2' }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- CIBIL Report from Manager (if available) -->
+        <div *ngIf="isLoadingCibilReport" style="text-align: center; padding: 12px; color: #6b7280;">
+          <i class="fa fa-spinner fa-spin"></i> Checking CIBIL records...
+        </div>
+        <div *ngIf="cibilReportData" style="margin-top: 16px; background: linear-gradient(135deg, #f0f9ff, #e0f2fe); border: 1px solid #7dd3fc; border-radius: 12px; padding: 20px;">
+          <h4 style="margin: 0 0 16px 0; color: #0369a1; display: flex; align-items: center; gap: 8px;">
+            <i class="fa fa-file-alt"></i> CIBIL Bureau Report (Verified)
+          </h4>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
+            <div class="prediction-card" style="background: white;">
+              <h5>Bureau Credit Score</h5>
+              <div class="prediction-item">
+                <span class="label">CIBIL Score:</span>
+                <span class="value cibil-score" [ngClass]="{
+                  'excellent': (cibilReportData.cibilScore ?? 0) >= 750,
+                  'good': (cibilReportData.cibilScore ?? 0) >= 700 && (cibilReportData.cibilScore ?? 0) < 750,
+                  'fair': (cibilReportData.cibilScore ?? 0) >= 650 && (cibilReportData.cibilScore ?? 0) < 700,
+                  'poor': (cibilReportData.cibilScore ?? 0) < 650
+                }">{{ cibilReportData.cibilScore ?? 'N/A' }}</span>
+              </div>
+              <div class="prediction-item">
+                <span class="label">Salary:</span>
+                <span class="value amount">₹{{ (cibilReportData.salary ?? 0) | number:'1.0-0' }}</span>
+              </div>
+              <div class="prediction-item">
+                <span class="label">Approval Limit:</span>
+                <span class="value amount">₹{{ (cibilReportData.approvalLimit ?? 0) | number:'1.0-0' }}</span>
+              </div>
+              <div class="prediction-item">
+                <span class="label">Status:</span>
+                <span class="value eligibility-badge" [ngClass]="{
+                  'approved': cibilReportData.status === 'APPROVED',
+                  'rejected': cibilReportData.status === 'REJECTED' || cibilReportData.status === 'NOT_ELIGIBLE',
+                  'review': cibilReportData.status === 'PENDING'
+                }">{{ cibilReportData.status }}</span>
+              </div>
+            </div>
+            <div class="prediction-card" style="background: white;">
+              <h5>ML Risk Analysis</h5>
+              <div class="prediction-item">
+                <span class="label">Risk Score:</span>
+                <span class="value">{{ cibilReportData.mlAnalysis?.riskScore ?? 'N/A' }}</span>
+              </div>
+              <div class="prediction-item">
+                <span class="label">Risk Category:</span>
+                <span class="value" [style.color]="
+                  cibilReportData.mlAnalysis?.riskCategory === 'LOW' ? '#166534' :
+                  cibilReportData.mlAnalysis?.riskCategory === 'MEDIUM' ? '#854d0e' :
+                  cibilReportData.mlAnalysis?.riskCategory === 'HIGH' ? '#c2410c' : '#991b1b'
+                " style="font-weight: 700;">{{ cibilReportData.mlAnalysis?.riskCategory ?? 'N/A' }}</span>
+              </div>
+              <div class="prediction-item">
+                <span class="label">Debt-to-Income:</span>
+                <span class="value">{{ cibilReportData.mlAnalysis?.debtToIncomeRatio ? (cibilReportData.mlAnalysis.debtToIncomeRatio * 100 | number:'1.0-0') + '%' : 'N/A' }}</span>
+              </div>
+              <div class="prediction-item highlight">
+                <span class="label">ML Recommended Limit:</span>
+                <span class="value amount highlight">₹{{ (cibilReportData.mlAnalysis?.recommendedLimit ?? 0) | number:'1.0-0' }}</span>
+              </div>
+            </div>
+            <div class="prediction-card" style="background: white;" *ngIf="cibilReportData.accounts">
+              <h5>Linked Bank Accounts</h5>
+              <div class="prediction-item" *ngIf="cibilReportData.accounts.savings">
+                <span class="label">Savings A/C:</span>
+                <span class="value" style="font-size: 0.85rem;">{{ cibilReportData.accounts.savings.accountNumber }}</span>
+              </div>
+              <div class="prediction-item" *ngIf="cibilReportData.accounts.savings">
+                <span class="label">Savings Balance:</span>
+                <span class="value amount">₹{{ (cibilReportData.accounts.savings.balance ?? 0) | number:'1.2-2' }}</span>
+              </div>
+              <div class="prediction-item" *ngIf="cibilReportData.accounts.salary">
+                <span class="label">Salary A/C:</span>
+                <span class="value" style="font-size: 0.85rem;">{{ cibilReportData.accounts.salary.accountNumber }}</span>
+              </div>
+              <div class="prediction-item" *ngIf="cibilReportData.accounts.salary">
+                <span class="label">Salary Balance:</span>
+                <span class="value amount">₹{{ (cibilReportData.accounts.salary.balance ?? 0) | number:'1.2-2' }}</span>
+              </div>
+              <div class="prediction-item" *ngIf="cibilReportData.accounts.current">
+                <span class="label">Current A/C:</span>
+                <span class="value" style="font-size: 0.85rem;">{{ cibilReportData.accounts.current.accountNumber }}</span>
+              </div>
+              <div class="prediction-item" *ngIf="cibilReportData.accounts.current">
+                <span class="label">Current Balance:</span>
+                <span class="value amount">₹{{ (cibilReportData.accounts.current.balance ?? 0) | number:'1.2-2' }}</span>
+              </div>
+              <div *ngIf="!cibilReportData.accounts.savings && !cibilReportData.accounts.salary && !cibilReportData.accounts.current" class="prediction-item">
+                <span class="label" style="color: #9ca3af;">No linked accounts found</span>
+              </div>
+            </div>
+          </div>
+          <div *ngIf="cibilReportData.mlAnalysis?.eligibilityReason" style="margin-top: 12px; padding: 10px 14px; background: white; border-radius: 8px; font-size: 0.85rem; color: #475569; border-left: 3px solid #3b82f6;">
+            <strong>Analysis:</strong> {{ cibilReportData.mlAnalysis.eligibilityReason }}
+          </div>
+        </div>
+
+        <h4>Terms & Conditions</h4>
+        <div class="terms-text">
+          <p>• By applying you agree to soft credit checks and verification.</p>
+          <p>• Interest rate of {{ interestRate ?? 'N/A' }}% p.a. will apply on outstanding balance.</p>
+          <p>• Annual fee of ₹{{ (annualFee ?? 0) | number:'1.2-2' }} will be charged.</p>
+          <p>• Overdue charges and penalties apply as per bank policy.</p>
+          <p>• Credit limit is subject to verification and may vary based on final assessment.</p>
+        </div>
+        <div class="terms-actions">
+          <button (click)="submitCreditApplication()" class="accept-btn" [disabled]="eligibility === 'Rejected'">
+            Accept & Submit Application
+          </button>
+          <button (click)="closeApplyForm()" class="cancel-btn">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bill Payment Modal -->
+  <div *ngIf="showBillPaymentModal" class="modal-overlay" (click)="showBillPaymentModal = false">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <h3>Pay Bill</h3>
+      <div *ngIf="selectedBill">
+        <div class="bill-info">
+          <p><strong>Total Amount:</strong> ₹{{ selectedBill.totalAmount | number:'1.2-2' }}</p>
+          <p><strong>Minimum Due:</strong> ₹{{ selectedBill.minimumDue | number:'1.2-2' }}</p>
+          <p><strong>Due Date:</strong> {{ selectedBill.dueDate | date:'dd/MM/yyyy' }}</p>
+        </div>
+        <label>Payment Amount:</label>
+        <input type="number" [(ngModel)]="billPaymentAmount" [min]="selectedBill.minimumDue" [max]="selectedBill.totalAmount" />
+        <div class="modal-actions">
+          <button (click)="payBill()" class="pay-btn">Pay Bill</button>
+          <button (click)="showBillPaymentModal = false" class="cancel-btn">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>

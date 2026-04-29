@@ -1,0 +1,113 @@
+<div class="subscription-container">
+  <div class="section-header">
+    <h2>🔄 Subscription Payments</h2>
+    <button class="btn-primary" (click)="openAddForm()" *ngIf="!showForm">+ Add Subscription</button>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <span class="stat-value">{{stats.total}}</span>
+      <span class="stat-label">Total</span>
+    </div>
+    <div class="stat-card active">
+      <span class="stat-value">{{stats.active}}</span>
+      <span class="stat-label">Active</span>
+    </div>
+    <div class="stat-card paused">
+      <span class="stat-value">{{stats.paused}}</span>
+      <span class="stat-label">Paused</span>
+    </div>
+    <div class="stat-card spending">
+      <span class="stat-value">{{formatCurrency(stats.totalMonthly)}}</span>
+      <span class="stat-label">Monthly Spend</span>
+    </div>
+  </div>
+
+  <!-- Add Form -->
+  <div class="form-card" *ngIf="showForm">
+    <h3>{{editMode ? 'Edit' : 'Add'}} Subscription</h3>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Subscription Name *</label>
+        <input type="text" [(ngModel)]="form.subscriptionName" placeholder="e.g. Netflix, Gym, Coursera" />
+      </div>
+      <div class="form-group">
+        <label>Category</label>
+        <select [(ngModel)]="form.subscriptionCategory">
+          <option *ngFor="let cat of categories" [value]="cat">{{getCategoryIcon(cat)}} {{formatCategory(cat)}}</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Amount (₹) *</label>
+        <input type="number" [(ngModel)]="form.amount" min="1" placeholder="0.00" />
+      </div>
+      <div class="form-group">
+        <label>Frequency</label>
+        <select [(ngModel)]="form.frequency">
+          <option *ngFor="let f of frequencies" [value]="f">{{f}}</option>
+        </select>
+      </div>
+      <div class="form-group toggle-group">
+        <label>Auto Debit</label>
+        <label class="switch">
+          <input type="checkbox" [(ngModel)]="form.autoDebit" />
+          <span class="slider"></span>
+        </label>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn-primary" (click)="saveSubscription()" [disabled]="saving || !isFormValid()">
+        {{saving ? 'Saving...' : (editMode ? 'Update' : 'Add Subscription')}}
+      </button>
+      <button class="btn-secondary" (click)="showForm = false; resetForm()">Cancel</button>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="filters" *ngIf="subscriptions.length > 0 && !showForm">
+    <button *ngFor="let f of filters" [class.active]="activeFilter === f" (click)="setFilter(f)">{{f}}</button>
+  </div>
+
+  <!-- Loading -->
+  <div class="loading-state" *ngIf="loading">
+    <div class="spinner"></div>
+    <p>Loading subscriptions...</p>
+  </div>
+
+  <!-- Empty -->
+  <div class="empty-state" *ngIf="!loading && subscriptions.length === 0 && !showForm">
+    <span class="empty-icon">🔄</span>
+    <h3>No Subscriptions</h3>
+    <p>Add your first subscription to manage recurring payments.</p>
+    <button class="btn-primary" (click)="openAddForm()">Add Subscription</button>
+  </div>
+
+  <!-- Subscription List -->
+  <div class="subscription-list" *ngIf="!loading && filteredSubscriptions.length > 0 && !showForm">
+    <div class="sub-card" *ngFor="let sub of filteredSubscriptions">
+      <div class="sub-header">
+        <span class="sub-icon">{{getCategoryIcon(sub.subscriptionCategory)}}</span>
+        <div class="sub-info">
+          <h4>{{sub.subscriptionName}}</h4>
+          <span class="sub-category">{{formatCategory(sub.subscriptionCategory)}}</span>
+        </div>
+        <div class="sub-amount">
+          <span class="amount">{{formatCurrency(sub.amount)}}</span>
+          <span class="freq">/{{sub.frequency?.toLowerCase()}}</span>
+        </div>
+      </div>
+      <div class="sub-details">
+        <span class="status-badge" [class]="getStatusClass(sub.status)">{{sub.status}}</span>
+        <span class="detail" *ngIf="sub.autoDebit">🔁 Auto Debit</span>
+        <span class="detail">Cycles: {{sub.billingCyclesCompleted || 0}}</span>
+        <span class="detail" *ngIf="sub.nextBillingDate">Next: {{formatDate(sub.nextBillingDate)}}</span>
+      </div>
+      <div class="sub-actions">
+        <button class="btn-sm" *ngIf="sub.status === 'ACTIVE'" (click)="pauseSubscription(sub.id)">⏸ Pause</button>
+        <button class="btn-sm success" *ngIf="sub.status === 'PAUSED'" (click)="resumeSubscription(sub.id)">▶ Resume</button>
+        <button class="btn-sm danger" *ngIf="sub.status !== 'CANCELLED'" (click)="cancelSubscription(sub.id)">✕ Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>

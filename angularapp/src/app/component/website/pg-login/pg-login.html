@@ -1,0 +1,153 @@
+<div class="pg-login-page">
+  <div class="pg-login-bg">
+    <div class="pg-bg-orb pg-orb-1"></div>
+    <div class="pg-bg-orb pg-orb-2"></div>
+    <div class="pg-bg-orb pg-orb-3"></div>
+    <div class="pg-grid-overlay"></div>
+  </div>
+
+  <button class="pg-back-btn" (click)="goToLanding()">
+    <i class="fa fa-arrow-left"></i> Back
+  </button>
+
+  <div class="pg-login-card">
+    <div class="pg-login-header">
+      <div class="pg-login-icon">
+        <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+          <rect width="48" height="48" rx="12" fill="url(#pgGrad)"/>
+          <path d="M14 20h20v2H14zm0 6h14v2H14zm8-14l10 8H12l10-8z" fill="white" opacity="0.9"/>
+          <defs><linearGradient id="pgGrad" x1="0" y1="0" x2="48" y2="48"><stop stop-color="#6366F1"/><stop offset="1" stop-color="#8B5CF6"/></linearGradient></defs>
+        </svg>
+      </div>
+      <h2>EzyVault Pay</h2>
+      <p class="pg-login-subtitle">Merchant Payment Gateway Login</p>
+    </div>
+
+    <!-- Error / Success -->
+    <div class="pg-alert pg-alert-error" *ngIf="errorMessage">
+      <i class="fa fa-exclamation-circle"></i> {{ errorMessage }}
+    </div>
+    <div class="pg-alert pg-alert-success" *ngIf="successMessage">
+      <i class="fa fa-check-circle"></i> {{ successMessage }}
+    </div>
+
+    <!-- Step 1: Email -->
+    <div class="pg-login-form" *ngIf="!otpSent">
+      <label class="pg-label">Business Email</label>
+      <div class="pg-input-group">
+        <i class="fa fa-envelope"></i>
+        <input type="email" [(ngModel)]="email" placeholder="your-business@example.com"
+               class="pg-input" [class.invalid]="email && !isValidEmail()"
+               (keydown.enter)="sendOtp()" />
+      </div>
+      <p class="pg-hint">Enter the email registered with your payment gateway account</p>
+      <button class="pg-btn pg-btn-primary" (click)="sendOtp()" [disabled]="loading || !email.trim()">
+        <span *ngIf="!loading">Send OTP</span>
+        <span *ngIf="loading" class="pg-spinner"></span>
+      </button>
+    </div>
+
+    <!-- Step 2: OTP -->
+    <div class="pg-login-form" *ngIf="otpSent">
+      <div class="pg-merchant-info" *ngIf="businessName">
+        <i class="fa fa-building"></i>
+        <span>{{ businessName }}</span>
+      </div>
+      <label class="pg-label">Enter 6-digit OTP</label>
+      <div class="pg-input-group">
+        <i class="fa fa-lock"></i>
+        <input type="text" [(ngModel)]="otp" placeholder="000000" maxlength="6"
+               class="pg-input pg-otp-input" (keydown.enter)="verifyOtp()" />
+      </div>
+      <p class="pg-hint">OTP sent to {{ maskedEmail }}</p>
+      <button class="pg-btn pg-btn-primary" (click)="verifyOtp()" [disabled]="verifying || otp.length < 6">
+        <span *ngIf="!verifying">Verify & Login</span>
+        <span *ngIf="verifying" class="pg-spinner"></span>
+      </button>
+      <div class="pg-resend-row">
+        <button class="pg-btn-link" (click)="resendOtp()" [disabled]="!canResend">
+          {{ canResend ? 'Resend OTP' : 'Resend in ' + resendTimer + 's' }}
+        </button>
+        <button class="pg-btn-link" (click)="resetForm()">Change Email</button>
+      </div>
+    </div>
+
+    <!-- New Merchant Registration -->
+    <div class="pg-new-merchant-section">
+      <button class="pg-btn pg-btn-outline pg-btn-new-merchant" (click)="showRegisterMerchant = true">
+        <i class="fa fa-plus-circle"></i> New Merchant Registration
+      </button>
+    </div>
+
+    <div class="pg-login-footer">
+      <div class="pg-footer-features">
+        <span><i class="fa fa-shield-alt"></i> HMAC-SHA256</span>
+        <span><i class="fa fa-bolt"></i> Instant Settlement</span>
+        <span><i class="fa fa-lock"></i> 256-bit Encrypted</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Register Merchant Modal -->
+  <div class="pg-modal-overlay" *ngIf="showRegisterMerchant" (click)="showRegisterMerchant = false">
+    <div class="pg-modal pg-modal-lg" (click)="$event.stopPropagation()">
+      <div class="pg-modal-header">
+        <h3>Register New Merchant</h3>
+        <button class="pg-modal-close" (click)="showRegisterMerchant = false">&times;</button>
+      </div>
+      <div class="pg-modal-body">
+        <div class="pg-form-row">
+          <div class="pg-form-group">
+            <label>Business Name *</label>
+            <input type="text" [(ngModel)]="registerForm.businessName" placeholder="Your Business" class="pg-input">
+          </div>
+          <div class="pg-form-group">
+            <label>Business Email *</label>
+            <input type="email" [(ngModel)]="registerForm.businessEmail" placeholder="biz@example.com" class="pg-input">
+          </div>
+        </div>
+        <div class="pg-form-row">
+          <div class="pg-form-group">
+            <label>Business Phone</label>
+            <input type="text" [(ngModel)]="registerForm.businessPhone" placeholder="9876543210" class="pg-input">
+          </div>
+          <div class="pg-form-group">
+            <label>Business Type</label>
+            <select [(ngModel)]="registerForm.businessType" class="pg-input">
+              <option value="ONLINE">Online</option>
+              <option value="RETAIL">Retail</option>
+              <option value="SAAS">SaaS</option>
+              <option value="MARKETPLACE">Marketplace</option>
+              <option value="EDUCATION">Education</option>
+            </select>
+          </div>
+        </div>
+        <div class="pg-form-row">
+          <div class="pg-form-group">
+            <label>Bank Account Number</label>
+            <input type="text" [(ngModel)]="registerForm.accountNumber" placeholder="Account number" class="pg-input">
+          </div>
+          <div class="pg-form-group">
+            <label>Settlement Account</label>
+            <input type="text" [(ngModel)]="registerForm.settlementAccount" placeholder="Settlement account" class="pg-input">
+          </div>
+        </div>
+        <div class="pg-form-group">
+          <label>Webhook URL</label>
+          <input type="text" [(ngModel)]="registerForm.webhookUrl" placeholder="https://yourdomain.com/webhook" class="pg-input">
+        </div>
+        <div class="pg-form-group">
+          <label>Callback URL</label>
+          <input type="text" [(ngModel)]="registerForm.callbackUrl" placeholder="https://yourdomain.com/callback" class="pg-input">
+        </div>
+      </div>
+      <div class="pg-modal-footer">
+        <button class="pg-btn pg-btn-outline" (click)="showRegisterMerchant = false">Cancel</button>
+        <button class="pg-btn pg-btn-primary" (click)="registerMerchant()" [disabled]="registerLoading">
+          <span *ngIf="!registerLoading">Register Merchant</span>
+          <span *ngIf="registerLoading" class="pg-spinner"></span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

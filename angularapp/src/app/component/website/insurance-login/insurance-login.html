@@ -1,0 +1,31 @@
+<div class="insurance-login-page">
+  <div class="card">
+    <h1>Insurance Login</h1>
+    <p class="subtitle">Login using your policy number or registered email. An OTP will be sent to your email and is mandatory to proceed.</p>
+
+    <form *ngIf="step === 'details'" (ngSubmit)="sendOtp()">
+      <label>
+        Policy Number or Email
+        <input type="text" [(ngModel)]="policyNumberOrEmail" name="policyNumberOrEmail" required>
+      </label>
+      <label>
+        Email (optional, if different)
+        <input type="email" [(ngModel)]="email" name="email">
+      </label>
+      <button type="submit" [disabled]="sendingOtp">
+        {{ sendingOtp ? 'Sending OTP...' : 'Send OTP' }}
+      </button>
+    </form>
+
+    <form *ngIf="step === 'otp'" (ngSubmit)="verifyOtp()">
+      <label>
+        Enter Email OTP
+        <input type="text" maxlength="6" [(ngModel)]="otp" name="otp" required>
+      </label>
+      <button type="submit" [disabled]="verifyingOtp">
+        {{ verifyingOtp ? 'Verifying...' : 'Verify OTP & Continue' }}
+      </button>
+    </form>
+  </div>
+</div>
+

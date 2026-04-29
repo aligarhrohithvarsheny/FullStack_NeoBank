@@ -1,0 +1,216 @@
+<div class="users-container">
+  <h2>User Account Management</h2>
+  
+  <div class="header-actions">
+    <button class="back-btn" (click)="goBack()">⬅ Back to Dashboard</button>
+    <button class="refresh-btn" (click)="refreshUsersData()" title="Refresh data from database">
+      🔄 Refresh Data
+    </button>
+  </div>
+
+  <!-- Summary Stats -->
+  <div class="stats-section">
+    <div class="stat-card">
+      <h3>Total Users</h3>
+      <span class="stat-number">{{ totalUsers }}</span>
+    </div>
+    <div class="stat-card pending">
+      <h3>Pending</h3>
+      <span class="stat-number">{{ pendingUsersCount }}</span>
+    </div>
+    <div class="stat-card approved">
+      <h3>Approved</h3>
+      <span class="stat-number">{{ approvedUsersCount }}</span>
+    </div>
+    <div class="stat-card closed">
+      <h3>Closed</h3>
+      <span class="stat-number">{{ closedUsersCount }}</span>
+    </div>
+  </div>
+
+  <!-- Debug Information -->
+  <div class="debug-info" *ngIf="pendingUsers.length === 0">
+    <div class="debug-card">
+      <h4>🔍 Debug Information</h4>
+      <p><strong>Users Array Length:</strong> {{ pendingUsers.length }}</p>
+      <p><strong>Total Users Count:</strong> {{ totalUsers }}</p>
+      <p><strong>Pending Users Count:</strong> {{ pendingUsersCount }}</p>
+      <p><strong>Approved Users Count:</strong> {{ approvedUsersCount }}</p>
+      <p><strong>Closed Users Count:</strong> {{ closedUsersCount }}</p>
+      <div class="debug-actions">
+        <button class="debug-btn" (click)="refreshUsersData()">🔄 Refresh Data</button>
+        <button class="debug-btn" (click)="createSampleUsers()">👥 Create Sample Users</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Users Table -->
+  <div class="users-table">
+    <table>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Email</th>
+        <th>PAN</th>
+        <th>Aadhar</th>
+        <th>Income</th>
+        <th>Account Status</th>
+        <th>KYC Status</th>
+        <th>Signature Status</th>
+        <th>Account No.</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let user of pendingUsers; trackBy: trackByUserId">
+        <td class="user-name">{{ user.name }}</td>
+        <td class="user-email">{{ user.email }}</td>
+        <td class="pan-number">{{ user.pan }}</td>
+        <td class="aadhar-number">{{ user.aadhar }}</td>
+        <td class="income">₹{{ user.income | number:'1.0-0' }}</td>
+        <td [ngClass]="{'approved': user.status==='APPROVED', 'pending': user.status==='PENDING', 'closed': user.status==='CLOSED'}">
+          <span class="status-badge">{{ user.status }}</span>
+        </td>
+        <td [ngClass]="getKycStatusClass(user)">
+          <span class="kyc-badge">{{ getKycStatus(user) }}</span>
+          <div *ngIf="getKycStatus(user) !== 'Not Submitted'" class="kyc-info">
+            <small>{{ user.assignedAccountNumber ? 'Account: ' + user.assignedAccountNumber : 'Email: ' + user.email }}</small>
+          </div>
+        </td>
+        <td [ngClass]="getSignatureStatusClass(user)">
+          <span class="signature-badge">{{ getSignatureStatus(user) }}</span>
+          <div class="signature-actions-cell" *ngIf="user.signatureStatus">
+            <button 
+              class="view-signature-btn-small" 
+              (click)="viewUserSignature(user)"
+              title="View Signature"
+            >
+              👁️ View
+            </button>
+          </div>
+        </td>
+        <td class="account-number">{{ user.assignedAccountNumber || '-' }}</td>
+        <td class="actions">
+          <button *ngIf="user.status==='PENDING'" (click)="approveUser(user)" class="approve-btn">
+            Assign Account
+          </button>
+          <button *ngIf="user.status==='APPROVED'" (click)="closeAccount(user)" class="close-btn">
+            Close Account
+          </button>
+          <span *ngIf="user.status==='CLOSED'" class="closed-status">
+            Account Closed
+          </span>
+        </td>
+      </tr>
+    </tbody>
+    </table>
+  </div>
+
+  <!-- Test Card Creation Buttons -->
+  <div class="test-section">
+    <button (click)="createCardManually()" class="test-card-btn">
+       Test Card Creation (for approved users)
+    </button>
+  </div>
+
+  <!-- Signature Management Section -->
+  <div class="signature-section">
+    <h3>📝 Signature Approvals</h3>
+    <div class="signature-stats">
+      <span class="signature-count">Pending Signatures: {{ pendingSignatures.length }}</span>
+      <button class="refresh-btn" (click)="loadPendingSignatures()">🔄 Refresh</button>
+    </div>
+    
+    <div class="signature-list" *ngIf="pendingSignatures.length > 0">
+      <div class="signature-item" *ngFor="let user of pendingSignatures">
+        <div class="signature-info">
+          <strong>{{ user.username || user.account?.name || 'User' }}</strong>
+          <span class="user-email">{{ user.email }}</span>
+          <span class="account-number">Account: {{ user.accountNumber || 'N/A' }}</span>
+        </div>
+        <button class="view-signature-btn" (click)="viewSignature(user)">View Signature</button>
+      </div>
+    </div>
+    
+    <div class="no-signatures" *ngIf="pendingSignatures.length === 0">
+      <p>No pending signatures to review.</p>
+    </div>
+  </div>
+
+  <!-- Signature Modal -->
+  <div class="modal-overlay" *ngIf="selectedSignature" (click)="closeSignatureModal()">
+    <div class="modal-content" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>Review Signature</h3>
+        <button class="close-modal-btn" (click)="closeSignatureModal()">×</button>
+      </div>
+      
+      <div class="modal-body">
+        <div class="user-info-section">
+          <h4>User Information</h4>
+          <div class="user-details">
+            <p><strong>Name:</strong> {{ selectedSignature.username || selectedSignature.account?.name }}</p>
+            <p><strong>Email:</strong> {{ selectedSignature.email }}</p>
+            <p><strong>Account Number:</strong> {{ selectedSignature.accountNumber || 'N/A' }}</p>
+          </div>
+        </div>
+        
+        <div class="photo-section" *ngIf="profilePhotoUrl">
+          <h4>Profile Photo</h4>
+          <img [src]="profilePhotoUrl" alt="Profile Photo" class="preview-image">
+        </div>
+        
+        <div class="signature-section-modal">
+          <h4>Digital Signature</h4>
+          <img *ngIf="signatureImageUrl" [src]="signatureImageUrl" alt="Signature" class="signature-preview">
+          <p *ngIf="!signatureImageUrl">Loading signature...</p>
+        </div>
+        
+        <div class="rejection-section">
+          <label for="rejectionReason">Rejection Reason (if rejecting):</label>
+          <textarea 
+            id="rejectionReason" 
+            [(ngModel)]="rejectionReason" 
+            placeholder="Enter reason for rejection..."
+            rows="3"
+          ></textarea>
+        </div>
+      </div>
+      
+      <div class="modal-footer">
+        <button class="approve-signature-btn" (click)="approveSignature()">✓ Approve</button>
+        <button class="reject-signature-btn" (click)="rejectSignature()">✗ Reject</button>
+        <button class="cancel-btn" (click)="closeSignatureModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Instructions -->
+  <div class="instructions">
+    <h4>📋 Admin Instructions:</h4>
+    <ul>
+      <li><strong>Account Status:</strong> PENDING users need account assignment, APPROVED users have active accounts</li>
+      <li><strong>KYC Status:</strong> Shows if user has submitted and status of their KYC verification</li>
+      <li>Users can submit KYC after getting an account number</li>
+      <li>KYC approval automatically updates user profile information</li>
+      <li><strong>Card Creation:</strong> Cards are automatically created when users are approved</li>
+      <li><strong>Signature Approval:</strong> Review and approve/reject user signatures. Rejection requires a reason.</li>
+    </ul>
+  </div>
+</div>
+
+  <!-- Admin Audit Upload Modal -->
+  <app-admin-audit-document-upload
+    [auditLogId]="currentAuditLogId ?? null"
+    [adminId]="adminId ?? null"
+    [adminName]="adminName"
+    [isModalOpen]="showAuditUploadModal"
+    (modalClosed)="onAuditModalClosed()"
+    (documentUploaded)="onAuditDocumentUploaded($event)">
+  </app-admin-audit-document-upload>
+
+  <!-- Audit History (for selected user) -->
+  <div *ngIf="auditTargetUser" class="audit-history-wrapper">
+    <h4>Audit History for {{ auditTargetUser.name }}</h4>
+    <app-admin-audit-history [entityType]="'USER'" [entityId]="getAuditTargetUserId()"></app-admin-audit-history>
+  </div>

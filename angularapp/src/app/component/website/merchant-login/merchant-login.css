@@ -1,0 +1,459 @@
+/* ===================================================
+   MERCHANT SOUNDBOX LOGIN PAGE
+   Color Theme: Green (#10B981) for merchant/business
+   =================================================== */
+
+.merchant-login-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #064E3B 0%, #065F46 30%, #047857 60%, #059669 100%);
+  padding: 40px 20px;
+  position: relative;
+  overflow: hidden;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+/* Background circles */
+.bg-decoration {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.bg-circle {
+  position: absolute;
+  border-radius: 50%;
+  opacity: 0.08;
+}
+
+.bg-circle.c1 {
+  width: 400px;
+  height: 400px;
+  background: #10B981;
+  top: -100px;
+  right: -100px;
+}
+
+.bg-circle.c2 {
+  width: 300px;
+  height: 300px;
+  background: #34D399;
+  bottom: -50px;
+  left: -80px;
+}
+
+.bg-circle.c3 {
+  width: 200px;
+  height: 200px;
+  background: #6EE7B7;
+  top: 40%;
+  left: 20%;
+}
+
+.login-container {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 460px;
+}
+
+/* Back button */
+.back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 0.9);
+  padding: 8px 16px;
+  border-radius: 50px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  margin-bottom: 20px;
+  transition: all 0.2s;
+}
+
+.back-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
+
+/* Login card */
+.login-card {
+  background: #fff;
+  border-radius: 20px;
+  padding: 40px 36px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+/* Header */
+.card-header {
+  text-align: center;
+  margin-bottom: 28px;
+}
+
+.merchant-icon {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 16px;
+}
+
+.merchant-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.card-title {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #064E3B;
+  margin: 0 0 8px;
+}
+
+.card-subtitle {
+  font-size: 0.85rem;
+  color: #6B7280;
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* Alerts */
+.alert {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  margin-bottom: 20px;
+  animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.alert-success {
+  background: #ECFDF5;
+  color: #065F46;
+  border: 1px solid #A7F3D0;
+}
+
+.alert-error {
+  background: #FEF2F2;
+  color: #991B1B;
+  border: 1px solid #FECACA;
+}
+
+.alert-icon {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.alert-success .alert-icon {
+  background: #10B981;
+  color: #fff;
+}
+
+.alert-error .alert-icon {
+  background: #EF4444;
+  color: #fff;
+}
+
+/* Form */
+.form-step {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.input-group label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+.input-wrapper {
+  display: flex;
+  align-items: center;
+  background: #F9FAFB;
+  border: 2px solid #E5E7EB;
+  border-radius: 12px;
+  overflow: hidden;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.input-wrapper:focus-within {
+  border-color: #10B981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+}
+
+.input-icon {
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  color: #9CA3AF;
+}
+
+.form-input {
+  flex: 1;
+  padding: 12px 12px 12px 0;
+  border: none;
+  background: transparent;
+  font-size: 0.95rem;
+  color: #111827;
+  outline: none;
+}
+
+.form-input::placeholder {
+  color: #9CA3AF;
+}
+
+.form-input.invalid {
+  color: #DC2626;
+}
+
+.form-input.otp-input {
+  letter-spacing: 8px;
+  font-size: 1.2rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.input-hint {
+  font-size: 0.75rem;
+  color: #DC2626;
+}
+
+.info-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: #F0FDF4;
+  border-radius: 8px;
+  font-size: 0.78rem;
+  color: #065F46;
+  border: 1px solid #BBF7D0;
+}
+
+/* OTP sent info */
+.otp-sent-info {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 16px;
+  background: #F0FDF4;
+  border-radius: 12px;
+  border: 1px solid #BBF7D0;
+}
+
+.sent-business {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.business-label {
+  font-size: 0.75rem;
+  color: #6B7280;
+}
+
+.business-name {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #065F46;
+}
+
+.sent-to-label {
+  font-size: 0.75rem;
+  color: #6B7280;
+}
+
+.sent-to-email {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #065F46;
+}
+
+.change-btn {
+  background: none;
+  border: none;
+  color: #10B981;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+  margin-top: 4px;
+}
+
+.change-btn:hover {
+  color: #059669;
+}
+
+/* Primary button */
+.btn-primary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 14px;
+  background: linear-gradient(135deg, #10B981, #059669);
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.3);
+}
+
+.btn-primary:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-loader {
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Resend */
+.resend-section {
+  text-align: center;
+  margin-top: 4px;
+}
+
+.resend-timer {
+  font-size: 0.8rem;
+  color: #9CA3AF;
+}
+
+.resend-btn {
+  background: none;
+  border: none;
+  color: #10B981;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.resend-btn:hover {
+  color: #059669;
+}
+
+/* Footer */
+.card-footer {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid #F3F4F6;
+}
+
+.security-note {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  color: #9CA3AF;
+}
+
+.security-note svg {
+  color: #10B981;
+}
+
+/* Features strip */
+.features-strip {
+  margin-top: 24px;
+  display: flex;
+  gap: 12px;
+}
+
+.feature-item {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  padding: 14px;
+}
+
+.feature-icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+
+.feature-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.feature-text strong {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.feature-text span {
+  font-size: 0.65rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+  .merchant-login-page {
+    padding: 20px 16px;
+  }
+
+  .login-card {
+    padding: 28px 24px;
+  }
+
+  .features-strip {
+    flex-direction: column;
+  }
+
+  .card-title {
+    font-size: 1.3rem;
+  }
+}

@@ -1,0 +1,136 @@
+<div class="investments-page">
+  <div class="page-header">
+    <button class="back-btn" (click)="goBack()">
+      <i class="fa fa-arrow-left"></i> Back
+    </button>
+    <h1><i class="fa fa-chart-line"></i> Investments Management</h1>
+    <button class="refresh-btn" (click)="loadInvestments()" [disabled]="isLoadingInvestments">
+      <i class="fa fa-sync-alt" [class.fa-spin]="isLoadingInvestments"></i> Refresh
+    </button>
+  </div>
+
+  <div class="filters-bar">
+    <select [(ngModel)]="investmentStatusFilter" (change)="loadInvestments()">
+      <option value="PENDING">Pending</option>
+      <option value="APPROVED">Approved</option>
+      <option value="REJECTED">Rejected</option>
+      <option value="ACTIVE">Active</option>
+      <option value="ALL">All</option>
+    </select>
+    <input type="text" [(ngModel)]="investmentSearchQuery" placeholder="Search by name, account, fund..." />
+  </div>
+
+  <div *ngIf="isLoadingInvestments" class="loading-state">
+    <p>Loading investments...</p>
+  </div>
+
+  <div *ngIf="!isLoadingInvestments && getFilteredInvestments().length === 0" class="no-data">
+    <p>No investments found</p>
+  </div>
+
+  <table class="data-table" *ngIf="!isLoadingInvestments && getFilteredInvestments().length > 0">
+    <thead>
+      <tr>
+        <th>User</th>
+        <th>Account</th>
+        <th>Fund Name</th>
+        <th>Category</th>
+        <th>Amount</th>
+        <th>Current Value</th>
+        <th>Units</th>
+        <th>Status</th>
+        <th>Date</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let inv of getFilteredInvestments()">
+        <td>{{ inv.userName }}</td>
+        <td>{{ inv.accountNumber }}</td>
+        <td>{{ inv.fundName || 'N/A' }}</td>
+        <td>{{ inv.fundCategory || 'N/A' }}</td>
+        <td>₹{{ inv.investmentAmount | number:'1.2-2' }}</td>
+        <td>₹{{ inv.currentValue | number:'1.2-2' }}</td>
+        <td>{{ inv.units | number:'1.2-2' }}</td>
+        <td><span class="status-badge" [ngClass]="inv.status.toLowerCase()">{{ inv.status }}</span></td>
+        <td>{{ inv.investmentDate | date:'dd/MM/yyyy' }}</td>
+        <td>
+          <button *ngIf="inv.status === 'PENDING'" (click)="approveInvestment(inv)" class="btn-approve">Approve</button>
+          <button *ngIf="inv.status === 'PENDING'" (click)="rejectInvestment(inv)" class="btn-reject">Reject</button>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- Foreclosure Management Section -->
+  <div class="foreclosure-section" style="margin-top: 40px;">
+    <div class="section-header">
+      <h2><i class="fa fa-money-bill-wave"></i> Mutual Fund Foreclosure Requests</h2>
+      <button (click)="toggleForeclosureSection()" class="toggle-btn">
+        {{ showForeclosureSection ? 'Hide' : 'Show' }} Foreclosures
+      </button>
+    </div>
+
+    <div *ngIf="showForeclosureSection">
+      <div class="filters-bar" style="margin-top: 20px;">
+        <select [(ngModel)]="foreclosureFilter" (change)="loadForeclosures()">
+          <option value="PENDING">Pending</option>
+          <option value="ALL">All</option>
+          <option value="COMPLETED">Completed</option>
+          <option value="REJECTED">Rejected</option>
+        </select>
+      </div>
+
+      <div *ngIf="isLoadingForeclosures" class="loading-state">
+        <p>Loading foreclosure requests...</p>
+      </div>
+
+      <div *ngIf="!isLoadingForeclosures && getFilteredForeclosures().length === 0" class="no-data">
+        <p>No foreclosure requests found</p>
+      </div>
+
+      <table class="data-table" *ngIf="!isLoadingForeclosures && getFilteredForeclosures().length > 0" style="margin-top: 20px;">
+        <thead>
+          <tr>
+            <th>User</th>
+            <th>Account</th>
+            <th>Fund Name</th>
+            <th>Investment Amount</th>
+            <th>Current Value</th>
+            <th>Fine</th>
+            <th>Foreclosure Amount</th>
+            <th>Status</th>
+            <th>Request Date</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let foreclosure of getFilteredForeclosures()">
+            <td>{{ foreclosure.userName }}</td>
+            <td>{{ foreclosure.accountNumber }}</td>
+            <td>{{ foreclosure.fundName || 'N/A' }}</td>
+            <td>₹{{ foreclosure.investmentAmount | number:'1.2-2' }}</td>
+            <td>₹{{ foreclosure.currentValue | number:'1.2-2' }}</td>
+            <td>₹{{ foreclosure.fine | number:'1.2-2' }}</td>
+            <td>₹{{ foreclosure.foreclosureAmount | number:'1.2-2' }}</td>
+            <td>
+              <span class="status-badge" [ngClass]="getForeclosureStatusClass(foreclosure.status)">{{ foreclosure.status }}</span>
+              <span class="otp-badge" [ngClass]="foreclosure.otpVerified ? 'otp-verified' : 'otp-not-verified'">
+                {{ foreclosure.otpVerified ? 'OTP Verified' : 'OTP Not Verified' }}
+              </span>
+            </td>
+            <td>{{ foreclosure.requestDate | date:'dd/MM/yyyy HH:mm' }}</td>
+            <td>
+              <button *ngIf="foreclosure.status === 'PENDING'" (click)="approveForeclosure(foreclosure)" class="btn-approve">Approve</button>
+              <button *ngIf="foreclosure.status === 'PENDING'" (click)="rejectForeclosure(foreclosure)" class="btn-reject">Reject</button>
+              <span *ngIf="foreclosure.status === 'COMPLETED'" class="completed-badge">Completed</span>
+              <span *ngIf="foreclosure.status === 'REJECTED'" class="rejected-badge">Rejected</span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+

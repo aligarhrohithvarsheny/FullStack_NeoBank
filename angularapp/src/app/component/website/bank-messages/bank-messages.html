@@ -1,0 +1,66 @@
+<div class="messages-container">
+  <div class="section-header">
+    <div>
+      <h2>📬 Bank Messages</h2>
+      <p class="subtitle" *ngIf="unreadCount > 0">You have <strong>{{unreadCount}}</strong> unread message(s)</p>
+    </div>
+    <button class="btn-secondary" (click)="markAllAsRead()" *ngIf="unreadCount > 0">✓ Mark All Read</button>
+  </div>
+
+  <div class="filters">
+    <button *ngFor="let filter of filters" [class.active]="activeFilter === filter" (click)="setFilter(filter)">
+      {{formatFilterLabel(filter)}}
+      <span class="badge" *ngIf="filter === 'UNREAD' && unreadCount > 0">{{unreadCount}}</span>
+    </button>
+  </div>
+
+  <!-- Message Detail Overlay -->
+  <div class="message-overlay" *ngIf="selectedMessage" (click)="closeMessage()">
+    <div class="message-detail-card" (click)="$event.stopPropagation()">
+      <div class="detail-header">
+        <span class="detail-icon">{{getMessageIcon(selectedMessage.messageType)}}</span>
+        <div>
+          <h3>{{selectedMessage.title}}</h3>
+          <span class="type-label">{{formatFilterLabel(selectedMessage.messageType)}}</span>
+        </div>
+        <button class="btn-close" (click)="closeMessage()">✕</button>
+      </div>
+      <div class="detail-body">
+        <p>{{selectedMessage.content}}</p>
+      </div>
+      <div class="detail-footer">
+        <span class="date">From: {{selectedMessage.sender || 'NeoBank System'}}</span>
+        <span class="date">{{formatDate(selectedMessage.createdAt)}}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <div class="loading-state" *ngIf="loading">
+    <div class="spinner"></div>
+    <p>Loading messages...</p>
+  </div>
+
+  <!-- Empty -->
+  <div class="empty-state" *ngIf="!loading && filteredMessages.length === 0">
+    <span class="empty-icon">📭</span>
+    <h3>No messages</h3>
+    <p>Your inbox is empty for this filter.</p>
+  </div>
+
+  <!-- Messages List -->
+  <div class="messages-list" *ngIf="!loading && filteredMessages.length > 0">
+    <div class="message-card" *ngFor="let msg of filteredMessages" [class.unread]="!msg.isRead" (click)="viewMessage(msg)">
+      <span class="msg-icon">{{getMessageIcon(msg.messageType)}}</span>
+      <div class="msg-content">
+        <h4>{{msg.title}}</h4>
+        <p class="msg-preview">{{msg.content | slice:0:100}}{{msg.content?.length > 100 ? '...' : ''}}</p>
+        <div class="msg-meta">
+          <span class="type-tag">{{formatFilterLabel(msg.messageType)}}</span>
+          <span class="date">{{formatDate(msg.createdAt)}}</span>
+        </div>
+      </div>
+      <span class="unread-dot" *ngIf="!msg.isRead"></span>
+    </div>
+  </div>
+</div>

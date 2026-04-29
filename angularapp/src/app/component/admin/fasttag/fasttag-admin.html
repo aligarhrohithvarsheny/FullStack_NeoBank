@@ -1,0 +1,287 @@
+<div class="kyc-container fasttag-admin">
+  <div class="topbar">
+    <button class="back-btn" (click)="goBack()">← Back</button>
+    <h1>FASTag Applications</h1>
+  </div>
+
+  <div class="filters-section">
+    <div class="search-box">
+      <input class="search-input" [(ngModel)]="searchTerm" placeholder="Search by vehicle, user, or FASTag" />
+    </div>
+    <div class="status-filter">
+      <label>Filter by Status:</label>
+      <select class="filter-select" [(ngModel)]="statusFilter">
+        <option value="All">All</option>
+        <option value="Applied">Applied</option>
+        <option value="Approved">Approved</option>
+        <option value="Closed">Closed</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="stats-section">
+    <div class="stat-card">
+      <h3>Total Tags</h3>
+      <span class="stat-number">{{ getTotal() }}</span>
+    </div>
+    <div class="stat-card pending">
+      <h3>Applied</h3>
+      <span class="stat-number">{{ getAppliedCount() }}</span>
+    </div>
+    <div class="stat-card approved">
+      <h3>Approved</h3>
+      <span class="stat-number">{{ getApprovedCount() }}</span>
+    </div>
+    <div class="stat-card rejected">
+      <h3>Closed</h3>
+      <span class="stat-number">{{ getClosedCount() }}</span>
+    </div>
+  </div>
+
+  <div class="kyc-table">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>User</th>
+          <th>Vehicle</th>
+          <th>Status</th>
+          <th>FASTag</th>
+          <th>Balance</th>
+          <th>Assigned Account</th>
+          <th>Applied</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <ng-container *ngFor="let t of getFilteredList()">
+        <tr>
+          <td>{{t.id}}</td>
+          <td>{{t.userName || t.userId}}</td>
+          <td>{{t.vehicleNumber}}</td>
+          <td [ngClass]="{'approved': t.status==='Approved', 'pending': t.status==='Applied', 'rejected': t.status==='Closed'}">
+            <span class="status-badge">{{t.status}}</span>
+          </td>
+          <td>{{t.fasttagNumber || '-'}}</td>
+          <td>{{t.balance || 0}}</td>
+          <td>
+            {{ t.assignedAccount?.accountNumber || t.assignedAccountId || '-' }}
+            <div *ngIf="t.assignedAt">Assigned: {{ t.assignedAt | date:'short' }}</div>
+          </td>
+          <td>{{t.createdAt | date:'short'}}</td>
+          <td class="actions">
+            <button (click)="viewDetails(t)" class="document-btn">{{ selectedDetailTag?.id === t.id ? 'Hide Details' : 'View Details' }}</button>
+            <button *ngIf="t.status==='Applied'" (click)="approve(t)" class="approve-btn">Approve</button>
+            <button (click)="selectForRecharge(t)" class="document-btn">Recharge</button>
+            <button *ngIf="t.status==='Approved'" (click)="openAssignAccount(t)" class="document-btn">Assign Account</button>
+            <button (click)="toggleTransactions(t)" class="document-btn">Transactions</button>
+            <button (click)="closeFasttag(t)" class="reject-btn">Close</button>
+          </td>
+        </tr>
+        <!-- Expanded Detail Row -->
+        <tr *ngIf="selectedDetailTag?.id === t.id" class="detail-expand-row">
+          <td colspan="9">
+            <div class="ft-admin-detail-panel">
+              <h4>📋 Application Details — {{ t.userName || t.userId }}</h4>
+
+              <div class="ft-admin-detail-grid">
+                <!-- Vehicle Details -->
+                <div class="ft-admin-detail-section">
+                  <h5>🚗 Vehicle Details</h5>
+                  <div class="ft-admin-detail-item">
+                    <span class="ft-admin-label">Chassis Number</span>
+                    <span class="ft-admin-value">{{ t.chassisNumber || '-' }}</span>
+                  </div>
+                  <div class="ft-admin-detail-item">
+                    <span class="ft-admin-label">Engine Number</span>
+                    <span class="ft-admin-value">{{ t.engineNumber || '-' }}</span>
+                  </div>
+                  <div class="ft-admin-detail-item">
+                    <span class="ft-admin-label">Vehicle Reg. No.</span>
+                    <span class="ft-admin-value">{{ t.vehicleNumber || '-' }}</span>
+                  </div>
+                  <div class="ft-admin-detail-item">
+                    <span class="ft-admin-label">Make</span>
+                    <span class="ft-admin-value">{{ t.make || '-' }}</span>
+                  </div>
+                  <div class="ft-admin-detail-item">
+                    <span class="ft-admin-label">Model</span>
+                    <span class="ft-admin-value">{{ t.model || '-' }}</span>
+                  </div>
+                  <div class="ft-admin-detail-item">
+                    <span class="ft-admin-label">Fuel Type</span>
+                    <span class="ft-admin-value">{{ t.fuelType || '-' }}</span>
+                  </div>
+                  <div class="ft-admin-detail-item">
+                    <span class="ft-admin-label">Vehicle Type</span>
+                    <span class="ft-admin-value">{{ t.vehicleType || '-' }}</span>
+                  </div>
+                </div>
+
+                <!-- RC Upload Images -->
+                <div class="ft-admin-detail-section">
+                  <h5>📄 RC Upload</h5>
+                  <div *ngIf="t.rcFrontPath" class="ft-admin-rc-img">
+                    <span>RC Front:</span>
+                    <img [src]="getRcImageUrl(t.rcFrontPath)" alt="RC Front" />
+                  </div>
+                  <div *ngIf="t.rcBackPath" class="ft-admin-rc-img">
+                    <span>RC Back:</span>
+                    <img [src]="getRcImageUrl(t.rcBackPath)" alt="RC Back" />
+                  </div>
+                  <div *ngIf="!t.rcFrontPath && !t.rcBackPath" class="ft-admin-no-data">No RC images uploaded</div>
+                </div>
+
+                <!-- Customer Details -->
+                <div class="ft-admin-detail-section">
+                  <h5>👤 Customer Details</h5>
+                  <div class="ft-admin-detail-item">
+                    <span class="ft-admin-label">Name</span>
+                    <span class="ft-admin-value">{{ t.userName || '-' }}</span>
+                  </div>
+                  <div class="ft-admin-detail-item">
+                    <span class="ft-admin-label">Mobile Number</span>
+                    <span class="ft-admin-value">{{ t.mobileNumber || '-' }}</span>
+                  </div>
+                  <div class="ft-admin-detail-item">
+                    <span class="ft-admin-label">Email</span>
+                    <span class="ft-admin-value">{{ t.email || '-' }}</span>
+                  </div>
+                  <div class="ft-admin-detail-item">
+                    <span class="ft-admin-label">Aadhar</span>
+                    <span class="ft-admin-value">{{ t.aadharNumber || '-' }}</span>
+                  </div>
+                  <div class="ft-admin-detail-item">
+                    <span class="ft-admin-label">PAN</span>
+                    <span class="ft-admin-value">{{ t.panNumber || '-' }}</span>
+                  </div>
+                  <div class="ft-admin-detail-item">
+                    <span class="ft-admin-label">DOB</span>
+                    <span class="ft-admin-value">{{ t.dob || '-' }}</span>
+                  </div>
+                </div>
+
+                <!-- Dispatch Address -->
+                <div class="ft-admin-detail-section">
+                  <h5>📍 Dispatch Address</h5>
+                  <div class="ft-admin-detail-item">
+                    <span class="ft-admin-label">Address</span>
+                    <span class="ft-admin-value">{{ t.dispatchAddress || '-' }}</span>
+                  </div>
+                  <div class="ft-admin-detail-item">
+                    <span class="ft-admin-label">Pin Code</span>
+                    <span class="ft-admin-value">{{ t.pinCode || '-' }}</span>
+                  </div>
+                  <div class="ft-admin-detail-item">
+                    <span class="ft-admin-label">City</span>
+                    <span class="ft-admin-value">{{ t.city || '-' }}</span>
+                  </div>
+                  <div class="ft-admin-detail-item">
+                    <span class="ft-admin-label">State</span>
+                    <span class="ft-admin-value">{{ t.state || '-' }}</span>
+                  </div>
+                </div>
+
+                <!-- Payment Details -->
+                <div class="ft-admin-detail-section">
+                  <h5>💰 Payment Details</h5>
+                  <div class="ft-admin-detail-item">
+                    <span class="ft-admin-label">Debit Account</span>
+                    <span class="ft-admin-value">{{ t.debitAccountNumber || '-' }}</span>
+                  </div>
+                  <div class="ft-admin-detail-item">
+                    <span class="ft-admin-label">Tag Issuance Fee</span>
+                    <span class="ft-admin-value">₹{{ t.tagIssuanceFee || 0 | number:'1.2-2' }}</span>
+                  </div>
+                  <div class="ft-admin-detail-item">
+                    <span class="ft-admin-label">Security Deposit</span>
+                    <span class="ft-admin-value">₹{{ t.tagSecurityDeposit || 0 | number:'1.2-2' }}</span>
+                  </div>
+                  <div class="ft-admin-detail-item">
+                    <span class="ft-admin-label">Upload Amount</span>
+                    <span class="ft-admin-value">₹{{ t.tagUploadAmount || 0 | number:'1.2-2' }}</span>
+                  </div>
+                  <div class="ft-admin-detail-item ft-admin-total">
+                    <span class="ft-admin-label">Total Amount</span>
+                    <span class="ft-admin-value">₹{{ t.tagTotalAmount || 0 | number:'1.2-2' }}</span>
+                  </div>
+                  <div class="ft-admin-detail-item">
+                    <span class="ft-admin-label">Terms Accepted</span>
+                    <span class="ft-admin-value">{{ t.termsAccepted ? '✅ Yes' : '❌ No' }}</span>
+                  </div>
+                </div>
+
+                <!-- FASTag Info (if approved) -->
+                <div class="ft-admin-detail-section" *ngIf="t.status === 'Approved'">
+                  <h5>🏷️ FASTag Info</h5>
+                  <div class="ft-admin-detail-item">
+                    <span class="ft-admin-label">FASTag Number</span>
+                    <span class="ft-admin-value">{{ t.fasttagNumber || '-' }}</span>
+                  </div>
+                  <div class="ft-admin-detail-item">
+                    <span class="ft-admin-label">Barcode</span>
+                    <span class="ft-admin-value">{{ t.barcodeNumber || '-' }}</span>
+                  </div>
+                  <div class="ft-admin-detail-item">
+                    <span class="ft-admin-label">Balance</span>
+                    <span class="ft-admin-value">₹{{ t.balance || 0 | number:'1.2-2' }}</span>
+                  </div>
+                  <div class="ft-admin-detail-item">
+                    <span class="ft-admin-label">Issue Date</span>
+                    <span class="ft-admin-value">{{ t.issueDate || '-' }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="ft-admin-detail-actions" *ngIf="t.status === 'Applied'">
+                <button (click)="approve(t)" class="approve-btn">✅ Approve Application</button>
+                <button (click)="closeFasttag(t)" class="reject-btn">❌ Reject Application</button>
+              </div>
+            </div>
+          </td>
+        </tr>
+        </ng-container>
+      </tbody>
+    </table>
+  </div>
+
+    <div *ngIf="assigningTagId" class="assign-panel">
+    <h4>Assign account to FASTag</h4>
+    <select [(ngModel)]="selectedAccountId">
+      <option [ngValue]="null">-- Select account --</option>
+      <option *ngFor="let a of accountsList" [value]="a.id">{{a.accountNumber}} — {{a.name}} — ₹{{a.balance}}</option>
+    </select>
+    <button (click)="confirmAssign(assigningTagId)" class="approve-btn">Confirm Assign</button>
+    <button (click)="confirmRechargeWithAccount(assigningTagId, selectedAccountId!)" class="approve-btn">Recharge Using Selected Account</button>
+    <button (click)="cancelAssign()" class="reject-btn">Cancel</button>
+  </div>
+
+  <div *ngIf="selectedTag" class="recharge-panel">
+    <h3>Recharge FASTag: {{selectedTag.fasttagNumber}}</h3>
+    <input type="number" [(ngModel)]="rechargeAmount" placeholder="Amount" />
+    <button (click)="recharge()" class="approve-btn">Confirm Recharge</button>
+    <button (click)="selectedTag=null" class="reject-btn">Cancel</button>
+  </div>
+
+  <div *ngIf="showingTransactionsFor" class="transactions-panel">
+    <h4>Transactions</h4>
+    <div class="kyc-table">
+      <table>
+        <thead>
+          <tr><th>Date</th><th>Type</th><th>Amount</th><th>By</th><th>Prev</th><th>New</th><th>Account Debited</th></tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let tx of transactionsMap[showingTransactionsFor]">
+            <td>{{tx.createdAt | date:'short'}}</td>
+            <td>{{tx.type}}</td>
+            <td>{{tx.amount}}</td>
+            <td>{{tx.initiatedBy}} {{tx.initiatedById ? ('(' + tx.initiatedById + ')') : ''}}</td>
+            <td>{{tx.previousBalance}}</td>
+            <td>{{tx.newBalance}}</td>
+            <td>{{tx.accountDebited || '-'}}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>

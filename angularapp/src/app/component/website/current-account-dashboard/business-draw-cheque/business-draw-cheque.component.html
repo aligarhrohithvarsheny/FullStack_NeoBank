@@ -1,0 +1,421 @@
+<div class="draw-cheque-container">
+  <!-- Header -->
+  <div class="cheque-header">
+    <div class="header-content">
+      <h1 class="header-title">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+          <line x1="16" y1="13" x2="8" y2="13"/>
+          <line x1="16" y1="17" x2="8" y2="17"/>
+          <polyline points="10 9 9 9 8 9"/>
+        </svg>
+        Draw Business Cheque
+      </h1>
+      <p class="header-subtitle">Request a cheque withdrawal from your current/business account</p>
+    </div>
+  </div>
+
+  <!-- Tab Navigation -->
+  <div class="tab-navigation">
+    <button
+      class="tab-button"
+      [class.active]="activeTab === 'form'"
+      (click)="switchTab('form')">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/>
+        <line x1="12" y1="8" x2="12" y2="16"/>
+        <line x1="8" y1="12" x2="16" y2="12"/>
+      </svg>
+      New Cheque Request
+    </button>
+    <button
+      class="tab-button"
+      [class.active]="activeTab === 'history'"
+      (click)="switchTab('history')">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/>
+        <polyline points="12 6 12 12 16 14"/>
+      </svg>
+      Cheque History
+    </button>
+  </div>
+
+  <!-- Main Content -->
+  <div class="cheque-content">
+    <!-- FORM TAB -->
+    <div class="tab-content" [class.active]="activeTab === 'form'">
+      <!-- Account Info Card -->
+      <div class="card account-info-card">
+        <div class="card-content">
+          <div class="info-section">
+            <div class="info-item">
+              <span class="info-label">Account Number</span>
+              <span class="info-value">{{ account?.accountNumber || 'Loading...' }}</span>
+            </div>
+            <div class="info-divider"></div>
+            <div class="info-item">
+              <span class="info-label">Business Name</span>
+              <span class="info-value">{{ account?.businessName || '-' }}</span>
+            </div>
+            <div class="info-divider"></div>
+            <div class="info-item">
+              <span class="info-label">Available Balance</span>
+              <span class="info-value balance">
+                {{ formatAmount(availableBalance) }}
+              </span>
+            </div>
+            <div class="info-divider"></div>
+            <div class="info-item">
+              <span class="info-label">Cheque Leaves</span>
+              <span class="info-value cheque-leaves-info">
+                <span class="leaves-available">{{ availableLeaves.length }}</span> / {{ totalAllocated }} available
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Messages -->
+      <div class="message-area" *ngIf="successMessage || errorMessage">
+        <div class="message" [class.success]="!!successMessage" [class.error]="!!errorMessage">
+          <svg *ngIf="successMessage" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+            <polyline points="22 4 12 14.01 9 11.01"/>
+          </svg>
+          <svg *ngIf="errorMessage" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="12" y1="8" x2="12" y2="12"/>
+            <line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+          <span>{{ successMessage || errorMessage }}</span>
+        </div>
+      </div>
+
+      <!-- Cheque Draw Form -->
+      <div class="card form-card">
+        <div class="card-header">
+          <h2>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+            </svg>
+            Cheque Details
+          </h2>
+        </div>
+
+        <form class="cheque-form" (input)="onFormChange()" (change)="onFormChange()">
+          <div class="form-grid">
+            <!-- Serial Number Dropdown -->
+            <div class="form-group">
+              <label for="serialNumber" class="form-label">
+                Cheque Leaf Number <span class="required">*</span>
+              </label>
+              <select
+                id="serialNumber"
+                class="form-input"
+                [(ngModel)]="serialNumber"
+                name="serialNumber"
+                (ngModelChange)="onFormChange()"
+                [disabled]="isLoadingLeaves">
+                <option value="" disabled>{{ isLoadingLeaves ? 'Loading cheque leaves...' : 'Select a cheque leaf' }}</option>
+                <option *ngFor="let leaf of availableLeaves" [value]="leaf.leafNumber">
+                  {{ leaf.leafNumber }}
+                </option>
+              </select>
+              <small class="form-hint" *ngIf="!isLoadingLeaves">
+                {{ availableLeaves.length }} of {{ totalAllocated }} leaves available ({{ totalUsed }} used)
+              </small>
+              <small class="form-hint" *ngIf="isLoadingLeaves">Loading your cheque book...</small>
+              <small class="form-hint warning-hint" *ngIf="!isLoadingLeaves && availableLeaves.length === 0">
+                No cheque leaves available. Request a cheque book first.
+              </small>
+            </div>
+
+            <!-- Cheque Date -->
+            <div class="form-group">
+              <label for="chequeDate" class="form-label">
+                Cheque Date <span class="required">*</span>
+              </label>
+              <input
+                type="date"
+                id="chequeDate"
+                class="form-input"
+                [(ngModel)]="chequeDate"
+                name="chequeDate"
+                [max]="getMaxDate()"
+                (ngModelChange)="onFormChange()" />
+              <small class="form-hint">Date to be written on cheque (max 6 months old)</small>
+            </div>
+
+            <!-- Amount -->
+            <div class="form-group">
+              <label for="amount" class="form-label">
+                Amount <span class="required">*</span>
+              </label>
+              <div class="input-wrapper">
+                <span class="currency-symbol">&#8377;</span>
+                <input
+                  type="number"
+                  id="amount"
+                  class="form-input with-prefix"
+                  [(ngModel)]="amount"
+                  name="amount"
+                  placeholder="0.00"
+                  min="1"
+                  [max]="availableBalance"
+                  step="1"
+                  (ngModelChange)="onFormChange()" />
+              </div>
+              <small class="form-hint" *ngIf="amount && amount > 0">
+                Balance after: <strong>{{ formatAmount(availableBalance - amount) }}</strong>
+              </small>
+              <small class="form-hint">Max: &#8377;50,00,000 per cheque</small>
+            </div>
+
+            <!-- Payee Name -->
+            <div class="form-group">
+              <label for="payeeName" class="form-label">
+                Payee Name <span class="required">*</span>
+              </label>
+              <input
+                type="text"
+                id="payeeName"
+                class="form-input"
+                [(ngModel)]="payeeName"
+                name="payeeName"
+                placeholder="Name on cheque"
+                maxlength="100"
+                (ngModelChange)="onFormChange()" />
+              <small class="form-hint">Who should the cheque be payable to?</small>
+            </div>
+
+            <!-- Remarks (Full Width) -->
+            <div class="form-group full-width">
+              <label for="remarks" class="form-label">
+                Remarks (Optional)
+              </label>
+              <textarea
+                id="remarks"
+                class="form-input textarea"
+                [(ngModel)]="remarks"
+                name="remarks"
+                placeholder="Any additional notes or remarks..."
+                maxlength="500"
+                rows="3"></textarea>
+              <small class="form-hint">{{ remarks.length }} / 500 characters</small>
+            </div>
+          </div>
+
+          <!-- Form Actions -->
+          <div class="form-actions">
+            <button
+              type="button"
+              class="btn btn-primary"
+              [disabled]="!formValid || isSubmitting"
+              (click)="submitChequeRequest()">
+              <span *ngIf="!isSubmitting">Submit Request</span>
+              <span *ngIf="isSubmitting">Submitting...</span>
+            </button>
+            <button
+              type="button"
+              class="btn btn-secondary"
+              (click)="resetForm()">
+              Reset
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Help Section -->
+      <div class="card help-card">
+        <div class="card-header">
+          <h3>How to Use</h3>
+        </div>
+        <div class="help-content">
+          <ol>
+            <li>Select a <strong>cheque leaf number</strong> from your allocated cheque leaves</li>
+            <li>Set the <strong>date</strong> to be printed on the cheque</li>
+            <li>Enter the <strong>withdrawal amount</strong> (max &#8377;50,00,000 per cheque)</li>
+            <li>Enter the <strong>payee name</strong> exactly as it should appear on cheque</li>
+            <li>Click <strong>Submit Request</strong> to send for admin approval</li>
+            <li>Once approved, you can <strong>download</strong> the printable business cheque</li>
+            <li>Cancelled cheques return the leaf back to available pool</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+
+    <!-- HISTORY TAB -->
+    <div class="tab-content" [class.active]="activeTab === 'history'">
+      <!-- Filter Controls -->
+      <div class="card filter-card">
+        <div class="filter-controls">
+          <label class="filter-label">Filter by Status:</label>
+          <select class="filter-select" [(ngModel)]="historyFilter">
+            <option value="ALL">All Cheques</option>
+            <option value="PENDING">Pending</option>
+            <option value="APPROVED">Approved</option>
+            <option value="COMPLETED">Completed</option>
+            <option value="REJECTED">Rejected</option>
+            <option value="CANCELLED">Cancelled</option>
+            <option value="CLEARED">Cleared</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Loading State -->
+      <div class="loading-state" *ngIf="isLoadingHistory">
+        <div class="spinner"></div>
+        <p>Loading cheque history...</p>
+      </div>
+
+      <!-- Cheque History Table -->
+      <div class="card history-card" *ngIf="!isLoadingHistory && getFilteredHistory().length > 0">
+        <div class="card-header">
+          <h3>Your Business Cheques <span class="badge">{{ getFilteredHistory().length }}</span></h3>
+        </div>
+
+        <div class="table-responsive">
+          <table class="history-table">
+            <thead>
+              <tr>
+                <th>Cheque #</th>
+                <th>Date</th>
+                <th>Payee</th>
+                <th>Amount</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <ng-container *ngFor="let cheque of getFilteredHistory()">
+                <tr class="history-row">
+                  <td class="cheque-number"><strong>{{ cheque.chequeNumber }}</strong></td>
+                  <td>{{ formatDate(cheque.chequeDate) }}</td>
+                  <td class="payee-name">
+                    <ng-container *ngIf="editingChequeId !== cheque.id">{{ cheque.payeeName }}</ng-container>
+                    <input
+                      *ngIf="editingChequeId === cheque.id"
+                      type="text"
+                      class="edit-inline-input"
+                      [(ngModel)]="editPayeeName"
+                      placeholder="Payee Name"
+                      maxlength="100"
+                    />
+                  </td>
+                  <td class="amount">
+                    <ng-container *ngIf="editingChequeId !== cheque.id">
+                      <strong>{{ formatAmount(cheque.amount) }}</strong>
+                    </ng-container>
+                    <div *ngIf="editingChequeId === cheque.id" class="edit-amount-wrapper">
+                      <span class="edit-currency">&#8377;</span>
+                      <input
+                        type="number"
+                        class="edit-inline-input edit-amount-input"
+                        [(ngModel)]="editAmount"
+                        min="1"
+                        [max]="availableBalance"
+                        step="1"
+                        placeholder="Amount"
+                      />
+                    </div>
+                  </td>
+                  <td>
+                    <span class="status-badge" [style.backgroundColor]="getStatusColor(cheque.status)">
+                      {{ getStatusText(cheque.status) }}
+                    </span>
+                  </td>
+                  <td class="actions">
+                    <ng-container *ngIf="cheque.status === 'PENDING' && editingChequeId !== cheque.id">
+                      <button
+                        class="btn-icon btn-edit"
+                        title="Edit Cheque Details"
+                        (click)="startEditCheque(cheque)">
+                        Edit
+                      </button>
+                      <button
+                        class="btn-icon btn-cancel"
+                        title="Cancel Request"
+                        (click)="cancelCheque(cheque.id)">
+                        Cancel
+                      </button>
+                    </ng-container>
+                    <ng-container *ngIf="cheque.status === 'PENDING' && editingChequeId === cheque.id">
+                      <button
+                        class="btn-icon btn-save"
+                        title="Save Changes"
+                        [disabled]="isEditing"
+                        (click)="saveEditCheque()">
+                        {{ isEditing ? 'Saving...' : 'Save' }}
+                      </button>
+                      <button
+                        class="btn-icon btn-cancel-edit"
+                        title="Cancel Edit"
+                        [disabled]="isEditing"
+                        (click)="cancelEditCheque()">
+                        Cancel
+                      </button>
+                    </ng-container>
+                    <button
+                      *ngIf="(cheque.status === 'APPROVED' || cheque.status === 'COMPLETED' || cheque.status === 'CLEARED') && !cheque.chequeDownloaded"
+                      class="btn-icon btn-download"
+                      title="Download Cheque"
+                      (click)="downloadCheque(cheque)">
+                      Download
+                    </button>
+                    <span
+                      *ngIf="(cheque.status === 'APPROVED' || cheque.status === 'COMPLETED' || cheque.status === 'CLEARED') && cheque.chequeDownloaded"
+                      class="downloaded-badge">
+                      Downloaded
+                    </span>
+                    <span *ngIf="cheque.status === 'REJECTED' || cheque.status === 'CANCELLED'" class="action-empty">-</span>
+                  </td>
+                </tr>
+                <!-- Transaction Details Row -->
+                <tr *ngIf="cheque.transactionReference" class="transaction-details-row">
+                  <td colspan="6">
+                    <div class="txn-details-container">
+                      <div class="txn-badge">Fund Transfer</div>
+                      <div class="txn-details-grid">
+                        <div class="txn-detail-item">
+                          <span class="txn-label">Transaction Ref</span>
+                          <span class="txn-value txn-ref-code">{{ cheque.transactionReference }}</span>
+                        </div>
+                        <div class="txn-detail-item" *ngIf="cheque.debitedFromAccount">
+                          <span class="txn-label">Debited From</span>
+                          <span class="txn-value">{{ cheque.debitedFromAccount }}</span>
+                        </div>
+                        <div class="txn-detail-item" *ngIf="cheque.creditedToAccount">
+                          <span class="txn-label">Credited To</span>
+                          <span class="txn-value">{{ cheque.creditedToAccount }}</span>
+                        </div>
+                        <div class="txn-detail-item" *ngIf="cheque.payeeAccountType">
+                          <span class="txn-label">Account Type</span>
+                          <span class="txn-value">{{ cheque.payeeAccountType }}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              </ng-container>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Empty State -->
+      <div class="empty-state" *ngIf="!isLoadingHistory && getFilteredHistory().length === 0">
+        <div class="empty-icon">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="1.5">
+            <polyline points="21 8 21 21 3 21 3 8"/>
+            <rect x="1" y="3" width="22" height="5" rx="1"/>
+          </svg>
+        </div>
+        <h3>No Cheque Requests</h3>
+        <p>You haven't requested any business cheques yet.</p>
+        <button class="btn btn-primary" (click)="switchTab('form')">Request a Cheque</button>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,185 @@
+<div class="merchant-login-page">
+  <!-- Background decoration -->
+  <div class="bg-decoration">
+    <div class="bg-circle c1"></div>
+    <div class="bg-circle c2"></div>
+    <div class="bg-circle c3"></div>
+  </div>
+
+  <div class="login-container">
+    <!-- Back button -->
+    <button class="back-btn" (click)="goToLanding()">
+      ← Back to Home
+    </button>
+
+    <div class="login-card">
+      <!-- Header -->
+      <div class="card-header">
+        <div class="merchant-icon">
+          <svg viewBox="0 0 48 48" fill="none">
+            <rect x="6" y="8" width="36" height="32" rx="4" fill="#10B981" opacity="0.15"/>
+            <rect x="6" y="8" width="36" height="32" rx="4" stroke="#10B981" stroke-width="2"/>
+            <path d="M6 16h36" stroke="#10B981" stroke-width="2"/>
+            <rect x="14" y="22" width="8" height="6" rx="1" fill="#10B981" opacity="0.3"/>
+            <rect x="26" y="22" width="8" height="6" rx="1" fill="#10B981" opacity="0.3"/>
+            <rect x="14" y="32" width="20" height="3" rx="1" fill="#10B981" opacity="0.2"/>
+            <circle cx="24" cy="12" r="2" fill="#10B981"/>
+          </svg>
+        </div>
+        <h2 class="card-title">Merchant Soundbox Login</h2>
+        <p class="card-subtitle">Login with your Current Account number &amp; registered email OTP</p>
+      </div>
+
+      <!-- Success message -->
+      <div class="alert alert-success" *ngIf="successMessage">
+        <span class="alert-icon">✓</span>
+        {{ successMessage }}
+      </div>
+
+      <!-- Error message -->
+      <div class="alert alert-error" *ngIf="errorMessage">
+        <span class="alert-icon">!</span>
+        {{ errorMessage }}
+      </div>
+
+      <!-- Step 1: Enter Account Number -->
+      <div class="form-step" *ngIf="!otpSent">
+        <div class="input-group">
+          <label for="email">Registered Email Address</label>
+          <div class="input-wrapper">
+            <span class="input-icon">
+              <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18">
+                <path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4z"/>
+                <path fill-rule="evenodd" d="M18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13a1 1 0 011-1h1a1 1 0 110 2H5a1 1 0 01-1-1zm5-1a1 1 0 100 2h1a1 1 0 100-2H9z" clip-rule="evenodd"/>
+              </svg>
+            </span>
+            <input
+              type="text"
+              id="email"
+              [(ngModel)]="email"
+              placeholder="Enter merchant onboarding email"
+              class="form-input"
+              [class.invalid]="email && !isValidEmail()"
+              (keydown.enter)="sendOtp()"
+              autocomplete="off"
+            />
+          </div>
+          <small class="input-hint" *ngIf="email && !isValidEmail()">
+            Please enter valid email address
+          </small>
+        </div>
+
+        <button
+          class="btn-primary"
+          (click)="sendOtp()"
+          [disabled]="loading || !email || !isValidEmail()"
+        >
+          <span class="btn-loader" *ngIf="loading"></span>
+          <span *ngIf="!loading">Send OTP</span>
+          <span *ngIf="loading">Verifying account...</span>
+        </button>
+
+        <div class="info-note">
+          <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14">
+            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
+          </svg>
+          <span>OTP will be sent to your merchant onboarding email</span>
+        </div>
+      </div>
+
+      <!-- Step 2: Enter OTP -->
+      <div class="form-step" *ngIf="otpSent">
+        <div class="otp-sent-info">
+          <div class="sent-business" *ngIf="businessName">
+            <span class="business-label">Business:</span>
+            <span class="business-name">{{ businessName }}</span>
+          </div>
+          <span class="sent-to-label">OTP sent to</span>
+          <span class="sent-to-email">{{ maskedEmail }}</span>
+          <button class="change-btn" (click)="resetForm()">Change Email</button>
+        </div>
+
+        <div class="input-group">
+          <label for="otp">Enter OTP</label>
+          <div class="input-wrapper">
+            <span class="input-icon">
+              <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18">
+                <path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"/>
+              </svg>
+            </span>
+            <input
+              type="text"
+              id="otp"
+              [(ngModel)]="otp"
+              placeholder="Enter 6-digit OTP"
+              class="form-input otp-input"
+              maxlength="6"
+              pattern="[0-9]*"
+              (keydown.enter)="verifyOtp()"
+              autocomplete="one-time-code"
+            />
+          </div>
+        </div>
+
+        <button
+          class="btn-primary"
+          (click)="verifyOtp()"
+          [disabled]="verifying || !otp || otp.length !== 6"
+        >
+          <span class="btn-loader" *ngIf="verifying"></span>
+          <span *ngIf="!verifying">Verify & Login</span>
+          <span *ngIf="verifying">Verifying...</span>
+        </button>
+
+        <div class="resend-section">
+          <span *ngIf="!canResend" class="resend-timer">
+            Resend OTP in {{ resendTimer }}s
+          </span>
+          <button
+            *ngIf="canResend"
+            class="resend-btn"
+            (click)="resendOtp()"
+            [disabled]="loading"
+          >
+            Resend OTP
+          </button>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div class="card-footer">
+        <div class="security-note">
+          <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14">
+            <path fill-rule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5C17.944 5.328 18 5.671 18 6.02V10c0 4.418-3.582 8-8 8s-8-3.582-8-8V6.02c0-.35.056-.692.166-1.021z" clip-rule="evenodd"/>
+          </svg>
+          <span>Secured with 256-bit encryption</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Features strip -->
+    <div class="features-strip">
+      <div class="feature-item">
+        <div class="feature-icon">🔊</div>
+        <div class="feature-text">
+          <strong>Voice Alerts</strong>
+          <span>Instant payment notifications</span>
+        </div>
+      </div>
+      <div class="feature-item">
+        <div class="feature-icon">📱</div>
+        <div class="feature-text">
+          <strong>QR Payments</strong>
+          <span>Accept UPI & QR payments</span>
+        </div>
+      </div>
+      <div class="feature-item">
+        <div class="feature-icon">📊</div>
+        <div class="feature-text">
+          <strong>Transaction History</strong>
+          <span>Track all your payments</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

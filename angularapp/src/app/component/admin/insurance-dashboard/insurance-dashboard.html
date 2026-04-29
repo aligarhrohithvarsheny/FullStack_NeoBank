@@ -1,0 +1,522 @@
+<div class="ins-dash">
+  <!-- ─── HERO HEADER ─── -->
+  <div class="ins-header">
+    <div class="ins-header-left">
+      <h1 class="ins-title">Insurance Management</h1>
+      <p class="ins-subtitle">Manage policies, applications, claims &amp; customer assignments</p>
+    </div>
+    <div class="ins-header-right">
+      <button class="ins-btn ins-btn-accent" (click)="toggleCreatePolicy()">
+        <span class="ins-btn-icon">＋</span>
+        {{ showCreatePolicy ? 'Close Form' : 'Create Policy' }}
+      </button>
+      <button class="ins-btn ins-btn-outline" (click)="loadAll()">
+        <span class="ins-btn-icon">↻</span> Refresh
+      </button>
+    </div>
+  </div>
+
+  <!-- ─── KPI STAT CARDS ─── -->
+  <div class="ins-kpi-row" *ngIf="stats">
+    <div class="ins-kpi-card ins-kpi-blue">
+      <div class="ins-kpi-icon">📋</div>
+      <div class="ins-kpi-body">
+        <span class="ins-kpi-label">Total Policies</span>
+        <span class="ins-kpi-value">{{ stats.totalPolicies || 0 }}</span>
+      </div>
+    </div>
+    <div class="ins-kpi-card ins-kpi-indigo">
+      <div class="ins-kpi-icon">📄</div>
+      <div class="ins-kpi-body">
+        <span class="ins-kpi-label">Total Applications</span>
+        <span class="ins-kpi-value">{{ stats.totalApplications || 0 }}</span>
+      </div>
+    </div>
+    <div class="ins-kpi-card ins-kpi-amber">
+      <div class="ins-kpi-icon">⏳</div>
+      <div class="ins-kpi-body">
+        <span class="ins-kpi-label">Pending Applications</span>
+        <span class="ins-kpi-value">{{ stats.pendingApplications || 0 }}</span>
+      </div>
+    </div>
+    <div class="ins-kpi-card ins-kpi-orange">
+      <div class="ins-kpi-icon">📝</div>
+      <div class="ins-kpi-body">
+        <span class="ins-kpi-label">Pending Claims</span>
+        <span class="ins-kpi-value">{{ stats.pendingClaims || 0 }}</span>
+      </div>
+    </div>
+    <div class="ins-kpi-card ins-kpi-green">
+      <div class="ins-kpi-icon">💰</div>
+      <div class="ins-kpi-body">
+        <span class="ins-kpi-label">Premium Collected</span>
+        <span class="ins-kpi-value">₹{{ stats.totalPremiumCollected || 0 | number:'1.0-0' }}</span>
+      </div>
+    </div>
+    <div class="ins-kpi-card ins-kpi-red" *ngIf="stats.highRiskClaims !== undefined">
+      <div class="ins-kpi-icon">⚠️</div>
+      <div class="ins-kpi-body">
+        <span class="ins-kpi-label">High-Risk Claims</span>
+        <span class="ins-kpi-value">{{ stats.highRiskClaims }}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── PROGRESS OVERVIEW ─── -->
+  <div class="ins-progress-panel" *ngIf="stats">
+    <h2 class="ins-section-title">Overview</h2>
+    <div class="ins-progress-grid">
+      <div class="ins-progress-item">
+        <div class="ins-progress-header">
+          <span>Applications</span>
+          <span class="ins-progress-num">{{ stats.totalApplications || 0 }}</span>
+        </div>
+        <div class="ins-progress-track"><div class="ins-progress-fill ins-fill-blue" [style.width.%]="100"></div></div>
+      </div>
+      <div class="ins-progress-item">
+        <div class="ins-progress-header">
+          <span>Pending Applications</span>
+          <span class="ins-progress-num">{{ stats.pendingApplications || 0 }}</span>
+        </div>
+        <div class="ins-progress-track">
+          <div class="ins-progress-fill ins-fill-amber"
+               [style.width.%]="(stats.totalApplications || 0) ? (stats.pendingApplications || 0) / (stats.totalApplications || 1) * 100 : 0">
+          </div>
+        </div>
+      </div>
+      <div class="ins-progress-item">
+        <div class="ins-progress-header">
+          <span>Pending Claims</span>
+          <span class="ins-progress-num">{{ stats.pendingClaims || 0 }}</span>
+        </div>
+        <div class="ins-progress-track">
+          <div class="ins-progress-fill ins-fill-red"
+               [style.width.%]="(stats.pendingClaims || 0) > 0 ? 80 : 10">
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── CREATE POLICY MODAL ─── -->
+  <div class="ins-modal-overlay" *ngIf="showCreatePolicy" (click)="toggleCreatePolicy()">
+    <div class="ins-modal" (click)="$event.stopPropagation()">
+      <div class="ins-modal-header">
+        <h2>Create Insurance Policy</h2>
+        <button class="ins-modal-close" (click)="toggleCreatePolicy()">✕</button>
+      </div>
+      <div class="ins-modal-body">
+        <div class="ins-form-grid">
+          <div class="ins-field">
+            <label class="ins-label">Policy Name</label>
+            <input class="ins-input" type="text" [(ngModel)]="newPolicy.name" placeholder="e.g. Gold Health Shield">
+          </div>
+          <div class="ins-field">
+            <label class="ins-label">Type</label>
+            <select class="ins-input" [(ngModel)]="newPolicy.type">
+              <option>Health</option>
+              <option>Life</option>
+              <option>Vehicle</option>
+              <option>Gold Protection</option>
+            </select>
+          </div>
+          <div class="ins-field">
+            <label class="ins-label">Coverage Amount (₹)</label>
+            <input class="ins-input" type="number" [(ngModel)]="newPolicy.coverageAmount">
+          </div>
+          <div class="ins-field">
+            <label class="ins-label">Premium Amount (₹)</label>
+            <input class="ins-input" type="number" [(ngModel)]="newPolicy.premiumAmount">
+          </div>
+          <div class="ins-field">
+            <label class="ins-label">Premium Type</label>
+            <select class="ins-input" [(ngModel)]="newPolicy.premiumType">
+              <option value="MONTHLY">Monthly</option>
+              <option value="YEARLY">Yearly</option>
+            </select>
+          </div>
+          <div class="ins-field">
+            <label class="ins-label">Duration (months)</label>
+            <input class="ins-input" type="number" [(ngModel)]="newPolicy.durationMonths">
+          </div>
+          <div class="ins-field ins-field-full">
+            <label class="ins-label">Description</label>
+            <textarea class="ins-input ins-textarea" [(ngModel)]="newPolicy.description" rows="2" placeholder="Policy description..."></textarea>
+          </div>
+          <div class="ins-field ins-field-full">
+            <label class="ins-label">Benefits</label>
+            <textarea class="ins-input ins-textarea" [(ngModel)]="newPolicy.benefits" rows="2" placeholder="Comma-separated benefits..."></textarea>
+          </div>
+          <div class="ins-field ins-field-full">
+            <label class="ins-label">Eligibility</label>
+            <input class="ins-input" type="text" [(ngModel)]="newPolicy.eligibility" placeholder="Age 18-65, etc.">
+          </div>
+        </div>
+      </div>
+      <div class="ins-modal-footer">
+        <button class="ins-btn ins-btn-ghost" (click)="toggleCreatePolicy()">Cancel</button>
+        <button class="ins-btn ins-btn-accent" (click)="createPolicy()" [disabled]="creatingPolicy">
+          {{ creatingPolicy ? 'Creating...' : 'Create Policy' }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── TAB NAVIGATION ─── -->
+  <div class="ins-tabs">
+    <button class="ins-tab" [class.active]="activeTab === 'policies'" (click)="activeTab = 'policies'">
+      <span class="ins-tab-icon">📋</span> Policies
+      <span class="ins-tab-badge" *ngIf="policies.length">{{ policies.length }}</span>
+    </button>
+    <button class="ins-tab" [class.active]="activeTab === 'applications'" (click)="activeTab = 'applications'">
+      <span class="ins-tab-icon">📄</span> Applications
+      <span class="ins-tab-badge ins-badge-warn" *ngIf="pendingApplications.length">{{ pendingApplications.length }}</span>
+    </button>
+    <button class="ins-tab" [class.active]="activeTab === 'claims'" (click)="activeTab = 'claims'">
+      <span class="ins-tab-icon">🛡️</span> Claims
+      <span class="ins-tab-badge ins-badge-danger" *ngIf="pendingClaims.length">{{ pendingClaims.length }}</span>
+    </button>
+    <button class="ins-tab" [class.active]="activeTab === 'customers'" (click)="activeTab = 'customers'">
+      <span class="ins-tab-icon">👥</span> Customers
+      <span class="ins-tab-badge" *ngIf="customers.length">{{ customers.length }}</span>
+    </button>
+  </div>
+
+  <!-- ═══════════ TAB: POLICIES ═══════════ -->
+  <div class="ins-tab-content" *ngIf="activeTab === 'policies'">
+    <div class="ins-panel">
+      <div class="ins-panel-header">
+        <h2 class="ins-panel-title">All Insurance Policies</h2>
+        <div class="ins-search-bar">
+          <input class="ins-search-input" type="text" [(ngModel)]="policySearchQuery" placeholder="Search policies by name, type, number...">
+        </div>
+      </div>
+      <div *ngIf="filteredPolicies.length === 0" class="ins-empty">
+        <div class="ins-empty-icon">📋</div>
+        <p>No policies found</p>
+      </div>
+      <div class="ins-table-wrap" *ngIf="filteredPolicies.length > 0">
+        <table class="ins-table">
+          <thead>
+            <tr>
+              <th class="ins-th-index">#</th>
+              <th>Policy Number</th>
+              <th>Policy Name</th>
+              <th>Type</th>
+              <th>Coverage</th>
+              <th>Premium</th>
+              <th>Duration</th>
+              <th>Status</th>
+              <th>Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let p of filteredPolicies; let i = index" class="ins-table-row">
+              <td class="ins-td-index">{{ i + 1 }}</td>
+              <td>
+                <span class="ins-mono">{{ p.policyNumber }}</span>
+              </td>
+              <td>
+                <span class="ins-text-bold">{{ p.name }}</span>
+              </td>
+              <td>
+                <span class="ins-type-badge"
+                      [class.health]="p.type === 'Health'"
+                      [class.life]="p.type === 'Life'"
+                      [class.vehicle]="p.type === 'Vehicle'"
+                      [class.gold]="p.type === 'Gold Protection'">
+                  {{ p.type }}
+                </span>
+              </td>
+              <td class="ins-td-amount">₹{{ p.coverageAmount | number:'1.0-0' }}</td>
+              <td>
+                <span class="ins-text-bold">₹{{ p.premiumAmount | number:'1.0-0' }}</span>
+                <span class="ins-text-muted"> / {{ p.premiumType }}</span>
+              </td>
+              <td>{{ p.durationMonths }} months</td>
+              <td>
+                <span class="ins-status-badge"
+                      [class.active]="p.status === 'ACTIVE'"
+                      [class.inactive]="p.status === 'INACTIVE'">
+                  {{ p.status }}
+                </span>
+              </td>
+              <td class="ins-td-desc">{{ p.description || '—' }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════ TAB: APPLICATIONS ═══════════ -->
+  <div class="ins-tab-content" *ngIf="activeTab === 'applications'">
+    <div class="ins-panel">
+      <div class="ins-panel-header">
+        <h2 class="ins-panel-title">Pending Applications</h2>
+        <span class="ins-count-badge">{{ pendingApplications.length }} pending</span>
+      </div>
+      <div *ngIf="pendingApplications.length === 0" class="ins-empty">
+        <div class="ins-empty-icon">✅</div>
+        <p>All applications have been processed</p>
+      </div>
+      <div class="ins-table-wrap" *ngIf="pendingApplications.length > 0">
+        <table class="ins-table ins-table-applications">
+          <thead>
+            <tr>
+              <th class="ins-th-index">#</th>
+              <th>Application #</th>
+              <th>Policy</th>
+              <th>Account</th>
+              <th>Nominee</th>
+              <th>Age</th>
+              <th>Premium</th>
+              <th>Coverage</th>
+              <th>Health</th>
+              <th>Lifestyle</th>
+              <th>EMIs</th>
+              <th>Fraud Score</th>
+              <th>Payment</th>
+              <th>Auto Debit</th>
+              <th>KYC</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let app of pendingApplications; let i = index" class="ins-table-row">
+              <td class="ins-td-index">{{ i + 1 }}</td>
+              <td><span class="ins-mono">{{ app.applicationNumber }}</span></td>
+              <td><span class="ins-text-bold">{{ app.policy?.name }}</span></td>
+              <td><span class="ins-mono">{{ app.accountNumber }}</span></td>
+              <td>{{ app.nomineeName }}</td>
+              <td class="ins-td-center">{{ app.proposerAge || '—' }}</td>
+              <td>
+                <span class="ins-text-bold">₹{{ app.policy?.premiumAmount | number:'1.0-0' }}</span>
+                <span class="ins-text-muted"> / {{ app.premiumType }}</span>
+              </td>
+              <td class="ins-td-amount">₹{{ app.policy?.coverageAmount | number:'1.0-0' }}</td>
+              <td>
+                <span class="ins-health-tag" *ngIf="app.healthConditions">{{ app.healthConditions }}</span>
+                <span class="ins-text-muted" *ngIf="!app.healthConditions">None</span>
+              </td>
+              <td>
+                <span class="ins-text-muted">{{ app.lifestyleHabits || 'None' }}</span>
+              </td>
+              <td class="ins-td-center">
+                <span class="ins-dot" [class.dot-red]="app.hasExistingEmis" [class.dot-green]="!app.hasExistingEmis"></span>
+                {{ app.hasExistingEmis ? 'Yes' : 'No' }}
+              </td>
+              <td class="ins-td-center">
+                <span class="ins-fraud-score"
+                      [class.low]="(app.fraudScore || 0) < 30"
+                      [class.medium]="(app.fraudScore || 0) >= 30 && (app.fraudScore || 0) < 70"
+                      [class.high]="(app.fraudScore || 0) >= 70">
+                  {{ app.fraudScore ?? '—' }}
+                </span>
+              </td>
+              <td>
+                <span class="ins-status-badge"
+                      [class.active]="app.paymentStatus === 'PAID'"
+                      [class.pending]="app.paymentStatus !== 'PAID'">
+                  {{ app.paymentStatus || 'NOT PAID' }}
+                </span>
+              </td>
+              <td>
+                <div class="ins-auto-debit-cell">
+                  <span class="ins-status-badge active" *ngIf="app.autoDebitApproved">Approved</span>
+                  <span class="ins-status-badge pending" *ngIf="!app.autoDebitApproved && app.autoDebitRequested">Requested</span>
+                  <span class="ins-text-muted" *ngIf="!app.autoDebitApproved && !app.autoDebitRequested">Off</span>
+                  <button class="ins-btn ins-btn-xs ins-btn-outline"
+                          *ngIf="app.autoDebitRequested && !app.autoDebitApproved"
+                          (click)="approveAutoDebit(app)"
+                          [disabled]="processingApplicationId === app.id">
+                    Approve
+                  </button>
+                </div>
+              </td>
+              <td>
+                <button class="ins-btn ins-btn-xs ins-btn-ghost" (click)="goToKyc(app)">View</button>
+              </td>
+              <td>
+                <div class="ins-actions">
+                  <button class="ins-btn ins-btn-xs ins-btn-success"
+                          (click)="approveApplication(app)"
+                          [disabled]="processingApplicationId === app.id">
+                    ✓ Approve
+                  </button>
+                  <button class="ins-btn ins-btn-xs ins-btn-danger"
+                          (click)="rejectApplication(app)"
+                          [disabled]="processingApplicationId === app.id">
+                    ✕ Reject
+                  </button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════ TAB: CLAIMS ═══════════ -->
+  <div class="ins-tab-content" *ngIf="activeTab === 'claims'">
+    <div class="ins-panel">
+      <div class="ins-panel-header">
+        <h2 class="ins-panel-title">Claims Management</h2>
+        <div class="ins-search-bar">
+          <input class="ins-search-input" type="text"
+                 [(ngModel)]="claimSearchPolicyNumber"
+                 placeholder="Search by policy number..."
+                 (keyup.enter)="searchClaimsByPolicyNumber()">
+          <button class="ins-btn ins-btn-accent ins-btn-sm" (click)="searchClaimsByPolicyNumber()" [disabled]="searchingClaims">
+            {{ searchingClaims ? 'Searching...' : 'Search' }}
+          </button>
+        </div>
+      </div>
+
+      <!-- Search results -->
+      <div *ngIf="searchedClaims.length > 0" class="ins-search-results">
+        <h3 class="ins-sub-title">Search Results</h3>
+        <div class="ins-table-wrap">
+          <table class="ins-table">
+            <thead>
+              <tr>
+                <th class="ins-th-index">#</th>
+                <th>Claim #</th>
+                <th>Policy</th>
+                <th>Account</th>
+                <th>Amount</th>
+                <th>Status</th>
+                <th>Documents</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let c of searchedClaims; let i = index" class="ins-table-row">
+                <td class="ins-td-index">{{ i + 1 }}</td>
+                <td><span class="ins-mono">{{ c.claimNumber }}</span></td>
+                <td><span class="ins-mono">{{ c.application?.policy?.policyNumber }}</span></td>
+                <td><span class="ins-mono">{{ c.accountNumber }}</span></td>
+                <td class="ins-td-amount">₹{{ c.claimAmount | number:'1.0-0' }}</td>
+                <td>
+                  <span class="ins-status-badge"
+                        [class.active]="c.status === 'APPROVED' || c.status === 'PAID'"
+                        [class.pending]="c.status === 'PENDING'"
+                        [class.rejected]="c.status === 'REJECTED'">
+                    {{ c.status }}
+                  </span>
+                </td>
+                <td>{{ c.documentsPath || '—' }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Pending claims -->
+      <h3 class="ins-sub-title" style="margin-top: 1.5rem;">Pending Claims
+        <span class="ins-count-badge">{{ pendingClaims.length }}</span>
+      </h3>
+      <div *ngIf="pendingClaims.length === 0" class="ins-empty">
+        <div class="ins-empty-icon">🛡️</div>
+        <p>No pending claims</p>
+      </div>
+      <div class="ins-table-wrap" *ngIf="pendingClaims.length > 0">
+        <table class="ins-table">
+          <thead>
+            <tr>
+              <th class="ins-th-index">#</th>
+              <th>Claim #</th>
+              <th>Policy</th>
+              <th>Account</th>
+              <th>Claim Amount</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let claim of pendingClaims; let i = index" class="ins-table-row">
+              <td class="ins-td-index">{{ i + 1 }}</td>
+              <td><span class="ins-mono">{{ claim.claimNumber }}</span></td>
+              <td><span class="ins-text-bold">{{ claim.application?.policy?.name }}</span></td>
+              <td><span class="ins-mono">{{ claim.accountNumber }}</span></td>
+              <td class="ins-td-amount">₹{{ claim.claimAmount | number:'1.0-0' }}</td>
+              <td>
+                <span class="ins-status-badge pending">{{ claim.status }}</span>
+              </td>
+              <td>
+                <div class="ins-actions">
+                  <button class="ins-btn ins-btn-xs ins-btn-success"
+                          (click)="approveClaim(claim)"
+                          [disabled]="processingClaimId === claim.id">
+                    ✓ Approve
+                  </button>
+                  <button class="ins-btn ins-btn-xs ins-btn-accent"
+                          (click)="payoutClaim(claim)"
+                          [disabled]="processingClaimId === claim.id">
+                    💳 Payout
+                  </button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════ TAB: CUSTOMERS ═══════════ -->
+  <div class="ins-tab-content" *ngIf="activeTab === 'customers'">
+    <div class="ins-panel">
+      <div class="ins-panel-header">
+        <h2 class="ins-panel-title">Assign Policy to Customer</h2>
+      </div>
+      <div class="ins-assign-row">
+        <div class="ins-field">
+          <label class="ins-label">Search Customer</label>
+          <input class="ins-input" type="text" [(ngModel)]="customerSearch" placeholder="Name, email, or account #...">
+        </div>
+        <div class="ins-field">
+          <label class="ins-label">Select Policy</label>
+          <select class="ins-input" [(ngModel)]="selectedPolicyIdForAssign">
+            <option [ngValue]="null">— Select a policy —</option>
+            <option *ngFor="let p of policies" [ngValue]="p.id">
+              {{ p.name }} ({{ p.policyNumber }})
+            </option>
+          </select>
+        </div>
+        <div class="ins-field">
+          <label class="ins-label">Premium Type</label>
+          <select class="ins-input" [(ngModel)]="selectedPremiumTypeForAssign">
+            <option value="MONTHLY">Monthly</option>
+            <option value="YEARLY">Yearly</option>
+          </select>
+        </div>
+        <div class="ins-field ins-field-btn">
+          <button class="ins-btn ins-btn-accent" (click)="assignPolicyToSelectedCustomer()" [disabled]="assigningPolicy">
+            {{ assigningPolicy ? 'Assigning...' : 'Assign Policy' }}
+          </button>
+        </div>
+      </div>
+
+      <div *ngIf="filteredCustomers.length === 0" class="ins-empty">
+        <div class="ins-empty-icon">👥</div>
+        <p>No customers found</p>
+      </div>
+      <div class="ins-customer-grid" *ngIf="filteredCustomers.length > 0">
+        <div class="ins-customer-card"
+             *ngFor="let c of filteredCustomers"
+             [class.selected]="selectedCustomer?.accountNumber === c.accountNumber"
+             (click)="selectCustomer(c)">
+          <div class="ins-customer-avatar">{{ (c.account?.name || c.username || '?').charAt(0).toUpperCase() }}</div>
+          <div class="ins-customer-info">
+            <span class="ins-customer-name">{{ c.account?.name || c.username }}</span>
+            <span class="ins-customer-email">{{ c.email }}</span>
+            <span class="ins-customer-acct">Acct: {{ c.accountNumber }}</span>
+          </div>
+          <div class="ins-customer-check" *ngIf="selectedCustomer?.accountNumber === c.accountNumber">✓</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+

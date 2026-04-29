@@ -1,0 +1,1848 @@
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+   NeoBank Private Bank â€” J.P. Morgan Style Login Page
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+
+.jpm-login-page {
+  display: flex;
+  min-height: 100vh;
+  font-family: 'Georgia', 'Times New Roman', Times, serif;
+  background: #ffffff;
+}
+
+/* â”€â”€â”€ Left Section: Form Area â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+.jpm-left-section {
+  flex: 0 0 55%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 60px 80px 30px 80px;
+  background: #ffffff;
+  min-height: 100vh;
+  box-sizing: border-box;
+}
+
+.jpm-form-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  max-width: 480px;
+}
+
+/* â”€â”€â”€ Brand / Logo â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+.jpm-brand {
+  margin-bottom: 50px;
+}
+
+.jpm-logo-text {
+  font-family: 'Georgia', 'Times New Roman', Times, serif;
+  font-size: 36px;
+  font-weight: 700;
+  color: #1a1a1a;
+  letter-spacing: 1px;
+  margin: 0 0 4px 0;
+}
+
+.jpm-sub-brand {
+  display: block;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  color: #1a1a1a;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+}
+
+/* â”€â”€â”€ Form Section â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+.jpm-form-section {
+  margin-bottom: 30px;
+}
+
+.jpm-account-hint {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 13px;
+  color: #666;
+  margin-bottom: 24px;
+  line-height: 1.5;
+}
+
+.jpm-section-title {
+  font-family: 'Georgia', 'Times New Roman', Times, serif;
+  font-size: 22px;
+  color: #1a1a1a;
+  font-weight: 600;
+  margin: 0 0 8px 0;
+}
+
+.jpm-hint {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 13px;
+  color: #666;
+  margin-bottom: 20px;
+}
+
+/* â”€â”€â”€ Form Fields â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+.jpm-field {
+  margin-bottom: 24px;
+}
+
+.jpm-label {
+  display: block;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+  margin-bottom: 8px;
+}
+
+.jpm-input {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid #c4c4c4;
+  border-radius: 4px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 15px;
+  color: #333;
+  background: #fff;
+  box-sizing: border-box;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.jpm-input:focus {
+  outline: none;
+  border-color: #333;
+  box-shadow: 0 0 0 1px #333;
+}
+
+.jpm-input::placeholder {
+  color: #aaa;
+}
+
+/* â”€â”€â”€ Password Field with Show/Hide â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+.jpm-password-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.jpm-password-input {
+  padding-right: 60px;
+}
+
+.jpm-show-btn {
+  position: absolute;
+  right: 14px;
+  background: none;
+  border: none;
+  color: #0060a9;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.2s;
+}
+
+.jpm-show-btn:hover {
+  color: #004080;
+}
+
+/* â”€â”€â”€ Remember Username â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+.jpm-remember {
+  margin-bottom: 24px;
+}
+
+.jpm-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 13px;
+  color: #333;
+  cursor: pointer;
+}
+
+.jpm-checkbox-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: #333;
+  cursor: pointer;
+}
+
+/* â”€â”€â”€ Sign In Button â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+.jpm-signin-btn {
+  display: inline-block;
+  padding: 14px 36px;
+  background: #3d3d3d;
+  color: #ffffff;
+  border: none;
+  border-radius: 28px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.1s ease;
+  margin-top: 8px;
+}
+
+.jpm-signin-btn:hover:not(:disabled) {
+  background: #2a2a2a;
+  transform: translateY(-1px);
+}
+
+.jpm-signin-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.jpm-signin-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* â”€â”€â”€ Messages â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+.jpm-message-section {
+  margin: 16px 0;
+}
+
+.jpm-error {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 13px;
+  color: #c41230;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  padding: 10px 14px;
+  border-radius: 4px;
+  margin-bottom: 8px;
+  line-height: 1.4;
+}
+
+.jpm-success {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 13px;
+  color: #065f46;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  padding: 10px 14px;
+  border-radius: 4px;
+  margin-bottom: 8px;
+  line-height: 1.4;
+}
+
+/* â”€â”€â”€ Links â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+.jpm-more-options {
+  margin-top: 24px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 13px;
+}
+
+.jpm-advanced-options {
+  margin-top: 12px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 12px;
+}
+
+.jpm-link {
+  color: #0060a9;
+  text-decoration: none;
+  font-weight: 500;
+  transition: color 0.2s;
+}
+
+.jpm-link:hover {
+  color: #004080;
+  text-decoration: underline;
+}
+
+.jpm-link-small {
+  color: #0060a9;
+  text-decoration: none;
+  font-weight: 400;
+  font-size: 12px;
+  transition: color 0.2s;
+}
+
+.jpm-link-small:hover {
+  color: #004080;
+  text-decoration: underline;
+}
+
+.jpm-separator {
+  color: #ccc;
+  margin: 0 10px;
+}
+
+.jpm-unlock-link {
+  margin-top: 12px;
+}
+
+.jpm-unlock-link a {
+  color: #c41230;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.jpm-unlock-link a:hover {
+  text-decoration: underline;
+}
+
+/* â”€â”€â”€ Fingerprint â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+.jpm-fingerprint {
+  margin-top: 16px;
+}
+
+.jpm-fingerprint-btn {
+  background: none;
+  border: 1px solid #c4c4c4;
+  color: #333;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 10px 20px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.jpm-fingerprint-btn:hover:not(:disabled) {
+  border-color: #333;
+  background: #f5f5f5;
+}
+
+.jpm-fingerprint-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* â”€â”€â”€ QR Code â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+.jpm-qr-section {
+  margin-top: 20px;
+  text-align: center;
+  padding: 20px;
+  background: #fafafa;
+  border: 1px solid #e5e5e5;
+  border-radius: 8px;
+}
+
+.jpm-qr-section h4 {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 14px;
+  color: #333;
+  margin-bottom: 12px;
+}
+
+.jpm-qr-image {
+  max-width: 200px;
+  margin: 12px auto;
+  display: block;
+}
+
+.jpm-qr-status {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 12px;
+  color: #666;
+  margin-top: 8px;
+}
+
+.jpm-qr-mode-banner {
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  padding: 10px 16px;
+  border-radius: 4px;
+  margin-top: 16px;
+}
+
+.jpm-qr-mode-banner p {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 13px;
+  color: #92400e;
+  margin: 0;
+}
+
+/* â”€â”€â”€ OTP â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+.jpm-otp-form {
+  margin-top: 16px;
+}
+
+.jpm-otp-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.jpm-cancel-btn {
+  padding: 12px 24px;
+  background: #fff;
+  border: 1px solid #c4c4c4;
+  border-radius: 4px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 14px;
+  color: #666;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.jpm-cancel-btn:hover:not(:disabled) {
+  border-color: #333;
+  background: #f5f5f5;
+}
+
+.jpm-cancel-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.jpm-resend {
+  margin-top: 16px;
+  text-align: center;
+}
+
+.jpm-resend .disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+/* â”€â”€â”€ Verified Card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+.jpm-verified-card {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 6px;
+  padding: 14px 18px;
+  margin-bottom: 20px;
+}
+
+.jpm-verified-card p {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 13px;
+  color: #333;
+  margin: 4px 0;
+}
+
+/* â”€â”€â”€ Footer (like JPM) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+.jpm-footer {
+  padding: 24px 0 0 0;
+  border-top: 1px solid #e5e5e5;
+  text-align: center;
+}
+
+.jpm-footer-links {
+  margin-bottom: 10px;
+}
+
+.jpm-footer-link {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 12px;
+  color: #0060a9;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.jpm-footer-link:hover {
+  color: #004080;
+  text-decoration: underline;
+}
+
+.jpm-footer-sep {
+  color: #ccc;
+  margin: 0 12px;
+  font-size: 12px;
+}
+
+.jpm-footer-security {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 12px;
+  color: #333;
+  font-weight: 500;
+  margin: 8px 0 6px;
+}
+
+.jpm-footer-copy {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 11px;
+  color: #999;
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* â”€â”€â”€ Right Section: Decorative Image â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+.jpm-right-section {
+  flex: 0 0 45%;
+  position: relative;
+  background: linear-gradient(135deg, #d4c5a9 0%, #b8a88a 30%, #8b7b6b 60%, #6b5b4b 100%);
+  background-image: url('data:image/svg+xml,\
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 1200">\
+      <defs>\
+        <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">\
+          <stop offset="0%25" stop-color="%23d4c5a9"/>\
+          <stop offset="50%25" stop-color="%23b0a08a"/>\
+          <stop offset="100%25" stop-color="%238b7b6b"/>\
+        </linearGradient>\
+        <linearGradient id="col" x1="0" y1="0" x2="0" y2="1">\
+          <stop offset="0%25" stop-color="%23e8dcc8"/>\
+          <stop offset="50%25" stop-color="%23d4c5a9"/>\
+          <stop offset="100%25" stop-color="%23c0b090"/>\
+        </linearGradient>\
+        <linearGradient id="shadow" x1="0" y1="0" x2="1" y2="0">\
+          <stop offset="0%25" stop-color="%23000" stop-opacity="0.15"/>\
+          <stop offset="100%25" stop-color="%23000" stop-opacity="0"/>\
+        </linearGradient>\
+        <linearGradient id="light" x1="1" y1="0" x2="0" y2="0">\
+          <stop offset="0%25" stop-color="%23fff" stop-opacity="0.3"/>\
+          <stop offset="100%25" stop-color="%23fff" stop-opacity="0"/>\
+        </linearGradient>\
+      </defs>\
+      <rect width="800" height="1200" fill="url(%23bg)"/>\
+      <rect x="80" y="0" width="100" height="1200" fill="url(%23col)" rx="8"/>\
+      <rect x="80" y="0" width="15" height="1200" fill="url(%23shadow)"/>\
+      <rect x="165" y="0" width="15" height="1200" fill="url(%23light)"/>\
+      <rect x="250" y="0" width="110" height="1200" fill="url(%23col)" rx="8"/>\
+      <rect x="250" y="0" width="15" height="1200" fill="url(%23shadow)"/>\
+      <rect x="345" y="0" width="15" height="1200" fill="url(%23light)"/>\
+      <rect x="440" y="0" width="100" height="1200" fill="url(%23col)" rx="8"/>\
+      <rect x="440" y="0" width="15" height="1200" fill="url(%23shadow)"/>\
+      <rect x="525" y="0" width="15" height="1200" fill="url(%23light)"/>\
+      <rect x="620" y="0" width="110" height="1200" fill="url(%23col)" rx="8"/>\
+      <rect x="620" y="0" width="15" height="1200" fill="url(%23shadow)"/>\
+      <rect x="715" y="0" width="15" height="1200" fill="url(%23light)"/>\
+      <rect x="380" y="0" width="80" height="1200" fill="%23fff" opacity="0.08"/>\
+      <rect x="0" y="1100" width="800" height="100" fill="url(%23col)" opacity="0.5"/>\
+    </svg>');
+  background-size: cover;
+  background-position: center;
+  overflow: hidden;
+}
+
+.jpm-image-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.05) 100%);
+}
+
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+   Responsive Styles
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+
+@media (max-width: 1024px) {
+  .jpm-left-section {
+    flex: 0 0 60%;
+    padding: 40px 50px 20px;
+  }
+  .jpm-right-section {
+    flex: 0 0 40%;
+  }
+}
+
+@media (max-width: 768px) {
+  .jpm-login-page {
+    flex-direction: column;
+  }
+  .jpm-left-section {
+    flex: none;
+    padding: 30px 24px 20px;
+    min-height: auto;
+  }
+  .jpm-right-section {
+    flex: none;
+    height: 200px;
+    order: -1;
+  }
+  .jpm-form-wrapper {
+    max-width: 100%;
+  }
+  .jpm-brand {
+    margin-bottom: 30px;
+  }
+  .jpm-logo-text {
+    font-size: 28px;
+  }
+}
+
+@media (max-width: 480px) {
+  .jpm-left-section {
+    padding: 20px 16px 16px;
+  }
+  .jpm-logo-text {
+    font-size: 24px;
+  }
+  .jpm-sub-brand {
+    font-size: 9px;
+  }
+  .jpm-signin-btn {
+    width: 100%;
+    text-align: center;
+  }
+  .jpm-footer-links {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 4px;
+  }
+  .jpm-footer-sep {
+    margin: 0 6px;
+  }
+}
+
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+   Existing Modal / OTP / Reset Styles (Preserved)
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+
+/* Modal Styles */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(4px);
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+.unlock-modal {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+  max-width: 500px;
+  width: 90%;
+  max-height: 90vh;
+  overflow-y: auto;
+  animation: modalSlideIn 0.3s ease-out;
+}
+
+@keyframes modalSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 25px;
+  border-bottom: 1px solid #e5e7eb;
+  background: linear-gradient(135deg, #f9fafb, #f3f4f6);
+}
+
+.modal-header h3 {
+  color: #374151;
+  font-size: 20px;
+  font-weight: 700;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 24px;
+  color: #6b7280;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.close-btn:hover {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.modal-body {
+  padding: 25px;
+}
+
+.unlock-instructions {
+  color: #4b5563;
+  font-size: 14px;
+  line-height: 1.6;
+  margin-bottom: 20px;
+}
+
+.unlock-form .input-group {
+  margin-bottom: 20px;
+}
+
+.unlock-form label {
+  display: block;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 6px;
+  font-size: 14px;
+}
+
+.unlock-form input {
+  width: 100%;
+  padding: 12px 16px;
+  border: 2px solid #e5e7eb;
+  border-radius: 6px;
+  font-size: 14px;
+  transition: border-color 0.2s ease;
+  box-sizing: border-box;
+}
+
+.unlock-form input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.unlock-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 25px;
+}
+
+.cancel-btn {
+  background: #f9fafb;
+  color: #6b7280;
+  border: 1px solid #d1d5db;
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.cancel-btn:hover {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+  color: #374151;
+}
+
+.unlock-submit-btn {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.unlock-submit-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #059669, #047857);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+.unlock-submit-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.unlock-footer {
+  margin-top: 20px;
+  padding-top: 15px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.security-note {
+  color: #6b7280;
+  font-size: 12px;
+  text-align: center;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.loading-icon, .unlock-icon, .error-icon, .success-icon, .security-icon {
+  font-size: 16px;
+}
+
+/* Forgot Password Modal Styles */
+.forgot-password-link {
+  margin-top: 8px;
+  text-align: right;
+  padding: 4px 0;
+}
+
+.forgot-link {
+  color: #3b82f6;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  padding: 4px 8px;
+  border-radius: 4px;
+  display: inline-block;
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+.forgot-link:hover {
+  color: #ffffff;
+  background: #3b82f6;
+  border-color: #3b82f6;
+  text-decoration: none;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+}
+
+.forgot-link:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 4px rgba(59, 130, 246, 0.3);
+}
+
+.forgot-password-modal {
+  max-width: 500px;
+  width: 100%;
+  max-height: 90vh;
+  background: white;
+  border-radius: 15px;
+  border: 2px solid #0077cc;
+  box-shadow: 0 8px 25px rgba(0, 119, 204, 0.15);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.forgot-password-modal .modal-header {
+  background: linear-gradient(135deg, #0077cc, #0056b3);
+  color: white;
+  padding: 20px 24px;
+  border-radius: 13px 13px 0 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.forgot-password-modal .modal-header h3 {
+  color: white;
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.forgot-password-modal .close-btn {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  font-size: 24px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease;
+}
+
+.forgot-password-modal .close-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.forgot-password-modal .modal-body {
+  padding: 25px;
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* Success Screen Styles */
+.success-screen {
+  text-align: center;
+  padding: 25px 0;
+}
+
+.success-icon-container {
+  margin-bottom: 20px;
+}
+
+.success-icon {
+  font-size: 64px;
+  animation: successPulse 1s ease-in-out;
+}
+
+@keyframes successPulse {
+  0% { transform: scale(0.8); opacity: 0.5; }
+  50% { transform: scale(1.1); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.success-title {
+  color: #059669;
+  font-size: 24px;
+  font-weight: 700;
+  margin: 0 0 16px 0;
+}
+
+.success-message {
+  color: #6b7280;
+  font-size: 16px;
+  line-height: 1.6;
+  margin: 0 0 32px 0;
+  max-width: 400px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.success-actions {
+  display: flex;
+  justify-content: center;
+}
+
+.success-btn {
+  padding: 14px 32px;
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+}
+
+.success-btn:hover {
+  background: linear-gradient(135deg, #047857 0%, #065f46 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(5, 150, 105, 0.4);
+}
+
+.login-icon {
+  font-size: 18px;
+}
+
+/* Error Message Styles */
+.error-message {
+  background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+  border: 2px solid #dc3545;
+  color: #333;
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin: 16px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  box-shadow: 0 4px 15px rgba(220, 53, 69, 0.1);
+}
+
+.error-icon {
+  font-size: 16px;
+}
+
+.instruction-text {
+  color: #6b7280;
+  font-size: 14px;
+  margin-bottom: 24px;
+  text-align: center;
+  line-height: 1.5;
+}
+
+.reset-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.form-row {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.reset-form .input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.reset-form .input-group label {
+  font-weight: 600;
+  color: #333;
+  font-size: 0.95rem;
+}
+
+.reset-form .input-group input {
+  padding: 12px 15px;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 1rem;
+  transition: all 0.3s ease;
+  background: white;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.reset-form .input-group input:focus {
+  outline: none;
+  border-color: #0077cc;
+  box-shadow: 0 0 0 3px rgba(0, 119, 204, 0.1);
+  transform: translateY(-1px);
+}
+
+.reset-form .input-group input:invalid {
+  border-color: #dc3545;
+  box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.1);
+}
+
+.reset-form .input-group input:valid {
+  border-color: #28a745;
+}
+
+.reset-form .input-help {
+  margin-top: 6px;
+}
+
+.reset-form .help-text {
+  font-size: 0.85rem;
+  color: #666;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 15px;
+  justify-content: flex-end;
+  margin-top: 25px;
+  align-items: center;
+}
+
+.cancel-btn {
+  padding: 12px 25px;
+  border: 2px solid #6c757d;
+  background: white;
+  color: #6c757d;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 1rem;
+  min-width: 100px;
+}
+
+.cancel-btn:hover {
+  border-color: #5a6268;
+  background: #f8f9fa;
+  color: #333;
+  transform: translateY(-1px);
+}
+
+.reset-submit-btn {
+  padding: 12px 25px;
+  background: linear-gradient(135deg, #0077cc, #0056b3);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1rem;
+  min-width: 140px;
+  justify-content: center;
+}
+
+.reset-submit-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #0056b3, #004085);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(0, 119, 204, 0.3);
+}
+
+.reset-submit-btn:active:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 119, 204, 0.3);
+}
+
+.reset-submit-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.reset-icon {
+  font-size: 16px;
+}
+
+.reset-footer {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid #e5e7eb;
+}
+
+/* Responsive forgot password modal */
+@media (max-width: 768px) {
+  .modal-overlay {
+    padding: 15px;
+  }
+  
+  .forgot-password-modal {
+    max-width: 100%;
+    width: 100%;
+    max-height: 95vh;
+  }
+  
+  .forgot-password-modal .modal-header {
+    padding: 18px 20px;
+  }
+  
+  .forgot-password-modal .modal-body {
+    padding: 20px;
+  }
+  
+  .modal-actions {
+    flex-direction: column;
+    gap: 15px;
+  }
+  
+  .cancel-btn, .reset-submit-btn {
+    width: 100%;
+  }
+}
+
+@media (max-width: 640px) {
+  .modal-overlay {
+    padding: 10px;
+  }
+  
+  .forgot-password-modal {
+    max-height: 98vh;
+  }
+  
+  .forgot-password-modal .modal-header {
+    padding: 16px 18px;
+  }
+  
+  .forgot-password-modal .modal-body {
+    padding: 18px;
+  }
+  
+  .forgot-link {
+    font-size: 13px;
+    padding: 6px 12px;
+  }
+  
+  .success-title {
+    font-size: 20px;
+  }
+  
+  .success-message {
+    font-size: 14px;
+    margin-bottom: 24px;
+  }
+  
+  .success-btn {
+    width: 100%;
+    padding: 16px 24px;
+  }
+  
+  .success-icon {
+    font-size: 48px;
+  }
+}
+
+/* Responsive modal */
+@media (max-width: 640px) {
+  .unlock-modal {
+    margin: 20px;
+    width: calc(100% - 40px);
+  }
+  
+  .modal-header, .modal-body {
+    padding: 20px;
+  }
+  
+  .unlock-actions {
+    flex-direction: column;
+  }
+  
+  .cancel-btn, .unlock-submit-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+/* Additional responsive breakpoint for very small screens */
+@media (max-width: 480px) {
+  .modal-overlay {
+    padding: 5px;
+  }
+  
+  .forgot-password-modal {
+    max-height: 99vh;
+    border-radius: 12px;
+  }
+  
+  .forgot-password-modal .modal-header {
+    padding: 15px 16px;
+  }
+  
+  .forgot-password-modal .modal-header h3 {
+    font-size: 18px;
+  }
+  
+  .forgot-password-modal .modal-body {
+    padding: 16px;
+  }
+  
+  .reset-form {
+    gap: 16px;
+  }
+  
+  .form-row {
+    gap: 10px;
+  }
+  
+  .reset-form .input-group {
+    gap: 8px;
+  }
+  
+  .reset-form .input-group input {
+    padding: 10px 12px;
+    font-size: 0.95rem;
+  }
+  
+  .reset-form .input-group label {
+    font-size: 0.9rem;
+  }
+  
+  .modal-actions {
+    margin-top: 20px;
+    gap: 12px;
+  }
+  
+  .cancel-btn, .reset-submit-btn {
+    padding: 10px 20px;
+    font-size: 0.95rem;
+  }
+}
+
+/* OTP Verification Section Styles */
+.otp-verification-section {
+  animation: fadeIn 0.3s ease-in;
+  padding: 20px 0;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.otp-header {
+  text-align: center;
+  margin-bottom: 25px;
+}
+
+.otp-header h3 {
+  color: #1e3a8a;
+  font-size: 24px;
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+
+.otp-instruction {
+  color: #64748b;
+  font-size: 14px;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.otp-form {
+  margin-top: 20px;
+}
+
+.otp-input {
+  text-align: center;
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: 8px;
+  padding: 15px;
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  background: #f8fafc;
+  transition: all 0.3s ease;
+}
+
+.otp-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.otp-help-text {
+  text-align: center;
+  margin-top: 8px;
+}
+
+.otp-help-text span {
+  color: #64748b;
+  font-size: 12px;
+  font-style: italic;
+}
+
+.otp-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 25px;
+}
+
+.cancel-otp-btn {
+  flex: 1;
+  padding: 14px;
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #64748b;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.cancel-otp-btn:hover:not(:disabled) {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  color: #475569;
+}
+
+.cancel-otp-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.verify-otp-btn {
+  flex: 2;
+  padding: 14px;
+  border: none;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+  color: white;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.verify-otp-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(30, 58, 138, 0.3);
+}
+
+.verify-otp-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.resend-otp-section {
+  text-align: center;
+  margin-top: 25px;
+  padding-top: 20px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.resend-text {
+  color: #64748b;
+  font-size: 14px;
+  margin-bottom: 10px;
+}
+
+.resend-otp-btn {
+  background: transparent;
+  border: none;
+  color: #3b82f6;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 8px 16px;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.resend-otp-btn:hover:not(:disabled) {
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.resend-otp-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.loading-icon {
+  display: inline-block;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Responsive styles for OTP section */
+@media (max-width: 768px) {
+  .otp-header h3 {
+    font-size: 20px;
+  }
+  
+  .otp-input {
+    font-size: 20px;
+    letter-spacing: 6px;
+    padding: 12px;
+  }
+  
+  .otp-actions {
+    flex-direction: column;
+  }
+  
+  .cancel-otp-btn,
+  .verify-otp-btn {
+    width: 100%;
+  }
+}
+
+/* Verification Method Selection Styles */
+.verification-method-selection {
+  margin-bottom: 24px;
+  padding: 16px;
+  background: #f8fafc;
+  border: 2px solid #e2e8f0;
+  border-radius: 8px;
+}
+
+.method-label {
+  display: block;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 12px;
+  font-size: 14px;
+}
+
+.method-options {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.method-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 10px 16px;
+  border: 2px solid #e2e8f0;
+  border-radius: 8px;
+  background: white;
+  transition: all 0.3s ease;
+  flex: 1;
+  min-width: 140px;
+}
+
+.method-option:hover {
+  border-color: #0077cc;
+  background: #f0f7ff;
+}
+
+.method-option input[type="radio"] {
+  margin: 0;
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: #0077cc;
+}
+
+.method-option input[type="radio"]:checked + .method-text {
+  color: #0077cc;
+  font-weight: 600;
+}
+
+.method-option:has(input[type="radio"]:checked) {
+  border-color: #0077cc;
+  background: #f0f7ff;
+}
+
+.method-text {
+  font-size: 14px;
+  font-weight: 500;
+  color: #374151;
+  transition: all 0.3s ease;
+}
+
+/* Email OTP Section Styles */
+.email-otp-section {
+  animation: fadeIn 0.3s ease-in;
+}
+
+.send-otp-btn {
+  width: 100%;
+  padding: 12px 20px;
+  background: linear-gradient(135deg, #0077cc, #0056b3);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.send-otp-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #0056b3, #004085);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 119, 204, 0.3);
+}
+
+.send-otp-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.otp-input {
+  text-align: center;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: 4px;
+  padding: 12px;
+  border: 2px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+  transition: all 0.3s ease;
+  font-family: 'Courier New', monospace;
+}
+
+.otp-input:focus {
+  outline: none;
+  border-color: #0077cc;
+  background: white;
+  box-shadow: 0 0 0 3px rgba(0, 119, 204, 0.1);
+}
+
+.resend-otp-link {
+  background: none;
+  border: none;
+  color: #0077cc;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  margin-left: 8px;
+  text-decoration: underline;
+}
+
+.resend-otp-link:hover:not(:disabled) {
+  color: #0056b3;
+  background: #f0f7ff;
+}
+
+.resend-otp-link:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Aadhar Verification Section Styles */
+.aadhar-verification-section {
+  animation: fadeIn 0.3s ease-in;
+}
+
+/* Success Message in Reset Form */
+.reset-form .success-message {
+  background: linear-gradient(135deg, #d1fae5, #a7f3d0);
+  border: 2px solid #10b981;
+  color: #065f46;
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin: 16px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  box-shadow: 0 4px 15px rgba(16, 185, 129, 0.1);
+}
+
+.reset-form .success-icon {
+  font-size: 18px;
+  color: #10b981;
+}
+
+/* Responsive styles for verification method selection */
+@media (max-width: 640px) {
+  .verification-method-selection {
+    padding: 12px;
+  }
+
+  .method-options {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .method-option {
+    width: 100%;
+    min-width: auto;
+  }
+
+  .otp-input {
+    font-size: 18px;
+    letter-spacing: 3px;
+    padding: 10px;
+  }
+
+  .send-otp-btn {
+    padding: 10px 16px;
+    font-size: 13px;
+  }
+}
+
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• SALARY TAB & AUTH STYLES â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+
+.tab-button.salary-tab {
+  color: #7c3aed;
+}
+.tab-button.salary-tab.active {
+  color: #7c3aed;
+  border-bottom-color: #7c3aed;
+  background: white;
+}
+.tab-button.salary-tab:hover:not(.active) {
+  color: #6d28d9;
+  background: #f5f3ff;
+}
+
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• CURRENT ACCOUNT TAB STYLES â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+
+.tab-button.current-tab {
+  color: #0891b2;
+}
+.tab-button.current-tab.active {
+  color: #0891b2;
+  border-bottom-color: #0891b2;
+  background: white;
+}
+.tab-button.current-tab:hover:not(.active) {
+  color: #0e7490;
+  background: #ecfeff;
+}
+
+.salary-auth-header {
+  text-align: center;
+  margin-bottom: 24px;
+}
+.salary-auth-header .salary-auth-icon {
+  font-size: 40px;
+  margin-bottom: 8px;
+}
+.salary-auth-header h3 {
+  margin: 0 0 6px;
+  font-size: 20px;
+  font-weight: 700;
+  color: #1e293b;
+}
+.salary-auth-header p {
+  margin: 0;
+  font-size: 14px;
+  color: #64748b;
+}
+
+.salary-login-btn {
+  background: linear-gradient(135deg, #7c3aed, #6d28d9) !important;
+}
+.salary-login-btn:hover {
+  background: linear-gradient(135deg, #6d28d9, #5b21b6) !important;
+}
+
+.input-hint {
+  font-size: 12px;
+  color: #94a3b8;
+  margin-top: 4px;
+}
+
+.salary-verified-card {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin-bottom: 20px;
+}
+.salary-verified-card .verified-badge {
+  font-size: 15px;
+  font-weight: 700;
+  color: #16a34a;
+  margin-bottom: 8px;
+}
+.salary-verified-card p {
+  margin: 4px 0;
+  font-size: 14px;
+  color: #334155;
+}
+
+.team-info-box {
+  background: #ede9fe;
+  border-left: 4px solid #7c3aed;
+  padding: 12px 14px;
+  border-radius: 0 8px 8px 0;
+  margin-bottom: 18px;
+  font-size: 13px;
+  color: #5b21b6;
+  line-height: 1.5;
+}
+
+.team-info-box p {
+  margin: 0;
+}
+
+.switch-back-link {
+  margin-top: 8px;
+}
+
+.salary-verify-section,
+.salary-setpass-section {
+  animation: fadeIn .3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ═══ Signup Step Indicators ═══ */
+.jpm-signup-steps {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 28px;
+  gap: 0;
+}
+
+.jpm-step-indicator {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  opacity: 0.4;
+  transition: opacity 0.3s ease;
+}
+
+.jpm-step-indicator.active {
+  opacity: 1;
+}
+
+.jpm-step-indicator.completed .jpm-step-num {
+  background: #16a34a;
+  color: #fff;
+}
+
+.jpm-step-num {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #e2e8f0;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.jpm-step-indicator.active .jpm-step-num {
+  background: #0077cc;
+  color: #fff;
+}
+
+.jpm-step-text {
+  font-size: 11px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.jpm-step-indicator.active .jpm-step-text {
+  color: #0077cc;
+  font-weight: 600;
+}
+
+.jpm-step-line {
+  width: 48px;
+  height: 2px;
+  background: #e2e8f0;
+  margin: 0 8px;
+  margin-bottom: 20px;
+  transition: background 0.3s ease;
+}
+
+.jpm-step-line.active {
+  background: #0077cc;
+}
+
+.jpm-verified-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  color: #16a34a;
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 20px;
+}
+
+.jpm-verified-badge i {
+  font-size: 18px;
+}
+
+.jpm-link.disabled {
+  pointer-events: none;
+  opacity: 0.5;
+}

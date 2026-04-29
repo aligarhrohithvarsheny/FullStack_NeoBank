@@ -1,0 +1,244 @@
+<div class="add-merchant-page">
+  <div class="form-container">
+    <button class="back-btn" (click)="goBack()">← Back to Dashboard</button>
+
+    <div class="form-card">
+      <div class="form-header">
+        <h1>{{ editMode ? 'Edit Merchant' : 'Add New Merchant' }}</h1>
+        <p>{{ editMode ? 'Update merchant details' : 'Fill in the details to onboard a new merchant' }}</p>
+      </div>
+
+      <!-- Step Indicator -->
+      <div class="step-indicator">
+        <div class="step" [class.active]="currentStep >= 1" [class.complete]="currentStep > 1" (click)="goToStep(1)">
+          <div class="step-circle">1</div>
+          <span>Business Info</span>
+        </div>
+        <div class="step-line" [class.active]="currentStep > 1"></div>
+        <div class="step" [class.active]="currentStep >= 2" [class.complete]="currentStep > 2" (click)="goToStep(2)">
+          <div class="step-circle">2</div>
+          <span>Bank Details</span>
+        </div>
+        <div class="step-line" [class.active]="currentStep > 2"></div>
+        <div class="step" [class.active]="currentStep >= 3" [class.complete]="currentStep > 3" (click)="goToStep(3)">
+          <div class="step-circle">3</div>
+          <span>Devices</span>
+        </div>
+        <div class="step-line" [class.active]="currentStep > 3"></div>
+        <div class="step" [class.active]="currentStep >= 4" (click)="goToStep(4)">
+          <div class="step-circle">4</div>
+          <span>Documents</span>
+        </div>
+      </div>
+
+      <!-- Step 1: Business Info -->
+      <div class="step-content" *ngIf="currentStep === 1">
+        <h2>📋 Business Information</h2>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Business Name *</label>
+            <input type="text" [(ngModel)]="businessName" placeholder="Enter business name">
+            <small class="error" *ngIf="errors['businessName']">{{ errors['businessName'] }}</small>
+          </div>
+          <div class="form-group">
+            <label>Owner Name *</label>
+            <input type="text" [(ngModel)]="ownerName" placeholder="Enter owner name">
+            <small class="error" *ngIf="errors['ownerName']">{{ errors['ownerName'] }}</small>
+          </div>
+          <div class="form-group">
+            <label>Mobile Number *</label>
+            <input type="tel" [(ngModel)]="mobile" placeholder="9876543210" maxlength="10">
+            <small class="error" *ngIf="errors['mobile']">{{ errors['mobile'] }}</small>
+          </div>
+          <div class="form-group">
+            <label>Email</label>
+            <input type="email" [(ngModel)]="email" placeholder="owner@example.com">
+            <small class="error" *ngIf="errors['email']">{{ errors['email'] }}</small>
+          </div>
+          <div class="form-group">
+            <label>Business Type *</label>
+            <select [(ngModel)]="businessType">
+              <option value="" disabled>Select business type</option>
+              <option *ngFor="let type of businessTypes" [value]="type">{{ type }}</option>
+            </select>
+            <small class="error" *ngIf="errors['businessType']">{{ errors['businessType'] }}</small>
+          </div>
+          <div class="form-group">
+            <label>GST Number (Optional)</label>
+            <input type="text" [(ngModel)]="gstNumber" placeholder="22AAAAA0000A1Z5">
+          </div>
+          <div class="form-group full-width">
+            <label>Shop Address *</label>
+            <textarea [(ngModel)]="shopAddress" placeholder="Enter complete shop address" rows="2"></textarea>
+            <small class="error" *ngIf="errors['shopAddress']">{{ errors['shopAddress'] }}</small>
+          </div>
+          <div class="form-group">
+            <label>City *</label>
+            <input type="text" [(ngModel)]="city" placeholder="Enter city">
+            <small class="error" *ngIf="errors['city']">{{ errors['city'] }}</small>
+          </div>
+          <div class="form-group">
+            <label>State *</label>
+            <select [(ngModel)]="state">
+              <option value="" disabled>Select state</option>
+              <option *ngFor="let s of states" [value]="s">{{ s }}</option>
+            </select>
+            <small class="error" *ngIf="errors['state']">{{ errors['state'] }}</small>
+          </div>
+          <div class="form-group">
+            <label>Pincode *</label>
+            <input type="text" [(ngModel)]="pincode" placeholder="400001" maxlength="6">
+            <small class="error" *ngIf="errors['pincode']">{{ errors['pincode'] }}</small>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 2: Bank Details -->
+      <div class="step-content" *ngIf="currentStep === 2">
+        <h2>🏦 Bank Account Details</h2>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Bank Name *</label>
+            <select [(ngModel)]="bankName">
+              <option value="" disabled>Select bank</option>
+              <option *ngFor="let b of bankNames" [value]="b">{{ b }}</option>
+            </select>
+            <small class="error" *ngIf="errors['bankName']">{{ errors['bankName'] }}</small>
+          </div>
+          <div class="form-group">
+            <label>Account Holder Name *</label>
+            <input type="text" [(ngModel)]="accountHolderName" placeholder="Enter account holder name">
+            <small class="error" *ngIf="errors['accountHolderName']">{{ errors['accountHolderName'] }}</small>
+          </div>
+          <div class="form-group">
+            <label>Account Number *</label>
+            <input type="text" [(ngModel)]="accountNumber" placeholder="Enter account number">
+            <small class="error" *ngIf="errors['accountNumber']">{{ errors['accountNumber'] }}</small>
+          </div>
+          <div class="form-group">
+            <label>Confirm Account Number *</label>
+            <input type="text" [(ngModel)]="confirmAccountNumber" placeholder="Re-enter account number">
+            <small class="error" *ngIf="errors['confirmAccountNumber']">{{ errors['confirmAccountNumber'] }}</small>
+          </div>
+          <div class="form-group">
+            <label>IFSC Code *</label>
+            <input type="text" [(ngModel)]="ifscCode" placeholder="ABCD0123456" style="text-transform:uppercase">
+            <small class="error" *ngIf="errors['ifscCode']">{{ errors['ifscCode'] }}</small>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 3: Device Selection -->
+      <div class="step-content" *ngIf="currentStep === 3">
+        <h2>📱 Device Selection</h2>
+        <p class="step-desc">Select the devices the merchant wants to apply for</p>
+
+        <div class="device-cards">
+          <div class="device-card" [class.selected]="applySoundbox" (click)="applySoundbox = !applySoundbox">
+            <div class="device-icon">🔊</div>
+            <h3>Soundbox</h3>
+            <p>Audio payment confirmation device for UPI, card, and QR transactions</p>
+            <div class="device-check" *ngIf="applySoundbox">✓</div>
+            <div class="qty-control" *ngIf="applySoundbox" (click)="$event.stopPropagation()">
+              <label>Quantity:</label>
+              <button (click)="soundboxQty = soundboxQty > 1 ? soundboxQty - 1 : 1">−</button>
+              <span>{{ soundboxQty }}</span>
+              <button (click)="soundboxQty = soundboxQty + 1">+</button>
+            </div>
+          </div>
+          <div class="device-card" [class.selected]="applyPos" (click)="applyPos = !applyPos">
+            <div class="device-icon">💳</div>
+            <h3>POS Machine</h3>
+            <p>Accept card payments, UPI, and generate receipts at point of sale</p>
+            <div class="device-check" *ngIf="applyPos">✓</div>
+            <div class="qty-control" *ngIf="applyPos" (click)="$event.stopPropagation()">
+              <label>Quantity:</label>
+              <button (click)="posQty = posQty > 1 ? posQty - 1 : 1">−</button>
+              <span>{{ posQty }}</span>
+              <button (click)="posQty = posQty + 1">+</button>
+            </div>
+          </div>
+        </div>
+        <small class="error" *ngIf="errors['device']">{{ errors['device'] }}</small>
+      </div>
+
+      <!-- Step 4: Document Upload -->
+      <div class="step-content" *ngIf="currentStep === 4">
+        <h2>📎 Upload Documents</h2>
+        <p class="step-desc">Upload required documents for verification</p>
+
+        <div class="upload-cards">
+          <div class="upload-card">
+            <div class="upload-icon">📸</div>
+            <h4>Shop Photo</h4>
+            <p>Front view of the shop</p>
+            <label class="upload-btn">
+              {{ shopPhotoName || 'Choose File' }}
+              <input type="file" accept="image/*" (change)="onFileSelect($event, 'shopPhoto')" hidden>
+            </label>
+          </div>
+          <div class="upload-card">
+            <div class="upload-icon">🪪</div>
+            <h4>Owner ID Proof</h4>
+            <p>Aadhaar Card / PAN Card</p>
+            <label class="upload-btn">
+              {{ ownerIdProofName || 'Choose File' }}
+              <input type="file" accept="image/*,.pdf" (change)="onFileSelect($event, 'ownerIdProof')" hidden>
+            </label>
+          </div>
+          <div class="upload-card">
+            <div class="upload-icon">🏦</div>
+            <h4>Bank Proof</h4>
+            <p>Passbook / Cancelled Cheque</p>
+            <label class="upload-btn">
+              {{ bankProofName || 'Choose File' }}
+              <input type="file" accept="image/*,.pdf" (change)="onFileSelect($event, 'bankProof')" hidden>
+            </label>
+          </div>
+        </div>
+
+        <!-- Summary -->
+        <div class="summary-section">
+          <h3>Application Summary</h3>
+          <div class="summary-grid">
+            <div class="summary-item">
+              <label>Business</label>
+              <span>{{ businessName }} ({{ businessType }})</span>
+            </div>
+            <div class="summary-item">
+              <label>Owner</label>
+              <span>{{ ownerName }} - {{ mobile }}</span>
+            </div>
+            <div class="summary-item">
+              <label>Location</label>
+              <span>{{ city }}, {{ state }} - {{ pincode }}</span>
+            </div>
+            <div class="summary-item">
+              <label>Bank</label>
+              <span>{{ bankName }} ({{ ifscCode }})</span>
+            </div>
+            <div class="summary-item">
+              <label>Devices</label>
+              <span>
+                <span *ngIf="applySoundbox">Soundbox x{{ soundboxQty }}</span>
+                <span *ngIf="applySoundbox && applyPos"> + </span>
+                <span *ngIf="applyPos">POS x{{ posQty }}</span>
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Navigation Buttons -->
+      <div class="form-nav">
+        <button class="btn-secondary" *ngIf="currentStep > 1" (click)="prevStep()">← Previous</button>
+        <div class="spacer"></div>
+        <button class="btn-primary" *ngIf="currentStep < totalSteps" (click)="nextStep()">Next →</button>
+        <button class="btn-submit" *ngIf="currentStep === totalSteps" (click)="submit()" [disabled]="loading">
+          <span *ngIf="!loading">{{ editMode ? 'Update Merchant' : 'Submit Application' }}</span>
+          <span *ngIf="loading">Submitting...</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

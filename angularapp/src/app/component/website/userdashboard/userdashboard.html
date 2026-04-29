@@ -1,0 +1,1184 @@
+﻿<div class="ud-shell">
+  <!-- Loading Overlay -->
+  <div *ngIf="loading" class="ud-loading-overlay">
+    <div class="ud-spinner"></div>
+    <p>Loading your dashboard...</p>
+  </div>
+
+  <!-- Error Toast -->
+  <div *ngIf="error && !loading" class="ud-toast ud-toast-error" (click)="error = ''">
+    <p>{{ error }}</p>
+    <small>Click to dismiss</small>
+  </div>
+
+  <!-- ═══ TOP NAVBAR (Canara Bank Style) ═══ -->
+  <nav class="cb-topnav">
+    <div class="cb-topnav-inner">
+      <!-- Left: Menu + Logo -->
+      <div class="cb-topnav-left">
+        <button class="cb-menu-btn" (click)="selectFeature(null)" title="Home">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22">
+            <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+          </svg>
+          <span>MENU</span>
+        </button>
+        <div class="cb-logo-block">
+          <div class="cb-logo-icon">
+            <svg viewBox="0 0 40 40" width="40" height="40">
+              <rect x="4" y="10" width="32" height="20" rx="4" fill="#0056b3" stroke="#ffd700" stroke-width="2"/>
+              <line x1="4" y1="18" x2="36" y2="18" stroke="#ffd700" stroke-width="1.5"/>
+              <circle cx="28" cy="24" r="4" fill="#ffd700" opacity="0.7"/>
+            </svg>
+          </div>
+          <div class="cb-logo-text">
+            <span class="cb-bank-name">NEOBANK</span>
+            <span class="cb-bank-tagline">Your Digital Banking Partner</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Center: Search -->
+      <div class="cb-search-block">
+        <div class="cb-search-wrap">
+          <input type="text" class="cb-search-input" placeholder="Search" [(ngModel)]="searchQuery" (keyup.enter)="onSearchSubmit()" />
+          <button class="cb-search-btn" (click)="onSearchSubmit()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Right: Welcome + Actions -->
+      <div class="cb-topnav-right">
+        <div class="cb-welcome-block">
+          <span class="cb-welcome-label">Welcome</span>
+          <span class="cb-welcome-name">{{ username | uppercase }}</span>
+          <span class="cb-welcome-login">Last login {{ loginTime | date:'dd MMM yyyy hh:mm a' }}</span>
+        </div>
+        <div class="cb-action-icons">
+          <button class="cb-icon-btn" (click)="goToProfile()" title="Profile">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          </button>
+          <button class="cb-icon-btn cb-logout-icon" (click)="logout()" title="Logout">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ═══ SERVICES ICON STRIP (Canara Bank Style) ═══ -->
+  <div class="cb-icon-strip">
+    <div class="cb-icon-strip-inner">
+      <div class="cb-strip-item" [class.active]="!selectedFeature" (click)="selectFeature(null)">
+        <div class="cb-strip-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        </div>
+        <span>Accounts &amp;<br>Services</span>
+      </div>
+      <div class="cb-strip-item" [class.active]="selectedFeature === 'transferfunds'" (click)="selectFeature('transferfunds')">
+        <div class="cb-strip-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+        </div>
+        <span>Pay &amp;<br>Transfer</span>
+      </div>
+      <div class="cb-strip-item" [class.active]="selectedFeature === 'atm-simulator'" (click)="selectFeature('atm-simulator')">
+        <div class="cb-strip-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="3" width="20" height="18" rx="3"/><rect x="5" y="6" width="14" height="8" rx="1"/><circle cx="8" cy="18" r="1"/><circle cx="12" cy="18" r="1"/><circle cx="16" cy="18" r="1"/></svg>
+        </div>
+        <span>Withdraw<br>Money</span>
+      </div>
+      <div class="cb-strip-item" [class.active]="selectedFeature === 'fixed-deposits' || selectedFeature === 'deposit-request'" (click)="selectFeature('fixed-deposits')">
+        <div class="cb-strip-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><rect x="2" y="7" width="20" height="5" rx="2"/><line x1="12" y1="12" x2="12" y2="17"/></svg>
+        </div>
+        <span>Deposits</span>
+      </div>
+      <div class="cb-strip-item" [class.active]="selectedFeature === 'loan' || selectedFeature === 'goldloan'" (click)="selectFeature('loan')">
+        <div class="cb-strip-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        </div>
+        <span>Loans</span>
+      </div>
+      <div class="cb-strip-item" [class.active]="selectedFeature === 'card' || selectedFeature === 'credit-card' || selectedFeature === 'virtual-card'" (click)="selectFeature('card')">
+        <div class="cb-strip-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+        </div>
+        <span>Cards</span>
+      </div>
+      <div class="cb-strip-item" [class.active]="selectedFeature === 'subsidy-claim'" (click)="selectFeature('subsidy-claim')">
+        <div class="cb-strip-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
+        </div>
+        <span>Government<br>Schemes</span>
+      </div>
+      <div class="cb-strip-item" [class.active]="selectedFeature === 'emi-monitoring'" (click)="selectFeature('emi-monitoring')">
+        <div class="cb-strip-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>
+        </div>
+        <span>Tax Center</span>
+      </div>
+      <div class="cb-strip-item" [class.active]="selectedFeature === 'investments'" (click)="selectFeature('investments')">
+        <div class="cb-strip-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        </div>
+        <span>Invest &amp;<br>Insure</span>
+      </div>
+      <div class="cb-strip-item" [class.active]="selectedFeature === 'bill-payment'" (click)="selectFeature('bill-payment')">
+        <div class="cb-strip-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        </div>
+        <span>Bills &amp;<br>Utilities</span>
+      </div>
+      <div class="cb-strip-item" [class.active]="selectedFeature === 'beneficiary-management'" (click)="selectFeature('beneficiary-management')">
+        <div class="cb-strip-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2a10 10 0 1 0 10 10H12V2z"/></svg>
+        </div>
+        <span>FX 4 U</span>
+      </div>
+      <div class="cb-strip-item" [class.active]="selectedFeature === 'fasttag'" (click)="selectFeature('fasttag')">
+        <div class="cb-strip-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 12h2"/><path d="M12 10v4"/><path d="M16 12h2"/><circle cx="12" cy="12" r="1"/></svg>
+        </div>
+        <span>FASTag</span>
+      </div>
+      <div class="cb-strip-item" [class.active]="selectedFeature === 'upi-pay'" (click)="selectFeature('upi-pay')">
+        <div class="cb-strip-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/><path d="M9 7h6"/><path d="M9 11h6"/></svg>
+        </div>
+        <span>UPI<br>Pay</span>
+      </div>
+      <div class="cb-strip-item" [class.active]="selectedFeature === 'support-tickets' || selectedFeature === 'kycupdate'" (click)="selectFeature('support-tickets')">
+        <div class="cb-strip-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </div>
+        <span>Other<br>Services</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ LINKED ACCOUNT SWITCH BAR ═══ -->
+  <div *ngIf="hasLinkedAccount && linkedAccount" class="ud-linked-switch-bar">
+    <div class="ud-linked-info">
+      <span class="ud-linked-icon">🔗</span>
+      <span class="ud-linked-text">
+        Linked Current Account: <strong>{{ linkedCurrentAccountDetails?.businessName || linkedAccount.currentAccountNumber }}</strong>
+        ({{ linkedAccount.currentAccountNumber }})
+      </span>
+    </div>
+    <div class="ud-linked-actions">
+      <span class="ud-active-badge">📋 Savings Account</span>
+      <button *ngIf="!linkedAccount.pinCreated" class="ud-switch-btn ud-btn-create-pin" (click)="openCreatePinModal()">
+        🔑 Create Switch PIN
+      </button>
+      <button *ngIf="linkedAccount.pinCreated" class="ud-switch-btn ud-btn-switch" (click)="openSwitchToCurrentAccount()">
+        🔄 Switch to Current Account
+      </button>
+    </div>
+  </div>
+
+  <!-- ═══ MAIN CONTENT ═══ -->
+  <main class="ud-main">
+
+    <!-- ─── HOME / DASHBOARD ─── -->
+    <div *ngIf="!selectedFeature" class="ud-home">
+      <!-- Canara-Style Welcome Banner -->
+      <div class="cb-welcome-banner">
+        <div class="cb-banner-left">
+          <h1 class="cb-banner-greeting">Good {{ getGreeting() }}, <strong>{{ username }}</strong></h1>
+          <p class="cb-banner-sub">Savings Account &bull; A/C No: {{ userAccountNumber || 'XXXX XXXX XXXX' }}</p>
+          <p class="cb-banner-balance">Available Balance: <strong>&#8377;{{ currentBalance | number:'1.2-2' }}</strong></p>
+        </div>
+        <div class="cb-banner-right">
+          <button class="cb-banner-btn" (click)="selectFeature('transferfunds')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            New Payment
+          </button>
+          <button class="cb-banner-btn cb-banner-btn-outline" (click)="selectFeature('transaction')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            View Statement
+          </button>
+        </div>
+      </div>
+
+      <!-- Filter Bar -->
+      <div class="ud-filter-bar">
+        <button class="ud-filter-chip" [class.active]="dashboardFilter === 'all'" (click)="dashboardFilter = 'all'">All</button>
+        <button class="ud-filter-chip" [class.active]="dashboardFilter === 'month'" (click)="dashboardFilter = 'month'">This Month</button>
+        <button class="ud-filter-chip" [class.active]="dashboardFilter === 'week'" (click)="dashboardFilter = 'week'">This Week</button>
+      </div>
+
+      <!-- ═══ WIDGETS GRID ═══ -->
+      <div class="ud-widgets">
+
+        <!-- Income Card -->
+        <div class="ud-widget ud-widget-income">
+          <div class="ud-widget-head">
+            <span class="ud-widget-title">Income</span>
+            <span class="ud-widget-link">Past 30 days</span>
+          </div>
+          <div class="ud-big-number">&#8377;{{ currentBalance | number:'1.0-0' }}</div>
+          <div class="ud-metric-row">
+            <span class="ud-metric-badge ud-up">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/></svg>
+              +8.25%
+            </span>
+          </div>
+          <div class="ud-mini-chart">
+            <svg viewBox="0 0 200 50" preserveAspectRatio="none" class="ud-sparkline">
+              <polyline points="0,40 20,38 40,35 60,30 80,32 100,25 120,28 140,20 160,22 180,15 200,10" fill="none" stroke="#16a34a" stroke-width="2"/>
+              <polyline points="0,40 20,38 40,35 60,30 80,32 100,25 120,28 140,20 160,22 180,15 200,10 200,50 0,50" fill="url(#incomeGrad)" stroke="none"/>
+              <defs><linearGradient id="incomeGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="rgba(22,163,74,0.15)"/><stop offset="100%" stop-color="rgba(22,163,74,0)"/></linearGradient></defs>
+            </svg>
+          </div>
+        </div>
+
+        <!-- Overview / Balance Donut -->
+        <div class="ud-widget ud-widget-overview">
+          <div class="ud-widget-head">
+            <span class="ud-widget-title">Overview</span>
+            <span class="ud-widget-link" (click)="selectFeature('accounts')">View details &rsaquo;</span>
+          </div>
+          <div class="ud-donut-wrap">
+            <svg viewBox="0 0 120 120" class="ud-donut">
+              <circle cx="60" cy="60" r="50" fill="none" stroke="#e2e8f0" stroke-width="12"/>
+              <circle cx="60" cy="60" r="50" fill="none" stroke="#0d9488" stroke-width="12" stroke-dasharray="220 94" stroke-dashoffset="0" stroke-linecap="round" class="ud-donut-seg1"/>
+              <circle cx="60" cy="60" r="50" fill="none" stroke="#f59e0b" stroke-width="12" stroke-dasharray="60 254" stroke-dashoffset="-220" stroke-linecap="round" class="ud-donut-seg2"/>
+              <circle cx="60" cy="60" r="50" fill="none" stroke="#94a3b8" stroke-width="12" stroke-dasharray="34 280" stroke-dashoffset="-280" stroke-linecap="round" class="ud-donut-seg3"/>
+            </svg>
+            <div class="ud-donut-center">
+              <span class="ud-donut-amount">&#8377;{{ currentBalance | number:'1.0-0' }}</span>
+              <span class="ud-donut-label">Available balance</span>
+            </div>
+          </div>
+          <div class="ud-legend">
+            <span class="ud-legend-item"><i class="ud-dot" style="background:#0d9488"></i> Available</span>
+            <span class="ud-legend-item"><i class="ud-dot" style="background:#f59e0b"></i> Planned</span>
+            <span class="ud-legend-item"><i class="ud-dot" style="background:#94a3b8"></i> Other</span>
+          </div>
+        </div>
+
+        <!-- My Finances Card -->
+        <div class="ud-widget ud-widget-finances">
+          <div class="ud-widget-head">
+            <span class="ud-widget-title">My Finances</span>
+            <button class="ud-chip-btn" (click)="selectFeature('card')">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              View cards
+            </button>
+          </div>
+          <!-- Mini Card Visual -->
+          <div class="ud-mini-card">
+            <div class="ud-mini-card-inner">
+              <span class="ud-mini-card-brand">VISA</span>
+              <span class="ud-mini-card-dots">**** **** **** {{ userAccountNumber.slice(-4) || '0000' }}</span>
+              <div class="ud-mini-card-row">
+                <span class="ud-mini-card-label">EXPIRES<br>12/2030</span>
+                <span class="ud-mini-card-name">{{ username }}</span>
+              </div>
+            </div>
+          </div>
+          <!-- Wealth Overview -->
+          <div class="ud-wealth">
+            <div class="ud-wealth-row ud-wealth-total">
+              <span>Wealth Overview</span>
+              <span>&#8377;{{ currentBalance | number:'1.2-2' }}</span>
+            </div>
+            <div class="ud-wealth-row">
+              <span>Banking</span>
+              <span>&#8377;{{ currentBalance | number:'1.2-2' }}</span>
+            </div>
+            <div class="ud-wealth-row">
+              <span>&rsaquo; Checking Account</span>
+              <span>&#8377;{{ currentBalance | number:'1.2-2' }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Expense Strategy -->
+        <div class="ud-widget ud-widget-expense">
+          <div class="ud-widget-head">
+            <span class="ud-widget-title">Expense Strategy</span>
+            <span class="ud-widget-link" (click)="selectFeature('transaction')">View details &rsaquo;</span>
+          </div>
+          <div class="ud-expense-hero">
+            <span class="ud-big-number">&#8377;{{ (currentBalance * 0.3) | number:'1.0-0' }}</span>
+            <span class="ud-expense-sub">Monthly Expense Insight</span>
+          </div>
+          <div class="ud-bar-chart">
+            <div class="ud-bar-group" *ngFor="let bar of expenseBars">
+              <div class="ud-bar" [style.height.%]="bar.pct" [style.background]="bar.color"></div>
+              <span class="ud-bar-label">&#8377;{{ bar.value | number:'1.0-0' }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Money Flow -->
+        <div class="ud-widget ud-widget-flow">
+          <div class="ud-widget-head">
+            <span class="ud-widget-title">Money Flow</span>
+            <span class="ud-widget-link">Past 30 days</span>
+          </div>
+          <div class="ud-flow-amount">
+            <span class="ud-big-number">&#8377;{{ (currentBalance * 0.6) | number:'1.0-0' }}</span>
+            <span class="ud-metric-badge ud-up">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/></svg>
+              +13.03%
+            </span>
+          </div>
+          <div class="ud-mini-chart">
+            <svg viewBox="0 0 200 50" preserveAspectRatio="none" class="ud-sparkline">
+              <polyline points="0,35 30,30 50,38 80,20 100,25 130,15 160,18 200,10" fill="none" stroke="#0d9488" stroke-width="2"/>
+              <polyline points="0,35 30,30 50,38 80,20 100,25 130,15 160,18 200,10 200,50 0,50" fill="url(#flowGrad)" stroke="none"/>
+              <defs><linearGradient id="flowGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="rgba(13,148,136,0.12)"/><stop offset="100%" stop-color="rgba(13,148,136,0)"/></linearGradient></defs>
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ QUICK ACTIONS (Canara Style Cards) ═══ -->
+      <div class="ud-section-title">Quick Actions</div>
+      <div class="cb-quick-grid">
+        <div class="cb-quick-card" (click)="selectFeature('transferfunds')">
+          <div class="cb-quick-icon cb-qi-transfer">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+          </div>
+          <span>Fund Transfer</span>
+        </div>
+        <div class="cb-quick-card" (click)="selectFeature('atm-simulator')">
+          <div class="cb-quick-icon cb-qi-atm">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="18" rx="3"/><rect x="5" y="6" width="14" height="8" rx="1"/><circle cx="8" cy="18" r="1"/><circle cx="12" cy="18" r="1"/><circle cx="16" cy="18" r="1"/></svg>
+          </div>
+          <span>ATM Withdrawal</span>
+        </div>
+        <div class="cb-quick-card" (click)="selectFeature('deposit-request')">
+          <div class="cb-quick-icon cb-qi-deposit">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="5 12 12 5 19 12"/></svg>
+          </div>
+          <span>Deposit</span>
+        </div>
+        <div class="cb-quick-card" (click)="selectFeature('card')">
+          <div class="cb-quick-icon cb-qi-card">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+          </div>
+          <span>Debit Card</span>
+        </div>
+        <div class="cb-quick-card" (click)="selectFeature('bill-payment')">
+          <div class="cb-quick-icon cb-qi-bill">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          </div>
+          <span>Bill Payment</span>
+        </div>
+        <div class="cb-quick-card" (click)="selectFeature('loan')">
+          <div class="cb-quick-icon cb-qi-loan">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+          </div>
+          <span>Loans</span>
+        </div>
+        <div class="cb-quick-card" (click)="selectFeature('cheque')">
+          <div class="cb-quick-icon cb-qi-cheque">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          </div>
+          <span>Cheque Book</span>
+        </div>
+        <div class="cb-quick-card" (click)="selectFeature('kycupdate')">
+          <div class="cb-quick-icon cb-qi-kyc">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          </div>
+          <span>KYC Update</span>
+        </div>
+        <div class="cb-quick-card" (click)="selectFeature('scheduled-payments')">
+          <div class="cb-quick-icon cb-qi-schedule">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          </div>
+          <span>Scheduled Pay</span>
+        </div>
+      </div>
+
+      <!-- ═══ TRANSACTION TABLE ═══ -->
+      <div class="ud-section-title">Recent Transactions</div>
+      <div class="ud-txn-card">
+        <div class="ud-txn-toolbar">
+          <div class="ud-txn-tabs">
+            <button class="ud-txn-tab" [class.active]="txnTab === 'all'" (click)="txnTab = 'all'">All</button>
+            <button class="ud-txn-tab" [class.active]="txnTab === 'credit'" (click)="txnTab = 'credit'">Credits</button>
+            <button class="ud-txn-tab" [class.active]="txnTab === 'debit'" (click)="txnTab = 'debit'">Debits</button>
+          </div>
+          <button class="ud-chip-btn" (click)="selectFeature('transaction')">View All &rsaquo;</button>
+        </div>
+        <div class="ud-txn-table-wrap">
+          <table class="ud-txn-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Transaction ID</th>
+                <th>Description</th>
+                <th>Debit</th>
+                <th>Credit</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngIf="recentTransactions.length === 0">
+                <td colspan="5" class="ud-txn-empty">No transactions found</td>
+              </tr>
+              <tr *ngFor="let txn of getFilteredTransactions()" class="ud-txn-row">
+                <td>{{ txn.date | date:'dd MMM yyyy' }}</td>
+                <td class="ud-txn-id">{{ txn.transactionId }}</td>
+                <td>{{ txn.description }}</td>
+                <td class="ud-debit">{{ txn.type === 'DEBIT' ? '&#8377;' + (txn.amount | number:'1.2-2') : '-' }}</td>
+                <td class="ud-credit">{{ txn.type === 'CREDIT' ? '&#8377;' + (txn.amount | number:'1.2-2') : '-' }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ═══ ANALYTICS ═══ -->
+      <div class="ud-section-title">Analytics</div>
+      <div class="ud-analytics-grid">
+        <!-- Monthly Spending -->
+        <div class="ud-widget ud-analytics-card">
+          <div class="ud-widget-head">
+            <span class="ud-widget-title">Monthly Spending</span>
+          </div>
+          <div class="ud-spending-bars">
+            <div class="ud-spend-bar" *ngFor="let m of monthlySpending">
+              <div class="ud-spend-fill" [style.height.%]="m.pct" [style.background]="m.pct > 70 ? '#ef4444' : m.pct > 40 ? '#f59e0b' : '#10b981'"></div>
+              <span class="ud-spend-label">{{ m.label }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Income vs Expenses -->
+        <div class="ud-widget ud-analytics-card">
+          <div class="ud-widget-head">
+            <span class="ud-widget-title">Income vs Expenses</span>
+          </div>
+          <div class="ud-ie-row">
+            <div class="ud-ie-bar-wrap">
+              <div class="ud-ie-bar ud-ie-income" style="width:75%"></div>
+              <span class="ud-ie-label">Income <strong>75%</strong></span>
+            </div>
+            <div class="ud-ie-bar-wrap">
+              <div class="ud-ie-bar ud-ie-expense" style="width:45%"></div>
+              <span class="ud-ie-label">Expenses <strong>45%</strong></span>
+            </div>
+            <div class="ud-ie-bar-wrap">
+              <div class="ud-ie-bar ud-ie-savings" style="width:30%"></div>
+              <span class="ud-ie-label">Savings <strong>30%</strong></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Category Breakdown -->
+        <div class="ud-widget ud-analytics-card">
+          <div class="ud-widget-head">
+            <span class="ud-widget-title">Category Breakdown</span>
+          </div>
+          <div class="ud-categories">
+            <div class="ud-cat-row" *ngFor="let cat of categoryBreakdown">
+              <div class="ud-cat-info">
+                <span class="ud-cat-dot" [style.background]="cat.color"></span>
+                <span class="ud-cat-name">{{ cat.name }}</span>
+              </div>
+              <div class="ud-cat-bar-wrap">
+                <div class="ud-cat-bar" [style.width.%]="cat.pct" [style.background]="cat.color"></div>
+              </div>
+              <span class="ud-cat-pct">{{ cat.pct }}%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ MORE SERVICES (Canara Style) ═══ -->
+      <div class="ud-section-title">More Services</div>
+      <div class="cb-services-grid">
+        <div class="cb-service-card" (click)="selectFeature('atm-simulator')">
+          <div class="cb-svc-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="18" rx="3"/><rect x="5" y="6" width="14" height="8" rx="1"/><circle cx="8" cy="18" r="1"/><circle cx="12" cy="18" r="1"/><circle cx="16" cy="18" r="1"/></svg></div>
+          <span>ATM Machine</span>
+        </div>
+        <div class="cb-service-card" (click)="selectFeature('credit-card')">
+          <div class="cb-svc-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg></div>
+          <span>Credit Card</span>
+        </div>
+        <div class="cb-service-card" (click)="selectFeature('goldloan')">
+          <div class="cb-svc-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></div>
+          <span>Gold Loan</span>
+        </div>
+        <div class="cb-service-card" (click)="selectFeature('subsidy-claim')">
+          <div class="cb-svc-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div>
+          <span>Subsidy Claim</span>
+        </div>
+        <div class="cb-service-card" (click)="selectFeature('emi-monitoring')">
+          <div class="cb-svc-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg></div>
+          <span>EMI Monitor</span>
+        </div>
+        <div class="cb-service-card" (click)="selectFeature('ml-loan-prediction')">
+          <div class="cb-svc-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 1 0 10 10H12V2z"/></svg></div>
+          <span>ML Loan AI</span>
+        </div>
+        <div class="cb-service-card" (click)="selectFeature('ai-assistant')">
+          <div class="cb-svc-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+          <span>AI Assistant</span>
+        </div>
+        <div class="cb-service-card" (click)="selectFeature('virtual-card')">
+          <div class="cb-svc-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="3"/><line x1="2" y1="10" x2="22" y2="10"/></svg></div>
+          <span>Virtual Card</span>
+        </div>
+        <div class="cb-service-card" (click)="selectFeature('beneficiary-management')">
+          <div class="cb-svc-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+          <span>Beneficiaries</span>
+        </div>
+        <div class="cb-service-card" (click)="goToInsurance()">
+          <div class="cb-svc-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+          <span>Insurance</span>
+        </div>
+        <div class="cb-service-card" (click)="selectFeature('fixed-deposits')">
+          <div class="cb-svc-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v3"/></svg></div>
+          <span>Fixed Deposit</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── FEATURE CONTENT (all existing feature views) ─── -->
+    <div *ngIf="selectedFeature" class="ud-feature-area">
+      <!-- Back button -->
+      <button class="ud-back-btn" (click)="selectFeature(null)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><polyline points="15 18 9 12 15 6"/></svg>
+        Back to Dashboard
+      </button>
+
+      <!-- AI Assistant -->
+      <app-ai-assistant *ngIf="selectedFeature === 'ai-assistant'"></app-ai-assistant>
+
+      <!-- ML Loan Prediction -->
+      <div *ngIf="selectedFeature === 'ml-loan-prediction'" class="ud-feature-card">
+        <div class="ud-feature-header"><h2>ML-Based Loan Approval Prediction</h2><p>AI-powered loan approval prediction based on your PAN card and financial profile</p></div>
+        <div class="ud-form-wrap" *ngIf="!predictionResult">
+          <div class="ud-form-grid">
+            <div class="ud-form-group"><label>PAN Card Number <span class="required">*</span></label><input type="text" [(ngModel)]="mlPredictionForm.pan" placeholder="Enter PAN number" maxlength="10" class="ud-input"/></div>
+            <div class="ud-form-group"><label>Loan Type <span class="required">*</span></label><select [(ngModel)]="mlPredictionForm.loanType" class="ud-input"><option value="">Select Loan Type</option><option value="Personal Loan">Personal Loan</option><option value="Education Loan">Education Loan</option><option value="Home Loan">Home Loan</option><option value="Car Loan">Car Loan</option></select></div>
+            <div class="ud-form-group"><label>Requested Amount (&#8377;) <span class="required">*</span></label><input type="number" [(ngModel)]="mlPredictionForm.amount" placeholder="Loan amount" min="10000" class="ud-input"/></div>
+            <div class="ud-form-group"><label>Tenure (Months) <span class="required">*</span></label><input type="number" [(ngModel)]="mlPredictionForm.tenure" placeholder="Tenure in months" min="6" max="360" class="ud-input"/></div>
+          </div>
+          <button class="ud-btn-primary" (click)="predictLoanApproval()" [disabled]="isPredicting || !isFormValid()">{{ isPredicting ? 'Predicting...' : 'Predict Loan Approval' }}</button>
+        </div>
+        <div *ngIf="predictionResult" class="ud-prediction-result">
+          <div class="ud-result-head"><h3>Prediction Result</h3><button class="ud-close-btn" (click)="clearPrediction()">&times;</button></div>
+          <div class="ud-result-card" [ngClass]="getPredictionResultClass(predictionResult.predictionResult)">
+            <div class="ud-result-status"><span class="ud-status-icon">{{ getStatusIcon(predictionResult.predictionResult) }}</span><h4>{{ predictionResult.predictionResult }}</h4><p>Approval Probability: {{ predictionResult.approvalPercentage || (predictionResult.approvalProbability ? Math.round(predictionResult.approvalProbability * 100) : 0) }}%</p></div>
+            <div class="ud-result-details"><div class="ud-detail-item"><span>CIBIL Score:</span><span>{{ predictionResult.cibilScore || 'N/A' }}</span></div><div class="ud-detail-item"><span>Interest Rate:</span><span>{{ predictionResult.interestRate || 'N/A' }}<ng-container *ngIf="predictionResult.interestRate">% p.a.</ng-container></span></div><div class="ud-detail-item"><span>Credit Limit:</span><span>&#8377;{{ (predictionResult.creditLimit || 0) | number:'1.0-0' }}</span></div></div>
+            <div *ngIf="predictionResult.rejectionReason" class="ud-rejection"><h5>Rejection Reason:</h5><p>{{ predictionResult.rejectionReason }}</p></div>
+            <div *ngIf="predictionResult.recommendations?.length" class="ud-recommendations"><h5>Recommendations:</h5><ul><li *ngFor="let rec of predictionResult.recommendations">{{ rec }}</li></ul></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Deposit Request -->
+      <div *ngIf="selectedFeature === 'deposit-request'" class="ud-feature-card">
+        <div class="ud-feature-header"><h2>Deposit Request</h2><button (click)="loadDepositRequests()" class="ud-chip-btn">Refresh</button></div>
+        <div class="ud-form-wrap">
+          <div class="ud-form-grid">
+            <div class="ud-form-group"><label>Amount (&#8377;) <span class="required">*</span></label><input type="number" [(ngModel)]="depositForm.amount" class="ud-input" min="1" placeholder="Enter amount"/></div>
+            <div class="ud-form-group"><label>Method</label><select [(ngModel)]="depositForm.method" class="ud-input"><option value="Cash">Cash</option><option value="Cheque">Cheque</option><option value="UPI">UPI</option><option value="Online Transfer">Online Transfer</option></select></div>
+            <div class="ud-form-group"><label>Reference Number</label><input type="text" [(ngModel)]="depositForm.referenceNumber" class="ud-input" placeholder="Slip/UTR/Reference"/></div>
+            <div class="ud-form-group ud-full"><label>Note</label><textarea [(ngModel)]="depositForm.note" class="ud-input ud-textarea" rows="3" placeholder="Note for admin"></textarea></div>
+          </div>
+          <div class="ud-form-actions"><button class="ud-btn-primary" (click)="submitDepositRequest()" [disabled]="isSubmittingDeposit">{{ isSubmittingDeposit ? 'Submitting...' : 'Submit Request' }}</button><button class="ud-btn-outline" (click)="resetDepositForm()">Clear</button></div>
+          <div class="ud-msg ud-msg-success" *ngIf="depositMessage">{{ depositMessage }}</div>
+          <div class="ud-msg ud-msg-error" *ngIf="depositError">{{ depositError }}</div>
+        </div>
+        <div class="ud-section-title" style="margin-top:28px">Recent Requests</div>
+        <div *ngIf="isLoadingDepositRequests" class="ud-empty">Loading deposit requests...</div>
+        <div *ngIf="!isLoadingDepositRequests && depositRequests.length === 0" class="ud-empty">No deposit requests found.</div>
+        <div *ngIf="!isLoadingDepositRequests && depositRequests.length > 0" class="ud-deposit-list">
+          <div *ngFor="let req of depositRequests" class="ud-deposit-card">
+            <div class="ud-deposit-head"><div><strong>&#8377;{{ req.amount | number:'1.2-2' }} &bull; {{ req.method }}</strong><br><small>Request ID: {{ req.requestId }}</small></div><span class="ud-status-badge" [ngClass]="req.status?.toLowerCase()">{{ req.status }}</span></div>
+            <div class="ud-deposit-body"><p><strong>Note:</strong> {{ req.note || 'N/A' }}</p><p><strong>Reference:</strong> {{ req.referenceNumber || 'N/A' }}</p><p><strong>Created:</strong> {{ req.createdAt | date:'dd/MM/yyyy, h:mm a' }}</p><p *ngIf="req.processedAt"><strong>Processed:</strong> {{ req.processedAt | date:'dd/MM/yyyy, h:mm a' }}</p><p *ngIf="req.rejectionReason" class="ud-text-danger">Reason: {{ req.rejectionReason }}</p></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Investments -->
+      <div *ngIf="selectedFeature === 'investments'" class="ud-feature-card">
+        <div class="ud-feature-header"><h2>Investments (Mutual Funds)</h2><button (click)="openInvestmentForm()" class="ud-btn-primary ud-btn-sm">+ New Investment</button></div>
+        <div *ngIf="isLoadingInvestments" class="ud-empty">Loading investments...</div>
+        <div *ngIf="!isLoadingInvestments && investments.length === 0" class="ud-empty">No investments found. Start investing today!</div>
+        <div *ngIf="!isLoadingInvestments && investments.length > 0" class="ud-invest-list">
+          <div *ngFor="let investment of investments" class="ud-invest-card" [ngClass]="getInvestmentStatusClass(investment.status)">
+            <div class="ud-invest-head"><h3>{{ investment.fundName || 'Mutual Fund' }}</h3><span class="ud-status-badge" [ngClass]="getInvestmentStatusClass(investment.status)">{{ investment.status }}</span></div>
+            <div class="ud-invest-body"><div class="ud-info-row"><span>Type:</span><span>{{ investment.investmentType }}</span></div><div class="ud-info-row"><span>Category:</span><span>{{ investment.fundCategory || 'N/A' }}</span></div><div class="ud-info-row"><span>Amount:</span><span>&#8377;{{ investment.investmentAmount | number:'1.2-2' }}</span></div><div class="ud-info-row"><span>Current Value:</span><span>&#8377;{{ investment.currentValue | number:'1.2-2' }}</span></div><div class="ud-info-row" *ngIf="investment.returns"><span>Returns:</span><span [class.ud-text-success]="investment.returns >= 0" [class.ud-text-danger]="investment.returns < 0">{{ investment.returns }}%</span></div><div class="ud-info-row"><span>Date:</span><span>{{ investment.investmentDate | date:'dd/MM/yyyy' }}</span></div></div>
+            <div class="ud-invest-foot" *ngIf="investment.status === 'ACTIVE' || investment.status === 'APPROVED'"><button (click)="openMFForeclosureModal(investment)" class="ud-btn-outline ud-btn-sm">Request Foreclosure</button></div>
+          </div>
+        </div>
+        <div *ngIf="mfForeclosureHistory.length > 0" style="margin-top:28px"><div class="ud-section-title">Foreclosure History</div><div *ngIf="isLoadingMFForeclosureHistory" class="ud-empty">Loading...</div><div *ngIf="!isLoadingMFForeclosureHistory" class="ud-invest-list"><div *ngFor="let f of mfForeclosureHistory" class="ud-invest-card"><div class="ud-invest-head"><h3>{{ f.fundName }}</h3><span class="ud-status-badge" [ngClass]="getMFForeclosureStatusClass(f.status)">{{ f.status }}</span></div><div class="ud-invest-body"><div class="ud-info-row"><span>Amount:</span><span>&#8377;{{ f.investmentAmount | number:'1.2-2' }}</span></div><div class="ud-info-row"><span>Fine:</span><span>&#8377;{{ f.fine | number:'1.2-2' }}</span></div><div class="ud-info-row"><span>Foreclosure Amt:</span><span>&#8377;{{ f.foreclosureAmount | number:'1.2-2' }}</span></div></div></div></div></div>
+        <!-- Investment Form Modal -->
+        <div *ngIf="showInvestmentForm" class="ud-modal-overlay" (click)="closeInvestmentForm()"><div class="ud-modal" (click)="$event.stopPropagation()"><div class="ud-modal-head"><h3>New Investment Application</h3><button (click)="closeInvestmentForm()" class="ud-close-btn">&times;</button></div><div class="ud-modal-body"><div class="ud-form-grid"><div class="ud-form-group"><label>Fund Name *</label><input type="text" [(ngModel)]="investmentForm.fundName" class="ud-input" placeholder="e.g., HDFC Equity Fund"/></div><div class="ud-form-group"><label>Category *</label><select [(ngModel)]="investmentForm.fundCategory" class="ud-input"><option value="">Select</option><option value="Equity">Equity</option><option value="Debt">Debt</option><option value="Hybrid">Hybrid</option><option value="Liquid">Liquid</option></select></div><div class="ud-form-group"><label>Scheme</label><select [(ngModel)]="investmentForm.fundScheme" class="ud-input"><option value="">Select</option><option value="Growth">Growth</option><option value="Dividend">Dividend</option></select></div><div class="ud-form-group"><label>Amount (&#8377;) *</label><input type="number" [(ngModel)]="investmentForm.investmentAmount" class="ud-input" min="1000"/></div><div class="ud-form-group"><label><input type="checkbox" [(ngModel)]="investmentForm.isSIP"/> SIP</label></div><div *ngIf="investmentForm.isSIP" class="ud-form-group"><label>SIP Amount</label><input type="number" [(ngModel)]="investmentForm.sipAmount" class="ud-input" min="500"/></div><div *ngIf="investmentForm.isSIP" class="ud-form-group"><label>SIP Duration (Months)</label><input type="number" [(ngModel)]="investmentForm.sipDuration" class="ud-input" min="6"/></div></div></div><div class="ud-modal-foot"><button (click)="closeInvestmentForm()" class="ud-btn-outline">Cancel</button><button (click)="submitInvestment()" [disabled]="isSubmittingInvestment" class="ud-btn-primary">{{ isSubmittingInvestment ? 'Submitting...' : 'Submit' }}</button></div></div></div>
+        <!-- MF Foreclosure Modal -->
+        <div *ngIf="showMFForeclosureModal" class="ud-modal-overlay" (click)="closeMFForeclosureModal()"><div class="ud-modal" (click)="$event.stopPropagation()"><div class="ud-modal-head"><h3>Request Foreclosure</h3><button (click)="closeMFForeclosureModal()" class="ud-close-btn">&times;</button></div><div class="ud-modal-body"><div *ngIf="selectedInvestmentForForeclosure"><h4>{{ selectedInvestmentForForeclosure.fundName }}</h4><div class="ud-info-row"><span>Investment:</span><span>&#8377;{{ selectedInvestmentForForeclosure.investmentAmount | number:'1.2-2' }}</span></div><div class="ud-info-row"><span>Current Value:</span><span>&#8377;{{ selectedInvestmentForForeclosure.currentValue | number:'1.2-2' }}</span></div></div><div *ngIf="isCalculatingMFForeclosure" class="ud-empty">Calculating...</div><div *ngIf="!isCalculatingMFForeclosure && mfForeclosureDetails?.success"><div class="ud-info-row"><span>Fine:</span><span class="ud-text-danger">&#8377;{{ mfForeclosureDetails.fine | number:'1.2-2' }}</span></div><div class="ud-info-row"><span>Credit Amount:</span><span class="ud-text-success">&#8377;{{ mfForeclosureDetails.foreclosureAmount | number:'1.2-2' }}</span></div><div class="ud-form-group" style="margin-top:12px"><label>Reason (Optional)</label><textarea [(ngModel)]="mfForeclosureRequestReason" class="ud-input ud-textarea" rows="3"></textarea></div></div></div><div class="ud-modal-foot" *ngIf="mfForeclosureDetails?.success"><button (click)="closeMFForeclosureModal()" class="ud-btn-outline">Cancel</button><button (click)="requestMFForeclosure()" [disabled]="isRequestingMFForeclosure" class="ud-btn-primary">{{ isRequestingMFForeclosure ? (mfForeclosureOtpSent ? 'Processing...' : 'Sending OTP...') : (mfForeclosureOtpSent ? 'Verify & Submit' : 'Submit') }}</button></div></div></div>
+
+        <!-- MF Foreclosure OTP Modal -->
+        <div *ngIf="showMFForeclosureOtpModal" class="ud-modal-overlay" (click)="closeMFForeclosureOtpModal()"><div class="ud-modal" (click)="$event.stopPropagation()"><div class="ud-modal-head"><h3>Verify OTP for Foreclosure</h3><button (click)="closeMFForeclosureOtpModal()" class="ud-close-btn">&times;</button></div><div class="ud-modal-body" style="text-align:center"><p style="margin-bottom:12px">An OTP has been sent to your registered email address.</p><div class="ud-form-group"><input type="text" [(ngModel)]="mfForeclosureOtpCode" placeholder="Enter 6-digit OTP" class="ud-input" maxlength="6" style="text-align:center;font-size:20px;letter-spacing:8px" /><p style="font-size:12px;color:#666;margin-top:8px">Check your email for the OTP code</p></div></div><div class="ud-modal-foot"><button (click)="closeMFForeclosureOtpModal()" class="ud-btn-outline">Cancel</button><button (click)="requestMFForeclosure()" [disabled]="isRequestingMFForeclosure || !mfForeclosureOtpCode" class="ud-btn-primary">{{ isRequestingMFForeclosure ? 'Verifying...' : 'Verify & Submit' }}</button></div></div></div>
+      </div>
+
+      <!-- Fixed Deposits -->
+      <div *ngIf="selectedFeature === 'fixed-deposits'" class="ud-feature-card">
+        <div class="ud-feature-header"><h2>Fixed Deposits</h2><button (click)="openFDForm()" class="ud-btn-primary ud-btn-sm">+ Open New FD</button></div>
+        <div *ngIf="isLoadingFDs" class="ud-empty">Loading fixed deposits...</div>
+        <div *ngIf="!isLoadingFDs && fixedDeposits.length === 0" class="ud-empty">No fixed deposits found.</div>
+        <div *ngIf="!isLoadingFDs && fixedDeposits.length > 0" class="ud-invest-list">
+          <div *ngFor="let fd of fixedDeposits" class="ud-invest-card" [ngClass]="getFDStatusClass(fd.status)">
+            <div class="ud-invest-head"><h3>FD: {{ fd.fdAccountNumber }}</h3><span class="ud-status-badge" [ngClass]="getFDStatusClass(fd.status)">{{ fd.status }}</span></div>
+            <div class="ud-invest-body"><div class="ud-info-row"><span>Principal:</span><span>&#8377;{{ fd.principalAmount | number:'1.2-2' }}</span></div><div class="ud-info-row"><span>Interest:</span><span>{{ fd.interestRate }}% p.a.</span></div><div class="ud-info-row"><span>Tenure:</span><span>{{ fd.tenure }} months</span></div><div class="ud-info-row"><span>Maturity:</span><span class="ud-text-success">&#8377;{{ fd.maturityAmount | number:'1.2-2' }}</span></div><div class="ud-info-row"><span>Start:</span><span>{{ fd.startDate | date:'dd/MM/yyyy' }}</span></div><div class="ud-info-row"><span>Maturity Date:</span><span>{{ fd.maturityDate | date:'dd/MM/yyyy' }}</span></div></div>
+            <div class="ud-invest-foot" *ngIf="fd.status === 'ACTIVE'"><button (click)="openForeclosureModal(fd)" class="ud-btn-outline ud-btn-sm">Foreclose</button><button (click)="openTopUpModal(fd)" class="ud-btn-primary ud-btn-sm">Top-up</button><button (click)="downloadFDReceipt(fd)" class="ud-btn-receipt ud-btn-sm" title="Download FD Receipt"><i class="fa fa-download"></i> Receipt</button></div>
+            <div class="ud-invest-foot" *ngIf="fd.status === 'MATURED' || fd.status === 'PREMATURE_CLOSED'"><button (click)="downloadFDReceipt(fd)" class="ud-btn-receipt ud-btn-sm" title="Download FD Receipt"><i class="fa fa-download"></i> Download Receipt</button></div>
+          </div>
+        </div>
+        <!-- FD Form Modal -->
+        <div *ngIf="showFDForm" class="ud-modal-overlay" (click)="closeFDForm()"><div class="ud-modal" (click)="$event.stopPropagation()"><div class="ud-modal-head"><h3>Open New Fixed Deposit</h3><button (click)="closeFDForm()" class="ud-close-btn">&times;</button></div><div class="ud-modal-body"><div class="ud-form-grid"><div class="ud-form-group"><label>Principal (&#8377;) *</label><input type="number" [(ngModel)]="fdForm.principalAmount" class="ud-input" min="1000"/></div><div class="ud-form-group"><label>Interest Rate (%)</label><input type="number" [(ngModel)]="fdForm.interestRate" class="ud-input" min="3" max="10" step="0.1"/></div><div class="ud-form-group"><label>Tenure (Months)</label><input type="number" [(ngModel)]="fdForm.tenure" class="ud-input" min="6" max="120"/></div><div class="ud-form-group"><label>Interest Payout</label><select [(ngModel)]="fdForm.interestPayout" class="ud-input"><option value="At Maturity">At Maturity</option><option value="Monthly">Monthly</option><option value="Quarterly">Quarterly</option></select></div></div></div><div class="ud-modal-foot"><button (click)="closeFDForm()" class="ud-btn-outline">Cancel</button><button (click)="submitFD()" [disabled]="isSubmittingFD" class="ud-btn-primary">{{ isSubmittingFD ? 'Submitting...' : 'Submit' }}</button></div></div></div>
+        <!-- Foreclosure Modal -->
+        <div *ngIf="showForeclosureModal" class="ud-modal-overlay" (click)="closeForeclosureModal()"><div class="ud-modal" (click)="$event.stopPropagation()"><div class="ud-modal-head"><h3>Foreclose Fixed Deposit</h3><button (click)="closeForeclosureModal()" class="ud-close-btn">&times;</button></div><div class="ud-modal-body"><div *ngIf="foreclosureDetails" class="ud-foreclosure-info"><div class="ud-info-row"><span>Principal:</span><span>&#8377;{{ foreclosureDetails.principalAmount | number:'1.2-2' }}</span></div><div class="ud-info-row"><span>Interest Earned:</span><span>&#8377;{{ foreclosureDetails.interestEarned | number:'1.2-2' }}</span></div><div class="ud-info-row"><span>Penalty ({{ foreclosureDetails.penaltyRate }}%):</span><span class="ud-text-danger">-&#8377;{{ foreclosureDetails.penalty | number:'1.2-2' }}</span></div><div class="ud-info-row"><span>Closure Amount:</span><span class="ud-text-success">&#8377;{{ foreclosureDetails.closureAmount | number:'1.2-2' }}</span></div></div><div *ngIf="isLoadingForeclosure" class="ud-empty">Calculating...</div></div><div class="ud-modal-foot"><button (click)="closeForeclosureModal()" class="ud-btn-outline">Cancel</button><button (click)="processForeclosure()" [disabled]="!foreclosureDetails || isProcessingForeclosure" class="ud-btn-primary">{{ isProcessingForeclosure ? (foreclosureOtpSent ? 'Processing...' : 'Send OTP...') : (foreclosureOtpSent ? 'Verify & Confirm' : 'Confirm') }}</button></div></div></div>
+
+        <!-- FD Foreclosure OTP Modal -->
+        <div *ngIf="showForeclosureOtpModal" class="ud-modal-overlay" (click)="closeForeclosureOtpModal()"><div class="ud-modal" (click)="$event.stopPropagation()"><div class="ud-modal-head"><h3>Verify OTP for FD Foreclosure</h3><button (click)="closeForeclosureOtpModal()" class="ud-close-btn">&times;</button></div><div class="ud-modal-body" style="text-align:center"><p style="margin-bottom:12px">An OTP has been sent to your registered email address.</p><div class="ud-form-group"><input type="text" [(ngModel)]="foreclosureOtpCode" placeholder="Enter 6-digit OTP" class="ud-input" maxlength="6" style="text-align:center;font-size:20px;letter-spacing:8px" /><p style="font-size:12px;color:#666;margin-top:8px">Check your email for the OTP code</p></div></div><div class="ud-modal-foot"><button (click)="closeForeclosureOtpModal()" class="ud-btn-outline">Cancel</button><button (click)="processForeclosure()" [disabled]="isProcessingForeclosure || !foreclosureOtpCode" class="ud-btn-primary">{{ isProcessingForeclosure ? 'Verifying...' : 'Verify & Process' }}</button></div></div></div>
+        <!-- FD Receipt Preview Modal -->
+        <div *ngIf="showFDReceiptModal" class="ud-modal-overlay" (click)="closeFDReceiptModal()">
+          <div class="ud-modal ud-receipt-modal" (click)="$event.stopPropagation()">
+            <div class="ud-modal-head">
+              <h3>Fixed Deposit Receipt</h3>
+              <button (click)="closeFDReceiptModal()" class="ud-close-btn">&times;</button>
+            </div>
+            <div class="ud-modal-body ud-receipt-body" id="fd-receipt-content">
+              <div class="fd-receipt" *ngIf="selectedFDForReceipt">
+                <div class="fd-receipt-header">
+                  <div class="fd-receipt-logo">
+                    <div class="fd-receipt-bank-icon">&#9878;</div>
+                    <div class="fd-receipt-bank-name">
+                      <h2>NeoBank</h2>
+                      <p>...the digital bank you can trust!</p>
+                    </div>
+                  </div>
+                </div>
+                <h3 class="fd-receipt-title">e-Fixed Deposit Account Receipt</h3>
+                <table class="fd-receipt-table fd-receipt-table-top">
+                  <tr>
+                    <th>FD Account No</th>
+                    <th>Customer Name</th>
+                  </tr>
+                  <tr>
+                    <td>{{ selectedFDForReceipt.fdAccountNumber }}</td>
+                    <td>{{ selectedFDForReceipt.userName || username }}</td>
+                  </tr>
+                </table>
+                <p class="fd-receipt-summary">
+                  Deposit Amount: <strong>INR|{{ selectedFDForReceipt.principalAmount | number:'1.2-2' }}</strong>
+                  for a period of <strong>{{ selectedFDForReceipt.years || (selectedFDForReceipt.tenure >= 12 ? (selectedFDForReceipt.tenure / 12 | number:'1.0-0') : 0) }}(yrs),
+                  {{ selectedFDForReceipt.tenure % 12 }}(months), 0(days)</strong>
+                  at the rate of <strong>{{ selectedFDForReceipt.interestRate }}</strong> per annum.
+                </p>
+                <table class="fd-receipt-table fd-receipt-table-details">
+                  <tr>
+                    <th>Date of Issue</th>
+                    <th>Date of Maturity</th>
+                    <th>Maturity Value</th>
+                  </tr>
+                  <tr>
+                    <td>{{ selectedFDForReceipt.startDate | date:'dd/MM/yyyy' }}</td>
+                    <td>{{ selectedFDForReceipt.maturityDate | date:'dd/MM/yyyy' }}</td>
+                    <td>{{ selectedFDForReceipt.maturityAmount | number:'1.2-2' }}</td>
+                  </tr>
+                  <tr>
+                    <th>Deposit Scheme</th>
+                    <th>Maturity Instruction</th>
+                    <th>Interest Payout</th>
+                  </tr>
+                  <tr>
+                    <td>NEOFD</td>
+                    <td>Auto Close</td>
+                    <td>{{ selectedFDForReceipt.interestPayout || 'At Maturity' }}</td>
+                  </tr>
+                </table>
+                <table class="fd-receipt-table fd-receipt-table-accounts">
+                  <tr>
+                    <th>Debit Account Number</th>
+                    <th>Repayment Account No</th>
+                  </tr>
+                  <tr>
+                    <td>{{ selectedFDForReceipt.accountNumber }}</td>
+                    <td>{{ selectedFDForReceipt.accountNumber }}</td>
+                  </tr>
+                </table>
+                <!-- Premature Closure / Foreclosure Details -->
+                <div *ngIf="selectedFDForReceipt.status === 'PREMATURE_CLOSED' || selectedFDForReceipt.status === 'CLOSED' || selectedFDForReceipt.isPrematureClosure" class="fd-receipt-closure-section">
+                  <h4 class="fd-receipt-closure-title">Premature Closure / Foreclosure Details</h4>
+                  <table class="fd-receipt-table fd-receipt-table-closure">
+                    <tr>
+                      <th>Closure Status</th>
+                      <th>Date of Closure</th>
+                    </tr>
+                    <tr>
+                      <td class="fd-receipt-closure-status">{{ selectedFDForReceipt.status === 'PREMATURE_CLOSED' ? 'Premature Closed' : 'Closed' }}</td>
+                      <td>{{ selectedFDForReceipt.closureDate | date:'dd/MM/yyyy' }}</td>
+                    </tr>
+                    <tr>
+                      <th>Penalty Amount</th>
+                      <th>Closure Amount Credited</th>
+                    </tr>
+                    <tr>
+                      <td class="fd-receipt-penalty">&#8377;{{ selectedFDForReceipt.prematureClosurePenalty | number:'1.2-2' }}</td>
+                      <td class="fd-receipt-closure-amount">&#8377;{{ selectedFDForReceipt.prematureClosureAmount | number:'1.2-2' }}</td>
+                    </tr>
+                  </table>
+                  <p class="fd-receipt-closed-by" *ngIf="selectedFDForReceipt.closedBy">Processed by: {{ selectedFDForReceipt.closedBy }}</p>
+                </div>
+                <div class="fd-receipt-footer">
+                  <p class="fd-receipt-note">This is a computer generated e-fixed deposit receipt from NeoBank Digital Banking, hence does not require any signature.</p>
+                  <div class="fd-receipt-instructions">
+                    <p><strong>Important Instructions:</strong></p>
+                    <ol>
+                      <li>This is not transferable.</li>
+                      <li>The confirmation of deposit is being issued against deposit as per given mandate of customer. In case of discrepancy please contact support within 7 days of issue of this confirmation.</li>
+                      <li>Maturity value and part withdrawal if any, are subject to TDS as per Income Tax Act.</li>
+                      <li>The deposit shall be auto renewed at the rate applicable for the concerned period on date of maturity.</li>
+                      <li>Withdrawal of term deposit before maturity is allowed subject to penal interest rate with regard to premature withdrawal of Term Deposit as per Bank Guidelines.</li>
+                    </ol>
+                  </div>
+                  <p class="fd-receipt-generated">Receipt generated on: {{ today | date:'dd/MM/yyyy HH:mm:ss' }}</p>
+                </div>
+              </div>
+            </div>
+            <div class="ud-modal-foot">
+              <button (click)="closeFDReceiptModal()" class="ud-btn-outline">Close</button>
+              <button (click)="printFDReceipt()" class="ud-btn-primary"><i class="fa fa-print"></i> Print / Save PDF</button>
+            </div>
+          </div>
+        </div>
+        <!-- Top-up Modal -->
+        <div *ngIf="showTopUpModal" class="ud-modal-overlay" (click)="closeTopUpModal()"><div class="ud-modal" (click)="$event.stopPropagation()"><div class="ud-modal-head"><h3>Increase FD Amount</h3><button (click)="closeTopUpModal()" class="ud-close-btn">&times;</button></div><div class="ud-modal-body"><div class="ud-form-group"><label>Additional Amount (&#8377;) *</label><input type="number" [(ngModel)]="topUpAmount" class="ud-input" min="1000"/></div><div *ngIf="selectedFDForTopUp" class="ud-info-box"><p>Current: &#8377;{{ selectedFDForTopUp.principalAmount | number:'1.2-2' }}</p><p>New: &#8377;{{ (selectedFDForTopUp.principalAmount + (topUpAmount || 0)) | number:'1.2-2' }}</p></div></div><div class="ud-modal-foot"><button (click)="closeTopUpModal()" class="ud-btn-outline">Cancel</button><button (click)="processTopUp()" [disabled]="!topUpAmount || topUpAmount <= 0 || isProcessingTopUp" class="ud-btn-primary">{{ isProcessingTopUp ? 'Processing...' : 'Confirm' }}</button></div></div></div>
+      </div>
+
+      <!-- EMI Monitoring -->
+      <div *ngIf="selectedFeature === 'emi-monitoring'" class="ud-feature-card">
+        <div class="ud-feature-header"><h2>EMI Monitoring</h2><button (click)="loadEMIs()" class="ud-chip-btn">Refresh</button></div>
+        <div *ngIf="emiSummary" class="ud-emi-summary"><div class="ud-emi-stat" *ngFor="let s of [{ l: 'Total', v: emiSummary.totalEmis }, { l: 'Paid', v: emiSummary.paidEmis }, { l: 'Pending', v: emiSummary.pendingEmis }, { l: 'Overdue', v: emiSummary.overdueEmis }]"><span class="ud-emi-stat-val">{{ s.v }}</span><span class="ud-emi-stat-label">{{ s.l }}</span></div></div>
+        <div class="ud-txn-tabs" style="margin:16px 0"><button class="ud-txn-tab" [class.active]="activeEmiTab === 'all'" (click)="switchEmiTab('all')">All ({{ emis.length }})</button><button class="ud-txn-tab" [class.active]="activeEmiTab === 'paid'" (click)="switchEmiTab('paid')">Paid</button><button class="ud-txn-tab" [class.active]="activeEmiTab === 'upcoming'" (click)="switchEmiTab('upcoming')">Upcoming</button></div>
+        <div *ngIf="isLoadingEMIs" class="ud-empty">Loading EMIs...</div>
+        <div *ngIf="!isLoadingEMIs && filteredEmis.length === 0" class="ud-empty">No EMIs found.</div>
+        <div *ngIf="!isLoadingEMIs && filteredEmis.length > 0" class="ud-invest-list"><div *ngFor="let emi of filteredEmis" class="ud-invest-card"><div class="ud-invest-head"><h3>EMI #{{ emi.emiNumber }} - {{ emi.loanAccountNumber }}</h3><span class="ud-status-badge" [ngClass]="getEMIStatusClass(emi.status)">{{ emi.status }}</span></div><div class="ud-invest-body"><div class="ud-info-row"><span>Due Date:</span><span>{{ emi.dueDate | date:'dd/MM/yyyy' }}</span></div><div class="ud-info-row"><span>Total:</span><span>&#8377;{{ emi.totalAmount | number:'1.2-2' }}</span></div><div class="ud-info-row"><span>Principal:</span><span>&#8377;{{ emi.principalAmount | number:'1.2-2' }}</span></div><div class="ud-info-row"><span>Interest:</span><span>&#8377;{{ emi.interestAmount | number:'1.2-2' }}</span></div></div><div class="ud-invest-foot" *ngIf="emi.status === 'Pending' || emi.status === 'PENDING'"><button (click)="payEMI(emi.id)" class="ud-btn-primary ud-btn-sm">Pay EMI</button></div></div></div>
+      </div>
+
+      <!-- Accounts -->
+      <div *ngIf="selectedFeature === 'accounts'" class="ud-feature-card">
+        <div class="ud-feature-header"><h2>Account Details</h2><button (click)="loadUserProfile()" class="ud-chip-btn">Refresh</button></div>
+        <div class="ud-account-grid"><div class="ud-info-row"><span>Account Number:</span><span>{{ userAccountNumber }}</span></div><div class="ud-info-row"><span>Holder:</span><span>{{ username }}</span></div><div class="ud-info-row"><span>Balance:</span><span class="ud-text-success">&#8377;{{ currentBalance | number:'1.2-2' }}</span></div><div class="ud-info-row" *ngIf="userProfile?.email"><span>Email:</span><span>{{ userProfile.email }}</span></div></div>
+        <div class="ud-form-actions" style="margin-top:16px"><button (click)="selectFeature('transaction')" class="ud-btn-outline">View Transactions</button><button (click)="selectFeature('transferfunds')" class="ud-btn-primary">Transfer Funds</button></div>
+      </div>
+
+      <!-- Embedded Features -->
+      <div *ngIf="selectedFeature === 'transferfunds'" class="ud-embedded"><app-transferfunds></app-transferfunds></div>
+      <div *ngIf="selectedFeature === 'transaction'" class="ud-embedded"><app-transaction></app-transaction></div>
+      <div *ngIf="selectedFeature === 'card'" class="ud-embedded"><app-card></app-card></div>
+      <div *ngIf="selectedFeature === 'credit-card'" class="ud-embedded"><app-creditcard></app-creditcard></div>
+      <div *ngIf="selectedFeature === 'loan'" class="ud-embedded"><app-loan></app-loan></div>
+      <div *ngIf="selectedFeature === 'cheque'" class="ud-embedded"><app-cheque></app-cheque></div>
+      <div *ngIf="selectedFeature === 'kycupdate'" class="ud-embedded"><app-kycupdate></app-kycupdate></div>
+      <div *ngIf="selectedFeature === 'goldloan'" class="ud-embedded"><app-goldloan></app-goldloan></div>
+      <div *ngIf="selectedFeature === 'subsidy-claim'" class="ud-embedded"><app-subsidy-claim></app-subsidy-claim></div>
+      <div *ngIf="selectedFeature === 'bill-payment'" class="ud-embedded"><app-billpayment></app-billpayment></div>
+      <div *ngIf="selectedFeature === 'scheduled-payments'" class="ud-embedded"><app-scheduled-payments></app-scheduled-payments></div>
+      <div *ngIf="selectedFeature === 'support-tickets'" class="ud-embedded"><app-support-tickets></app-support-tickets></div>
+      <div *ngIf="selectedFeature === 'bank-messages'" class="ud-embedded"><app-bank-messages></app-bank-messages></div>
+      <div *ngIf="selectedFeature === 'virtual-card'" class="ud-embedded"><app-virtual-card></app-virtual-card></div>
+      <div *ngIf="selectedFeature === 'beneficiary-management'" class="ud-embedded"><app-beneficiary-management></app-beneficiary-management></div>
+      <div *ngIf="selectedFeature === 'atm-simulator'" class="ud-embedded"><app-atm-simulator></app-atm-simulator></div>
+      <div *ngIf="selectedFeature === 'fasttag'" class="ud-embedded"><app-fasttag-user></app-fasttag-user></div>
+
+      <!-- ─── UPI PAY SECTION ─── -->
+      <div *ngIf="selectedFeature === 'upi-pay'" class="ud-feature-card upi-section">
+        <!-- Tab bar -->
+        <div class="upi-tab-bar">
+          <button class="upi-tab" [class.active]="upiSendTab === 'send'" (click)="upiSendTab = 'send'">📲 Send Money</button>
+          <button class="upi-tab" [class.active]="upiSendTab === 'manage'" (click)="upiSendTab = 'manage'">⚙️ Manage UPI</button>
+          <button class="upi-tab" [class.active]="upiSendTab === 'history'" (click)="upiSendTab = 'history'; loadUpiTransactions()">📋 History</button>
+          <button class="upi-tab" [class.active]="upiSendTab === 'links'" (click)="upiSendTab = 'links'; loadUserPaymentLinks()">
+            💸 Payment Links
+            <span *ngIf="pendingPaymentLinks.length > 0" class="upi-link-badge">{{pendingPaymentLinks.length}}</span>
+          </button>
+        </div>
+
+        <!-- MANAGE UPI tab -->
+        <div *ngIf="upiSendTab === 'manage'" class="upi-manage-tab">
+          <div *ngIf="isLoadingUpiStatus" class="ud-empty">Loading UPI status...</div>
+          <div *ngIf="!isLoadingUpiStatus">
+            <!-- Not set up yet -->
+            <div *ngIf="!upiStatus?.upiId" class="upi-setup-card">
+              <div class="upi-setup-icon">📲</div>
+              <h3>Set Up UPI for This Account</h3>
+              <p>Your savings account UPI ID will be: <strong>{{userAccountNumber}}&#64;neobank</strong></p>
+              <div *ngIf="upiSetupError" class="upi-error-msg">{{upiSetupError}}</div>
+              <div *ngIf="upiSetupSuccess" class="upi-success-msg">{{upiSetupSuccess}}</div>
+              <button class="ud-btn-primary" (click)="setupUpi()" [disabled]="isSettingUpUpi">
+                {{isSettingUpUpi ? 'Setting up...' : 'Enable UPI'}}
+              </button>
+            </div>
+            <!-- UPI set up -->
+            <div *ngIf="upiStatus?.upiId" class="upi-status-card">
+              <div class="upi-id-display">
+                <span class="upi-id-label">Your UPI ID</span>
+                <span class="upi-id-value">{{upiStatus.upiId}}</span>
+                <span class="upi-badge" [class.active]="upiStatus.upiEnabled" [class.blocked]="!upiStatus.upiEnabled">
+                  {{upiStatus.upiEnabled ? 'Active' : 'Blocked'}}
+                </span>
+              </div>
+              <div class="upi-status-grid">
+                <div class="upi-stat-item">
+                  <span class="upi-stat-label">Balance</span>
+                  <span class="upi-stat-value">₹{{(upiStatus.balance || 0) | number:'1.2-2'}}</span>
+                </div>
+                <div class="upi-stat-item">
+                  <span class="upi-stat-label">PIN</span>
+                  <span class="upi-stat-value">{{upiStatus.pinSet ? '✅ Set' : '❌ Not Set'}}</span>
+                </div>
+              </div>
+              <div class="upi-actions">
+                <button class="ud-btn-outline ud-btn-sm" (click)="openUpiPinModal('set')">
+                  {{upiStatus.pinSet ? '🔑 Change PIN' : '🔑 Set PIN'}}
+                </button>
+                <button class="ud-btn-outline ud-btn-sm" *ngIf="upiStatus.pinSet" (click)="openUpiPinModal('forgot')">
+                  🔓 Forgot PIN
+                </button>
+                <button class="ud-btn-sm" [class.ud-btn-danger]="upiStatus.upiEnabled" [class.ud-btn-primary]="!upiStatus.upiEnabled" (click)="toggleUpi()">
+                  {{upiStatus.upiEnabled ? '🔒 Block UPI' : '✅ Enable UPI'}}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SEND MONEY tab -->
+        <div *ngIf="upiSendTab === 'send'" class="upi-send-tab">
+          <div *ngIf="!upiStatus?.upiId || !upiStatus?.upiEnabled" class="upi-not-ready">
+            <p *ngIf="!upiStatus?.upiId">⚠️ Please set up UPI first in the Manage UPI tab.</p>
+            <p *ngIf="upiStatus?.upiId && !upiStatus?.upiEnabled">🔒 Your UPI is currently blocked. Enable it from Manage UPI.</p>
+          </div>
+          <div *ngIf="upiStatus?.upiId && upiStatus?.upiEnabled" class="upi-send-form">
+            <h3>Send Money via UPI</h3>
+            <div *ngIf="!upiStatus?.pinSet" class="upi-warn-msg">⚠️ Please set your UPI PIN first.</div>
+            <div class="ud-form-group">
+              <label>Receiver UPI ID</label>
+              <div class="upi-verify-row">
+                <input type="text" [(ngModel)]="upiSendForm.receiverUpiId" class="ud-input" placeholder="e.g. 1234567890@neobank" (keyup.enter)="verifyUpiSendId()" />
+                <button class="ud-btn-outline ud-btn-sm" (click)="verifyUpiSendId()" [disabled]="isVerifyingUpiSend || !upiSendForm.receiverUpiId">
+                  {{isVerifyingUpiSend ? 'Verifying...' : 'Verify'}}
+                </button>
+              </div>
+              <div *ngIf="upiSendVerified" class="upi-verified-name">✅ {{upiSendVerifiedName}}</div>
+              <div *ngIf="upiSendVerifyError" class="upi-error-msg">{{upiSendVerifyError}}</div>
+            </div>
+            <div class="ud-form-group" *ngIf="upiSendVerified">
+              <label>Amount (₹)</label>
+              <input type="number" [(ngModel)]="upiSendForm.amount" class="ud-input" min="1" placeholder="Enter amount" />
+            </div>
+            <div class="ud-form-group" *ngIf="upiSendVerified">
+              <label>Remark (optional)</label>
+              <input type="text" [(ngModel)]="upiSendForm.remark" class="ud-input" placeholder="e.g. Rent, Groceries" />
+            </div>
+            <div class="ud-form-group" *ngIf="upiSendVerified">
+              <label>UPI PIN (6 digits)</label>
+              <input type="password" [(ngModel)]="upiSendForm.transactionPin" class="ud-input" maxlength="6" placeholder="••••••" inputmode="numeric" />
+            </div>
+            <div *ngIf="upiSendError" class="upi-error-msg">{{upiSendError}}</div>
+            <div *ngIf="upiSendSuccess" class="upi-success-msg">{{upiSendSuccess}}</div>
+            <button *ngIf="upiSendVerified" class="ud-btn-primary" (click)="submitUpiSend()"
+              [disabled]="isSubmittingUpiSend || !upiSendForm.amount || upiSendForm.transactionPin.length !== 6">
+              {{isSubmittingUpiSend ? 'Processing...' : 'Pay ₹' + upiSendForm.amount}}
+            </button>
+          </div>
+        </div>
+
+        <!-- HISTORY tab -->
+        <div *ngIf="upiSendTab === 'history'" class="upi-history-tab">
+          <div *ngIf="isLoadingUpiTxns" class="ud-empty">Loading transactions...</div>
+          <div *ngIf="!isLoadingUpiTxns && upiTransactions.length === 0" class="ud-empty">No UPI transactions yet.</div>
+          <table *ngIf="!isLoadingUpiTxns && upiTransactions.length > 0" class="ud-table">
+            <thead>
+              <tr><th>Date</th><th>Ref</th><th>Party</th><th>Remark</th><th>Amount</th><th>Status</th></tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let tx of upiTransactions">
+                <td>{{tx.createdAt | date:'dd/MM/yy, h:mm a'}}</td>
+                <td class="upi-ref">{{tx.transactionRef}}</td>
+                <td>
+                  <div *ngIf="tx.senderUpiId === upiStatus?.upiId">
+                    <span class="upi-party-label upi-debit-label">Sent To</span><br/>
+                    <strong>{{tx.receiverName || 'Account Holder'}}</strong><br/>
+                    <small class="upi-id-small">{{tx.receiverUpiId}}</small>
+                  </div>
+                  <div *ngIf="tx.senderUpiId !== upiStatus?.upiId">
+                    <span class="upi-party-label upi-credit-label">Received From</span><br/>
+                    <strong>{{tx.senderName || 'Account Holder'}}</strong><br/>
+                    <small class="upi-id-small">{{tx.senderUpiId}}</small>
+                  </div>
+                </td>
+                <td>{{tx.remark || '—'}}</td>
+                <td [class.upi-debit]="tx.senderUpiId === upiStatus?.upiId" [class.upi-credit]="tx.senderUpiId !== upiStatus?.upiId">
+                  <span *ngIf="tx.senderUpiId === upiStatus?.upiId">− ₹{{tx.amount | number:'1.2-2'}}</span>
+                  <span *ngIf="tx.senderUpiId !== upiStatus?.upiId">+ ₹{{tx.amount | number:'1.2-2'}}</span>
+                </td>
+                <td><span class="upi-status-badge" [class.success]="tx.status === 'SUCCESS'" [class.flagged]="tx.fraudFlagged">{{tx.fraudFlagged ? '⚠️ Flagged' : tx.status}}</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <!-- PAYMENT LINKS tab -->
+        <div *ngIf="upiSendTab === 'links'" class="upi-history-tab">
+          <div *ngIf="!upiStatus?.upiId" class="upi-not-ready">
+            <p>⚠️ Please set up UPI first in the Manage UPI tab to receive payment requests.</p>
+          </div>
+          <div *ngIf="upiStatus?.upiId">
+            <div *ngIf="isLoadingLinks" class="ud-empty">Loading payment requests...</div>
+            <div *ngIf="!isLoadingLinks && allPaymentLinks.length === 0" class="ud-empty">No payment requests received yet.</div>
+            <table *ngIf="!isLoadingLinks && allPaymentLinks.length > 0" class="ud-table">
+              <thead>
+                <tr><th>Merchant</th><th>Description</th><th>Amount</th><th>Expires</th><th>Status</th><th>Action</th></tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let link of allPaymentLinks" [class.upi-link-pending]="link.status === 'PENDING'">
+                  <td><strong>{{link.merchantName || link.merchantId}}</strong><br/><small class="upi-id-small">{{link.merchantUpiId}}</small></td>
+                  <td>{{link.description || '—'}}</td>
+                  <td class="upi-debit"><strong>₹{{link.amount | number:'1.2-2'}}</strong></td>
+                  <td><small>{{link.expiresAt ? (link.expiresAt | date:'dd/MM/yy HH:mm') : 'No expiry'}}</small></td>
+                  <td>
+                    <span class="upi-status-badge" [class.success]="link.status === 'PAID'" [class.upi-status-pending]="link.status === 'PENDING'" [class.flagged]="link.status === 'EXPIRED' || link.status === 'CANCELLED'">
+                      {{link.status}}
+                    </span>
+                  </td>
+                  <td>
+                    <button *ngIf="link.status === 'PENDING'" class="ud-btn-primary ud-btn-sm" (click)="openLinkPayModal(link)">
+                      💸 Pay Now
+                    </button>
+                    <span *ngIf="link.status !== 'PENDING'" class="upi-id-small">—</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <!-- /UPI PAY SECTION -->
+    </div>
+  </main>
+
+  <!-- ─── PAYMENT LINK PAY MODAL ─── -->
+  <div *ngIf="showLinkPayModal" class="ud-modal-overlay" (click)="!isLinkPayProcessing && closeLinkPayModal()">
+    <div class="ud-modal" (click)="$event.stopPropagation()">
+      <div class="ud-modal-head">
+        <h3>💸 Pay Payment Request</h3>
+        <button (click)="closeLinkPayModal()" class="ud-close-btn" [disabled]="isLinkPayProcessing">&times;</button>
+      </div>
+      <div class="ud-modal-body" *ngIf="!linkPaySuccess">
+        <div style="background:#f8fafc;border-radius:8px;padding:12px 16px;margin-bottom:16px;">
+          <div style="font-weight:600;font-size:15px;margin-bottom:4px;">{{selectedLink?.merchantName}}</div>
+          <div style="color:#6b7280;font-size:13px;margin-bottom:4px;">{{selectedLink?.description}}</div>
+          <div style="font-size:22px;font-weight:700;color:#1e3a5f;">₹{{selectedLink?.amount | number:'1.2-2'}}</div>
+        </div>
+        <div class="ud-form-group">
+          <label>Your UPI PIN (6 digits)</label>
+          <input type="password" [(ngModel)]="linkPayPin" maxlength="6" class="ud-input ud-pin-input"
+                 placeholder="••••••" inputmode="numeric" [disabled]="isLinkPayProcessing" />
+        </div>
+        <div *ngIf="linkPayError" class="upi-error-msg">{{linkPayError}}</div>
+      </div>
+      <div class="ud-modal-body" *ngIf="linkPaySuccess" style="padding:0;max-height:75vh;overflow-y:auto;">
+        <div id="pg-invoice-print" style="padding:24px;">
+          <!-- Invoice Header -->
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #1e3a5f;padding-bottom:14px;margin-bottom:16px;">
+            <div>
+              <div style="font-size:22px;font-weight:800;color:#1e3a5f;">🏦 NeoBank</div>
+              <div style="font-size:11px;color:#64748b;margin-top:2px;">Payment Gateway Invoice</div>
+            </div>
+            <div style="text-align:right;">
+              <div style="background:#dcfce7;color:#16a34a;padding:5px 14px;border-radius:20px;font-weight:700;font-size:12px;display:inline-block;">✓ PAID</div>
+              <div style="font-size:11px;color:#94a3b8;margin-top:4px;">{{ linkPayResult?.invoice?.invoiceNumber }}</div>
+            </div>
+          </div>
+
+          <!-- Merchant & Customer Info -->
+          <div style="display:flex;gap:20px;margin-bottom:16px;">
+            <div style="flex:1;">
+              <div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;font-weight:600;">Merchant</div>
+              <div style="font-weight:700;font-size:15px;color:#1e293b;">{{ linkPayResult?.invoice?.merchantName }}</div>
+              <div style="font-size:13px;color:#475569;">UPI: {{ linkPayResult?.invoice?.merchantUpiId }}</div>
+              <div *ngIf="linkPayResult?.invoice?.businessEmail" style="font-size:12px;color:#64748b;">{{ linkPayResult?.invoice?.businessEmail }}</div>
+              <div *ngIf="linkPayResult?.invoice?.businessPhone" style="font-size:12px;color:#64748b;">📞 {{ linkPayResult?.invoice?.businessPhone }}</div>
+            </div>
+            <div style="flex:1;">
+              <div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;font-weight:600;">Billed To</div>
+              <div style="font-weight:700;font-size:15px;color:#1e293b;">{{ linkPayResult?.invoice?.payerName }}</div>
+              <div style="font-size:13px;color:#475569;">A/C: {{ linkPayResult?.invoice?.payerAccount }}</div>
+              <div *ngIf="linkPayResult?.invoice?.payerEmail" style="font-size:12px;color:#64748b;">{{ linkPayResult?.invoice?.payerEmail }}</div>
+              <div style="font-size:12px;color:#64748b;">Type: {{ linkPayResult?.invoice?.accountType }}</div>
+            </div>
+          </div>
+
+          <!-- Date & Transaction Info -->
+          <div style="background:#f8fafc;border-radius:8px;padding:10px 14px;margin-bottom:16px;display:flex;justify-content:space-between;font-size:12px;color:#475569;">
+            <span><strong>Date:</strong> {{ linkPayResult?.invoice?.date | date:'dd MMM yyyy, hh:mm a' }}</span>
+            <span><strong>Txn ID:</strong> {{ linkPayResult?.invoice?.transactionId }}</span>
+            <span><strong>Method:</strong> UPI Link</span>
+          </div>
+
+          <!-- Items Table -->
+          <table style="width:100%;border-collapse:collapse;margin-bottom:16px;">
+            <thead>
+              <tr style="background:#f1f5f9;">
+                <th style="padding:10px 14px;text-align:left;font-size:12px;color:#475569;font-weight:600;border-bottom:2px solid #e2e8f0;">Item / Description</th>
+                <th style="padding:10px 14px;text-align:right;font-size:12px;color:#475569;font-weight:600;border-bottom:2px solid #e2e8f0;">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style="padding:12px 14px;font-size:14px;border-bottom:1px solid #f1f5f9;">{{ linkPayResult?.invoice?.description || 'Payment' }}</td>
+                <td style="padding:12px 14px;text-align:right;font-size:14px;font-weight:600;border-bottom:1px solid #f1f5f9;">₹{{ linkPayResult?.invoice?.grossAmount | number:'1.2-2' }}</td>
+              </tr>
+              <tr>
+                <td style="padding:8px 14px;font-size:12px;color:#64748b;border-bottom:1px solid #f1f5f9;">Platform Fee (2%)</td>
+                <td style="padding:8px 14px;text-align:right;font-size:12px;color:#64748b;border-bottom:1px solid #f1f5f9;">- ₹{{ linkPayResult?.invoice?.platformFee | number:'1.2-2' }}</td>
+              </tr>
+              <tr>
+                <td style="padding:8px 14px;font-size:12px;color:#64748b;border-bottom:1px solid #f1f5f9;">GST (18%)</td>
+                <td style="padding:8px 14px;text-align:right;font-size:12px;color:#64748b;border-bottom:1px solid #f1f5f9;">- ₹{{ linkPayResult?.invoice?.gst | number:'1.2-2' }}</td>
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr>
+                <td style="padding:12px 14px;font-weight:700;font-size:15px;color:#1e3a5f;border-top:2px solid #1e3a5f;">Total Paid</td>
+                <td style="padding:12px 14px;text-align:right;font-weight:700;font-size:18px;color:#1e3a5f;border-top:2px solid #1e3a5f;">₹{{ linkPayResult?.invoice?.grossAmount | number:'1.2-2' }}</td>
+              </tr>
+            </tfoot>
+          </table>
+
+          <!-- Seal -->
+          <div style="text-align:center;margin-top:20px;padding-top:16px;border-top:2px dashed #cbd5e1;">
+            <div style="width:85px;height:85px;border:3px solid #16a34a;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;transform:rotate(-15deg);">
+              <div style="font-size:10px;color:#16a34a;font-weight:800;text-transform:uppercase;line-height:1.3;text-align:center;">
+                NeoBank<br/>✓ Verified<br/>Payment
+              </div>
+            </div>
+            <div style="font-size:11px;color:#94a3b8;margin-top:8px;">This is a computer-generated invoice. No signature required.</div>
+          </div>
+        </div>
+
+        <!-- Print / Download buttons -->
+        <div style="display:flex;gap:10px;padding:12px 24px 20px;border-top:1px solid #e2e8f0;">
+          <button class="ud-btn-primary" style="flex:1;" (click)="printInvoice()">🖨️ Print / Download PDF</button>
+          <button class="ud-btn-outline" style="flex:1;" (click)="closeLinkPayModal()">Close</button>
+        </div>
+      </div>
+      <div class="ud-modal-foot" *ngIf="!linkPaySuccess">
+        <button class="ud-btn-outline" (click)="closeLinkPayModal()" [disabled]="isLinkPayProcessing">Cancel</button>
+        <button class="ud-btn-primary" (click)="payLinkWithPin()"
+                [disabled]="isLinkPayProcessing || linkPayPin.length < 6">
+          {{isLinkPayProcessing ? 'Processing...' : '💸 Pay ₹' + (selectedLink?.amount | number:'1.2-2')}}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── UPI PIN MODAL ─── -->
+  <div *ngIf="showUpiPinModal" class="ud-modal-overlay" (click)="closeUpiPinModal()">
+    <div class="ud-modal" (click)="$event.stopPropagation()">
+      <div class="ud-modal-head">
+        <h3>{{ upiPinMode === 'forgot' ? '🔓 Reset UPI PIN' : '🔑 Set UPI PIN' }}</h3>
+        <button (click)="closeUpiPinModal()" class="ud-close-btn">&times;</button>
+      </div>
+      <div class="ud-modal-body">
+        <p class="ud-pin-desc">
+          <ng-container *ngIf="upiPinMode === 'forgot'">Enter your registered mobile number to verify identity and reset your 6-digit UPI PIN.</ng-container>
+          <ng-container *ngIf="upiPinMode === 'set'">Create a 6-digit UPI PIN to authorise payments from your savings account.</ng-container>
+        </p>
+        <div *ngIf="upiPinMode === 'forgot'" class="ud-form-group">
+          <label>Registered Mobile Number</label>
+          <input type="tel" [(ngModel)]="upiPinForm.registeredPhone" maxlength="10" class="ud-input" placeholder="Enter registered phone number" />
+        </div>
+        <div class="ud-form-group">
+          <label>New 6-Digit PIN</label>
+          <input type="password" [(ngModel)]="upiPinForm.newPin" maxlength="6" pattern="[0-9]{6}" class="ud-input ud-pin-input" placeholder="••••••" inputmode="numeric" />
+        </div>
+        <div class="ud-form-group">
+          <label>Confirm PIN</label>
+          <input type="password" [(ngModel)]="upiPinForm.confirmPin" maxlength="6" pattern="[0-9]{6}" class="ud-input ud-pin-input" placeholder="••••••" inputmode="numeric" />
+        </div>
+        <div *ngIf="upiPinError" class="upi-error-msg">{{upiPinError}}</div>
+        <div *ngIf="upiPinSuccess" class="upi-success-msg">{{upiPinSuccess}}</div>
+      </div>
+      <div class="ud-modal-foot">
+        <button *ngIf="upiPinMode === 'set'" (click)="openUpiPinModal('forgot')" class="ud-btn-link" type="button">Forgot PIN?</button>
+        <button *ngIf="upiPinMode === 'forgot'" (click)="openUpiPinModal('set')" class="ud-btn-link" type="button">Back to Set PIN</button>
+        <button (click)="closeUpiPinModal()" class="ud-btn-outline">Cancel</button>
+        <button (click)="submitUpiPin()" [disabled]="isSettingUpiPin || upiPinForm.newPin.length !== 6" class="ud-btn-primary">
+          {{isSettingUpiPin ? 'Saving...' : (upiPinMode === 'forgot' ? 'Reset PIN' : 'Save PIN')}}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Chat -->
+  <app-chat></app-chat>
+
+  <!-- ═══ CREATE PIN MODAL ═══ -->
+  <div *ngIf="showPinModal" class="ud-modal-overlay" (click)="closeCreatePinModal()">
+    <div class="ud-modal ud-pin-modal" (click)="$event.stopPropagation()">
+      <div class="ud-modal-head">
+        <h3>🔑 Create Switch PIN</h3>
+        <button (click)="closeCreatePinModal()" class="ud-close-btn">&times;</button>
+      </div>
+      <div class="ud-modal-body">
+        <p class="ud-pin-desc">Create a 4-digit PIN to switch between your linked Savings and Current accounts securely.</p>
+        <div class="ud-form-group">
+          <label>Enter 4-Digit PIN</label>
+          <input type="password" [(ngModel)]="switchPin" maxlength="4" pattern="[0-9]{4}" class="ud-input ud-pin-input" placeholder="••••" />
+        </div>
+        <div class="ud-form-group">
+          <label>Confirm PIN</label>
+          <input type="password" [(ngModel)]="confirmSwitchPin" maxlength="4" pattern="[0-9]{4}" class="ud-input ud-pin-input" placeholder="••••" />
+        </div>
+      </div>
+      <div class="ud-modal-foot">
+        <button (click)="closeCreatePinModal()" class="ud-btn-outline">Cancel</button>
+        <button (click)="createSwitchPin()" [disabled]="isPinCreating || switchPin.length !== 4 || confirmSwitchPin.length !== 4" class="ud-btn-primary">
+          {{ isPinCreating ? 'Creating...' : 'Create PIN' }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ VERIFY PIN MODAL ═══ -->
+  <div *ngIf="showVerifyPinModal" class="ud-modal-overlay" (click)="closeVerifyPinModal()">
+    <div class="ud-modal ud-pin-modal" (click)="$event.stopPropagation()">
+      <div class="ud-modal-head">
+        <h3>🔄 Switch to Current Account</h3>
+        <button (click)="closeVerifyPinModal()" class="ud-close-btn">&times;</button>
+      </div>
+      <div class="ud-modal-body">
+        <div class="ud-switch-target-info">
+          <div class="ud-switch-target-icon">🏢</div>
+          <div class="ud-switch-target-detail">
+            <strong>{{ linkedCurrentAccountDetails?.businessName || 'Current Account' }}</strong>
+            <span>{{ linkedAccount?.currentAccountNumber }}</span>
+          </div>
+        </div>
+        <p class="ud-pin-desc">Enter your 4-digit PIN to switch to your linked Current Account.</p>
+        <div class="ud-form-group">
+          <label>Enter PIN</label>
+          <input type="password" [(ngModel)]="verifyPin" maxlength="4" pattern="[0-9]{4}" class="ud-input ud-pin-input" placeholder="••••" (keyup.enter)="verifySwitchAndNavigate()" />
+        </div>
+      </div>
+      <div class="ud-modal-foot">
+        <button (click)="closeVerifyPinModal()" class="ud-btn-outline">Cancel</button>
+        <button (click)="verifySwitchAndNavigate()" [disabled]="isVerifyingPin || verifyPin.length !== 4" class="ud-btn-primary">
+          {{ isVerifyingPin ? 'Verifying...' : 'Switch Account' }}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

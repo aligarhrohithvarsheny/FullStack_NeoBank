@@ -1,0 +1,153 @@
+<div class="agent-dashboard">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-logo">🏪</div>
+      <h2>Agent Panel</h2>
+    </div>
+    <div class="agent-info" *ngIf="agent">
+      <div class="agent-avatar">{{ agent.name.charAt(0) }}</div>
+      <div class="agent-details">
+        <strong>{{ agent.name }}</strong>
+        <small>{{ agent.agentId }}</small>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <a [class.active]="activeTab === 'merchants'" (click)="activeTab = 'merchants'">
+        📋 My Merchants
+      </a>
+      <a (click)="addNewMerchant()">➕ Add New Merchant</a>
+      <a [class.active]="activeTab === 'stats'" (click)="activeTab = 'stats'">
+        📊 Statistics
+      </a>
+    </nav>
+    <button class="logout-btn" (click)="logout()">🚪 Logout</button>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="main-content">
+    <!-- Stats Cards -->
+    <div class="stats-row">
+      <div class="stat-card total" (click)="statusFilter = 'ALL'">
+        <div class="stat-icon">📦</div>
+        <div class="stat-value">{{ stats.totalMerchants || 0 }}</div>
+        <div class="stat-label">Total Merchants</div>
+      </div>
+      <div class="stat-card pending" (click)="statusFilter = 'PENDING'">
+        <div class="stat-icon">⏳</div>
+        <div class="stat-value">{{ stats.pending || 0 }}</div>
+        <div class="stat-label">Pending</div>
+      </div>
+      <div class="stat-card approved" (click)="statusFilter = 'APPROVED'">
+        <div class="stat-icon">✅</div>
+        <div class="stat-value">{{ stats.approved || 0 }}</div>
+        <div class="stat-label">Approved</div>
+      </div>
+      <div class="stat-card rejected" (click)="statusFilter = 'REJECTED'">
+        <div class="stat-icon">❌</div>
+        <div class="stat-value">{{ stats.rejected || 0 }}</div>
+        <div class="stat-label">Rejected</div>
+      </div>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="toolbar">
+      <div class="toolbar-left">
+        <h2>{{ statusFilter === 'ALL' ? 'All' : statusFilter }} Merchants</h2>
+        <span class="count-badge">{{ filteredMerchants.length }}</span>
+      </div>
+      <div class="toolbar-right">
+        <input type="text" [(ngModel)]="searchTerm" placeholder="🔍 Search merchants..." class="search-input">
+        <select [(ngModel)]="statusFilter" class="filter-select">
+          <option value="ALL">All Status</option>
+          <option value="PENDING">Pending</option>
+          <option value="APPROVED">Approved</option>
+          <option value="REJECTED">Rejected</option>
+        </select>
+        <button class="btn-add" (click)="addNewMerchant()">+ Add Merchant</button>
+      </div>
+    </div>
+
+    <!-- Loading -->
+    <div class="loading-state" *ngIf="loading">
+      <div class="spinner"></div>
+      <p>Loading merchants...</p>
+    </div>
+
+    <!-- Empty State -->
+    <div class="empty-state" *ngIf="!loading && filteredMerchants.length === 0">
+      <div class="empty-icon">📭</div>
+      <h3>No merchants found</h3>
+      <p>Start by adding a new merchant.</p>
+      <button class="btn-add" (click)="addNewMerchant()">+ Add New Merchant</button>
+    </div>
+
+    <!-- Merchant Cards -->
+    <div class="merchant-grid" *ngIf="!loading && filteredMerchants.length > 0">
+      <div class="merchant-card" *ngFor="let m of filteredMerchants" (click)="viewMerchant(m)">
+        <div class="merchant-card-header">
+          <div class="merchant-avatar">{{ m.businessName.charAt(0) }}</div>
+          <span class="status-badge" [ngClass]="getStatusClass(m.status)">{{ m.status }}</span>
+        </div>
+        <div class="merchant-card-body">
+          <h3>{{ m.businessName }}</h3>
+          <p class="owner">{{ m.ownerName }}</p>
+          <div class="merchant-meta">
+            <span>📞 {{ m.mobile }}</span>
+            <span>📍 {{ m.city }}, {{ m.state }}</span>
+          </div>
+          <div class="merchant-meta">
+            <span>🏷️ {{ m.businessType }}</span>
+            <span>🆔 {{ m.merchantId }}</span>
+          </div>
+        </div>
+        <div class="merchant-card-footer">
+          <button class="btn-view" (click)="viewMerchant(m); $event.stopPropagation()">View Details</button>
+          <button class="btn-edit" *ngIf="m.status === 'PENDING'" (click)="editMerchant(m); $event.stopPropagation()">Edit</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Detail Overlay -->
+    <div class="detail-overlay" *ngIf="selectedMerchant" (click)="closeDetail()">
+      <div class="detail-card" (click)="$event.stopPropagation()">
+        <button class="close-btn" (click)="closeDetail()">✕</button>
+        <h2>Merchant Details</h2>
+        <span class="status-badge large" [ngClass]="getStatusClass(selectedMerchant.status)">{{ selectedMerchant.status }}</span>
+
+        <div class="detail-section">
+          <h4>Business Information</h4>
+          <div class="detail-grid">
+            <div><label>Merchant ID</label><p>{{ selectedMerchant.merchantId }}</p></div>
+            <div><label>Business Name</label><p>{{ selectedMerchant.businessName }}</p></div>
+            <div><label>Owner Name</label><p>{{ selectedMerchant.ownerName }}</p></div>
+            <div><label>Mobile</label><p>{{ selectedMerchant.mobile }}</p></div>
+            <div><label>Email</label><p>{{ selectedMerchant.email || 'N/A' }}</p></div>
+            <div><label>Business Type</label><p>{{ selectedMerchant.businessType }}</p></div>
+            <div><label>GST Number</label><p>{{ selectedMerchant.gstNumber || 'N/A' }}</p></div>
+            <div><label>Address</label><p>{{ selectedMerchant.shopAddress }}, {{ selectedMerchant.city }}, {{ selectedMerchant.state }} - {{ selectedMerchant.pincode }}</p></div>
+          </div>
+        </div>
+
+        <div class="detail-section">
+          <h4>Bank Details</h4>
+          <div class="detail-grid">
+            <div><label>Bank Name</label><p>{{ selectedMerchant.bankName }}</p></div>
+            <div><label>Account Number</label><p>{{ selectedMerchant.accountNumber }}</p></div>
+            <div><label>IFSC Code</label><p>{{ selectedMerchant.ifscCode }}</p></div>
+            <div><label>Account Holder</label><p>{{ selectedMerchant.accountHolderName }}</p></div>
+          </div>
+        </div>
+
+        <div class="detail-section" *ngIf="selectedMerchant.rejectionReason">
+          <h4>Rejection Reason</h4>
+          <p class="rejection-reason">{{ selectedMerchant.rejectionReason }}</p>
+        </div>
+
+        <div class="detail-section">
+          <p class="created-at">Submitted: {{ selectedMerchant.createdAt | date:'medium' }}</p>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>

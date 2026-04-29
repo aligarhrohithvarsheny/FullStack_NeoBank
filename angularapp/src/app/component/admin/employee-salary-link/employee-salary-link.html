@@ -1,0 +1,148 @@
+<div class="esl-container">
+  <div class="esl-header">
+    <h2><i class="fa fa-link"></i> Employee ID — Salary Account Linking</h2>
+    <p class="esl-subtitle">Map employee IDs to NeoBank salary accounts (one-time per account)</p>
+  </div>
+
+  <!-- Stats Cards -->
+  <div class="esl-stats">
+    <div class="esl-stat-card">
+      <div class="esl-stat-value">{{ stats.total }}</div>
+      <div class="esl-stat-label">Total Accounts</div>
+    </div>
+    <div class="esl-stat-card linked">
+      <div class="esl-stat-value">{{ stats.linked }}</div>
+      <div class="esl-stat-label">Linked</div>
+    </div>
+    <div class="esl-stat-card unlinked">
+      <div class="esl-stat-value">{{ stats.unlinked }}</div>
+      <div class="esl-stat-label">Unlinked</div>
+    </div>
+  </div>
+
+  <!-- Toolbar -->
+  <div class="esl-toolbar">
+    <div class="esl-search">
+      <i class="fa fa-search"></i>
+      <input type="text" [(ngModel)]="searchTerm" (input)="applyFilter()" placeholder="Search by name, account, employee ID, company..." />
+    </div>
+    <div class="esl-filters">
+      <button *ngFor="let f of ['ALL', 'LINKED', 'UNLINKED']"
+              [class.active]="activeFilter === f"
+              (click)="setFilter(f)">{{ f }}</button>
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <div *ngIf="loading" class="esl-loading">
+    <i class="fa fa-spinner fa-spin"></i> Loading salary accounts...
+  </div>
+
+  <!-- Table -->
+  <div *ngIf="!loading && filteredAccounts.length > 0" class="esl-table-wrapper">
+    <table class="esl-table">
+      <thead>
+        <tr>
+          <th>Employee Name</th>
+          <th>Account Number</th>
+          <th>Company</th>
+          <th>Designation</th>
+          <th>Monthly Salary</th>
+          <th>Employee ID</th>
+          <th>Status</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let acc of filteredAccounts" [class.linked-row]="acc.employeeIdLinked">
+          <td class="emp-name">
+            <i class="fa fa-user-circle"></i>
+            {{ acc.employeeName }}
+          </td>
+          <td><code>{{ acc.accountNumber }}</code></td>
+          <td>{{ acc.companyName || '—' }}</td>
+          <td>{{ acc.designation || '—' }}</td>
+          <td>{{ formatCurrency(acc.monthlySalary) }}</td>
+          <td>
+            <span *ngIf="acc.employeeIdLinked" class="linked-badge">
+              <i class="fa fa-check-circle"></i> {{ acc.employeeId }}
+            </span>
+            <span *ngIf="!acc.employeeIdLinked" class="unlinked-badge">Not Linked</span>
+          </td>
+          <td>
+            <span class="status-badge" [ngClass]="acc.status === 'Active' ? 'status-active' : 'status-inactive'">
+              {{ acc.status }}
+            </span>
+          </td>
+          <td>
+            <button *ngIf="!acc.employeeIdLinked"
+                    class="btn-link"
+                    (click)="openLinkForm(acc)">
+              <i class="fa fa-link"></i> Link
+            </button>
+            <span *ngIf="acc.employeeIdLinked" class="already-linked">
+              <i class="fa fa-lock"></i> Locked
+            </span>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Empty State -->
+  <div *ngIf="!loading && filteredAccounts.length === 0" class="esl-empty">
+    <i class="fa fa-inbox"></i>
+    <p>No salary accounts found</p>
+  </div>
+
+  <!-- Link Modal Overlay -->
+  <div class="esl-overlay" *ngIf="selectedAccount" (click)="closeLinkForm()">
+    <div class="esl-modal" (click)="$event.stopPropagation()">
+      <div class="esl-modal-header">
+        <h3><i class="fa fa-link"></i> Link Employee ID</h3>
+        <button class="close-btn" (click)="closeLinkForm()">&times;</button>
+      </div>
+      <div class="esl-modal-body">
+        <div class="esl-info-row">
+          <span class="esl-info-label">Employee Name</span>
+          <span class="esl-info-value">{{ selectedAccount.employeeName }}</span>
+        </div>
+        <div class="esl-info-row">
+          <span class="esl-info-label">Account Number</span>
+          <span class="esl-info-value"><code>{{ selectedAccount.accountNumber }}</code></span>
+        </div>
+        <div class="esl-info-row">
+          <span class="esl-info-label">Company</span>
+          <span class="esl-info-value">{{ selectedAccount.companyName || '—' }}</span>
+        </div>
+        <div class="esl-info-row">
+          <span class="esl-info-label">Designation</span>
+          <span class="esl-info-value">{{ selectedAccount.designation || '—' }}</span>
+        </div>
+        <div class="esl-info-row">
+          <span class="esl-info-label">Monthly Salary</span>
+          <span class="esl-info-value">{{ formatCurrency(selectedAccount.monthlySalary) }}</span>
+        </div>
+
+        <div class="esl-warning">
+          <i class="fa fa-exclamation-triangle"></i>
+          <strong>One-Time Operation:</strong> Once linked, the Employee ID cannot be changed or removed.
+        </div>
+
+        <div class="esl-form-group">
+          <label for="empId">Employee ID</label>
+          <input type="text" id="empId" [(ngModel)]="employeeIdInput" placeholder="Enter Employee ID (e.g., EMP001)" />
+        </div>
+      </div>
+      <div class="esl-modal-footer">
+        <button class="btn-cancel" (click)="closeLinkForm()">Cancel</button>
+        <button class="btn-confirm"
+                [disabled]="!employeeIdInput.trim() || linking"
+                (click)="linkEmployee()">
+          <i class="fa fa-spinner fa-spin" *ngIf="linking"></i>
+          {{ linking ? 'Linking...' : 'Confirm Link' }}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

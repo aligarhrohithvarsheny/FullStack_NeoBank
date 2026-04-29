@@ -1,0 +1,105 @@
+<div class="support-tickets-container">
+  <div class="section-header">
+    <h2>🎫 Customer Support</h2>
+    <button class="btn-primary" (click)="showForm = !showForm">
+      {{ showForm ? '✕ Close' : '+ New Ticket' }}
+    </button>
+  </div>
+
+  <!-- Create Form -->
+  <div *ngIf="showForm" class="form-card">
+    <h3>Raise Support Request</h3>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Issue Category *</label>
+        <select [(ngModel)]="ticketForm.category">
+          <option *ngFor="let cat of categories" [value]="cat.value">{{ cat.label }}</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Priority</label>
+        <select [(ngModel)]="ticketForm.priority">
+          <option *ngFor="let p of priorities" [value]="p">{{ p }}</option>
+        </select>
+      </div>
+      <div class="form-group full-width">
+        <label>Subject *</label>
+        <input type="text" [(ngModel)]="ticketForm.subject" placeholder="Brief summary of the issue" />
+      </div>
+      <div class="form-group full-width">
+        <label>Description *</label>
+        <textarea [(ngModel)]="ticketForm.description" rows="4" placeholder="Describe the issue in detail..."></textarea>
+      </div>
+      <div class="form-group" *ngIf="ticketForm.category === 'TRANSACTION_FAILED'">
+        <label>Transaction ID (if applicable)</label>
+        <input type="text" [(ngModel)]="ticketForm.transactionId" placeholder="e.g. TXN-123456" />
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn-primary" (click)="createTicket()" [disabled]="isSubmitting">
+        {{ isSubmitting ? 'Submitting...' : 'Submit Ticket' }}
+      </button>
+      <button class="btn-secondary" (click)="showForm = false; resetForm()">Cancel</button>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button [class.active]="activeTab === 'all'" (click)="activeTab = 'all'">All ({{ tickets.length }})</button>
+    <button [class.active]="activeTab === 'open'" (click)="activeTab = 'open'">Open</button>
+    <button [class.active]="activeTab === 'in_progress'" (click)="activeTab = 'in_progress'">In Progress</button>
+    <button [class.active]="activeTab === 'resolved'" (click)="activeTab = 'resolved'">Resolved</button>
+    <button [class.active]="activeTab === 'closed'" (click)="activeTab = 'closed'">Closed</button>
+  </div>
+
+  <!-- Loading -->
+  <div *ngIf="isLoading" class="loading-state">
+    <div class="spinner"></div>
+    <p>Loading tickets...</p>
+  </div>
+
+  <!-- Empty State -->
+  <div *ngIf="!isLoading && getFilteredTickets().length === 0" class="empty-state">
+    <span class="empty-icon">🎫</span>
+    <p>No support tickets found</p>
+    <button class="btn-primary" (click)="showForm = true">Raise a Ticket</button>
+  </div>
+
+  <!-- Tickets List -->
+  <div class="tickets-list" *ngIf="!isLoading && getFilteredTickets().length > 0">
+    <div class="ticket-card" *ngFor="let ticket of getFilteredTickets()" (click)="viewTicket(ticket)">
+      <div class="ticket-header">
+        <span class="ticket-icon">{{ getCategoryIcon(ticket.category) }}</span>
+        <div class="ticket-info">
+          <h4>{{ ticket.subject }}</h4>
+          <p class="ticket-id">{{ ticket.ticketId }} · {{ ticket.category?.replace('_', ' ') }}</p>
+        </div>
+        <span class="status-badge" [style.background]="getStatusColor(ticket.status)">{{ ticket.status?.replace('_', ' ') }}</span>
+      </div>
+      <div class="ticket-meta">
+        <span class="priority-badge" [class]="'priority-' + ticket.priority?.toLowerCase()">{{ ticket.priority }}</span>
+        <span class="date">{{ formatDate(ticket.createdAt) }}</span>
+      </div>
+
+      <!-- Expanded View -->
+      <div class="ticket-details" *ngIf="selectedTicket?.id === ticket.id">
+        <div class="detail-section">
+          <h5>Description</h5>
+          <p>{{ ticket.description }}</p>
+        </div>
+        <div class="detail-section" *ngIf="ticket.adminResponse">
+          <h5>Admin Response</h5>
+          <p class="admin-response">{{ ticket.adminResponse }}</p>
+        </div>
+        <div class="detail-section" *ngIf="ticket.assignedTo">
+          <h5>Assigned To</h5>
+          <p>{{ ticket.assignedTo }}</p>
+        </div>
+        <div class="detail-section" *ngIf="ticket.resolvedAt">
+          <h5>Resolved At</h5>
+          <p>{{ formatDate(ticket.resolvedAt) }}</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

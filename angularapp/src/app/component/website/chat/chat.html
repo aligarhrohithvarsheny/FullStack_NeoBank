@@ -1,0 +1,98 @@
+<div class="chat-wrapper">
+  <!-- Chat Button -->
+  <button class="chat-button" (click)="toggleChat()" [class.active]="isOpen">
+    <span class="chat-icon">💬</span>
+    <span class="chat-badge" *ngIf="messages.length > 0 && !isOpen">{{ messages.length }}</span>
+  </button>
+
+  <!-- Chat Window -->
+  <div class="chat-window" [class.open]="isOpen">
+    <div class="chat-header">
+      <div class="chat-header-content">
+        <span class="chat-title">💬 Customer Support</span>
+        <button class="close-btn" (click)="toggleChat()">×</button>
+      </div>
+    </div>
+
+    <!-- Quick Action Shortcuts -->
+    <div class="quick-actions" *ngIf="isOpen">
+      <button class="quick-action-btn" (click)="sendQuickMessage('Check balance')" title="Check Balance">
+        💰 Balance
+      </button>
+      <button class="quick-action-btn" (click)="sendQuickMessage('My loans')" title="View Loans">
+        📋 Loans
+      </button>
+      <button class="quick-action-btn" (click)="sendQuickMessage('Transaction history')" title="Transactions">
+        💳 Transactions
+      </button>
+      <button class="quick-action-btn" (click)="sendQuickMessage('Account details')" title="Account Info">
+        🏦 Account
+      </button>
+    </div>
+
+    <div class="chat-messages" #chatContainer>
+      <div *ngFor="let msg of messages" class="message" [class.user-message]="msg.sender === 'USER'" [class.bot-message]="msg.sender === 'BOT'" [class.admin-message]="msg.sender === 'ADMIN'" [class.system-message]="msg.sender === 'SYSTEM'">
+        <div class="message-content">
+          <div class="message-header">
+            <span class="sender-name">{{ msg.sender === 'USER' ? userName : (msg.sender === 'ADMIN' ? 'Admin' : (msg.sender === 'SYSTEM' ? 'System' : 'Bot')) }}</span>
+            <span class="message-time">{{ formatTime(msg.timestamp) }}</span>
+          </div>
+          <div class="message-text" [innerHTML]="formatMessage(msg.message)"></div>
+          <!-- Attachment Display -->
+          <div *ngIf="msg.attachmentUrl" class="message-attachment">
+            <div *ngIf="msg.attachmentType === 'IMAGE'">
+              <img [src]="getAttachmentUrl(msg.attachmentUrl)" [alt]="msg.attachmentName || 'Image'" class="attachment-image" />
+            </div>
+            <div *ngIf="msg.attachmentType === 'PDF' || msg.attachmentType === 'FILE'" class="attachment-file">
+              <a [href]="getAttachmentUrl(msg.attachmentUrl)" target="_blank" class="attachment-link">
+                📄 {{ msg.attachmentName || 'Download File' }}
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div *ngIf="isLoading" class="message bot-message">
+        <div class="message-content">
+          <div class="typing-indicator">
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="chat-input">
+      <!-- Selected File Display -->
+      <div *ngIf="selectedFile" class="selected-file">
+        <span class="file-name">📎 {{ selectedFile.name }}</span>
+        <button (click)="removeFile()" class="remove-file-btn">×</button>
+      </div>
+      
+      <div class="input-row">
+        <input 
+          type="file"
+          id="fileInput"
+          accept="image/*,.pdf"
+          (change)="onFileSelected($event)"
+          style="display: none;"
+        />
+        <button (click)="triggerFileInput()" class="attach-btn" title="Attach File">
+          📎
+        </button>
+        <input 
+          type="text" 
+          [(ngModel)]="newMessage" 
+          (keyup.enter)="sendMessage()"
+          placeholder="Type your message..."
+          [disabled]="isLoading"
+          class="message-input"
+        />
+        <button (click)="sendMessage()" [disabled]="(!newMessage.trim() && !selectedFile) || isLoading" class="send-btn">
+          <span>Send</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+

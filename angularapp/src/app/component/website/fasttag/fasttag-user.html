@@ -1,0 +1,356 @@
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<div class="fasttag-container">
+  <!-- Header -->
+  <div class="ft-header">
+    <button class="ft-back-btn" (click)="goBack()">← Back</button>
+    <div class="ft-header-right">
+      <span class="ft-help-text">How to {{ activeTab === 'PURCHASE' ? 'purchase' : 'recharge your' }} FASTag?</span>
+      <button class="ft-demo-btn">Watch iplay demo ►</button>
+    </div>
+  </div>
+
+  <!-- PURCHASE / RECHARGE Tabs -->
+  <div class="ft-tabs">
+    <button class="ft-tab" [class.active]="activeTab === 'PURCHASE'" (click)="activeTab = 'PURCHASE'">PURCHASE</button>
+    <button class="ft-tab" [class.active]="activeTab === 'RECHARGE'" (click)="activeTab = 'RECHARGE'">RECHARGE</button>
+  </div>
+
+  <!-- ═══ PURCHASE TAB ═══ -->
+  <div *ngIf="activeTab === 'PURCHASE'" class="ft-tab-content">
+    <div class="ft-purchase-layout">
+      <div class="ft-purchase-form">
+        <!-- Notes -->
+        <div class="ft-notes">
+          <p>• Please refer to the RC of the vehicle to know your Chassis number and Engine number. <a href="javascript:void(0)">See example</a></p>
+          <p>• FASTag purchase is only applicable for passenger vehicles i.e. Vehicle Class 4 (Car/Jeep/Van).</p>
+          <p>• To purchase FASTag for other vehicle classes, please contact our <a href="javascript:void(0)">offline agents</a></p>
+        </div>
+
+        <!-- VEHICLE DETAILS -->
+        <h3 class="ft-section-title">VEHICLE DETAILS</h3>
+        <div class="ft-form-grid-3">
+          <div class="ft-form-group">
+            <label>Chassis Number</label>
+            <input type="text" [(ngModel)]="chassisNumber" placeholder="Enter chassis number" />
+          </div>
+          <div class="ft-form-group">
+            <label>Engine Number</label>
+            <input type="text" [(ngModel)]="engineNumber" placeholder="Enter engine number" />
+          </div>
+          <div class="ft-form-group">
+            <label>Vehicle Registration Number</label>
+            <input type="text" [(ngModel)]="vehicleRegNumber" placeholder="e.g., AP09AB1234" />
+          </div>
+        </div>
+        <div class="ft-form-grid-3">
+          <div class="ft-form-group">
+            <label>Make</label>
+            <select [(ngModel)]="make">
+              <option value="">Select</option>
+              <option *ngFor="let m of makes" [value]="m">{{ m }}</option>
+            </select>
+          </div>
+          <div class="ft-form-group">
+            <label>Model</label>
+            <input type="text" [(ngModel)]="model" placeholder="Enter model" />
+          </div>
+          <div class="ft-form-group">
+            <label>Fuel Type</label>
+            <select [(ngModel)]="fuelType">
+              <option value="">Select</option>
+              <option *ngFor="let f of fuelTypes" [value]="f">{{ f }}</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- RC Upload -->
+        <div class="ft-rc-upload">
+          <div class="ft-upload-row">
+            <label>Upload Vehicle RC Front* <i class="fa fa-info-circle" title="Please upload clear image of vehicle RC front"></i></label>
+            <div class="ft-file-input">
+              <input type="file" accept="image/*,.pdf" (change)="onRcFrontSelected($event)" id="rcFront" />
+              <label for="rcFront" class="ft-choose-file">Choose File</label>
+              <span class="ft-file-name">{{ rcFrontName || 'No file chosen' }}</span>
+            </div>
+            <button *ngIf="rcFrontFile" class="ft-upload-btn">UPLOAD</button>
+          </div>
+          <div class="ft-upload-row">
+            <label>Upload Vehicle RC Back* <i class="fa fa-info-circle" title="Please upload clear image of vehicle RC back"></i></label>
+            <div class="ft-file-input">
+              <input type="file" accept="image/*,.pdf" (change)="onRcBackSelected($event)" id="rcBack" />
+              <label for="rcBack" class="ft-choose-file">Choose File</label>
+              <span class="ft-file-name">{{ rcBackName || 'No file chosen' }}</span>
+            </div>
+            <button *ngIf="rcBackFile" class="ft-upload-btn">UPLOAD</button>
+          </div>
+          <button class="ft-remove-rc-btn" (click)="removeAllRcFiles()">REMOVE ALL RC FILES</button>
+        </div>
+
+        <!-- CUSTOMER DETAILS -->
+        <h3 class="ft-section-title">CUSTOMER DETAILS</h3>
+        <div class="ft-form-grid-3">
+          <div class="ft-form-group">
+            <label>Customer Name</label>
+            <div class="ft-readonly-value">{{ customerName || '-' }}</div>
+          </div>
+          <div class="ft-form-group">
+            <label>Mobile Number</label>
+            <div class="ft-readonly-value">{{ mobileNumber || '-' }}</div>
+          </div>
+          <div class="ft-form-group">
+            <label>Email ID</label>
+            <div class="ft-readonly-value">{{ emailId || '-' }}</div>
+          </div>
+        </div>
+
+        <!-- DISPATCH ADDRESS -->
+        <h3 class="ft-section-title">DISPATCH ADDRESS <small>Tag will be dispatched to this address.</small></h3>
+        <div class="ft-form-group ft-full">
+          <label>Address</label>
+          <input type="text" [(ngModel)]="dispatchAddress" placeholder="Enter full address" />
+        </div>
+        <div class="ft-form-grid-3">
+          <div class="ft-form-group">
+            <label>Pin Code</label>
+            <input type="text" [(ngModel)]="pinCode" maxlength="6" placeholder="Enter pin code" />
+          </div>
+          <div class="ft-form-group">
+            <label>City</label>
+            <input type="text" [(ngModel)]="city" placeholder="Enter city" />
+          </div>
+          <div class="ft-form-group">
+            <label>State</label>
+            <select [(ngModel)]="state">
+              <option value="">Select</option>
+              <option *ngFor="let s of states" [value]="s">{{ s }}</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- PAYMENT DETAILS -->
+        <h3 class="ft-section-title">PAYMENT DETAILS</h3>
+        <div class="ft-form-grid-2">
+          <div class="ft-form-group">
+            <label>Select Debit Account Number</label>
+            <select [(ngModel)]="debitAccountNumber" (change)="onDebitAccountChange()">
+              <option value="">Select account</option>
+              <option *ngFor="let acc of userAccounts" [value]="acc.accountNumber || acc.id">
+                {{ acc.accountNumber || acc.id }} - {{ acc.name }}
+              </option>
+            </select>
+          </div>
+          <div class="ft-form-group">
+            <div class="ft-balance-display" *ngIf="debitAccountNumber">
+              Total Available Amount is <strong>INR {{ availableBalance | number:'1.2-2' }}</strong> as on {{ today | date:'dd-MM-yyyy HH:mm' }}
+            </div>
+          </div>
+        </div>
+
+        <!-- Terms -->
+        <div class="ft-terms">
+          <label class="ft-checkbox-label">
+            <input type="checkbox" [(ngModel)]="termsAccepted" />
+            I have read, understood and agree to be bound by the <a href="javascript:void(0)">Terms & Conditions</a>
+          </label>
+        </div>
+
+        <!-- Proceed Button -->
+        <button class="ft-proceed-btn" (click)="submitPurchase()" [disabled]="isSubmitting">
+          {{ isSubmitting ? 'Processing...' : 'Proceed' }}
+        </button>
+      </div>
+
+      <!-- Tag Details Sidebar -->
+      <div class="ft-tag-sidebar">
+        <div class="ft-netc-logo">
+          <img src="assets/images/netc-fastag-logo.png" alt="NETC FASTag" onerror="this.style.display='none'" />
+          <div class="ft-netc-text">
+            <strong>NETC</strong> | <strong style="color:#d35400">FASTag</strong>
+          </div>
+        </div>
+        <div class="ft-tag-details-card">
+          <h3>Tag details</h3>
+          <div class="ft-detail-row">
+            <div>
+              <strong class="ft-detail-label">Tag issuance fee</strong>
+              <div class="ft-detail-sub">(One-time non-refundable fee)</div>
+            </div>
+            <strong>₹ {{ tagIssuanceFee | number:'1.2-2' }}</strong>
+          </div>
+          <div class="ft-detail-row">
+            <div>
+              <strong class="ft-detail-label">Tag security deposit</strong>
+              <div class="ft-detail-sub">(Refundable post tag closure)</div>
+            </div>
+            <strong>₹ {{ tagSecurityDeposit | number:'1.2-2' }}</strong>
+          </div>
+          <div class="ft-detail-row">
+            <div>
+              <strong class="ft-detail-label">Tag upload amount</strong>
+              <div class="ft-detail-sub">(Funds that'll be used for transaction)</div>
+            </div>
+            <strong>₹ {{ tagUploadAmount | number:'1.2-2' }}</strong>
+          </div>
+          <div class="ft-detail-total">
+            <strong>Tag total amount</strong>
+            <strong class="ft-total-amount">₹ {{ tagTotalAmount | number:'1.2-2' }}</strong>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ RECHARGE TAB ═══ -->
+  <div *ngIf="activeTab === 'RECHARGE'" class="ft-tab-content">
+    <div class="ft-recharge-layout">
+      <div class="ft-recharge-form">
+        <!-- Auto-Recharge -->
+        <div class="ft-auto-recharge-bar">
+          <span>Tired of doing recharges frequently ?</span>
+          <button class="ft-auto-recharge-btn">Auto-Recharge</button>
+        </div>
+
+        <!-- Recharge Type -->
+        <div class="ft-recharge-type">
+          <label class="ft-radio-label">
+            <input type="radio" name="rechargeType" value="vehicle" [(ngModel)]="rechargeType" />
+            Vehicle Recharge
+          </label>
+          <label class="ft-radio-label">
+            <input type="radio" name="rechargeType" value="cug" [(ngModel)]="rechargeType" />
+            CUG Wallet recharge
+          </label>
+        </div>
+
+        <div class="ft-form-grid-2">
+          <div class="ft-form-group">
+            <label>Vehicle Registration Number</label>
+            <input type="text" [(ngModel)]="rechargeVehicleNumber" placeholder="Enter vehicle number" />
+          </div>
+          <div class="ft-form-group">
+            <label>Enter Recharge Amount</label>
+            <input type="number" [(ngModel)]="rechargeAmount" placeholder="Enter amount" min="500" max="10000" />
+            <div class="ft-amount-range">
+              <span>Min ₹500</span>
+              <span>Max ₹10000</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="ft-form-grid-2">
+          <div class="ft-form-group">
+            <label>Debit Account</label>
+            <select [(ngModel)]="rechargeDebitAccount" (change)="onRechargeDebitAccountChange()">
+              <option value="">Select account</option>
+              <option *ngFor="let acc of userAccounts" [value]="acc.accountNumber || acc.id">
+                {{ acc.accountNumber || acc.id }} - {{ acc.name }}
+              </option>
+            </select>
+          </div>
+          <div class="ft-form-group">
+            <label>Available Balance</label>
+            <div class="ft-balance-value">₹ {{ rechargeAvailableBalance | number:'1.2-2' }}</div>
+          </div>
+        </div>
+
+        <button class="ft-paynow-btn" (click)="submitRecharge()" [disabled]="isSubmitting">
+          {{ isSubmitting ? 'Processing...' : 'Pay now' }}
+        </button>
+      </div>
+
+      <!-- NETC FASTag Logo -->
+      <div class="ft-recharge-sidebar">
+        <div class="ft-netc-logo">
+          <img src="assets/images/netc-fastag-logo.png" alt="NETC FASTag" onerror="this.style.display='none'" />
+          <div class="ft-netc-text">
+            <strong>NETC</strong> | <strong style="color:#d35400">FASTag</strong>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ MY FASTags Section ═══ -->
+  <div class="ft-my-tags-section">
+    <h3><i class="fa fa-tags"></i> My FASTags</h3>
+    <div class="ft-tags-filter">
+      <input type="text" class="ft-search-input" [(ngModel)]="searchTerm" placeholder="Search by vehicle or FASTag number" />
+      <select class="ft-filter-select" [(ngModel)]="statusFilter">
+        <option value="All">All</option>
+        <option value="Applied">Applied</option>
+        <option value="Approved">Approved</option>
+        <option value="Closed">Closed</option>
+      </select>
+      <button class="ft-refresh-btn" (click)="loadMyTags()"><i class="fa fa-refresh"></i> Refresh</button>
+    </div>
+
+    <div class="ft-tags-grid">
+      <div *ngFor="let t of getFilteredTags()"
+           class="ft-tag-card"
+           [class.active]="selectedTag && selectedTag.id === t.id"
+           (click)="selectTag(t)">
+        <div class="ft-tag-card-top">
+          <span class="ft-tag-number">{{ t.fasttagNumber || 'Pending' }}</span>
+          <span class="ft-tag-status" [ngClass]="(t.status || '').toLowerCase()">{{ t.status }}</span>
+        </div>
+        <div class="ft-tag-card-body">
+          <div><i class="fa fa-car"></i> {{ t.vehicleNumber }}</div>
+          <div><i class="fa fa-wallet"></i> Balance: ₹{{ t.balance || 0 }}</div>
+          <div *ngIf="t.make"><i class="fa fa-industry"></i> {{ t.make }} {{ t.model }}</div>
+        </div>
+      </div>
+      <div *ngIf="getFilteredTags().length === 0" class="ft-no-results">
+        No FASTags found. Purchase a new FASTag to get started.
+      </div>
+    </div>
+
+    <!-- Selected Tag Detail -->
+    <div *ngIf="selectedTag" class="ft-selected-detail">
+      <div class="ft-detail-header">
+        <div>
+          <h3>{{ selectedTag.fasttagNumber || 'Pending Approval' }}</h3>
+          <div class="ft-detail-meta">{{ selectedTag.vehicleNumber }} • {{ selectedTag.make }} {{ selectedTag.model }}</div>
+        </div>
+        <div class="ft-detail-actions">
+          <div class="ft-detail-balance">Balance: <strong>₹{{ selectedTag.balance || 0 }}</strong></div>
+          <button *ngIf="selectedTag.status === 'Approved'" class="ft-download-btn" (click)="downloadSticker(selectedTag.id)">
+            <i class="fa fa-download"></i> Download Sticker
+          </button>
+        </div>
+      </div>
+
+      <!-- Transactions -->
+      <div class="ft-transactions">
+        <h4><i class="fa fa-history"></i> Transaction History</h4>
+        <table *ngIf="transactions.length > 0">
+          <thead>
+            <tr><th>ID</th><th>Type</th><th>Amount</th><th>Balance</th><th>Date</th></tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let tx of transactions">
+              <td>{{ tx.id || '-' }}</td>
+              <td>{{ tx.type }}</td>
+              <td class="ft-amount-positive">+₹{{ tx.amount }}</td>
+              <td>₹{{ tx.newBalance ?? '-' }}</td>
+              <td>{{ tx.createdAt ? (tx.createdAt | date:'short') : '-' }}</td>
+            </tr>
+          </tbody>
+        </table>
+        <div *ngIf="transactions.length === 0 && !isLoadingTransactions" class="ft-no-results">No transactions yet.</div>
+        <div *ngIf="isLoadingTransactions" class="ft-no-results">Loading transactions...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer Links -->
+  <div class="ft-footer-links">
+    <a href="javascript:void(0)">Terms & Conditions</a> |
+    <a href="javascript:void(0)">Interest Rates</a> |
+    <a href="javascript:void(0)">Service Charges & Fees</a> |
+    <a href="javascript:void(0)">Disclaimer</a> |
+    <a href="javascript:void(0)">Do Not Call Registry</a> |
+    <a href="javascript:void(0)">Multilingual Disclaimer</a> |
+    <a href="javascript:void(0)">Code of Commitment</a> |
+    <a href="javascript:void(0)">Privacy Policy</a>
+  </div>
+</div>

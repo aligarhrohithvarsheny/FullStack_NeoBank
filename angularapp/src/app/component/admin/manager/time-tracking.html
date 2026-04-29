@@ -1,0 +1,429 @@
+<!-- Font Awesome Link -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+<div class="time-tracking-container">
+  <!-- Header -->
+  <div class="time-tracking-header">
+    <div class="header-left">
+      <h1><i class="fa fa-clock"></i> Time Management & Tracking</h1>
+      <p class="subtitle">Monitor employee check-in/check-out and manage working hours</p>
+    </div>
+    <div class="header-right">
+      <button class="btn-generate" (click)="generateReport('PDF')">
+        <i class="fa fa-file-pdf"></i> PDF Report
+      </button>
+      <button class="btn-generate" (click)="generateReport('EXCEL')">
+        <i class="fa fa-file-excel"></i> Excel Report
+      </button>
+    </div>
+  </div>
+
+  <!-- Tab Navigation -->
+  <div class="tab-navigation">
+    <button 
+      class="tab-button" 
+      [class.active]="activeTab === 'overview'"
+      (click)="selectTab('overview')">
+      <i class="fa fa-chart-bar"></i> Overview
+    </button>
+    <button 
+      class="tab-button" 
+      [class.active]="activeTab === 'employees'"
+      (click)="selectTab('employees')">
+      <i class="fa fa-users"></i> Employee Hours
+    </button>
+    <button 
+      class="tab-button" 
+      [class.active]="activeTab === 'records'"
+      (click)="selectTab('records')">
+      <i class="fa fa-clock"></i> Time Records
+    </button>
+    <button 
+      class="tab-button" 
+      [class.active]="activeTab === 'policy'"
+      (click)="selectTab('policy')">
+      <i class="fa fa-cog"></i> Policies
+    </button>
+  </div>
+
+  <!-- Content Area -->
+  <div class="tab-content">
+    
+    <!-- OVERVIEW TAB -->
+    <div class="tab-pane" *ngIf="activeTab === 'overview'">
+      <div class="overview-grid">
+        <!-- Key Stats Cards -->
+        <div class="stats-card primary" *ngIf="timeStats">
+          <div class="stat-icon">
+            <i class="fa fa-users"></i>
+          </div>
+          <div class="stat-content">
+            <h3>Total Employees</h3>
+            <p class="stat-value">{{ timeStats.totalEmployees }}</p>
+          </div>
+        </div>
+
+        <div class="stats-card success" *ngIf="timeStats">
+          <div class="stat-icon">
+            <i class="fa fa-check-circle"></i>
+          </div>
+          <div class="stat-content">
+            <h3>Checked In</h3>
+            <p class="stat-value">{{ timeStats.checkedInToday }}</p>
+          </div>
+        </div>
+
+        <div class="stats-card info" *ngIf="timeStats">
+          <div class="stat-icon">
+            <i class="fa fa-sign-out-alt"></i>
+          </div>
+          <div class="stat-content">
+            <h3>Checked Out</h3>
+            <p class="stat-value">{{ timeStats.checkedOutToday }}</p>
+          </div>
+        </div>
+
+        <div class="stats-card warning" *ngIf="timeStats">
+          <div class="stat-icon">
+            <i class="fa fa-clock"></i>
+          </div>
+          <div class="stat-content">
+            <h3>Average Hours</h3>
+            <p class="stat-value">{{ formatHours(timeStats.averageWorkingHours) }}</p>
+          </div>
+        </div>
+
+        <div class="stats-card danger" *ngIf="timeStats">
+          <div class="stat-icon">
+            <i class="fa fa-exclamation-triangle"></i>
+          </div>
+          <div class="stat-content">
+            <h3>Pending Checkouts</h3>
+            <p class="stat-value">{{ timeStats.overdueCheckouts }}</p>
+          </div>
+        </div>
+
+        <div class="stats-card secondary" *ngIf="timeStats">
+          <div class="stat-icon">
+            <i class="fa fa-calendar"></i>
+          </div>
+          <div class="stat-content">
+            <h3>On Leave</h3>
+            <p class="stat-value">{{ timeStats.onLeaveToday }}</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Daily Attendance Chart Area -->
+      <div class="attendance-summary" *ngIf="dailyStats">
+        <h3>Today's Attendance Summary</h3>
+        <div class="attendance-grid">
+          <div class="attendance-item">
+            <span class="label">Total Employees:</span>
+            <span class="value">{{ dailyStats.totalEmployees }}</span>
+          </div>
+          <div class="attendance-item">
+            <span class="label">Present:</span>
+            <span class="value present">{{ dailyStats.presentCount }}</span>
+          </div>
+          <div class="attendance-item">
+            <span class="label">Absent:</span>
+            <span class="value absent">{{ dailyStats.absentCount }}</span>
+          </div>
+          <div class="attendance-item">
+            <span class="label">On Leave:</span>
+            <span class="value leave">{{ dailyStats.onLeaveCount }}</span>
+          </div>
+          <div class="attendance-item">
+            <span class="label">Avg Hours:</span>
+            <span class="value">{{ formatHours(dailyStats.averageWorkingHours) }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- EMPLOYEE HOURS TAB -->
+    <div class="tab-pane" *ngIf="activeTab === 'employees'">
+      <div class="section-header">
+        <h3>Employee Working Hours</h3>
+        <div class="search-filters">
+          <input 
+            type="text" 
+            placeholder="Search by name or ID card..." 
+            [(ngModel)]="searchTerm"
+            (keyup)="searchEmployees()"
+            class="search-input">
+        </div>
+      </div>
+
+      <div class="table-responsive" *ngIf="!recordsLoading">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>ID Card</th>
+              <th>Employee Name</th>
+              <th>Email</th>
+              <th>This Week</th>
+              <th>This Month</th>
+              <th>Avg Daily Hours</th>
+              <th>Overtime Hours</th>
+              <th>Attendance %</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let employee of filteredEmployees" class="table-row">
+              <td>{{ employee.idCardNumber }}</td>
+              <td class="emp-name">{{ employee.adminName }}</td>
+              <td>{{ employee.email }}</td>
+              <td>{{ formatHours(employee.hoursThisWeek) }}</td>
+              <td>{{ formatHours(employee.hoursThisMonth) }}</td>
+              <td>{{ formatHours(employee.averageDailyHours) }}</td>
+              <td class="overtime">{{ formatHours(employee.overtimeHours) }}</td>
+              <td>
+                <span class="attendance-badge" [ngClass]="getAttendancePercentageClass(employee.attendancePercentage)">
+                  {{ employee.attendancePercentage.toFixed(1) }}%
+                </span>
+              </td>
+              <td class="actions">
+                <button class="btn-sm btn-absent" title="Mark Absent" (click)="markAbsent(employee)">
+                  <i class="fa fa-ban"></i>
+                </button>
+                <button class="btn-sm btn-leave" title="Mark on Leave" (click)="markOnLeave(employee)">
+                  <i class="fa fa-calendar-times"></i>
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="loading-spinner" *ngIf="recordsLoading">
+        <i class="fa fa-spinner fa-spin"></i> Loading...
+      </div>
+    </div>
+
+    <!-- TIME RECORDS TAB -->
+    <div class="tab-pane" *ngIf="activeTab === 'records'">
+      <div class="section-header">
+        <h3>Time Records Management</h3>
+        <div class="search-filters">
+          <input 
+            type="text" 
+            placeholder="Search by name or ID..." 
+            [(ngModel)]="searchTerm"
+            (keyup)="loadTimeRecords()"
+            class="search-input">
+          <select [(ngModel)]="statusFilter" (change)="loadTimeRecords()" class="filter-select">
+            <option value="ALL">All Status</option>
+            <option value="ACTIVE">Active</option>
+            <option value="CHECKED_OUT">Checked Out</option>
+            <option value="ABSENT">Absent</option>
+            <option value="ON_LEAVE">On Leave</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="table-responsive" *ngIf="!recordsLoading">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Employee ID</th>
+              <th>Name</th>
+              <th>Date</th>
+              <th>Check In</th>
+              <th>Check Out</th>
+              <th>Working Hours</th>
+              <th>Status</th>
+              <th>Remarks</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let record of employeeRecords" class="table-row">
+              <td>{{ record.idCardNumber }}</td>
+              <td class="emp-name">{{ record.adminName }}</td>
+              <td>{{ formatDate(record.date) }}</td>
+              <td>{{ formatTime(record.checkInTime) }}</td>
+              <td>{{ formatTime(record.checkOutTime) }}</td>
+              <td class="highlight">{{ formatHours(record.totalWorkingHours) }}</td>
+              <td>
+                <span class="status-badge" [ngClass]="getStatusBadgeClass(record.status)">
+                  {{ record.status }}
+                </span>
+              </td>
+              <td>{{ record.remarks || '-' }}</td>
+              <td class="actions">
+                <button class="btn-sm btn-edit" title="Adjust Time" (click)="adjustTime(record)">
+                  <i class="fa fa-edit"></i>
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="loading-spinner" *ngIf="recordsLoading">
+        <i class="fa fa-spinner fa-spin"></i> Loading...
+      </div>
+    </div>
+
+    <!-- POLICY TAB -->
+    <div class="tab-pane" *ngIf="activeTab === 'policy'">
+      <div class="section-header">
+        <h3>Time Management Policies</h3>
+        <button class="btn-primary" (click)="openPolicyForm()" *ngIf="!showPolicyForm">
+          <i class="fa fa-plus"></i> New Policy
+        </button>
+      </div>
+
+      <!-- Policy Form -->
+      <div class="policy-form-container" *ngIf="showPolicyForm">
+        <div class="policy-form-card">
+          <h4>{{ editingPolicyId ? 'Edit' : 'Create' }} Time Management Policy</h4>
+          <form (ngSubmit)="savePolicy()">
+            <div class="form-row">
+              <div class="form-group">
+                <label>Policy Name <span class="required">*</span></label>
+                <input 
+                  type="text" 
+                  [(ngModel)]="newPolicy.policyName" 
+                  name="policyName"
+                  placeholder="e.g., Standard 8-Hour Day"
+                  required>
+              </div>
+              <div class="form-group">
+                <label>Working Hours Per Day <span class="required">*</span></label>
+                <input 
+                  type="number" 
+                  [(ngModel)]="newPolicy.workingHoursPerDay" 
+                  name="workingHours"
+                  min="1"
+                  max="24"
+                  required>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label>Check In Time <span class="required">*</span></label>
+                <input 
+                  type="time" 
+                  [(ngModel)]="newPolicy.checkInTime" 
+                  name="checkInTime"
+                  required>
+              </div>
+              <div class="form-group">
+                <label>Check Out Time <span class="required">*</span></label>
+                <input 
+                  type="time" 
+                  [(ngModel)]="newPolicy.checkOutTime" 
+                  name="checkOutTime"
+                  required>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label>Grace Period (minutes)</label>
+                <input 
+                  type="number" 
+                  [(ngModel)]="newPolicy.gracePeriodMinutes" 
+                  name="gracePeriodMinutes"
+                  min="0"
+                  max="60">
+              </div>
+              <div class="form-group">
+                <label>Max Working Hours</label>
+                <input 
+                  type="number" 
+                  [(ngModel)]="newPolicy.maxWorkingHours" 
+                  name="maxHours"
+                  min="1"
+                  max="24">
+              </div>
+              <div class="form-group">
+                <label>Overtime Multiplier</label>
+                <input 
+                  type="number" 
+                  [(ngModel)]="newPolicy.overtimeMultiplier" 
+                  name="overtimeMultiplier"
+                  min="1"
+                  step="0.1">
+              </div>
+            </div>
+
+            <div class="form-actions">
+              <button type="submit" class="btn-save" [disabled]="policyLoading">
+                <i class="fa fa-save"></i> Save Policy
+              </button>
+              <button type="button" class="btn-cancel" (click)="closePolicyForm()">
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Policies List -->
+      <div class="policies-grid" *ngIf="!showPolicyForm">
+        <div class="policy-card" *ngFor="let policy of timePolicies">
+          <div class="policy-header">
+            <h5>{{ policy.policyName }}</h5>
+            <span class="policy-status" [class.active]="policy.isActive">
+              {{ policy.isActive ? 'Active' : 'Inactive' }}
+            </span>
+          </div>
+
+          <div class="policy-details">
+            <div class="detail-item">
+              <span class="label">Working Hours:</span>
+              <span class="value">{{ policy.workingHoursPerDay }} hours/day</span>
+            </div>
+            <div class="detail-item">
+              <span class="label">Check In:</span>
+              <span class="value">{{ policy.checkInTime }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="label">Check Out:</span>
+              <span class="value">{{ policy.checkOutTime }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="label">Grace Period:</span>
+              <span class="value">{{ policy.gracePeriodMinutes }} minutes</span>
+            </div>
+            <div class="detail-item">
+              <span class="label">Max Hours:</span>
+              <span class="value">{{ policy.maxWorkingHours }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="label">Overtime Multiplier:</span>
+              <span class="value">{{ policy.overtimeMultiplier }}x</span>
+            </div>
+          </div>
+
+          <div class="policy-actions">
+            <button 
+              class="btn-sm btn-toggle" 
+              [class.active]="policy.isActive"
+              (click)="activatePolicy(policy)">
+              <i class="fa" [ngClass]="policy.isActive ? 'fa-toggle-on' : 'fa-toggle-off'"></i>
+              {{ policy.isActive ? 'Deactivate' : 'Activate' }}
+            </button>
+            <button class="btn-sm btn-edit" (click)="openPolicyForm(policy)">
+              <i class="fa fa-edit"></i> Edit
+            </button>
+            <button class="btn-sm btn-danger" (click)="deletePolicy(policy.id)">
+              <i class="fa fa-trash"></i> Delete
+            </button>
+          </div>
+        </div>
+
+        <div class="no-policies" *ngIf="timePolicies.length === 0">
+          <i class="fa fa-inbox"></i>
+          <p>No time management policies created yet</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

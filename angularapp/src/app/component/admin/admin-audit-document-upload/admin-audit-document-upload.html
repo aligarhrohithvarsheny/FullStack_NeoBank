@@ -1,0 +1,166 @@
+<div class="audit-document-upload-modal" *ngIf="isModalOpen" [@fadeInOut]>
+  <div class="modal-backdrop" (click)="closeModal()"></div>
+  
+  <div class="modal-container">
+    <div class="modal-header">
+      <h2>Upload Signed Document</h2>
+      <button class="close-btn" (click)="closeModal()">&times;</button>
+    </div>
+
+    <div class="modal-body">
+      <!-- Error Message -->
+      <div class="alert alert-danger" *ngIf="errorMessage">
+        <span>{{ errorMessage }}</span>
+        <button (click)="errorMessage = ''" class="alert-close">&times;</button>
+      </div>
+
+      <!-- Success Message -->
+      <div class="alert alert-success" *ngIf="successMessage">
+        <span>{{ successMessage }}</span>
+      </div>
+
+      <!-- Tab Navigation -->
+      <div class="tab-navigation">
+        <button 
+          class="tab-btn" 
+          [class.active]="!isSigningMode"
+          (click)="isSigningMode = false">
+          Upload File
+        </button>
+        <button 
+          class="tab-btn" 
+          [class.active]="isSigningMode"
+          (click)="toggleSignatureMode()">
+          Draw Signature
+        </button>
+      </div>
+
+      <!-- File Upload Tab -->
+      <div class="tab-content" *ngIf="!isSigningMode">
+        <div class="form-group">
+          <label>Select Document (PDF/Image)</label>
+          <div class="file-input-wrapper">
+            <input 
+              type="file" 
+              #fileInput
+              (change)="onFileSelected($event)"
+              accept=".pdf,.jpg,.jpeg,.png,.gif"
+              id="fileInput"
+              [disabled]="isUploading">
+            <label for="fileInput" class="file-input-label">
+              <i class="icon-upload"></i>
+              <span>{{ selectedFile ? selectedFile.name : 'Click to select or drag & drop' }}</span>
+            </label>
+          </div>
+          <small class="form-text text-muted">
+            Supported: PDF, JPEG, PNG, GIF (Max 10MB)
+          </small>
+        </div>
+
+        <!-- File Preview -->
+        <div class="file-preview" *ngIf="filePreview">
+          <img [src]="filePreview" alt="Document preview" class="preview-image">
+        </div>
+
+        <div class="form-group">
+          <label for="description">Description</label>
+          <textarea 
+            id="description"
+            [(ngModel)]="description"
+            class="form-control"
+            rows="3"
+            placeholder="Add any notes about this document..."
+            [disabled]="isUploading">
+          </textarea>
+        </div>
+
+        <!-- Upload Progress -->
+        <div class="progress" *ngIf="isUploading">
+          <div class="progress-bar" [style.width.%]="uploadProgress">
+            {{ uploadProgress }}%
+          </div>
+        </div>
+
+        <!-- Upload Button -->
+        <div class="button-group">
+          <button 
+            class="btn btn-primary"
+            (click)="uploadDocument()"
+            [disabled]="!selectedFile || isUploading">
+            <span *ngIf="!isUploading">Upload Document</span>
+            <span *ngIf="isUploading">Uploading...</span>
+          </button>
+          <button 
+            class="btn btn-secondary"
+            (click)="closeModal()"
+            [disabled]="isUploading">
+            Cancel
+          </button>
+        </div>
+      </div>
+
+      <!-- Signature Canvas Tab -->
+      <div class="tab-content" *ngIf="isSigningMode && showSignatureCanvas">
+        <div class="signature-container">
+          <p class="signature-instruction">Sign below with your mouse or finger</p>
+          <canvas 
+            id="signatureCanvas"
+            class="signature-canvas"
+            width="400"
+            height="200">
+          </canvas>
+          <div class="signature-actions">
+            <button 
+              class="btn btn-small btn-warning"
+              (click)="clearSignature()"
+              [disabled]="isUploading">
+              Clear
+            </button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="signatureDescription">Description</label>
+          <textarea 
+            id="signatureDescription"
+            [(ngModel)]="description"
+            class="form-control"
+            rows="2"
+            placeholder="Add notes about this signature..."
+            [disabled]="isUploading">
+          </textarea>
+        </div>
+
+        <!-- Upload Progress -->
+        <div class="progress" *ngIf="isUploading">
+          <div class="progress-bar" [style.width.%]="uploadProgress">
+            {{ uploadProgress }}%
+          </div>
+        </div>
+
+        <!-- Signature Buttons -->
+        <div class="button-group">
+          <button 
+            class="btn btn-success"
+            (click)="saveSignature()"
+            [disabled]="isUploading">
+            <span *ngIf="!isUploading">Save Signature</span>
+            <span *ngIf="isUploading">Saving...</span>
+          </button>
+          <button 
+            class="btn btn-secondary"
+            (click)="closeModal()"
+            [disabled]="isUploading">
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <small class="text-muted">
+        Document will be saved and linked to this audit record for compliance and download purposes.
+      </small>
+    </div>
+  </div>
+</div>

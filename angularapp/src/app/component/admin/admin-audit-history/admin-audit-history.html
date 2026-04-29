@@ -1,0 +1,196 @@
+<div class="audit-history-container">
+  <!-- Header -->
+  <div class="audit-header">
+    <h3>Audit History</h3>
+    <div class="header-controls">
+      <select [(ngModel)]="selectedDateRange" (change)="onDateRangeChange()" class="form-select">
+        <option value="all">All Time</option>
+        <option value="today">Today</option>
+        <option value="week">Last 7 Days</option>
+        <option value="month">Last 30 Days</option>
+      </select>
+      <button (click)="refresh()" class="btn btn-sm btn-refresh" [disabled]="isLoading">
+        <span *ngIf="!isLoading">🔄</span>
+        <span *ngIf="isLoading">⏳</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Error Message -->
+  <div class="alert alert-danger" *ngIf="errorMessage">
+    <span>{{ errorMessage }}</span>
+    <button (click)="errorMessage = ''" class="alert-close">&times;</button>
+  </div>
+
+  <!-- Loading State -->
+  <div class="loading-skeleton" *ngIf="isLoading">
+    <div class="skeleton-item"></div>
+    <div class="skeleton-item"></div>
+    <div class="skeleton-item"></div>
+  </div>
+
+  <!-- Empty State -->
+  <div class="empty-state" *ngIf="!isLoading && auditHistory.length === 0">
+    <div class="empty-icon">📋</div>
+    <p>No audit history found</p>
+  </div>
+
+  <!-- Audit History Table -->
+  <div class="audit-table-wrapper" *ngIf="!isLoading && auditHistory.length > 0">
+    <table class="audit-table">
+      <thead>
+        <tr>
+          <th class="col-expand"></th>
+          <th class="col-date">Date & Time</th>
+          <th class="col-admin">Admin Name</th>
+          <th class="col-action">Action</th>
+          <th class="col-changes">Changes</th>
+          <th class="col-document">Document</th>
+          <th class="col-status">Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        <ng-container *ngFor="let audit of auditHistory">
+          <tr class="audit-row" [class.expanded]="expandedAuditId === audit.id">
+            <td class="col-expand">
+              <button 
+                class="expand-btn" 
+                (click)="toggleAuditExpand(audit.id)"
+                [class.active]="expandedAuditId === audit.id">
+                ▼
+              </button>
+            </td>
+            <td class="col-date">
+              <div class="date-time">
+                <span class="date">{{ audit.createdAt | date: 'short' }}</span>
+                <span class="time">{{ audit.createdAt | date: 'HH:mm:ss' }}</span>
+              </div>
+            </td>
+            <td class="col-admin">
+              <div class="admin-info">
+                <span class="admin-name">{{ audit.adminName }}</span>
+                <span class="admin-id" *ngIf="audit.adminId">#{{ audit.adminId }}</span>
+              </div>
+            </td>
+            <td class="col-action">
+              <span class="badge" [ngClass]="getActionTypeClass(audit.actionType)">
+                {{ audit.actionType }}
+              </span>
+            </td>
+            <td class="col-changes">
+              <span class="changes-text">{{ getChangeSummary(audit.changes) | slice: 0: 40 }}...</span>
+            </td>
+            <td class="col-document">
+              <span 
+                class="badge" 
+                [class.badge-success]="audit.documentUploaded"
+                [class.badge-warning]="!audit.documentUploaded && audit.documentRequired">
+                {{ audit.documentUploaded ? '✓ Uploaded' : (audit.documentRequired ? '⚠ Required' : '—') }}
+              </span>
+            </td>
+            <td class="col-status">
+              <span class="badge" [ngClass]="getStatusClass(audit.status)">
+                {{ audit.status }}
+              </span>
+            </td>
+          </tr>
+
+          <tr *ngIf="expandedAuditId === audit.id" class="expanded-row" [attr.aria-expanded]="true">
+            <td colspan="7">
+              <div class="expanded-content">
+                <!-- Audit Details -->
+                <div class="audit-details">
+                  <div class="detail-group">
+                    <h4>Audit Details</h4>
+                    <div class="detail-rows">
+                      <div class="detail-row">
+                        <span class="label">Reason for Change:</span>
+                        <span class="value">{{ audit.reasonForChange || 'N/A' }}</span>
+                      </div>
+                      <div class="detail-row">
+                        <span class="label">IP Address:</span>
+                        <span class="value">{{ audit.ipAddress || 'N/A' }}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Changes Details -->
+                  <div class="detail-group">
+                    <h4>Changes Made</h4>
+                    <div class="changes-detail">
+                      <pre *ngIf="audit.changes">{{ audit.changes }}</pre>
+                      <p *ngIf="!audit.changes" class="no-data">No changes recorded</p>
+                    </div>
+                  </div>
+
+                  <!-- Documents Section -->
+                  <div class="detail-group">
+                    <h4>Supporting Documents</h4>
+                    <div class="documents-list">
+                      <div 
+                        class="document-item" 
+                        *ngFor="let doc of auditDocuments">
+                        <div class="document-header">
+                          <span class="doc-icon">{{ getDocumentTypeIcon(doc.documentType) }}</span>
+                          <div class="doc-info">
+                            <span class="doc-name">{{ doc.documentName }}</span>
+                            <span class="doc-meta">
+                              {{ doc.fileSize ? formatFileSize(doc.fileSize) : 'Unknown size' }} • 
+                              Uploaded by {{ doc.uploadedByName }} on {{ doc.uploadedAt | date: 'short' }}
+                            </span>
+                          </div>
+                        </div>
+                        <div class="document-actions">
+                          <button 
+                            class="btn btn-sm btn-download"
+                            (click)="downloadDocument(doc)"
+                            title="Download document">
+                            ⬇️ Download
+                          </button>
+                          <button 
+                            class="btn btn-sm btn-verify"
+                            (click)="verifyDocument(doc)"
+                            [disabled]="doc.signatureVerified"
+                            [title]="doc.signatureVerified ? 'Already verified' : 'Verify document'">
+                            <span *ngIf="!doc.signatureVerified">🔍 Verify</span>
+                            <span *ngIf="doc.signatureVerified">✓ Verified</span>
+                          </button>
+                          <span class="doc-status" [ngClass]="'status-' + doc.status.toLowerCase()">
+                            {{ doc.status }}
+                          </span>
+                        </div>
+                        <div class="doc-description" *ngIf="doc.description">
+                          <p>{{ doc.description }}</p>
+                        </div>
+                      </div>
+
+                      <div class="no-documents" *ngIf="auditDocuments.length === 0">
+                        <p>No documents attached to this audit record</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </td>
+          </tr>
+        </ng-container>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Summary Stats -->
+  <div class="audit-stats" *ngIf="!isLoading && auditHistory.length > 0">
+    <div class="stat-card">
+      <span class="stat-label">Total Edits</span>
+      <span class="stat-value">{{ auditHistory.length }}</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-label">Documents Uploaded</span>
+      <span class="stat-value">{{ totalUploadedCount() }}</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-label">Pending Documents</span>
+      <span class="stat-value">{{ totalPendingCount() }}</span>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,29 @@
+<div class="fasttag-root" role="img" aria-label="FASTag">
+  <div class="arrow arrow-top">→</div>
+
+  <div class="fasttag-strip">
+    <div class="left">
+      <img *ngIf="logoUrl" [src]="logoUrl" class="bank-logo" alt="bank logo" />
+      <div class="bank-name">{{ bankName }}</div>
+    </div>
+
+    <div class="center">
+      <div class="customer-care">Customer Care<br/><strong>{{ customerCare }}</strong></div>
+      <div class="barcode">
+        <div class="barcode-numbers">{{ barcode }}</div>
+        <div class="barcode-bars">
+          <span *ngFor="let b of [1,2,3,4,5,6,7,8,9,10]" class="bar"></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="right">
+      <div class="npcilogs">
+        <div class="npcilogo">NPCI</div>
+        <div class="fasttag-text">FASTag</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="arrow arrow-bottom">←</div>
+</div>

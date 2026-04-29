@@ -1,0 +1,605 @@
+<div class="admin-gold-loans-container">
+  <header class="admin-header">
+    <h2>🥇 Gold Loan Management</h2>
+    <div class="header-actions">
+      <button (click)="navigateToDashboard()" class="back-btn">⬅ Back to Dashboard</button>
+      <button (click)="logout()" class="logout-btn">Logout</button>
+    </div>
+  </header>
+
+  <!-- Gold Rate Management -->
+  <div class="gold-rate-section">
+    <h3>📊 Gold Rate Management</h3>
+    <div class="rate-card">
+      <div class="current-rate" *ngIf="currentGoldRate">
+        <div class="rate-info">
+          <span class="rate-label">Current Rate (22K Gold):</span>
+          <span class="rate-value">₹{{ currentGoldRate.ratePerGram | number:'1.2-2' }} per gram</span>
+        </div>
+        <div class="rate-date">
+          <span>Last Updated: {{ formatDate(currentGoldRate.lastUpdated) }}</span>
+        </div>
+      </div>
+      <div class="update-rate-form">
+        <label for="newGoldRate">Update Gold Rate (22K Gold - ₹ per gram):</label>
+        <div class="rate-input-group">
+          <input
+            type="number"
+            id="newGoldRate"
+            [(ngModel)]="newGoldRate"
+            placeholder="Enter new gold rate"
+            min="0"
+            step="0.01"
+            class="rate-input"
+          />
+          <button
+            type="button"
+            class="update-rate-btn"
+            (click)="updateGoldRate()"
+            [disabled]="updatingRate || newGoldRate <= 0"
+          >
+            <span *ngIf="!updatingRate">Update Rate</span>
+            <span *ngIf="updatingRate">Updating...</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filter Section -->
+  <div class="filter-section">
+    <h3>Gold Loan Applications</h3>
+    <div class="filter-buttons">
+      <button
+        type="button"
+        (click)="filterStatus = 'Pending'; onFilterChange()"
+        [class.active]="filterStatus === 'Pending'"
+        class="filter-btn pending-filter"
+      >
+        Pending
+      </button>
+      <button
+        type="button"
+        (click)="filterStatus = 'Approved'; onFilterChange()"
+        [class.active]="filterStatus === 'Approved'"
+        class="filter-btn approved-filter"
+      >
+        Approved
+      </button>
+      <button
+        type="button"
+        (click)="filterStatus = 'Rejected'; onFilterChange()"
+        [class.active]="filterStatus === 'Rejected'"
+        class="filter-btn rejected-filter"
+      >
+        Rejected
+      </button>
+      <button
+        type="button"
+        (click)="filterStatus = 'All'; onFilterChange()"
+        [class.active]="filterStatus === 'All'"
+        class="filter-btn"
+      >
+        All
+      </button>
+    </div>
+  </div>
+
+  <!-- Loading State -->
+  <div *ngIf="loading" class="loading-overlay">
+    <div class="loading-spinner"></div>
+    <p>Loading gold loans...</p>
+  </div>
+
+  <!-- Error State -->
+  <div *ngIf="error && !loading" class="error-message">
+    <p>{{ error }}</p>
+  </div>
+
+  <!-- Gold Loans List -->
+  <div *ngIf="!loading && !error" class="gold-loans-list">
+    <div *ngIf="filteredLoans.length === 0" class="no-loans">
+      <p>No gold loans found with status: {{ filterStatus }}</p>
+    </div>
+
+    <div *ngFor="let loan of filteredLoans" class="loan-card">
+      <div class="loan-header">
+        <div class="loan-info">
+          <h4>Loan #{{ loan.loanAccountNumber || 'N/A' }}</h4>
+          <span class="status-badge" [ngClass]="getStatusClass(loan.status)">
+            {{ loan.status }}
+          </span>
+          <span class="otp-badge" [ngClass]="loan.otpVerified ? 'otp-verified' : 'otp-not-verified'">
+            {{ loan.otpVerified ? 'OTP Verified' : 'OTP Not Verified' }}
+          </span>
+        </div>
+        <div class="loan-actions">
+          <div *ngIf="loan.status === 'Pending'">
+            <button
+              type="button"
+              class="action-btn approve-btn"
+              (click)="approveGoldLoan(loan, 'Approved')"
+              [disabled]="approving"
+            >
+              <span *ngIf="!approving">✓ Approve</span>
+              <span *ngIf="approving">Approving...</span>
+            </button>
+            <button
+              type="button"
+              class="action-btn reject-btn"
+              (click)="approveGoldLoan(loan, 'Rejected')"
+              [disabled]="approving"
+            >
+              ✗ Reject
+            </button>
+          </div>
+          <div *ngIf="loan.status === 'Approved'">
+            <button
+              type="button"
+              class="action-btn foreclosure-btn"
+              (click)="viewForeclosure(loan)"
+            >
+              💰 Foreclosure
+            </button>
+            <button
+              type="button"
+              class="action-btn emi-btn"
+              (click)="viewEmiDetails(loan)"
+            >
+              📅 EMI Details
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="loan-details">
+        <div class="details-grid">
+          <div class="detail-item" *ngIf="loan.customerId">
+            <span class="detail-label">Customer ID:</span>
+            <span class="detail-value">{{ loan.customerId }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Applicant Name:</span>
+            <span class="detail-value">{{ loan.userName }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Account Number:</span>
+            <span class="detail-value">{{ loan.accountNumber }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Email:</span>
+            <span class="detail-value">{{ loan.userEmail }}</span>
+          </div>
+          <div class="detail-item highlight">
+            <span class="detail-label">Gold Weight (22K):</span>
+            <span class="detail-value">{{ loan.goldGrams }} grams</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Gold Rate (at application):</span>
+            <span class="detail-value">₹{{ loan.goldRatePerGram | number:'1.2-2' }} per gram</span>
+          </div>
+          <div class="detail-item highlight">
+            <span class="detail-label">Total Gold Value:</span>
+            <span class="detail-value">₹{{ loan.goldValue | number:'1.2-2' }}</span>
+          </div>
+          <div class="detail-item highlight loan-amount">
+            <span class="detail-label">Loan Amount (75%):</span>
+            <span class="detail-value">₹{{ loan.loanAmount | number:'1.2-2' }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Tenure:</span>
+            <span class="detail-value">{{ loan.tenure }} months</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Interest Rate:</span>
+            <span class="detail-value">{{ loan.interestRate }}% p.a.</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Application Date:</span>
+            <span class="detail-value">{{ formatDate(loan.applicationDate) }}</span>
+          </div>
+          <div class="detail-item" *ngIf="loan.approvalDate">
+            <span class="detail-label">Approval Date:</span>
+            <span class="detail-value">{{ formatDate(loan.approvalDate) }}</span>
+          </div>
+          <div class="detail-item" *ngIf="loan.approvedBy">
+            <span class="detail-label">Approved By:</span>
+            <span class="detail-value">{{ loan.approvedBy }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Gold Details Section (if approved) -->
+      <div class="gold-details-section" *ngIf="loan.status === 'Approved' && loan.goldItems">
+        <h5>📦 Gold Details (Verified)</h5>
+        <div class="details-grid">
+          <div class="detail-item" *ngIf="loan.goldItems">
+            <span class="detail-label">Gold Items:</span>
+            <span class="detail-value">{{ loan.goldItems }}</span>
+          </div>
+          <div class="detail-item" *ngIf="loan.goldDescription">
+            <span class="detail-label">Description:</span>
+            <span class="detail-value">{{ loan.goldDescription }}</span>
+          </div>
+          <div class="detail-item" *ngIf="loan.goldPurity">
+            <span class="detail-label">Verified Purity:</span>
+            <span class="detail-value">{{ loan.goldPurity }}</span>
+          </div>
+          <div class="detail-item" *ngIf="loan.verifiedGoldGrams">
+            <span class="detail-label">Verified Weight:</span>
+            <span class="detail-value">{{ loan.verifiedGoldGrams }} grams</span>
+          </div>
+          <div class="detail-item" *ngIf="loan.verifiedGoldValue">
+            <span class="detail-label">Verified Gold Value:</span>
+            <span class="detail-value">₹{{ loan.verifiedGoldValue | number:'1.2-2' }}</span>
+          </div>
+          <div class="detail-item" *ngIf="loan.storageLocation">
+            <span class="detail-label">Storage Location:</span>
+            <span class="detail-value">{{ loan.storageLocation }}</span>
+          </div>
+          <div class="detail-item" *ngIf="loan.verificationNotes">
+            <span class="detail-label">Verification Notes:</span>
+            <span class="detail-value">{{ loan.verificationNotes }}</span>
+          </div>
+          <div class="detail-item" *ngIf="loan.termsAccepted !== undefined">
+            <span class="detail-label">Terms Accepted:</span>
+            <span class="detail-value" [ngClass]="loan.termsAccepted ? 'status-approved' : 'status-pending'">
+              {{ loan.termsAccepted ? 'Yes' : 'No' }}
+            </span>
+          </div>
+          <div class="detail-item" *ngIf="loan.termsAcceptedDate">
+            <span class="detail-label">Terms Accepted Date:</span>
+            <span class="detail-value">{{ formatDate(loan.termsAcceptedDate) }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Gold Details Modal -->
+<div class="modal-overlay" *ngIf="showGoldDetailsModal" (click)="cancelGoldDetails()">
+  <div class="modal-content" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3>📦 Enter Gold Details</h3>
+      <button class="close-btn" (click)="cancelGoldDetails()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <form (ngSubmit)="submitGoldDetails()">
+        <div class="form-group">
+          <label for="goldItems">Gold Items Description <span class="required">*</span></label>
+          <input
+            type="text"
+            id="goldItems"
+            [(ngModel)]="goldDetailsForm.goldItems"
+            name="goldItems"
+            placeholder="e.g., 2 bangles, 1 chain, 3 rings"
+            class="form-input"
+            required
+          />
+          <small class="form-hint">Describe the gold items being pledged</small>
+        </div>
+
+        <div class="form-group">
+          <label for="goldDescription">Detailed Description</label>
+          <textarea
+            id="goldDescription"
+            [(ngModel)]="goldDetailsForm.goldDescription"
+            name="goldDescription"
+            placeholder="Enter detailed description of gold items..."
+            class="form-textarea"
+            rows="3"
+          ></textarea>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="goldPurity">Gold Purity <span class="required">*</span></label>
+            <select
+              id="goldPurity"
+              [(ngModel)]="goldDetailsForm.goldPurity"
+              name="goldPurity"
+              class="form-input"
+              required
+            >
+              <option value="22K">22 Karat (22K)</option>
+              <option value="18K">18 Karat (18K)</option>
+              <option value="24K">24 Karat (24K)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="verifiedGoldGrams">Verified Weight (grams) <span class="required">*</span></label>
+            <input
+              type="number"
+              id="verifiedGoldGrams"
+              [(ngModel)]="goldDetailsForm.verifiedGoldGrams"
+              name="verifiedGoldGrams"
+              placeholder="Enter verified weight"
+              class="form-input"
+              min="0"
+              step="0.01"
+              required
+              (input)="calculateLoanDetails()"
+            />
+            <small class="form-hint">Actual verified weight after testing</small>
+          </div>
+        </div>
+
+        <!-- Auto-calculated Loan Details -->
+        <div class="calculation-preview" *ngIf="goldDetailsForm.verifiedGoldGrams > 0 && currentGoldRate">
+          <h4>💰 Auto-Calculated Loan Details</h4>
+          <div class="calc-grid">
+            <div class="calc-item">
+              <span class="calc-label">Verified Gold Value:</span>
+              <span class="calc-value">₹{{ calculatedVerifiedValue | number:'1.2-2' }}</span>
+            </div>
+            <div class="calc-item highlight">
+              <span class="calc-label">Loan Amount (75%):</span>
+              <span class="calc-value">₹{{ calculatedLoanAmount | number:'1.2-2' }}</span>
+            </div>
+            <div class="calc-item" *ngIf="calculatedEMI > 0">
+              <span class="calc-label">Monthly EMI:</span>
+              <span class="calc-value">₹{{ calculatedEMI | number:'1.2-2' }}</span>
+            </div>
+            <div class="calc-item" *ngIf="calculatedTotalInterest > 0">
+              <span class="calc-label">Total Interest:</span>
+              <span class="calc-value">₹{{ calculatedTotalInterest | number:'1.2-2' }}</span>
+            </div>
+          </div>
+          <div class="calc-note">
+            <p><strong>Note:</strong> Loan amount will be automatically calculated as 75% of verified gold value and credited to user's account upon approval.</p>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="storageLocation">Storage Location</label>
+          <input
+            type="text"
+            id="storageLocation"
+            [(ngModel)]="goldDetailsForm.storageLocation"
+            name="storageLocation"
+            placeholder="e.g., Vault A-123, Branch XYZ"
+            class="form-input"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="verificationNotes">Verification Notes</label>
+          <textarea
+            id="verificationNotes"
+            [(ngModel)]="goldDetailsForm.verificationNotes"
+            name="verificationNotes"
+            placeholder="Enter any notes from verification process..."
+            class="form-textarea"
+            rows="3"
+          ></textarea>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn-cancel" (click)="cancelGoldDetails()" [disabled]="approving">
+            Cancel
+          </button>
+          <button type="submit" class="btn-submit" [disabled]="approving">
+            <span *ngIf="!approving">✓ Approve & Save Details</span>
+            <span *ngIf="approving">Processing...</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Foreclosure Modal -->
+<div class="modal-overlay" *ngIf="showForeclosureModal" (click)="closeForeclosureModal()">
+  <div class="modal-content" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3>💰 Loan Foreclosure Details</h3>
+      <button class="close-btn" (click)="closeForeclosureModal()">×</button>
+    </div>
+    <div class="modal-body" *ngIf="foreclosureDetails && selectedLoan">
+      <div class="foreclosure-summary">
+        <h4>Current Foreclosure Details</h4>
+        <div class="summary-grid">
+          <div class="summary-item">
+            <span class="label">Months Elapsed:</span>
+            <span class="value">{{ foreclosureDetails.monthsElapsed }}</span>
+          </div>
+          <div class="summary-item">
+            <span class="label">Principal Paid:</span>
+            <span class="value">₹{{ foreclosureDetails.principalPaid | number:'1.2-2' }}</span>
+          </div>
+          <div class="summary-item">
+            <span class="label">Interest Paid:</span>
+            <span class="value">₹{{ foreclosureDetails.interestPaid | number:'1.2-2' }}</span>
+          </div>
+          <div class="summary-item">
+            <span class="label">Remaining Principal:</span>
+            <span class="value">₹{{ foreclosureDetails.remainingPrincipal | number:'1.2-2' }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="edit-section">
+        <div class="edit-header">
+          <h4>✏️ Edit Foreclosure & Interest</h4>
+          <button 
+            type="button" 
+            class="edit-toggle-btn" 
+            (click)="toggleEditForeclosure()"
+            [class.active]="editingForeclosure"
+          >
+            {{ editingForeclosure ? 'Cancel Edit' : 'Edit' }}
+          </button>
+        </div>
+
+        <div class="edit-form" *ngIf="editingForeclosure">
+          <div class="form-group">
+            <label for="editedInterestRate">Interest Rate (% per annum) *</label>
+            <input
+              type="number"
+              id="editedInterestRate"
+              [(ngModel)]="editedInterestRate"
+              (input)="onInterestRateChange()"
+              min="0"
+              max="30"
+              step="0.1"
+              class="form-input"
+              required
+            />
+            <small class="form-hint">Current: {{ selectedLoan.interestRate }}%</small>
+          </div>
+
+          <div class="form-group">
+            <label for="editedForeclosureAmount">Foreclosure Amount (₹) *</label>
+            <input
+              type="number"
+              id="editedForeclosureAmount"
+              [(ngModel)]="editedForeclosureAmount"
+              (input)="onForeclosureAmountChange()"
+              min="0"
+              step="0.01"
+              class="form-input"
+              required
+            />
+            <small class="form-hint">Original: ₹{{ foreclosureDetails.totalForeclosureAmount | number:'1.2-2' }}</small>
+          </div>
+
+          <div class="calculated-amounts">
+            <h5>📊 Auto-Calculated Amounts</h5>
+            <div class="calc-grid">
+              <div class="calc-item">
+                <span class="calc-label">Interest Amount:</span>
+                <span class="calc-value">₹{{ calculatedInterestAmount | number:'1.2-2' }}</span>
+              </div>
+              <div class="calc-item highlight">
+                <span class="calc-label">Total Payable Amount:</span>
+                <span class="calc-value">₹{{ calculatedPayableAmount | number:'1.2-2' }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="readonly-details" *ngIf="!editingForeclosure">
+          <div class="detail-row">
+            <span class="label">Remaining Interest:</span>
+            <span class="value">₹{{ foreclosureDetails.remainingInterest | number:'1.2-2' }}</span>
+          </div>
+          <div class="detail-row">
+            <span class="label">Foreclosure Charges (4%):</span>
+            <span class="value">₹{{ foreclosureDetails.foreclosureCharges | number:'1.2-2' }}</span>
+          </div>
+          <div class="detail-row">
+            <span class="label">GST (18%):</span>
+            <span class="value">₹{{ foreclosureDetails.gst | number:'1.2-2' }}</span>
+          </div>
+          <div class="detail-row highlight">
+            <span class="label">Total Foreclosure Amount:</span>
+            <span class="value">₹{{ foreclosureDetails.totalForeclosureAmount | number:'1.2-2' }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" (click)="closeForeclosureModal()">Close</button>
+      <button 
+        *ngIf="editingForeclosure"
+        class="btn-save" 
+        (click)="saveForeclosureChanges()" 
+        [disabled]="processingForeclosure"
+      >
+        {{ processingForeclosure ? 'Processing...' : 'Save & Process Foreclosure' }}
+      </button>
+      <button 
+        *ngIf="!editingForeclosure"
+        class="btn-submit" 
+        (click)="processForeclosure()" 
+        [disabled]="processingForeclosure"
+      >
+        {{ processingForeclosure ? 'Processing...' : 'Process Foreclosure' }}
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- EMI Details Modal -->
+<div class="modal-overlay" *ngIf="showEmiDetailsModal" (click)="closeEmiDetailsModal()">
+  <div class="modal-content large-modal" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3>📅 EMI Schedule & Details</h3>
+      <button class="close-btn" (click)="closeEmiDetailsModal()">×</button>
+    </div>
+    <div class="modal-body" *ngIf="selectedLoan">
+      <div class="emi-summary">
+        <h4>Loan Summary</h4>
+        <div class="summary-grid">
+          <div class="summary-item">
+            <span class="label">Loan Amount:</span>
+            <span class="value">₹{{ selectedLoan.loanAmount | number:'1.2-2' }}</span>
+          </div>
+          <div class="summary-item">
+            <span class="label">Interest Rate:</span>
+            <span class="value">{{ selectedLoan.interestRate }}% p.a.</span>
+          </div>
+          <div class="summary-item">
+            <span class="label">Tenure:</span>
+            <span class="value">{{ selectedLoan.tenure }} months</span>
+          </div>
+          <div class="summary-item" *ngIf="emiSchedule.length > 0">
+            <span class="label">Monthly EMI:</span>
+            <span class="value highlight">₹{{ emiSchedule[0]?.totalAmount | number:'1.2-2' }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="emi-schedule-table" *ngIf="emiSchedule.length > 0">
+        <h4>EMI Schedule ({{ emiSchedule.length }} installments)</h4>
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>EMI #</th>
+                <th>Due Date & Time</th>
+                <th>Principal</th>
+                <th>Interest</th>
+                <th>Total EMI</th>
+                <th>Remaining Principal</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let emi of emiSchedule" [ngClass]="{'paid': emi.status === 'Paid', 'pending': emi.status === 'Pending', 'overdue': emi.status === 'Overdue', 'upcoming': isUpcomingEmi(emi.dueDate)}">
+                <td><strong>{{ emi.emiNumber }}</strong></td>
+                <td>
+                  <div class="date-time">
+                    <div class="date">{{ formatDate(emi.dueDate) }}</div>
+                    <div class="time-info">{{ getTimeUntilDue(emi.dueDate) }}</div>
+                  </div>
+                </td>
+                <td>₹{{ emi.principalAmount | number:'1.2-2' }}</td>
+                <td>₹{{ emi.interestAmount | number:'1.2-2' }}</td>
+                <td><strong>₹{{ emi.totalAmount | number:'1.2-2' }}</strong></td>
+                <td>₹{{ emi.remainingPrincipal | number:'1.2-2' }}</td>
+                <td>
+                  <span class="status-badge" [ngClass]="'status-' + emi.status.toLowerCase()">
+                    {{ emi.status }}
+                  </span>
+                  <span *ngIf="emi.paymentDate" class="payment-date">
+                    Paid: {{ formatDateTime(emi.paymentDate) }}
+                  </span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="no-emi" *ngIf="emiSchedule.length === 0">
+        <p>No EMI schedule available for this loan. EMI schedule will be generated after loan approval.</p>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" (click)="closeEmiDetailsModal()">Close</button>
+    </div>
+  </div>
+</div>
+

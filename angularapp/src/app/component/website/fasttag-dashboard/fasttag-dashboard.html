@@ -1,0 +1,599 @@
+<div class="fasttag-dashboard-page">
+  <!-- Global Alert -->
+  <div class="global-alert" *ngIf="showAlert" [ngClass]="alertType">
+    <span>{{ alertMessage }}</span>
+    <button class="alert-close" (click)="showAlert = false">&times;</button>
+  </div>
+
+  <!-- Top bar -->
+  <div class="dashboard-topbar">
+    <div class="topbar-left">
+      <button class="hamburger-btn" (click)="goToLanding()">
+        <svg viewBox="0 0 24 24" fill="none" width="24" height="24" stroke="#0F172A" stroke-width="2">
+          <path d="M4 6h16M4 12h16M4 18h16"/>
+        </svg>
+      </button>
+      <div class="topbar-brand">
+        <img src="/favicon.ico" alt="NeoBank" class="topbar-logo">
+        <span class="topbar-divider"></span>
+        <span class="topbar-title">NeoBank FASTag</span>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <button class="topbar-icon-btn">
+        <svg viewBox="0 0 24 24" fill="none" width="22" height="22" stroke="#334155" stroke-width="1.8">
+          <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/>
+          <circle cx="12" cy="7" r="4"/>
+        </svg>
+      </button>
+      <button class="topbar-icon-btn notification-btn" (click)="logout()" title="Logout">
+        <svg viewBox="0 0 24 24" fill="none" width="22" height="22" stroke="#334155" stroke-width="1.8">
+          <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+          <path d="M13.73 21a2 2 0 01-3.46 0"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Main Content -->
+  <div class="dashboard-content">
+    <!-- Welcome -->
+    <div class="welcome-bar">
+      <h1 class="welcome-greeting">Welcome, <strong>{{ user?.userName || user?.gmailId || 'NA' }}</strong></h1>
+    </div>
+
+    <!-- Dashboard Grid Layout -->
+    <div class="dashboard-grid">
+      <!-- Left Column -->
+      <div class="dash-left">
+        <!-- Wallet Balance Card -->
+        <div class="wallet-card">
+          <div class="wallet-card-bg">
+            <div class="wallet-label">
+              <svg viewBox="0 0 24 24" fill="none" width="18" height="18" stroke="#fff" stroke-width="1.5">
+                <rect x="2" y="6" width="20" height="12" rx="3"/>
+                <path d="M7 12h4m2 0h4"/>
+                <circle cx="12" cy="12" r="1.5"/>
+              </svg>
+              FASTag Wallet Balance
+            </div>
+            <div class="wallet-amount">₹{{ getTotalBalance() }}</div>
+            <div class="wallet-id">Wallet ID: {{ fasttags.length > 0 ? (fasttags[0]?.fasttagNumber || 'NA') : 'NA' }}</div>
+            <button class="recharge-slider-btn" (click)="fasttags.length > 0 && fasttags[0]?.status === 'Approved' ? openRecharge(fasttags[0]) : null"
+                    [class.disabled]="fasttags.length === 0 || fasttags[0]?.status !== 'Approved'">
+              <span class="recharge-text">Recharge</span>
+              <span class="recharge-icon">
+                <svg viewBox="0 0 24 24" fill="none" width="20" height="20" stroke="#fff" stroke-width="2.5">
+                  <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+                </svg>
+              </span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Quick Action Icons -->
+        <div class="quick-actions">
+          <div class="qa-item" (click)="activeTab = 'all'">
+            <div class="qa-icon">
+              <svg viewBox="0 0 24 24" fill="none" width="24" height="24" stroke="#1E40AF" stroke-width="1.5">
+                <path d="M16 3h5v5M14 10l7-7M8 21H3v-5M10 14l-7 7"/>
+              </svg>
+            </div>
+            <span>Manage<br>Vehicles</span>
+          </div>
+          <div class="qa-item" (click)="fasttags.length > 0 && fasttags[0]?.status === 'Approved' ? viewTransactions(fasttags[0]) : null">
+            <div class="qa-icon">
+              <svg viewBox="0 0 24 24" fill="none" width="24" height="24" stroke="#1E40AF" stroke-width="1.5">
+                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/>
+              </svg>
+            </div>
+            <span>Get<br>Statement</span>
+          </div>
+          <div class="qa-item" (click)="openLinkAccountModal()">
+            <div class="qa-icon">
+              <svg viewBox="0 0 24 24" fill="none" width="24" height="24" stroke="#1E40AF" stroke-width="1.5">
+                <circle cx="12" cy="12" r="10"/>
+                <path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3M12 17h.01"/>
+              </svg>
+            </div>
+            <span>Link<br>Account</span>
+          </div>
+          <div class="qa-item" (click)="activeTab = 'all'">
+            <div class="qa-icon">
+              <svg viewBox="0 0 24 24" fill="none" width="24" height="24" stroke="#1E40AF" stroke-width="1.5">
+                <path d="M12 20h9M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/>
+              </svg>
+            </div>
+            <span>Account<br>Activity</span>
+          </div>
+        </div>
+
+        <div class="quick-actions-divider"></div>
+
+        <!-- Buy New FASTag Button -->
+        <button class="btn-buy-fasttag" (click)="openApplyForm()">
+          <svg viewBox="0 0 24 24" fill="none" width="20" height="20" stroke="currentColor" stroke-width="2">
+            <rect x="2" y="6" width="20" height="12" rx="3"/>
+            <path d="M7 12h4m2 0h4"/>
+            <circle cx="12" cy="12" r="1.5"/>
+          </svg>
+          Buy New FASTag
+        </button>
+      </div>
+
+      <!-- Right Column -->
+      <div class="dash-right">
+        <!-- Recent Transactions -->
+        <div class="section-card">
+          <h2 class="section-title">Recent Transactions</h2>
+          <div class="section-body" *ngIf="!loading">
+            <!-- No transactions state -->
+            <div class="no-data-state" *ngIf="fasttags.length === 0 || activeTags.length === 0">
+              <h3>No Transactions</h3>
+              <p>It seems that you don't have any recent transactions.</p>
+            </div>
+            <!-- Has active tags - show mini transactions -->
+            <div class="mini-txn-list" *ngIf="activeTags.length > 0">
+              <div class="mini-txn-item" *ngFor="let tag of activeTags">
+                <div class="mini-txn-left">
+                  <span class="mini-txn-vehicle">{{ tag.vehicleNumber }}</span>
+                  <span class="mini-txn-status" [ngClass]="getStatusClass(tag.status)">{{ tag.status }}</span>
+                </div>
+                <div class="mini-txn-right">
+                  <span class="mini-txn-balance">₹{{ tag.balance?.toFixed(2) || '0.00' }}</span>
+                  <button class="mini-txn-btn" (click)="viewTransactions(tag)" *ngIf="tag.status === 'Approved'">View</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="section-loading" *ngIf="loading">
+            <div class="loader-ring small"></div>
+          </div>
+        </div>
+
+        <!-- Wallet Spends / Stats -->
+        <div class="section-card">
+          <h2 class="section-title">Wallet Spends</h2>
+          <div class="section-body">
+            <!-- Stats Summary -->
+            <div class="wallet-stats" *ngIf="!loading && fasttags.length > 0">
+              <div class="ws-item">
+                <span class="ws-value">{{ fasttags.length }}</span>
+                <span class="ws-label">Total Tags</span>
+              </div>
+              <div class="ws-item ws-active">
+                <span class="ws-value">{{ activeTags.length }}</span>
+                <span class="ws-label">Active</span>
+              </div>
+              <div class="ws-item ws-closed">
+                <span class="ws-value">{{ closedTags.length }}</span>
+                <span class="ws-label">Closed</span>
+              </div>
+            </div>
+            <div class="spend-chart-placeholder" *ngIf="!loading">
+              <div class="spend-bar-row" *ngFor="let tag of activeTags">
+                <span class="spend-vehicle">{{ tag.vehicleNumber }}</span>
+                <div class="spend-bar">
+                  <div class="spend-bar-fill" [style.width.%]="tag.balance > 0 ? Math.min((tag.balance / 10000) * 100, 100) : 2"></div>
+                </div>
+                <span class="spend-amount">₹{{ tag.balance?.toFixed(0) || '0' }}</span>
+              </div>
+              <p class="no-spend-text" *ngIf="activeTags.length === 0">No active FASTag to display.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Linked Bank Account Section -->
+    <div class="linked-account-section" *ngIf="!loading">
+      <div class="section-card">
+        <h2 class="section-title">
+          Linked Bank Account
+          <button class="link-add-btn" (click)="openLinkAccountModal()" *ngIf="linkedAccounts.length === 0">
+            <svg viewBox="0 0 24 24" fill="none" width="16" height="16" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+            Link Account
+          </button>
+        </h2>
+        <div class="section-body">
+          <!-- No linked accounts -->
+          <div class="no-data-state" *ngIf="linkedAccounts.length === 0">
+            <h3>No Account Linked</h3>
+            <p>Link your NeoBank savings account to recharge FASTag directly from your bank balance.</p>
+            <button class="btn-apply-empty" (click)="openLinkAccountModal()">Link Bank Account</button>
+          </div>
+          <!-- Linked accounts list -->
+          <div class="linked-accounts-list" *ngIf="linkedAccounts.length > 0">
+            <div class="linked-acc-card" *ngFor="let acc of linkedAccounts">
+              <div class="linked-acc-left">
+                <div class="linked-acc-icon">
+                  <svg viewBox="0 0 24 24" fill="none" width="24" height="24" stroke="#10B981" stroke-width="1.8">
+                    <path d="M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11M20 10v11M8 14v3M12 14v3M16 14v3"/>
+                  </svg>
+                </div>
+                <div class="linked-acc-info">
+                  <span class="linked-acc-name">{{ acc.accountHolderName || 'Account Holder' }}</span>
+                  <span class="linked-acc-number">A/C: {{ getMaskedAccountNumber(acc.accountNumber) }}</span>
+                  <span class="linked-acc-status">
+                    <svg viewBox="0 0 24 24" fill="none" width="12" height="12" stroke="#10B981" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
+                    Verified & Linked
+                  </span>
+                </div>
+              </div>
+              <button class="linked-acc-unlink" (click)="unlinkAccount(acc)" title="Unlink this account">
+                <svg viewBox="0 0 24 24" fill="none" width="16" height="16" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- FASTag Cards Section (below the dashboard grid) -->
+    <div class="fasttag-cards-section" *ngIf="!loading && fasttags.length > 0">
+      <!-- Tabs -->
+      <div class="tabs-bar">
+        <button class="tab-btn" [class.active]="activeTab === 'active'" (click)="activeTab = 'active'">
+          Active & Applied ({{ activeTags.length }})
+        </button>
+        <button class="tab-btn" [class.active]="activeTab === 'closed'" (click)="activeTab = 'closed'">
+          Closed ({{ closedTags.length }})
+        </button>
+        <button class="tab-btn" [class.active]="activeTab === 'all'" (click)="activeTab = 'all'">
+          All ({{ fasttags.length }})
+        </button>
+      </div>
+
+      <!-- No tags in tab -->
+      <div class="empty-state small" *ngIf="displayTags.length === 0">
+        <p>No {{ activeTab === 'closed' ? 'closed' : 'active' }} FASTag found.</p>
+      </div>
+
+      <!-- FASTag Cards -->
+      <div class="fasttag-grid" *ngIf="displayTags.length > 0">
+        <div class="fasttag-card" *ngFor="let tag of displayTags" [class.closed-card]="tag.status === 'Closed'">
+          <div class="ftc-header">
+            <div class="ftc-header-left">
+              <h3 class="ftc-vehicle">{{ tag.vehicleNumber || 'N/A' }}</h3>
+              <span class="ftc-type">{{ tag.vehicleType || 'Vehicle' }}</span>
+            </div>
+            <span class="ftc-status" [ngClass]="getStatusClass(tag.status)">{{ tag.status }}</span>
+          </div>
+
+          <div class="ftc-details">
+            <div class="ftc-detail-row">
+              <span class="ftc-label">FASTag Number</span>
+              <span class="ftc-value">{{ tag.fasttagNumber || 'Pending' }}</span>
+            </div>
+            <div class="ftc-detail-row">
+              <span class="ftc-label">Balance</span>
+              <span class="ftc-value ftc-balance" [class.zero-balance]="tag.balance === 0">₹{{ tag.balance?.toFixed(2) || '0.00' }}</span>
+            </div>
+            <div class="ftc-detail-row" *ngIf="tag.userName">
+              <span class="ftc-label">Name</span>
+              <span class="ftc-value">{{ tag.userName }}</span>
+            </div>
+            <div class="ftc-detail-row" *ngIf="tag.bank">
+              <span class="ftc-label">Bank</span>
+              <span class="ftc-value">{{ tag.bank }}</span>
+            </div>
+            <div class="ftc-detail-row" *ngIf="tag.issueDate">
+              <span class="ftc-label">Issue Date</span>
+              <span class="ftc-value">{{ formatDate(tag.issueDate) }}</span>
+            </div>
+            <div class="ftc-detail-row" *ngIf="tag.mobileNumber">
+              <span class="ftc-label">Mobile</span>
+              <span class="ftc-value">{{ tag.mobileNumber }}</span>
+            </div>
+          </div>
+
+          <!-- Card Actions -->
+          <div class="ftc-actions">
+            <button class="ftc-btn btn-detail" (click)="viewDetails(tag)">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              Details
+            </button>
+            <button class="ftc-btn btn-txn" (click)="viewTransactions(tag)" *ngIf="tag.status === 'Approved'">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M2 12h20"/><path d="M17 7l-5 5-5-5"/></svg>
+              History
+            </button>
+            <button class="ftc-btn btn-recharge" (click)="openRecharge(tag)" *ngIf="tag.status === 'Approved'">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20"/><path d="M5 12h14"/></svg>
+              Recharge
+            </button>
+            <button class="ftc-btn btn-close-tag" (click)="closeFasttag(tag)"
+                    *ngIf="tag.status === 'Approved'"
+                    [class.disabled]="tag.balance > 0"
+                    [title]="tag.balance > 0 ? 'Balance must be ₹0 to close' : 'Close this FASTag'">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Loading -->
+    <div class="loading-section" *ngIf="loading">
+      <div class="loader-ring"></div>
+      <p>Loading your FASTag details...</p>
+    </div>
+
+    <!-- No FASTag at all -->
+    <div class="empty-state" *ngIf="!loading && fasttags.length === 0">
+      <div class="empty-icon">🏷️</div>
+      <h3>No FASTag Found</h3>
+      <p>No FASTag is linked to your Gmail ID yet.</p>
+      <button class="btn-apply-empty" (click)="openApplyForm()">Apply for FASTag</button>
+    </div>
+  </div>
+
+  <!-- =========================== MODALS =========================== -->
+
+  <!-- Detail Modal -->
+  <div class="modal-overlay" *ngIf="showDetailModal" (click)="closeDetailModal()">
+    <div class="modal-box detail-modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>FASTag Details</h2>
+        <button class="modal-close" (click)="closeDetailModal()">&times;</button>
+      </div>
+      <div class="modal-body" *ngIf="selectedTag">
+        <div class="detail-status-bar">
+          <span class="ftc-status large" [ngClass]="getStatusClass(selectedTag.status)">{{ selectedTag.status }}</span>
+          <span class="detail-balance">Balance: <strong>₹{{ selectedTag.balance?.toFixed(2) || '0.00' }}</strong></span>
+        </div>
+
+        <div class="detail-grid">
+          <div class="detail-group">
+            <h4>Vehicle Info</h4>
+            <div class="detail-item"><span>Vehicle Number</span><strong>{{ selectedTag.vehicleNumber || 'N/A' }}</strong></div>
+            <div class="detail-item"><span>Vehicle Type</span><strong>{{ selectedTag.vehicleType || 'N/A' }}</strong></div>
+            <div class="detail-item"><span>Vehicle Details</span><strong>{{ selectedTag.vehicleDetails || 'N/A' }}</strong></div>
+            <div class="detail-item" *ngIf="selectedTag.chassisNumber"><span>Chassis Number</span><strong>{{ selectedTag.chassisNumber }}</strong></div>
+            <div class="detail-item" *ngIf="selectedTag.engineNumber"><span>Engine Number</span><strong>{{ selectedTag.engineNumber }}</strong></div>
+            <div class="detail-item" *ngIf="selectedTag.make"><span>Make</span><strong>{{ selectedTag.make }}</strong></div>
+            <div class="detail-item" *ngIf="selectedTag.model"><span>Model</span><strong>{{ selectedTag.model }}</strong></div>
+            <div class="detail-item" *ngIf="selectedTag.fuelType"><span>Fuel Type</span><strong>{{ selectedTag.fuelType }}</strong></div>
+          </div>
+
+          <div class="detail-group">
+            <h4>FASTag Info</h4>
+            <div class="detail-item"><span>FASTag Number</span><strong>{{ selectedTag.fasttagNumber || 'Pending' }}</strong></div>
+            <div class="detail-item" *ngIf="selectedTag.barcodeNumber"><span>Barcode Number</span><strong>{{ selectedTag.barcodeNumber }}</strong></div>
+            <div class="detail-item"><span>Bank</span><strong>{{ selectedTag.bank || 'N/A' }}</strong></div>
+            <div class="detail-item" *ngIf="selectedTag.issueDate"><span>Issue Date</span><strong>{{ formatDate(selectedTag.issueDate) }}</strong></div>
+            <div class="detail-item" *ngIf="selectedTag.assignedAccountId"><span>Linked Account</span><strong>{{ selectedTag.assignedAccountId }}</strong></div>
+            <div class="detail-item"><span>Created At</span><strong>{{ formatDateTime(selectedTag.createdAt) }}</strong></div>
+          </div>
+
+          <div class="detail-group">
+            <h4>Owner Info</h4>
+            <div class="detail-item"><span>Name</span><strong>{{ selectedTag.userName || 'N/A' }}</strong></div>
+            <div class="detail-item"><span>Email</span><strong>{{ selectedTag.email || 'N/A' }}</strong></div>
+            <div class="detail-item" *ngIf="selectedTag.mobileNumber"><span>Mobile</span><strong>{{ selectedTag.mobileNumber }}</strong></div>
+            <div class="detail-item" *ngIf="selectedTag.aadharNumber"><span>Aadhar</span><strong>{{ selectedTag.aadharNumber }}</strong></div>
+            <div class="detail-item" *ngIf="selectedTag.panNumber"><span>PAN</span><strong>{{ selectedTag.panNumber }}</strong></div>
+            <div class="detail-item" *ngIf="selectedTag.dob"><span>Date of Birth</span><strong>{{ selectedTag.dob }}</strong></div>
+          </div>
+
+          <div class="detail-group" *ngIf="selectedTag.dispatchAddress || selectedTag.city">
+            <h4>Address</h4>
+            <div class="detail-item" *ngIf="selectedTag.dispatchAddress"><span>Dispatch Address</span><strong>{{ selectedTag.dispatchAddress }}</strong></div>
+            <div class="detail-item" *ngIf="selectedTag.city"><span>City</span><strong>{{ selectedTag.city }}</strong></div>
+            <div class="detail-item" *ngIf="selectedTag.state"><span>State</span><strong>{{ selectedTag.state }}</strong></div>
+            <div class="detail-item" *ngIf="selectedTag.pinCode"><span>PIN Code</span><strong>{{ selectedTag.pinCode }}</strong></div>
+          </div>
+
+          <div class="detail-group" *ngIf="selectedTag.tagIssuanceFee || selectedTag.tagTotalAmount">
+            <h4>Fee Details</h4>
+            <div class="detail-item" *ngIf="selectedTag.tagIssuanceFee"><span>Issuance Fee</span><strong>₹{{ selectedTag.tagIssuanceFee?.toFixed(2) }}</strong></div>
+            <div class="detail-item" *ngIf="selectedTag.tagSecurityDeposit"><span>Security Deposit</span><strong>₹{{ selectedTag.tagSecurityDeposit?.toFixed(2) }}</strong></div>
+            <div class="detail-item" *ngIf="selectedTag.tagUploadAmount"><span>Upload Amount</span><strong>₹{{ selectedTag.tagUploadAmount?.toFixed(2) }}</strong></div>
+            <div class="detail-item" *ngIf="selectedTag.tagTotalAmount"><span>Total Amount</span><strong>₹{{ selectedTag.tagTotalAmount?.toFixed(2) }}</strong></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Apply FASTag Modal -->
+  <div class="modal-overlay" *ngIf="showApplyForm" (click)="closeApplyForm()">
+    <div class="modal-box apply-modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>Apply for New FASTag</h2>
+        <button class="modal-close" (click)="closeApplyForm()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Your Name</label>
+          <input type="text" [(ngModel)]="applyForm.userName" placeholder="Enter your full name" class="form-input">
+        </div>
+        <div class="form-group">
+          <label>Vehicle Number <span class="required">*</span></label>
+          <input type="text" [(ngModel)]="applyForm.vehicleNumber" placeholder="e.g. AP09AB1234" class="form-input" style="text-transform: uppercase;">
+        </div>
+        <div class="form-group">
+          <label>Vehicle Type <span class="required">*</span></label>
+          <select [(ngModel)]="applyForm.vehicleType" class="form-input">
+            <option *ngFor="let vt of vehicleTypes" [value]="vt">{{ vt }}</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Chassis Number</label>
+            <input type="text" [(ngModel)]="applyForm.chassisNumber" placeholder="Optional" class="form-input">
+          </div>
+          <div class="form-group">
+            <label>Engine Number</label>
+            <input type="text" [(ngModel)]="applyForm.engineNumber" placeholder="Optional" class="form-input">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Mobile Number</label>
+          <input type="tel" [(ngModel)]="applyForm.mobileNumber" placeholder="Optional" class="form-input">
+        </div>
+
+        <div class="form-alert" *ngIf="applyMessage" [class.success]="applySuccess" [class.error]="!applySuccess">
+          {{ applyMessage }}
+        </div>
+
+        <div class="form-actions">
+          <button class="btn-cancel" (click)="closeApplyForm()">Cancel</button>
+          <button class="btn-submit" (click)="submitApply()" [disabled]="applyLoading">
+            <span *ngIf="!applyLoading">Submit Application</span>
+            <span *ngIf="applyLoading">Applying...</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Recharge Modal -->
+  <div class="modal-overlay" *ngIf="showRechargeModal" (click)="closeRechargeModal()">
+    <div class="modal-box recharge-modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>Recharge FASTag</h2>
+        <button class="modal-close" (click)="closeRechargeModal()">&times;</button>
+      </div>
+      <div class="modal-body" *ngIf="rechargeTag">
+        <div class="recharge-info">
+          <div class="ri-row"><span>Vehicle</span><strong>{{ rechargeTag.vehicleNumber }}</strong></div>
+          <div class="ri-row"><span>FASTag Number</span><strong>{{ rechargeTag.fasttagNumber }}</strong></div>
+          <div class="ri-row"><span>Current Balance</span><strong class="ftc-balance">₹{{ rechargeTag.balance?.toFixed(2) || '0.00' }}</strong></div>
+        </div>
+
+        <!-- Linked Account Info -->
+        <div class="recharge-debit-info" *ngIf="linkedAccounts.length > 0">
+          <div class="debit-label">Debiting From</div>
+          <div class="debit-account-card">
+            <svg viewBox="0 0 24 24" fill="none" width="20" height="20" stroke="#2563EB" stroke-width="1.8">
+              <path d="M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11M20 10v11M8 14v3M12 14v3M16 14v3"/>
+            </svg>
+            <div class="debit-account-details">
+              <span class="debit-acc-name">{{ linkedAccounts[0].accountHolderName }}</span>
+              <span class="debit-acc-num">A/C: {{ getMaskedAccountNumber(linkedAccounts[0].accountNumber) }}</span>
+            </div>
+            <svg viewBox="0 0 24 24" fill="none" width="16" height="16" stroke="#10B981" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Recharge Amount (₹100 - ₹50,000) <span class="required">*</span></label>
+          <input type="number" [(ngModel)]="rechargeAmount" placeholder="Enter amount" class="form-input recharge-input" min="100" max="50000">
+        </div>
+
+        <div class="quick-amounts">
+          <button *ngFor="let amt of [500, 1000, 2000, 5000]" class="quick-amt" (click)="rechargeAmount = amt">₹{{ amt }}</button>
+        </div>
+
+        <div class="form-alert" *ngIf="rechargeMessage" [class.success]="rechargeSuccess" [class.error]="!rechargeSuccess">
+          {{ rechargeMessage }}
+        </div>
+
+        <div class="form-actions">
+          <button class="btn-cancel" (click)="closeRechargeModal()">Cancel</button>
+          <button class="btn-submit btn-recharge-submit" (click)="submitRecharge()" [disabled]="rechargeLoading">
+            <span *ngIf="!rechargeLoading">Recharge Now</span>
+            <span *ngIf="rechargeLoading">Processing...</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Transactions Modal -->
+  <div class="modal-overlay" *ngIf="showTransactions" (click)="closeTransactions()">
+    <div class="modal-box txn-modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>Transaction History</h2>
+        <button class="modal-close" (click)="closeTransactions()">&times;</button>
+      </div>
+      <div class="modal-body" *ngIf="transactionTag">
+        <div class="txn-tag-info">
+          <span>{{ transactionTag.vehicleNumber }} — {{ transactionTag.fasttagNumber }}</span>
+        </div>
+
+        <div class="txn-loading" *ngIf="transactionsLoading">
+          <div class="loader-ring small"></div>
+          <p>Loading transactions...</p>
+        </div>
+
+        <div class="txn-empty" *ngIf="!transactionsLoading && transactions.length === 0">
+          <p>No transactions found for this FASTag.</p>
+        </div>
+
+        <div class="txn-list" *ngIf="!transactionsLoading && transactions.length > 0">
+          <div class="txn-item" *ngFor="let txn of transactions" [class.credit]="txn.type === 'CREDIT' || txn.type === 'RECHARGE'" [class.debit]="txn.type === 'DEBIT' || txn.type === 'TOLL'">
+            <div class="txn-left">
+              <span class="txn-type">{{ txn.type || txn.transactionType }}</span>
+              <span class="txn-date">{{ formatDateTime(txn.createdAt || txn.transactionDate) }}</span>
+              <span class="txn-desc" *ngIf="txn.description">{{ txn.description }}</span>
+            </div>
+            <div class="txn-right">
+              <span class="txn-amount" [class.positive]="txn.type === 'CREDIT' || txn.type === 'RECHARGE'" [class.negative]="txn.type === 'DEBIT' || txn.type === 'TOLL'">
+                {{ (txn.type === 'CREDIT' || txn.type === 'RECHARGE') ? '+' : '-' }}₹{{ txn.amount?.toFixed(2) }}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Link Account Modal -->
+  <div class="modal-overlay" *ngIf="showLinkAccountModal" (click)="closeLinkAccountModal()">
+    <div class="modal-box link-modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>Link Bank Account</h2>
+        <button class="modal-close" (click)="closeLinkAccountModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <!-- Step 1: Enter Account Number -->
+        <div class="link-step" *ngIf="!linkOtpSent">
+          <p class="link-desc">Enter your NeoBank account number to link it with your FASTag for seamless recharges.</p>
+          <div class="form-group">
+            <label>Account Number <span class="required">*</span></label>
+            <input type="text" [(ngModel)]="linkAccountNumber" placeholder="Enter your account number" class="form-input" maxlength="20">
+          </div>
+          <div class="form-alert error" *ngIf="linkMessage && !linkSuccess">{{ linkMessage }}</div>
+          <div class="form-actions">
+            <button class="btn-cancel" (click)="closeLinkAccountModal()">Cancel</button>
+            <button class="btn-submit" (click)="sendLinkOtp()" [disabled]="linkLoading || !linkAccountNumber">
+              <span *ngIf="!linkLoading">Verify Account</span>
+              <span *ngIf="linkLoading">Verifying...</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Step 2: OTP Verification -->
+        <div class="link-step" *ngIf="linkOtpSent">
+          <div class="link-account-preview" *ngIf="linkAccountDetails">
+            <div class="lap-icon">
+              <svg viewBox="0 0 24 24" fill="none" width="24" height="24" stroke="#2563EB" stroke-width="1.8">
+                <path d="M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11M20 10v11M8 14v3M12 14v3M16 14v3"/>
+              </svg>
+            </div>
+            <div class="lap-details">
+              <span class="lap-name">{{ linkAccountDetails.accountHolderName }}</span>
+              <span class="lap-num">A/C: {{ getMaskedAccountNumber(linkAccountNumber) }}</span>
+            </div>
+          </div>
+          <p class="link-desc">An OTP has been sent to your registered email. Enter it below to complete linking.</p>
+          <div class="form-group">
+            <label>Enter OTP <span class="required">*</span></label>
+            <input type="text" [(ngModel)]="linkOtp" placeholder="Enter 6-digit OTP" class="form-input" maxlength="6">
+          </div>
+          <div class="form-alert" *ngIf="linkMessage" [class.success]="linkSuccess" [class.error]="!linkSuccess">{{ linkMessage }}</div>
+          <div class="form-actions">
+            <button class="btn-cancel" (click)="closeLinkAccountModal()">Cancel</button>
+            <button class="btn-submit" (click)="verifyLinkOtp()" [disabled]="linkLoading || !linkOtp">
+              <span *ngIf="!linkLoading">Verify & Link</span>
+              <span *ngIf="linkLoading">Linking...</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

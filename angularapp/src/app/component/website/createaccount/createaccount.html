@@ -1,0 +1,1156 @@
+<div class="create-account-container">
+  <!-- Step Progress Bar -->
+  <div class="step-progress-bar">
+    <div class="step-item" [class.active]="currentStep >= 1" [class.completed]="currentStep > 1" (click)="canGoToStep(1) && goToStep(1)">
+      <div class="step-circle"><span *ngIf="currentStep > 1"><i class="fa fa-check"></i></span><span *ngIf="currentStep <= 1">1</span></div>
+      <div class="step-label">Register</div>
+    </div>
+    <div class="step-line" [class.active]="currentStep > 1"></div>
+    <div class="step-item" [class.active]="currentStep >= 2" [class.completed]="currentStep > 2" (click)="canGoToStep(2) && goToStep(2)">
+      <div class="step-circle"><span *ngIf="currentStep > 2"><i class="fa fa-check"></i></span><span *ngIf="currentStep <= 2">2</span></div>
+      <div class="step-label">Upload</div>
+    </div>
+    <div class="step-line" [class.active]="currentStep > 2"></div>
+    <div class="step-item" [class.active]="currentStep >= 3" [class.completed]="currentStep > 3" (click)="canGoToStep(3) && goToStep(3)">
+      <div class="step-circle"><span *ngIf="currentStep > 3"><i class="fa fa-check"></i></span><span *ngIf="currentStep <= 3">3</span></div>
+      <div class="step-label">Book Slot</div>
+    </div>
+    <div class="step-line" [class.active]="currentStep > 3"></div>
+    <div class="step-item" [class.active]="currentStep >= 4" [class.completed]="currentStep > 4" (click)="canGoToStep(4) && goToStep(4)">
+      <div class="step-circle"><span *ngIf="currentStep > 4"><i class="fa fa-check"></i></span><span *ngIf="currentStep <= 4">4</span></div>
+      <div class="step-label">Video KYC</div>
+    </div>
+    <div class="step-line" [class.active]="currentStep > 4"></div>
+    <div class="step-item" [class.active]="currentStep >= 5" [class.completed]="kycSessionData?.kycStatus === 'Approved'">
+      <div class="step-circle"><span *ngIf="kycSessionData?.kycStatus === 'Approved'"><i class="fa fa-check"></i></span><span *ngIf="kycSessionData?.kycStatus !== 'Approved'">5</span></div>
+      <div class="step-label">Status</div>
+    </div>
+  </div>
+
+  <div class="header-section">
+    <div class="brand-container">
+      <img src="/favicon.ico" alt="NeoBank Logo" class="logo">
+      <span class="brand-name">NeoBank</span>
+    </div>
+    <h2 *ngIf="currentStep === 1">Create New Account</h2>
+    <h2 *ngIf="currentStep === 2">Upload Documents</h2>
+    <h2 *ngIf="currentStep === 3">Book Video KYC Slot</h2>
+    <h2 *ngIf="currentStep === 4">Video KYC Verification</h2>
+    <h2 *ngIf="currentStep === 5">Application Status</h2>
+  </div>
+
+  <!-- Loading State -->
+  <div *ngIf="loading" class="loading-overlay">
+    <div class="loading-spinner"></div>
+    <p>{{ loadingMessage }}</p>
+  </div>
+
+  <!-- Success & Error messages -->
+  <div *ngIf="submitError" class="error-msg">
+    <i class="fa fa-exclamation-circle"></i> {{ submitError }}
+  </div>
+  <div *ngIf="successMessage" class="success-msg">
+    <i class="fa fa-check-circle"></i> {{ successMessage }}
+  </div>
+
+  <!-- ==================== STEP 1: REGISTRATION ==================== -->
+  <div *ngIf="currentStep === 1" class="step-content">
+
+    <!-- Video KYC Tracking Section -->
+    <div class="tracking-section">
+      <button type="button" (click)="toggleTracking()" class="tracking-toggle-btn">
+        <i class="fa" [ngClass]="showTracking ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+        {{ showTracking ? 'Hide' : 'Track' }} Video KYC Status
+      </button>
+      
+      <div *ngIf="showTracking" class="tracking-form">
+        <h3><i class="fa fa-video"></i> Track Your Video KYC Status</h3>
+        <p>Enter your mobile number or verification number to check your Video KYC application status.</p>
+        
+        <div class="tracking-tabs">
+          <button type="button" [class.active]="trackingTab === 'mobile'" (click)="trackingTab = 'mobile'" class="tracking-tab-btn">
+            <i class="fa fa-phone"></i> By Mobile
+          </button>
+          <button type="button" [class.active]="trackingTab === 'verification'" (click)="trackingTab = 'verification'" class="tracking-tab-btn">
+            <i class="fa fa-shield-alt"></i> By Verification Number
+          </button>
+        </div>
+
+        <div *ngIf="trackingTab === 'mobile'" class="form-group">
+          <label><i class="fa fa-phone"></i> Mobile Number</label>
+          <input 
+            type="text" 
+            [(ngModel)]="trackingMobile" 
+            placeholder="Enter your 10-digit mobile number" 
+            maxlength="10"
+            (input)="filterDigits('mobile', $event)"
+          />
+        </div>
+        
+        <div *ngIf="trackingTab === 'verification'" class="form-group">
+          <label><i class="fa fa-shield-alt"></i> Verification Number</label>
+          <input 
+            type="text" 
+            [(ngModel)]="trackingVerificationNumber" 
+            placeholder="e.g. VKYC20250322001" 
+            maxlength="15"
+          />
+        </div>
+
+        <button type="button" (click)="trackVideoKycStatus()" class="track-btn" [disabled]="trackingLoading">
+          <i class="fa" [ngClass]="trackingLoading ? 'fa-spinner fa-spin' : 'fa-search'"></i>
+          {{ trackingLoading ? 'Checking...' : 'Check Status' }}
+        </button>
+        
+        <div *ngIf="trackingError" class="error-msg">
+          <i class="fa fa-exclamation-circle"></i> {{ trackingError }}
+        </div>
+        
+        <div *ngIf="trackingResult" class="tracking-result">
+          <h4><i class="fa fa-info-circle"></i> Video KYC Session Status</h4>
+          <div class="status-info">
+            <div class="tracking-detail-item">
+              <label><i class="fa fa-user"></i> Customer ID:</label>
+              <span class="tracking-id">{{ trackingResult.customerId }}</span>
+            </div>
+            <div class="tracking-detail-item">
+              <label><i class="fa fa-credit-card"></i> Temp Account:</label>
+              <span>{{ trackingResult.temporaryAccountNumber }}</span>
+            </div>
+            <div class="tracking-detail-item">
+              <label><i class="fa fa-user"></i> Name:</label>
+              <span>{{ trackingResult.fullName }}</span>
+            </div>
+            <div class="tracking-detail-item">
+              <label><i class="fa fa-info-circle"></i> KYC Status:</label>
+              <span [ngClass]="getKycStatusClass(trackingResult.kycStatus)" class="status-badge">
+                {{ trackingResult.kycStatus }}
+              </span>
+            </div>
+            <div class="tracking-detail-item" *ngIf="trackingResult.finalAccountNumber">
+              <label><i class="fa fa-university"></i> Account Number:</label>
+              <span class="tracking-id">{{ trackingResult.finalAccountNumber }}</span>
+            </div>
+            <div class="tracking-detail-item" *ngIf="trackingResult.verificationNumber">
+              <label><i class="fa fa-shield-alt"></i> Verification Number:</label>
+              <span class="tracking-id verification-number">{{ trackingResult.verificationNumber }}</span>
+            </div>
+            <div class="tracking-detail-item" *ngIf="trackingResult.slotDate">
+              <label><i class="fa fa-calendar-alt"></i> Scheduled Slot:</label>
+              <span>{{ trackingResult.slotDate }} at {{ trackingResult.slotTime }}</span>
+            </div>
+            <div class="tracking-detail-item" *ngIf="trackingResult.rejectionReason">
+              <label><i class="fa fa-times-circle"></i> Rejection Reason:</label>
+              <span class="status-rejected">{{ trackingResult.rejectionReason }}</span>
+            </div>
+          </div>
+          
+          <div class="tracking-actions" *ngIf="trackingResult.kycStatus !== 'Approved'">
+            <button type="button" class="resume-btn" (click)="resumeSession(trackingResult)">
+              <i class="fa fa-play-circle"></i> Resume Application
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <form [formGroup]="form" (ngSubmit)="onSubmit()">
+
+      <!-- Account Type -->
+      <div class="form-group">
+        <label>Account Type</label>
+        <select formControlName="accountType" class="state-dropdown">
+          <option value="Savings">Savings Account</option>
+          <option value="Current">Current Account</option>
+          <option value="Salary">Salary Account</option>
+        </select>
+      </div>
+
+      <!-- ═══════ SAVINGS ACCOUNT FIELDS ═══════ -->
+      <div *ngIf="selectedAccountType === 'Savings'">
+        <div class="form-group">
+          <label>Full Name</label>
+          <input type="text" formControlName="name" placeholder="Enter your name" />
+          <div *ngIf="submitted && f['name'].errors" class="error">
+            <small *ngIf="f['name'].errors['required']">Name is required.</small>
+            <small *ngIf="f['name'].errors['minlength']">Name must be at least 2 characters.</small>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Email (Gmail only)</label>
+          <input type="email" formControlName="email" placeholder="Enter your Gmail" />
+          <div *ngIf="submitted && f['email'].errors" class="error">
+            <small *ngIf="f['email'].errors['required']">Email is required.</small>
+            <small *ngIf="f['email'].errors['email']">Invalid email format.</small>
+            <small *ngIf="f['email'].errors['gmailOnly']">Only Gmail addresses allowed.</small>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Date of Birth</label>
+          <input type="date" formControlName="dob" />
+          <div *ngIf="submitted && f['dob'].errors" class="error">
+            <small>Date of birth is required.</small>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Income</label>
+          <input type="number" formControlName="income" placeholder="Enter income" />
+          <div *ngIf="submitted && f['income'].errors" class="error">
+            <small *ngIf="f['income'].errors?.['required']">Income is required.</small>
+            <small *ngIf="f['income'].errors?.['min']">Income cannot be negative.</small>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Occupation</label>
+          <input type="text" formControlName="occupation" placeholder="Enter occupation" />
+          <div *ngIf="submitted && f['occupation'].errors" class="error">
+            <small>Occupation is required.</small>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>PAN</label>
+          <input type="text" formControlName="pan" placeholder="ABCDE1234F" />
+          <div *ngIf="panChecking" class="info"><small>Checking PAN availability...</small></div>
+          <div *ngIf="submitted && f['pan'].errors" class="error">
+            <small *ngIf="f['pan'].errors['required']">PAN is required.</small>
+            <small *ngIf="f['pan'].errors['invalidPan']">Invalid PAN format.</small>
+          </div>
+          <div *ngIf="panExists && f['pan'].valid && f['pan'].touched" class="error"><small>PAN number is already registered.</small></div>
+          <div *ngIf="!panExists && !panChecking && f['pan'].valid && f['pan'].touched" class="success"><small>PAN number is available</small></div>
+        </div>
+
+        <div class="form-group">
+          <label>Aadhar</label>
+          <div class="aadhar-input-container">
+            <input type="text" formControlName="aadhar" placeholder="12-digit Aadhar" maxlength="12" class="aadhar-input"
+              [class.valid]="f['aadhar'].valid && f['aadhar'].touched && !aadharExists"
+              [class.invalid]="f['aadhar'].invalid && f['aadhar'].touched || aadharExists" />
+            <div class="validation-indicator">
+              <span *ngIf="f['aadhar'].valid && f['aadhar'].touched && !aadharExists && !aadharChecking" class="valid-icon"></span>
+              <span *ngIf="(f['aadhar'].invalid && f['aadhar'].touched) || aadharExists" class="invalid-icon"></span>
+            </div>
+          </div>
+          <div *ngIf="aadharChecking" class="info"><small>Checking Aadhar availability...</small></div>
+          <div *ngIf="submitted && f['aadhar'].errors" class="error">
+            <small *ngIf="f['aadhar'].errors['required']">Aadhar is required.</small>
+            <small *ngIf="f['aadhar'].errors['invalidAadhar']">Invalid Aadhar format. Must be 12 digits starting with 2-9.</small>
+            <small *ngIf="f['aadhar'].errors['invalidAadharChecksum']">Invalid Aadhar number. Please check the digits.</small>
+          </div>
+          <div *ngIf="aadharExists && f['aadhar'].valid && f['aadhar'].touched" class="error"><small>Aadhar number is already registered.</small></div>
+          <div *ngIf="!aadharExists && !aadharChecking && f['aadhar'].valid && f['aadhar'].touched" class="success"><small>Valid Aadhaar number and available</small></div>
+        </div>
+
+        <div class="form-group">
+          <label>Mobile</label>
+          <input type="text" formControlName="mobile" placeholder="10-digit Mobile" />
+          <div *ngIf="mobileChecking" class="info"><small>Checking mobile number availability...</small></div>
+          <div *ngIf="submitted && f['mobile'].errors" class="error">
+            <small *ngIf="f['mobile'].errors?.['required']">Mobile is required.</small>
+            <small *ngIf="f['mobile'].errors?.['invalidMobile']">Invalid mobile number.</small>
+          </div>
+          <div *ngIf="mobileExists && f['mobile'].valid && f['mobile'].touched" class="error"><small>Mobile number is already registered.</small></div>
+          <div *ngIf="!mobileExists && !mobileChecking && f['mobile'].valid && f['mobile'].touched" class="success"><small>Mobile number is available</small></div>
+        </div>
+
+        <div class="form-group">
+          <label>State</label>
+          <select formControlName="state" class="state-dropdown">
+            <option value="">Select your state</option>
+            <option *ngFor="let state of indianStates" [value]="state">{{ state }}</option>
+          </select>
+          <div *ngIf="submitted && f['state'].errors" class="error"><small>State is required.</small></div>
+        </div>
+
+        <div class="form-group">
+          <label>City</label>
+          <select formControlName="city" class="city-dropdown">
+            <option value="">Select your city</option>
+            <option *ngFor="let city of availableCities" [value]="city">{{ city }}</option>
+          </select>
+          <div *ngIf="submitted && f['city'].errors" class="error"><small>City is required.</small></div>
+        </div>
+      </div>
+
+      <!-- ═══════ CURRENT ACCOUNT FIELDS ═══════ -->
+      <div *ngIf="selectedAccountType === 'Current'">
+        <div class="account-type-header">
+          <h3><i class="fa fa-briefcase"></i> Current Account - Business Details</h3>
+        </div>
+
+        <div class="form-section-group">
+          <h4><i class="fa fa-building"></i> Business Information</h4>
+          <div class="form-group">
+            <label>Business Name *</label>
+            <input type="text" formControlName="businessName" placeholder="Enter business name" />
+            <div *ngIf="submitted && f['businessName'].errors" class="error"><small>Business name is required.</small></div>
+          </div>
+
+          <div class="form-group">
+            <label>Business Type *</label>
+            <select formControlName="businessType" class="state-dropdown">
+              <option value="Proprietor">Proprietor</option>
+              <option value="Partnership">Partnership</option>
+              <option value="Pvt Ltd">Pvt Ltd</option>
+              <option value="Startup">Startup</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Business Registration Number</label>
+            <input type="text" formControlName="businessRegistrationNumber" placeholder="Enter registration number" />
+          </div>
+
+          <div class="form-group">
+            <label>GST Number</label>
+            <input type="text" formControlName="gstNumber" placeholder="e.g., 22AAAAA0000A1Z5" maxlength="15" />
+          </div>
+        </div>
+
+        <div class="form-section-group">
+          <h4><i class="fa fa-user"></i> Owner Details</h4>
+          <div class="form-group">
+            <label>Owner Name *</label>
+            <input type="text" formControlName="name" placeholder="Enter owner full name" />
+            <div *ngIf="submitted && f['name'].errors" class="error">
+              <small *ngIf="f['name'].errors['required']">Owner name is required.</small>
+              <small *ngIf="f['name'].errors['minlength']">Name must be at least 2 characters.</small>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Email (Gmail only) *</label>
+            <input type="email" formControlName="email" placeholder="Enter your Gmail" />
+            <div *ngIf="submitted && f['email'].errors" class="error">
+              <small *ngIf="f['email'].errors['required']">Email is required.</small>
+              <small *ngIf="f['email'].errors['email']">Invalid email format.</small>
+              <small *ngIf="f['email'].errors['gmailOnly']">Only Gmail addresses allowed.</small>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Date of Birth</label>
+            <input type="date" formControlName="dob" />
+            <div *ngIf="submitted && f['dob'].errors" class="error"><small>Date of birth is required.</small></div>
+          </div>
+
+          <div class="form-group">
+            <label>Mobile Number *</label>
+            <input type="text" formControlName="mobile" placeholder="10-digit mobile number" maxlength="10" />
+            <div *ngIf="mobileChecking" class="info"><small>Checking mobile number availability...</small></div>
+            <div *ngIf="submitted && f['mobile'].errors" class="error">
+              <small *ngIf="f['mobile'].errors?.['required']">Mobile is required.</small>
+              <small *ngIf="f['mobile'].errors?.['invalidMobile']">Invalid mobile number.</small>
+            </div>
+            <div *ngIf="mobileExists && f['mobile'].valid && f['mobile'].touched" class="error"><small>Mobile number is already registered.</small></div>
+            <div *ngIf="!mobileExists && !mobileChecking && f['mobile'].valid && f['mobile'].touched" class="success"><small>Mobile number is available</small></div>
+          </div>
+
+          <div class="form-group">
+            <label>Aadhaar Number *</label>
+            <div class="aadhar-input-container">
+              <input type="text" formControlName="aadhar" placeholder="12-digit Aadhaar number" maxlength="12" class="aadhar-input"
+                [class.valid]="f['aadhar'].valid && f['aadhar'].touched && !aadharExists"
+                [class.invalid]="f['aadhar'].invalid && f['aadhar'].touched || aadharExists" />
+              <div class="validation-indicator">
+                <span *ngIf="f['aadhar'].valid && f['aadhar'].touched && !aadharExists && !aadharChecking" class="valid-icon"></span>
+                <span *ngIf="(f['aadhar'].invalid && f['aadhar'].touched) || aadharExists" class="invalid-icon"></span>
+              </div>
+            </div>
+            <div *ngIf="aadharChecking" class="info"><small>Checking Aadhar availability...</small></div>
+            <div *ngIf="submitted && f['aadhar'].errors" class="error">
+              <small *ngIf="f['aadhar'].errors['required']">Aadhar is required.</small>
+              <small *ngIf="f['aadhar'].errors['invalidAadhar']">Invalid Aadhar format.</small>
+              <small *ngIf="f['aadhar'].errors['invalidAadharChecksum']">Invalid Aadhar number.</small>
+            </div>
+            <div *ngIf="aadharExists && f['aadhar'].valid && f['aadhar'].touched" class="error"><small>Aadhar number is already registered.</small></div>
+            <div *ngIf="!aadharExists && !aadharChecking && f['aadhar'].valid && f['aadhar'].touched" class="success"><small>Valid Aadhaar number and available</small></div>
+          </div>
+
+          <div class="form-group">
+            <label>PAN Number *</label>
+            <input type="text" formControlName="pan" placeholder="ABCDE1234F" style="text-transform: uppercase;" />
+            <div *ngIf="panChecking" class="info"><small>Checking PAN availability...</small></div>
+            <div *ngIf="submitted && f['pan'].errors" class="error">
+              <small *ngIf="f['pan'].errors['required']">PAN is required.</small>
+              <small *ngIf="f['pan'].errors['invalidPan']">Invalid PAN format.</small>
+            </div>
+            <div *ngIf="panExists && f['pan'].valid && f['pan'].touched" class="error"><small>PAN number is already registered.</small></div>
+            <div *ngIf="!panExists && !panChecking && f['pan'].valid && f['pan'].touched" class="success"><small>PAN number is available</small></div>
+          </div>
+
+          <div class="form-group">
+            <label>Income / Turnover</label>
+            <input type="number" formControlName="income" placeholder="Annual business turnover" />
+            <div *ngIf="submitted && f['income'].errors" class="error">
+              <small *ngIf="f['income'].errors?.['required']">Income is required.</small>
+              <small *ngIf="f['income'].errors?.['min']">Income cannot be negative.</small>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section-group">
+          <h4><i class="fa fa-map-marker-alt"></i> Business Address</h4>
+          <div class="form-group">
+            <label>Shop / Office Address</label>
+            <textarea formControlName="shopAddress" placeholder="Enter complete business address" rows="2"></textarea>
+          </div>
+
+          <div class="form-group">
+            <label>State</label>
+            <select formControlName="state" class="state-dropdown">
+              <option value="">Select your state</option>
+              <option *ngFor="let state of indianStates" [value]="state">{{ state }}</option>
+            </select>
+            <div *ngIf="submitted && f['state'].errors" class="error"><small>State is required.</small></div>
+          </div>
+
+          <div class="form-group">
+            <label>City</label>
+            <select formControlName="city" class="city-dropdown">
+              <option value="">Select your city</option>
+              <option *ngFor="let city of availableCities" [value]="city">{{ city }}</option>
+            </select>
+            <div *ngIf="submitted && f['city'].errors" class="error"><small>City is required.</small></div>
+          </div>
+
+          <div class="form-group">
+            <label>Pincode</label>
+            <input type="text" formControlName="pincode" placeholder="6-digit pincode" maxlength="6" />
+          </div>
+        </div>
+
+        <div class="form-section-group">
+          <h4><i class="fa fa-university"></i> Bank Details</h4>
+          <div class="form-group">
+            <label>Branch Name</label>
+            <input type="text" formControlName="branchName" placeholder="Branch name" />
+          </div>
+          <div class="form-group">
+            <label>IFSC Code</label>
+            <input type="text" formControlName="ifscCode" placeholder="IFSC code" />
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══════ SALARY ACCOUNT FIELDS ═══════ -->
+      <div *ngIf="selectedAccountType === 'Salary'">
+        <div class="account-type-header">
+          <h3><i class="fa fa-money-check-alt"></i> Salary Account - Employee Details</h3>
+        </div>
+
+        <div class="form-section-group">
+          <h4><i class="fa fa-user"></i> Employee Details</h4>
+          <div class="form-group">
+            <label>Employee Name *</label>
+            <input type="text" formControlName="name" placeholder="Enter full name" />
+            <div *ngIf="submitted && f['name'].errors" class="error">
+              <small *ngIf="f['name'].errors['required']">Employee name is required.</small>
+              <small *ngIf="f['name'].errors['minlength']">Name must be at least 2 characters.</small>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Date of Birth</label>
+            <input type="date" formControlName="dob" />
+            <div *ngIf="submitted && f['dob'].errors" class="error"><small>Date of birth is required.</small></div>
+          </div>
+
+          <div class="form-group">
+            <label>Email (Gmail only) *</label>
+            <input type="email" formControlName="email" placeholder="Enter your Gmail" />
+            <div *ngIf="submitted && f['email'].errors" class="error">
+              <small *ngIf="f['email'].errors['required']">Email is required.</small>
+              <small *ngIf="f['email'].errors['email']">Invalid email format.</small>
+              <small *ngIf="f['email'].errors['gmailOnly']">Only Gmail addresses allowed.</small>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Mobile Number *</label>
+            <input type="text" formControlName="mobile" placeholder="10-digit mobile" maxlength="10" />
+            <div *ngIf="mobileChecking" class="info"><small>Checking mobile number availability...</small></div>
+            <div *ngIf="submitted && f['mobile'].errors" class="error">
+              <small *ngIf="f['mobile'].errors?.['required']">Mobile is required.</small>
+              <small *ngIf="f['mobile'].errors?.['invalidMobile']">Invalid mobile number.</small>
+            </div>
+            <div *ngIf="mobileExists && f['mobile'].valid && f['mobile'].touched" class="error"><small>Mobile number is already registered.</small></div>
+            <div *ngIf="!mobileExists && !mobileChecking && f['mobile'].valid && f['mobile'].touched" class="success"><small>Mobile number is available</small></div>
+          </div>
+
+          <div class="form-group">
+            <label>Aadhaar Number *</label>
+            <div class="aadhar-input-container">
+              <input type="text" formControlName="aadhar" placeholder="12-digit Aadhaar" maxlength="12" class="aadhar-input"
+                [class.valid]="f['aadhar'].valid && f['aadhar'].touched && !aadharExists"
+                [class.invalid]="f['aadhar'].invalid && f['aadhar'].touched || aadharExists" />
+              <div class="validation-indicator">
+                <span *ngIf="f['aadhar'].valid && f['aadhar'].touched && !aadharExists && !aadharChecking" class="valid-icon"></span>
+                <span *ngIf="(f['aadhar'].invalid && f['aadhar'].touched) || aadharExists" class="invalid-icon"></span>
+              </div>
+            </div>
+            <div *ngIf="aadharChecking" class="info"><small>Checking Aadhar availability...</small></div>
+            <div *ngIf="submitted && f['aadhar'].errors" class="error">
+              <small *ngIf="f['aadhar'].errors['required']">Aadhar is required.</small>
+              <small *ngIf="f['aadhar'].errors['invalidAadhar']">Invalid Aadhar format.</small>
+              <small *ngIf="f['aadhar'].errors['invalidAadharChecksum']">Invalid Aadhar number.</small>
+            </div>
+            <div *ngIf="aadharExists && f['aadhar'].valid && f['aadhar'].touched" class="error"><small>Aadhar number is already registered.</small></div>
+            <div *ngIf="!aadharExists && !aadharChecking && f['aadhar'].valid && f['aadhar'].touched" class="success"><small>Valid Aadhaar number and available</small></div>
+          </div>
+
+          <div class="form-group">
+            <label>PAN Number *</label>
+            <input type="text" formControlName="pan" placeholder="ABCDE1234F" style="text-transform: uppercase;" />
+            <div *ngIf="panChecking" class="info"><small>Checking PAN availability...</small></div>
+            <div *ngIf="submitted && f['pan'].errors" class="error">
+              <small *ngIf="f['pan'].errors['required']">PAN is required.</small>
+              <small *ngIf="f['pan'].errors['invalidPan']">Invalid PAN format.</small>
+            </div>
+            <div *ngIf="panExists && f['pan'].valid && f['pan'].touched" class="error"><small>PAN number is already registered.</small></div>
+            <div *ngIf="!panExists && !panChecking && f['pan'].valid && f['pan'].touched" class="success"><small>PAN number is available</small></div>
+          </div>
+        </div>
+
+        <div class="form-section-group">
+          <h4><i class="fa fa-building"></i> Company Details</h4>
+          <div class="form-group">
+            <label>Company Name *</label>
+            <input type="text" formControlName="companyName" placeholder="e.g. Infosys, TCS" />
+            <div *ngIf="submitted && f['companyName'].errors" class="error"><small>Company name is required.</small></div>
+          </div>
+
+          <div class="form-group">
+            <label>Company ID</label>
+            <input type="text" formControlName="companyId" placeholder="Company registration ID" />
+          </div>
+
+          <div class="form-group">
+            <label>Employer Address</label>
+            <input type="text" formControlName="employerAddress" placeholder="Employer address" />
+          </div>
+
+          <div class="form-group">
+            <label>HR Contact Number</label>
+            <input type="text" formControlName="hrContactNumber" placeholder="HR phone number" maxlength="10" />
+          </div>
+        </div>
+
+        <div class="form-section-group">
+          <h4><i class="fa fa-rupee-sign"></i> Salary Details</h4>
+          <div class="form-group">
+            <label>Monthly Salary (₹) *</label>
+            <input type="number" formControlName="monthlySalary" placeholder="e.g. 45000" />
+            <div *ngIf="submitted && f['monthlySalary'].errors" class="error">
+              <small *ngIf="f['monthlySalary'].errors?.['required']">Monthly salary is required.</small>
+              <small *ngIf="f['monthlySalary'].errors?.['min']">Salary must be greater than 0.</small>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Salary Credit Date (Day of Month) *</label>
+            <input type="number" formControlName="salaryCreditDate" min="1" max="28" placeholder="e.g. 1" />
+            <div *ngIf="submitted && f['salaryCreditDate'].errors" class="error">
+              <small *ngIf="f['salaryCreditDate'].errors?.['required']">Salary credit date is required.</small>
+              <small *ngIf="f['salaryCreditDate'].errors?.['min'] || f['salaryCreditDate'].errors?.['max']">Must be between 1 and 28.</small>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Designation</label>
+            <input type="text" formControlName="designation" placeholder="e.g. Software Engineer" />
+          </div>
+        </div>
+
+        <div class="form-section-group">
+          <h4><i class="fa fa-map-marker-alt"></i> Address</h4>
+          <div class="form-group">
+            <label>State</label>
+            <select formControlName="state" class="state-dropdown">
+              <option value="">Select your state</option>
+              <option *ngFor="let state of indianStates" [value]="state">{{ state }}</option>
+            </select>
+            <div *ngIf="submitted && f['state'].errors" class="error"><small>State is required.</small></div>
+          </div>
+
+          <div class="form-group">
+            <label>City</label>
+            <select formControlName="city" class="city-dropdown">
+              <option value="">Select your city</option>
+              <option *ngFor="let city of availableCities" [value]="city">{{ city }}</option>
+            </select>
+            <div *ngIf="submitted && f['city'].errors" class="error"><small>City is required.</small></div>
+          </div>
+        </div>
+
+        <div class="form-section-group">
+          <h4><i class="fa fa-university"></i> Bank Details</h4>
+          <div class="form-group">
+            <label>Branch Name</label>
+            <input type="text" formControlName="salaryBranchName" placeholder="e.g. Hyderabad Main" />
+          </div>
+          <div class="form-group">
+            <label>IFSC Code</label>
+            <input type="text" formControlName="salaryIfscCode" placeholder="e.g. NEOB0001234" />
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══════ PASSWORD (Common for all types) ═══════ -->
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" formControlName="password" placeholder="Enter password" /> 
+        <div *ngIf="submitted && f['password'].errors" class="error">
+          <small *ngIf="f['password'].errors?.['required']">Password is required.</small>
+          <small *ngIf="f['password'].errors?.['minlength']">Password must be at least 6 characters.</small>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Confirm Password</label>
+        <input type="password" formControlName="confirmPassword" placeholder="Re-enter password" />
+        <div *ngIf="submitted && (f['confirmPassword'].errors || form.errors?.['passwordsMismatch'])" class="error">
+          <small *ngIf="f['confirmPassword'].errors?.['required']">Confirm Password is required.</small>
+          <small *ngIf="form.errors?.['passwordsMismatch']">Passwords do not match.</small>
+        </div>
+      </div>
+
+      <!-- Child Account Section -->
+      <div class="child-account-section">
+        <h3><i class="fa fa-child"></i> Child Account (Optional)</h3>
+        <p class="info-text">If you want to create a child account (age below 18), please fill in the details below.</p>
+        
+        <div class="form-group">
+          <label>
+            <input 
+              type="checkbox" 
+              [(ngModel)]="hasChildAccount"
+              [ngModelOptions]="{standalone: true}"
+              (change)="onChildAccountToggle()"
+            />
+            <span>Create child account</span>
+          </label>
+        </div>
+
+        <div *ngIf="hasChildAccount" class="child-account-fields">
+          <div class="form-group">
+            <label>Child's Full Name</label>
+            <input type="text" formControlName="childName" placeholder="Enter child's name" />
+            <div *ngIf="submitted && f['childName'].errors" class="error">
+              <small *ngIf="f['childName'].errors['required']">Child's name is required.</small>
+              <small *ngIf="f['childName'].errors['minlength']">Name must be at least 2 characters.</small>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Child's Email (Gmail only)</label>
+            <input type="email" formControlName="childEmail" placeholder="Enter child's Gmail" />
+            <div *ngIf="submitted && f['childEmail'].errors" class="error">
+              <small *ngIf="f['childEmail'].errors['required']">Child's email is required.</small>
+              <small *ngIf="f['childEmail'].errors['email']">Invalid email format.</small>
+              <small *ngIf="f['childEmail'].errors['gmailOnly']">Only Gmail addresses allowed.</small>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Child's Date of Birth</label>
+            <input type="date" formControlName="childDob" (change)="validateChildAge()" />
+            <div *ngIf="submitted && f['childDob'].errors" class="error">
+              <small *ngIf="f['childDob'].errors['required']">Child's date of birth is required.</small>
+              <small *ngIf="f['childDob'].errors['ageRestriction']">Child must be below 18 years of age.</small>
+            </div>
+            <div *ngIf="childAgeError" class="error">
+              <small>{{ childAgeError }}</small>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Child's Studies/Education</label>
+            <input type="text" formControlName="childStudies" placeholder="e.g., Class 10, Class 12, B.Tech, etc." />
+            <div *ngIf="submitted && f['childStudies'].errors" class="error">
+              <small>Child's studies/education is required.</small>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Form 60 Details</label>
+            <textarea formControlName="form60" placeholder="Enter Form 60 details for child account" rows="3"></textarea>
+            <div *ngIf="submitted && f['form60'].errors" class="error">
+              <small>Form 60 details are required for child accounts.</small>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>PAN Child Form Details</label>
+            <textarea formControlName="panChildForm" placeholder="Enter PAN child form details" rows="3"></textarea>
+            <div *ngIf="submitted && f['panChildForm'].errors" class="error">
+              <small>PAN child form details are required for child accounts.</small>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Child's Password</label>
+            <input type="password" formControlName="childPassword" placeholder="Enter password for child account" />
+            <div *ngIf="submitted && f['childPassword'].errors" class="error">
+              <small *ngIf="f['childPassword'].errors?.['required']">Child's password is required.</small>
+              <small *ngIf="f['childPassword'].errors?.['minlength']">Password must be at least 6 characters.</small>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Confirm Child's Password</label>
+            <input type="password" formControlName="confirmChildPassword" placeholder="Re-enter child's password" />
+            <div *ngIf="submitted && (f['confirmChildPassword'].errors || childForm.errors?.['childPasswordsMismatch'])" class="error">
+              <small *ngIf="f['confirmChildPassword'].errors?.['required']">Confirm password is required.</small>
+              <small *ngIf="childForm.errors?.['childPasswordsMismatch']">Passwords do not match.</small>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Terms and Conditions -->
+      <div class="form-group terms-group">
+        <label class="terms-label">
+          <input type="checkbox" formControlName="termsAccepted" class="terms-checkbox" />
+          <span>I accept the <a href="#" (click)="showTerms($event)" class="terms-link">Terms and Conditions</a> and <a href="#" (click)="showPrivacy($event)" class="terms-link">Privacy Policy</a></span>
+        </label>
+        <div *ngIf="submitted && f['termsAccepted'].errors" class="error">
+          <small>You must accept the Terms and Conditions to create an account.</small>
+        </div>
+      </div>
+
+      <!-- Submit -->
+      <button type="submit" [disabled]="!form.get('termsAccepted')?.value">
+        <i class="fa fa-arrow-right"></i> Register & Continue to Document Upload
+      </button>
+    </form>
+  </div>
+
+  <!-- ==================== STEP 2: DOCUMENT UPLOAD ==================== -->
+  <div *ngIf="currentStep === 2" class="step-content">
+    <div class="document-upload-section">
+      <p class="step-info"><i class="fa fa-info-circle"></i> Upload your Aadhaar and PAN documents for verification. Accepted formats: JPEG, PNG, PDF (Max 5MB each)</p>
+
+      <div class="upload-cards">
+        <!-- Aadhaar Upload -->
+        <div class="upload-card">
+          <div class="upload-icon"><i class="fa fa-id-card fa-3x"></i></div>
+          <h3>Aadhaar Card</h3>
+          <div class="upload-area" (click)="aadharFileInput.click()" 
+               [class.has-file]="aadharPreview">
+            <div *ngIf="!aadharPreview" class="upload-placeholder">
+              <i class="fa fa-cloud-upload fa-2x"></i>
+              <p>Click to upload Aadhaar</p>
+              <small>JPEG, PNG, PDF - Max 5MB</small>
+            </div>
+            <div *ngIf="aadharPreview" class="file-preview">
+              <img *ngIf="aadharPreview !== 'pdf'" [src]="aadharPreview" alt="Aadhaar Preview" />
+              <div *ngIf="aadharPreview === 'pdf'" class="pdf-preview">
+                <i class="fa fa-file-pdf fa-3x"></i>
+                <p>{{ aadharFile?.name }}</p>
+              </div>
+              <button type="button" class="remove-file" (click)="removeFile('aadhar', $event)">
+                <i class="fa fa-times"></i>
+              </button>
+            </div>
+          </div>
+          <input #aadharFileInput type="file" hidden accept=".jpg,.jpeg,.png,.pdf" (change)="onAadharFileSelect($event)" />
+        </div>
+
+        <!-- PAN Upload -->
+        <div class="upload-card">
+          <div class="upload-icon"><i class="fa fa-address-card fa-3x"></i></div>
+          <h3>PAN Card</h3>
+          <div class="upload-area" (click)="panFileInput.click()"
+               [class.has-file]="panPreview">
+            <div *ngIf="!panPreview" class="upload-placeholder">
+              <i class="fa fa-cloud-upload fa-2x"></i>
+              <p>Click to upload PAN</p>
+              <small>JPEG, PNG, PDF - Max 5MB</small>
+            </div>
+            <div *ngIf="panPreview" class="file-preview">
+              <img *ngIf="panPreview !== 'pdf'" [src]="panPreview" alt="PAN Preview" />
+              <div *ngIf="panPreview === 'pdf'" class="pdf-preview">
+                <i class="fa fa-file-pdf fa-3x"></i>
+                <p>{{ panFile?.name }}</p>
+              </div>
+              <button type="button" class="remove-file" (click)="removeFile('pan', $event)">
+                <i class="fa fa-times"></i>
+              </button>
+            </div>
+          </div>
+          <input #panFileInput type="file" hidden accept=".jpg,.jpeg,.png,.pdf" (change)="onPanFileSelect($event)" />
+        </div>
+      </div>
+
+      <div *ngIf="uploadError" class="error-msg">
+        <i class="fa fa-exclamation-circle"></i> {{ uploadError }}
+      </div>
+
+      <div class="step-actions">
+        <button type="button" class="btn-secondary" (click)="goToStep(1)">
+          <i class="fa fa-arrow-left"></i> Back
+        </button>
+        <button type="button" class="btn-primary" (click)="uploadDocuments()" 
+                [disabled]="!aadharFile || !panFile || uploading">
+          <i class="fa" [ngClass]="uploading ? 'fa-spinner fa-spin' : 'fa-upload'"></i>
+          {{ uploading ? 'Uploading...' : 'Upload & Continue' }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== STEP 3: BOOK SLOT ==================== -->
+  <div *ngIf="currentStep === 3" class="step-content">
+    <div class="slot-booking-section">
+      
+      <!-- Already Booked -->
+      <div *ngIf="kycSessionData?.bookedSlotId" class="booked-slot-card">
+        <div class="booked-slot-header">
+          <i class="fa fa-calendar-check fa-2x"></i>
+          <h3>Your Scheduled Slot</h3>
+        </div>
+        <div class="booked-slot-details">
+          <div class="detail-row">
+            <label><i class="fa fa-calendar-alt"></i> Date:</label>
+            <span class="highlight">{{ kycSessionData.slotDate }}</span>
+          </div>
+          <div class="detail-row">
+            <label><i class="fa fa-clock"></i> Time:</label>
+            <span class="highlight">{{ kycSessionData.slotTime }} - {{ kycSessionData.slotEndTime }}</span>
+          </div>
+        </div>
+
+        <!-- Countdown Timer -->
+        <div *ngIf="countdownDisplay" class="countdown-timer">
+          <p class="countdown-label">Video KYC session starts in:</p>
+          <div class="countdown-digits">
+            <div class="countdown-block">
+              <span class="countdown-value">{{ countdownParts.hours }}</span>
+              <span class="countdown-unit">Hours</span>
+            </div>
+            <span class="countdown-separator">:</span>
+            <div class="countdown-block">
+              <span class="countdown-value">{{ countdownParts.minutes }}</span>
+              <span class="countdown-unit">Min</span>
+            </div>
+            <span class="countdown-separator">:</span>
+            <div class="countdown-block">
+              <span class="countdown-value">{{ countdownParts.seconds }}</span>
+              <span class="countdown-unit">Sec</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="slot-actions">
+          <button type="button" class="btn-primary btn-large" (click)="goToStep(4)" [disabled]="!canJoinNow">
+            <i class="fa fa-video"></i> {{ canJoinNow ? 'Join Video KYC Now' : 'Wait for Slot Time' }}
+          </button>
+          <button type="button" class="btn-secondary" (click)="cancelSlotBooking()">
+            <i class="fa fa-times"></i> Cancel Booking
+          </button>
+        </div>
+      </div>
+
+      <!-- Select Slot -->
+      <div *ngIf="!kycSessionData?.bookedSlotId">
+        <div class="slot-info-card">
+          <i class="fa fa-calendar-alt fa-3x"></i>
+          <h3>Book a Video KYC Slot</h3>
+          <p>Select a convenient date and time for your Video KYC session. You will only be able to join at the scheduled time.</p>
+        </div>
+
+        <!-- Date Selection -->
+        <div class="date-selector">
+          <h4><i class="fa fa-calendar"></i> Select Date</h4>
+          <div class="date-chips">
+            <button *ngFor="let date of availableDates" type="button" class="date-chip"
+                    [class.selected]="selectedSlotDate === date"
+                    (click)="selectDate(date)">
+              {{ date }}
+            </button>
+          </div>
+        </div>
+
+        <!-- Available Slots -->
+        <div *ngIf="filteredSlots.length > 0" class="slot-grid">
+          <h4><i class="fa fa-clock"></i> Available Time Slots</h4>
+          <div class="slots-container">
+            <div *ngFor="let slot of filteredSlots" class="slot-card"
+                 [class.selected]="selectedSlot?.id === slot.id"
+                 [class.full]="slot.currentBookings >= slot.maxBookings"
+                 (click)="slot.currentBookings < slot.maxBookings && selectSlot(slot)">
+              <div class="slot-time">
+                <i class="fa fa-clock"></i>
+                {{ slot.slotTime }} - {{ slot.slotEndTime }}
+              </div>
+              <div class="slot-availability">
+                <span *ngIf="slot.currentBookings < slot.maxBookings" class="available-badge">
+                  {{ slot.maxBookings - slot.currentBookings }} slots left
+                </span>
+                <span *ngIf="slot.currentBookings >= slot.maxBookings" class="full-badge">
+                  Fully Booked
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div *ngIf="selectedSlotDate && filteredSlots.length === 0" class="no-slots-msg">
+          <i class="fa fa-exclamation-triangle"></i>
+          <p>No available slots for this date. Please select another date.</p>
+        </div>
+
+        <div *ngIf="slotBookingError" class="error-msg">
+          <i class="fa fa-exclamation-circle"></i> {{ slotBookingError }}
+        </div>
+
+        <div class="step-actions">
+          <button type="button" class="btn-secondary" (click)="goToStep(2)">
+            <i class="fa fa-arrow-left"></i> Back
+          </button>
+          <button type="button" class="btn-primary" (click)="confirmSlotBooking()" 
+                  [disabled]="!selectedSlot || bookingSlot">
+            <i class="fa" [ngClass]="bookingSlot ? 'fa-spinner fa-spin' : 'fa-calendar-check'"></i>
+            {{ bookingSlot ? 'Booking...' : 'Confirm Booking' }}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== STEP 4: VIDEO KYC ==================== -->
+  <div *ngIf="currentStep === 4" class="step-content">
+    <div class="video-kyc-section">
+      
+      <!-- Pre-Video Info -->
+      <div *ngIf="!videoStarted" class="pre-video-info">
+        <div class="video-info-card">
+          <i class="fa fa-video fa-3x"></i>
+          <h3>Video KYC Verification</h3>
+          <p>You will be connected to a live video session with our verification agent. Please ensure:</p>
+          <ul class="kyc-checklist">
+            <li><i class="fa fa-check-circle"></i> Good lighting on your face</li>
+            <li><i class="fa fa-check-circle"></i> Keep your Aadhaar/PAN card ready</li>
+            <li><i class="fa fa-check-circle"></i> Stable internet connection</li>
+            <li><i class="fa fa-check-circle"></i> Camera and microphone permissions enabled</li>
+          </ul>
+          <button type="button" class="btn-primary btn-large" (click)="startVideoKyc()" [disabled]="startingVideo">
+            <i class="fa" [ngClass]="startingVideo ? 'fa-spinner fa-spin' : 'fa-video'"></i>
+            {{ startingVideo ? 'Initializing...' : 'Start Video KYC' }}
+          </button>
+        </div>
+      </div>
+
+      <!-- Video Session Active -->
+      <div *ngIf="videoStarted" class="video-session">
+        <div class="video-container">
+          <video #localVideo autoplay playsinline muted class="video-feed"></video>
+          <div class="video-overlay">
+            <span class="live-indicator"><i class="fa fa-circle"></i> LIVE</span>
+            <span class="connection-status" [ngClass]="connectionStatus">
+              {{ connectionStatus === 'connected' ? 'Connected' : connectionStatus === 'connecting' ? 'Connecting...' : 'Waiting for Agent' }}
+            </span>
+          </div>
+        </div>
+
+        <!-- OTP Display -->
+        <div *ngIf="kycOtp" class="otp-display">
+          <h4><i class="fa fa-key"></i> Your OTP Code</h4>
+          <div class="otp-code">{{ kycOtp }}</div>
+          <p class="otp-info">Share this OTP with the verification agent when asked</p>
+          <div *ngIf="!otpVerifiedFlag" class="otp-verify-section">
+            <button type="button" class="btn-small" (click)="verifyOtpAction()" [disabled]="verifyingOtp">
+              <i class="fa" [ngClass]="verifyingOtp ? 'fa-spinner fa-spin' : 'fa-check'"></i>
+              {{ verifyingOtp ? 'Verifying...' : 'Verify OTP' }}
+            </button>
+          </div>
+          <div *ngIf="otpVerifiedFlag" class="otp-verified">
+            <i class="fa fa-check-circle"></i> OTP Verified Successfully
+          </div>
+        </div>
+
+        <!-- Live Instructions -->
+        <div class="live-instructions">
+          <h4><i class="fa fa-list-ol"></i> Verification Steps</h4>
+          <div class="instruction-item" [class.completed]="otpVerifiedFlag">
+            <span class="instruction-num">1</span>
+            <span>OTP Verification</span>
+            <i *ngIf="otpVerifiedFlag" class="fa fa-check-circle"></i>
+          </div>
+          <div class="instruction-item" [class.completed]="faceSnapshotTaken">
+            <span class="instruction-num">2</span>
+            <span>Face Capture</span>
+            <i *ngIf="faceSnapshotTaken" class="fa fa-check-circle"></i>
+          </div>
+          <div class="instruction-item" [class.completed]="idSnapshotTaken">
+            <span class="instruction-num">3</span>
+            <span>ID Document Capture</span>
+            <i *ngIf="idSnapshotTaken" class="fa fa-check-circle"></i>
+          </div>
+          <div class="instruction-item" [class.completed]="livenessChecked">
+            <span class="instruction-num">4</span>
+            <span>Liveness Check</span>
+            <i *ngIf="livenessChecked" class="fa fa-check-circle"></i>
+          </div>
+        </div>
+
+        <!-- Video Action Buttons -->
+        <div class="video-action-buttons">
+          <button type="button" class="btn-capture" (click)="captureFaceSnapshot()" 
+                  [disabled]="faceSnapshotTaken || !otpVerifiedFlag" title="Capture Face Photo">
+            <i class="fa fa-camera"></i> Capture Face
+          </button>
+          <button type="button" class="btn-capture" (click)="captureIdSnapshot()" 
+                  [disabled]="idSnapshotTaken || !faceSnapshotTaken" title="Capture ID Document">
+            <i class="fa fa-id-card"></i> Capture ID
+          </button>
+          <button type="button" class="btn-liveness" (click)="performLivenessCheck()" 
+                  [disabled]="livenessChecked || !idSnapshotTaken" title="Liveness Detection">
+            <i class="fa fa-user-check"></i> Liveness Check
+          </button>
+          <button type="button" class="btn-submit-kyc" (click)="submitVideoKyc()" 
+                  [disabled]="!otpVerifiedFlag || !faceSnapshotTaken || !idSnapshotTaken || !livenessChecked">
+            <i class="fa fa-paper-plane"></i> Submit for Review
+          </button>
+        </div>
+
+        <div class="step-actions">
+          <button type="button" class="btn-danger" (click)="stopVideo()">
+            <i class="fa fa-phone-slash"></i> End Session
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== STEP 5: STATUS ==================== -->
+  <div *ngIf="currentStep === 5" class="step-content">
+    <div class="status-section">
+      
+      <!-- Approved -->
+      <div *ngIf="kycSessionData?.kycStatus === 'Approved'" class="status-card status-approved">
+        <div class="status-icon-large"><i class="fa fa-check-circle fa-4x"></i></div>
+        <h3>KYC Approved!</h3>
+        <p>Congratulations! Your Video KYC has been approved successfully.</p>
+        <div class="approved-details">
+          <div class="detail-row" *ngIf="kycSessionData.verificationNumber">
+            <label>Verification Number:</label>
+            <span class="highlight verification-number">{{ kycSessionData.verificationNumber }}</span>
+          </div>
+          <div class="detail-row">
+            <label>Account Number:</label>
+            <span class="highlight">{{ kycSessionData.finalAccountNumber }}</span>
+          </div>
+          <div class="detail-row">
+            <label>IFSC Code:</label>
+            <span class="highlight">{{ kycSessionData.ifscCode }}</span>
+          </div>
+          <div class="detail-row">
+            <label>Customer ID:</label>
+            <span>{{ kycSessionData.customerId }}</span>
+          </div>
+          <div class="detail-row">
+            <label>Account Type:</label>
+            <span>{{ kycSessionData.accountType }}</span>
+          </div>
+        </div>
+        <button type="button" class="btn-primary btn-large" (click)="goToLogin()">
+          <i class="fa fa-sign-in-alt"></i> Proceed to Login
+        </button>
+      </div>
+
+      <!-- Rejected -->
+      <div *ngIf="kycSessionData?.kycStatus === 'Rejected'" class="status-card status-rejected">
+        <div class="status-icon-large"><i class="fa fa-times-circle fa-4x"></i></div>
+        <h3>KYC Rejected</h3>
+        <p>Unfortunately your Video KYC was not approved.</p>
+        <div class="rejection-details" *ngIf="kycSessionData.rejectionReason">
+          <label>Reason:</label>
+          <p>{{ kycSessionData.rejectionReason }}</p>
+        </div>
+        <div class="detail-row" *ngIf="kycSessionData.kycAttemptCount < kycSessionData.maxAttempts">
+          <p>Attempts: {{ kycSessionData.kycAttemptCount }} / {{ kycSessionData.maxAttempts }}</p>
+        </div>
+        <button *ngIf="kycSessionData.kycAttemptCount < kycSessionData.maxAttempts" 
+                type="button" class="btn-primary btn-large" (click)="reattemptVideoKyc()">
+          <i class="fa fa-redo"></i> Re-attempt Video KYC
+        </button>
+        <p *ngIf="kycSessionData.kycAttemptCount >= kycSessionData.maxAttempts" class="max-attempts-msg">
+          Maximum attempts reached. Please visit the nearest branch.
+        </p>
+      </div>
+
+      <!-- Under Review / Pending -->
+      <div *ngIf="kycSessionData?.kycStatus === 'Under Review' || kycSessionData?.kycStatus === 'Submitted'" class="status-card status-pending">
+        <div class="status-icon-large"><i class="fa fa-hourglass-half fa-4x"></i></div>
+        <h3>Under Review</h3>
+        <p>Your Video KYC session has been submitted and is under review by our verification team.</p>
+        <div class="detail-row" *ngIf="kycSessionData.verificationNumber">
+          <label>Verification Number:</label>
+          <span class="highlight verification-number">{{ kycSessionData.verificationNumber }}</span>
+        </div>
+        <div class="detail-row">
+          <label>Session ID:</label>
+          <span>{{ kycSessionData.roomId }}</span>
+        </div>
+        <div class="detail-row">
+          <label>Submitted:</label>
+          <span>{{ kycSessionData.updatedAt | date:'medium' }}</span>
+        </div>
+        <button type="button" class="btn-secondary" (click)="refreshStatus()">
+          <i class="fa fa-sync-alt"></i> Refresh Status
+        </button>
+      </div>
+
+      <!-- Scheduled (slot booked, waiting for slot time) -->
+      <div *ngIf="kycSessionData?.kycStatus === 'Scheduled'" class="status-card status-scheduled">
+        <div class="status-icon-large"><i class="fa fa-calendar-check fa-4x"></i></div>
+        <h3>Slot Booked</h3>
+        <p>Your Video KYC session is scheduled. Please join at the scheduled time.</p>
+        <div class="detail-row" *ngIf="kycSessionData.slotDate">
+          <label>Date:</label>
+          <span class="highlight">{{ kycSessionData.slotDate }}</span>
+        </div>
+        <div class="detail-row" *ngIf="kycSessionData.slotTime">
+          <label>Time:</label>
+          <span class="highlight">{{ kycSessionData.slotTime }} - {{ kycSessionData.slotEndTime }}</span>
+        </div>
+        <button type="button" class="btn-primary btn-large" (click)="goToStep(3)">
+          <i class="fa fa-calendar-alt"></i> View Slot Details
+        </button>
+      </div>
+
+      <!-- Documents Uploaded (waiting to book slot) -->
+      <div *ngIf="kycSessionData?.kycStatus === 'Documents Uploaded'" class="status-card status-info">
+        <div class="status-icon-large"><i class="fa fa-file-alt fa-4x"></i></div>
+        <h3>Documents Uploaded</h3>
+        <p>Your documents have been uploaded. Please book a Video KYC slot.</p>
+        <button type="button" class="btn-primary btn-large" (click)="goToStep(3)">
+          <i class="fa fa-calendar-alt"></i> Book Video KYC Slot
+        </button>
+      </div>
+
+      <!-- Registered (waiting to upload docs) -->
+      <div *ngIf="kycSessionData?.kycStatus === 'Registered'" class="status-card status-info">
+        <div class="status-icon-large"><i class="fa fa-user-check fa-4x"></i></div>
+        <h3>Registration Complete</h3>
+        <p>Your registration is complete. Please proceed to upload your documents.</p>
+        <button type="button" class="btn-primary btn-large" (click)="goToStep(2)">
+          <i class="fa fa-upload"></i> Upload Documents
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Back Button -->
+  <div class="back-button-section">
+    <button class="back-button" (click)="goBack()">
+      ← Back to Landing Page
+    </button>
+  </div>
+</div>

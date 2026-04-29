@@ -1,0 +1,42 @@
+<!-- Alert Overlay -->
+<div *ngIf="alertState.show" class="alert-overlay" (click)="onClose()">
+  <div class="alert-container" (click)="$event.stopPropagation()">
+    
+    <!-- Alert Content -->
+    <div class="alert-content" [ngClass]="getAlertClass(alertState.config?.type || 'info')">
+      
+      <!-- Alert Header -->
+      <div class="alert-header">
+        <div class="alert-icon">
+          {{ getAlertIcon(alertState.config?.type || 'info') }}
+        </div>
+        <div class="alert-title">
+          {{ alertState.config?.title || 'Alert' }}
+        </div>
+        <button class="alert-close" (click)="onClose()" *ngIf="alertState.config?.type !== 'confirm'">
+          <span>&times;</span>
+        </button>
+      </div>
+
+      <!-- Alert Body -->
+      <div class="alert-body">
+        <p class="alert-message">{{ alertState.config?.message || '' }}</p>
+      </div>
+
+      <!-- Alert Footer -->
+      <div class="alert-footer" *ngIf="alertState.config?.type === 'confirm'">
+        <button class="btn btn-cancel" (click)="onCancel()">
+          {{ alertState.config?.cancelText || 'Cancel' }}
+        </button>
+        <button class="btn btn-confirm" (click)="onConfirm()">
+          {{ alertState.config?.confirmText || 'Confirm' }}
+        </button>
+      </div>
+
+      <!-- Auto-close indicator -->
+      <div class="alert-progress" *ngIf="alertState.config?.autoClose && alertState.config?.type !== 'confirm'">
+        <div class="progress-bar"></div>
+      </div>
+    </div>
+  </div>
+</div>

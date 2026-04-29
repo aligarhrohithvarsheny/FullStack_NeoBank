@@ -1,0 +1,128 @@
+<div class="scheduled-payments-container">
+  <div class="section-header">
+    <h2>📅 Scheduled Payments</h2>
+    <button class="btn-primary" (click)="showForm = !showForm">
+      {{ showForm ? '✕ Close' : '+ New Schedule' }}
+    </button>
+  </div>
+
+  <!-- Create Form -->
+  <div *ngIf="showForm" class="form-card">
+    <h3>Create Scheduled Payment</h3>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Recipient Account Number *</label>
+        <input type="text" [(ngModel)]="paymentForm.recipientAccountNumber" placeholder="Enter account number" />
+      </div>
+      <div class="form-group">
+        <label>Recipient Name *</label>
+        <input type="text" [(ngModel)]="paymentForm.recipientName" placeholder="Enter name" />
+      </div>
+      <div class="form-group">
+        <label>IFSC Code</label>
+        <input type="text" [(ngModel)]="paymentForm.recipientIfsc" placeholder="e.g. NEOBNK001" />
+      </div>
+      <div class="form-group">
+        <label>Amount (₹) *</label>
+        <input type="number" [(ngModel)]="paymentForm.amount" min="1" placeholder="0.00" />
+      </div>
+      <div class="form-group">
+        <label>Payment Type *</label>
+        <select [(ngModel)]="paymentForm.paymentType">
+          <option *ngFor="let type of paymentTypes" [value]="type">{{ type.replace('_', ' ') }}</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Frequency *</label>
+        <select [(ngModel)]="paymentForm.frequency">
+          <option *ngFor="let freq of frequencies" [value]="freq">{{ freq }}</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Start Date *</label>
+        <input type="date" [(ngModel)]="paymentForm.startDate" />
+      </div>
+      <div class="form-group">
+        <label>End Date (Optional)</label>
+        <input type="date" [(ngModel)]="paymentForm.endDate" />
+      </div>
+      <div class="form-group full-width">
+        <label>Description</label>
+        <input type="text" [(ngModel)]="paymentForm.description" placeholder="e.g. Monthly rent for flat" />
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn-primary" (click)="createPayment()" [disabled]="isSubmitting">
+        {{ isSubmitting ? 'Creating...' : 'Create Schedule' }}
+      </button>
+      <button class="btn-secondary" (click)="showForm = false; resetForm()">Cancel</button>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button [class.active]="activeTab === 'all'" (click)="activeTab = 'all'">All</button>
+    <button [class.active]="activeTab === 'active'" (click)="activeTab = 'active'">Active</button>
+    <button [class.active]="activeTab === 'paused'" (click)="activeTab = 'paused'">Paused</button>
+    <button [class.active]="activeTab === 'completed'" (click)="activeTab = 'completed'">Completed</button>
+    <button [class.active]="activeTab === 'cancelled'" (click)="activeTab = 'cancelled'">Cancelled</button>
+  </div>
+
+  <!-- Loading -->
+  <div *ngIf="isLoading" class="loading-state">
+    <div class="spinner"></div>
+    <p>Loading scheduled payments...</p>
+  </div>
+
+  <!-- Empty State -->
+  <div *ngIf="!isLoading && getFilteredPayments().length === 0" class="empty-state">
+    <span class="empty-icon">📅</span>
+    <p>No scheduled payments found</p>
+    <button class="btn-primary" (click)="showForm = true">Create Your First Schedule</button>
+  </div>
+
+  <!-- Payments List -->
+  <div class="payments-grid" *ngIf="!isLoading && getFilteredPayments().length > 0">
+    <div class="payment-card" *ngFor="let payment of getFilteredPayments()">
+      <div class="payment-header">
+        <span class="payment-icon">{{ getPaymentTypeIcon(payment.paymentType) }}</span>
+        <div class="payment-info">
+          <h4>{{ payment.recipientName }}</h4>
+          <p class="payment-type">{{ payment.paymentType?.replace('_', ' ') }} · {{ payment.frequency }}</p>
+        </div>
+        <span class="status-badge" [style.background]="getStatusColor(payment.status)">{{ payment.status }}</span>
+      </div>
+      <div class="payment-details">
+        <div class="detail-row">
+          <span>Amount</span>
+          <strong>₹{{ payment.amount | number:'1.2-2' }}</strong>
+        </div>
+        <div class="detail-row">
+          <span>To Account</span>
+          <span>{{ payment.recipientAccountNumber }}</span>
+        </div>
+        <div class="detail-row">
+          <span>Next Payment</span>
+          <span>{{ payment.nextPaymentDate || 'N/A' }}</span>
+        </div>
+        <div class="detail-row">
+          <span>Payments Done</span>
+          <span>{{ payment.completedPayments || 0 }} {{ payment.totalPayments ? '/ ' + payment.totalPayments : '' }}</span>
+        </div>
+        <div class="detail-row" *ngIf="payment.totalAmountPaid">
+          <span>Total Paid</span>
+          <strong>₹{{ payment.totalAmountPaid | number:'1.2-2' }}</strong>
+        </div>
+        <div class="detail-row" *ngIf="payment.description">
+          <span>Description</span>
+          <span>{{ payment.description }}</span>
+        </div>
+      </div>
+      <div class="payment-actions" *ngIf="payment.status === 'ACTIVE' || payment.status === 'PAUSED'">
+        <button *ngIf="payment.status === 'ACTIVE'" class="btn-warning btn-sm" (click)="pausePayment(payment.id)">⏸ Pause</button>
+        <button *ngIf="payment.status === 'PAUSED'" class="btn-success btn-sm" (click)="resumePayment(payment.id)">▶ Resume</button>
+        <button class="btn-danger btn-sm" (click)="cancelPayment(payment.id)">✕ Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>

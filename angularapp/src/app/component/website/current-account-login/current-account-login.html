@@ -1,0 +1,96 @@
+<div class="ca-login-page">
+  <div class="login-container">
+    <div class="login-header">
+      <div class="bank-logo">🏦</div>
+      <h1>NeoBank</h1>
+      <h2>Current Account Portal</h2>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs tabs-3">
+      <button [class.active]="activeTab === 'login'" (click)="activeTab = 'login'; loginError = ''; signupError = ''; signupSuccess = ''; teamLoginError = ''">Login</button>
+      <button [class.active]="activeTab === 'signup'" (click)="activeTab = 'signup'; loginError = ''; signupError = ''; signupSuccess = ''; teamLoginError = ''">Sign Up</button>
+      <button [class.active]="activeTab === 'team'" (click)="activeTab = 'team'; loginError = ''; signupError = ''; signupSuccess = ''; teamLoginError = ''">Team Login</button>
+    </div>
+
+    <!-- Login Tab -->
+    <div *ngIf="activeTab === 'login'" class="form-section">
+      <div class="form-group">
+        <label>Account Number</label>
+        <input type="text" [(ngModel)]="loginAccountNumber" placeholder="Enter your account number" (keyup.enter)="login()">
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" [(ngModel)]="loginPassword" placeholder="Enter your password" (keyup.enter)="login()">
+      </div>
+      <div class="error" *ngIf="loginError">{{ loginError }}</div>
+      <button class="btn btn-primary" (click)="login()" [disabled]="isLoggingIn">
+        {{ isLoggingIn ? 'Logging in...' : 'Login' }}
+      </button>
+      <p class="switch-text">Don't have a password? <a (click)="activeTab = 'signup'">Sign Up</a></p>
+    </div>
+
+    <!-- Signup Tab -->
+    <div *ngIf="activeTab === 'signup'" class="form-section">
+      <div *ngIf="signupSuccess" class="success-msg">{{ signupSuccess }}</div>
+
+      <div *ngIf="!verifyResult || !verifyResult.exists || verifyResult.passwordSet">
+        <div class="form-group">
+          <label>Customer ID</label>
+          <input type="text" [(ngModel)]="signupCustomerId" placeholder="Enter your Customer ID" (keyup.enter)="verifyCustomer()">
+        </div>
+        <div class="error" *ngIf="signupError">{{ signupError }}</div>
+        <button class="btn btn-primary" (click)="verifyCustomer()" [disabled]="isVerifying">
+          {{ isVerifying ? 'Verifying...' : 'Verify Customer ID' }}
+        </button>
+      </div>
+
+      <div *ngIf="verifyResult && verifyResult.exists && !verifyResult.passwordSet">
+        <div class="verify-info">
+          <p><strong>Business:</strong> {{ verifyResult.businessName }}</p>
+          <p><strong>Owner:</strong> {{ verifyResult.ownerName }}</p>
+          <p><strong>Account:</strong> {{ verifyResult.accountNumber }}</p>
+        </div>
+        <div class="form-group">
+          <label>Create Password</label>
+          <input type="password" [(ngModel)]="signupPassword" placeholder="Min 6 characters">
+        </div>
+        <div class="form-group">
+          <label>Confirm Password</label>
+          <input type="password" [(ngModel)]="signupConfirmPassword" placeholder="Confirm password" (keyup.enter)="signup()">
+        </div>
+        <div class="error" *ngIf="signupError">{{ signupError }}</div>
+        <button class="btn btn-primary" (click)="signup()" [disabled]="isSigningUp">
+          {{ isSigningUp ? 'Setting up...' : 'Set Password' }}
+        </button>
+      </div>
+
+      <p class="switch-text">Already have a password? <a (click)="activeTab = 'login'">Login</a></p>
+    </div>
+
+    <!-- Team Login Tab -->
+    <div *ngIf="activeTab === 'team'" class="form-section">
+      <div class="team-info-banner">
+        <span>👥</span>
+        <p>Team members can login with the email and password provided by the business owner.</p>
+      </div>
+      <div class="form-group">
+        <label>Email Address</label>
+        <input type="email" [(ngModel)]="teamEmail" placeholder="Enter your team email" (keyup.enter)="teamLogin()">
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" [(ngModel)]="teamPassword" placeholder="Enter your password" (keyup.enter)="teamLogin()">
+      </div>
+      <div class="error" *ngIf="teamLoginError">{{ teamLoginError }}</div>
+      <button class="btn btn-primary" (click)="teamLogin()" [disabled]="isTeamLogging">
+        {{ isTeamLogging ? 'Logging in...' : 'Team Login' }}
+      </button>
+      <p class="switch-text">Business owner? <a (click)="activeTab = 'login'">Login here</a></p>
+    </div>
+
+    <div class="footer-link">
+      <a routerLink="/website/landing">← Back to Home</a>
+    </div>
+  </div>
+</div>

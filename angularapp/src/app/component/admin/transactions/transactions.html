@@ -1,0 +1,211 @@
+<!-- Include Font Awesome -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+<div class="transaction-container">
+  <div class="header-section">
+    <h2><i class="fa fa-exchange-alt"></i> All User Transactions</h2>
+    <div class="header-actions">
+      <button class="refresh-btn" (click)="loadAllTransactions()" [disabled]="isLoadingTransactions">
+        <i class="fa fa-sync-alt"></i> Refresh
+      </button>
+      <button class="back-btn" (click)="backToDashboard()">
+        <i class="fa fa-arrow-left"></i> Back to Dashboard
+      </button>
+    </div>
+  </div>
+
+  <!-- User Selection Buttons -->
+  <div class="users-filter-section" *ngIf="!isLoadingTransactions">
+    <h3><i class="fa fa-users"></i> Filter by User</h3>
+    <div class="users-buttons-container">
+      <button 
+        class="user-filter-btn" 
+        [class.active]="selectedUserForTransactions === null"
+        (click)="clearTransactionFilters()"
+      >
+        <i class="fa fa-list"></i> All Users
+      </button>
+      <button 
+        *ngFor="let user of users.slice(0, 20)" 
+        class="user-filter-btn"
+        [class.active]="selectedUserForTransactions === getUserAccountNumber(user)"
+        (click)="filterByUser(getUserAccountNumber(user))"
+        [title]="(user.name || user.username) + ' - ' + getUserAccountNumber(user)"
+      >
+        <i class="fa fa-user"></i> {{ user.name || user.username }}
+        <small>({{ getUserAccountNumber(user) }})</small>
+      </button>
+    </div>
+    <div class="clear-filters-btn-container">
+      <button class="clear-filters-btn" (click)="clearTransactionFilters()">
+        <i class="fa fa-times-circle"></i> Clear All Filters
+      </button>
+    </div>
+  </div>
+
+  <!-- Advanced Filters -->
+  <div class="filter-section" *ngIf="!isLoadingTransactions">
+    <div class="filter-row">
+      <div class="filter-group">
+        <label><i class="fa fa-search"></i> Search:</label>
+        <input 
+          type="text" 
+          [(ngModel)]="transactionsSearchQuery" 
+          placeholder="Account Number, Name, Description, Loan Number, FD Number..."
+          class="search-input"
+          (input)="onTransactionSearchChange()"
+        >
+      </div>
+      <div class="filter-group">
+        <label><i class="fa fa-id-card"></i> PAN Number:</label>
+        <input 
+          type="text" 
+          [(ngModel)]="transactionsPANFilter" 
+          placeholder="Enter PAN number"
+          class="search-input"
+          (input)="onTransactionSearchChange()"
+        >
+      </div>
+      <div class="filter-group">
+        <label><i class="fa fa-calendar"></i> Date:</label>
+        <input 
+          type="date" 
+          [(ngModel)]="transactionsDateFilter" 
+          class="search-input"
+          (change)="onTransactionSearchChange()"
+        >
+      </div>
+    </div>
+    <div class="filter-row">
+      <div class="filter-group">
+        <label><i class="fa fa-filter"></i> Transaction Type:</label>
+        <select [(ngModel)]="transactionsTypeFilter" class="filter-select" (change)="onTransactionSearchChange()">
+          <option value="ALL">All Types</option>
+          <option value="Credit">Credit</option>
+          <option value="Debit">Debit</option>
+          <option value="Deposit">Deposit</option>
+          <option value="Withdraw">Withdraw</option>
+          <option value="Transfer">Transfer</option>
+          <option value="Loan Credit">Loan Credit</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label><i class="fa fa-tags"></i> Category:</label>
+        <select [(ngModel)]="transactionsCategoryFilter" class="filter-select" (change)="onTransactionSearchChange()">
+          <option value="ALL">All Categories</option>
+          <option value="LOAN">Loan Related</option>
+          <option value="SUBSIDY">Subsidy</option>
+          <option value="FD">Fixed Deposit</option>
+          <option value="INVESTMENT">Investment</option>
+          <option value="MUTUAL_FUND">Mutual Fund</option>
+          <option value="REGULAR">Regular Transactions</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <div *ngIf="isLoadingTransactions" class="loading-state">
+    <i class="fa fa-spinner fa-spin"></i> Loading transactions...
+  </div>
+
+  <!-- Transactions Table -->
+  <div *ngIf="!isLoadingTransactions" class="transactions-table">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Account Number</th>
+          <th>User Name</th>
+          <th>Category</th>
+          <th>Type</th>
+          <th>Amount</th>
+          <th>Balance</th>
+          <th>Date</th>
+          <th>OTP Verified</th>
+          <th>ACH Time</th>
+          <th>Description</th>
+          <th>Status</th>
+          <th>Signature</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let txn of transactions">
+          <td>{{ txn.id }}</td>
+          <td>{{ txn.accountNumber }}</td>
+          <td>{{ txn.userName || txn.user || 'Unknown' }}</td>
+          <td>
+            <span class="transaction-category-badge" [ngClass]="(txn.category || 'regular').toLowerCase().replace('_', '-')">
+              {{ txn.category || 'Regular' }}
+            </span>
+          </td>
+          <td>
+            <span class="transaction-type-badge" [ngClass]="txn.type.toLowerCase().replace(' ', '-')">
+              {{ txn.type }}
+            </span>
+          </td>
+          <td class="amount" [ngClass]="txn.type === 'Credit' || txn.type === 'Deposit' || txn.type === 'Loan Credit' ? 'positive' : 'negative'">
+            {{ (txn.type === 'Credit' || txn.type === 'Deposit' || txn.type === 'Loan Credit') ? '+' : '-' }}₹{{ txn.amount | number:'1.2-2' }}
+          </td>
+          <td>₹{{ txn.balance | number:'1.2-2' }}</td>
+          <td>{{ txn.date | date:'short' }}</td>
+          <td>
+            <span *ngIf="txn.otpVerified">✅</span>
+            <span *ngIf="!txn.otpVerified">—</span>
+          </td>
+          <td>{{ txn.achTime ? (txn.achTime | date:'short') : '-' }}</td>
+          <td>{{ txn.description || txn.merchant || '-' }}</td>
+          <td>
+            <span class="status-badge" [ngClass]="'status-' + (txn.status || 'Completed').toLowerCase()">
+              {{ txn.status || 'Completed' }}
+            </span>
+          </td>
+          <td>
+            <button *ngIf="isDebitTransaction(txn) && txn.accountNumber"
+                    class="signature-btn"
+                    (click)="viewSignature(txn.accountNumber!)"
+                    title="View Signature Document">
+              <i class="fa fa-file-signature"></i> Verify
+            </button>
+            <span *ngIf="!isDebitTransaction(txn)">—</span>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+    
+    <!-- No Results Message -->
+    <div *ngIf="transactions.length === 0" class="no-results">
+      <i class="fa fa-inbox"></i>
+      <p>No transactions found.</p>
+    </div>
+  </div>
+</div>
+
+<!-- Signature Verification Modal -->
+<div class="signature-modal-overlay" *ngIf="showSignatureModal" (click)="closeSignatureModal()">
+  <div class="signature-modal" (click)="$event.stopPropagation()">
+    <div class="signature-modal-header">
+      <h2><i class="fa fa-file-signature"></i> Signature Verification</h2>
+      <button class="signature-modal-close" (click)="closeSignatureModal()">
+        <i class="fa fa-times"></i>
+      </button>
+    </div>
+    <div class="signature-modal-body">
+      <div *ngIf="signatureLoading" class="signature-loading">
+        <i class="fa fa-spinner fa-spin"></i> Loading signed document...
+      </div>
+      <div *ngIf="signatureError" class="signature-error">
+        <i class="fa fa-exclamation-triangle"></i> {{ signatureError }}
+      </div>
+      <div *ngIf="signatureInfo && !signatureLoading" class="signature-info-bar">
+        <span><strong>Account:</strong> {{ signatureInfo.accountNumber }}</span>
+        <span><strong>Name:</strong> {{ signatureInfo.fullName }}</span>
+        <span><strong>Type:</strong> {{ signatureInfo.accountType }}</span>
+        <span><strong>App #:</strong> {{ signatureInfo.applicationNumber }}</span>
+      </div>
+      <div *ngIf="signatureDocUrl && !signatureLoading" class="signature-doc-container">
+        <iframe [src]="signatureDocUrl" class="signature-doc-frame"></iframe>
+      </div>
+    </div>
+  </div>
+</div>

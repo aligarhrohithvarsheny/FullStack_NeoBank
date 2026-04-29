@@ -1,0 +1,151 @@
+<div class="complete-profile-container">
+  <div class="profile-completion-card">
+    <div class="card-header">
+      <h2><i class="fa fa-user-check"></i> Complete Your Profile</h2>
+      <p class="subtitle">Please fill in your profile details to continue</p>
+    </div>
+
+    <div class="card-body" *ngIf="!isLoading">
+      <form (ngSubmit)="saveProfile()">
+        <div class="form-section">
+          <h3><i class="fa fa-user"></i> Personal Information</h3>
+          
+          <div class="form-row">
+            <div class="form-group">
+              <label for="name">Full Name <span class="required">*</span></label>
+              <input 
+                type="text" 
+                id="name"
+                [(ngModel)]="profileForm.name"
+                name="name"
+                placeholder="Enter your full name"
+                class="form-input"
+                required
+              >
+            </div>
+            <div class="form-group">
+              <label for="email">Email <span class="required">*</span></label>
+              <input 
+                type="email" 
+                id="email"
+                [(ngModel)]="profileForm.email"
+                name="email"
+                placeholder="your.email@neobank.com"
+                class="form-input"
+                required
+              >
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="employeeId">Employee ID</label>
+              <input 
+                type="text" 
+                id="employeeId"
+                [(ngModel)]="profileForm.employeeId"
+                name="employeeId"
+                placeholder="EMP001 (optional)"
+                class="form-input"
+              >
+            </div>
+            <div class="form-group">
+              <label for="mobileNumber">Mobile Number</label>
+              <input 
+                type="tel" 
+                id="mobileNumber"
+                [(ngModel)]="profileForm.mobileNumber"
+                name="mobileNumber"
+                placeholder="10 digits"
+                class="form-input"
+                maxlength="10"
+                pattern="[0-9]{10}"
+              >
+            </div>
+          </div>
+
+          <div class="form-group full-width">
+            <label for="address">Address</label>
+            <textarea 
+              id="address"
+              [(ngModel)]="profileForm.address"
+              name="address"
+              placeholder="Enter your address"
+              class="form-textarea"
+              rows="3"
+            ></textarea>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <h3><i class="fa fa-id-card"></i> Identity Information</h3>
+          
+          <div class="form-row">
+            <div class="form-group">
+              <label for="aadharNumber">Aadhar Number</label>
+              <input 
+                type="text" 
+                id="aadharNumber"
+                [(ngModel)]="profileForm.aadharNumber"
+                name="aadharNumber"
+                placeholder="12 digits"
+                class="form-input"
+                maxlength="12"
+                pattern="[0-9]{12}"
+              >
+              <small class="form-hint">12 digits</small>
+            </div>
+            <div class="form-group">
+              <label for="pan">PAN Number</label>
+              <input 
+                type="text" 
+                id="pan"
+                [(ngModel)]="profileForm.pan"
+                name="pan"
+                placeholder="ABCDE1234F"
+                class="form-input"
+                maxlength="10"
+                pattern="[A-Z]{5}[0-9]{4}[A-Z]{1}"
+              >
+              <small class="form-hint">10 characters</small>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <h3><i class="fa fa-graduation-cap"></i> Professional Information</h3>
+          
+          <div class="form-group full-width">
+            <label for="qualifications">Qualifications</label>
+            <input 
+              type="text" 
+              id="qualifications"
+              [(ngModel)]="profileForm.qualifications"
+              name="qualifications"
+              placeholder="e.g., MBA, B.Tech, MCA"
+              class="form-input"
+            >
+            <small class="form-hint">Separate multiple qualifications with commas</small>
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" class="btn-primary" [disabled]="isSaving">
+            <i class="fa fa-check"></i>
+            <span *ngIf="!isSaving">Complete Profile</span>
+            <span *ngIf="isSaving">Saving...</span>
+          </button>
+          <button type="button" class="btn-secondary" (click)="logout()">
+            <i class="fa fa-sign-out-alt"></i> Logout
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <div class="loading-spinner" *ngIf="isLoading">
+      <i class="fa fa-spinner fa-spin"></i>
+      <p>Loading profile...</p>
+    </div>
+  </div>
+</div>
+

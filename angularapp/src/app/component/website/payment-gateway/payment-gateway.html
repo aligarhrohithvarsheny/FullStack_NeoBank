@@ -1,0 +1,895 @@
+<div class="pg-container">
+  <!-- ===== HEADER ===== -->
+  <header class="pg-header">
+    <div class="pg-header-left">
+      <button class="pg-back-btn" (click)="goBack()">← Back</button>
+      <div class="pg-brand">
+        <div class="pg-brand-icon">⚡</div>
+        <div>
+          <h1 class="pg-brand-name">EzyVault Pay</h1>
+          <span class="pg-brand-tag">Production Payment Gateway</span>
+        </div>
+      </div>
+    </div>
+    <div class="pg-header-right">
+      <div class="pg-merchant-badge" *ngIf="currentMerchant">
+        <span class="pg-merchant-dot"></span>
+        <span>{{currentMerchant.businessName}}</span>
+      </div>
+      <button class="pg-btn pg-btn-outline" (click)="showRegisterMerchant = true">+ New Merchant</button>
+      <button class="pg-btn pg-btn-primary" (click)="startDemoFlow()">🚀 Live Demo</button>
+    </div>
+  </header>
+
+  <!-- ===== TABS ===== -->
+  <nav class="pg-tabs">
+    <button class="pg-tab" [class.active]="activeTab === 'dashboard'" (click)="activeTab = 'dashboard'">Dashboard</button>
+    <button class="pg-tab" [class.active]="activeTab === 'orders'" (click)="activeTab = 'orders'">Orders</button>
+    <button class="pg-tab" [class.active]="activeTab === 'transactions'" (click)="activeTab = 'transactions'">Transactions</button>
+    <button class="pg-tab" [class.active]="activeTab === 'refunds'" (click)="activeTab = 'refunds'">Refunds</button>
+    <button class="pg-tab" [class.active]="activeTab === 'payment-links'" (click)="activeTab = 'payment-links'; loadPaymentLinks()">💸 Payment Links</button>
+    <button class="pg-tab" [class.active]="activeTab === 'api'" (click)="activeTab = 'api'">API & Keys</button>
+    <button class="pg-tab" [class.active]="activeTab === 'architecture'" (click)="activeTab = 'architecture'">Architecture</button>
+  </nav>
+
+  <!-- ===== DEMO FLOW BANNER ===== -->
+  <div class="pg-demo-banner" *ngIf="demoStep > 0">
+    <div class="pg-demo-steps">
+      <div class="pg-demo-step" [class.completed]="demoStep >= 1" [class.active]="demoStep === 1">
+        <div class="step-circle">1</div>
+        <span>Order Created</span>
+      </div>
+      <div class="pg-demo-line" [class.completed]="demoStep >= 2"></div>
+      <div class="pg-demo-step" [class.completed]="demoStep >= 2" [class.active]="demoStep === 2">
+        <div class="step-circle">2</div>
+        <span>Payment Done</span>
+      </div>
+      <div class="pg-demo-line" [class.completed]="demoStep >= 3"></div>
+      <div class="pg-demo-step" [class.completed]="demoStep >= 3" [class.active]="demoStep === 3">
+        <div class="step-circle">3</div>
+        <span>Verified</span>
+      </div>
+    </div>
+    <div class="pg-demo-action" *ngIf="demoStep === 1 && demoOrder">
+      <span>Order <strong>{{demoOrder.orderId}}</strong> created for ₹{{demoOrder.amount}}</span>
+      <button class="pg-btn pg-btn-success" (click)="openPayForOrder(demoOrder)">Pay (Account) →</button>
+      <button class="pg-btn pg-btn-primary" (click)="openUpiPayModal(demoOrder)" style="margin-left:8px;">📲 Pay with UPI ID →</button>
+      <button class="pg-btn pg-btn-danger pg-btn-sm-inline" (click)="deleteOrder(demoOrder)" style="margin-left:8px;">🗑 Delete Order</button>
+    </div>
+    <div class="pg-demo-action" *ngIf="demoStep === 2 && demoTransaction">
+      <span>Payment <strong>{{demoTransaction.transactionId}}</strong> completed! Signature verified ✓</span>
+      <button class="pg-btn pg-btn-outline" (click)="demoStep = 3">View Details →</button>
+    </div>
+  </div>
+
+  <!-- ===== LOADING ===== -->
+  <div class="pg-loading" *ngIf="isLoading">
+    <div class="pg-spinner"></div>
+    <span>Processing...</span>
+  </div>
+
+  <!-- ================================================= -->
+  <!-- ===== DASHBOARD TAB ===== -->
+  <!-- ================================================= -->
+  <div class="pg-content" *ngIf="activeTab === 'dashboard'">
+    <!-- Stats Cards -->
+    <div class="pg-stats-grid">
+      <div class="pg-stat-card pg-stat-blue">
+        <div class="pg-stat-icon">💰</div>
+        <div class="pg-stat-info">
+          <span class="pg-stat-label">Total Volume</span>
+          <span class="pg-stat-value">₹{{totalVolume | number:'1.2-2'}}</span>
+        </div>
+      </div>
+      <div class="pg-stat-card pg-stat-green">
+        <div class="pg-stat-icon">✅</div>
+        <div class="pg-stat-info">
+          <span class="pg-stat-label">Successful</span>
+          <span class="pg-stat-value">{{successCount}}</span>
+        </div>
+      </div>
+      <div class="pg-stat-card pg-stat-red">
+        <div class="pg-stat-icon">❌</div>
+        <div class="pg-stat-info">
+          <span class="pg-stat-label">Failed</span>
+          <span class="pg-stat-value">{{failedCount}}</span>
+        </div>
+      </div>
+      <div class="pg-stat-card pg-stat-purple">
+        <div class="pg-stat-icon">📊</div>
+        <div class="pg-stat-info">
+          <span class="pg-stat-label">Platform Fees</span>
+          <span class="pg-stat-value">₹{{totalFees | number:'1.2-2'}}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Payment Flow Diagram -->
+    <div class="pg-flow-section">
+      <h3 class="pg-section-title">Payment Flow — How EzyVault Pay Works</h3>
+      <div class="pg-flow-diagram">
+        <div class="pg-flow-node">
+          <div class="pg-flow-icon">🛒</div>
+          <span>Create Order</span>
+        </div>
+        <div class="pg-flow-arrow">→</div>
+        <div class="pg-flow-node">
+          <div class="pg-flow-icon">🔒</div>
+          <span>Lock Balance</span>
+        </div>
+        <div class="pg-flow-arrow">→</div>
+        <div class="pg-flow-node">
+          <div class="pg-flow-icon">🛡️</div>
+          <span>Fraud Check</span>
+        </div>
+        <div class="pg-flow-arrow">→</div>
+        <div class="pg-flow-node">
+          <div class="pg-flow-icon">⚙️</div>
+          <span>Process</span>
+        </div>
+        <div class="pg-flow-arrow">→</div>
+        <div class="pg-flow-node">
+          <div class="pg-flow-icon">✍️</div>
+          <span>Sign & Verify</span>
+        </div>
+        <div class="pg-flow-arrow">→</div>
+        <div class="pg-flow-node pg-flow-node-success">
+          <div class="pg-flow-icon">✅</div>
+          <span>Success</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="pg-quick-actions">
+      <button class="pg-action-card" (click)="showCreateOrder = true">
+        <div class="pg-action-icon">🛒</div>
+        <h4>Create Order</h4>
+        <p>Create a new payment order</p>
+      </button>
+      <button class="pg-action-card" (click)="showPayOrder = true">
+        <div class="pg-action-icon">💳</div>
+        <h4>Process Payment</h4>
+        <p>Pay an existing order</p>
+      </button>
+      <button class="pg-action-card" (click)="openSendLinkModal()">
+        <div class="pg-action-icon">🔗</div>
+        <h4>Send Payment Link</h4>
+        <p>Send link via customer UPI ID</p>
+      </button>
+      <button class="pg-action-card" (click)="showRefundModal = true">
+        <div class="pg-action-icon">↩️</div>
+        <h4>Issue Refund</h4>
+        <p>Refund a transaction</p>
+      </button>
+      <button class="pg-action-card" (click)="activeTab = 'api'">
+        <div class="pg-action-icon">🔑</div>
+        <h4>API Keys</h4>
+        <p>View API credentials</p>
+      </button>
+    </div>
+
+    <!-- Recent Transactions -->
+    <div class="pg-recent-section">
+      <h3 class="pg-section-title">Recent Transactions</h3>
+      <div class="pg-table-wrap" *ngIf="transactions.length > 0">
+        <table class="pg-table">
+          <thead>
+            <tr>
+              <th>Transaction ID</th>
+              <th>Order ID</th>
+              <th>Amount</th>
+              <th>Fee</th>
+              <th>Method</th>
+              <th>Status</th>
+              <th>Time</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let txn of transactions | slice:0:10">
+              <td class="pg-mono">{{txn.transactionId}}</td>
+              <td class="pg-mono">{{txn.orderId}}</td>
+              <td class="pg-amount">₹{{txn.amount | number:'1.2-2'}}</td>
+              <td>₹{{txn.fee | number:'1.2-2'}}</td>
+              <td><span class="pg-method-badge">{{txn.paymentMethod}}</span></td>
+              <td><span class="pg-status" [ngClass]="getStatusClass(txn.status)">{{txn.status}}</span></td>
+              <td>{{txn.createdAt | date:'short'}}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="pg-empty" *ngIf="transactions.length === 0">
+        <div class="pg-empty-icon">📭</div>
+        <p>No transactions yet. Create an order and process a payment to get started!</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================================================= -->
+  <!-- ===== ORDERS TAB ===== -->
+  <!-- ================================================= -->
+  <div class="pg-content" *ngIf="activeTab === 'orders'">
+    <div class="pg-content-header">
+      <h3 class="pg-section-title">Orders</h3>
+      <button class="pg-btn pg-btn-primary" (click)="showCreateOrder = true">+ Create Order</button>
+    </div>
+    <div class="pg-table-wrap" *ngIf="orders.length > 0">
+      <table class="pg-table">
+        <thead>
+          <tr>
+            <th>Order ID</th>
+            <th>Customer</th>
+            <th>Amount</th>
+            <th>Status</th>
+            <th>Created</th>
+            <th>Expires</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let order of orders">
+            <td class="pg-mono">{{order.orderId}}</td>
+            <td>{{order.customerName || '—'}}</td>
+            <td class="pg-amount">₹{{order.amount | number:'1.2-2'}}</td>
+            <td><span class="pg-status" [ngClass]="getStatusClass(order.status)">{{order.status}}</span></td>
+            <td>{{order.createdAt | date:'short'}}</td>
+            <td>{{order.expiresAt | date:'short'}}</td>
+            <td>
+              <button class="pg-btn-sm pg-btn-success" *ngIf="order.status === 'CREATED'" (click)="openPayForOrder(order)">Pay (Acct)</button>
+              <button class="pg-btn-sm pg-btn-upi" *ngIf="order.status === 'CREATED'" (click)="openUpiPayModal(order)" style="margin-left:4px;">📲 Pay UPI</button>
+              <button class="pg-btn-sm pg-btn-danger" *ngIf="order.status === 'CREATED'" (click)="deleteOrder(order)" style="margin-left:4px;" title="Delete this order">🗑</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="pg-empty" *ngIf="orders.length === 0">
+      <div class="pg-empty-icon">📋</div>
+      <p>No orders yet.</p>
+    </div>
+  </div>
+
+  <!-- ================================================= -->
+  <!-- ===== TRANSACTIONS TAB ===== -->
+  <!-- ================================================= -->
+  <div class="pg-content" *ngIf="activeTab === 'transactions'">
+    <div class="pg-content-header">
+      <h3 class="pg-section-title">All Transactions <span class="pg-live-badge">● LIVE</span></h3>
+    </div>
+    <div class="pg-table-wrap" *ngIf="transactions.length > 0">
+      <table class="pg-table">
+        <thead>
+          <tr>
+            <th>Txn ID</th>
+            <th>Order</th>
+            <th>Payer</th>
+            <th>Amount</th>
+            <th>Fee</th>
+            <th>Net</th>
+            <th>Method</th>
+            <th>Risk</th>
+            <th>Status</th>
+            <th>Signature</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let txn of transactions" [class.pg-row-flagged]="txn.fraudFlagged">
+            <td class="pg-mono">{{txn.transactionId}}</td>
+            <td class="pg-mono">{{txn.orderId}}</td>
+            <td>{{txn.payerName || '—'}}</td>
+            <td class="pg-amount">₹{{txn.amount | number:'1.2-2'}}</td>
+            <td>₹{{txn.fee | number:'1.2-2'}}</td>
+            <td>₹{{txn.netAmount | number:'1.2-2'}}</td>
+            <td><span class="pg-method-badge">{{txn.paymentMethod}}</span></td>
+            <td>
+              <span class="pg-risk" [class.pg-risk-high]="txn.riskScore > 50" [class.pg-risk-low]="txn.riskScore <= 50">
+                {{txn.riskScore}}
+              </span>
+            </td>
+            <td><span class="pg-status" [ngClass]="getStatusClass(txn.status)">{{txn.status}}</span></td>
+            <td>
+              <span class="pg-sig-badge" *ngIf="txn.signatureVerified">✓ Verified</span>
+              <span class="pg-sig-badge pg-sig-unverified" *ngIf="!txn.signatureVerified">✗ Unverified</span>
+            </td>
+            <td>
+              <button class="pg-btn-sm pg-btn-warning" *ngIf="txn.status === 'SUCCESS' && !txn.refundStatus" (click)="openRefundForTxn(txn)">Refund</button>
+              <span class="pg-refund-badge" *ngIf="txn.refundStatus">{{txn.refundStatus}}</span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="pg-empty" *ngIf="transactions.length === 0">
+      <div class="pg-empty-icon">📊</div>
+      <p>No transactions yet.</p>
+    </div>
+  </div>
+
+  <!-- ================================================= -->
+  <!-- ===== REFUNDS TAB ===== -->
+  <!-- ================================================= -->
+  <div class="pg-content" *ngIf="activeTab === 'refunds'">
+    <div class="pg-content-header">
+      <h3 class="pg-section-title">Refunds</h3>
+    </div>
+    <div class="pg-table-wrap" *ngIf="refunds.length > 0">
+      <table class="pg-table">
+        <thead>
+          <tr>
+            <th>Refund ID</th>
+            <th>Transaction</th>
+            <th>Amount</th>
+            <th>Type</th>
+            <th>Reason</th>
+            <th>Status</th>
+            <th>Processed</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let ref of refunds">
+            <td class="pg-mono">{{ref.refundId}}</td>
+            <td class="pg-mono">{{ref.transactionId}}</td>
+            <td class="pg-amount">₹{{ref.amount | number:'1.2-2'}}</td>
+            <td>{{ref.refundType}}</td>
+            <td>{{ref.reason || '—'}}</td>
+            <td><span class="pg-status" [ngClass]="getStatusClass(ref.status)">{{ref.status}}</span></td>
+            <td>{{ref.processedAt | date:'short'}}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="pg-empty" *ngIf="refunds.length === 0">
+      <div class="pg-empty-icon">↩️</div>
+      <p>No refunds yet.</p>
+    </div>
+  </div>
+
+  <!-- ================================================= -->
+  <!-- ===== API & KEYS TAB ===== -->
+  <!-- ================================================= -->
+  <div class="pg-content" *ngIf="activeTab === 'api'">
+    <div class="pg-api-section" *ngIf="currentMerchant">
+      <h3 class="pg-section-title">API Credentials</h3>
+      <div class="pg-api-card">
+        <div class="pg-api-row">
+          <label>Merchant ID</label>
+          <code>{{currentMerchant.merchantId}}</code>
+        </div>
+        <div class="pg-api-row">
+          <label>API Key</label>
+          <code>{{currentMerchant.apiKey}}</code>
+        </div>
+        <div class="pg-api-row">
+          <label>Secret Key</label>
+          <code>{{currentMerchant.secretKey}}</code>
+        </div>
+        <div class="pg-api-row" *ngIf="currentMerchant.webhookUrl">
+          <label>Webhook URL</label>
+          <code>{{currentMerchant.webhookUrl}}</code>
+        </div>
+      </div>
+
+      <h3 class="pg-section-title" style="margin-top: 32px;">Integration Guide</h3>
+      <div class="pg-code-section">
+        <h4>1. Create Order (Server-side)</h4>
+        <pre class="pg-code"><code>POST /api/payment-gateway/orders/create
+Content-Type: application/json
+
+&#123;
+  "merchantId": "{{currentMerchant.merchantId}}",
+  "amount": 1500.00,
+  "description": "Premium Plan",
+  "customerName": "John Doe",
+  "customerEmail": "john&#64;example.com"
+&#125;</code></pre>
+
+        <h4>2. Process Payment</h4>
+        <pre class="pg-code"><code>POST /api/payment-gateway/pay
+Content-Type: application/json
+
+&#123;
+  "orderId": "ORD1234567890",
+  "paymentMethod": "UPI",
+  "payerAccount": "ACC987654321",
+  "payerName": "John Doe"
+&#125;</code></pre>
+
+        <h4>3. Verify Signature (Critical)</h4>
+        <pre class="pg-code"><code>POST /api/payment-gateway/verify-signature
+
+&#123;
+  "orderId": "ORD1234567890",
+  "transactionId": "PGTXN1234567890",
+  "signature": "abc123...",
+  "secretKey": "{{currentMerchant.secretKey}}"
+&#125;
+
+// Signature = HMAC-SHA256(orderId + "|" + transactionId, secretKey)</code></pre>
+
+        <h4>4. Process Refund</h4>
+        <pre class="pg-code"><code>POST /api/payment-gateway/refunds
+
+&#123;
+  "transactionId": "PGTXN1234567890",
+  "amount": 500.00,
+  "reason": "Customer requested refund"
+&#125;</code></pre>
+      </div>
+    </div>
+    <div class="pg-empty" *ngIf="!currentMerchant">
+      <div class="pg-empty-icon">🔑</div>
+      <p>Register a merchant to get API credentials.</p>
+      <button class="pg-btn pg-btn-primary" (click)="showRegisterMerchant = true">Register Merchant</button>
+    </div>
+  </div>
+
+  <!-- ================================================= -->
+  <!-- ===== PAYMENT LINKS TAB ===== -->
+  <!-- ================================================= -->
+  <div class="pg-content" *ngIf="activeTab === 'payment-links'">
+    <div class="pg-section-header">
+      <h3 class="pg-section-title">💸 Payment Links</h3>
+      <button class="pg-btn pg-btn-primary" (click)="openSendLinkModal()" *ngIf="currentMerchant">
+        + Send Payment Link
+      </button>
+    </div>
+    <div class="pg-empty" *ngIf="paymentLinks.length === 0">
+      <div class="pg-empty-icon">🔗</div>
+      <p>No payment links sent yet.</p>
+      <button class="pg-btn pg-btn-primary" (click)="openSendLinkModal()">Send Your First Link</button>
+    </div>
+    <div class="pg-table-wrap" *ngIf="paymentLinks.length > 0">
+      <table class="pg-table">
+        <thead>
+          <tr>
+            <th>Link ID</th>
+            <th>Recipient UPI</th>
+            <th>Recipient Name</th>
+            <th>Amount</th>
+            <th>Description</th>
+            <th>Status</th>
+            <th>Sent At</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let link of paymentLinks">
+            <td><code>{{ link.linkId }}</code></td>
+            <td>{{ link.recipientUpiId }}</td>
+            <td>{{ link.recipientName }}</td>
+            <td><strong>₹{{ link.amount }}</strong></td>
+            <td>{{ link.description }}</td>
+            <td>
+              <span class="pg-status-badge" [ngClass]="getStatusClass(link.status)">{{ link.status }}</span>
+            </td>
+            <td>{{ link.createdAt | date:'dd MMM, HH:mm' }}</td>
+            <td>
+              <button class="pg-btn-sm pg-btn-danger"
+                      *ngIf="link.status === 'PENDING'"
+                      (click)="cancelLink(link.linkToken)">Cancel</button>
+              <span *ngIf="link.status === 'PAID'" class="pg-paid-label">✅ Paid by {{ link.payerName }}</span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ================================================= -->
+  <!-- ===== ARCHITECTURE TAB ===== -->
+  <!-- ================================================= -->
+  <div class="pg-content" *ngIf="activeTab === 'architecture'">
+    <div class="pg-arch-section">
+      <h3 class="pg-section-title">System Architecture</h3>
+
+      <!-- Architecture Diagram -->
+      <div class="pg-arch-diagram">
+        <div class="pg-arch-row">
+          <div class="pg-arch-box pg-arch-client">
+            <h4>🖥️ Client App</h4>
+            <p>Web / Mobile / POS</p>
+          </div>
+        </div>
+        <div class="pg-arch-arrow">▼</div>
+        <div class="pg-arch-row">
+          <div class="pg-arch-box pg-arch-gateway">
+            <h4>🌐 API Gateway</h4>
+            <p>Rate Limiting • Authentication • Routing</p>
+          </div>
+        </div>
+        <div class="pg-arch-arrow">▼</div>
+        <div class="pg-arch-row pg-arch-services">
+          <div class="pg-arch-box pg-arch-svc">
+            <h4>🔐 Auth</h4>
+            <p>JWT + OAuth2</p>
+          </div>
+          <div class="pg-arch-box pg-arch-svc pg-arch-svc-main">
+            <h4>💳 Payment</h4>
+            <p>Core Engine</p>
+          </div>
+          <div class="pg-arch-box pg-arch-svc">
+            <h4>🛡️ Fraud</h4>
+            <p>Risk Scoring</p>
+          </div>
+          <div class="pg-arch-box pg-arch-svc">
+            <h4>🔔 Notify</h4>
+            <p>Webhooks/SMS</p>
+          </div>
+        </div>
+        <div class="pg-arch-arrow">▼</div>
+        <div class="pg-arch-row pg-arch-services">
+          <div class="pg-arch-box pg-arch-db">
+            <h4>🗄️ MySQL</h4>
+            <p>Transactions + Orders</p>
+          </div>
+          <div class="pg-arch-box pg-arch-cache">
+            <h4>⚡ Redis</h4>
+            <p>Cache + Sessions</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tech Stack -->
+      <div class="pg-tech-stack">
+        <h3 class="pg-section-title">Tech Stack</h3>
+        <div class="pg-tech-grid">
+          <div class="pg-tech-item">
+            <div class="pg-tech-icon">☕</div>
+            <h4>Spring Boot</h4>
+            <p>Backend Services</p>
+          </div>
+          <div class="pg-tech-item">
+            <div class="pg-tech-icon">🅰️</div>
+            <h4>Angular</h4>
+            <p>Frontend Dashboard</p>
+          </div>
+          <div class="pg-tech-item">
+            <div class="pg-tech-icon">🗄️</div>
+            <h4>MySQL</h4>
+            <p>ACID Transactions</p>
+          </div>
+          <div class="pg-tech-item">
+            <div class="pg-tech-icon">🐳</div>
+            <h4>Docker</h4>
+            <p>Containerization</p>
+          </div>
+          <div class="pg-tech-item">
+            <div class="pg-tech-icon">🔐</div>
+            <h4>HMAC-SHA256</h4>
+            <p>Signature Verification</p>
+          </div>
+          <div class="pg-tech-item">
+            <div class="pg-tech-icon">🛡️</div>
+            <h4>Fraud Detection</h4>
+            <p>ML Risk Scoring</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Security Features -->
+      <div class="pg-security-section">
+        <h3 class="pg-section-title">Security Features</h3>
+        <div class="pg-security-grid">
+          <div class="pg-security-item">
+            <span class="pg-check">✓</span>
+            <div>
+              <h4>HMAC-SHA256 Signature</h4>
+              <p>Every transaction is cryptographically signed to prevent tampering</p>
+            </div>
+          </div>
+          <div class="pg-security-item">
+            <span class="pg-check">✓</span>
+            <div>
+              <h4>Real-time Fraud Detection</h4>
+              <p>Multi-rule engine with velocity checks, amount thresholds, and device fingerprinting</p>
+            </div>
+          </div>
+          <div class="pg-security-item">
+            <span class="pg-check">✓</span>
+            <div>
+              <h4>MySQL Transactions (ACID)</h4>
+              <p>All payment operations use database transactions with proper rollback</p>
+            </div>
+          </div>
+          <div class="pg-security-item">
+            <span class="pg-check">✓</span>
+            <div>
+              <h4>Idempotent APIs</h4>
+              <p>Duplicate requests are safely handled — no double charges</p>
+            </div>
+          </div>
+          <div class="pg-security-item">
+            <span class="pg-check">✓</span>
+            <div>
+              <h4>Rate Limiting</h4>
+              <p>API rate limiting prevents abuse and DDoS attacks</p>
+            </div>
+          </div>
+          <div class="pg-security-item">
+            <span class="pg-check">✓</span>
+            <div>
+              <h4>PCI-DSS Ready</h4>
+              <p>Architecture designed for PCI-DSS compliance readiness</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================================================= -->
+  <!-- ===== MODALS ===== -->
+  <!-- ================================================= -->
+
+  <!-- Create Order Modal -->
+  <div class="pg-modal-overlay" *ngIf="showCreateOrder" (click)="showCreateOrder = false">
+    <div class="pg-modal" (click)="$event.stopPropagation()">
+      <div class="pg-modal-header">
+        <h3>Create Payment Order</h3>
+        <button class="pg-modal-close" (click)="showCreateOrder = false">×</button>
+      </div>
+      <div class="pg-modal-body">
+        <div class="pg-form-group">
+          <label>Amount (₹) *</label>
+          <input type="number" [(ngModel)]="orderForm.amount" placeholder="Enter amount" class="pg-input">
+        </div>
+        <div class="pg-form-group">
+          <label>Description</label>
+          <input type="text" [(ngModel)]="orderForm.description" placeholder="Payment for..." class="pg-input">
+        </div>
+        <div class="pg-form-row">
+          <div class="pg-form-group">
+            <label>Customer Name</label>
+            <input type="text" [(ngModel)]="orderForm.customerName" placeholder="John Doe" class="pg-input">
+          </div>
+          <div class="pg-form-group">
+            <label>Customer Email</label>
+            <input type="email" [(ngModel)]="orderForm.customerEmail" placeholder="john@example.com" class="pg-input">
+          </div>
+        </div>
+        <div class="pg-form-group">
+          <label>Customer Phone</label>
+          <input type="text" [(ngModel)]="orderForm.customerPhone" placeholder="9876543210" class="pg-input">
+        </div>
+      </div>
+      <div class="pg-modal-footer">
+        <button class="pg-btn pg-btn-outline" (click)="showCreateOrder = false">Cancel</button>
+        <button class="pg-btn pg-btn-primary" (click)="createOrder()" [disabled]="isLoading">Create Order</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pay Order Modal -->
+  <div class="pg-modal-overlay" *ngIf="showPayOrder" (click)="showPayOrder = false">
+    <div class="pg-modal" (click)="$event.stopPropagation()">
+      <div class="pg-modal-header">
+        <h3>Process Payment</h3>
+        <button class="pg-modal-close" (click)="showPayOrder = false">×</button>
+      </div>
+      <div class="pg-modal-body">
+        <div class="pg-form-group">
+          <label>Order ID *</label>
+          <input type="text" [(ngModel)]="payForm.orderId" placeholder="ORD..." class="pg-input">
+        </div>
+        <div class="pg-form-group">
+          <label>Payment Method</label>
+          <select [(ngModel)]="payForm.paymentMethod" class="pg-input">
+            <option value="UPI">UPI</option>
+            <option value="NEFT">NEFT</option>
+            <option value="IMPS">IMPS</option>
+            <option value="RTGS">RTGS</option>
+            <option value="DEBIT_CARD">Debit Card</option>
+            <option value="CREDIT_CARD">Credit Card</option>
+            <option value="NET_BANKING">Net Banking</option>
+            <option value="WALLET">Wallet</option>
+          </select>
+        </div>
+        <div class="pg-form-group">
+          <label>Payer Account Number</label>
+          <input type="text" [(ngModel)]="payForm.payerAccount" placeholder="Account number" class="pg-input">
+        </div>
+        <div class="pg-form-group">
+          <label>Payer Name</label>
+          <input type="text" [(ngModel)]="payForm.payerName" placeholder="Name" class="pg-input">
+        </div>
+      </div>
+      <div class="pg-modal-footer">
+        <button class="pg-btn pg-btn-outline" (click)="showPayOrder = false">Cancel</button>
+        <button class="pg-btn pg-btn-success" (click)="processPayment()" [disabled]="isLoading">💳 Pay Now</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Refund Modal -->
+  <div class="pg-modal-overlay" *ngIf="showRefundModal" (click)="showRefundModal = false">
+    <div class="pg-modal" (click)="$event.stopPropagation()">
+      <div class="pg-modal-header">
+        <h3>Process Refund</h3>
+        <button class="pg-modal-close" (click)="showRefundModal = false">×</button>
+      </div>
+      <div class="pg-modal-body">
+        <div class="pg-form-group">
+          <label>Transaction ID *</label>
+          <input type="text" [(ngModel)]="refundForm.transactionId" placeholder="PGTXN..." class="pg-input">
+        </div>
+        <div class="pg-form-group">
+          <label>Refund Amount (₹) *</label>
+          <input type="number" [(ngModel)]="refundForm.amount" placeholder="Amount" class="pg-input">
+        </div>
+        <div class="pg-form-group">
+          <label>Reason</label>
+          <input type="text" [(ngModel)]="refundForm.reason" placeholder="Reason for refund" class="pg-input">
+        </div>
+      </div>
+      <div class="pg-modal-footer">
+        <button class="pg-btn pg-btn-outline" (click)="showRefundModal = false">Cancel</button>
+        <button class="pg-btn pg-btn-warning" (click)="processRefund()" [disabled]="isLoading">Process Refund</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Register Merchant Modal -->
+  <div class="pg-modal-overlay" *ngIf="showRegisterMerchant" (click)="showRegisterMerchant = false">
+    <div class="pg-modal pg-modal-lg" (click)="$event.stopPropagation()">
+      <div class="pg-modal-header">
+        <h3>Register New Merchant</h3>
+        <button class="pg-modal-close" (click)="showRegisterMerchant = false">×</button>
+      </div>
+      <div class="pg-modal-body">
+        <div class="pg-form-row">
+          <div class="pg-form-group">
+            <label>Business Name *</label>
+            <input type="text" [(ngModel)]="registerForm.businessName" placeholder="Your Business" class="pg-input">
+          </div>
+          <div class="pg-form-group">
+            <label>Business Email *</label>
+            <input type="email" [(ngModel)]="registerForm.businessEmail" placeholder="biz@example.com" class="pg-input">
+          </div>
+        </div>
+        <div class="pg-form-row">
+          <div class="pg-form-group">
+            <label>Business Phone</label>
+            <input type="text" [(ngModel)]="registerForm.businessPhone" placeholder="9876543210" class="pg-input">
+          </div>
+          <div class="pg-form-group">
+            <label>Business Type</label>
+            <select [(ngModel)]="registerForm.businessType" class="pg-input">
+              <option value="ONLINE">Online</option>
+              <option value="RETAIL">Retail</option>
+              <option value="SAAS">SaaS</option>
+              <option value="MARKETPLACE">Marketplace</option>
+              <option value="EDUCATION">Education</option>
+            </select>
+          </div>
+        </div>
+        <div class="pg-form-row">
+          <div class="pg-form-group">
+            <label>Bank Account Number</label>
+            <input type="text" [(ngModel)]="registerForm.accountNumber" placeholder="Account number" class="pg-input">
+          </div>
+          <div class="pg-form-group">
+            <label>Settlement Account</label>
+            <input type="text" [(ngModel)]="registerForm.settlementAccount" placeholder="Settlement account" class="pg-input">
+          </div>
+        </div>
+        <div class="pg-form-group">
+          <label>Webhook URL</label>
+          <input type="text" [(ngModel)]="registerForm.webhookUrl" placeholder="https://yourdomain.com/webhook" class="pg-input">
+        </div>
+        <div class="pg-form-group">
+          <label>Callback URL</label>
+          <input type="text" [(ngModel)]="registerForm.callbackUrl" placeholder="https://yourdomain.com/callback" class="pg-input">
+        </div>
+      </div>
+      <div class="pg-modal-footer">
+        <button class="pg-btn pg-btn-outline" (click)="showRegisterMerchant = false">Cancel</button>
+        <button class="pg-btn pg-btn-primary" (click)="registerMerchant()" [disabled]="isLoading">Register Merchant</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Send Payment Link Modal -->
+  <div class="pg-modal-overlay" *ngIf="showSendLinkModal" (click)="showSendLinkModal = false">
+    <div class="pg-modal" (click)="$event.stopPropagation()">
+      <div class="pg-modal-header">
+        <h3>🔗 Send Payment Link</h3>
+        <button class="pg-modal-close" (click)="showSendLinkModal = false">×</button>
+      </div>
+      <div class="pg-modal-body" *ngIf="!sendLinkSuccess">
+        <div class="pg-form-group">
+          <label>Recipient UPI ID *</label>
+          <div class="pg-input-row">
+            <input type="text" [(ngModel)]="linkForm.recipientUpiId" placeholder="customer@neobank"
+                   class="pg-input" (input)="linkRecipientVerified = false; linkRecipientName = ''; linkVerifyError = ''">
+            <button class="pg-btn pg-btn-outline" (click)="verifyLinkRecipientUpi()"
+                    [disabled]="!linkForm.recipientUpiId || isVerifyingLinkUpi">
+              {{ isVerifyingLinkUpi ? '...' : 'Verify' }}
+            </button>
+          </div>
+          <div class="pg-verify-success" *ngIf="linkRecipientVerified">
+            ✅ Verified: <strong>{{ linkRecipientName }}</strong>
+          </div>
+          <div class="pg-verify-error" *ngIf="linkVerifyError">⚠️ {{ linkVerifyError }}</div>
+        </div>
+        <div class="pg-form-group">
+          <label>Amount (₹) *</label>
+          <input type="number" [(ngModel)]="linkForm.amount" placeholder="Enter amount" class="pg-input">
+        </div>
+        <div class="pg-form-group">
+          <label>Description</label>
+          <input type="text" [(ngModel)]="linkForm.description" placeholder="Payment for order #123" class="pg-input">
+        </div>
+      </div>
+      <div class="pg-link-success" *ngIf="sendLinkSuccess">
+        ✅ Payment link sent to <strong>{{ linkRecipientName }}</strong>!<br>
+        <small>The customer will see this request in their dashboard.</small>
+      </div>
+      <div class="pg-modal-footer" *ngIf="!sendLinkSuccess">
+        <button class="pg-btn pg-btn-outline" (click)="showSendLinkModal = false">Cancel</button>
+        <button class="pg-btn pg-btn-primary" (click)="sendLink()"
+                [disabled]="!linkRecipientVerified || !linkForm.amount || isSendingLink">
+          {{ isSendingLink ? 'Sending...' : '🔗 Send Link' }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pay with UPI ID Modal -->
+  <div class="pg-modal-overlay" *ngIf="showUpiPayModal" (click)="!isSubmittingUpiPay && (showUpiPayModal = false)">
+    <div class="pg-modal" (click)="$event.stopPropagation()">
+      <div class="pg-modal-header">
+        <div>
+          <h3>📲 Pay with UPI ID</h3>
+          <div *ngIf="upiPayOrder" style="font-size:13px;color:#6b7280;margin-top:2px;">
+            Order: <strong>{{upiPayOrder.orderId}}</strong> · ₹{{upiPayOrder.amount | number:'1.2-2'}}
+          </div>
+        </div>
+        <button class="pg-modal-close" (click)="showUpiPayModal = false" [disabled]="isSubmittingUpiPay">×</button>
+      </div>
+      <div class="pg-modal-body" *ngIf="!upiPaySuccess">
+        <div class="pg-form-group">
+          <label>Payer UPI ID *</label>
+          <div class="pg-input-row">
+            <input type="text" [(ngModel)]="upiPayForm.upiId" placeholder="yourname@upi"
+                   class="pg-input"
+                   (input)="upiPayVerified = false; upiPayVerifiedName = ''; upiPayVerifyError = ''"
+                   [disabled]="isSubmittingUpiPay">
+            <button class="pg-btn pg-btn-outline" (click)="verifyUpiForPayment()"
+                    [disabled]="!upiPayForm.upiId || isVerifyingUpiPay || isSubmittingUpiPay">
+              {{ isVerifyingUpiPay ? 'Checking...' : 'Verify' }}
+            </button>
+          </div>
+          <div class="pg-verify-success" *ngIf="upiPayVerified">
+            ✅ UPI verified: <strong>{{upiPayVerifiedName}}</strong>
+          </div>
+          <div class="pg-verify-error" *ngIf="upiPayVerifyError">⚠️ {{upiPayVerifyError}}</div>
+        </div>
+        <div *ngIf="upiPayVerified" class="pg-upi-verification-note">
+          <span>✅ Verified: <strong>{{upiPayVerifiedName}}</strong>. Payment request will be sent to their dashboard for authorization.</span>
+        </div>
+        <div class="pg-upi-info" *ngIf="upiPayOrder">
+          <div class="pg-upi-amount-summary">
+            <span>Amount to pay:</span>
+            <strong>₹{{upiPayOrder.amount | number:'1.2-2'}}</strong>
+          </div>
+          <div style="font-size:12px;color:#6b7280;margin-top:4px;">
+            Payment request will be sent to the user's dashboard. They will authorize with their UPI PIN.
+          </div>
+        </div>
+      </div>
+      <div class="pg-link-success" *ngIf="upiPaySuccess">
+        ✅ Payment request sent!<br>
+        <small>{{upiPaySuccessMessage || 'The user will see this payment request in their dashboard and can authorize it with their UPI PIN.'}}</small>
+      </div>
+      <div class="pg-modal-footer" *ngIf="!upiPaySuccess">
+        <button class="pg-btn pg-btn-outline" (click)="showUpiPayModal = false" [disabled]="isSubmittingUpiPay">Cancel</button>
+        <button class="pg-btn pg-btn-primary" (click)="submitUpiPay()"
+                [disabled]="!upiPayVerified || isSubmittingUpiPay">
+          {{ isSubmittingUpiPay ? 'Sending...' : '📲 Send Payment Request ₹' + (upiPayOrder?.amount | number:'1.2-2') }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+</div>

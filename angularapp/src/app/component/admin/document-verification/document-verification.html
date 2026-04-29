@@ -1,0 +1,121 @@
+<div class="doc-verification-container">
+  <div class="section-header">
+    <h2>📋 Document Verification</h2>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <span class="stat-value">{{stats.total}}</span>
+      <span class="stat-label">Total</span>
+    </div>
+    <div class="stat-card pending">
+      <span class="stat-value">{{stats.pending}}</span>
+      <span class="stat-label">Pending</span>
+    </div>
+    <div class="stat-card verified">
+      <span class="stat-value">{{stats.verified}}</span>
+      <span class="stat-label">Verified</span>
+    </div>
+    <div class="stat-card rejected">
+      <span class="stat-value">{{stats.rejected}}</span>
+      <span class="stat-label">Rejected</span>
+    </div>
+  </div>
+
+  <!-- Filters & Search -->
+  <div class="toolbar">
+    <div class="filters">
+      <button *ngFor="let f of filters" [class.active]="activeFilter === f" (click)="setFilter(f)">{{f}}</button>
+    </div>
+    <input type="text" class="search-input" [(ngModel)]="searchTerm" (ngModelChange)="applyFilter()" placeholder="Search by name, account or doc number..." />
+  </div>
+
+  <!-- Detail Panel Overlay -->
+  <div class="overlay" *ngIf="selectedDocument" (click)="selectedDocument = null">
+    <div class="detail-panel" (click)="$event.stopPropagation()">
+      <div class="detail-header">
+        <span class="doc-icon-lg">{{getDocIcon(selectedDocument.documentType)}}</span>
+        <div>
+          <h3>{{formatDocType(selectedDocument.documentType)}}</h3>
+          <span class="detail-status" [class]="getStatusClass(selectedDocument.status)">{{selectedDocument.status}}</span>
+        </div>
+        <button class="btn-close" (click)="selectedDocument = null">✕</button>
+      </div>
+
+      <div class="detail-grid">
+        <div class="detail-item"><span class="label">User</span><span class="value">{{selectedDocument.userName}}</span></div>
+        <div class="detail-item"><span class="label">Account</span><span class="value mono">{{selectedDocument.accountNumber}}</span></div>
+        <div class="detail-item"><span class="label">Document Number</span><span class="value mono">{{selectedDocument.documentNumber}}</span></div>
+        <div class="detail-item"><span class="label">Submitted</span><span class="value">{{formatDate(selectedDocument.createdAt)}}</span></div>
+        <div class="detail-item" *ngIf="selectedDocument.verifiedBy"><span class="label">Verified By</span><span class="value">{{selectedDocument.verifiedBy}}</span></div>
+        <div class="detail-item" *ngIf="selectedDocument.verifiedAt"><span class="label">Verified At</span><span class="value">{{formatDate(selectedDocument.verifiedAt)}}</span></div>
+      </div>
+
+      <div class="action-section" *ngIf="selectedDocument.status === 'PENDING'">
+        <div class="form-group">
+          <label>Remarks</label>
+          <textarea [(ngModel)]="remarks" rows="2" placeholder="Optional remarks..."></textarea>
+        </div>
+        <div class="form-group">
+          <label>Rejection Reason (required for reject)</label>
+          <textarea [(ngModel)]="rejectionReason" rows="2" placeholder="Reason for rejection..."></textarea>
+        </div>
+        <div class="action-buttons">
+          <button class="btn-success" (click)="verifyDocument()" [disabled]="processing">
+            {{processing ? 'Processing...' : '✅ Verify'}}
+          </button>
+          <button class="btn-danger" (click)="rejectDocument()" [disabled]="processing || !rejectionReason">
+            {{processing ? 'Processing...' : '❌ Reject'}}
+          </button>
+        </div>
+      </div>
+
+      <div class="rejection-info" *ngIf="selectedDocument.status === 'REJECTED' && selectedDocument.rejectionReason">
+        <h4>Rejection Reason</h4>
+        <p>{{selectedDocument.rejectionReason}}</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <div class="loading-state" *ngIf="loading">
+    <div class="spinner"></div>
+    <p>Loading documents...</p>
+  </div>
+
+  <!-- Empty -->
+  <div class="empty-state" *ngIf="!loading && filteredDocuments.length === 0">
+    <span class="empty-icon">📋</span>
+    <h3>No documents found</h3>
+    <p>No documents match the current filter.</p>
+  </div>
+
+  <!-- Documents Table -->
+  <div class="doc-table" *ngIf="!loading && filteredDocuments.length > 0">
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>User</th>
+          <th>Account</th>
+          <th>Doc Number</th>
+          <th>Status</th>
+          <th>Submitted</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let doc of filteredDocuments">
+          <td><span class="doc-icon">{{getDocIcon(doc.documentType)}}</span> {{formatDocType(doc.documentType)}}</td>
+          <td>{{doc.userName}}</td>
+          <td class="mono">{{doc.accountNumber}}</td>
+          <td class="mono">{{doc.documentNumber}}</td>
+          <td><span class="status-badge" [class]="getStatusClass(doc.status)">{{doc.status}}</span></td>
+          <td>{{formatDate(doc.createdAt)}}</td>
+          <td><button class="btn-sm-primary" (click)="selectDocument(doc)">Review</button></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>

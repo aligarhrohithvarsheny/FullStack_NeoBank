@@ -1,0 +1,227 @@
+<div class="fasttag-login-page">
+  <!-- Top Navigation Bar -->
+  <div class="login-topbar">
+    <div class="topbar-brand" (click)="goToLanding()">
+      <img src="/favicon.ico" alt="NeoBank" class="topbar-logo">
+      <span class="topbar-divider"></span>
+    </div>
+    <div class="topbar-secure">
+      <span class="secure-badge">100%</span>
+      <span class="secure-text">SAFE &<br>SECURE</span>
+      <svg class="secure-check" viewBox="0 0 24 24" fill="none" width="28" height="28">
+        <circle cx="12" cy="12" r="11" fill="#10B981"/>
+        <path d="M7 12l3 3 7-7" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+  </div>
+
+  <!-- Main Content -->
+  <div class="login-main">
+    <!-- Left Panel -->
+    <div class="login-left">
+      <h1 class="brand-title">NeoBank FASTag</h1>
+      <p class="brand-subtitle">Get your FASTag in a few<br>simple steps.</p>
+      <div class="toll-illustration">
+        <img src="/images/fasttag-toll-bg.jpg" alt="Toll Plaza" class="toll-img" />
+      </div>
+      <div class="copyright">© Copyright NeoBank Ltd.</div>
+    </div>
+
+    <!-- Right Panel - Form -->
+    <div class="login-right">
+      <div class="form-card">
+        <h2 class="form-title">Let's Get Started</h2>
+
+        <!-- Info Banner -->
+        <div class="info-banner">
+          <svg viewBox="0 0 24 24" fill="none" width="22" height="22">
+            <rect x="2" y="6" width="20" height="12" rx="3" stroke="#1E40AF" stroke-width="1.5"/>
+            <path d="M7 12h4m2 0h4" stroke="#1E40AF" stroke-width="1.5" stroke-linecap="round"/>
+            <circle cx="12" cy="12" r="1.5" fill="#1E40AF"/>
+          </svg>
+          <span>Please note, keep your <strong>Vehicle RC</strong> document ready to get FASTag.</span>
+        </div>
+
+        <!-- Success message -->
+        <div class="alert alert-success" *ngIf="successMessage">
+          <span class="alert-icon">✓</span>
+          {{ successMessage }}
+        </div>
+
+        <!-- Error message -->
+        <div class="alert alert-error" *ngIf="errorMessage">
+          <span class="alert-icon">!</span>
+          {{ errorMessage }}
+        </div>
+
+        <!-- Step 1: Enter Gmail -->
+        <div class="form-step" *ngIf="!otpSent">
+          <div class="input-row">
+            <div class="input-group input-email">
+              <div class="input-wrapper">
+                <span class="input-prefix">
+                  <svg viewBox="0 0 20 20" fill="#64748B" width="16" height="16">
+                    <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z"/>
+                    <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z"/>
+                  </svg>
+                </span>
+                <input
+                  type="email"
+                  id="gmailId"
+                  [(ngModel)]="gmailId"
+                  placeholder="yourname&#64;gmail.com"
+                  class="form-input"
+                  [class.invalid]="gmailId && !isValidGmail()"
+                  (keydown.enter)="sendOtp()"
+                  autocomplete="email"
+                />
+              </div>
+              <small class="input-hint" *ngIf="gmailId && !isValidGmail()">
+                Please enter a valid Gmail address
+              </small>
+            </div>
+          </div>
+
+          <!-- Consent Checkboxes -->
+          <div class="consent-section">
+            <label class="consent-label">
+              <input type="checkbox" class="consent-check" checked />
+              <span>I consent NeoBank to collect & process my data for availing FASTag (Prepaid Payment Instrument) and related services.</span>
+            </label>
+            <label class="consent-label">
+              <input type="checkbox" class="consent-check" />
+              <span>I hereby consent to processing of my data for sending me personalised offers on other products and services of NeoBank through Call, SMS, WhatsApp, Email or other channels.</span>
+            </label>
+          </div>
+
+          <button
+            class="btn-get-otp"
+            (click)="sendOtp()"
+            [disabled]="loading || !gmailId || !isValidGmail()"
+          >
+            <span class="btn-loader" *ngIf="loading"></span>
+            <span *ngIf="!loading">Get OTP</span>
+            <span *ngIf="loading">Sending...</span>
+            <svg *ngIf="!loading" viewBox="0 0 24 24" fill="none" width="18" height="18" stroke="currentColor" stroke-width="2">
+              <path d="M9 5l7 7-7 7"/>
+            </svg>
+          </button>
+
+          <div class="terms-links">
+            For full details check our <a href="javascript:void(0)">Terms & Conditions</a> and <a href="javascript:void(0)">Privacy Policy</a>
+          </div>
+        </div>
+
+        <!-- Step 2: Enter OTP -->
+        <div class="form-step" *ngIf="otpSent">
+          <div class="otp-sent-info">
+            <span class="sent-to-label">OTP sent to</span>
+            <span class="sent-to-email">{{ gmailId }}</span>
+            <button class="change-email-btn" (click)="resetForm()">Change</button>
+          </div>
+
+          <div class="input-group">
+            <div class="input-wrapper">
+              <span class="input-prefix">
+                <svg viewBox="0 0 20 20" fill="#64748B" width="16" height="16">
+                  <path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"/>
+                </svg>
+              </span>
+              <input
+                type="text"
+                id="otp"
+                [(ngModel)]="otp"
+                placeholder="Enter 6-digit OTP"
+                class="form-input otp-input"
+                maxlength="6"
+                pattern="[0-9]*"
+                (keydown.enter)="verifyOtp()"
+                autocomplete="one-time-code"
+              />
+            </div>
+          </div>
+
+          <button
+            class="btn-get-otp"
+            (click)="verifyOtp()"
+            [disabled]="verifying || !otp || otp.length !== 6"
+          >
+            <span class="btn-loader" *ngIf="verifying"></span>
+            <span *ngIf="!verifying">Verify & Login</span>
+            <span *ngIf="verifying">Verifying...</span>
+            <svg *ngIf="!verifying" viewBox="0 0 24 24" fill="none" width="18" height="18" stroke="currentColor" stroke-width="2">
+              <path d="M9 5l7 7-7 7"/>
+            </svg>
+          </button>
+
+          <div class="resend-section">
+            <span *ngIf="!canResend" class="resend-timer">
+              Resend OTP in {{ resendTimer }}s
+            </span>
+            <button
+              *ngIf="canResend"
+              class="resend-btn"
+              (click)="resendOtp()"
+              [disabled]="loading"
+            >
+              Resend OTP
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Steps to Follow -->
+      <div class="steps-section">
+        <h3 class="steps-title">Steps to Follow</h3>
+        <div class="steps-row">
+          <div class="step-item">
+            <div class="step-icon">
+              <svg viewBox="0 0 24 24" fill="none" width="28" height="28" stroke="#1E40AF" stroke-width="1.5">
+                <rect x="3" y="5" width="18" height="14" rx="2"/>
+                <path d="M7 15h4M13 15h4M7 11h10"/>
+              </svg>
+            </div>
+            <span>Enter Gmail<br>& verify identity</span>
+          </div>
+          <div class="step-item">
+            <div class="step-icon">
+              <svg viewBox="0 0 24 24" fill="none" width="28" height="28" stroke="#1E40AF" stroke-width="1.5">
+                <rect x="5" y="2" width="14" height="20" rx="2"/>
+                <path d="M9 18h6"/>
+                <path d="M9 10l2 2 4-4"/>
+              </svg>
+            </div>
+            <span>Verify with OTP</span>
+          </div>
+          <div class="step-item">
+            <div class="step-icon">
+              <svg viewBox="0 0 24 24" fill="none" width="28" height="28" stroke="#1E40AF" stroke-width="1.5">
+                <path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14c-4 0-7 2-7 4v2h14v-2c0-2-3-4-7-4z"/>
+              </svg>
+            </div>
+            <span>Enter personal &<br>vehicle details</span>
+          </div>
+          <div class="step-item">
+            <div class="step-icon">
+              <svg viewBox="0 0 24 24" fill="none" width="28" height="28" stroke="#1E40AF" stroke-width="1.5">
+                <rect x="2" y="5" width="20" height="14" rx="2"/>
+                <path d="M2 10h20"/>
+                <path d="M6 15h4"/>
+              </svg>
+            </div>
+            <span>Make payment</span>
+          </div>
+          <div class="step-item">
+            <div class="step-icon">
+              <svg viewBox="0 0 24 24" fill="none" width="28" height="28" stroke="#1E40AF" stroke-width="1.5">
+                <circle cx="12" cy="12" r="10"/>
+                <path d="M8 12l3 3 5-5"/>
+              </svg>
+            </div>
+            <span>Get FASTag</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

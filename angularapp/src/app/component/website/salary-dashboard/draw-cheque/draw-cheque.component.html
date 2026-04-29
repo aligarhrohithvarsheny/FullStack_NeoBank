@@ -1,0 +1,425 @@
+<div class="draw-cheque-container">
+  <!-- Header -->
+  <div class="cheque-header">
+    <div class="header-content">
+      <h1 class="header-title">
+        <i class="fas fa-receipt"></i> Draw Cheque
+      </h1>
+      <p class="header-subtitle">Request a cheque withdrawal from your salary account</p>
+    </div>
+  </div>
+
+  <!-- Tab Navigation -->
+  <div class="tab-navigation">
+    <button 
+      class="tab-button" 
+      [class.active]="activeTab === 'form'"
+      (click)="switchTab('form')">
+      <i class="fas fa-plus-circle"></i> New Cheque Request
+    </button>
+    <button 
+      class="tab-button" 
+      [class.active]="activeTab === 'history'"
+      (click)="switchTab('history')">
+      <i class="fas fa-history"></i> Cheque History
+    </button>
+  </div>
+
+  <!-- Main Content -->
+  <div class="cheque-content">
+    <!-- FORM TAB -->
+    <div class="tab-content" [class.active]="activeTab === 'form'">
+      <!-- Account Info Card -->
+      <div class="card account-info-card">
+        <div class="card-content">
+          <div class="info-section">
+            <div class="info-item">
+              <span class="info-label">Account Number</span>
+              <span class="info-value">{{ account?.accountNumber || 'Loading...' }}</span>
+            </div>
+            <div class="info-divider"></div>
+            <div class="info-item">
+              <span class="info-label">Available Balance</span>
+              <span class="info-value balance">
+                {{ formatAmount(availableBalance) }}
+              </span>
+            </div>
+            <div class="info-divider"></div>
+            <div class="info-item">
+              <span class="info-label">Cheque Leaves</span>
+              <span class="info-value cheque-leaves-info">
+                <span class="leaves-available">{{ availableLeaves.length }}</span> / {{ totalAllocated }} available
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Messages -->
+      <div class="message-area" *ngIf="successMessage || errorMessage">
+        <div class="message" [class.success]="successMessage" [class.error]="errorMessage">
+          <i class="fas" [ngClass]="successMessage ? 'fa-check-circle' : 'fa-exclamation-circle'"></i>
+          <span>{{ successMessage || errorMessage }}</span>
+        </div>
+      </div>
+
+      <!-- Cheque Draw Form -->
+      <div class="card form-card">
+        <div class="card-header">
+          <h2>
+            <i class="fas fa-file-contract"></i> Cheque Details
+          </h2>
+        </div>
+
+        <form class="cheque-form" (input)="onFormChange()" (change)="onFormChange()">
+          <div class="form-grid">
+            <!-- Serial Number Dropdown -->
+            <div class="form-group">
+              <label for="serialNumber" class="form-label">
+                <i class="fas fa-barcode"></i> Cheque Leaf Number
+                <span class="required">*</span>
+              </label>
+              <select
+                id="serialNumber"
+                class="form-input"
+                [(ngModel)]="serialNumber"
+                name="serialNumber"
+                (ngModelChange)="onFormChange()"
+                [disabled]="isLoadingLeaves"
+              >
+                <option value="" disabled>{{ isLoadingLeaves ? 'Loading cheque leaves...' : 'Select a cheque leaf' }}</option>
+                <option *ngFor="let leaf of availableLeaves" [value]="leaf.leafNumber">
+                  {{ leaf.leafNumber }}
+                </option>
+              </select>
+              <small class="form-hint" *ngIf="!isLoadingLeaves">
+                {{ availableLeaves.length }} of {{ totalAllocated }} leaves available ({{ totalUsed }} used)
+              </small>
+              <small class="form-hint" *ngIf="isLoadingLeaves">
+                <i class="fas fa-spinner fa-spin"></i> Loading your cheque book...
+              </small>
+              <small class="form-hint warning-hint" *ngIf="!isLoadingLeaves && availableLeaves.length === 0">
+                <i class="fas fa-exclamation-triangle"></i> No cheque leaves available. All 30 leaves have been used.
+              </small>
+            </div>
+
+            <!-- Cheque Date -->
+            <div class="form-group">
+              <label for="chequeDate" class="form-label">
+                <i class="fas fa-calendar-alt"></i> Cheque Date
+                <span class="required">*</span>
+              </label>
+              <input
+                type="date"
+                id="chequeDate"
+                class="form-input"
+                [(ngModel)]="chequeDate"
+                name="chequeDate"
+                [max]="getMaxDate()"
+                (ngModelChange)="onFormChange()"
+              />
+              <small class="form-hint">Date to be written on cheque (max 6 months old)</small>
+            </div>
+
+            <!-- Amount -->
+            <div class="form-group">
+              <label for="amount" class="form-label">
+                <i class="fas fa-rupee-sign"></i> Amount
+                <span class="required">*</span>
+              </label>
+              <div class="input-wrapper">
+                <span class="currency-symbol">₹</span>
+                <input
+                  type="number"
+                  id="amount"
+                  class="form-input with-prefix"
+                  [(ngModel)]="amount"
+                  name="amount"
+                  placeholder="0.00"
+                  min="1"
+                  [max]="availableBalance"
+                  step="1"
+                  (ngModelChange)="onFormChange()"
+                />
+              </div>
+              <small class="form-hint" *ngIf="amount && amount > 0">
+                Balance after: <strong>{{ formatAmount(availableBalance - amount) }}</strong>
+              </small>
+            </div>
+
+            <!-- Payee Name -->
+            <div class="form-group">
+              <label for="payeeName" class="form-label">
+                <i class="fas fa-user"></i> Payee Name
+                <span class="required">*</span>
+              </label>
+              <input
+                type="text"
+                id="payeeName"
+                class="form-input"
+                [(ngModel)]="payeeName"
+                name="payeeName"
+                placeholder="Name on cheque"
+                maxlength="100"
+                (ngModelChange)="onFormChange()"
+              />
+              <small class="form-hint">Who should the cheque be payable to?</small>
+            </div>
+
+            <!-- Remarks (Full Width) -->
+            <div class="form-group full-width">
+              <label for="remarks" class="form-label">
+                <i class="fas fa-sticky-note"></i> Remarks (Optional)
+              </label>
+              <textarea
+                id="remarks"
+                class="form-input textarea"
+                [(ngModel)]="remarks"
+                name="remarks"
+                placeholder="Any additional notes or remarks..."
+                maxlength="500"
+                rows="3"
+              ></textarea>
+              <small class="form-hint">
+                {{ remarks.length }} / 500 characters
+              </small>
+            </div>
+          </div>
+
+          <!-- Form Actions -->
+          <div class="form-actions">
+            <button
+              type="button"
+              class="btn btn-primary"
+              [disabled]="!formValid || isSubmitting"
+              (click)="submitChequeRequest()"
+            >
+              <span *ngIf="!isSubmitting">
+                <i class="fas fa-paper-plane"></i> Submit Request
+              </span>
+              <span *ngIf="isSubmitting">
+                <i class="fas fa-spinner fa-spin"></i> Submitting...
+              </span>
+            </button>
+            <button
+              type="button"
+              class="btn btn-secondary"
+              (click)="resetForm()"
+            >
+              <i class="fas fa-redo"></i> Reset
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Help Section -->
+      <div class="card help-card">
+        <div class="card-header">
+          <h3>
+            <i class="fas fa-lightbulb"></i> How to Use
+          </h3>
+        </div>
+        <div class="help-content">
+          <ol>
+            <li>Select a <strong>cheque leaf number</strong> from your allocated 30 cheque leaves</li>
+            <li>Set the <strong>date</strong> to be printed on the cheque</li>
+            <li>Enter the <strong>withdrawal amount</strong> (cannot exceed your balance)</li>
+            <li>Enter the <strong>payee name</strong> exactly as it should appear on cheque</li>
+            <li>Click <strong>Submit Request</strong> to send for admin approval</li>
+            <li>Once used, a cheque leaf is removed from the dropdown</li>
+            <li>Cancelled cheques return the leaf back to available</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+
+    <!-- HISTORY TAB -->
+    <div class="tab-content" [class.active]="activeTab === 'history'">
+      <!-- Filter Controls -->
+      <div class="card filter-card">
+        <div class="filter-controls">
+          <label class="filter-label">
+            <i class="fas fa-filter"></i> Filter by Status:
+          </label>
+          <select class="filter-select" [(ngModel)]="historyFilter">
+            <option value="ALL">All Cheques</option>
+            <option value="PENDING">Pending</option>
+            <option value="APPROVED">Approved</option>
+            <option value="COMPLETED">Completed</option>
+            <option value="REJECTED">Rejected</option>
+            <option value="CANCELLED">Cancelled</option>
+            <option value="CLEARED">Cleared</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Loading State -->
+      <div class="loading-state" *ngIf="isLoadingHistory">
+        <div class="spinner"></div>
+        <p>Loading cheque history...</p>
+      </div>
+
+      <!-- Cheque History Table -->
+      <div class="card history-card" *ngIf="!isLoadingHistory && getFilteredHistory().length > 0">
+        <div class="card-header">
+          <h3>
+            <i class="fas fa-list"></i> Your Cheques
+            <span class="badge">{{ getFilteredHistory().length }}</span>
+          </h3>
+        </div>
+
+        <div class="table-responsive">
+          <table class="history-table">
+            <thead>
+              <tr>
+                <th>Cheque #</th>
+                <th>Date</th>
+                <th>Payee</th>
+                <th>Amount</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <ng-container *ngFor="let cheque of getFilteredHistory()">
+              <tr class="history-row">
+                <td class="cheque-number">
+                  <strong>{{ cheque.chequeNumber }}</strong>
+                </td>
+                <td>{{ formatDate(cheque.chequeDate) }}</td>
+                <td class="payee-name">
+                  <ng-container *ngIf="editingChequeId !== cheque.id">{{ cheque.payeeName }}</ng-container>
+                  <input
+                    *ngIf="editingChequeId === cheque.id"
+                    type="text"
+                    class="edit-inline-input"
+                    [(ngModel)]="editPayeeName"
+                    placeholder="Payee Name"
+                    maxlength="100"
+                  />
+                </td>
+                <td class="amount">
+                  <ng-container *ngIf="editingChequeId !== cheque.id">
+                    <strong>{{ formatAmount(cheque.amount) }}</strong>
+                  </ng-container>
+                  <div *ngIf="editingChequeId === cheque.id" class="edit-amount-wrapper">
+                    <span class="edit-currency">₹</span>
+                    <input
+                      type="number"
+                      class="edit-inline-input edit-amount-input"
+                      [(ngModel)]="editAmount"
+                      min="1"
+                      [max]="availableBalance"
+                      step="1"
+                      placeholder="Amount"
+                    />
+                  </div>
+                </td>
+                <td>
+                  <span 
+                    class="status-badge"
+                    [style.backgroundColor]="getStatusColor(cheque.status)"
+                  >
+                    {{ getStatusText(cheque.status) }}
+                  </span>
+                </td>
+                <td class="actions">
+                  <ng-container *ngIf="cheque.status === 'PENDING' && editingChequeId !== cheque.id">
+                    <button
+                      class="btn-icon btn-edit"
+                      title="Edit Cheque Details"
+                      (click)="startEditCheque(cheque)"
+                    >
+                      <i class="fas fa-edit"></i>
+                    </button>
+                    <button
+                      class="btn-icon btn-cancel"
+                      title="Cancel Request"
+                      (click)="cancelCheque(cheque.id)"
+                    >
+                      <i class="fas fa-times"></i>
+                    </button>
+                  </ng-container>
+                  <ng-container *ngIf="cheque.status === 'PENDING' && editingChequeId === cheque.id">
+                    <button
+                      class="btn-icon btn-save"
+                      title="Save Changes"
+                      [disabled]="isEditing"
+                      (click)="saveEditCheque()"
+                    >
+                      <i class="fas" [ngClass]="isEditing ? 'fa-spinner fa-spin' : 'fa-check'"></i>
+                    </button>
+                    <button
+                      class="btn-icon btn-cancel-edit"
+                      title="Cancel Edit"
+                      [disabled]="isEditing"
+                      (click)="cancelEditCheque()"
+                    >
+                      <i class="fas fa-times"></i>
+                    </button>
+                  </ng-container>
+                  <button
+                    *ngIf="(cheque.status === 'APPROVED' || cheque.status === 'COMPLETED' || cheque.status === 'CLEARED') && !cheque.chequeDownloaded"
+                    class="btn-icon btn-download"
+                    title="Download Cheque"
+                    (click)="downloadCheque(cheque)"
+                  >
+                    <i class="fas fa-download"></i> Download
+                  </button>
+                  <span
+                    *ngIf="(cheque.status === 'APPROVED' || cheque.status === 'COMPLETED' || cheque.status === 'CLEARED') && cheque.chequeDownloaded"
+                    class="downloaded-badge"
+                  >
+                    <i class="fas fa-check-circle"></i> Downloaded
+                  </span>
+                  <span *ngIf="cheque.status === 'REJECTED' || cheque.status === 'CANCELLED'" class="action-empty">-</span>
+                </td>
+              </tr>
+              <!-- Transaction Details Row -->
+              <tr *ngIf="cheque.transactionReference" class="transaction-details-row">
+                <td colspan="6">
+                  <div class="txn-details-container">
+                    <div class="txn-badge">
+                      <i class="fas fa-exchange-alt"></i> Fund Transfer
+                    </div>
+                    <div class="txn-details-grid">
+                      <div class="txn-detail-item">
+                        <span class="txn-label">Transaction Ref</span>
+                        <span class="txn-value txn-ref-code">{{ cheque.transactionReference }}</span>
+                      </div>
+                      <div class="txn-detail-item" *ngIf="cheque.debitedFromAccount">
+                        <span class="txn-label">Debited From</span>
+                        <span class="txn-value">{{ cheque.debitedFromAccount }}</span>
+                      </div>
+                      <div class="txn-detail-item" *ngIf="cheque.creditedToAccount">
+                        <span class="txn-label">Credited To</span>
+                        <span class="txn-value">{{ cheque.creditedToAccount }}</span>
+                      </div>
+                      <div class="txn-detail-item" *ngIf="cheque.payeeAccountType">
+                        <span class="txn-label">Account Type</span>
+                        <span class="txn-value">{{ cheque.payeeAccountType }}</span>
+                      </div>
+                    </div>
+                  </div>
+                </td>
+              </tr>
+              </ng-container>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Empty State -->
+      <div class="empty-state" *ngIf="!isLoadingHistory && getFilteredHistory().length === 0">
+        <div class="empty-icon">
+          <i class="fas fa-inbox"></i>
+        </div>
+        <h3>No Cheque Requests</h3>
+        <p>You haven't requested any cheques yet.</p>
+        <button class="btn btn-primary" (click)="switchTab('form')">
+          <i class="fas fa-plus"></i> Request a Cheque
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

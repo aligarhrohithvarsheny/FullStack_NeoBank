@@ -1,0 +1,700 @@
+<div class="neo-landing">
+
+  <!-- Full Screen Animated Logo Overlay -->
+  <div *ngIf="showAnimatedLogo" class="fullscreen-logo-overlay" [class.animate-upward]="logoAnimationComplete">
+    <div class="animated-logo-container">
+      <div class="animated-logo">
+        <div class="logo-icon-wrap">
+          <img src="/favicon.ico" alt="NeoBank Logo" class="logo-image">
+        </div>
+        <div class="logo-text">
+          <span class="bank-name">NeoBank</span>
+          <span class="tagline">Relationship beyond banking</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== NAVBAR ========== -->
+  <nav class="neo-navbar" [class.scrolled]="isScrolled">
+    <div class="nav-container">
+      <div class="nav-brand" (click)="scrollToTop()">
+        <img src="/favicon.ico" alt="NeoBank" class="nav-logo-img">
+        <span class="nav-brand-text">NeoBank</span>
+      </div>
+
+      <div class="nav-links">
+        <div class="nav-item dropdown">
+          <a href="#" class="nav-link" (click)="togglePersonalDropdown($event)">Personal <span class="chevron">▾</span></a>
+          <div class="dropdown-menu" [class.show]="showPersonalDropdown">
+            <a href="#" class="dropdown-item" (click)="goTo('website/createaccount', $event)">Create Account</a>
+            <a href="#" class="dropdown-item" (click)="goTo('website/user', $event)">User Login</a>
+            <a href="#" class="dropdown-item" (click)="goTo('website/user', $event)">Internet Banking</a>
+            <a href="#" class="dropdown-item" (click)="goTo('website/fasttag-login', $event)">FASTag Login</a>
+          </div>
+        </div>
+        <div class="nav-item dropdown">
+          <a href="#" class="nav-link" (click)="toggleBusinessDropdown($event)">Business <span class="chevron">▾</span></a>
+          <div class="dropdown-menu" [class.show]="showBusinessDropdown">
+            <a href="#" class="dropdown-item" (click)="goTo('admin/login', $event)">Corporate Login</a>
+            <a href="#" class="dropdown-item" (click)="goTo('website/merchant-login', $event)">Merchant Login</a>
+            <a href="#" class="dropdown-item" (click)="goTo('website/agent-login', $event)">Agent Login</a>
+            <a href="#" class="dropdown-item" (click)="goTo('website/pg-login', $event)">Payment Gateway Login</a>
+          </div>
+        </div>
+        <div class="nav-item dropdown">
+          <a href="#" class="nav-link" (click)="toggleInvestInsureDropdown($event)">Invest & Insure <span class="chevron">▾</span></a>
+          <div class="dropdown-menu" [class.show]="showInvestInsureDropdown">
+            <a href="#" class="dropdown-item" (click)="goTo('website/insurance-login', $event)">Insurance Login</a>
+            <a href="#" class="dropdown-item" (click)="goTo('website/createaccount', $event)">Insurance Signup</a>
+            <a href="#" class="dropdown-item" (click)="goTo('website/insurance', $event)">Apply Insurance</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="nav-actions">
+<button class="btn-ghost" routerLink="/website/user">Login</button>
+        <button class="btn-fasttag" (click)="goTo('website/fasttag-login', $event)">FASTag Login</button>
+        <button class="btn-merchant" (click)="goTo('website/merchant-login', $event)">Merchant Login</button>
+        <button class="btn-glow" (click)="goTo('website/createaccount', $event)">Open Account</button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ========== 1. HERO SECTION ========== -->
+  <section class="hero-section">
+    <div class="hero-bg-particles">
+      <div class="particle p1"></div>
+      <div class="particle p2"></div>
+      <div class="particle p3"></div>
+      <div class="particle p4"></div>
+      <div class="particle p5"></div>
+    </div>
+
+    <div class="hero-container">
+      <div class="hero-content" [class.visible]="heroVisible">
+        <span class="hero-badge">Next-Gen Digital Banking</span>
+        <h1 class="hero-title">Banking Made<br><span class="gradient-text">Smarter</span> with NeoBank</h1>
+        <p class="hero-subtitle">Instant accounts, FASTag, insurance, digital loans — all in one place. Experience the future of banking today.</p>
+        <div class="hero-buttons">
+          <button class="btn-glow large" (click)="goTo('website/createaccount', $event)">Open Account</button>
+          <button class="btn-outline large" routerLink="/website/user">
+  Login to Dashboard
+</button>
+          <button class="btn-fasttag-hero" (click)="goTo('website/fasttag-login', $event)">
+            🏷️ FASTag Login
+          </button>
+          <button class="btn-merchant-hero" (click)="goTo('website/merchant-login', $event)">
+            🔊 Merchant Login
+          </button>
+          <button class="btn-agent-hero" (click)="goTo('website/agent-login', $event)">
+            🧑‍💼 Agent Login
+          </button>
+          <button class="btn-pg-hero" (click)="goTo('website/pg-login', $event)">
+            ⚡ Payment Gateway
+          </button>
+        </div>
+        <div class="hero-stats">
+          <div class="hero-stat">
+            <span class="stat-num">1M+</span>
+            <span class="stat-lbl">Active Users</span>
+          </div>
+          <div class="hero-stat-divider"></div>
+          <div class="hero-stat">
+            <span class="stat-num">₹50K Cr</span>
+            <span class="stat-lbl">Deposits</span>
+          </div>
+          <div class="hero-stat-divider"></div>
+          <div class="hero-stat">
+            <span class="stat-num">99.9%</span>
+            <span class="stat-lbl">Uptime</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="hero-visual" [class.visible]="heroVisible">
+        <div class="hero-phone-mockup">
+          <div class="phone-screen">
+            <div class="phone-header">
+              <span class="phone-time">9:41</span>
+              <span class="phone-app-name">NeoBank</span>
+            </div>
+            <div class="phone-balance">
+              <span class="balance-label">Total Balance</span>
+              <span class="balance-amount">₹2,45,890.00</span>
+            </div>
+            <div class="phone-actions">
+              <div class="phone-action-btn"><small>Send</small></div>
+              <div class="phone-action-btn"><small>Receive</small></div>
+              <div class="phone-action-btn"><small>Cards</small></div>
+              <div class="phone-action-btn"><small>Analytics</small></div>
+            </div>
+            <div class="phone-transactions">
+              <div class="phone-txn"><div><strong>Amazon</strong><small>Today</small></div><span class="txn-amount negative">-₹1,299</span></div>
+              <div class="phone-txn"><div><strong>Salary Credit</strong><small>Yesterday</small></div><span class="txn-amount positive">+₹85,000</span></div>
+              <div class="phone-txn"><div><strong>Electricity Bill</strong><small>2 days ago</small></div><span class="txn-amount negative">-₹2,450</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Floating cards -->
+        <div class="floating-card fc-1">
+          <div><strong>Digital Card</strong><small>Ready to use</small></div>
+        </div>
+        <div class="floating-card fc-2">
+          <div><strong>Instant Transfer</strong><small>0 sec processing</small></div>
+        </div>
+        <div class="floating-card fc-3">
+          <div><strong>Secured</strong><small>256-bit encrypted</small></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== 2. ZIGZAG: INSTANT ACCOUNT OPENING ========== -->
+  <section class="zigzag-section" id="accounts" data-anim="zigzag1Visible">
+    <div class="zigzag-container" [class.visible]="zigzag1Visible">
+      <div class="zigzag-visual">
+        <div class="zigzag-illustration">
+          <div class="zz-card account-card">
+            <div class="zz-card-header">
+              <h4>Account Opening</h4>
+            </div>
+            <div class="account-types">
+              <div class="account-type-item active">Savings</div>
+              <div class="account-type-item">Salary</div>
+              <div class="account-type-item">Current</div>
+            </div>
+            <div class="zz-progress">
+              <div class="progress-bar"><div class="progress-fill" style="width: 75%"></div></div>
+              <span class="progress-text">KYC 75% Complete</span>
+            </div>
+            <button class="zz-mini-btn">Complete Verification →</button>
+          </div>
+        </div>
+      </div>
+      <div class="zigzag-content">
+        <span class="section-badge">Accounts</span>
+        <h2 class="section-title">Instant Account<br><span class="gradient-text">Opening</span></h2>
+        <p class="section-desc">Open your bank account in minutes with our seamless digital KYC process. No paperwork, no branch visits.</p>
+        <div class="feature-list">
+          <div class="feature-list-item"><span class="check-icon">✓</span> Savings Account with high interest rates</div>
+          <div class="feature-list-item"><span class="check-icon">✓</span> Salary Account with premium perks</div>
+          <div class="feature-list-item"><span class="check-icon">✓</span> Current Account for businesses</div>
+          <div class="feature-list-item"><span class="check-icon">✓</span> Video KYC — Complete verification from home</div>
+        </div>
+        <button class="btn-glow" (click)="goTo('website/createaccount', $event)">Open Account Now</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== 3. ZIGZAG: SMART PAYMENTS ========== -->
+  <section class="zigzag-section zigzag-reverse" data-anim="zigzag2Visible">
+    <div class="zigzag-container" [class.visible]="zigzag2Visible">
+      <div class="zigzag-content">
+        <span class="section-badge">Payments</span>
+        <h2 class="section-title">Smart<br><span class="gradient-text">Payments</span></h2>
+        <p class="section-desc">Send and receive money instantly. Pay bills, recharge FASTag, scan QR codes — all from one app.</p>
+        <div class="feature-list">
+          <div class="feature-list-item"><span class="check-icon">✓</span> UPI Transfer — Instant & Free</div>
+          <div class="feature-list-item"><span class="check-icon">✓</span> Bill Payments — Electricity, Water, Gas</div>
+          <div class="feature-list-item"><span class="check-icon">✓</span> FASTag Recharge — One-tap top up</div>
+          <div class="feature-list-item"><span class="check-icon">✓</span> QR Payments — Scan & Pay anywhere</div>
+        </div>
+        <button class="btn-glow" (click)="goTo('website/user', $event)">Start Paying</button>
+      </div>
+      <div class="zigzag-visual">
+        <div class="zigzag-illustration">
+          <div class="zz-card payment-card">
+            <div class="zz-card-header">
+              <h4>Send Money</h4>
+            </div>
+            <div class="payment-amount-display">
+              <span class="pay-currency">₹</span>
+              <span class="pay-amount">5,000</span>
+            </div>
+            <div class="payment-methods">
+              <div class="pay-method active">UPI</div>
+              <div class="pay-method">NEFT</div>
+              <div class="pay-method">IMPS</div>
+            </div>
+            <div class="pay-status">
+              <span class="status-dot success"></span>
+              <span>Transfer Successful!</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== 4. ZIGZAG: LOANS & CREDIT ========== -->
+  <section class="zigzag-section" data-anim="zigzag3Visible">
+    <div class="zigzag-container" [class.visible]="zigzag3Visible">
+      <div class="zigzag-visual">
+        <div class="zigzag-illustration">
+          <div class="zz-card loan-card">
+            <div class="zz-card-header">
+              <h4>Loan Dashboard</h4>
+            </div>
+            <div class="loan-meter">
+              <div class="loan-circle">
+                <svg viewBox="0 0 120 120">
+                  <circle cx="60" cy="60" r="52" fill="none" stroke="#E2E8F0" stroke-width="8"/>
+                  <circle cx="60" cy="60" r="52" fill="none" stroke="url(#loanGrad)" stroke-width="8" stroke-dasharray="240 327" stroke-linecap="round" transform="rotate(-90 60 60)"/>
+                  <defs><linearGradient id="loanGrad"><stop offset="0%" stop-color="#0ea5e9"/><stop offset="100%" stop-color="#10b981"/></linearGradient></defs>
+                </svg>
+                <div class="loan-circle-text">
+                  <strong>₹5L</strong>
+                  <small>Approved</small>
+                </div>
+              </div>
+            </div>
+            <div class="loan-stats">
+              <div class="loan-stat"><span>EMI</span><strong>₹12,500/mo</strong></div>
+              <div class="loan-stat"><span>Rate</span><strong>10.5% p.a.</strong></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="zigzag-content">
+        <span class="section-badge">Loans</span>
+        <h2 class="section-title">Loans &<br><span class="gradient-text">Credit</span></h2>
+        <p class="section-desc">Get instant loans with minimal documentation. Track your EMIs, check eligibility, and manage credit all in one place.</p>
+        <div class="feature-list">
+          <div class="feature-list-item"><span class="check-icon">✓</span> Instant Personal Loan up to ₹10L</div>
+          <div class="feature-list-item"><span class="check-icon">✓</span> Credit Card with cashback rewards</div>
+          <div class="feature-list-item"><span class="check-icon">✓</span> EMI Calculator — Plan your payments</div>
+          <div class="feature-list-item"><span class="check-icon">✓</span> Real-time Loan Approval Tracking</div>
+        </div>
+        <button class="btn-glow" (click)="goTo('website/user', $event)">Apply for Loan</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== 5. ZIGZAG: INSURANCE ========== -->
+  <section class="zigzag-section zigzag-reverse" data-anim="zigzag4Visible">
+    <div class="zigzag-container" [class.visible]="zigzag4Visible">
+      <div class="zigzag-content">
+        <span class="section-badge">Insurance</span>
+        <h2 class="section-title">Insurance &<br><span class="gradient-text">Protection</span></h2>
+        <p class="section-desc">Protect what matters most. Compare policies, buy insurance, and track claims — everything digitally.</p>
+        <div class="feature-list">
+          <div class="feature-list-item"><span class="check-icon">✓</span> Health Insurance — Cashless hospitalisation</div>
+          <div class="feature-list-item"><span class="check-icon">✓</span> Motor Insurance — Instant policy</div>
+          <div class="feature-list-item"><span class="check-icon">✓</span> Claim Tracking — Real-time updates</div>
+          <div class="feature-list-item"><span class="check-icon">✓</span> Policy Dashboard — All in one view</div>
+        </div>
+        <button class="btn-glow" (click)="goTo('website/insurance', $event)">Explore Insurance</button>
+      </div>
+      <div class="zigzag-visual">
+        <div class="zigzag-illustration">
+          <div class="zz-card insurance-card">
+            <div class="zz-card-header">
+              <h4>Insurance Hub</h4>
+            </div>
+            <div class="insurance-policies">
+              <div class="policy-item">
+                <div><strong>Health Cover</strong><small>₹10L Cover</small></div>
+                <span class="policy-status active-status">Active</span>
+              </div>
+              <div class="policy-item">
+                <div><strong>Motor Insurance</strong><small>Comprehensive</small></div>
+                <span class="policy-status active-status">Active</span>
+              </div>
+              <div class="policy-item">
+                <div><strong>Life Cover</strong><small>₹1Cr Term</small></div>
+                <span class="policy-status pending-status">Pending</span>
+              </div>
+            </div>
+            <div class="floating-shield"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== 6. FEATURE CARDS ========== -->
+  <section class="cards-section" data-anim="cardsVisible">
+    <div class="cards-container" [class.visible]="cardsVisible">
+      <div class="section-header-center">
+        <span class="section-badge">Why NeoBank</span>
+        <h2 class="section-title centered">Powerful Features for<br><span class="gradient-text">Modern Banking</span></h2>
+      </div>
+      <div class="feature-cards-grid">
+        <div class="neo-feature-card">
+          <div class="nfc-glow"></div>
+          <h3>FASTag Management</h3>
+          <p>Manage your FASTag, auto-recharge, track toll history, and get real-time balance updates.</p>
+        </div>
+        <div class="neo-feature-card">
+          <div class="nfc-glow"></div>
+          <h3>AI Fraud Detection</h3>
+          <p>Advanced machine learning algorithms detect and prevent fraudulent transactions in real-time.</p>
+        </div>
+        <div class="neo-feature-card">
+          <div class="nfc-glow"></div>
+          <h3>Transaction Analytics</h3>
+          <p>Detailed spending insights, category-wise breakdown, and smart budget recommendations.</p>
+        </div>
+        <div class="neo-feature-card">
+          <div class="nfc-glow"></div>
+          <h3>Secure Payments</h3>
+          <p>256-bit encryption, biometric authentication, and multi-factor verification for every transaction.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== 6.5 EZYVAULT PAY — PAYMENT GATEWAY ========== -->
+  <section class="pg-showcase-section" data-anim="paymentGatewayVisible">
+    <div class="pg-showcase-container" [class.visible]="paymentGatewayVisible">
+      <div class="pg-showcase-bg">
+        <div class="pg-grid-line pg-gl1"></div>
+        <div class="pg-grid-line pg-gl2"></div>
+        <div class="pg-grid-line pg-gl3"></div>
+        <div class="pg-orb pg-orb1"></div>
+        <div class="pg-orb pg-orb2"></div>
+      </div>
+
+      <div class="section-header-center">
+        <span class="section-badge pg-badge">⚡ EzyVault Pay</span>
+        <h2 class="section-title centered">Accept Payments<br><span class="gradient-text">Like Never Before</span></h2>
+        <p class="section-desc centered">Production-grade payment gateway with HMAC‑SHA256 signatures, AI fraud detection, and instant settlements.</p>
+      </div>
+
+      <div class="pg-stats-row">
+        <div class="pg-stat-card">
+          <span class="pg-stat-value">99.99%</span>
+          <span class="pg-stat-label">Uptime SLA</span>
+        </div>
+        <div class="pg-stat-card">
+          <span class="pg-stat-value">&lt;200ms</span>
+          <span class="pg-stat-label">Avg Latency</span>
+        </div>
+        <div class="pg-stat-card">
+          <span class="pg-stat-value">256-bit</span>
+          <span class="pg-stat-label">Encryption</span>
+        </div>
+        <div class="pg-stat-card">
+          <span class="pg-stat-value">2.0%</span>
+          <span class="pg-stat-label">Platform Fee</span>
+        </div>
+      </div>
+
+      <div class="pg-flow-visual">
+        <div class="pg-flow-step">
+          <div class="pg-flow-icon">🛒</div>
+          <div class="pg-flow-label">Create Order</div>
+          <div class="pg-flow-sub">POST /api/payment-gateway/orders/create</div>
+        </div>
+        <div class="pg-flow-arrow">→</div>
+        <div class="pg-flow-step">
+          <div class="pg-flow-icon">🔒</div>
+          <div class="pg-flow-label">Lock & Verify</div>
+          <div class="pg-flow-sub">Fraud check + Balance lock</div>
+        </div>
+        <div class="pg-flow-arrow">→</div>
+        <div class="pg-flow-step">
+          <div class="pg-flow-icon">⚡</div>
+          <div class="pg-flow-label">Process Payment</div>
+          <div class="pg-flow-sub">HMAC-SHA256 signature</div>
+        </div>
+        <div class="pg-flow-arrow">→</div>
+        <div class="pg-flow-step">
+          <div class="pg-flow-icon">✅</div>
+          <div class="pg-flow-label">Settlement</div>
+          <div class="pg-flow-sub">Instant merchant credit</div>
+        </div>
+      </div>
+
+      <div class="pg-code-preview">
+        <div class="pg-code-header">
+          <span class="pg-code-dot red"></span>
+          <span class="pg-code-dot yellow"></span>
+          <span class="pg-code-dot green"></span>
+          <span class="pg-code-title">integration.js</span>
+        </div>
+        <pre class="pg-code-body"><code><span class="pg-kw">const</span> order = <span class="pg-kw">await</span> <span class="pg-fn">fetch</span>(<span class="pg-str">'/api/payment-gateway/orders/create'</span>, &#123;
+  method: <span class="pg-str">'POST'</span>,
+  body: JSON.<span class="pg-fn">stringify</span>(&#123;
+    merchantId: <span class="pg-str">'PGMER-XXXXX'</span>,
+    amount: <span class="pg-num">1500.00</span>,
+    currency: <span class="pg-str">'INR'</span>,
+    customerEmail: <span class="pg-str">'user&#64;example.com'</span>
+  &#125;)
+&#125;);
+<span class="pg-cm">// → &#123; orderId: "ORD-20250615-ABCD", status: "CREATED" &#125;</span></code></pre>
+      </div>
+
+      <div class="pg-features-grid">
+        <div class="pg-feat-card">
+          <div class="pg-feat-icon">🛡️</div>
+          <h4>AI Fraud Detection</h4>
+          <p>Real-time risk scoring with velocity checks, amount thresholds, and behavioral analysis.</p>
+        </div>
+        <div class="pg-feat-card">
+          <div class="pg-feat-icon">🔑</div>
+          <h4>API Key Management</h4>
+          <p>Secure API key & secret generation with key rotation and webhook configuration.</p>
+        </div>
+        <div class="pg-feat-card">
+          <div class="pg-feat-icon">💸</div>
+          <h4>Instant Refunds</h4>
+          <p>Full & partial refunds with automatic balance reconciliation and status tracking.</p>
+        </div>
+        <div class="pg-feat-card">
+          <div class="pg-feat-icon">📊</div>
+          <h4>Rich Analytics</h4>
+          <p>Transaction volume, success rates, fee breakdown, and merchant performance dashboards.</p>
+        </div>
+      </div>
+
+      <div class="pg-cta-row">
+        <button class="btn-glow large pg-cta-btn" (click)="goTo('website/pg-login', $event)">
+          ⚡ Launch EzyVault Pay Dashboard
+        </button>
+        <span class="pg-cta-sub">No setup fee · Go live in minutes · Full API docs included</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== 7. DASHBOARD PREVIEW ========== -->
+  <section class="dashboard-section" data-anim="dashboardVisible">
+    <div class="dashboard-container" [class.visible]="dashboardVisible">
+      <div class="section-header-center">
+        <span class="section-badge">Dashboard</span>
+        <h2 class="section-title centered">Your Banking<br><span class="gradient-text">Command Center</span></h2>
+        <p class="section-desc centered">Everything you need in one beautiful dashboard</p>
+      </div>
+      <div class="dashboard-mockup">
+        <div class="dash-topbar">
+          <div class="dash-topbar-left">
+            <span class="dash-logo">NeoBank</span>
+            <span class="dash-nav-item">Overview</span>
+            <span class="dash-nav-item active">Accounts</span>
+            <span class="dash-nav-item">Cards</span>
+            <span class="dash-nav-item">Loans</span>
+          </div>
+          <div class="dash-topbar-right">
+            <span class="dash-notif">Alerts</span>
+            <span class="dash-avatar">Profile</span>
+          </div>
+        </div>
+        <div class="dash-body">
+          <div class="dash-col-main">
+            <div class="dash-card balance-card">
+              <span class="dash-card-label">Total Balance</span>
+              <span class="dash-card-value">₹4,85,230.00</span>
+              <div class="dash-sparkline">
+                <div class="sparkline-bar" style="height:40%"></div>
+                <div class="sparkline-bar" style="height:65%"></div>
+                <div class="sparkline-bar" style="height:45%"></div>
+                <div class="sparkline-bar" style="height:80%"></div>
+                <div class="sparkline-bar" style="height:55%"></div>
+                <div class="sparkline-bar" style="height:90%"></div>
+                <div class="sparkline-bar" style="height:70%"></div>
+              </div>
+            </div>
+            <div class="dash-card">
+              <span class="dash-card-label">Recent Transactions</span>
+              <div class="dash-txn"><div><strong>Amazon</strong><small>Today 2:30 PM</small></div><span class="neg">-₹2,499</span></div>
+              <div class="dash-txn"><div><strong>Salary</strong><small>1 Mar</small></div><span class="pos">+₹85,000</span></div>
+              <div class="dash-txn"><div><strong>Swiggy</strong><small>28 Feb</small></div><span class="neg">-₹450</span></div>
+              <div class="dash-txn"><div><strong>Electricity</strong><small>27 Feb</small></div><span class="neg">-₹3,200</span></div>
+            </div>
+          </div>
+          <div class="dash-col-side">
+            <div class="dash-card debit-card-preview">
+              <div class="mini-debit-card">
+                <span class="mdc-bank">NeoBank</span>
+                <span class="mdc-number">•••• •••• •••• 4589</span>
+                <div class="mdc-bottom"><span class="mdc-name">JOHN DOE</span><span class="mdc-exp">09/28</span></div>
+              </div>
+            </div>
+            <div class="dash-card">
+              <span class="dash-card-label">Loan Status</span>
+              <div class="dash-loan-progress">
+                <div class="dash-loan-bar"><div class="dash-loan-fill" style="width:62%"></div></div>
+                <div class="dash-loan-info"><span>₹3.1L / ₹5L paid</span><span>62%</span></div>
+              </div>
+            </div>
+            <div class="dash-card">
+              <span class="dash-card-label">Insurance</span>
+              <div class="dash-insurance-item"><strong>Health</strong><span class="ins-active">Active</span></div>
+              <div class="dash-insurance-item"><strong>Motor</strong><span class="ins-active">Active</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== 8. SECURITY SECTION ========== -->
+  <section class="security-section" data-anim="securityVisible">
+    <div class="security-container" [class.visible]="securityVisible">
+      <div class="security-content">
+        <div class="security-text">
+          <span class="section-badge">Security</span>
+          <h2 class="section-title">Bank-Level<br><span class="gradient-text">Security</span></h2>
+          <p class="section-desc">Your money and data are protected by the most advanced security infrastructure in digital banking.</p>
+          <div class="security-features">
+            <div class="security-feature">
+              <div>
+                <h4>AI Fraud Detection</h4>
+                <p>Real-time monitoring of every transaction using machine learning</p>
+              </div>
+            </div>
+            <div class="security-feature">
+              <div>
+                <h4>Biometric Login</h4>
+                <p>Fingerprint and face recognition for secure access</p>
+              </div>
+            </div>
+            <div class="security-feature">
+              <div>
+                <h4>OTP Verification</h4>
+                <p>Two-factor authentication for all sensitive operations</p>
+              </div>
+            </div>
+            <div class="security-feature">
+              <div>
+                <h4>Encrypted Transactions</h4>
+                <p>256-bit AES encryption for all data in transit and at rest</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="security-visual">
+          <div class="lock-animation">
+            <div class="lock-ring ring-1"></div>
+            <div class="lock-ring ring-2"></div>
+            <div class="lock-ring ring-3"></div>
+            <div class="lock-center">
+              <span class="lock-emoji">SECURE</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== 9. APP DOWNLOAD ========== -->
+  <section class="download-section" data-anim="downloadVisible">
+    <div class="download-container" [class.visible]="downloadVisible">
+      <div class="download-content">
+        <span class="section-badge">Mobile App</span>
+        <h2 class="section-title">Bank On The<br><span class="gradient-text">Go</span></h2>
+        <p class="section-desc">Download the NeoBank app and experience seamless banking from your smartphone. Available on all platforms.</p>
+        <div class="store-buttons">
+          <button class="store-btn">
+            <div>
+              <small>Download on the</small>
+              <strong>App Store</strong>
+            </div>
+          </button>
+          <button class="store-btn">
+            <div>
+              <small>Get it on</small>
+              <strong>Google Play</strong>
+            </div>
+          </button>
+        </div>
+        <div class="download-stats">
+          <div class="dl-stat"><strong>4.8★</strong><small>App Rating</small></div>
+          <div class="dl-stat"><strong>10L+</strong><small>Downloads</small></div>
+          <div class="dl-stat"><strong>24/7</strong><small>Support</small></div>
+        </div>
+      </div>
+      <div class="download-visual">
+        <div class="floating-phone">
+          <div class="fp-screen">
+            <div class="fp-header">
+              <span>NeoBank</span>
+            </div>
+            <div class="fp-balance">
+              <small>Available Balance</small>
+              <strong>₹2,45,890</strong>
+            </div>
+            <div class="fp-quick-actions">
+              <div class="fp-qa">Send</div>
+              <div class="fp-qa">Scan</div>
+              <div class="fp-qa">Cards</div>
+              <div class="fp-qa">Tag</div>
+            </div>
+            <div class="fp-promo">
+              Get ₹500 cashback on first UPI payment!
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== 10. FOOTER ========== -->
+  <footer class="neo-footer">
+    <div class="footer-wave">
+      <svg viewBox="0 0 1440 120"><path fill="rgba(15,23,42,0.05)" d="M0,64L80,69.3C160,75,320,85,480,80C640,75,800,53,960,48C1120,43,1280,53,1360,58.7L1440,64L1440,120L1360,120C1280,120,1120,120,960,120C800,120,640,120,480,120C320,120,160,120,80,120L0,120Z"></path></svg>
+    </div>
+    <div class="footer-container">
+      <div class="footer-grid">
+        <div class="footer-col brand-col">
+          <div class="footer-brand">
+            <img src="/favicon.ico" alt="NeoBank" class="footer-logo-img">
+            <span class="footer-brand-text">NeoBank</span>
+          </div>
+          <p class="footer-about">Next-generation digital banking platform. Experience smarter, faster, and more secure banking.</p>
+          <div class="footer-social">
+            <a href="#" class="social-btn">IG</a>
+            <a href="#" class="social-btn">FB</a>
+            <a href="#" class="social-btn">X</a>
+            <a href="#" class="social-btn">YT</a>
+            <a href="#" class="social-btn">IN</a>
+          </div>
+        </div>
+        <div class="footer-col">
+          <h4 class="footer-heading">Services</h4>
+          <ul class="footer-links">
+            <li><a href="#">Savings Account</a></li>
+            <li><a href="#">Current Account</a></li>
+            <li><a href="#">Personal Loan</a></li>
+            <li><a href="#">Credit Card</a></li>
+            <li><a href="#">FASTag</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4 class="footer-heading">Company</h4>
+          <ul class="footer-links">
+            <li><a href="#">About Us</a></li>
+            <li><a href="#">Careers</a></li>
+            <li><a href="#">Press</a></li>
+            <li><a href="#">Blog</a></li>
+            <li><a href="#">Partners</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4 class="footer-heading">Help Center</h4>
+          <ul class="footer-links">
+            <li><a href="#">FAQs</a></li>
+            <li><a href="#">Contact Support</a></li>
+            <li><a href="#">Privacy Policy</a></li>
+            <li><a href="#">Terms of Service</a></li>
+            <li><a href="#">Grievance Redressal</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4 class="footer-heading">Contact</h4>
+          <div class="footer-contact">
+            <p>📍 561 Balaji Nagar, Tirumala, Tirupati, AP</p>
+            <p>📞 +91 7093976680</p>
+            <p>✉️ support&#64;neobank.co.in</p>
+          </div>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p>&copy; 2025 NeoBank. All rights reserved. | RBI Registered Digital Bank</p>
+      </div>
+    </div>
+  </footer>
+
+</div>

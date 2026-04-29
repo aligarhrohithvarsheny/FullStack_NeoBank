@@ -1,0 +1,272 @@
+<div class="bill-payment-container">
+  <div class="header">
+    <h2>🧾 Bill Payment</h2>
+    <p>Pay your mobile and WiFi bills using your Neo Bank credit card</p>
+  </div>
+
+  <div class="payment-section">
+    <div class="form-container">
+      <h3>Bill Details</h3>
+      
+      <div class="form-group">
+        <label>Bill Type <span class="required">*</span></label>
+        <select [(ngModel)]="billForm.billType" class="form-input">
+          <option value="Mobile Bill">Mobile Bill</option>
+          <option value="WiFi Bill">WiFi Bill</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Network Provider <span class="required">*</span></label>
+        <select [(ngModel)]="billForm.networkProvider" class="form-input">
+          <option value="">Select Provider</option>
+          <option *ngFor="let provider of getProviders()" [value]="provider">{{ provider }}</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Customer/Mobile Number <span class="required">*</span></label>
+        <input 
+          type="text" 
+          [(ngModel)]="billForm.customerNumber" 
+          class="form-input"
+          placeholder="Enter mobile or account number"
+          maxlength="15"
+        />
+      </div>
+
+      <div class="form-group">
+        <label>Amount (₹) <span class="required">*</span></label>
+        <input 
+          type="number" 
+          [(ngModel)]="billForm.amount" 
+          class="form-input"
+          placeholder="Enter bill amount"
+          min="1"
+          step="0.01"
+          (input)="onAmountInput($event)"
+          (blur)="onAmountBlur($event)"
+        />
+      </div>
+
+      <h3 class="section-title">Card Details (Debit or Credit Card)</h3>
+
+      <div class="form-group" *ngIf="isLoadingCards">
+        <p>Loading cards...</p>
+      </div>
+
+      <div class="form-group" *ngIf="!isLoadingCards && creditCards.length > 0">
+        <label>Select Credit Card (Optional - for reference)</label>
+        <select [(ngModel)]="cardForm.creditCardId" (change)="onCardSelect()" class="form-input">
+          <option [value]="null">None (Using Debit Card)</option>
+          <option *ngFor="let card of creditCards" [value]="card.id">
+            {{ card.getMaskedCardNumber ? card.getMaskedCardNumber() : ('**** **** **** ' + card.cardNumber.substring(card.cardNumber.length - 4)) }} 
+            - Available: ₹{{ card.availableLimit | number:'1.2-2' }}
+          </option>
+        </select>
+        <small class="form-hint">You can pay with any debit or credit card registered to your account</small>
+      </div>
+
+      <div *ngIf="selectedCreditCard" class="card-info">
+        <div class="info-item">
+          <span class="label">Card Limit:</span>
+          <span class="value">₹{{ selectedCreditCard.approvedLimit | number:'1.2-2' }}</span>
+        </div>
+        <div class="info-item">
+          <span class="label">Available Credit:</span>
+          <span class="value">₹{{ selectedCreditCard.availableLimit | number:'1.2-2' }}</span>
+        </div>
+        <div class="info-item">
+          <span class="label">Current Balance:</span>
+          <span class="value">₹{{ selectedCreditCard.currentBalance | number:'1.2-2' }}</span>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Card Number <span class="required">*</span></label>
+        <input 
+          type="text" 
+          [(ngModel)]="cardForm.cardNumber" 
+          (input)="onCardNumberInput($event)"
+          class="form-input"
+          placeholder="1234 5678 9012 3456"
+          maxlength="19"
+        />
+        <small class="form-hint">Enter 16-digit card number</small>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>CVV <span class="required">*</span></label>
+          <input 
+            type="password" 
+            [(ngModel)]="cardForm.cvv" 
+            (input)="onCvvInput($event)"
+            class="form-input"
+            placeholder="123"
+            maxlength="3"
+          />
+        </div>
+
+        <div class="form-group">
+          <label>Expiry Date <span class="required">*</span></label>
+          <input 
+            type="text" 
+            [(ngModel)]="cardForm.expiryDate" 
+            (input)="onExpiryInput($event)"
+            class="form-input"
+            placeholder="MM/YY"
+            maxlength="5"
+          />
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Cardholder Name <span class="required">*</span></label>
+        <input 
+          type="text" 
+          [(ngModel)]="cardForm.cardholderName" 
+          class="form-input"
+          placeholder="Enter name as on card"
+          [disabled]="showOtpPage"
+        />
+        <small class="form-hint">Name must match the name on your card</small>
+      </div>
+
+      <div class="form-actions" *ngIf="!showOtpPage">
+        <button 
+          class="btn-primary" 
+          (click)="processPayment()" 
+          [disabled]="isProcessing"
+        >
+          <span *ngIf="!isProcessing">💳 Verify Card & Pay</span>
+          <span *ngIf="isProcessing">Verifying...</span>
+        </button>
+        <button class="btn-secondary" (click)="resetForm()" [disabled]="isProcessing">
+          Reset
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- OTP Verification Page -->
+  <div *ngIf="showOtpPage" class="otp-page-overlay">
+    <div class="otp-page-container">
+      <div class="otp-header">
+        <div class="neobank-stamp">
+          <div class="stamp-icon">🏦</div>
+          <div class="stamp-text">NeoBank</div>
+        </div>
+        <h2>Verify Payment</h2>
+        <p class="otp-subtitle">Enter OTP sent to your registered email</p>
+      </div>
+
+      <div class="otp-info-card">
+        <div class="info-row">
+          <span class="info-label">Email:</span>
+          <span class="info-value">{{ otpData?.maskedEmail }}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Card:</span>
+          <span class="info-value">**** **** **** {{ otpData?.cardLastFour }}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Card Type:</span>
+          <span class="info-value">{{ otpData?.cardType === 'CREDIT' ? 'Credit Card' : 'Debit Card' }}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Amount:</span>
+          <span class="info-value amount-highlight">₹{{ billForm.amount | number:'1.2-2' }}</span>
+        </div>
+      </div>
+
+      <div class="otp-input-section">
+        <label>Enter 6-Digit OTP</label>
+        <input 
+          type="text" 
+          [(ngModel)]="otp" 
+          class="otp-input"
+          placeholder="000000"
+          maxlength="6"
+          (input)="onOtpInput($event)"
+          [disabled]="isVerifyingOtp || otpTimer <= 0"
+        />
+        <div class="otp-timer" [ngClass]="{'expired': otpTimer <= 0}">
+          <span *ngIf="otpTimer > 0">⏱️ OTP expires in: {{ formatOtpTimer() }}</span>
+          <span *ngIf="otpTimer <= 0" class="expired-text">⏱️ OTP Expired</span>
+        </div>
+      </div>
+
+      <div class="otp-actions">
+        <button 
+          class="btn-primary" 
+          (click)="verifyOtpAndPay()" 
+          [disabled]="isVerifyingOtp || otp.length !== 6 || otpTimer <= 0"
+        >
+          <span *ngIf="!isVerifyingOtp">✅ Verify & Pay</span>
+          <span *ngIf="isVerifyingOtp">Processing Payment...</span>
+        </button>
+        <button 
+          class="btn-secondary" 
+          (click)="resendOtp()" 
+          [disabled]="isProcessing || otpTimer > 60"
+        >
+          🔄 Resend OTP
+        </button>
+        <button 
+          class="btn-cancel" 
+          (click)="closeOtpPage()" 
+          [disabled]="isVerifyingOtp"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="payment-history-section">
+    <h3>Payment History</h3>
+    
+    <div *ngIf="isLoadingHistory" class="loading-state">
+      Loading payment history...
+    </div>
+
+    <div *ngIf="!isLoadingHistory && paymentHistory.length === 0" class="empty-state">
+      <p>No payment history found.</p>
+    </div>
+
+    <div *ngIf="!isLoadingHistory && paymentHistory.length > 0" class="history-list">
+      <div *ngFor="let payment of paymentHistory" class="history-item">
+        <div class="history-header">
+          <div>
+            <h4>{{ payment.billType }} - {{ payment.networkProvider }}</h4>
+            <p class="muted">Customer: {{ payment.customerNumber }}</p>
+          </div>
+          <div class="amount-badge">
+            ₹{{ payment.amount | number:'1.2-2' }}
+          </div>
+        </div>
+        <div class="history-body">
+          <div class="info-row">
+            <span class="label">Card:</span>
+            <span class="value">{{ getMaskedCardNumber(payment.cardLastFour) || payment.cardNumber }}</span>
+          </div>
+          <div class="info-row">
+            <span class="label">Transaction ID:</span>
+            <span class="value">{{ payment.transactionId }}</span>
+          </div>
+          <div class="info-row">
+            <span class="label">Payment Date:</span>
+            <span class="value">{{ payment.paymentDate | date:'dd/MM/yyyy, h:mm a' }}</span>
+          </div>
+          <div class="info-row">
+            <span class="label">Status:</span>
+            <span class="status-badge" [ngClass]="payment.status.toLowerCase()">
+              {{ payment.status }}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

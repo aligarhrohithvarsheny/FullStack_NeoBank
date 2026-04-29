@@ -1,0 +1,275 @@
+<div class="merchant-admin-page">
+  <div class="topbar">
+    <button class="back-btn" (click)="goBack()">← Back</button>
+    <h1>Merchant Onboarding Management</h1>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-section">
+    <div class="stat-card">
+      <h3>Total Merchants</h3>
+      <span class="stat-number">{{ stats.totalMerchants }}</span>
+    </div>
+    <div class="stat-card pending">
+      <h3>Pending</h3>
+      <span class="stat-number">{{ stats.pendingMerchants }}</span>
+    </div>
+    <div class="stat-card approved">
+      <h3>Approved</h3>
+      <span class="stat-number">{{ stats.approvedMerchants }}</span>
+    </div>
+    <div class="stat-card rejected">
+      <h3>Rejected</h3>
+      <span class="stat-number">{{ stats.rejectedMerchants }}</span>
+    </div>
+    <div class="stat-card device">
+      <h3>Active Soundboxes</h3>
+      <span class="stat-number">{{ stats.activeSoundboxes }}</span>
+    </div>
+    <div class="stat-card device">
+      <h3>Active POS</h3>
+      <span class="stat-number">{{ stats.activePos }}</span>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="filters-section">
+    <div class="search-box">
+      <input class="search-input" [(ngModel)]="searchTerm" placeholder="Search by business, owner, ID, mobile, agent..." />
+    </div>
+    <div class="status-filter">
+      <label>Status:</label>
+      <select class="filter-select" [(ngModel)]="statusFilter">
+        <option value="ALL">All</option>
+        <option value="PENDING">Pending</option>
+        <option value="APPROVED">Approved</option>
+        <option value="REJECTED">Rejected</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Merchants Table -->
+  <div class="table-container">
+    <table>
+      <thead>
+        <tr>
+          <th>Merchant ID</th>
+          <th>Business Name</th>
+          <th>Owner</th>
+          <th>Mobile</th>
+          <th>City</th>
+          <th>Agent ID</th>
+          <th>Status</th>
+          <th>Date</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let m of filteredMerchants">
+          <td>{{ m.merchantId }}</td>
+          <td>{{ m.businessName }}</td>
+          <td>{{ m.ownerName }}</td>
+          <td>{{ m.mobile }}</td>
+          <td>{{ m.city }}</td>
+          <td>{{ m.agentId }}</td>
+          <td><span class="status-badge" [ngClass]="getStatusClass(m.status || '')">{{ m.status }}</span></td>
+          <td>{{ m.createdAt | date:'dd MMM yyyy' }}</td>
+          <td>
+            <button class="btn-view" (click)="viewDetails(m)">View</button>
+            <button class="btn-view" (click)="viewDetails(m); startEdit()">Edit</button>
+            <button class="btn-approve" *ngIf="m.status === 'PENDING'" (click)="approveMerchant(m.merchantId!)">Approve</button>
+            <button class="btn-reject" *ngIf="m.status === 'PENDING'" (click)="openRejectModal(m.merchantId!)">Reject</button>
+          </td>
+        </tr>
+        <tr *ngIf="filteredMerchants.length === 0">
+          <td colspan="9" class="empty-row">No merchants found</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Detail Overlay -->
+  <div class="detail-overlay" *ngIf="selectedMerchant" (click)="closeDetails()">
+    <div class="detail-panel" (click)="$event.stopPropagation()">
+      <div class="detail-header">
+        <h2>Merchant Details</h2>
+        <div class="header-actions">
+          <button class="btn-edit" *ngIf="!editing" (click)="startEdit()">Edit Details</button>
+          <button class="btn-secondary" *ngIf="editing" (click)="cancelEdit()">Cancel Edit</button>
+          <button class="close-btn" (click)="closeDetails()">✕</button>
+        </div>
+      </div>
+
+      <div class="detail-body">
+        <div class="detail-section" *ngIf="editing">
+          <h3>Edit Merchant Details</h3>
+          <div class="edit-grid">
+            <input [(ngModel)]="editForm.businessName" placeholder="Business Name" />
+            <input [(ngModel)]="editForm.ownerName" placeholder="Owner Name" />
+            <input [(ngModel)]="editForm.mobile" placeholder="Mobile" />
+            <input [(ngModel)]="editForm.email" placeholder="Email" />
+            <input [(ngModel)]="editForm.businessType" placeholder="Business Type" />
+            <input [(ngModel)]="editForm.gstNumber" placeholder="GST Number" />
+            <input [(ngModel)]="editForm.shopAddress" placeholder="Shop Address" />
+            <input [(ngModel)]="editForm.city" placeholder="City" />
+            <input [(ngModel)]="editForm.state" placeholder="State" />
+            <input [(ngModel)]="editForm.pincode" placeholder="Pincode" />
+            <input [(ngModel)]="editForm.bankName" placeholder="Bank Name" />
+            <input [(ngModel)]="editForm.accountHolderName" placeholder="Account Holder Name" />
+            <input [(ngModel)]="editForm.accountNumber" placeholder="Account Number" />
+            <input [(ngModel)]="editForm.ifscCode" placeholder="IFSC Code" />
+          </div>
+          <div class="edit-actions">
+            <button class="btn-approve-lg" (click)="saveEdit()" [disabled]="loading">
+              {{ loading ? 'Saving...' : 'Save Changes' }}
+            </button>
+            <button class="btn-secondary" (click)="cancelEdit()" [disabled]="loading">Cancel</button>
+          </div>
+        </div>
+
+        <div *ngIf="!editing">
+        <div class="detail-section">
+          <h3>Business Information</h3>
+          <div class="info-grid">
+            <div><label>Merchant ID</label><span>{{ selectedMerchant.merchantId }}</span></div>
+            <div><label>Business Name</label><span>{{ selectedMerchant.businessName }}</span></div>
+            <div><label>Business Type</label><span>{{ selectedMerchant.businessType }}</span></div>
+            <div><label>GST Number</label><span>{{ selectedMerchant.gstNumber || 'N/A' }}</span></div>
+            <div><label>Owner Name</label><span>{{ selectedMerchant.ownerName }}</span></div>
+            <div><label>Mobile</label><span>{{ selectedMerchant.mobile }}</span></div>
+            <div><label>Email</label><span>{{ selectedMerchant.email || 'N/A' }}</span></div>
+            <div><label>Address</label><span>{{ selectedMerchant.shopAddress }}</span></div>
+            <div><label>City</label><span>{{ selectedMerchant.city }}</span></div>
+            <div><label>State</label><span>{{ selectedMerchant.state }}</span></div>
+            <div><label>Pincode</label><span>{{ selectedMerchant.pincode }}</span></div>
+            <div><label>Status</label><span class="status-badge" [ngClass]="getStatusClass(selectedMerchant.status || '')">{{ selectedMerchant.status }}</span></div>
+          </div>
+        </div>
+
+        <div class="detail-section">
+          <h3>Bank Details</h3>
+          <div class="info-grid">
+            <div><label>Bank</label><span>{{ selectedMerchant.bankName }}</span></div>
+            <div><label>Account Holder</label><span>{{ selectedMerchant.accountHolderName }}</span></div>
+            <div><label>Account No.</label><span>{{ selectedMerchant.accountNumber }}</span></div>
+            <div><label>IFSC</label><span>{{ selectedMerchant.ifscCode }}</span></div>
+          </div>
+        </div>
+
+        <div class="detail-section">
+          <h3>Agent Information</h3>
+          <div class="info-grid">
+            <div><label>Agent ID</label><span>{{ selectedMerchant.agentId }}</span></div>
+            <div><label>Applied On</label><span>{{ selectedMerchant.createdAt | date:'dd MMM yyyy, hh:mm a' }}</span></div>
+          </div>
+        </div>
+
+        <div class="detail-section" *ngIf="merchantApplications.length > 0">
+          <h3>Device Applications</h3>
+          <table class="inner-table">
+            <thead><tr><th>App ID</th><th>Device</th><th>Qty</th><th>Status</th></tr></thead>
+            <tbody>
+              <tr *ngFor="let app of merchantApplications">
+                <td>{{ app.applicationId }}</td>
+                <td>{{ app.deviceType }}</td>
+                <td>{{ app.deviceQuantity }}</td>
+                <td><span class="status-badge" [ngClass]="getStatusClass(app.status || '')">{{ app.status }}</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="detail-section" *ngIf="merchantDevices.length > 0">
+          <h3>Assigned Devices</h3>
+          <div class="edit-grid" style="margin-bottom:10px;">
+            <select class="filter-select" [(ngModel)]="selectedDeviceId">
+              <option value="">Select device</option>
+              <option *ngFor="let dev of merchantDevices" [value]="dev.deviceId">{{ dev.deviceId }} ({{ dev.deviceType }})</option>
+            </select>
+            <div style="display:flex; gap:8px;">
+              <button class="btn-view" (click)="adminUpdateDeviceStatus('ACTIVE')" [disabled]="loading || !selectedDeviceId">Set Active</button>
+              <button class="btn-view" (click)="adminUpdateDeviceStatus('PAUSED')" [disabled]="loading || !selectedDeviceId">Set Pause</button>
+              <button class="btn-reject" (click)="adminUpdateDeviceStatus('INACTIVE')" [disabled]="loading || !selectedDeviceId">Set Close</button>
+            </div>
+          </div>
+          <div class="edit-grid" style="margin-bottom:10px;">
+            <input [(ngModel)]="adminChargeAmount" type="number" min="1" placeholder="Debit speaker charge amount" />
+            <input [(ngModel)]="adminChargeReason" placeholder="Charge reason" />
+          </div>
+          <div class="edit-actions" style="margin-top:0; margin-bottom:10px;">
+            <button class="btn-approve-lg" (click)="adminDebitCharges()" [disabled]="loading || !selectedDeviceId || !adminChargeAmount || adminChargeAmount<=0">Debit Charges</button>
+          </div>
+          <div class="edit-grid" style="margin-bottom:10px;">
+            <input [(ngModel)]="upiId" placeholder="UPI ID to link" />
+            <input [(ngModel)]="upiBeneficiaryName" placeholder="Beneficiary name for verification" />
+            <input [(ngModel)]="upiVerifyDepositAmount" type="number" min="0" placeholder="Verification deposit amount" />
+          </div>
+          <div class="edit-actions" style="margin-top:0;">
+            <button class="btn-approve-lg" (click)="adminLinkUpi()" [disabled]="loading || !selectedDeviceId || !upiId.trim()">Link UPI + Verify Deposit</button>
+          </div>
+          <table class="inner-table">
+            <thead><tr><th>Device ID</th><th>Type</th><th>Status</th><th>Speaker State</th><th>Assigned On</th></tr></thead>
+            <tbody>
+              <tr *ngFor="let dev of merchantDevices">
+                <td>{{ dev.deviceId }}</td>
+                <td>{{ dev.deviceType }}</td>
+                <td><span class="status-badge" [ngClass]="getStatusClass(dev.status || '')">{{ dev.status }}</span></td>
+                <td>{{ dev.status === 'ACTIVE' ? 'ACTIVE' : (dev.status === 'PAUSED' ? 'PAUSED' : 'CLOSED') }}</td>
+                <td>{{ dev.createdAt | date:'dd MMM yyyy' }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="detail-section" *ngIf="merchantTransactions.length > 0">
+          <h3>Merchant Transactions & Speaker Charges</h3>
+          <div class="rejection-box" style="margin-bottom:10px;">
+            Total debited speaker charges: {{ getMerchantChargeDebitTotal() | number:'1.2-2' }}
+          </div>
+          <table class="inner-table">
+            <thead><tr><th>Txn ID</th><th>Mode</th><th>Amount</th><th>Status</th><th>Date</th></tr></thead>
+            <tbody>
+              <tr *ngFor="let txn of merchantTransactions">
+                <td>{{ txn.transactionId }}</td>
+                <td>{{ txn.paymentMode }}</td>
+                <td>{{ txn.amount }}</td>
+                <td>{{ txn.status }}</td>
+                <td>{{ txn.createdAt | date:'dd MMM yyyy, hh:mm a' }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="detail-section" *ngIf="selectedMerchant.rejectionReason">
+          <h3>Rejection Details</h3>
+          <div class="rejection-box">{{ selectedMerchant.rejectionReason }}</div>
+        </div>
+
+        <div class="detail-actions" *ngIf="selectedMerchant.status === 'PENDING'">
+          <button class="btn-approve-lg" (click)="approveMerchant(selectedMerchant.merchantId!)" [disabled]="loading">
+            {{ loading ? 'Processing...' : '✓ Approve Merchant' }}
+          </button>
+          <button class="btn-reject-lg" (click)="openRejectModal(selectedMerchant.merchantId!)" [disabled]="loading">
+            ✕ Reject Merchant
+          </button>
+        </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Reject Modal -->
+  <div class="detail-overlay reject-modal-overlay" *ngIf="showRejectModal" (click)="closeRejectModal()">
+    <div class="reject-modal" (click)="$event.stopPropagation()">
+      <h3>Reject Merchant Application</h3>
+      <p>Please provide a reason for rejection:</p>
+      <textarea [(ngModel)]="rejectionReason" placeholder="Enter rejection reason..." rows="4"></textarea>
+      <div class="modal-actions">
+        <button class="btn-secondary" (click)="closeRejectModal()">Cancel</button>
+        <button class="btn-reject-confirm" (click)="confirmReject()" [disabled]="loading">
+          {{ loading ? 'Rejecting...' : 'Confirm Rejection' }}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

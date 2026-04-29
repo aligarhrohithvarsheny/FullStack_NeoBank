@@ -1,0 +1,480 @@
+<!-- Include Font Awesome -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+<div class="credit-cards-container">
+  <!-- Back Button -->
+  <div class="back-button">
+    <button (click)="goBack()">
+      <i class="fa fa-arrow-left"></i> Back to Dashboard
+    </button>
+  </div>
+
+  <!-- Credit Card Management Section -->
+  <div class="section-content">
+    <div class="section-header">
+      <h2><i class="fa fa-credit-card"></i> Credit Card Management</h2>
+      <div class="header-actions">
+        <button class="btn-primary" (click)="showApplyCreditCardModal = true">
+          <i class="fa fa-plus"></i> Apply for Credit Card
+        </button>
+        <button class="btn-primary" (click)="loadCreditCards()">
+          <i class="fa fa-sync-alt"></i> Refresh
+        </button>
+      </div>
+    </div>
+
+    <div class="filters-bar">
+      <select [(ngModel)]="creditCardStatusFilter" (change)="filterCreditCards()">
+        <option value="ALL">All Status</option>
+        <option value="Active">Active</option>
+        <option value="Blocked">Blocked</option>
+        <option value="Closed">Closed</option>
+      </select>
+      <input type="text" [(ngModel)]="creditCardSearchQuery" placeholder="Search by name, account, card number..." (keyup)="filterCreditCards()" />
+    </div>
+
+    <div *ngIf="isLoadingCreditCards" class="loading-state">Loading credit cards...</div>
+    <div *ngIf="!isLoadingCreditCards && creditCards.length === 0 && filteredCreditCards.length === 0" class="no-data">
+      <i class="fa fa-credit-card"></i>
+      <p>No credit cards found</p>
+      <p class="hint">Credit cards will appear here once they are created.</p>
+    </div>
+
+    <div class="credit-cards-grid" *ngIf="!isLoadingCreditCards && filteredCreditCards.length > 0">
+      <div class="credit-card-item" *ngFor="let card of filteredCreditCards" (click)="viewCreditCardDetails(card)" [class.can-close]="canCloseCard(card)" [class.cannot-close]="!canCloseCard(card) && card.status !== 'Closed'">
+        <div class="card-header">
+          <h3>{{ card.userName }}</h3>
+          <div class="header-badges">
+            <span class="status-badge" [ngClass]="card.status?.toLowerCase()">{{ card.status }}</span>
+            <span class="close-status-badge" *ngIf="card.status !== 'Closed' && !canCloseCard(card)" title="Cannot close: Balance must be ₹0">
+              <i class="fa fa-lock"></i> Cannot Close
+            </span>
+            <span class="close-status-badge can-close-badge" *ngIf="card.status !== 'Closed' && canCloseCard(card)" title="Card can be closed">
+              <i class="fa fa-unlock"></i> Can Close
+            </span>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="card-info-row">
+            <label>Card Number:</label>
+            <span>{{ card.maskedCardNumber || card.cardNumber }}</span>
+          </div>
+          <div class="card-info-row">
+            <label>Account Number:</label>
+            <span>{{ card.accountNumber }}</span>
+          </div>
+          <div class="card-info-row">
+            <label>Approved Limit:</label>
+            <span class="amount">₹{{ card.approvedLimit | number:'1.2-2' }}</span>
+          </div>
+          <div class="card-info-row">
+            <label>Current Balance:</label>
+            <span class="amount">₹{{ card.currentBalance | number:'1.2-2' }}</span>
+          </div>
+          <div class="card-info-row">
+            <label>Available Limit:</label>
+            <span class="amount">₹{{ card.availableLimit | number:'1.2-2' }}</span>
+          </div>
+          <div class="card-info-row">
+            <label>Usage:</label>
+            <span>{{ card.usageLimit | number:'1.2-2' }}%</span>
+          </div>
+          <div class="card-info-row">
+            <label>Overdue:</label>
+            <span class="amount overdue">₹{{ card.overdueAmount | number:'1.2-2' }}</span>
+          </div>
+          <div class="card-info-row">
+            <label>Applied Date:</label>
+            <span>{{ card.appliedDate | date:'dd/MM/yyyy' }}</span>
+          </div>
+          <div class="card-info-row">
+            <label>Approval Date:</label>
+            <span>{{ card.approvalDate | date:'dd/MM/yyyy' }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Credit Card Details Modal -->
+    <div class="modal-overlay" *ngIf="selectedCreditCard" (click)="selectedCreditCard = null">
+      <div class="modal-content" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h3>Credit Card Details - {{ selectedCreditCard.userName }}</h3>
+          <button class="close-btn" (click)="selectedCreditCard = null">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="details-section">
+            <h4>Card Information</h4>
+            <div class="info-grid">
+              <div class="info-item">
+                <label>Card Number:</label>
+                <span>{{ selectedCreditCard.cardNumber }}</span>
+              </div>
+              <div class="info-item">
+                <label>CVV:</label>
+                <span>{{ selectedCreditCard.cvv }}</span>
+              </div>
+              <div class="info-item">
+                <label>Expiry:</label>
+                <span>{{ selectedCreditCard.expiryDate }}</span>
+              </div>
+              <div class="info-item">
+                <label>Status:</label>
+                <span class="status-badge" [ngClass]="selectedCreditCard.status?.toLowerCase()">{{ selectedCreditCard.status }}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="details-section">
+            <h4>Credit Information</h4>
+            <div class="info-grid">
+              <div class="info-item">
+                <label>Approved Limit:</label>
+                <span class="amount">₹{{ selectedCreditCard.approvedLimit | number:'1.2-2' }}</span>
+              </div>
+              <div class="info-item">
+                <label>Current Balance:</label>
+                <span class="amount">₹{{ selectedCreditCard.currentBalance | number:'1.2-2' }}</span>
+              </div>
+              <div class="info-item">
+                <label>Available Limit:</label>
+                <span class="amount">₹{{ selectedCreditCard.availableLimit | number:'1.2-2' }}</span>
+              </div>
+              <div class="info-item">
+                <label>Usage:</label>
+                <span>{{ selectedCreditCard.usageLimit | number:'1.2-2' }}%</span>
+              </div>
+              <div class="info-item">
+                <label>Overdue:</label>
+                <span class="amount overdue">₹{{ selectedCreditCard.overdueAmount | number:'1.2-2' }}</span>
+              </div>
+              <div class="info-item">
+                <label>Fine:</label>
+                <span class="amount">₹{{ selectedCreditCard.fine | number:'1.2-2' }}</span>
+              </div>
+              <div class="info-item">
+                <label>Penalty:</label>
+                <span class="amount">₹{{ selectedCreditCard.penalty | number:'1.2-2' }}</span>
+              </div>
+            </div>
+            
+            <!-- Balance Summary for Closing -->
+            <div class="balance-summary" *ngIf="selectedCreditCard.status !== 'Closed'">
+              <div class="summary-header">
+                <h5><i class="fa fa-info-circle"></i> Card Closure Status</h5>
+              </div>
+              <div class="summary-content" [ngClass]="{'can-close': canCloseCard(selectedCreditCard), 'cannot-close': !canCloseCard(selectedCreditCard)}">
+                <div class="summary-item">
+                  <label>Total Outstanding:</label>
+                  <span class="amount" [ngClass]="{'overdue': (selectedCreditCard.currentBalance || 0) + (selectedCreditCard.overdueAmount || 0) !== 0}">
+                    ₹{{ ((selectedCreditCard.currentBalance || 0) + (selectedCreditCard.overdueAmount || 0)) | number:'1.2-2' }}
+                  </span>
+                </div>
+                <div class="summary-message">
+                  <i class="fa" [ngClass]="canCloseCard(selectedCreditCard) ? 'fa-check-circle' : 'fa-exclamation-triangle'"></i>
+                  <span>{{ getCloseCardStatus(selectedCreditCard).message }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="details-section">
+            <h4>Dates</h4>
+            <div class="info-grid">
+              <div class="info-item">
+                <label>Applied Date:</label>
+                <span>{{ selectedCreditCard.appliedDate | date:'dd/MM/yyyy HH:mm' }}</span>
+              </div>
+              <div class="info-item">
+                <label>Approval Date:</label>
+                <span>{{ selectedCreditCard.approvalDate | date:'dd/MM/yyyy HH:mm' }}</span>
+              </div>
+              <div class="info-item" *ngIf="selectedCreditCard.closureDate">
+                <label>Closure Date:</label>
+                <span>{{ selectedCreditCard.closureDate | date:'dd/MM/yyyy HH:mm' }}</span>
+              </div>
+              <div class="info-item" *ngIf="selectedCreditCard.lastPaidDate">
+                <label>Last Paid Date:</label>
+                <span>{{ selectedCreditCard.lastPaidDate | date:'dd/MM/yyyy HH:mm' }}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="details-section">
+            <h4>Bills</h4>
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Bill Date</th>
+                  <th>Due Date</th>
+                  <th>Total Amount</th>
+                  <th>Minimum Due</th>
+                  <th>Paid Amount</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let bill of creditCardBills">
+                  <td>{{ bill.billGenerationDate | date:'dd/MM/yyyy' }}</td>
+                  <td>{{ bill.dueDate | date:'dd/MM/yyyy' }}</td>
+                  <td>₹{{ bill.totalAmount | number:'1.2-2' }}</td>
+                  <td>₹{{ bill.minimumDue | number:'1.2-2' }}</td>
+                  <td>₹{{ bill.paidAmount | number:'1.2-2' }}</td>
+                  <td><span class="status-badge" [ngClass]="bill.status?.toLowerCase()">{{ bill.status }}</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="details-section">
+            <h4>Transactions</h4>
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Type</th>
+                  <th>Merchant</th>
+                  <th>Amount</th>
+                  <th>Balance After</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let transaction of creditCardTransactions">
+                  <td>{{ transaction.transactionDate | date:'dd/MM/yyyy HH:mm' }}</td>
+                  <td>{{ transaction.transactionType }}</td>
+                  <td>{{ transaction.merchant || '-' }}</td>
+                  <td>₹{{ transaction.amount | number:'1.2-2' }}</td>
+                  <td>₹{{ transaction.balanceAfter | number:'1.2-2' }}</td>
+                  <td><span class="status-badge" [ngClass]="transaction.status?.toLowerCase()">{{ transaction.status }}</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="modal-actions">
+            <button class="btn-primary" (click)="generateBill(selectedCreditCard.id)">
+              <i class="fa fa-file-invoice"></i> Generate Bill
+            </button>
+            <button class="btn-secondary" (click)="getStatement(selectedCreditCard.id)">
+              <i class="fa fa-file-alt"></i> Get Statement
+            </button>
+            <button class="btn-info" (click)="showLimitHistory(selectedCreditCard.id)">
+              <i class="fa fa-history"></i> Limit History
+            </button>
+            <button class="btn-success" (click)="showLimitModal = true; limitAction = 'increase'">
+              <i class="fa fa-arrow-up"></i> Increase Limit
+            </button>
+            <button class="btn-warning" (click)="showLimitModal = true; limitAction = 'decrease'">
+              <i class="fa fa-arrow-down"></i> Decrease Limit
+            </button>
+            <button 
+              class="btn-danger" 
+              [class.disabled]="!canCloseCard(selectedCreditCard)"
+              [title]="getCloseCardStatus(selectedCreditCard).message"
+              (click)="closeCreditCard(selectedCreditCard.id)" 
+              *ngIf="selectedCreditCard.status !== 'Closed'"
+              [disabled]="!canCloseCard(selectedCreditCard)">
+              <i class="fa fa-times"></i> Close Card
+            </button>
+            <button 
+              class="btn-download" 
+              (click)="downloadCloseCardDocument(selectedCreditCard.id)"
+              *ngIf="selectedCreditCard.status === 'Closed' && getCloseCardDocument(selectedCreditCard.id)">
+              <i class="fa fa-download"></i> Download Closure Document
+            </button>
+            <div class="close-card-warning" *ngIf="selectedCreditCard.status !== 'Closed' && !canCloseCard(selectedCreditCard)">
+              <i class="fa fa-exclamation-triangle"></i>
+              <span>{{ getCloseCardStatus(selectedCreditCard).message }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Apply Credit Card Modal -->
+    <div class="modal-overlay" *ngIf="showApplyCreditCardModal" (click)="showApplyCreditCardModal = false">
+      <div class="modal-content" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h3>Apply for Credit Card</h3>
+          <button class="close-btn" (click)="showApplyCreditCardModal = false">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label>Account Number:</label>
+            <input type="text" [(ngModel)]="applyCreditCardForm.accountNumber" placeholder="Enter account number" />
+          </div>
+          <div class="form-group">
+            <label>User Name:</label>
+            <input type="text" [(ngModel)]="applyCreditCardForm.userName" placeholder="Enter user name" />
+          </div>
+          <div class="form-group">
+            <label>User Email:</label>
+            <input type="email" [(ngModel)]="applyCreditCardForm.userEmail" placeholder="Enter user email" />
+          </div>
+          <div class="form-group">
+            <label>PAN:</label>
+            <input type="text" [(ngModel)]="applyCreditCardForm.pan" placeholder="Enter PAN" maxlength="10" />
+          </div>
+          <div class="form-group">
+            <label>Annual Income (optional):</label>
+            <input type="number" [(ngModel)]="applyCreditCardForm.income" placeholder="Enter annual income" />
+          </div>
+          <div class="modal-actions">
+            <button class="btn-primary" (click)="submitCreditCardApplication()">
+              <i class="fa fa-check"></i> Submit Application
+            </button>
+            <button class="btn-secondary" (click)="showApplyCreditCardModal = false">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Limit Change Modal -->
+    <div class="modal-overlay" *ngIf="showLimitModal" (click)="showLimitModal = false">
+      <div class="modal-content" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h3>{{ limitAction === 'increase' ? 'Increase' : 'Decrease' }} Credit Limit</h3>
+          <button class="close-btn" (click)="showLimitModal = false">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div *ngIf="selectedCreditCard">
+            <div class="form-group">
+              <label>Current Credit Limit:</label>
+              <span class="amount">₹{{ selectedCreditCard.approvedLimit | number:'1.2-2' }}</span>
+            </div>
+            <div class="form-group">
+              <label>Current Balance:</label>
+              <span class="amount">₹{{ selectedCreditCard.currentBalance | number:'1.2-2' }}</span>
+            </div>
+            <div class="form-group">
+              <label>{{ limitAction === 'increase' ? 'Increase' : 'Decrease' }} Amount:</label>
+              <input type="number" [(ngModel)]="limitChangeAmount" [min]="0" 
+                     [max]="limitAction === 'decrease' ? (selectedCreditCard.approvedLimit - selectedCreditCard.currentBalance) : null" 
+                     placeholder="Enter amount" />
+            </div>
+            <div class="form-group" *ngIf="limitChangeAmount">
+              <label>New Credit Limit:</label>
+              <span class="amount" [ngClass]="{'highlight': limitAction === 'increase', 'warning': limitAction === 'decrease'}">
+                ₹{{ (limitAction === 'increase' ? (selectedCreditCard.approvedLimit + limitChangeAmount) : (selectedCreditCard.approvedLimit - limitChangeAmount)) | number:'1.2-2' }}
+              </span>
+            </div>
+            <div class="form-group">
+              <label>Reason for {{ limitAction === 'increase' ? 'Increase' : 'Decrease' }}:</label>
+              <textarea [(ngModel)]="limitChangeReason" placeholder="Enter reason for limit change" rows="3"></textarea>
+            </div>
+            <div class="modal-actions">
+              <button class="btn-primary" (click)="updateCreditLimit()" [ngClass]="{'btn-success': limitAction === 'increase', 'btn-warning': limitAction === 'decrease'}">
+                <i class="fa" [ngClass]="limitAction === 'increase' ? 'fa-arrow-up' : 'fa-arrow-down'"></i>
+                {{ limitAction === 'increase' ? 'Increase' : 'Decrease' }} Limit
+              </button>
+              <button class="btn-secondary" (click)="showLimitModal = false">Cancel</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Close Card Modal with Document Upload -->
+    <div class="modal-overlay" *ngIf="showCloseCardModal" (click)="cancelCloseCard()">
+      <div class="modal-content" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h3><i class="fa fa-file-upload"></i> Close Credit Card - Upload Document</h3>
+          <button class="close-btn" (click)="cancelCloseCard()">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label>Card Number:</label>
+            <span>{{ selectedCreditCard?.maskedCardNumber || selectedCreditCard?.cardNumber }}</span>
+          </div>
+          <div class="form-group">
+            <label>Account Holder:</label>
+            <span>{{ selectedCreditCard?.userName }}</span>
+          </div>
+          <div class="form-group">
+            <label>Upload Signed Closure Document <span class="required">*</span>:</label>
+            <div class="file-upload-area" [class.has-file]="closeCardDocument">
+              <input type="file" id="closeCardDocument" (change)="onDocumentSelected($event)" 
+                     accept=".pdf,.jpg,.jpeg,.png" style="display: none;">
+              <label for="closeCardDocument" class="file-upload-label">
+                <i class="fa fa-cloud-upload-alt"></i>
+                <span *ngIf="!closeCardDocument">Click to upload or drag and drop</span>
+                <span *ngIf="closeCardDocument" class="file-name">{{ closeCardDocumentName }}</span>
+                <small>PDF, JPEG, PNG (Max 5MB)</small>
+              </label>
+            </div>
+          </div>
+          <div class="form-group">
+            <div class="info-box">
+              <i class="fa fa-info-circle"></i>
+              <p>Please upload a signed document confirming the closure of this credit card. This document will be stored for future reference.</p>
+            </div>
+          </div>
+          <div class="modal-actions">
+            <button class="btn-primary" (click)="confirmCloseCard()" [disabled]="!closeCardDocument || isUploadingDocument">
+              <i class="fa fa-check" *ngIf="!isUploadingDocument"></i>
+              <i class="fa fa-spinner fa-spin" *ngIf="isUploadingDocument"></i>
+              {{ isUploadingDocument ? 'Uploading...' : 'Close Card & Upload' }}
+            </button>
+            <button class="btn-secondary" (click)="cancelCloseCard()" [disabled]="isUploadingDocument">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Limit Change History Modal -->
+    <div class="modal-overlay" *ngIf="showHistoryModal" (click)="showHistoryModal = false">
+      <div class="modal-content history-modal" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h3><i class="fa fa-history"></i> Credit Limit Change History</h3>
+          <button class="close-btn" (click)="showHistoryModal = false">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="history-list" *ngIf="limitChangeHistory.length > 0">
+            <div class="history-item" *ngFor="let history of limitChangeHistory">
+              <div class="history-header">
+                <div class="history-action" [ngClass]="history.action">
+                  <i class="fa" [ngClass]="history.action === 'increase' ? 'fa-arrow-up' : 'fa-arrow-down'"></i>
+                  <span>{{ history.action === 'increase' ? 'Increased' : 'Decreased' }}</span>
+                </div>
+                <div class="history-date">
+                  <i class="fa fa-calendar"></i> {{ history.date }}
+                  <i class="fa fa-clock"></i> {{ history.time }}
+                </div>
+              </div>
+              <div class="history-details">
+                <div class="detail-row">
+                  <label>Old Limit:</label>
+                  <span class="amount">₹{{ history.oldLimit | number:'1.2-2' }}</span>
+                </div>
+                <div class="detail-row">
+                  <label>New Limit:</label>
+                  <span class="amount highlight">₹{{ history.newLimit | number:'1.2-2' }}</span>
+                </div>
+                <div class="detail-row">
+                  <label>Change Amount:</label>
+                  <span class="amount" [ngClass]="history.action">{{ history.action === 'increase' ? '+' : '-' }}₹{{ history.changeAmount | number:'1.2-2' }}</span>
+                </div>
+                <div class="detail-row">
+                  <label>Reason:</label>
+                  <span class="reason">{{ history.reason || 'No reason provided' }}</span>
+                </div>
+                <div class="detail-row">
+                  <label>Updated By:</label>
+                  <span class="admin-name"><i class="fa fa-user-shield"></i> {{ history.adminName }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="no-history" *ngIf="limitChangeHistory.length === 0">
+            <i class="fa fa-history"></i>
+            <p>No limit change history found for this credit card.</p>
+          </div>
+          <div class="modal-actions">
+            <button class="btn-secondary" (click)="showHistoryModal = false">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,51 @@
+<div class="agent-login-page">
+  <div class="login-container">
+    <button class="back-btn" (click)="goBack()">← Back to Home</button>
+
+    <div class="login-card">
+      <div class="login-header">
+        <div class="login-icon">🏪</div>
+        <h1>Agent Login</h1>
+        <p>Login to onboard merchants and manage applications</p>
+      </div>
+
+      <div class="mode-toggle">
+        <button [class.active]="loginMode === 'email'" (click)="loginMode = 'email'; errorMsg = ''">
+          📧 Email
+        </button>
+        <button [class.active]="loginMode === 'mobile'" (click)="loginMode = 'mobile'; errorMsg = ''">
+          📱 Mobile
+        </button>
+      </div>
+
+      <div class="login-form">
+        <div class="form-group" *ngIf="loginMode === 'email'">
+          <label>Email Address</label>
+          <input type="email" [(ngModel)]="email" placeholder="agent@neobank.com" (keyup.enter)="login()">
+        </div>
+
+        <div class="form-group" *ngIf="loginMode === 'mobile'">
+          <label>Mobile Number</label>
+          <input type="tel" [(ngModel)]="mobile" placeholder="9876543210" maxlength="10" (keyup.enter)="login()">
+        </div>
+
+        <div class="form-group">
+          <label>Password</label>
+          <input type="password" [(ngModel)]="password" placeholder="Enter password" (keyup.enter)="login()">
+        </div>
+
+        <div class="error-msg" *ngIf="errorMsg">{{ errorMsg }}</div>
+
+        <button class="login-btn" (click)="login()" [disabled]="loading">
+          <span *ngIf="!loading">Login as Agent</span>
+          <span *ngIf="loading">Logging in...</span>
+        </button>
+      </div>
+
+      <div class="login-footer">
+        <p>Default credentials for testing:</p>
+        <small>Email: agent&#64;neobank.com | Password: agent123</small>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,1998 @@
+<div class="sdash-container">
+  <!-- Sidebar -->
+  <aside class="sdash-sidebar" [class.collapsed]="sidebarCollapsed">
+    <div class="sdash-sidebar-header">
+      <div class="sdash-brand" *ngIf="!sidebarCollapsed">
+        <div class="sdash-brand-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="3"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+        </div>
+        <div>
+          <h2>NEO BANK</h2>
+          <span class="sdash-subtitle">Employee Portal</span>
+        </div>
+      </div>
+      <button class="sdash-toggle-btn" (click)="toggleSidebar()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+      </button>
+    </div>
+
+    <!-- Sidebar Search Bar -->
+    <div class="sdash-sidebar-search" *ngIf="!sidebarCollapsed">
+      <div class="sdash-search-box">
+        <svg class="sdash-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" placeholder="Search menu..." [(ngModel)]="sidebarSearchQuery" (input)="onSidebarSearch()" class="sdash-search-input" />
+        <svg class="sdash-search-clear" *ngIf="sidebarSearchQuery" (click)="sidebarSearchQuery = ''; onSidebarSearch()" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </div>
+    </div>
+
+    <nav class="sdash-nav">
+      <a class="sdash-nav-item" [class.active]="activeSection === 'overview'" (click)="setActiveSection('overview')" [hidden]="!matchesSidebarSearch('Dashboard')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+        <span *ngIf="!sidebarCollapsed">Dashboard</span>
+      </a>
+      <a class="sdash-nav-item" [class.active]="activeSection === 'account'" (click)="setActiveSection('account')" [hidden]="!matchesSidebarSearch('My Account')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        <span *ngIf="!sidebarCollapsed">My Account</span>
+      </a>
+      <a class="sdash-nav-item" [class.active]="activeSection === 'salary-transactions'" (click)="setActiveSection('salary-transactions')" [hidden]="!matchesSidebarSearch('Salary Transactions')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5l-5-3-5 3M17 19l-5 3-5-3"/></svg>
+        <span *ngIf="!sidebarCollapsed">Salary Transactions</span>
+      </a>
+      <a class="sdash-nav-item" [class.active]="activeSection === 'transfer'" (click)="setActiveSection('transfer')" [hidden]="!matchesSidebarSearch('Transfer Money')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+        <span *ngIf="!sidebarCollapsed">Transfer Money</span>
+      </a>
+      <a class="sdash-nav-item" [class.active]="activeSection === 'withdraw'" (click)="setActiveSection('withdraw')" [hidden]="!matchesSidebarSearch('Withdraw Money')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>
+        <span *ngIf="!sidebarCollapsed">Withdraw Money</span>
+      </a>
+      <a class="sdash-nav-item" [class.active]="activeSection === 'transactions'" (click)="setActiveSection('transactions')" [hidden]="!matchesSidebarSearch('Transactions')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        <span *ngIf="!sidebarCollapsed">Transactions</span>
+      </a>
+      <a class="sdash-nav-item" [class.active]="activeSection === 'bank-charges'" (click)="setActiveSection('bank-charges')" [hidden]="!matchesSidebarSearch('Bank Charges')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        <span *ngIf="!sidebarCollapsed">Bank Charges</span>
+      </a>
+      <a class="sdash-nav-item" [class.active]="activeSection === 'salary-slip'" (click)="setActiveSection('salary-slip')" [hidden]="!matchesSidebarSearch('Salary Slip')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        <span *ngIf="!sidebarCollapsed">Salary Slip</span>
+      </a>
+      <a class="sdash-nav-item" [class.active]="activeSection === 'login-activity'" (click)="setActiveSection('login-activity')" [hidden]="!matchesSidebarSearch('Login Activity')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        <span *ngIf="!sidebarCollapsed">Login Activity</span>
+      </a>
+      <a class="sdash-nav-item" [class.active]="activeSection === 'settings'" (click)="setActiveSection('settings')" [hidden]="!matchesSidebarSearch('Profile Settings')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <span *ngIf="!sidebarCollapsed">Profile Settings</span>
+      </a>
+
+      <div class="sdash-nav-divider" *ngIf="!sidebarSearchQuery"></div>
+      <span class="sdash-nav-label" *ngIf="!sidebarCollapsed && !sidebarSearchQuery">Services</span>
+
+      <a class="sdash-nav-item" [class.active]="activeSection === 'upi'" (click)="setActiveSection('upi')" [hidden]="!matchesSidebarSearch('UPI Payments')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+        <span *ngIf="!sidebarCollapsed">UPI Payments</span>
+      </a>
+      <a class="sdash-nav-item" [class.active]="activeSection === 'debit-card'" (click)="setActiveSection('debit-card')" [hidden]="!matchesSidebarSearch('Debit Card')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+        <span *ngIf="!sidebarCollapsed">Debit Card</span>
+      </a>
+      <a class="sdash-nav-item" [class.active]="activeSection === 'loan-eligibility'" (click)="setActiveSection('loan-eligibility')" [hidden]="!matchesSidebarSearch('Loan Eligibility')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        <span *ngIf="!sidebarCollapsed">Loan Eligibility</span>
+      </a>
+      <a class="sdash-nav-item" [class.active]="activeSection === 'auto-savings'" (click)="setActiveSection('auto-savings')" [hidden]="!matchesSidebarSearch('Auto Savings')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 5c-1.5 0-2.8 1.4-3 2-3.5-1.5-11-.3-11 5 0 1.8 0 3 2 4.5V20h4v-2h3v2h4v-4c1-.5 1.7-1 2-2h2v-4h-2c0-1-.5-1.5-1-2"/><path d="M2 9.1C1.8 10 2 11 2 12"/></svg>
+        <span *ngIf="!sidebarCollapsed">Auto Savings</span>
+      </a>
+      <a class="sdash-nav-item" [class.active]="activeSection === 'salary-advance'" (click)="setActiveSection('salary-advance')" [hidden]="!matchesSidebarSearch('Salary Advance')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        <span *ngIf="!sidebarCollapsed">Salary Advance</span>
+      </a>
+      <a class="sdash-nav-item" [class.active]="activeSection === 'draw-cheque'" (click)="setActiveSection('draw-cheque')" [hidden]="!matchesSidebarSearch('Draw Cheque')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h18v4H3z"/><path d="M21 11v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-6"/></svg>
+        <span *ngIf="!sidebarCollapsed">Draw Cheque</span>
+      </a>
+      <a class="sdash-nav-item" [class.active]="activeSection === 'gold-loan'" (click)="setActiveSection('gold-loan')" [hidden]="!matchesSidebarSearch('Gold Loan')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v12M8 10h8M8 14h8"/></svg>
+        <span *ngIf="!sidebarCollapsed">Gold Loan</span>
+      </a>
+      <a class="sdash-nav-item" [class.active]="activeSection === 'fraud-detection'" (click)="setActiveSection('fraud-detection')" [hidden]="!matchesSidebarSearch('Fraud Detection')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M12 8v4"/><circle cx="12" cy="16" r="1"/></svg>
+        <span *ngIf="!sidebarCollapsed">Fraud Detection</span>
+      </a>
+      <a class="sdash-nav-item" [class.active]="activeSection === 'employee-profile'" (click)="setActiveSection('employee-profile')" [hidden]="!matchesSidebarSearch('Employee Profile')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        <span *ngIf="!sidebarCollapsed">Employee Profile</span>
+      </a>
+      <a class="sdash-nav-item" [class.active]="activeSection === 'subscriptions'" (click)="setActiveSection('subscriptions')" [hidden]="!matchesSidebarSearch('Subscriptions')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/><polyline points="21 3 21 9 15 9"/></svg>
+        <span *ngIf="!sidebarCollapsed">Subscriptions</span>
+      </a>
+
+      <div class="sdash-nav-divider" *ngIf="!sidebarSearchQuery"></div>
+
+      <a class="sdash-nav-item sdash-logout" (click)="logout()" [hidden]="!matchesSidebarSearch('Logout')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        <span *ngIf="!sidebarCollapsed">Logout</span>
+      </a>
+    </nav>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="sdash-main" [class.expanded]="sidebarCollapsed">
+    <!-- Header -->
+    <header class="sdash-header">
+      <div class="sdash-header-left">
+         <h1>{{ activeSection === 'overview' ? 'Dashboard' :
+           activeSection === 'account' ? 'My Account' :
+           activeSection === 'salary-transactions' ? 'Salary Transactions' :
+           activeSection === 'transfer' ? 'Transfer Money' :
+           activeSection === 'withdraw' ? 'Withdraw Money' :
+           activeSection === 'transactions' ? 'Transactions' :
+           activeSection === 'bank-charges' ? 'Bank Charges' :
+           activeSection === 'salary-slip' ? 'Download Salary Slip' :
+           activeSection === 'login-activity' ? 'Login Activity' :
+           activeSection === 'settings' ? 'Profile Settings' :
+           activeSection === 'upi' ? 'UPI Payments' :
+           activeSection === 'debit-card' ? 'Debit Card Management' :
+           activeSection === 'loan-eligibility' ? 'Loan Eligibility' :
+           activeSection === 'auto-savings' ? 'Auto Savings' :
+           activeSection === 'salary-advance' ? 'Salary Advance' :
+           activeSection === 'draw-cheque' ? 'Draw Cheque' :
+           activeSection === 'gold-loan' ? 'Gold Loan' :
+           activeSection === 'fraud-detection' ? 'AI Fraud Detection' :
+           activeSection === 'employee-profile' ? 'Employee Profile' : 'Dashboard' }}</h1>
+      </div>
+      <div class="sdash-header-right">
+        <div class="sdash-user-info">
+          <div class="sdash-user-avatar">{{ (employee?.employeeName || 'U')[0] }}</div>
+          <div class="sdash-user-details">
+            <span class="sdash-user-name">{{ employee?.employeeName }}</span>
+            <span class="sdash-user-role">{{ employee?.designation }}</span>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <div class="sdash-content">
+
+      <!-- ─── OVERVIEW ──────────────────────────────────── -->
+      <div *ngIf="activeSection === 'overview'" class="sdash-section">
+        <div class="sdash-overview-cards">
+          <div class="sdash-stat-card sdash-card-balance">
+            <div class="sdash-stat-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="3"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+            </div>
+            <div class="sdash-stat-info">
+              <span class="sdash-stat-label">Available Balance</span>
+              <span class="sdash-stat-value">&#8377;{{ (account?.balance || 0) | number:'1.2-2' }}</span>
+            </div>
+          </div>
+          <div class="sdash-stat-card sdash-card-salary">
+            <div class="sdash-stat-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+            </div>
+            <div class="sdash-stat-info">
+              <span class="sdash-stat-label">Monthly Salary</span>
+              <span class="sdash-stat-value">&#8377;{{ (account?.monthlySalary || 0) | number:'1.2-2' }}</span>
+            </div>
+          </div>
+          <div class="sdash-stat-card sdash-card-yearly">
+            <div class="sdash-stat-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+            </div>
+            <div class="sdash-stat-info">
+              <span class="sdash-stat-label">Total Salary This Year</span>
+              <span class="sdash-stat-value">&#8377;{{ (dashboardStats?.totalSalaryThisYear || 0) | number:'1.2-2' }}</span>
+            </div>
+          </div>
+          <div class="sdash-stat-card sdash-card-company">
+            <div class="sdash-stat-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+            </div>
+            <div class="sdash-stat-info">
+              <span class="sdash-stat-label">Company</span>
+              <span class="sdash-stat-value sdash-company-name">{{ account?.companyName || '-' }}</span>
+            </div>
+          </div>
+          <div class="sdash-stat-card sdash-card-credit">
+            <div class="sdash-stat-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            </div>
+            <div class="sdash-stat-info">
+              <span class="sdash-stat-label">Salary Credit Date</span>
+              <span class="sdash-stat-value">{{ account?.salaryCreditDate || '-' }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="sdash-quick-actions">
+          <h3>Quick Actions</h3>
+          <div class="sdash-action-grid">
+            <button class="sdash-action-btn" (click)="setActiveSection('transfer')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+              Transfer Money
+            </button>
+            <button class="sdash-action-btn" (click)="setActiveSection('withdraw')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>
+              Withdraw Money
+            </button>
+            <button class="sdash-action-btn" (click)="setActiveSection('salary-slip')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              Download Salary Slip
+            </button>
+            <button class="sdash-action-btn" (click)="setActiveSection('draw-cheque')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="10" rx="2"/><line x1="2" y1="7" x2="22" y2="7"/></svg>
+              Draw Cheque
+            </button>
+            <button class="sdash-action-btn" (click)="setActiveSection('salary-transactions')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5l-5-3-5 3M17 19l-5 3-5-3"/></svg>
+              View Transactions
+            </button>
+          </div>
+        </div>
+
+        <!-- Account Info Summary -->
+        <div class="sdash-info-banner" *ngIf="account">
+          <div class="sdash-info-banner-row">
+            <div><span class="sdash-info-label">Account No:</span> <span class="sdash-info-value">{{ account.accountNumber }}</span></div>
+            <div><span class="sdash-info-label">IFSC:</span> <span class="sdash-info-value">{{ account.ifscCode }}</span></div>
+            <div><span class="sdash-info-label">Branch:</span> <span class="sdash-info-value">{{ account.branchName }}</span></div>
+            <div><span class="sdash-info-label">Status:</span> <span class="sdash-info-value sdash-badge" [class.active]="account.status === 'Active'" [class.frozen]="account.status === 'Frozen'">{{ account.status }}</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── DRAW CHEQUE ───────────────────────────────── -->
+      <div *ngIf="activeSection === 'draw-cheque'" class="sdash-section">
+        <div class="sdash-card">
+          <div class="sdash-card-header">
+            <h3>Draw Cheque</h3>
+          </div>
+          <div class="sdash-card-body">
+            <app-draw-cheque></app-draw-cheque>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── MY ACCOUNT ────────────────────────────────── -->
+      <div *ngIf="activeSection === 'account'" class="sdash-section">
+        <div class="sdash-card" *ngIf="account">
+          <div class="sdash-card-header">
+            <h3>Account Information</h3>
+          </div>
+          <div class="sdash-card-body">
+            <div class="sdash-detail-grid">
+              <div class="sdash-detail-item"><span class="sdash-detail-label">Employee Name</span><span class="sdash-detail-value">{{ account.employeeName }}</span></div>
+              <div class="sdash-detail-item"><span class="sdash-detail-label">Date of Birth</span><span class="sdash-detail-value">{{ account.dob }}</span></div>
+              <div class="sdash-detail-item"><span class="sdash-detail-label">Mobile Number</span><span class="sdash-detail-value">{{ account.mobileNumber }}</span></div>
+              <div class="sdash-detail-item"><span class="sdash-detail-label">Email</span><span class="sdash-detail-value">{{ account.email }}</span></div>
+              <div class="sdash-detail-item"><span class="sdash-detail-label">Aadhar Number</span><span class="sdash-detail-value">{{ account.aadharNumber }}</span></div>
+              <div class="sdash-detail-item"><span class="sdash-detail-label">PAN Number</span><span class="sdash-detail-value">{{ account.panNumber }}</span></div>
+              <div class="sdash-detail-item"><span class="sdash-detail-label">Company Name</span><span class="sdash-detail-value">{{ account.companyName }}</span></div>
+              <div class="sdash-detail-item"><span class="sdash-detail-label">Company ID</span><span class="sdash-detail-value">{{ account.companyId }}</span></div>
+              <div class="sdash-detail-item"><span class="sdash-detail-label">Designation</span><span class="sdash-detail-value">{{ account.designation }}</span></div>
+              <div class="sdash-detail-item"><span class="sdash-detail-label">Account Number</span><span class="sdash-detail-value">{{ account.accountNumber }}</span></div>
+              <div class="sdash-detail-item"><span class="sdash-detail-label">Customer ID</span><span class="sdash-detail-value">{{ account.customerId }}</span></div>
+              <div class="sdash-detail-item"><span class="sdash-detail-label">Debit Card Number</span><span class="sdash-detail-value">{{ account.debitCardNumber }}</span></div>
+              <div class="sdash-detail-item"><span class="sdash-detail-label">Branch Name</span><span class="sdash-detail-value">{{ account.branchName }}</span></div>
+              <div class="sdash-detail-item"><span class="sdash-detail-label">IFSC Code</span><span class="sdash-detail-value">{{ account.ifscCode }}</span></div>
+              <div class="sdash-detail-item"><span class="sdash-detail-label">Monthly Salary</span><span class="sdash-detail-value">&#8377;{{ account.monthlySalary | number:'1.2-2' }}</span></div>
+              <div class="sdash-detail-item"><span class="sdash-detail-label">Salary Credit Date</span><span class="sdash-detail-value">{{ account.salaryCreditDate }}</span></div>
+              <div class="sdash-detail-item"><span class="sdash-detail-label">Net Banking</span><span class="sdash-detail-value">{{ account.netBankingEnabled ? 'Enabled' : 'Disabled' }}</span></div>
+              <div class="sdash-detail-item"><span class="sdash-detail-label">Status</span><span class="sdash-detail-value sdash-badge" [class.active]="account.status === 'Active'" [class.frozen]="account.status === 'Frozen'">{{ account.status }}</span></div>
+              <div class="sdash-detail-item"><span class="sdash-detail-label">Balance</span><span class="sdash-detail-value sdash-balance-value">&#8377;{{ account.balance | number:'1.2-2' }}</span></div>
+              <div class="sdash-detail-item"><span class="sdash-detail-label">Transaction PIN</span><span class="sdash-detail-value">{{ account.transactionPinSet ? 'Set ✓' : 'Not Set' }}</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── SALARY TRANSACTIONS ───────────────────────── -->
+      <div *ngIf="activeSection === 'salary-transactions'" class="sdash-section">
+        <div class="sdash-card">
+          <div class="sdash-card-header">
+            <h3>Salary Credit History</h3>
+          </div>
+          <div class="sdash-card-body">
+            <div *ngIf="isLoadingSalaryTxns" class="sdash-loading">
+              <div class="sdash-spinner"></div>
+              <span>Loading transactions...</span>
+            </div>
+            <div *ngIf="!isLoadingSalaryTxns && salaryTransactions.length === 0" class="sdash-empty">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:48px;height:48px;color:#94a3b8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              <p>No salary transactions found</p>
+            </div>
+            <div class="sdash-table-wrapper" *ngIf="!isLoadingSalaryTxns && salaryTransactions.length > 0">
+              <table class="sdash-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Date</th>
+                    <th>Description</th>
+                    <th>Amount</th>
+                    <th>Company</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let txn of salaryTransactions; let i = index">
+                    <td>{{ i + 1 }}</td>
+                    <td>{{ txn.creditDate | date:'dd MMM yyyy' }}</td>
+                    <td>{{ txn.description }}</td>
+                    <td class="sdash-amount-credit">+&#8377;{{ txn.salaryAmount | number:'1.2-2' }}</td>
+                    <td>{{ txn.companyName }}</td>
+                    <td><span class="sdash-badge active">{{ txn.status }}</span></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── TRANSFER MONEY ────────────────────────────── -->
+      <div *ngIf="activeSection === 'transfer'" class="sdash-section">
+
+        <!-- Transfer Result Modal -->
+        <div *ngIf="showTransferResult" class="sdash-result-overlay">
+          <div class="sdash-result-modal">
+            <div class="sdash-result-header">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="sdash-result-icon"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+              <h3>Transfer Successful!</h3>
+            </div>
+            <div class="sdash-result-body">
+              <div class="sdash-result-txnid">Transaction ID: <strong>#{{ transferResult?.transactionId }}</strong></div>
+              <div class="sdash-result-grid">
+                <div class="sdash-result-row"><span>From</span><span>{{ transferResult?.senderName }} ({{ transferResult?.senderAccount }})</span></div>
+                <div class="sdash-result-row"><span>To</span><span>{{ transferResult?.recipientName }} ({{ transferResult?.recipientAccount }})</span></div>
+                <div class="sdash-result-row"><span>Amount</span><span>&#8377;{{ transferResult?.amount | number:'1.2-2' }}</span></div>
+                <div class="sdash-result-row"><span>Bank Charge</span><span>&#8377;{{ transferResult?.charge | number:'1.2-2' }}</span></div>
+                <div class="sdash-result-row sdash-result-total"><span>Total Debit</span><span>&#8377;{{ transferResult?.total | number:'1.2-2' }}</span></div>
+                <div class="sdash-result-row"><span>New Balance</span><span>&#8377;{{ transferResult?.newBalance | number:'1.2-2' }}</span></div>
+                <div class="sdash-result-row"><span>Remark</span><span>{{ transferResult?.remark }}</span></div>
+              </div>
+            </div>
+            <div class="sdash-result-actions">
+              <button class="sdash-btn sdash-btn-outline" (click)="downloadTransferReceipt()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Download Receipt
+              </button>
+              <button class="sdash-btn sdash-btn-primary" (click)="closeTransferResult()">Done</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="sdash-card">
+          <div class="sdash-card-header">
+            <h3>Transfer Money</h3>
+            <span class="sdash-card-badge" *ngIf="account">Balance: &#8377;{{ account.balance | number:'1.2-2' }}</span>
+          </div>
+          <div class="sdash-card-body">
+            <div *ngIf="!account?.transactionPinSet" class="sdash-warning-box">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+              <span>Please set your Transaction PIN in <a (click)="setActiveSection('settings')">Profile Settings</a> before making transfers.</span>
+            </div>
+            <form (ngSubmit)="transferMoney()" class="sdash-form" *ngIf="account?.transactionPinSet">
+              <div class="sdash-form-grid">
+                <div class="sdash-form-group">
+                  <label>Recipient Account Number <span class="required">*</span></label>
+                  <div class="sdash-input-with-btn">
+                    <input type="text" [(ngModel)]="transferRecipient" name="transferRecipient" placeholder="Enter account number" required (input)="onRecipientChange()">
+                    <button type="button" class="sdash-verify-btn" (click)="verifyRecipient()" [disabled]="isVerifyingRecipient || !transferRecipient">
+                      <span *ngIf="!isVerifyingRecipient">Verify</span>
+                      <span *ngIf="isVerifyingRecipient"><div class="sdash-spinner-small sdash-spinner-dark"></div></span>
+                    </button>
+                  </div>
+                </div>
+                <div class="sdash-form-group">
+                  <label>IFSC Code</label>
+                  <input type="text" [(ngModel)]="transferIfsc" name="transferIfsc" placeholder="Enter IFSC code" [readonly]="recipientVerified">
+                </div>
+              </div>
+
+              <!-- Verified Recipient Info -->
+              <div *ngIf="recipientVerified" class="sdash-recipient-info">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="sdash-verified-icon"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                <div class="sdash-recipient-details">
+                  <span class="sdash-recipient-name">{{ recipientName }}</span>
+                  <span class="sdash-recipient-meta">{{ recipientAccountType }} &bull; {{ recipientBankName }}</span>
+                </div>
+              </div>
+
+              <!-- Recipient Not Found -->
+              <div *ngIf="recipientNotFound" class="sdash-recipient-notfound">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                <span>{{ recipientMessage }}</span>
+              </div>
+
+              <div class="sdash-form-grid">
+                <div class="sdash-form-group">
+                  <label>Amount (&#8377;) <span class="required">*</span></label>
+                  <input type="number" [(ngModel)]="transferAmount" name="transferAmount" placeholder="Enter amount" required min="1">
+                  <span class="sdash-field-note" *ngIf="transferAmount">
+                    Charges: &#8377;{{ getTransferCharge(transferAmount) }}
+                    <span *ngIf="getTransferCharge(transferAmount) === 0" class="sdash-free-badge">FREE</span>
+                  </span>
+                </div>
+                <div class="sdash-form-group">
+                  <label>Transaction PIN <span class="required">*</span></label>
+                  <input type="password" [(ngModel)]="transferPin" name="transferPin" placeholder="Enter 4-digit PIN" required maxlength="6">
+                </div>
+              </div>
+              <div class="sdash-form-group sdash-full-width">
+                <label>Remark</label>
+                <input type="text" [(ngModel)]="transferRemark" name="transferRemark" placeholder="Add a note (optional)">
+              </div>
+              <div class="sdash-form-actions">
+                <button type="submit" class="sdash-btn sdash-btn-primary" [disabled]="isTransferring">
+                  <span *ngIf="!isTransferring">Transfer Money</span>
+                  <span *ngIf="isTransferring" class="sdash-btn-loading">
+                    <div class="sdash-spinner-small"></div> Processing...
+                  </span>
+                </button>
+              </div>
+            </form>
+
+            <!-- Transfer Charge Info -->
+            <div class="sdash-charge-info">
+              <h4>Transfer Charges</h4>
+              <div class="sdash-charge-grid">
+                <div class="sdash-charge-item"><span>Up to &#8377;10,000</span><span class="sdash-free-badge">FREE</span></div>
+                <div class="sdash-charge-item"><span>&#8377;10,001 - &#8377;50,000</span><span>&#8377;5</span></div>
+                <div class="sdash-charge-item"><span>&#8377;50,001 - &#8377;2,00,000</span><span>&#8377;15</span></div>
+                <div class="sdash-charge-item"><span>Above &#8377;2,00,000</span><span>&#8377;25</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── WITHDRAW MONEY ────────────────────────────── -->
+      <div *ngIf="activeSection === 'withdraw'" class="sdash-section">
+        <div class="sdash-card">
+          <div class="sdash-card-header">
+            <h3>Withdraw Money</h3>
+            <span class="sdash-card-badge" *ngIf="account">Balance: &#8377;{{ account.balance | number:'1.2-2' }}</span>
+          </div>
+          <div class="sdash-card-body">
+            <div *ngIf="!account?.transactionPinSet" class="sdash-warning-box">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+              <span>Please set your Transaction PIN in <a (click)="setActiveSection('settings')">Profile Settings</a> before withdrawing.</span>
+            </div>
+            <form (ngSubmit)="withdrawMoney()" class="sdash-form" *ngIf="account?.transactionPinSet">
+              <div class="sdash-form-grid">
+                <div class="sdash-form-group">
+                  <label>Amount (&#8377;) <span class="required">*</span></label>
+                  <input type="number" [(ngModel)]="withdrawAmount" name="withdrawAmount" placeholder="Enter amount" required min="1">
+                  <span class="sdash-field-note" *ngIf="withdrawAmount">
+                    Charges: &#8377;{{ getWithdrawCharge(withdrawAmount) }}
+                    <span *ngIf="getWithdrawCharge(withdrawAmount) === 0" class="sdash-free-badge">FREE</span>
+                  </span>
+                </div>
+                <div class="sdash-form-group">
+                  <label>Transaction PIN <span class="required">*</span></label>
+                  <input type="password" [(ngModel)]="withdrawPin" name="withdrawPin" placeholder="Enter 4-digit PIN" required maxlength="6">
+                </div>
+              </div>
+              <div class="sdash-form-actions">
+                <button type="submit" class="sdash-btn sdash-btn-primary" [disabled]="isWithdrawing">
+                  <span *ngIf="!isWithdrawing">Withdraw Money</span>
+                  <span *ngIf="isWithdrawing" class="sdash-btn-loading">
+                    <div class="sdash-spinner-small"></div> Processing...
+                  </span>
+                </button>
+              </div>
+            </form>
+
+            <div class="sdash-charge-info">
+              <h4>Withdrawal Charges</h4>
+              <div class="sdash-charge-grid">
+                <div class="sdash-charge-item"><span>Up to &#8377;25,000</span><span class="sdash-free-badge">FREE</span></div>
+                <div class="sdash-charge-item"><span>Above &#8377;25,000</span><span>&#8377;10</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── TRANSACTIONS ──────────────────────────────── -->
+      <div *ngIf="activeSection === 'transactions'" class="sdash-section">
+        <div class="sdash-card">
+          <div class="sdash-card-header">
+            <h3>All Transactions</h3>
+            <span class="sdash-card-badge" *ngIf="account">Balance: &#8377;{{ account.balance | number:'1.2-2' }}</span>
+          </div>
+          <div class="sdash-card-body">
+            <div *ngIf="isLoadingNormalTxns" class="sdash-loading">
+              <div class="sdash-spinner"></div>
+              <p>Loading transactions...</p>
+            </div>
+            <div *ngIf="!isLoadingNormalTxns && normalTransactions.length === 0" class="sdash-empty-state">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:48px;height:48px;color:#bbb"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+              <p>No transactions yet. Make a transfer or withdrawal to see your transaction history.</p>
+            </div>
+
+            <!-- Filter Tabs -->
+            <div *ngIf="!isLoadingNormalTxns && normalTransactions.length > 0" class="sdash-txn-filters">
+              <button class="sdash-txn-filter-btn" [class.active]="txnFilter === 'all'" (click)="txnFilter = 'all'">All</button>
+              <button class="sdash-txn-filter-btn" [class.active]="txnFilter === 'TRANSFER'" (click)="txnFilter = 'TRANSFER'">Transfers</button>
+              <button class="sdash-txn-filter-btn" [class.active]="txnFilter === 'WITHDRAW'" (click)="txnFilter = 'WITHDRAW'">Withdrawals</button>
+            </div>
+
+            <!-- Transactions Table -->
+            <div *ngIf="!isLoadingNormalTxns && normalTransactions.length > 0" class="sdash-txn-table-wrapper">
+              <table class="sdash-txn-table">
+                <thead>
+                  <tr>
+                    <th>Txn ID</th>
+                    <th>Date</th>
+                    <th>Time</th>
+                    <th>Type</th>
+                    <th>Amount</th>
+                    <th>Charge</th>
+                    <th>Debit Reason</th>
+                    <th>Credit Reason</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let txn of getFilteredTransactions()" class="sdash-txn-row">
+                    <td class="sdash-txn-id">#{{ txn.id }}</td>
+                    <td>{{ txn.createdAt | date:'dd MMM yyyy' }}</td>
+                    <td>{{ txn.createdAt | date:'hh:mm a' }}</td>
+                    <td>
+                      <span class="sdash-txn-type-badge" [class.transfer]="txn.type === 'TRANSFER'" [class.withdraw]="txn.type === 'WITHDRAW'">{{ txn.type }}</span>
+                    </td>
+                    <td class="sdash-txn-amount">&#8377;{{ txn.amount | number:'1.2-2' }}</td>
+                    <td>&#8377;{{ txn.charge | number:'1.2-2' }}</td>
+                    <td class="sdash-txn-reason sdash-debit">
+                      <span *ngIf="txn.type === 'TRANSFER'">Transfer to {{ txn.recipientAccount }}</span>
+                      <span *ngIf="txn.type === 'WITHDRAW'">Cash Withdrawal</span>
+                      <span *ngIf="txn.type !== 'TRANSFER' && txn.type !== 'WITHDRAW'">{{ txn.remark || '-' }}</span>
+                    </td>
+                    <td class="sdash-txn-reason sdash-credit">
+                      <span *ngIf="txn.type === 'TRANSFER'">Credit to {{ txn.recipientAccount }}</span>
+                      <span *ngIf="txn.type === 'WITHDRAW'">-</span>
+                      <span *ngIf="txn.type !== 'TRANSFER' && txn.type !== 'WITHDRAW'">-</span>
+                    </td>
+                    <td>
+                      <span class="sdash-txn-status" [class.success]="txn.status === 'Success'" [class.failed]="txn.status !== 'Success'">{{ txn.status }}</span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── BANK CHARGES ──────────────────────────────── -->
+      <div *ngIf="activeSection === 'bank-charges'" class="sdash-section">
+        <div class="sdash-card">
+          <div class="sdash-card-header">
+            <h3>Bank Charges Summary</h3>
+          </div>
+          <div class="sdash-card-body">
+            <div *ngIf="isLoadingCharges" class="sdash-loading">
+              <div class="sdash-spinner"></div>
+              <span>Loading charges...</span>
+            </div>
+            <div *ngIf="!isLoadingCharges" class="sdash-charges-summary">
+              <div class="sdash-charges-cards">
+                <div class="sdash-charge-card">
+                  <span class="sdash-charge-card-label">Total Transfer Charges</span>
+                  <span class="sdash-charge-card-value">&#8377;{{ (bankCharges?.totalTransferCharges || 0) | number:'1.2-2' }}</span>
+                </div>
+                <div class="sdash-charge-card">
+                  <span class="sdash-charge-card-label">Total Withdrawal Charges</span>
+                  <span class="sdash-charge-card-value">&#8377;{{ (bankCharges?.totalWithdrawalCharges || 0) | number:'1.2-2' }}</span>
+                </div>
+                <div class="sdash-charge-card sdash-charge-card-total">
+                  <span class="sdash-charge-card-label">Total Charges Paid</span>
+                  <span class="sdash-charge-card-value">&#8377;{{ (bankCharges?.totalCharges || 0) | number:'1.2-2' }}</span>
+                </div>
+              </div>
+
+              <!-- Charge Schedule -->
+              <div class="sdash-charge-schedule">
+                <h4>Charge Schedule</h4>
+                <div class="sdash-schedule-row">
+                  <div class="sdash-schedule-col">
+                    <h5>Transfer Charges</h5>
+                    <table class="sdash-table sdash-table-compact">
+                      <thead><tr><th>Amount Range</th><th>Charge</th></tr></thead>
+                      <tbody>
+                        <tr><td>Up to &#8377;10,000</td><td class="sdash-free-badge">FREE</td></tr>
+                        <tr><td>&#8377;10,001 - &#8377;50,000</td><td>&#8377;5</td></tr>
+                        <tr><td>&#8377;50,001 - &#8377;2,00,000</td><td>&#8377;15</td></tr>
+                        <tr><td>Above &#8377;2,00,000</td><td>&#8377;25</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <div class="sdash-schedule-col">
+                    <h5>Withdrawal Charges</h5>
+                    <table class="sdash-table sdash-table-compact">
+                      <thead><tr><th>Amount Range</th><th>Charge</th></tr></thead>
+                      <tbody>
+                        <tr><td>Up to &#8377;25,000</td><td class="sdash-free-badge">FREE</td></tr>
+                        <tr><td>Above &#8377;25,000</td><td>&#8377;10</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── SALARY SLIP ───────────────────────────────── -->
+      <div *ngIf="activeSection === 'salary-slip'" class="sdash-section">
+        <div class="sdash-card">
+          <div class="sdash-card-header">
+            <h3>Download Salary Slip</h3>
+          </div>
+          <div class="sdash-card-body">
+            <p class="sdash-section-desc">Select a salary transaction to download its salary slip.</p>
+            <div *ngIf="isLoadingSalaryTxns" class="sdash-loading">
+              <div class="sdash-spinner"></div>
+              <span>Loading transactions...</span>
+            </div>
+            <div *ngIf="!isLoadingSalaryTxns && salaryTransactions.length === 0" class="sdash-empty">
+              <p>No salary transactions to generate slips from.</p>
+            </div>
+            <div class="sdash-table-wrapper" *ngIf="!isLoadingSalaryTxns && salaryTransactions.length > 0">
+              <table class="sdash-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Credit Date</th>
+                    <th>Amount</th>
+                    <th>Company</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let txn of salaryTransactions; let i = index">
+                    <td>{{ i + 1 }}</td>
+                    <td>{{ txn.creditDate | date:'dd MMM yyyy' }}</td>
+                    <td class="sdash-amount-credit">&#8377;{{ txn.salaryAmount | number:'1.2-2' }}</td>
+                    <td>{{ txn.companyName }}</td>
+                    <td>
+                      <button class="sdash-btn sdash-btn-sm sdash-btn-outline" (click)="downloadSalarySlip(txn)" [disabled]="isLoadingSlip">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                        Download
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── LOGIN ACTIVITY ────────────────────────────── -->
+      <div *ngIf="activeSection === 'login-activity'" class="sdash-section">
+        <!-- Current Session Card -->
+        <div class="sdash-card sdash-mb">
+          <div class="sdash-card-header">
+            <h3>Current Session</h3>
+            <span class="sdash-badge active">ACTIVE NOW</span>
+          </div>
+          <div class="sdash-card-body">
+            <div class="sdash-current-session">
+              <div class="sdash-session-item">
+                <span class="sdash-session-label">Browser</span>
+                <span class="sdash-session-value">{{ getBrowserName() }}</span>
+              </div>
+              <div class="sdash-session-item">
+                <span class="sdash-session-label">Login Time</span>
+                <span class="sdash-session-value">{{ sessionStartTime | date:'dd MMM yyyy, hh:mm:ss a' }}</span>
+              </div>
+              <div class="sdash-session-item">
+                <span class="sdash-session-label">Time Used</span>
+                <span class="sdash-session-value sdash-timer">{{ currentSessionDuration }}</span>
+              </div>
+              <div class="sdash-session-item">
+                <span class="sdash-session-label">Device</span>
+                <span class="sdash-session-value">{{ getDeviceInfo() }}</span>
+              </div>
+            </div>
+            <div class="sdash-form-actions" style="margin-top: 16px;">
+              <button class="sdash-btn sdash-btn-danger" (click)="logout()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;margin-right:6px;"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                Logout
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Activity History -->
+        <div class="sdash-card">
+          <div class="sdash-card-header">
+            <h3>Login Activity History</h3>
+          </div>
+          <div class="sdash-card-body">
+            <div *ngIf="isLoadingActivity" class="sdash-loading">
+              <div class="sdash-spinner"></div>
+              <span>Loading activity...</span>
+            </div>
+            <div *ngIf="!isLoadingActivity && loginActivities.length === 0" class="sdash-empty">
+              <p>No login activity recorded yet.</p>
+            </div>
+            <div class="sdash-table-wrapper" *ngIf="!isLoadingActivity && loginActivities.length > 0">
+              <table class="sdash-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Date</th>
+                    <th>Time</th>
+                    <th>Activity</th>
+                    <th>Browser</th>
+                    <th>Device Info</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let act of loginActivities; let i = index">
+                    <td>{{ i + 1 }}</td>
+                    <td>{{ act.createdAt | date:'dd MMM yyyy' }}</td>
+                    <td>{{ act.createdAt | date:'hh:mm:ss a' }}</td>
+                    <td>
+                      <span class="sdash-badge" [class.active]="act.activityType === 'LOGIN'" [class.frozen]="act.activityType === 'LOGOUT'">{{ act.activityType }}</span>
+                    </td>
+                    <td>{{ act.ipAddress || '-' }}</td>
+                    <td class="sdash-device-info">{{ act.deviceInfo || '-' }}</td>
+                    <td>
+                      <span class="sdash-badge active">{{ act.status }}</span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── PROFILE SETTINGS ──────────────────────────── -->
+      <div *ngIf="activeSection === 'settings'" class="sdash-section">
+        <!-- Set/Change Transaction PIN -->
+        <div class="sdash-card sdash-mb">
+          <div class="sdash-card-header">
+            <h3>{{ account?.transactionPinSet ? 'Change Transaction PIN' : 'Set Transaction PIN' }}</h3>
+          </div>
+          <div class="sdash-card-body">
+            <!-- Set PIN (first time) -->
+            <form *ngIf="!account?.transactionPinSet" (ngSubmit)="setTransactionPin()" class="sdash-form">
+              <div class="sdash-form-grid">
+                <div class="sdash-form-group">
+                  <label>Login Password <span class="required">*</span></label>
+                  <input type="password" [(ngModel)]="pinPassword" name="pinPassword" placeholder="Enter your login password" required>
+                </div>
+                <div class="sdash-form-group">
+                  <label>New PIN <span class="required">*</span></label>
+                  <input type="password" [(ngModel)]="newPin" name="newPin" placeholder="Enter 4-digit PIN" required maxlength="6">
+                </div>
+                <div class="sdash-form-group">
+                  <label>Confirm PIN <span class="required">*</span></label>
+                  <input type="password" [(ngModel)]="confirmPin" name="confirmPin" placeholder="Confirm PIN" required maxlength="6">
+                </div>
+              </div>
+              <div class="sdash-form-actions">
+                <button type="submit" class="sdash-btn sdash-btn-primary" [disabled]="isSettingPin">
+                  <span *ngIf="!isSettingPin">Set Transaction PIN</span>
+                  <span *ngIf="isSettingPin" class="sdash-btn-loading"><div class="sdash-spinner-small"></div> Setting...</span>
+                </button>
+              </div>
+            </form>
+
+            <!-- Change PIN -->
+            <form *ngIf="account?.transactionPinSet" (ngSubmit)="changeTransactionPin()" class="sdash-form">
+              <div class="sdash-form-grid">
+                <div class="sdash-form-group">
+                  <label>Current PIN <span class="required">*</span></label>
+                  <input type="password" [(ngModel)]="oldPin" name="oldPin" placeholder="Enter current PIN" required maxlength="6">
+                </div>
+                <div class="sdash-form-group">
+                  <label>New PIN <span class="required">*</span></label>
+                  <input type="password" [(ngModel)]="changePinNew" name="changePinNew" placeholder="Enter new PIN" required maxlength="6">
+                </div>
+                <div class="sdash-form-group">
+                  <label>Confirm New PIN <span class="required">*</span></label>
+                  <input type="password" [(ngModel)]="changePinConfirm" name="changePinConfirm" placeholder="Confirm new PIN" required maxlength="6">
+                </div>
+              </div>
+              <div class="sdash-form-actions">
+                <button type="submit" class="sdash-btn sdash-btn-primary" [disabled]="isChangingPin">
+                  <span *ngIf="!isChangingPin">Change PIN</span>
+                  <span *ngIf="isChangingPin" class="sdash-btn-loading"><div class="sdash-spinner-small"></div> Changing...</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <!-- Change Password -->
+        <div class="sdash-card">
+          <div class="sdash-card-header">
+            <h3>Change Password</h3>
+          </div>
+          <div class="sdash-card-body">
+            <form (ngSubmit)="changePassword()" class="sdash-form">
+              <div class="sdash-form-grid">
+                <div class="sdash-form-group">
+                  <label>Current Password <span class="required">*</span></label>
+                  <input type="password" [(ngModel)]="currentPassword" name="currentPassword" placeholder="Enter current password" required>
+                </div>
+                <div class="sdash-form-group">
+                  <label>New Password <span class="required">*</span></label>
+                  <input type="password" [(ngModel)]="newPassword" name="newPassword" placeholder="Enter new password (min 6 chars)" required minlength="6">
+                </div>
+                <div class="sdash-form-group">
+                  <label>Confirm New Password <span class="required">*</span></label>
+                  <input type="password" [(ngModel)]="confirmNewPassword" name="confirmNewPassword" placeholder="Confirm new password" required>
+                </div>
+              </div>
+              <div class="sdash-form-actions">
+                <button type="submit" class="sdash-btn sdash-btn-primary" [disabled]="isChangingPassword">
+                  <span *ngIf="!isChangingPassword">Change Password</span>
+                  <span *ngIf="isChangingPassword" class="sdash-btn-loading"><div class="sdash-spinner-small"></div> Changing...</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── UPI PAYMENTS ────────────────────────────────── -->
+      <div *ngIf="activeSection === 'upi'" class="sdash-section">
+        <!-- Enable UPI -->
+        <div *ngIf="!account?.upiEnabled" class="sdash-card sdash-mb">
+          <div class="sdash-card-header">
+            <h3>Enable UPI</h3>
+          </div>
+          <div class="sdash-card-body sdash-center-content">
+            <div class="sdash-upi-enable-box">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="sdash-big-icon"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+              <h3>UPI Payments Not Enabled</h3>
+              <p>Enable UPI to send and receive instant payments using your UPI ID.</p>
+              <button class="sdash-btn sdash-btn-primary" (click)="enableUpi()" [disabled]="isEnablingUpi">
+                <span *ngIf="!isEnablingUpi">Enable UPI</span>
+                <span *ngIf="isEnablingUpi" class="sdash-btn-loading"><div class="sdash-spinner-small"></div> Enabling...</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- UPI Active -->
+        <div *ngIf="account?.upiEnabled">
+          <!-- UPI Info -->
+          <div class="sdash-overview-cards sdash-mb">
+            <div class="sdash-stat-card sdash-card-upi">
+              <div class="sdash-stat-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+              </div>
+              <div class="sdash-stat-info">
+                <span class="sdash-stat-label">Your UPI ID</span>
+                <span class="sdash-stat-value sdash-upi-id">{{ account?.upiId }}</span>
+              </div>
+            </div>
+            <div class="sdash-stat-card sdash-card-balance">
+              <div class="sdash-stat-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="3"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+              </div>
+              <div class="sdash-stat-info">
+                <span class="sdash-stat-label">Available Balance</span>
+                <span class="sdash-stat-value">&#8377;{{ (account?.balance || 0) | number:'1.2-2' }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- UPI PIN Management -->
+          <div class="sdash-card sdash-mb">
+            <div class="sdash-card-header">
+              <h3>🔑 UPI PIN Management</h3>
+            </div>
+            <div class="sdash-card-body">
+              <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+                <span style="font-size:15px;color:#374151;">PIN Status:</span>
+                <span *ngIf="account?.transactionPinSet" style="color:#16a34a;font-weight:600;">✅ PIN is set</span>
+                <span *ngIf="!account?.transactionPinSet" style="color:#dc2626;font-weight:600;">❌ PIN not set</span>
+              </div>
+              <!-- Set PIN form (shown when PIN not set) -->
+              <div *ngIf="!account?.transactionPinSet" class="sdash-form">
+                <div class="sdash-form-grid">
+                  <div class="sdash-form-group">
+                    <label>Account Password <span class="required">*</span></label>
+                    <input type="password" [(ngModel)]="pinPassword" name="pinPassword" placeholder="Verify your account password" maxlength="30">
+                  </div>
+                  <div class="sdash-form-group">
+                    <label>New 6-Digit UPI PIN <span class="required">*</span></label>
+                    <input type="password" [(ngModel)]="newPin" name="newPin" placeholder="Enter 6-digit PIN" maxlength="6" inputmode="numeric">
+                  </div>
+                  <div class="sdash-form-group">
+                    <label>Confirm PIN <span class="required">*</span></label>
+                    <input type="password" [(ngModel)]="confirmPin" name="confirmPin" placeholder="Re-enter PIN" maxlength="6" inputmode="numeric">
+                  </div>
+                </div>
+                <div class="sdash-form-actions">
+                  <button type="button" class="sdash-btn sdash-btn-primary" (click)="setTransactionPin()" [disabled]="isSettingPin">
+                    <span *ngIf="!isSettingPin">Set UPI PIN</span>
+                    <span *ngIf="isSettingPin" class="sdash-btn-loading"><div class="sdash-spinner-small"></div> Saving...</span>
+                  </button>
+                </div>
+              </div>
+              <!-- Change PIN form (shown when PIN already set) -->
+              <div *ngIf="account?.transactionPinSet" class="sdash-form">
+                <div class="sdash-form-grid">
+                  <div class="sdash-form-group">
+                    <label>Current UPI PIN <span class="required">*</span></label>
+                    <input type="password" [(ngModel)]="oldPin" name="oldPin" placeholder="Enter current PIN" maxlength="6" inputmode="numeric">
+                  </div>
+                  <div class="sdash-form-group">
+                    <label>New UPI PIN <span class="required">*</span></label>
+                    <input type="password" [(ngModel)]="changePinNew" name="changePinNew" placeholder="Enter new 6-digit PIN" maxlength="6" inputmode="numeric">
+                  </div>
+                  <div class="sdash-form-group">
+                    <label>Confirm New PIN <span class="required">*</span></label>
+                    <input type="password" [(ngModel)]="changePinConfirm" name="changePinConfirm" placeholder="Re-enter new PIN" maxlength="6" inputmode="numeric">
+                  </div>
+                </div>
+                <div class="sdash-form-actions">
+                  <button type="button" class="sdash-btn sdash-btn-primary" (click)="changeTransactionPin()" [disabled]="isChangingPin">
+                    <span *ngIf="!isChangingPin">Change UPI PIN</span>
+                    <span *ngIf="isChangingPin" class="sdash-btn-loading"><div class="sdash-spinner-small"></div> Updating...</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Send UPI Payment -->
+          <div class="sdash-card sdash-mb">
+            <div class="sdash-card-header">
+              <h3>Send UPI Payment</h3>
+            </div>
+            <div class="sdash-card-body">
+              <form (ngSubmit)="sendUpiPayment()" class="sdash-form">
+                <div class="sdash-form-grid">
+                  <div class="sdash-form-group">
+                    <label>Recipient UPI ID <span class="required">*</span></label>
+                    <input type="text" [(ngModel)]="upiRecipient" name="upiRecipient" placeholder="e.g. user&#64;neobank" required>
+                  </div>
+                  <div class="sdash-form-group">
+                    <label>Amount (&#8377;) <span class="required">*</span></label>
+                    <input type="number" [(ngModel)]="upiAmount" name="upiAmount" placeholder="Enter amount" required min="1">
+                  </div>
+                  <div class="sdash-form-group">
+                    <label>Remark</label>
+                    <input type="text" [(ngModel)]="upiRemark" name="upiRemark" placeholder="Optional remark">
+                  </div>
+                  <div class="sdash-form-group">
+                    <label>Transaction PIN <span class="required">*</span></label>
+                    <input type="password" [(ngModel)]="upiPin" name="upiPin" placeholder="Enter PIN" required maxlength="6">
+                  </div>
+                </div>
+                <div class="sdash-form-actions">
+                  <button type="submit" class="sdash-btn sdash-btn-primary" [disabled]="isSendingUpi">
+                    <span *ngIf="!isSendingUpi">Send Payment</span>
+                    <span *ngIf="isSendingUpi" class="sdash-btn-loading"><div class="sdash-spinner-small"></div> Sending...</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          <!-- ─── Pay via QR Code (Upload from Gallery) ─────────────────── -->
+          <div class="sdash-card sdash-mb sdash-qr-pay-card">
+            <div class="sdash-card-header sdash-qr-pay-header">
+              <div class="sdash-qr-pay-title-row">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="sdash-qr-icon-header"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 14h.01M14 18h.01M18 14h.01M18 18h.01M14 14v4h4v-4z"/></svg>
+                <h3>Pay via QR Code</h3>
+                <span class="sdash-qr-badge">Upload from Gallery</span>
+              </div>
+              <p class="sdash-qr-pay-subtitle">Scan any merchant or personal UPI QR code to pay instantly</p>
+            </div>
+            <div class="sdash-card-body">
+              <!-- Upload Button (idle state) -->
+              <div *ngIf="!showQrScanResult && !showQrPaySuccess" class="sdash-qr-upload-area">
+                <div class="sdash-qr-upload-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                </div>
+                <p class="sdash-qr-upload-text">Select a NeoBank QR code image from your gallery</p>
+                <p class="sdash-qr-upload-hint">Supports JPG, PNG, WebP &mdash; <strong>NeoBank account &amp; Payment Gateway QR codes</strong></p>
+                <label class="sdash-btn sdash-btn-primary sdash-qr-upload-btn" [class.disabled]="isQrScanning">
+                  <input type="file" accept="image/*" (change)="onQrFileSelected($event)" style="display:none;" [disabled]="isQrScanning">
+                  <span *ngIf="!isQrScanning">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;vertical-align:middle;margin-right:6px;"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 14h.01M14 18h.01M18 14h.01M18 18h.01"/></svg>
+                    Upload QR Code
+                  </span>
+                  <span *ngIf="isQrScanning" class="sdash-btn-loading"><div class="sdash-spinner-small"></div> Scanning...</span>
+                </label>
+                <div *ngIf="qrScanError" class="sdash-qr-error">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                  {{ qrScanError }}
+                </div>
+              </div>
+
+              <!-- Scanned QR Result + Pay Form -->
+              <div *ngIf="showQrScanResult && !showQrPaySuccess" class="sdash-qr-result">
+                <div class="sdash-qr-result-header">
+                  <div class="sdash-qr-success-tick">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                  </div>
+                  <div>
+                    <h4 class="sdash-qr-result-title">QR Code Scanned ✓</h4>
+                    <p class="sdash-qr-result-sub">Review and confirm payment details</p>
+                  </div>
+                </div>
+
+                <div class="sdash-qr-merchant-card">
+                  <div class="sdash-qr-merchant-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 9V21H4V9"/><path d="M23 9H1"/><path d="M9 21V9"/><path d="M15 21V9"/><path d="M8 9V3h8v6"/></svg>
+                  </div>
+                  <div class="sdash-qr-merchant-info">
+                    <span class="sdash-qr-merchant-name">{{ qrScannedName || qrScannedUpiId }}</span>
+                    <span class="sdash-qr-merchant-upi">{{ qrScannedUpiId }}</span>
+                  </div>
+                  <div class="sdash-qr-verified-badge sdash-qr-neobank-badge">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:14px;height:14px;"><polyline points="20 6 9 17 4 12"/></svg>
+                    {{ qrScannedUpiId.toLowerCase().endsWith('@ezyvault') ? 'Verified Payment Gateway' : 'Verified NeoBank Merchant' }}
+                  </div>
+                </div>
+
+                <div class="sdash-qr-pay-form">
+                  <div class="sdash-form-group">
+                    <label>Amount (&#8377;) <span class="required">*</span></label>
+                    <input type="number" [(ngModel)]="qrScannedAmount" placeholder="Enter amount" class="sdash-qr-amount-input" min="1">
+                    <span *ngIf="qrScannedAmount" class="sdash-qr-amount-hint">₹{{ qrScannedAmount | number:'1.2-2' }}</span>
+                  </div>
+                  <div class="sdash-form-group">
+                    <label>Remark</label>
+                    <input type="text" [(ngModel)]="qrScannedRemark" placeholder="Optional remark">
+                  </div>
+                  <div class="sdash-form-group">
+                    <label>Transaction PIN <span class="required">*</span></label>
+                    <input type="password" [(ngModel)]="qrPayPin" placeholder="Enter 4-6 digit PIN" maxlength="6">
+                  </div>
+                </div>
+
+                <div class="sdash-qr-pay-actions">
+                  <button class="sdash-btn sdash-btn-primary" (click)="payViaScannedQr()"
+                          [disabled]="isQrPayProcessing || !qrScannedUpiId || !qrScannedAmount || !qrPayPin">
+                    <span *ngIf="!isQrPayProcessing">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px;vertical-align:middle;margin-right:5px;"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                      Pay ₹{{ qrScannedAmount | number:'1.0-0' }}
+                    </span>
+                    <span *ngIf="isQrPayProcessing" class="sdash-btn-loading">
+                      <div class="sdash-spinner-small"></div> Processing...
+                    </span>
+                  </button>
+                  <button class="sdash-btn sdash-btn-secondary" (click)="resetQrScan()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;vertical-align:middle;margin-right:4px;"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.51"/></svg>
+                    Scan Again
+                  </button>
+                </div>
+              </div>
+
+              <!-- QR Payment Success -->
+              <div *ngIf="showQrPaySuccess && qrPaySuccessResult" class="sdash-qr-pay-success">
+                <div class="sdash-qr-success-circle">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                </div>
+                <h3 class="sdash-qr-success-title">Payment Successful!</h3>
+                <div class="sdash-qr-success-amount">₹{{ qrPaySuccessResult.amount | number:'1.2-2' }}</div>
+                <p class="sdash-qr-success-to">Paid to <strong>{{ qrPaySuccessResult.recipientName }}</strong></p>
+                <p class="sdash-qr-success-upi">{{ qrPaySuccessResult.recipient }}</p>
+                <p class="sdash-qr-success-txn">Txn ID: <strong>{{ qrPaySuccessResult.txnId }}</strong></p>
+                <p *ngIf="qrPaySuccessResult.newBalance != null" class="sdash-qr-success-balance">
+                  New Balance: <strong>₹{{ qrPaySuccessResult.newBalance | number:'1.2-2' }}</strong>
+                </p>
+                <button class="sdash-btn sdash-btn-primary sdash-qr-success-btn" (click)="resetQrScan()">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;vertical-align:middle;margin-right:5px;"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.51"/></svg>
+                  Scan Another QR
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- ─── Incoming Payment Requests (from Merchants) ────── -->
+          <div class="sdash-card sdash-mb">
+            <div class="sdash-card-header" style="display:flex;align-items:center;justify-content:space-between;">
+              <h3>💸 Payment Requests</h3>
+              <span *ngIf="pendingPaymentLinks.length > 0" class="sdash-badge sdash-badge-warning" style="font-size:0.85rem;padding:4px 12px;">
+                {{ pendingPaymentLinks.length }} Pending
+              </span>
+            </div>
+            <div class="sdash-card-body">
+              <!-- Loading -->
+              <div *ngIf="isLoadingLinks" class="sdash-loading">
+                <div class="sdash-spinner"></div><span>Loading requests...</span>
+              </div>
+
+              <!-- No pending links -->
+              <div *ngIf="!isLoadingLinks && allPaymentLinks.length === 0" class="sdash-empty">
+                <p>No payment requests received yet.</p>
+              </div>
+
+              <!-- Links table -->
+              <div *ngIf="!isLoadingLinks && allPaymentLinks.length > 0" class="sdash-table-wrapper">
+                <table class="sdash-table">
+                  <thead>
+                    <tr>
+                      <th>From (Merchant)</th>
+                      <th>Amount</th>
+                      <th>Description</th>
+                      <th>Status</th>
+                      <th>Date</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr *ngFor="let link of allPaymentLinks">
+                      <td>
+                        <strong>{{ link.merchantName }}</strong><br>
+                        <small style="color:#888;">{{ link.merchantUpiId }}</small>
+                      </td>
+                      <td><strong style="color:#4361ee;">&#8377;{{ link.amount | number:'1.2-2' }}</strong></td>
+                      <td>{{ link.description || '-' }}</td>
+                      <td>
+                        <span class="sdash-badge"
+                          [class.active]="link.status === 'PAID'"
+                          [class.sdash-badge-warning]="link.status === 'PENDING'"
+                          [class.frozen]="link.status === 'CANCELLED' || link.status === 'EXPIRED'">
+                          {{ link.status }}
+                        </span>
+                      </td>
+                      <td>{{ link.createdAt | date:'dd MMM, hh:mm a' }}</td>
+                      <td>
+                        <button *ngIf="link.status === 'PENDING'" class="sdash-btn sdash-btn-primary sdash-btn-sm"
+                                (click)="openLinkPayModal(link)">
+                          Pay Now
+                        </button>
+                        <span *ngIf="link.status === 'PAID'" style="color:#28a745;font-weight:600;">✅ Paid</span>
+                        <span *ngIf="link.status === 'CANCELLED' || link.status === 'EXPIRED'" style="color:#888;">–</span>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- ─── Pay via Link modal ────────────────────────────────── -->
+          <div *ngIf="showLinkPayModal" class="sdash-modal-backdrop" (click)="closeLinkPayModal()">
+            <div class="sdash-modal" (click)="$event.stopPropagation()" [style.max-width]="linkPaySuccess ? '520px' : '420px'">
+              <div class="sdash-modal-header">
+                <h3>{{ linkPaySuccess ? '🧾 Payment Invoice' : '💳 Pay Payment Request' }}</h3>
+                <button class="sdash-modal-close" (click)="closeLinkPayModal()">✕</button>
+              </div>
+              <div class="sdash-modal-body" *ngIf="linkPaySuccess && linkPayResult" style="padding:0;max-height:70vh;overflow-y:auto;">
+                <div id="pg-invoice-print" style="padding:20px;">
+                  <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #1e3a5f;padding-bottom:12px;margin-bottom:14px;">
+                    <div>
+                      <div style="font-size:20px;font-weight:800;color:#1e3a5f;">🏦 NeoBank</div>
+                      <div style="font-size:11px;color:#64748b;">Payment Gateway Invoice</div>
+                    </div>
+                    <div style="text-align:right;">
+                      <div style="background:#dcfce7;color:#16a34a;padding:4px 12px;border-radius:20px;font-weight:700;font-size:12px;display:inline-block;">✓ PAID</div>
+                      <div style="font-size:10px;color:#94a3b8;margin-top:3px;">{{ linkPayResult?.invoice?.invoiceNumber }}</div>
+                    </div>
+                  </div>
+                  <div style="display:flex;gap:16px;margin-bottom:14px;">
+                    <div style="flex:1;">
+                      <div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;font-weight:600;">Merchant</div>
+                      <div style="font-weight:700;font-size:14px;">{{ linkPayResult?.invoice?.merchantName }}</div>
+                      <div style="font-size:12px;color:#475569;">UPI: {{ linkPayResult?.invoice?.merchantUpiId }}</div>
+                      <div *ngIf="linkPayResult?.invoice?.businessPhone" style="font-size:11px;color:#64748b;">📞 {{ linkPayResult?.invoice?.businessPhone }}</div>
+                    </div>
+                    <div style="flex:1;">
+                      <div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;font-weight:600;">Billed To</div>
+                      <div style="font-weight:700;font-size:14px;">{{ linkPayResult?.invoice?.payerName }}</div>
+                      <div style="font-size:12px;color:#475569;">A/C: {{ linkPayResult?.invoice?.payerAccount }}</div>
+                      <div style="font-size:11px;color:#64748b;">Type: {{ linkPayResult?.invoice?.accountType }}</div>
+                    </div>
+                  </div>
+                  <div style="background:#f8fafc;border-radius:8px;padding:8px 12px;margin-bottom:14px;display:flex;justify-content:space-between;font-size:11px;color:#475569;">
+                    <span><strong>Date:</strong> {{ linkPayResult?.invoice?.date | date:'dd MMM yyyy, hh:mm a' }}</span>
+                    <span><strong>Txn:</strong> {{ linkPayResult?.invoice?.transactionId }}</span>
+                  </div>
+                  <table style="width:100%;border-collapse:collapse;margin-bottom:14px;">
+                    <thead>
+                      <tr style="background:#f1f5f9;">
+                        <th style="padding:8px 12px;text-align:left;font-size:11px;color:#475569;font-weight:600;border-bottom:2px solid #e2e8f0;">Description</th>
+                        <th style="padding:8px 12px;text-align:right;font-size:11px;color:#475569;font-weight:600;border-bottom:2px solid #e2e8f0;">Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td style="padding:10px 12px;font-size:13px;border-bottom:1px solid #f1f5f9;">{{ linkPayResult?.invoice?.description || 'Payment' }}</td>
+                        <td style="padding:10px 12px;text-align:right;font-size:13px;font-weight:600;border-bottom:1px solid #f1f5f9;">₹{{ linkPayResult?.invoice?.grossAmount | number:'1.2-2' }}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding:6px 12px;font-size:11px;color:#64748b;">Platform Fee (2%)</td>
+                        <td style="padding:6px 12px;text-align:right;font-size:11px;color:#64748b;">- ₹{{ linkPayResult?.invoice?.platformFee | number:'1.2-2' }}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding:6px 12px;font-size:11px;color:#64748b;">GST (18%)</td>
+                        <td style="padding:6px 12px;text-align:right;font-size:11px;color:#64748b;">- ₹{{ linkPayResult?.invoice?.gst | number:'1.2-2' }}</td>
+                      </tr>
+                    </tbody>
+                    <tfoot>
+                      <tr>
+                        <td style="padding:10px 12px;font-weight:700;font-size:14px;color:#1e3a5f;border-top:2px solid #1e3a5f;">Total Paid</td>
+                        <td style="padding:10px 12px;text-align:right;font-weight:700;font-size:16px;color:#1e3a5f;border-top:2px solid #1e3a5f;">₹{{ linkPayResult?.invoice?.grossAmount | number:'1.2-2' }}</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                  <div style="text-align:center;padding-top:14px;border-top:2px dashed #cbd5e1;">
+                    <div style="width:75px;height:75px;border:3px solid #16a34a;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;transform:rotate(-15deg);">
+                      <div style="font-size:9px;color:#16a34a;font-weight:800;text-transform:uppercase;line-height:1.3;text-align:center;">NeoBank<br/>✓ Verified<br/>Payment</div>
+                    </div>
+                    <div style="font-size:10px;color:#94a3b8;margin-top:6px;">Computer-generated invoice. No signature required.</div>
+                  </div>
+                </div>
+                <div style="display:flex;gap:10px;padding:10px 20px 16px;border-top:1px solid #e2e8f0;">
+                  <button class="sdash-btn sdash-btn-primary" style="flex:1;" (click)="printInvoice()">🖨️ Print / Download PDF</button>
+                  <button class="sdash-btn sdash-btn-secondary" style="flex:1;" (click)="closeLinkPayModal()">Close</button>
+                </div>
+              </div>
+
+              <div class="sdash-modal-body" *ngIf="!linkPaySuccess">
+                  <div class="sdash-link-pay-info" style="background:#f8f9fa;border-radius:10px;padding:16px;margin-bottom:16px;">
+                    <p style="margin:0 0 4px;color:#888;font-size:0.8rem;">FROM MERCHANT</p>
+                    <p style="margin:0 0 4px;font-weight:700;font-size:1rem;">{{ selectedLink?.merchantName }}</p>
+                    <p style="margin:0 0 8px;color:#888;font-size:0.85rem;">{{ selectedLink?.merchantUpiId }}</p>
+                    <p style="margin:0 0 4px;color:#888;font-size:0.8rem;">AMOUNT</p>
+                    <p style="margin:0 0 8px;font-weight:700;font-size:1.4rem;color:#4361ee;">&#8377;{{ selectedLink?.amount | number:'1.2-2' }}</p>
+                    <p *ngIf="selectedLink?.description" style="margin:0;color:#555;font-size:0.85rem;">{{ selectedLink?.description }}</p>
+                  </div>
+
+                  <div class="sdash-form-group" style="margin-bottom:16px;">
+                    <label style="font-weight:600;margin-bottom:6px;display:block;">Enter 4-Digit UPI PIN</label>
+                    <input type="password" [(ngModel)]="linkPayPin" maxlength="4" placeholder="••••"
+                      style="width:100%;padding:12px 14px;border-radius:8px;border:1px solid #ddd;font-size:1.2rem;letter-spacing:8px;text-align:center;"
+                      (keyup.enter)="payLinkWithPin()">
+                    <small style="color:#888;display:block;margin-top:4px;text-align:center;">Your UPI PIN = Account Transaction PIN</small>
+                  </div>
+
+                  <div class="sdash-form-actions" style="display:flex;gap:10px;">
+                    <button class="sdash-btn sdash-btn-primary" style="flex:1;"
+                            (click)="payLinkWithPin()"
+                            [disabled]="isLinkPayProcessing || !linkPayPin || linkPayPin.length !== 4">
+                      <span *ngIf="!isLinkPayProcessing">💳 Pay &#8377;{{ selectedLink?.amount | number:'1.0-0' }}</span>
+                      <span *ngIf="isLinkPayProcessing" class="sdash-btn-loading">
+                        <div class="sdash-spinner-small"></div> Processing...
+                      </span>
+                    </button>
+                    <button class="sdash-btn sdash-btn-secondary" style="flex:1;" (click)="closeLinkPayModal()" [disabled]="isLinkPayProcessing">
+                      Cancel
+                    </button>
+                  </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- UPI Transactions -->
+          <div class="sdash-card">
+            <div class="sdash-card-header">
+              <h3>UPI Transaction History</h3>
+            </div>
+            <div class="sdash-card-body">
+              <div *ngIf="isLoadingUpiTxns" class="sdash-loading">
+                <div class="sdash-spinner"></div>
+                <span>Loading transactions...</span>
+              </div>
+              <div *ngIf="!isLoadingUpiTxns && upiTransactions.length === 0" class="sdash-empty">
+                <p>No UPI transactions yet.</p>
+              </div>
+              <div class="sdash-table-wrapper" *ngIf="!isLoadingUpiTxns && upiTransactions.length > 0">
+                <table class="sdash-table">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Date</th>
+                      <th>Type</th>
+                      <th>Recipient</th>
+                      <th>Amount</th>
+                      <th>Remark</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr *ngFor="let txn of upiTransactions; let i = index">
+                      <td>{{ i + 1 }}</td>
+                      <td>{{ txn.createdAt | date:'dd MMM yyyy, hh:mm a' }}</td>
+                      <td><span class="sdash-badge" [class.active]="txn.type === 'CREDIT'" [class.frozen]="txn.type === 'DEBIT'">{{ txn.type }}</span></td>
+                      <td>{{ txn.recipientUpi }}</td>
+                      <td [class.sdash-amount-credit]="txn.type === 'CREDIT'" [class.sdash-amount-debit]="txn.type === 'DEBIT'">&#8377;{{ txn.amount | number:'1.2-2' }}</td>
+                      <td>{{ txn.remark || '-' }}</td>
+                      <td><span class="sdash-badge" [class.active]="txn.status === 'SUCCESS'" [class.frozen]="txn.status === 'FAILED'">{{ txn.status }}</span></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── DEBIT CARD MANAGEMENT ─────────────────────── -->
+      <div *ngIf="activeSection === 'debit-card'" class="sdash-section">
+        <div *ngIf="isLoadingCard" class="sdash-loading">
+          <div class="sdash-spinner"></div>
+          <span>Loading card details...</span>
+        </div>
+        <div *ngIf="!isLoadingCard && debitCardInfo">
+
+          <!-- Generate Card Details Button (only if CVV/Expiry not yet generated) -->
+          <div *ngIf="!debitCardInfo.cvv || !debitCardInfo.expiryDate" class="sdash-card sdash-mb" style="text-align:center;padding:32px 24px;">
+            <div style="margin-bottom:16px;">
+              <i class="fa fa-credit-card" style="font-size:3rem;color:#4361ee;opacity:0.7;"></i>
+            </div>
+            <h3 style="margin:0 0 8px;color:#1a1a2e;">Card Details Not Generated</h3>
+            <p style="color:#6c757d;margin:0 0 20px;font-size:0.92rem;">Your debit card CVV and expiry date have not been generated yet. Click below to generate them permanently.</p>
+            <button class="sdash-btn sdash-btn-primary" (click)="generateCardDetails()" [disabled]="isGeneratingCard" style="padding:10px 32px;font-size:1rem;">
+              <i class="fa fa-spinner fa-spin" *ngIf="isGeneratingCard" style="margin-right:8px;"></i>
+              {{ isGeneratingCard ? 'Generating...' : 'Generate Card Details' }}
+            </button>
+          </div>
+
+          <!-- Card Visual (only shown when CVV/Expiry exist) -->
+          <div *ngIf="debitCardInfo.cvv && debitCardInfo.expiryDate" class="sdash-debit-card-visual sdash-mb">
+            <div class="sdash-card-chip"></div>
+            <div class="sdash-card-number" (click)="toggleCardNumberVisibility()" style="cursor:pointer;" title="Click to toggle">
+              {{ showFullCardNumber ? formatFullCardNumber(debitCardInfo.cardNumber || '') : maskCardNumber(debitCardInfo.cardNumber || account?.accountNumber || '') }}
+              <i class="fa" [ngClass]="showFullCardNumber ? 'fa-eye-slash' : 'fa-eye'" style="margin-left:10px;font-size:0.7em;opacity:0.7"></i>
+            </div>
+            <div class="sdash-card-details-row">
+              <div>
+                <span class="sdash-card-label">CARD HOLDER</span>
+                <span class="sdash-card-value">{{ employee?.employeeName }}</span>
+              </div>
+              <div>
+                <span class="sdash-card-label">VALID THRU</span>
+                <span class="sdash-card-value">{{ debitCardInfo.expiryDate || 'N/A' }}</span>
+              </div>
+              <div>
+                <span class="sdash-card-label">CVV</span>
+                <span class="sdash-card-value" (click)="toggleCvvVisibility()" style="cursor:pointer;" title="Click to toggle">
+                  {{ showCvv ? (debitCardInfo.cvv || '---') : '***' }}
+                  <i class="fa" [ngClass]="showCvv ? 'fa-eye-slash' : 'fa-eye'" style="margin-left:4px;font-size:0.75em;opacity:0.7"></i>
+                </span>
+              </div>
+              <div>
+                <span class="sdash-card-label">STATUS</span>
+                <span class="sdash-card-value">{{ debitCardInfo.status }}</span>
+              </div>
+            </div>
+            <div class="sdash-card-type">NEOBANK DEBIT</div>
+          </div>
+
+          <ng-container *ngIf="debitCardInfo.cvv && debitCardInfo.expiryDate">
+          <!-- Card Settings -->
+          <div class="sdash-overview-cards sdash-mb">
+            <div class="sdash-stat-card" [class.sdash-card-active]="debitCardInfo.internationalEnabled" [class.sdash-card-inactive]="!debitCardInfo.internationalEnabled">
+              <div class="sdash-stat-info">
+                <span class="sdash-stat-label">International</span>
+                <span class="sdash-stat-value">{{ debitCardInfo.internationalEnabled ? 'Enabled' : 'Disabled' }}</span>
+              </div>
+              <label class="sdash-toggle">
+                <input type="checkbox" [checked]="debitCardInfo.internationalEnabled" (change)="updateCardSetting('international', !debitCardInfo.internationalEnabled)" [disabled]="isUpdatingCard">
+                <span class="sdash-toggle-slider"></span>
+              </label>
+            </div>
+            <div class="sdash-stat-card" [class.sdash-card-active]="debitCardInfo.onlineEnabled" [class.sdash-card-inactive]="!debitCardInfo.onlineEnabled">
+              <div class="sdash-stat-info">
+                <span class="sdash-stat-label">Online Transactions</span>
+                <span class="sdash-stat-value">{{ debitCardInfo.onlineEnabled ? 'Enabled' : 'Disabled' }}</span>
+              </div>
+              <label class="sdash-toggle">
+                <input type="checkbox" [checked]="debitCardInfo.onlineEnabled" (change)="updateCardSetting('online', !debitCardInfo.onlineEnabled)" [disabled]="isUpdatingCard">
+                <span class="sdash-toggle-slider"></span>
+              </label>
+            </div>
+            <div class="sdash-stat-card" [class.sdash-card-active]="debitCardInfo.contactlessEnabled" [class.sdash-card-inactive]="!debitCardInfo.contactlessEnabled">
+              <div class="sdash-stat-info">
+                <span class="sdash-stat-label">Contactless</span>
+                <span class="sdash-stat-value">{{ debitCardInfo.contactlessEnabled ? 'Enabled' : 'Disabled' }}</span>
+              </div>
+              <label class="sdash-toggle">
+                <input type="checkbox" [checked]="debitCardInfo.contactlessEnabled" (change)="updateCardSetting('contactless', !debitCardInfo.contactlessEnabled)" [disabled]="isUpdatingCard">
+                <span class="sdash-toggle-slider"></span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Daily Limit & Block/Unblock -->
+          <div class="sdash-card">
+            <div class="sdash-card-header">
+              <h3>Card Controls</h3>
+            </div>
+            <div class="sdash-card-body">
+              <div class="sdash-form sdash-form-grid">
+                <div class="sdash-form-group">
+                  <label>Daily Transaction Limit (&#8377;)</label>
+                  <input type="number" [(ngModel)]="debitCardInfo.dailyLimit" name="dailyLimit" min="1000" max="500000">
+                </div>
+                <div class="sdash-form-group sdash-form-actions-inline">
+                  <button class="sdash-btn sdash-btn-primary" (click)="updateCardSetting('dailyLimit', debitCardInfo.dailyLimit)" [disabled]="isUpdatingCard">Update Limit</button>
+                  <button class="sdash-btn" [class.sdash-btn-danger]="debitCardInfo.status === 'ACTIVE'" [class.sdash-btn-success]="debitCardInfo.status !== 'ACTIVE'" (click)="updateCardSetting('status', debitCardInfo.status === 'ACTIVE' ? 'BLOCKED' : 'ACTIVE')" [disabled]="isUpdatingCard">
+                    {{ debitCardInfo.status === 'ACTIVE' ? 'Block Card' : 'Unblock Card' }}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          </ng-container>
+        </div>
+      </div>
+
+      <!-- ─── LOAN ELIGIBILITY ──────────────────────────── -->
+      <div *ngIf="activeSection === 'loan-eligibility'" class="sdash-section">
+        <div *ngIf="isLoadingLoan" class="sdash-loading">
+          <div class="sdash-spinner"></div>
+          <span>Calculating loan eligibility...</span>
+        </div>
+        <div *ngIf="!isLoadingLoan && loanEligibility">
+          <div class="sdash-card sdash-mb">
+            <div class="sdash-card-header">
+              <h3>Your Monthly Salary</h3>
+            </div>
+            <div class="sdash-card-body sdash-center-content">
+              <span class="sdash-salary-display">&#8377;{{ (loanEligibility.monthlySalary || 0) | number:'1.2-2' }}</span>
+            </div>
+          </div>
+
+          <div class="sdash-loan-grid">
+            <div class="sdash-loan-card sdash-loan-personal">
+              <div class="sdash-loan-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              </div>
+              <h4>Personal Loan</h4>
+              <span class="sdash-loan-multiplier">10 &times; Salary</span>
+              <span class="sdash-loan-amount">&#8377;{{ (loanEligibility.personalLoan || 0) | number:'1.0-0' }}</span>
+            </div>
+            <div class="sdash-loan-card sdash-loan-home">
+              <div class="sdash-loan-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+              </div>
+              <h4>Home Loan</h4>
+              <span class="sdash-loan-multiplier">60 &times; Salary</span>
+              <span class="sdash-loan-amount">&#8377;{{ (loanEligibility.homeLoan || 0) | number:'1.0-0' }}</span>
+            </div>
+            <div class="sdash-loan-card sdash-loan-car">
+              <div class="sdash-loan-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 16H9m10 0h3v-3.15a1 1 0 0 0-.84-.99L16 11l-2.7-3.6a1 1 0 0 0-.8-.4H5.24a1 1 0 0 0-.9.55l-2.18 4.37A1 1 0 0 0 2 12.26V16h3"/><circle cx="6.5" cy="16.5" r="2.5"/><circle cx="16.5" cy="16.5" r="2.5"/></svg>
+              </div>
+              <h4>Car Loan</h4>
+              <span class="sdash-loan-multiplier">15 &times; Salary</span>
+              <span class="sdash-loan-amount">&#8377;{{ (loanEligibility.carLoan || 0) | number:'1.0-0' }}</span>
+            </div>
+            <div class="sdash-loan-card sdash-loan-education">
+              <div class="sdash-loan-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c0 2 3 3 6 3s6-1 6-3v-5"/></svg>
+              </div>
+              <h4>Education Loan</h4>
+              <span class="sdash-loan-multiplier">25 &times; Salary</span>
+              <span class="sdash-loan-amount">&#8377;{{ (loanEligibility.educationLoan || 0) | number:'1.0-0' }}</span>
+            </div>
+          </div>
+
+          <div class="sdash-card sdash-mt">
+            <div class="sdash-card-header">
+              <h3>General Loan Limit</h3>
+            </div>
+            <div class="sdash-card-body sdash-center-content">
+              <span class="sdash-general-loan">20 &times; Salary = &#8377;{{ (loanEligibility.generalLimit || 0) | number:'1.0-0' }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── AUTO SAVINGS ──────────────────────────────── -->
+      <div *ngIf="activeSection === 'auto-savings'" class="sdash-section">
+        <div *ngIf="isLoadingSavings" class="sdash-loading">
+          <div class="sdash-spinner"></div>
+          <span>Loading savings info...</span>
+        </div>
+        <div *ngIf="!isLoadingSavings && savingsInfo">
+          <div class="sdash-overview-cards sdash-mb">
+            <div class="sdash-stat-card sdash-card-savings">
+              <div class="sdash-stat-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 5c-1.5 0-2.8 1.4-3 2-3.5-1.5-11-.3-11 5 0 1.8 0 3 2 4.5V20h4v-2h3v2h4v-4c1-.5 1.7-1 2-2h2v-4h-2c0-1-.5-1.5-1-2"/></svg>
+              </div>
+              <div class="sdash-stat-info">
+                <span class="sdash-stat-label">Savings Balance</span>
+                <span class="sdash-stat-value">&#8377;{{ (savingsInfo.savingsBalance || 0) | number:'1.2-2' }}</span>
+              </div>
+            </div>
+            <div class="sdash-stat-card" [class.sdash-card-active]="savingsInfo.autoSavingsEnabled" [class.sdash-card-inactive]="!savingsInfo.autoSavingsEnabled">
+              <div class="sdash-stat-info">
+                <span class="sdash-stat-label">Auto Savings</span>
+                <span class="sdash-stat-value">{{ savingsInfo.autoSavingsEnabled ? 'Active' : 'Inactive' }}</span>
+              </div>
+              <label class="sdash-toggle">
+                <input type="checkbox" [checked]="savingsInfo.autoSavingsEnabled" (change)="toggleAutoSavings(!savingsInfo.autoSavingsEnabled)" [disabled]="isTogglingSavings">
+                <span class="sdash-toggle-slider"></span>
+              </label>
+            </div>
+            <div class="sdash-stat-card sdash-card-salary">
+              <div class="sdash-stat-info">
+                <span class="sdash-stat-label">Saving Percentage</span>
+                <span class="sdash-stat-value">{{ savingsInfo.autoSavingsPercentage || 10 }}%</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Percentage Settings -->
+          <div class="sdash-card sdash-mb">
+            <div class="sdash-card-header">
+              <h3>Savings Settings</h3>
+            </div>
+            <div class="sdash-card-body">
+              <div class="sdash-form sdash-form-grid">
+                <div class="sdash-form-group">
+                  <label>Auto Save Percentage (%)</label>
+                  <input type="number" [(ngModel)]="savingsPercentage" name="savingsPercentage" min="1" max="50" placeholder="e.g. 10">
+                </div>
+                <div class="sdash-form-group sdash-form-actions-inline">
+                  <button class="sdash-btn sdash-btn-primary" (click)="toggleAutoSavings(!savingsInfo.autoSavingsEnabled)" [disabled]="isTogglingSavings">
+                    Update &amp; {{ savingsInfo.autoSavingsEnabled ? 'Save' : 'Enable' }}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Withdraw from Savings -->
+          <div class="sdash-card">
+            <div class="sdash-card-header">
+              <h3>Withdraw from Savings</h3>
+            </div>
+            <div class="sdash-card-body">
+              <form (ngSubmit)="withdrawFromSavings()" class="sdash-form">
+                <div class="sdash-form-grid">
+                  <div class="sdash-form-group">
+                    <label>Amount to Withdraw (&#8377;) <span class="required">*</span></label>
+                    <input type="number" [(ngModel)]="savingsWithdrawAmount" name="savingsWithdrawAmount" placeholder="Enter amount" required min="1">
+                  </div>
+                </div>
+                <div class="sdash-form-actions">
+                  <button type="submit" class="sdash-btn sdash-btn-primary" [disabled]="isWithdrawingSavings">
+                    <span *ngIf="!isWithdrawingSavings">Withdraw</span>
+                    <span *ngIf="isWithdrawingSavings" class="sdash-btn-loading"><div class="sdash-spinner-small"></div> Processing...</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── SALARY ADVANCE ───────────────────────────── -->
+      <div *ngIf="activeSection === 'salary-advance'" class="sdash-section">
+        <div *ngIf="isLoadingAdvance" class="sdash-loading">
+          <div class="sdash-spinner"></div>
+          <span>Loading advance info...</span>
+        </div>
+        <div *ngIf="!isLoadingAdvance && advanceInfo">
+          <div class="sdash-overview-cards sdash-mb">
+            <div class="sdash-stat-card sdash-card-salary">
+              <div class="sdash-stat-info">
+                <span class="sdash-stat-label">Monthly Salary</span>
+                <span class="sdash-stat-value">&#8377;{{ (advanceInfo.monthlySalary || 0) | number:'1.2-2' }}</span>
+              </div>
+            </div>
+            <div class="sdash-stat-card sdash-card-balance">
+              <div class="sdash-stat-info">
+                <span class="sdash-stat-label">Advance Limit (50%)</span>
+                <span class="sdash-stat-value">&#8377;{{ (advanceInfo.advanceLimit || 0) | number:'1.2-2' }}</span>
+              </div>
+            </div>
+            <div class="sdash-stat-card" [class.sdash-card-active]="advanceInfo.pendingCount === 0" [class.sdash-card-inactive]="advanceInfo.pendingCount > 0">
+              <div class="sdash-stat-info">
+                <span class="sdash-stat-label">Active Advances</span>
+                <span class="sdash-stat-value">{{ advanceInfo.activeAdvances || 0 }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Request Advance -->
+          <div class="sdash-card sdash-mb">
+            <div class="sdash-card-header">
+              <h3>Request Salary Advance</h3>
+            </div>
+            <div class="sdash-card-body">
+              <form (ngSubmit)="requestSalaryAdvance()" class="sdash-form">
+                <div class="sdash-form-grid">
+                  <div class="sdash-form-group">
+                    <label>Advance Amount (&#8377;) <span class="required">*</span></label>
+                    <input type="number" [(ngModel)]="advanceAmount" name="advanceAmount" placeholder="Enter amount" required min="1" [max]="advanceInfo.advanceLimit">
+                  </div>
+                  <div class="sdash-form-group">
+                    <label>Reason <span class="required">*</span></label>
+                    <input type="text" [(ngModel)]="advanceReason" name="advanceReason" placeholder="Enter reason for advance" required>
+                  </div>
+                </div>
+                <div class="sdash-form-actions">
+                  <button type="submit" class="sdash-btn sdash-btn-primary" [disabled]="isRequestingAdvance">
+                    <span *ngIf="!isRequestingAdvance">Request Advance</span>
+                    <span *ngIf="isRequestingAdvance" class="sdash-btn-loading"><div class="sdash-spinner-small"></div> Submitting...</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          <!-- Advance History -->
+          <div class="sdash-card">
+            <div class="sdash-card-header">
+              <h3>Advance History</h3>
+            </div>
+            <div class="sdash-card-body">
+              <div *ngIf="isLoadingAdvanceHistory" class="sdash-loading">
+                <div class="sdash-spinner"></div>
+                <span>Loading history...</span>
+              </div>
+              <div *ngIf="!isLoadingAdvanceHistory && advanceHistory.length === 0" class="sdash-empty">
+                <p>No salary advance requests yet.</p>
+              </div>
+              <div class="sdash-table-wrapper" *ngIf="!isLoadingAdvanceHistory && advanceHistory.length > 0">
+                <table class="sdash-table">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Date</th>
+                      <th>Amount</th>
+                      <th>Reason</th>
+                      <th>Status</th>
+                      <th>Repaid</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr *ngFor="let adv of advanceHistory; let i = index">
+                      <td>{{ i + 1 }}</td>
+                      <td>{{ adv.createdAt | date:'dd MMM yyyy' }}</td>
+                      <td>&#8377;{{ adv.advanceAmount | number:'1.2-2' }}</td>
+                      <td>{{ adv.reason }}</td>
+                      <td><span class="sdash-badge" [class.active]="adv.status === 'APPROVED'" [class.frozen]="adv.status === 'REJECTED'" [class.pending]="adv.status === 'PENDING'">{{ adv.status }}</span></td>
+                      <td><span class="sdash-badge" [class.active]="adv.repaid" [class.frozen]="!adv.repaid">{{ adv.repaid ? 'Yes' : 'No' }}</span></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── GOLD LOAN ──────────────────────────────── -->
+      <div *ngIf="activeSection === 'gold-loan'" class="sdash-section">
+        <div *ngIf="isLoadingGoldLoans && !currentGoldRate" class="sdash-loading">
+          <div class="sdash-spinner"></div>
+          <span>Loading gold loan info...</span>
+        </div>
+
+        <!-- Current Gold Rate Card -->
+        <div *ngIf="currentGoldRate" class="sdash-overview-cards sdash-mb">
+          <div class="sdash-stat-card sdash-card-salary">
+            <div class="sdash-stat-info">
+              <span class="sdash-stat-label">Current Gold Rate/gram</span>
+              <span class="sdash-stat-value">&#8377;{{ (currentGoldRate.ratePerGram || 0) | number:'1.2-2' }}</span>
+            </div>
+          </div>
+          <div class="sdash-stat-card sdash-card-balance">
+            <div class="sdash-stat-info">
+              <span class="sdash-stat-label">Last Updated</span>
+              <span class="sdash-stat-value" style="font-size: 16px;">{{ currentGoldRate.lastUpdated | date:'dd MMM yyyy, hh:mm a' }}</span>
+            </div>
+          </div>
+          <div class="sdash-stat-card sdash-card-active">
+            <div class="sdash-stat-info">
+              <span class="sdash-stat-label">My Gold Loans</span>
+              <span class="sdash-stat-value">{{ myGoldLoans.length }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Gold Loan Calculator & Application -->
+        <div class="sdash-card sdash-mb">
+          <div class="sdash-card-header">
+            <h3>Apply for Gold Loan</h3>
+          </div>
+          <div class="sdash-card-body">
+            <form (ngSubmit)="applyGoldLoan()" class="sdash-form">
+              <div class="sdash-form-grid">
+                <div class="sdash-form-group">
+                  <label>Gold Weight (grams) <span class="required">*</span></label>
+                  <input type="number" [(ngModel)]="goldLoanGrams" name="goldLoanGrams" placeholder="Enter gold weight in grams" required min="1" step="0.1">
+                </div>
+                <div class="sdash-form-group">
+                  <label>Purpose</label>
+                  <input type="text" [(ngModel)]="goldLoanPurpose" name="goldLoanPurpose" placeholder="e.g. Business, Education, Personal">
+                </div>
+              </div>
+              <div class="sdash-form-actions" style="gap: 10px; display: flex;">
+                <button type="button" class="sdash-btn sdash-btn-secondary" (click)="calculateGoldLoan()" [disabled]="isCalculatingGoldLoan || !goldLoanGrams">
+                  <span *ngIf="!isCalculatingGoldLoan">Calculate Loan</span>
+                  <span *ngIf="isCalculatingGoldLoan" class="sdash-btn-loading"><div class="sdash-spinner-small"></div> Calculating...</span>
+                </button>
+                <button type="submit" class="sdash-btn sdash-btn-primary" [disabled]="isApplyingGoldLoan || !goldLoanGrams || !goldLoanCalculation">
+                  <span *ngIf="!isApplyingGoldLoan">Apply for Gold Loan</span>
+                  <span *ngIf="isApplyingGoldLoan" class="sdash-btn-loading"><div class="sdash-spinner-small"></div> Submitting...</span>
+                </button>
+              </div>
+            </form>
+
+            <!-- Calculation Result -->
+            <div *ngIf="goldLoanCalculation" style="margin-top: 20px; padding: 16px; background: linear-gradient(135deg, #fff8e1, #fff3e0); border-radius: 12px; border: 1px solid #ffe082;">
+              <h4 style="margin: 0 0 12px; color: #e65100;">Loan Calculation</h4>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <div style="padding: 8px;"><span style="color: #666; font-size: 13px;">Gold Value</span><br><strong>&#8377;{{ (goldLoanCalculation.goldValue || 0) | number:'1.2-2' }}</strong></div>
+                <div style="padding: 8px;"><span style="color: #666; font-size: 13px;">Loan Amount (75%)</span><br><strong style="color: #2e7d32;">&#8377;{{ (goldLoanCalculation.loanAmount || 0) | number:'1.2-2' }}</strong></div>
+                <div style="padding: 8px;"><span style="color: #666; font-size: 13px;">Rate/gram</span><br><strong>&#8377;{{ (goldLoanCalculation.ratePerGram || 0) | number:'1.2-2' }}</strong></div>
+                <div style="padding: 8px;"><span style="color: #666; font-size: 13px;">Gold Weight</span><br><strong>{{ goldLoanCalculation.grams || goldLoanGrams }} grams</strong></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- My Gold Loans -->
+        <div class="sdash-card">
+          <div class="sdash-card-header">
+            <h3>My Gold Loans</h3>
+          </div>
+          <div class="sdash-card-body">
+            <div *ngIf="isLoadingGoldLoans" class="sdash-loading">
+              <div class="sdash-spinner"></div>
+              <span>Loading your gold loans...</span>
+            </div>
+            <div *ngIf="!isLoadingGoldLoans && myGoldLoans.length === 0" class="sdash-empty">
+              <p>No gold loan applications yet.</p>
+            </div>
+            <div class="sdash-table-wrapper" *ngIf="!isLoadingGoldLoans && myGoldLoans.length > 0">
+              <table class="sdash-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Date</th>
+                    <th>Gold (grams)</th>
+                    <th>Gold Value</th>
+                    <th>Loan Amount</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let loan of myGoldLoans; let i = index">
+                    <td>{{ i + 1 }}</td>
+                    <td>{{ loan.applicationDate | date:'dd MMM yyyy' }}</td>
+                    <td>{{ loan.goldGrams }} g</td>
+                    <td>&#8377;{{ (loan.goldValue || 0) | number:'1.2-2' }}</td>
+                    <td>&#8377;{{ (loan.loanAmount || 0) | number:'1.2-2' }}</td>
+                    <td>
+                      <span class="sdash-badge" [class.active]="loan.status === 'Approved'" [class.frozen]="loan.status === 'Rejected'" [class.pending]="loan.status === 'Pending'">{{ loan.status }}</span>
+                    </td>
+                    <td>
+                      <button class="sdash-btn sdash-btn-sm" (click)="viewGoldLoanDetails(loan)" style="padding: 4px 10px; font-size: 12px;">Details</button>
+                      <button *ngIf="loan.status === 'Approved' && !loan.termsAccepted" class="sdash-btn sdash-btn-primary sdash-btn-sm" (click)="acceptGoldLoanTerms(loan)" style="padding: 4px 10px; font-size: 12px; margin-left: 4px;">Accept Terms</button>
+                      <button class="sdash-btn sdash-btn-sm" (click)="printGoldLoanReceipt(loan)" style="padding: 4px 10px; font-size: 12px; margin-left: 4px;" title="Print Receipt">Receipt</button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Gold Loan Detail Modal -->
+        <div *ngIf="selectedGoldLoan" class="sdash-modal-overlay" (click)="closeGoldLoanDetails()">
+          <div class="sdash-modal-content" (click)="$event.stopPropagation()" style="max-width: 700px;">
+            <div class="sdash-modal-header">
+              <h3>Gold Loan Details</h3>
+              <button class="sdash-modal-close" (click)="closeGoldLoanDetails()">&times;</button>
+            </div>
+            <div class="sdash-modal-body">
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                <div><span style="color: #666; font-size: 13px;">Loan Account</span><br><strong>{{ selectedGoldLoan.loanAccountNumber || 'Pending' }}</strong></div>
+                <div><span style="color: #666; font-size: 13px;">Status</span><br><span class="sdash-badge" [class.active]="selectedGoldLoan.status === 'Approved'" [class.frozen]="selectedGoldLoan.status === 'Rejected'" [class.pending]="selectedGoldLoan.status === 'Pending'">{{ selectedGoldLoan.status }}</span></div>
+                <div><span style="color: #666; font-size: 13px;">Gold Weight</span><br><strong>{{ selectedGoldLoan.goldGrams }} grams</strong></div>
+                <div><span style="color: #666; font-size: 13px;">Gold Rate/gram</span><br><strong>&#8377;{{ (selectedGoldLoan.goldRatePerGram || 0) | number:'1.2-2' }}</strong></div>
+                <div><span style="color: #666; font-size: 13px;">Gold Value</span><br><strong>&#8377;{{ (selectedGoldLoan.goldValue || 0) | number:'1.2-2' }}</strong></div>
+                <div><span style="color: #666; font-size: 13px;">Loan Amount</span><br><strong style="color: #2e7d32;">&#8377;{{ (selectedGoldLoan.loanAmount || 0) | number:'1.2-2' }}</strong></div>
+                <div><span style="color: #666; font-size: 13px;">Tenure</span><br><strong>{{ selectedGoldLoan.tenure || 12 }} months</strong></div>
+                <div><span style="color: #666; font-size: 13px;">Interest Rate</span><br><strong>{{ selectedGoldLoan.interestRate || 9 }}% p.a.</strong></div>
+                <div><span style="color: #666; font-size: 13px;">Application Date</span><br><strong>{{ selectedGoldLoan.applicationDate | date:'dd MMM yyyy' }}</strong></div>
+                <div><span style="color: #666; font-size: 13px;">Purpose</span><br><strong>{{ selectedGoldLoan.purpose || 'Gold Loan' }}</strong></div>
+                <div *ngIf="selectedGoldLoan.approvedBy"><span style="color: #666; font-size: 13px;">Approved By</span><br><strong>{{ selectedGoldLoan.approvedBy }}</strong></div>
+                <div *ngIf="selectedGoldLoan.goldPurity"><span style="color: #666; font-size: 13px;">Gold Purity</span><br><strong>{{ selectedGoldLoan.goldPurity }}</strong></div>
+                <div *ngIf="selectedGoldLoan.verifiedGoldGrams"><span style="color: #666; font-size: 13px;">Verified Weight</span><br><strong>{{ selectedGoldLoan.verifiedGoldGrams }} grams</strong></div>
+              </div>
+
+              <!-- EMI Schedule -->
+              <div *ngIf="goldLoanEmiSchedule.length > 0" style="margin-top: 20px;">
+                <h4 style="margin-bottom: 10px;">EMI Schedule</h4>
+                <div class="sdash-table-wrapper">
+                  <table class="sdash-table">
+                    <thead>
+                      <tr><th>EMI #</th><th>Due Date</th><th>Principal</th><th>Interest</th><th>Total</th><th>Status</th><th>Action</th></tr>
+                    </thead>
+                    <tbody>
+                      <tr *ngFor="let emi of goldLoanEmiSchedule">
+                        <td>{{ emi.emiNumber }}</td>
+                        <td>{{ emi.dueDate | date:'dd MMM yyyy' }}</td>
+                        <td>&#8377;{{ (emi.principalAmount || 0) | number:'1.2-2' }}</td>
+                        <td>&#8377;{{ (emi.interestAmount || 0) | number:'1.2-2' }}</td>
+                        <td>&#8377;{{ (emi.totalAmount || 0) | number:'1.2-2' }}</td>
+                        <td><span class="sdash-badge" [class.active]="emi.status === 'Paid'" [class.pending]="emi.status === 'Pending'">{{ emi.status }}</span></td>
+                        <td>
+                          <button *ngIf="emi.status === 'Pending'" class="sdash-btn sdash-btn-primary sdash-btn-sm" (click)="payGoldLoanEmi(emi)" style="padding: 3px 8px; font-size: 11px;">Pay EMI</button>
+                          <span *ngIf="emi.status === 'Paid'" style="color: #2e7d32; font-size: 12px;">&#10003; Paid</span>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <div *ngIf="isLoadingEmi" class="sdash-loading" style="margin-top: 16px;">
+                <div class="sdash-spinner"></div>
+                <span>Loading EMI schedule...</span>
+              </div>
+            </div>
+            <div class="sdash-modal-footer" style="display: flex; gap: 8px; justify-content: flex-end; padding: 16px 24px; border-top: 1px solid #eee;">
+              <button class="sdash-btn sdash-btn-sm" (click)="printGoldLoanReceipt(selectedGoldLoan)">Print Receipt</button>
+              <button *ngIf="selectedGoldLoan.status === 'Approved' && !selectedGoldLoan.termsAccepted" class="sdash-btn sdash-btn-primary sdash-btn-sm" (click)="acceptGoldLoanTerms(selectedGoldLoan)">Accept Terms</button>
+              <button class="sdash-btn sdash-btn-sm" (click)="closeGoldLoanDetails()">Close</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── AI FRAUD DETECTION ────────────────────────── -->
+      <div *ngIf="activeSection === 'fraud-detection'" class="sdash-section">
+        <div *ngIf="isLoadingFraud" class="sdash-loading">
+          <div class="sdash-spinner"></div>
+          <span>Analyzing fraud patterns...</span>
+        </div>
+        <div *ngIf="!isLoadingFraud && fraudSummary">
+          <!-- Risk Score -->
+          <div class="sdash-fraud-risk-card sdash-mb">
+            <div class="sdash-risk-gauge">
+              <div class="sdash-risk-circle" [class.sdash-risk-low]="fraudSummary.riskScore < 30" [class.sdash-risk-medium]="fraudSummary.riskScore >= 30 && fraudSummary.riskScore < 70" [class.sdash-risk-high]="fraudSummary.riskScore >= 70">
+                <span class="sdash-risk-score">{{ fraudSummary.riskScore }}</span>
+                <span class="sdash-risk-label">Risk Score</span>
+              </div>
+            </div>
+            <div class="sdash-risk-details">
+              <div class="sdash-risk-stat">
+                <span class="sdash-risk-stat-label">Total Alerts</span>
+                <span class="sdash-risk-stat-value">{{ fraudSummary.totalAlerts || 0 }}</span>
+              </div>
+              <div class="sdash-risk-stat">
+                <span class="sdash-risk-stat-label">Unresolved</span>
+                <span class="sdash-risk-stat-value sdash-text-danger">{{ fraudSummary.unresolvedAlerts || 0 }}</span>
+              </div>
+              <div class="sdash-risk-stat">
+                <span class="sdash-risk-stat-label">Risk Level</span>
+                <span class="sdash-risk-stat-value" [class.sdash-text-success]="fraudSummary.riskLevel === 'LOW'" [class.sdash-text-warning]="fraudSummary.riskLevel === 'MEDIUM'" [class.sdash-text-danger]="fraudSummary.riskLevel === 'HIGH'">{{ fraudSummary.riskLevel }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Fraud Alerts -->
+          <div class="sdash-card">
+            <div class="sdash-card-header">
+              <h3>Fraud Alerts</h3>
+            </div>
+            <div class="sdash-card-body">
+              <div *ngIf="fraudAlerts.length === 0" class="sdash-empty">
+                <p>No fraud alerts detected. Your account is secure!</p>
+              </div>
+              <div *ngIf="fraudAlerts.length > 0" class="sdash-fraud-alerts-list">
+                <div *ngFor="let alert of fraudAlerts" class="sdash-fraud-alert-item" [class.sdash-alert-resolved]="alert.resolved">
+                  <div class="sdash-alert-severity" [class.sdash-severity-low]="alert.severity === 'LOW'" [class.sdash-severity-medium]="alert.severity === 'MEDIUM'" [class.sdash-severity-high]="alert.severity === 'HIGH'" [class.sdash-severity-critical]="alert.severity === 'CRITICAL'">
+                    {{ alert.severity }}
+                  </div>
+                  <div class="sdash-alert-content">
+                    <h4>{{ alert.alertType }}</h4>
+                    <p>{{ alert.description }}</p>
+                    <div class="sdash-alert-meta">
+                      <span>Amount: &#8377;{{ (alert.amount || 0) | number:'1.2-2' }}</span>
+                      <span *ngIf="alert.location">Location: {{ alert.location }}</span>
+                      <span>{{ alert.createdAt | date:'dd MMM yyyy, hh:mm a' }}</span>
+                    </div>
+                  </div>
+                  <div class="sdash-alert-action">
+                    <button *ngIf="!alert.resolved" class="sdash-btn sdash-btn-sm sdash-btn-success" (click)="resolveAlert($any(alert.id))">Resolve</button>
+                    <span *ngIf="alert.resolved" class="sdash-badge active">Resolved</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── EMPLOYEE PROFILE ──────────────────────────── -->
+      <div *ngIf="activeSection === 'employee-profile'" class="sdash-section">
+        <div class="sdash-card sdash-mb">
+          <div class="sdash-card-header">
+            <h3>Employee Information</h3>
+          </div>
+          <div class="sdash-card-body">
+            <div class="sdash-profile-info-grid">
+              <div class="sdash-profile-field">
+                <span class="sdash-profile-label">Name</span>
+                <span class="sdash-profile-value">{{ employee?.employeeName }}</span>
+              </div>
+              <div class="sdash-profile-field">
+                <span class="sdash-profile-label">Employee ID</span>
+                <span class="sdash-profile-value">{{ employee?.employeeId }}</span>
+              </div>
+              <div class="sdash-profile-field">
+                <span class="sdash-profile-label">Designation</span>
+                <span class="sdash-profile-value">{{ employee?.designation }}</span>
+              </div>
+              <div class="sdash-profile-field">
+                <span class="sdash-profile-label">Department</span>
+                <span class="sdash-profile-value">{{ employee?.department }}</span>
+              </div>
+              <div class="sdash-profile-field">
+                <span class="sdash-profile-label">Company</span>
+                <span class="sdash-profile-value">{{ employee?.companyName }}</span>
+              </div>
+              <div class="sdash-profile-field">
+                <span class="sdash-profile-label">Account Number</span>
+                <span class="sdash-profile-value">{{ account?.accountNumber }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Update Profile -->
+        <div class="sdash-card">
+          <div class="sdash-card-header">
+            <h3>Update Profile</h3>
+          </div>
+          <div class="sdash-card-body">
+            <form (ngSubmit)="updateProfile()" class="sdash-form">
+              <div class="sdash-form-grid">
+                <div class="sdash-form-group">
+                  <label>Address</label>
+                  <input type="text" [(ngModel)]="profileAddress" name="profileAddress" placeholder="Enter your address">
+                </div>
+                <div class="sdash-form-group">
+                  <label>Mobile Number</label>
+                  <input type="text" [(ngModel)]="profileMobile" name="profileMobile" placeholder="Enter mobile number">
+                </div>
+                <div class="sdash-form-group">
+                  <label>Email</label>
+                  <input type="email" [(ngModel)]="profileEmail" name="profileEmail" placeholder="Enter email address">
+                </div>
+              </div>
+              <div class="sdash-form-actions">
+                <button type="submit" class="sdash-btn sdash-btn-primary" [disabled]="isUpdatingProfile">
+                  <span *ngIf="!isUpdatingProfile">Update Profile</span>
+                  <span *ngIf="isUpdatingProfile" class="sdash-btn-loading"><div class="sdash-spinner-small"></div> Updating...</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Subscription Payments Section -->
+    <div class="sdash-content-section" *ngIf="activeSection === 'subscriptions'">
+      <app-subscription-payment></app-subscription-payment>
+    </div>
+
+  </main>
+</div>

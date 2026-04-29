@@ -1,0 +1,599 @@
+<div class="cheque-management-container">
+  <!-- Header -->
+  <div class="management-header">
+    <div class="header-content">
+      <h1 class="header-title">
+        <i class="fas fa-check-square"></i> Cheque Management
+      </h1>
+      <p class="header-subtitle">Review and process cheque draw requests from users</p>
+    </div>
+  </div>
+
+  <!-- Statistics Cards -->
+  <div class="stats-grid" *ngIf="stats">
+    <div class="stat-card pending">
+      <div class="stat-icon">
+        <i class="fas fa-hourglass-half"></i>
+      </div>
+      <div class="stat-content">
+        <div class="stat-value">{{ stats.pendingRequests }}</div>
+        <div class="stat-label">Pending Approval</div>
+      </div>
+    </div>
+
+    <div class="stat-card approved">
+      <div class="stat-icon">
+        <i class="fas fa-check-circle"></i>
+      </div>
+      <div class="stat-content">
+        <div class="stat-value">{{ stats.approvedRequests }}</div>
+        <div class="stat-label">Approved</div>
+      </div>
+    </div>
+
+    <div class="stat-card completed">
+      <div class="stat-icon">
+        <i class="fas fa-flag-checkered"></i>
+      </div>
+      <div class="stat-content">
+        <div class="stat-value">{{ stats.completedRequests }}</div>
+        <div class="stat-label">Completed</div>
+      </div>
+    </div>
+
+    <div class="stat-card rejected">
+      <div class="stat-icon">
+        <i class="fas fa-times-circle"></i>
+      </div>
+      <div class="stat-content">
+        <div class="stat-value">{{ stats.rejectedRequests }}</div>
+        <div class="stat-label">Rejected</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="filter-section">
+    <div class="filter-group">
+      <label for="statusFilter">Status Filter:</label>
+      <select id="statusFilter" [(ngModel)]="statusFilter" (change)="onFilterChange()" class="filter-select">
+        <option value="ALL">All Statuses</option>
+        <option value="PENDING">Pending</option>
+        <option value="APPROVED">Approved</option>
+        <option value="COMPLETED">Completed</option>
+        <option value="REJECTED">Rejected</option>
+      </select>
+    </div>
+
+    <div class="filter-group">
+      <label for="searchQuery">Search Cheque Number:</label>
+      <div class="search-wrapper">
+        <input
+          type="text"
+          id="searchQuery"
+          [(ngModel)]="searchQuery"
+          (keyup.enter)="onSearch()"
+          placeholder="e.g., CHQ000001"
+          class="search-input"
+        />
+        <button class="search-btn" (click)="onSearch()">
+          <i class="fas fa-search"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading State -->
+  <div class="loading-state" *ngIf="isLoading">
+    <div class="spinner"></div>
+    <p>Loading cheque requests...</p>
+  </div>
+
+  <!-- Cheques Table -->
+  <div class="table-section" *ngIf="!isLoading && chequeRequests.length > 0">
+    <div class="table-responsive">
+      <table class="cheques-table">
+        <thead>
+          <tr>
+            <th>Cheque #</th>
+            <th>User / Account</th>
+            <th>Serial #</th>
+            <th>Amount</th>
+            <th>Payee</th>
+            <th>Date</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let cheque of chequeRequests" class="cheque-row">
+            <td class="cheque-number">
+              <strong>{{ cheque.chequeNumber }}</strong>
+            </td>
+            <td class="user-info">
+              <div class="user-name">{{ cheque.userName }}</div>
+              <div class="account-number">{{ cheque.accountNumber }}</div>
+            </td>
+            <td class="serial-number">{{ cheque.serialNumber }}</td>
+            <td class="amount">{{ formatAmount(cheque.amount) }}</td>
+            <td class="payee">{{ cheque.payeeName }}</td>
+            <td class="date">{{ formatDate(cheque.chequeDate) }}</td>
+            <td class="status">
+              <span 
+                class="status-badge"
+                [style.backgroundColor]="getStatusColor(cheque.status)"
+              >
+                {{ getStatusText(cheque.status) }}
+              </span>
+              <span *ngIf="cheque.chequeDownloaded" class="downloaded-indicator" title="User has downloaded this cheque">
+                <i class="fas fa-download"></i> Downloaded
+              </span>
+            </td>
+            <td class="actions">
+              <div class="action-buttons">
+                <button
+                  class="btn-action view"
+                  title="View Details"
+                  (click)="viewChequeDetails(cheque)"
+                >
+                  <i class="fas fa-eye"></i>
+                </button>
+                <button
+                  *ngIf="cheque.status === 'PENDING'"
+                  class="btn-action approve"
+                  title="Approve"
+                  (click)="showApprovalDialog(cheque)"
+                >
+                  <i class="fas fa-check"></i>
+                </button>
+                <button
+                  *ngIf="cheque.status === 'PENDING'"
+                  class="btn-action reject"
+                  title="Reject"
+                  (click)="showRejectionDialog(cheque)"
+                >
+                  <i class="fas fa-ban"></i>
+                </button>
+                <button
+                  *ngIf="cheque.status === 'APPROVED'"
+                  class="btn-action pickup"
+                  title="Mark Picked Up"
+                  (click)="markPickedUp(cheque)"
+                >
+                  <i class="fas fa-box"></i>
+                </button>
+                <button
+                  *ngIf="cheque.status === 'APPROVED' || cheque.status === 'COMPLETED'"
+                  class="btn-action clear"
+                  title="Clear Cheque"
+                  (click)="clearCheque(cheque)"
+                >
+                  <i class="fas fa-check-double"></i>
+                </button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Pagination -->
+    <div class="pagination-controls">
+      <button 
+        class="pagination-btn" 
+        [disabled]="currentPage === 0"
+        (click)="previousPage()"
+      >
+        <i class="fas fa-chevron-left"></i> Previous
+      </button>
+      <span class="pagination-info">
+        Page {{ currentPage + 1 }} of {{ getTotalPages() }} 
+        ({{ totalItems }} total requests)
+      </span>
+      <button 
+        class="pagination-btn" 
+        [disabled]="currentPage >= getTotalPages() - 1"
+        (click)="nextPage()"
+      >
+        Next <i class="fas fa-chevron-right"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- Empty State -->
+  <div class="empty-state" *ngIf="!isLoading && chequeRequests.length === 0">
+    <div class="empty-icon">
+      <i class="fas fa-folder-open"></i>
+    </div>
+    <h3>No Cheque Requests</h3>
+    <p>No cheque requests match your filters.</p>
+  </div>
+
+  <!-- MODALS -->
+
+  <!-- Details Modal -->
+  <div class="modal-overlay" *ngIf="showDetailsModal" (click)="closeDetailsModal()">
+    <div class="modal-content" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>
+          <i class="fas fa-receipt"></i> Cheque Request Details
+        </h2>
+        <button class="modal-close" (click)="closeDetailsModal()">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+
+      <div class="modal-body" *ngIf="selectedCheque">
+        <!-- User Information -->
+        <div class="detail-section">
+          <h3 class="section-title">User Information</h3>
+          <div class="detail-grid">
+            <div class="detail-item">
+              <span class="detail-label">User Name</span>
+              <span class="detail-value">{{ selectedCheque.userName }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Email</span>
+              <span class="detail-value">{{ selectedCheque.userEmail }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Account Number</span>
+              <span class="detail-value">{{ selectedCheque.accountNumber }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Current Balance</span>
+              <span class="detail-value">{{ formatAmount(selectedCheque.currentBalance) }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Cheque Information -->
+        <div class="detail-section">
+          <h3 class="section-title">Cheque Details</h3>
+          <div class="detail-grid">
+            <div class="detail-item">
+              <span class="detail-label">Cheque Number</span>
+              <span class="detail-value cheque-number">{{ selectedCheque.chequeNumber }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Serial Number</span>
+              <span class="detail-value">{{ selectedCheque.serialNumber }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Cheque Date</span>
+              <span class="detail-value">{{ formatDate(selectedCheque.chequeDate) }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Requested On</span>
+              <span class="detail-value">{{ formatDateTime(selectedCheque.createdAt) }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Transaction Information -->
+        <div class="detail-section">
+          <h3 class="section-title">Transaction Details</h3>
+          <div class="detail-grid">
+            <div class="detail-item">
+              <span class="detail-label">Amount</span>
+              <span class="detail-value amount">{{ formatAmount(selectedCheque.amount) }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Available Balance</span>
+              <span class="detail-value">{{ formatAmount(selectedCheque.availableBalance) }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Payee Name</span>
+              <span class="detail-value">{{ selectedCheque.payeeName }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Remarks</span>
+              <span class="detail-value">{{ selectedCheque.remarks || '-' }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Status Information -->
+        <div class="detail-section">
+          <h3 class="section-title">Status & Approval</h3>
+          <div class="detail-grid">
+            <div class="detail-item">
+              <span class="detail-label">Status</span>
+              <span 
+                class="status-badge"
+                [style.backgroundColor]="getStatusColor(selectedCheque.status)"
+              >
+                {{ getStatusText(selectedCheque.status) }}
+              </span>
+            </div>
+            <div *ngIf="selectedCheque.approvedAt" class="detail-item">
+              <span class="detail-label">Approved By</span>
+              <span class="detail-value">{{ selectedCheque.approvedBy }}</span>
+            </div>
+            <div *ngIf="selectedCheque.approvedAt" class="detail-item">
+              <span class="detail-label">Approved On</span>
+              <span class="detail-value">{{ formatDateTime(selectedCheque.approvedAt) }}</span>
+            </div>
+            <div *ngIf="selectedCheque.rejectionReason" class="detail-item">
+              <span class="detail-label">Rejection Reason</span>
+              <span class="detail-value">{{ selectedCheque.rejectionReason }}</span>
+            </div>
+            <div *ngIf="selectedCheque.chequeDownloaded" class="detail-item">
+              <span class="detail-label">Cheque Downloaded</span>
+              <span class="detail-value downloaded-indicator">
+                <i class="fas fa-check-circle"></i> Yes — {{ formatDateTime(selectedCheque.chequeDownloadedAt) }}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Transaction Details (shown for approved/cleared cheques) -->
+        <div class="detail-section" *ngIf="selectedCheque.transactionReference">
+          <h3 class="section-title"><i class="fas fa-exchange-alt"></i> Transaction Details</h3>
+          <div class="detail-grid">
+            <div class="detail-item">
+              <span class="detail-label">Transaction Reference</span>
+              <span class="detail-value txn-ref">{{ selectedCheque.transactionReference }}</span>
+            </div>
+            <div *ngIf="selectedCheque.payeeAccountNumber" class="detail-item">
+              <span class="detail-label">Payee Account Number</span>
+              <span class="detail-value">{{ selectedCheque.payeeAccountNumber }}</span>
+            </div>
+            <div *ngIf="selectedCheque.payeeAccountType" class="detail-item">
+              <span class="detail-label">Payee Account Type</span>
+              <span class="detail-value">{{ selectedCheque.payeeAccountType }}</span>
+            </div>
+            <div *ngIf="selectedCheque.payeeAccountVerified" class="detail-item">
+              <span class="detail-label">Payee Verified</span>
+              <span class="detail-value verified-badge"><i class="fas fa-check-circle"></i> Verified</span>
+            </div>
+            <div *ngIf="selectedCheque.debitedFromAccount" class="detail-item">
+              <span class="detail-label">Debited From</span>
+              <span class="detail-value">{{ selectedCheque.debitedFromAccount }}</span>
+            </div>
+            <div *ngIf="selectedCheque.creditedToAccount" class="detail-item">
+              <span class="detail-label">Credited To</span>
+              <span class="detail-value">{{ selectedCheque.creditedToAccount }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Audit Log -->
+        <div class="detail-section">
+          <div class="audit-header">
+            <h3 class="section-title">Activity Log</h3>
+            <button class="toggle-btn" (click)="toggleAuditLog()">
+              <i class="fas" [ngClass]="showAuditLog ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+            </button>
+          </div>
+          <div class="audit-log" *ngIf="showAuditLog && auditLog.length > 0">
+            <div class="audit-item" *ngFor="let log of auditLog">
+              <div class="audit-time">{{ formatDateTime(log.timestamp) }}</div>
+              <div class="audit-action">{{ log.action }}</div>
+              <div class="audit-admin">{{ log.adminEmail }}</div>
+              <div class="audit-remarks" *ngIf="log.remarks">{{ log.remarks }}</div>
+            </div>
+          </div>
+          <div class="empty-audit" *ngIf="showAuditLog && auditLog.length === 0">
+            No activity logged yet
+          </div>
+        </div>
+
+        <!-- Signature Verification Section -->
+        <div class="detail-section signature-verification-section">
+          <h3 class="section-title"><i class="fas fa-file-signature"></i> Signature Verification</h3>
+          <div *ngIf="signatureLoading" class="signature-loading">
+            <i class="fas fa-spinner fa-spin"></i> Loading signed document...
+          </div>
+          <div *ngIf="signatureError && !signatureLoading" class="signature-error">
+            <i class="fas fa-exclamation-triangle"></i> {{ signatureError }}
+          </div>
+          <div *ngIf="signatureInfo && !signatureLoading" class="signature-info-bar">
+            <span><strong>Name:</strong> {{ signatureInfo.fullName }}</span>
+            <span><strong>Account Type:</strong> {{ signatureInfo.accountType }}</span>
+            <span><strong>App #:</strong> {{ signatureInfo.applicationNumber }}</span>
+          </div>
+          <div *ngIf="signatureDocUrl && !signatureLoading" class="signature-doc-container">
+            <iframe [src]="signatureDocUrl" class="signature-doc-frame"></iframe>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary" (click)="closeDetailsModal()">
+          <i class="fas fa-times"></i> Close
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Approval Modal -->
+  <div class="modal-overlay" *ngIf="showApprovalModal" (click)="closeApprovalModal()">
+    <div class="modal-content approval-modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>
+          <i class="fas fa-check-circle"></i> Approve Cheque Request
+        </h2>
+        <button class="modal-close" (click)="closeApprovalModal()">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+
+      <div class="modal-body" *ngIf="selectedCheque">
+        <div class="approval-info">
+          <p class="info-text">
+            <strong>Cheque Number:</strong> {{ selectedCheque.chequeNumber }}
+          </p>
+          <p class="info-text">
+            <strong>Amount:</strong> {{ formatAmount(selectedCheque.amount) }}
+          </p>
+          <p class="info-text">
+            <strong>Payee Name:</strong> {{ selectedCheque.payeeName }}
+          </p>
+          <p class="info-text">
+            <strong>From Account:</strong> {{ selectedCheque.accountNumber }}
+          </p>
+        </div>
+
+        <!-- Payee Account Verification Section -->
+        <div class="payee-verification-section">
+          <h3 class="section-label"><i class="fas fa-user-check"></i> Payee Account Verification</h3>
+          <p class="verification-hint">Enter the payee's account number to verify name match before approval</p>
+          
+          <div class="form-group">
+            <label for="payeeAccountNumber">Payee Account Number <span class="required">*</span></label>
+            <div class="verify-input-group">
+              <input
+                type="text"
+                id="payeeAccountNumber"
+                [(ngModel)]="payeeAccountNumber"
+                placeholder="Enter payee's NeoBank account number"
+                class="form-input"
+                [disabled]="isVerifying || payeeVerified"
+              />
+              <button
+                class="btn btn-verify"
+                (click)="verifyPayeeAccount()"
+                [disabled]="!payeeAccountNumber || payeeAccountNumber.trim() === '' || isVerifying || payeeVerified"
+              >
+                <span *ngIf="!isVerifying">
+                  <i class="fas fa-search"></i> Verify
+                </span>
+                <span *ngIf="isVerifying">
+                  <i class="fas fa-spinner fa-spin"></i>
+                </span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Verification Result -->
+          <div *ngIf="verificationResult" class="verification-result" [class.success]="verificationResult.verified" [class.error]="!verificationResult.verified">
+            <div class="verification-icon">
+              <i class="fas" [ngClass]="verificationResult.verified ? 'fa-check-circle' : 'fa-times-circle'"></i>
+            </div>
+            <div class="verification-details">
+              <p class="verification-status">{{ verificationResult.verified ? 'Verified Successfully' : 'Verification Failed' }}</p>
+              <p *ngIf="verificationResult.accountHolderName" class="verification-info">
+                <strong>Account Holder:</strong> {{ verificationResult.accountHolderName }}
+              </p>
+              <p *ngIf="verificationResult.accountType" class="verification-info">
+                <strong>Account Type:</strong> {{ verificationResult.accountType }}
+              </p>
+              <p class="verification-message">{{ verificationResult.message }}</p>
+            </div>
+            <button *ngIf="!verificationResult.verified" class="btn-reset-verify" (click)="resetVerification()">
+              <i class="fas fa-redo"></i> Try Again
+            </button>
+          </div>
+
+          <!-- Transfer Summary (shown after verification) -->
+          <div *ngIf="payeeVerified" class="transfer-summary">
+            <h4><i class="fas fa-exchange-alt"></i> Transfer Summary</h4>
+            <div class="transfer-flow">
+              <div class="transfer-from">
+                <span class="transfer-label">Debit From</span>
+                <span class="transfer-account">{{ selectedCheque.accountNumber }}</span>
+                <span class="transfer-name">{{ selectedCheque.userName }}</span>
+              </div>
+              <div class="transfer-arrow">
+                <i class="fas fa-arrow-right"></i>
+                <span class="transfer-amount">{{ formatAmount(selectedCheque.amount) }}</span>
+              </div>
+              <div class="transfer-to">
+                <span class="transfer-label">Credit To</span>
+                <span class="transfer-account">{{ payeeAccountNumber }}</span>
+                <span class="transfer-name">{{ verificationResult?.accountHolderName }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="approvalRemarks">Remarks (Optional):</label>
+          <textarea
+            id="approvalRemarks"
+            [(ngModel)]="approvalRemarks"
+            placeholder="Add any remarks about this approval..."
+            maxlength="500"
+            rows="3"
+            class="form-textarea"
+          ></textarea>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary" (click)="closeApprovalModal()">
+          Cancel
+        </button>
+        <button 
+          class="btn btn-success" 
+          [disabled]="isProcessing || !payeeVerified"
+          (click)="approveCheque()"
+        >
+          <span *ngIf="!isProcessing">
+            <i class="fas fa-check"></i> Approve & Transfer
+          </span>
+          <span *ngIf="isProcessing">
+            <i class="fas fa-spinner fa-spin"></i> Processing...
+          </span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rejection Modal -->
+  <div class="modal-overlay" *ngIf="showRejectionModal" (click)="closeRejectionModal()">
+    <div class="modal-content rejection-modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>
+          <i class="fas fa-times-circle"></i> Reject Cheque Request
+        </h2>
+        <button class="modal-close" (click)="closeRejectionModal()">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+
+      <div class="modal-body" *ngIf="selectedCheque">
+        <div class="rejection-info">
+          <p class="info-text">
+            <strong>Cheque Number:</strong> {{ selectedCheque.chequeNumber }}
+          </p>
+          <p class="info-text">
+            <strong>Requested Amount:</strong> {{ formatAmount(selectedCheque.amount) }}
+          </p>
+        </div>
+
+        <div class="form-group">
+          <label for="rejectionReason">Rejection Reason: <span class="required">*</span></label>
+          <textarea
+            id="rejectionReason"
+            [(ngModel)]="rejectionReason"
+            placeholder="Explain why you are rejecting this cheque request..."
+            maxlength="500"
+            rows="4"
+            class="form-textarea"
+          ></textarea>
+          <small class="form-hint">{{ rejectionReason.length }} / 500 characters</small>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary" (click)="closeRejectionModal()">
+          Cancel
+        </button>
+        <button 
+          class="btn btn-danger" 
+          [disabled]="!rejectionReason || rejectionReason.trim() === '' || isProcessing"
+          (click)="rejectCheque()"
+        >
+          <span *ngIf="!isProcessing">
+            <i class="fas fa-ban"></i> Reject Request
+          </span>
+          <span *ngIf="isProcessing">
+            <i class="fas fa-spinner fa-spin"></i> Processing...
+          </span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,475 @@
+<div class="profile-container">
+  <div class="profile-header">
+    <button class="back-btn" (click)="goBack()">← Back to Dashboard</button>
+    <h2>My Profile</h2>
+  </div>
+
+  <!-- Loading State -->
+  <div *ngIf="loading && !userProfile.name" class="loading-overlay">
+    <div class="loading-spinner"></div>
+    <p>Loading your profile...</p>
+  </div>
+
+  <!-- Error State -->
+  <div *ngIf="error && !loading" class="error-message">
+    <p>{{ error }}</p>
+  </div>
+
+  <div class="profile-content" *ngIf="!loading || (userProfile && userProfile.name)">
+    <!-- Profile Card -->
+    <div class="profile-card">
+      <div class="profile-avatar">
+        <div class="avatar-circle" *ngIf="!profilePhotoUrl">
+          <span class="avatar-text">{{ userProfile.name.charAt(0) }}</span>
+        </div>
+        <img *ngIf="profilePhotoUrl" [src]="profilePhotoUrl" alt="Profile Photo" class="profile-photo-img">
+      </div>
+      
+      <div class="profile-info">
+        <h3>{{ userProfile.name }}</h3>
+        <p class="account-type">{{ userProfile.accountType }}</p>
+        <p class="account-number">Account: {{ userProfile.accountNumber }}</p>
+        <p class="customer-id" *ngIf="userProfile.account?.customerId">Customer ID: {{ userProfile.account?.customerId }}</p>
+      </div>
+
+      <div class="balance-section">
+        <div class="balance-card">
+          <h4>Current Balance</h4>
+          <p class="balance-amount">₹{{ currentBalance | number:'1.2-2' }}</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Profile Photo Section -->
+    <div class="details-section">
+      <h3>Profile Photo</h3>
+      <div class="upload-section">
+        <div class="photo-preview-container">
+          <div class="passport-photo-frame" *ngIf="profilePhotoUrl">
+            <img [src]="profilePhotoUrl" alt="Profile Photo Preview" class="passport-size-photo">
+          </div>
+          <div class="no-photo-placeholder" *ngIf="!profilePhotoUrl">
+            <div class="placeholder-icon">📷</div>
+            <p>No photo uploaded</p>
+          </div>
+        </div>
+        <div class="upload-controls">
+          <input 
+            type="file" 
+            id="profilePhotoInput" 
+            accept="image/jpeg,image/jpg,image/png,application/pdf"
+            (change)="onProfilePhotoSelected($event)"
+            style="display: none;"
+          />
+          <button 
+            type="button"
+            class="upload-button-primary"
+            (click)="triggerFileInput('profilePhotoInput')"
+          >
+            <span class="button-icon">📤</span>
+            <span>Choose Profile Photo</span>
+          </button>
+          <button 
+            *ngIf="profilePhoto" 
+            class="upload-button-secondary" 
+            (click)="uploadProfilePhoto()"
+            [disabled]="uploadingPhoto"
+            type="button"
+          >
+            <span *ngIf="!uploadingPhoto" class="button-icon">✓</span>
+            <span *ngIf="!uploadingPhoto">Upload Photo</span>
+            <span *ngIf="uploadingPhoto" class="button-icon">⏳</span>
+            <span *ngIf="uploadingPhoto">Uploading...</span>
+          </button>
+          <p class="file-info-text">Accepted: JPEG, PNG, PDF | Max Size: 5MB</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Signature Section -->
+    <div class="details-section">
+      <h3>Digital Signature</h3>
+      <div class="upload-section">
+        <div class="signature-status" *ngIf="signatureStatus">
+          <span class="status-badge" [ngClass]="getSignatureStatusClass()">
+            {{ getSignatureStatusText() }}
+          </span>
+          <p *ngIf="signatureStatus === 'REJECTED' && signatureRejectionReason" class="rejection-reason">
+            Reason: {{ signatureRejectionReason }}
+          </p>
+        </div>
+
+        <!-- Online signature pad -->
+        <div class="signature-pad-container">
+          <label class="signature-pad-label">Draw your signature below</label>
+          <div 
+            class="signature-canvas-wrapper"
+            (mousedown)="onSignatureCanvasDown($event)"
+            (mousemove)="onSignatureCanvasMove($event)"
+            (mouseup)="onSignatureCanvasUp()"
+            (mouseleave)="onSignatureCanvasUp()"
+            (touchstart)="onSignatureCanvasDown($event)"
+            (touchmove)="onSignatureCanvasMove($event)"
+            (touchend)="onSignatureCanvasUp()"
+          >
+            <canvas #signatureCanvas class="signature-canvas"></canvas>
+          </div>
+          <div class="signature-pad-actions">
+            <button type="button" class="upload-button-secondary" (click)="clearSignatureCanvas()">
+              Clear
+            </button>
+            <button 
+              type="button" 
+              class="upload-button-primary" 
+              (click)="saveCanvasSignatureAndUpload()"
+              [disabled]="uploadingSignature"
+            >
+              <span *ngIf="!uploadingSignature" class="button-icon">✓</span>
+              <span *ngIf="!uploadingSignature">Save & Upload</span>
+              <span *ngIf="uploadingSignature" class="button-icon">⏳</span>
+              <span *ngIf="uploadingSignature">Uploading...</span>
+            </button>
+          </div>
+          <p class="info-text">You can draw your signature directly here. Admin will review and approve it.</p>
+        </div>
+
+        <!-- Existing preview and file upload fallback -->
+        <div class="signature-preview-container" *ngIf="showSignature && signatureUrl">
+          <div class="signature-frame">
+            <img [src]="signatureUrl" alt="Signature Preview" class="signature-preview-image">
+          </div>
+        </div>
+        <div class="signature-actions" *ngIf="signatureStatus">
+          <button 
+            *ngIf="!showSignature"
+            type="button"
+            class="show-signature-btn"
+            (click)="showSignature = true; loadSignatureImage()"
+          >
+            <span class="button-icon">👁️</span>
+            <span>Show Signature</span>
+          </button>
+          <button 
+            *ngIf="showSignature"
+            type="button"
+            class="hide-signature-btn"
+            (click)="showSignature = false; signatureUrl = null"
+          >
+            <span class="button-icon">🙈</span>
+            <span>Hide Signature</span>
+          </button>
+        </div>
+
+        <div class="upload-controls">
+          <input 
+            type="file" 
+            id="signatureInput" 
+            accept="image/jpeg,image/jpg,image/png,application/pdf"
+            (change)="onSignatureSelected($event)"
+            style="display: none;"
+          />
+          <button 
+            type="button"
+            class="upload-button-secondary"
+            (click)="triggerFileInput('signatureInput')"
+          >
+            <span class="button-icon">📤</span>
+            <span>Upload from file (optional)</span>
+          </button>
+          <p class="file-info-text">Accepted: JPEG, PNG, PDF | Max Size: 5MB</p>
+        </div>
+        <p class="info-text">* Signature requires admin approval before it can be used for profile or Aadhaar/PAN updates.</p>
+      </div>
+    </div>
+
+    <!-- Personal Details -->
+    <div class="details-section">
+      <h3>Personal Information</h3>
+      <div class="details-grid">
+        <div class="detail-item">
+          <label>Full Name</label>
+          <p>{{ userProfile.name }}</p>
+        </div>
+        <div class="detail-item">
+          <label>Email Address</label>
+          <div *ngIf="!editingEmail" class="email-display">
+            <p>{{ userProfile.email }}</p>
+            <button class="edit-email-btn" (click)="startEditingEmail()" type="button">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+              </svg>
+              Update
+            </button>
+          </div>
+          <div *ngIf="editingEmail" class="email-edit">
+            <input 
+              type="email" 
+              [(ngModel)]="newEmail" 
+              class="email-input"
+              placeholder="Enter new email"
+              [disabled]="updatingEmail"
+            />
+            <div class="email-error" *ngIf="emailError">{{ emailError }}</div>
+            <div class="email-actions">
+              <button 
+                class="save-email-btn" 
+                (click)="updateEmail()" 
+                [disabled]="updatingEmail"
+                type="button"
+              >
+                <span *ngIf="!updatingEmail">Save</span>
+                <span *ngIf="updatingEmail">Updating...</span>
+              </button>
+              <button 
+                class="cancel-email-btn" 
+                (click)="cancelEditingEmail()" 
+                [disabled]="updatingEmail"
+                type="button"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="detail-item">
+          <label>Account Number</label>
+          <p>{{ userProfile.accountNumber }}</p>
+        </div>
+        <div class="detail-item" *ngIf="userProfile.account?.customerId">
+          <label>Customer ID</label>
+          <p>{{ userProfile.account?.customerId }}</p>
+        </div>
+        <div class="detail-item">
+          <label>IFSC Code</label>
+          <p>{{ userProfile.ifscCode }}</p>
+        </div>
+        <div class="detail-item">
+          <label>Phone Number</label>
+          <div *ngIf="!editingPhone" class="phone-display">
+            <p>{{ userProfile.phoneNumber || 'Not provided' }}</p>
+            <button class="edit-btn-small" (click)="startEditingPhone()" type="button">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+              </svg>
+              Update
+            </button>
+          </div>
+          <div *ngIf="editingPhone" class="phone-edit">
+            <input 
+              type="tel" 
+              [(ngModel)]="newPhone" 
+              class="form-input"
+              placeholder="Enter 10-digit phone number"
+              maxlength="10"
+              [disabled]="isRequestingUpdate"
+            />
+            <div class="error-message" *ngIf="updateError">{{ updateError }}</div>
+            <div class="edit-actions">
+              <button 
+                class="save-btn" 
+                (click)="requestPhoneUpdate()" 
+                [disabled]="isRequestingUpdate"
+                type="button"
+              >
+                <span *ngIf="!isRequestingUpdate">Request Update</span>
+                <span *ngIf="isRequestingUpdate">Requesting...</span>
+              </button>
+              <button 
+                class="cancel-btn" 
+                (click)="cancelEditingPhone()" 
+                [disabled]="isRequestingUpdate"
+                type="button"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="detail-item">
+          <label>Date of Birth</label>
+          <p>{{ userProfile.dateOfBirth || 'Not provided' }}</p>
+        </div>
+        <div class="detail-item">
+          <label>Address</label>
+          <div *ngIf="!editingAddress" class="address-display">
+            <p>{{ userProfile.address || 'Not provided' }}</p>
+            <button class="edit-btn-small" (click)="startEditingAddress()" type="button">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+              </svg>
+              Update
+            </button>
+          </div>
+          <div *ngIf="editingAddress" class="address-edit">
+            <textarea 
+              [(ngModel)]="newAddress" 
+              class="form-input"
+              placeholder="Enter your address"
+              rows="3"
+              [disabled]="isRequestingUpdate"
+            ></textarea>
+            <div class="error-message" *ngIf="updateError">{{ updateError }}</div>
+            <div class="edit-actions">
+              <button 
+                class="save-btn" 
+                (click)="requestAddressUpdate()" 
+                [disabled]="isRequestingUpdate"
+                type="button"
+              >
+                <span *ngIf="!isRequestingUpdate">Request Update</span>
+                <span *ngIf="isRequestingUpdate">Requesting...</span>
+              </button>
+              <button 
+                class="cancel-btn" 
+                (click)="cancelEditingAddress()" 
+                [disabled]="isRequestingUpdate"
+                type="button"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="detail-item">
+          <label>Account Type</label>
+          <p>{{ userProfile.accountType }}</p>
+        </div>
+        <div class="detail-item">
+          <label>Member Since</label>
+          <p>{{ userProfile.joinDate }}</p>
+        </div>
+        <div class="detail-item" *ngIf="userProfile.pan">
+          <label>PAN Number</label>
+          <p>{{ userProfile.pan }}</p>
+        </div>
+        <div class="detail-item" *ngIf="userProfile.aadhar">
+          <label>Aadhar Number</label>
+          <div class="aadhar-section">
+            <p>{{ userProfile.aadhar }}</p>
+            <div class="verification-status">
+              <span class="status-badge" [ngClass]="getAadharStatusClass()">
+                {{ getAadharStatusText() }}
+              </span>
+              <span *ngIf="userProfile.aadharVerified && userProfile.aadharVerifiedDate" class="verified-date">
+                Verified on: {{ userProfile.aadharVerifiedDate | date:'short' }}
+              </span>
+            </div>
+            <button 
+              *ngIf="!userProfile.aadharVerified || userProfile.aadharVerificationStatus === 'FAILED'"
+              type="button"
+              class="verify-aadhar-btn"
+              (click)="initiateAadharVerification()"
+              [disabled]="aadharVerifying || !userProfile.aadhar"
+            >
+              <span *ngIf="!aadharVerifying">🔐 Verify Aadhaar</span>
+              <span *ngIf="aadharVerifying">⏳ Verifying...</span>
+            </button>
+            <div *ngIf="userProfile.aadharVerificationStatus === 'PENDING'" class="verification-pending">
+              <p class="pending-message">⚠️ Verification in progress. Please complete the process on Aadhaar website.</p>
+            </div>
+          </div>
+        </div>
+        <div class="detail-item" *ngIf="userProfile.occupation">
+          <label>Occupation</label>
+          <p>{{ userProfile.occupation }}</p>
+        </div>
+        <div class="detail-item" *ngIf="userProfile.income">
+          <label>Annual Income</label>
+          <p>₹{{ userProfile.income | number:'1.2-2' }}</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Update History Section -->
+    <div class="details-section" *ngIf="updateHistory.length > 0">
+      <h3>Update History</h3>
+      <div *ngIf="isLoadingUpdateHistory" class="loading-state">Loading update history...</div>
+      <div *ngIf="!isLoadingUpdateHistory" class="update-history-list">
+        <div *ngFor="let history of updateHistory" class="update-history-item">
+          <div class="history-header">
+            <span class="field-name">{{ history.fieldUpdated === 'ADDRESS' ? 'Address' : 'Phone Number' }}</span>
+            <span class="update-date">{{ history.updateDate | date:'dd/MM/yyyy HH:mm' }}</span>
+          </div>
+          <div class="history-changes">
+            <div class="change-row">
+              <span class="old-value">Before: {{ history.oldValue || 'Not provided' }}</span>
+            </div>
+            <div class="change-row">
+              <span class="new-value">After: {{ history.newValue }}</span>
+            </div>
+            <div class="change-row">
+              <span class="approved-by">Approved by: {{ history.approvedBy }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="action-buttons">
+      <button class="edit-btn" (click)="editProfile()">Edit Profile</button>
+      <button class="refresh-btn" (click)="loadCurrentBalance()">Refresh Balance</button>
+      <button 
+        class="generate-passbook-btn" 
+        (click)="generatePassbook()"
+        [disabled]="generatingPassbook"
+        type="button"
+      >
+        <span *ngIf="!generatingPassbook" class="button-icon">📄</span>
+        <span *ngIf="!generatingPassbook">Generate Passbook</span>
+        <span *ngIf="generatingPassbook" class="button-icon">⏳</span>
+        <span *ngIf="generatingPassbook">Generating...</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- OTP Verification Modal -->
+  <div *ngIf="showOtpModal" class="modal-overlay" (click)="closeOtpModal()">
+    <div class="modal-content otp-modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>Verify OTP</h3>
+        <button (click)="closeOtpModal()" class="close-btn">×</button>
+      </div>
+      <div class="modal-body">
+        <p class="otp-info">An OTP has been sent to your registered email. Please enter it below to submit your update request.</p>
+        <div class="otp-input-group">
+          <input 
+            type="text" 
+            [(ngModel)]="otpInput"
+            class="otp-input"
+            placeholder="000000"
+            maxlength="6"
+            (input)="onOtpInput($event)"
+            [disabled]="isVerifyingOtp || otpTimer <= 0"
+          />
+          <div class="otp-timer" [ngClass]="{'expired': otpTimer <= 0}">
+            <span *ngIf="otpTimer > 0">Time remaining: {{ formatTimer(otpTimer) }}</span>
+            <span *ngIf="otpTimer <= 0" class="expired-text">OTP expired</span>
+          </div>
+        </div>
+        <div class="error-message" *ngIf="otpError">{{ otpError }}</div>
+        <div class="otp-actions">
+          <button 
+            (click)="verifyOtpAndSubmit()" 
+            [disabled]="isVerifyingOtp || otpTimer <= 0 || otpInput.length !== 6"
+            class="verify-btn"
+            type="button"
+          >
+            {{ isVerifyingOtp ? 'Verifying...' : 'Verify & Submit' }}
+          </button>
+          <button 
+            (click)="resendOtp()" 
+            [disabled]="otpTimer > 0"
+            class="resend-btn"
+            type="button"
+          >
+            Resend OTP
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

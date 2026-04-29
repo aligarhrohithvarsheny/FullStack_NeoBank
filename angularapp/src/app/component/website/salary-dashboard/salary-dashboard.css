@@ -1,0 +1,2024 @@
+﻿/* ===========================================================================
+   SALARY EMPLOYEE DASHBOARD — GLASSMORPHISM FINTECH DESIGN
+   =========================================================================== */
+
+/* ── Layout ─────────────────────────────────────────────── */
+.sdash-container {
+  display: flex;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 30%, #f0f9ff 60%, #f5f3ff 100%);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: #334155;
+}
+
+/* ── Sidebar ────────────────────────────────────────────── */
+.sdash-sidebar {
+  width: 270px;
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  color: #334155;
+  display: flex;
+  flex-direction: column;
+  transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  z-index: 100;
+  overflow-y: auto;
+  border-right: 1px solid rgba(148, 163, 184, 0.2);
+  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.03);
+}
+
+.sdash-sidebar.collapsed {
+  width: 70px;
+}
+
+.sdash-sidebar-header {
+  padding: 20px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+}
+
+.sdash-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sdash-brand-icon {
+  width: 38px;
+  height: 38px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+}
+
+.sdash-brand-icon svg {
+  width: 20px;
+  height: 20px;
+  color: #fff;
+}
+
+.sdash-brand h2 {
+  font-size: 16px;
+  font-weight: 800;
+  color: #1e293b;
+  margin: 0;
+  white-space: nowrap;
+  letter-spacing: -0.02em;
+}
+
+.sdash-subtitle {
+  font-size: 11px;
+  color: #6366f1;
+  letter-spacing: 0.5px;
+  font-weight: 500;
+}
+
+.sdash-toggle-btn {
+  background: none;
+  border: none;
+  color: #64748b;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 10px;
+  transition: all 0.25s ease;
+}
+
+.sdash-toggle-btn:hover {
+  background: rgba(99, 102, 241, 0.08);
+  color: #6366f1;
+}
+
+.sdash-toggle-btn svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* ── Sidebar Search ─────────────────────────────────────── */
+.sdash-sidebar-search {
+  padding: 12px 12px 8px;
+}
+
+.sdash-search-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.sdash-search-icon {
+  position: absolute;
+  left: 12px;
+  width: 16px;
+  height: 16px;
+  color: #94a3b8;
+  pointer-events: none;
+}
+
+.sdash-search-input {
+  width: 100%;
+  padding: 9px 32px 9px 36px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 12px;
+  background: rgba(248, 250, 252, 0.8);
+  color: #334155;
+  font-size: 13px;
+  outline: none;
+  transition: all 0.25s ease;
+}
+
+.sdash-search-input::placeholder {
+  color: #94a3b8;
+}
+
+.sdash-search-input:focus {
+  border-color: rgba(99, 102, 241, 0.4);
+  background: #fff;
+  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.08);
+}
+
+.sdash-search-clear {
+  position: absolute;
+  right: 10px;
+  width: 16px;
+  height: 16px;
+  color: #94a3b8;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.sdash-search-clear:hover {
+  color: #334155;
+}
+
+.sdash-no-results {
+  text-align: center;
+  padding: 16px 12px;
+  color: #94a3b8;
+  font-size: 13px;
+}
+
+/* ── Navigation ─────────────────────────────────────────── */
+.sdash-nav {
+  padding: 12px 8px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.sdash-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 16px;
+  border-radius: 12px;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 2px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.sdash-nav-item svg {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  transition: transform 0.25s ease;
+}
+
+.sdash-nav-item:hover {
+  background: rgba(99, 102, 241, 0.06);
+  color: #6366f1;
+}
+
+.sdash-nav-item:hover svg {
+  transform: scale(1.1);
+}
+
+.sdash-nav-item.active {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(139, 92, 246, 0.08));
+  color: #6366f1;
+  font-weight: 600;
+  box-shadow: inset 3px 0 0 #6366f1;
+}
+
+.sdash-nav-divider {
+  height: 1px;
+  background: rgba(148, 163, 184, 0.15);
+  margin: 12px 16px;
+}
+
+.sdash-nav-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: #94a3b8;
+  padding: 4px 20px 2px;
+  font-weight: 600;
+}
+
+.sdash-nav-item.sdash-logout {
+  color: #ef4444;
+  margin-top: auto;
+}
+
+.sdash-nav-item.sdash-logout:hover {
+  background: rgba(239, 68, 68, 0.06);
+  color: #dc2626;
+}
+
+/* ── Main Content ───────────────────────────────────────── */
+.sdash-main {
+  margin-left: 270px;
+  flex: 1;
+  transition: margin-left 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  min-height: 100vh;
+}
+
+.sdash-main.expanded {
+  margin-left: 70px;
+}
+
+/* ── Header ─────────────────────────────────────────────── */
+.sdash-header {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  padding: 18px 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+
+.sdash-header h1 {
+  font-size: 22px;
+  font-weight: 800;
+  color: #1e293b;
+  margin: 0;
+  letter-spacing: -0.03em;
+}
+
+.sdash-user-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sdash-user-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 16px;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.25);
+}
+
+.sdash-user-details {
+  display: flex;
+  flex-direction: column;
+}
+
+.sdash-user-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.sdash-user-role {
+  font-size: 12px;
+  color: #64748b;
+}
+
+/* ── Content Area ───────────────────────────────────────── */
+.sdash-content {
+  padding: 28px 32px;
+}
+
+.sdash-section {
+  animation: sdash-fadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes sdash-fadeIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Overview Cards (Glassmorphism) ─────────────────────── */
+.sdash-overview-cards {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 20px;
+  margin-bottom: 28px;
+}
+
+.sdash-stat-card {
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-radius: 16px;
+  padding: 22px;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04), 0 0 1px rgba(0, 0, 0, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.sdash-stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  border-radius: 16px 16px 0 0;
+  opacity: 0;
+  transition: opacity 0.35s ease;
+}
+
+.sdash-stat-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.08), 0 0 1px rgba(0, 0, 0, 0.08);
+  border-color: rgba(255, 255, 255, 0.8);
+}
+
+.sdash-stat-card:hover::before {
+  opacity: 1;
+}
+
+.sdash-card-balance::before { background: linear-gradient(90deg, #7c3aed, #a78bfa); }
+.sdash-card-salary::before { background: linear-gradient(90deg, #16a34a, #4ade80); }
+.sdash-card-yearly::before { background: linear-gradient(90deg, #2563eb, #60a5fa); }
+.sdash-card-company::before { background: linear-gradient(90deg, #d97706, #fbbf24); }
+.sdash-card-credit::before { background: linear-gradient(90deg, #db2777, #f472b6); }
+
+.sdash-stat-icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: transform 0.35s ease;
+}
+
+.sdash-stat-card:hover .sdash-stat-icon {
+  transform: scale(1.08);
+}
+
+.sdash-stat-icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.sdash-card-balance .sdash-stat-icon { background: rgba(124, 58, 237, 0.1); color: #7c3aed; }
+.sdash-card-salary .sdash-stat-icon { background: rgba(22, 163, 74, 0.1); color: #16a34a; }
+.sdash-card-yearly .sdash-stat-icon { background: rgba(37, 99, 235, 0.1); color: #2563eb; }
+.sdash-card-company .sdash-stat-icon { background: rgba(217, 119, 6, 0.1); color: #d97706; }
+.sdash-card-credit .sdash-stat-icon { background: rgba(219, 39, 119, 0.1); color: #db2777; }
+
+.sdash-stat-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.sdash-stat-label {
+  font-size: 12px;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 500;
+}
+
+.sdash-stat-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.sdash-company-name {
+  font-size: 15px !important;
+  word-break: break-word;
+}
+
+/* ── Quick Actions ──────────────────────────────────────── */
+.sdash-quick-actions {
+  margin-bottom: 28px;
+}
+
+.sdash-quick-actions h3 {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 14px;
+  letter-spacing: -0.01em;
+}
+
+.sdash-action-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+}
+
+.sdash-action-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 24px 20px;
+  border: 1px solid rgba(148, 163, 184, 0.15);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: #475569;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  text-align: center;
+}
+
+.sdash-action-btn:hover {
+  border-color: rgba(99, 102, 241, 0.3);
+  background: rgba(255, 255, 255, 0.85);
+  color: #6366f1;
+  box-shadow: 0 8px 24px rgba(99, 102, 241, 0.1);
+  transform: translateY(-3px);
+}
+
+.sdash-action-btn svg {
+  width: 28px;
+  height: 28px;
+  padding: 10px;
+  background: rgba(99, 102, 241, 0.08);
+  border-radius: 14px;
+  transition: all 0.3s ease;
+}
+
+.sdash-action-btn:hover svg {
+  background: rgba(99, 102, 241, 0.15);
+  transform: scale(1.05);
+}
+
+/* ── Info Banner ────────────────────────────────────────── */
+.sdash-info-banner {
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 14px;
+  padding: 18px 24px;
+  border: 1px solid rgba(148, 163, 184, 0.15);
+}
+
+.sdash-info-banner-row {
+  display: flex;
+  gap: 32px;
+  flex-wrap: wrap;
+}
+
+.sdash-info-label {
+  font-size: 13px;
+  color: #94a3b8;
+  margin-right: 6px;
+}
+
+.sdash-info-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+/* ── Glassmorphism Cards ────────────────────────────────── */
+.sdash-card {
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-radius: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04), 0 0 1px rgba(0, 0, 0, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  overflow: hidden;
+  transition: box-shadow 0.35s ease;
+}
+
+.sdash-card:hover {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+}
+
+.sdash-mb {
+  margin-bottom: 24px;
+}
+
+.sdash-card-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sdash-card-header h3 {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.sdash-card-badge {
+  background: rgba(99, 102, 241, 0.1);
+  color: #6366f1;
+  padding: 6px 16px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  border: 1px solid rgba(99, 102, 241, 0.15);
+}
+
+.sdash-card-body {
+  padding: 24px;
+}
+
+/* ── Detail Grid (My Account) ───────────────────────────── */
+.sdash-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+.sdash-detail-item {
+  padding: 16px 18px;
+  background: rgba(248, 250, 252, 0.7);
+  border-radius: 14px;
+  border-left: 3px solid #6366f1;
+  transition: all 0.25s ease;
+}
+
+.sdash-detail-item:hover {
+  background: rgba(248, 250, 252, 0.95);
+  transform: translateX(3px);
+}
+
+.sdash-detail-label {
+  display: block;
+  font-size: 11px;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+  font-weight: 500;
+}
+
+.sdash-detail-value {
+  display: block;
+  font-size: 15px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.sdash-balance-value {
+  color: #16a34a !important;
+}
+
+/* ── Badge ──────────────────────────────────────────────── */
+.sdash-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.sdash-badge.active {
+  background: rgba(22, 163, 74, 0.1);
+  color: #16a34a;
+}
+
+.sdash-badge.frozen {
+  background: rgba(220, 38, 38, 0.1);
+  color: #dc2626;
+}
+
+.sdash-badge.pending {
+  background: rgba(217, 119, 6, 0.1);
+  color: #d97706;
+}
+
+/* ── Tables ─────────────────────────────────────────────── */
+.sdash-table-wrapper {
+  overflow-x: auto;
+}
+
+.sdash-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.sdash-table th {
+  text-align: left;
+  padding: 13px 16px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: #94a3b8;
+  background: rgba(248, 250, 252, 0.5);
+  border-bottom: 2px solid rgba(148, 163, 184, 0.15);
+}
+
+.sdash-table td {
+  padding: 13px 16px;
+  font-size: 14px;
+  color: #334155;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.08);
+}
+
+.sdash-table tbody tr {
+  transition: background 0.2s ease;
+}
+
+.sdash-table tbody tr:hover {
+  background: rgba(99, 102, 241, 0.03);
+}
+
+.sdash-table-compact th,
+.sdash-table-compact td {
+  padding: 10px 14px;
+}
+
+.sdash-amount-credit {
+  color: #16a34a !important;
+  font-weight: 600;
+}
+
+.sdash-amount-debit {
+  color: #dc2626;
+  font-weight: 600;
+}
+
+.sdash-device-info {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Forms ──────────────────────────────────────────────── */
+.sdash-form {
+  max-width: 700px;
+}
+
+.sdash-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+.sdash-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sdash-form-group label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.sdash-form-group label .required {
+  color: #ef4444;
+}
+
+.sdash-form-group input,
+.sdash-form-group select {
+  padding: 11px 16px;
+  border: 1.5px solid rgba(148, 163, 184, 0.25);
+  border-radius: 12px;
+  font-size: 14px;
+  color: #1e293b;
+  transition: all 0.25s ease;
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.sdash-form-group input:focus,
+.sdash-form-group select:focus {
+  border-color: rgba(99, 102, 241, 0.5);
+  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.08);
+  outline: none;
+  background: #fff;
+}
+
+.sdash-full-width {
+  margin-bottom: 18px;
+  max-width: 700px;
+}
+
+.sdash-field-note {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.sdash-free-badge {
+  display: inline-block;
+  background: rgba(22, 163, 74, 0.1);
+  color: #16a34a;
+  padding: 2px 10px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  margin-left: 4px;
+}
+
+.sdash-form-actions {
+  padding-top: 8px;
+}
+
+/* ── Buttons ────────────────────────────────────────────── */
+.sdash-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 26px;
+  border: none;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  letter-spacing: 0.01em;
+}
+
+.sdash-btn-primary {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.25);
+}
+
+.sdash-btn-primary:hover:not(:disabled) {
+  box-shadow: 0 8px 20px rgba(99, 102, 241, 0.4);
+  transform: translateY(-2px);
+}
+
+.sdash-btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.sdash-btn-sm {
+  padding: 7px 16px;
+  font-size: 13px;
+  border-radius: 10px;
+}
+
+.sdash-btn-outline {
+  background: rgba(255, 255, 255, 0.7);
+  border: 1.5px solid rgba(99, 102, 241, 0.3);
+  color: #6366f1;
+}
+
+.sdash-btn-outline:hover:not(:disabled) {
+  background: rgba(99, 102, 241, 0.06);
+  border-color: #6366f1;
+}
+
+.sdash-btn-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sdash-btn-success {
+  background: linear-gradient(135deg, #16a34a, #22c55e);
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.25s ease;
+  box-shadow: 0 4px 12px rgba(22, 163, 74, 0.2);
+}
+
+.sdash-btn-success:hover {
+  box-shadow: 0 8px 20px rgba(22, 163, 74, 0.35);
+  transform: translateY(-1px);
+}
+
+.sdash-btn-danger {
+  background: linear-gradient(135deg, #dc2626, #ef4444);
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.25s ease;
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.2);
+}
+
+.sdash-btn-danger:hover {
+  box-shadow: 0 8px 20px rgba(220, 38, 38, 0.35);
+  transform: translateY(-1px);
+}
+
+/* ── Current Session Display ────────────────────────────── */
+.sdash-current-session {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 14px;
+}
+.sdash-session-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px;
+  background: rgba(13, 148, 136, 0.04);
+  border-radius: 10px;
+  border: 1px solid rgba(13, 148, 136, 0.1);
+}
+.sdash-session-label {
+  font-size: 0.78rem;
+  color: #64748b;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.sdash-session-value {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #0f766e;
+}
+.sdash-timer {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 1.1rem;
+  color: #0d9488;
+  font-weight: 700;
+}
+
+/* ── Spinners ───────────────────────────────────────────── */
+.sdash-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 40px 0;
+  color: #64748b;
+}
+
+.sdash-spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid rgba(99, 102, 241, 0.15);
+  border-top-color: #6366f1;
+  border-radius: 50%;
+  animation: sdash-spin 0.8s linear infinite;
+}
+
+.sdash-spinner-small {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: sdash-spin 0.8s linear infinite;
+}
+
+.sdash-spinner-dark {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(99, 102, 241, 0.2);
+  border-top-color: #6366f1;
+  border-radius: 50%;
+  animation: sdash-spin 0.6s linear infinite;
+  display: inline-block;
+}
+
+@keyframes sdash-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Empty State ────────────────────────────────────────── */
+.sdash-empty {
+  text-align: center;
+  padding: 40px 0;
+  color: #94a3b8;
+}
+
+.sdash-empty p {
+  margin-top: 10px;
+  font-size: 15px;
+}
+
+.sdash-empty-state {
+  text-align: center;
+  padding: 40px 0;
+  color: #94a3b8;
+}
+
+.sdash-section-desc {
+  color: #64748b;
+  font-size: 14px;
+  margin-bottom: 18px;
+}
+
+/* ── Warning Box ────────────────────────────────────────── */
+.sdash-warning-box {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 18px;
+  background: rgba(255, 251, 235, 0.8);
+  border: 1px solid rgba(252, 211, 77, 0.4);
+  border-radius: 14px;
+  color: #92400e;
+  font-size: 14px;
+  margin-bottom: 20px;
+  backdrop-filter: blur(8px);
+}
+
+.sdash-warning-box a {
+  color: #6366f1;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+/* ── Charge Info ────────────────────────────────────────── */
+.sdash-charge-info {
+  margin-top: 28px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+.sdash-charge-info h4 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #64748b;
+  margin-bottom: 12px;
+}
+
+.sdash-charge-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.sdash-charge-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 16px;
+  background: rgba(248, 250, 252, 0.6);
+  border-radius: 10px;
+  font-size: 13px;
+  color: #334155;
+  transition: background 0.2s ease;
+}
+
+.sdash-charge-item:hover {
+  background: rgba(248, 250, 252, 0.9);
+}
+
+/* ── Bank Charges Summary ───────────────────────────────── */
+.sdash-charges-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
+  margin-bottom: 28px;
+}
+
+.sdash-charge-card {
+  padding: 24px;
+  background: rgba(248, 250, 252, 0.6);
+  border-radius: 16px;
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  text-align: center;
+  transition: all 0.3s ease;
+}
+
+.sdash-charge-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.04);
+}
+
+.sdash-charge-card-label {
+  display: block;
+  font-size: 13px;
+  color: #94a3b8;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+.sdash-charge-card-value {
+  display: block;
+  font-size: 24px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.sdash-charge-card-total {
+  background: rgba(99, 102, 241, 0.06);
+  border-color: rgba(99, 102, 241, 0.15);
+}
+
+.sdash-charge-card-total .sdash-charge-card-value {
+  color: #6366f1;
+}
+
+.sdash-charge-schedule {
+  margin-top: 8px;
+}
+
+.sdash-charge-schedule h4 {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 14px;
+}
+
+.sdash-schedule-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+.sdash-schedule-col h5 {
+  font-size: 13px;
+  font-weight: 600;
+  color: #6366f1;
+  margin-bottom: 8px;
+}
+
+/* ── Verify Recipient ───────────────────────────────────── */
+.sdash-input-with-btn {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.sdash-input-with-btn input {
+  flex: 1;
+}
+
+.sdash-verify-btn {
+  padding: 11px 22px;
+  background: linear-gradient(135deg, #1e293b, #334155);
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.25s ease;
+  min-width: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(30, 41, 59, 0.2);
+}
+
+.sdash-verify-btn:hover:not(:disabled) {
+  box-shadow: 0 8px 20px rgba(30, 41, 59, 0.3);
+  transform: translateY(-1px);
+}
+
+.sdash-verify-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.sdash-recipient-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(22, 163, 74, 0.06);
+  border: 1px solid rgba(22, 163, 74, 0.2);
+  border-radius: 14px;
+  padding: 14px 18px;
+  margin-bottom: 16px;
+}
+
+.sdash-verified-icon {
+  width: 28px;
+  height: 28px;
+  color: #16a34a;
+  flex-shrink: 0;
+}
+
+.sdash-recipient-details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sdash-recipient-name {
+  font-weight: 700;
+  font-size: 1rem;
+  color: #166534;
+}
+
+.sdash-recipient-meta {
+  font-size: 0.82rem;
+  color: #64748b;
+}
+
+.sdash-recipient-notfound {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(220, 38, 38, 0.05);
+  border: 1px solid rgba(220, 38, 38, 0.2);
+  border-radius: 14px;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  color: #dc2626;
+  font-size: 0.9rem;
+}
+
+/* ── Transfer Result Modal ──────────────────────────────── */
+.sdash-result-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(8px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+  animation: sdash-fadeIn 0.25s ease;
+}
+
+.sdash-result-modal {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px);
+  border-radius: 20px;
+  width: 480px;
+  max-width: 92vw;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+  animation: sdash-slideUp 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+}
+
+.sdash-result-header {
+  background: linear-gradient(135deg, #16a34a, #22c55e);
+  color: #fff;
+  padding: 28px;
+  text-align: center;
+}
+
+.sdash-result-header h3 {
+  margin: 10px 0 0;
+  font-size: 1.3rem;
+  font-weight: 700;
+}
+
+.sdash-result-icon {
+  width: 48px;
+  height: 48px;
+}
+
+.sdash-result-body {
+  padding: 24px;
+}
+
+.sdash-result-txnid {
+  text-align: center;
+  font-size: 0.95rem;
+  margin-bottom: 16px;
+  color: #475569;
+  background: rgba(248, 250, 252, 0.8);
+  padding: 10px 14px;
+  border-radius: 12px;
+}
+
+.sdash-result-txnid strong {
+  color: #1e293b;
+}
+
+.sdash-result-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sdash-result-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.9rem;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+}
+
+.sdash-result-row span:first-child {
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.sdash-result-row span:last-child {
+  color: #1e293b;
+  font-weight: 600;
+  text-align: right;
+  max-width: 60%;
+}
+
+.sdash-result-total {
+  background: rgba(248, 250, 252, 0.8);
+  border-radius: 10px;
+  padding: 10px 14px !important;
+  border-bottom: none !important;
+}
+
+.sdash-result-total span:last-child {
+  color: #1e293b;
+  font-weight: 700;
+}
+
+.sdash-result-actions {
+  display: flex;
+  gap: 12px;
+  padding: 16px 24px 24px;
+  justify-content: center;
+}
+
+@keyframes sdash-slideUp {
+  from { transform: translateY(30px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* ── Utility ────────────────────────────────────────────── */
+.sdash-mb { margin-bottom: 24px; }
+.sdash-mt { margin-top: 24px; }
+
+.sdash-center-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 16px;
+  text-align: center;
+}
+
+.sdash-big-icon {
+  width: 64px;
+  height: 64px;
+  color: #6366f1;
+  margin-bottom: 16px;
+}
+
+.sdash-text-success { color: #16a34a !important; }
+.sdash-text-warning { color: #d97706 !important; }
+.sdash-text-danger { color: #dc2626 !important; }
+
+/* ── Stat Card Variants ─────────────────────────────────── */
+.sdash-card-upi .sdash-stat-icon { background: rgba(124, 58, 237, 0.1); color: #7c3aed; }
+.sdash-card-savings .sdash-stat-icon { background: rgba(5, 150, 105, 0.1); color: #059669; }
+.sdash-card-active { border-left: 4px solid #16a34a; }
+.sdash-card-inactive { border-left: 4px solid #94a3b8; }
+
+/* ── UPI ────────────────────────────────────────────────── */
+.sdash-upi-enable-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.sdash-upi-enable-box h3 {
+  font-size: 20px;
+  color: #1e293b;
+  margin: 0;
+  font-weight: 700;
+}
+
+.sdash-upi-enable-box p {
+  color: #64748b;
+  max-width: 400px;
+}
+
+.sdash-upi-id {
+  font-size: 16px !important;
+  color: #6366f1 !important;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* ── Toggle Switch ──────────────────────────────────────── */
+.sdash-toggle {
+  position: relative;
+  display: inline-block;
+  width: 48px;
+  height: 26px;
+  flex-shrink: 0;
+}
+
+.sdash-toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.sdash-toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: #cbd5e1;
+  border-radius: 26px;
+  transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sdash-toggle-slider::before {
+  content: "";
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  left: 3px;
+  bottom: 3px;
+  background: #fff;
+  border-radius: 50%;
+  transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.sdash-toggle input:checked + .sdash-toggle-slider {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+}
+
+.sdash-toggle input:checked + .sdash-toggle-slider::before {
+  transform: translateX(22px);
+}
+
+/* ── Debit Card Visual ──────────────────────────────────── */
+.sdash-debit-card-visual {
+  background: linear-gradient(135deg, #312e81 0%, #6366f1 50%, #818cf8 100%);
+  border-radius: 20px;
+  padding: 28px 32px;
+  color: #fff;
+  position: relative;
+  overflow: hidden;
+  max-width: 460px;
+  box-shadow: 0 16px 40px rgba(99, 102, 241, 0.3);
+  transition: transform 0.35s ease, box-shadow 0.35s ease;
+}
+
+.sdash-debit-card-visual:hover {
+  transform: translateY(-4px) rotate(0.5deg);
+  box-shadow: 0 20px 50px rgba(99, 102, 241, 0.4);
+}
+
+.sdash-debit-card-visual::before {
+  content: '';
+  position: absolute;
+  top: -60%;
+  right: -20%;
+  width: 300px;
+  height: 300px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 50%;
+}
+
+.sdash-card-chip {
+  width: 40px;
+  height: 30px;
+  background: linear-gradient(135deg, #fbbf24, #f59e0b);
+  border-radius: 8px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+.sdash-card-number {
+  font-size: 22px;
+  letter-spacing: 4px;
+  font-family: 'Courier New', monospace;
+  margin-bottom: 20px;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+}
+
+.sdash-card-details-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.sdash-card-label {
+  display: block;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  opacity: 0.7;
+  margin-bottom: 2px;
+}
+
+.sdash-card-value {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.sdash-card-type {
+  text-align: right;
+  font-size: 12px;
+  letter-spacing: 2px;
+  font-weight: 700;
+  opacity: 0.8;
+}
+
+.sdash-form-actions-inline {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+/* ── Loan Eligibility ───────────────────────────────────── */
+.sdash-salary-display {
+  font-size: 32px;
+  font-weight: 700;
+  color: #6366f1;
+}
+
+.sdash-loan-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 20px;
+}
+
+.sdash-loan-card {
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(12px);
+  border-radius: 16px;
+  padding: 24px;
+  text-align: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  border-top: 4px solid transparent;
+  transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sdash-loan-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.08);
+}
+
+.sdash-loan-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 14px;
+  transition: transform 0.3s ease;
+}
+
+.sdash-loan-card:hover .sdash-loan-icon {
+  transform: scale(1.1);
+}
+
+.sdash-loan-icon svg {
+  width: 24px;
+  height: 24px;
+}
+
+.sdash-loan-card h4 {
+  margin: 0 0 8px;
+  font-size: 16px;
+  color: #1e293b;
+  font-weight: 700;
+}
+
+.sdash-loan-multiplier {
+  display: block;
+  font-size: 12px;
+  color: #64748b;
+  margin-bottom: 8px;
+}
+
+.sdash-loan-amount {
+  display: block;
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.sdash-loan-personal { border-top-color: #6366f1; }
+.sdash-loan-personal .sdash-loan-icon { background: rgba(99, 102, 241, 0.1); color: #6366f1; }
+.sdash-loan-personal .sdash-loan-amount { color: #6366f1; }
+
+.sdash-loan-home { border-top-color: #2563eb; }
+.sdash-loan-home .sdash-loan-icon { background: rgba(37, 99, 235, 0.1); color: #2563eb; }
+.sdash-loan-home .sdash-loan-amount { color: #2563eb; }
+
+.sdash-loan-car { border-top-color: #d97706; }
+.sdash-loan-car .sdash-loan-icon { background: rgba(217, 119, 6, 0.1); color: #d97706; }
+.sdash-loan-car .sdash-loan-amount { color: #d97706; }
+
+.sdash-loan-education { border-top-color: #059669; }
+.sdash-loan-education .sdash-loan-icon { background: rgba(5, 150, 105, 0.1); color: #059669; }
+.sdash-loan-education .sdash-loan-amount { color: #059669; }
+
+.sdash-general-loan {
+  font-size: 20px;
+  font-weight: 600;
+  color: #6366f1;
+}
+
+/* ── Fraud Detection ────────────────────────────────────── */
+.sdash-fraud-risk-card {
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(12px);
+  border-radius: 16px;
+  padding: 32px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  display: flex;
+  align-items: center;
+  gap: 40px;
+}
+
+.sdash-risk-gauge { flex-shrink: 0; }
+
+.sdash-risk-circle {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 6px solid #e2e8f0;
+  transition: border-color 0.3s ease;
+}
+
+.sdash-risk-low { border-color: #16a34a; }
+.sdash-risk-medium { border-color: #d97706; }
+.sdash-risk-high { border-color: #dc2626; }
+
+.sdash-risk-score {
+  font-size: 36px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.sdash-risk-low .sdash-risk-score { color: #16a34a; }
+.sdash-risk-medium .sdash-risk-score { color: #d97706; }
+.sdash-risk-high .sdash-risk-score { color: #dc2626; }
+
+.sdash-risk-label {
+  font-size: 11px;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 4px;
+}
+
+.sdash-risk-details {
+  display: flex;
+  gap: 32px;
+  flex-wrap: wrap;
+}
+
+.sdash-risk-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sdash-risk-stat-label {
+  font-size: 12px;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.sdash-risk-stat-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.sdash-fraud-alerts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sdash-fraud-alert-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 18px;
+  background: rgba(254, 242, 242, 0.6);
+  border-radius: 14px;
+  border: 1px solid rgba(254, 202, 202, 0.4);
+  transition: all 0.25s ease;
+}
+
+.sdash-fraud-alert-item:hover {
+  transform: translateX(4px);
+}
+
+.sdash-fraud-alert-item.sdash-alert-resolved {
+  background: rgba(240, 253, 244, 0.6);
+  border-color: rgba(187, 247, 208, 0.4);
+  opacity: 0.7;
+}
+
+.sdash-alert-severity {
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.sdash-severity-low { background: rgba(209, 250, 229, 0.8); color: #065f46; }
+.sdash-severity-medium { background: rgba(254, 243, 199, 0.8); color: #92400e; }
+.sdash-severity-high { background: rgba(254, 226, 226, 0.8); color: #991b1b; }
+.sdash-severity-critical { background: #dc2626; color: #fff; }
+
+.sdash-alert-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.sdash-alert-content h4 {
+  margin: 0 0 4px;
+  font-size: 14px;
+  color: #1e293b;
+  font-weight: 600;
+}
+
+.sdash-alert-content p {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.sdash-alert-meta {
+  display: flex;
+  gap: 16px;
+  font-size: 12px;
+  color: #94a3b8;
+  flex-wrap: wrap;
+}
+
+/* ─── Gold Loan Modal ──────────────────────────────────── */
+.sdash-modal-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.sdash-modal-content {
+  background: #fff;
+  border-radius: 16px;
+  width: 90%;
+  max-height: 85vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+}
+.sdash-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid #eee;
+}
+.sdash-modal-header h3 { margin: 0; color: #1a237e; }
+.sdash-modal-close {
+  background: none; border: none;
+  font-size: 24px; cursor: pointer; color: #666;
+}
+.sdash-modal-body { padding: 24px; }
+.sdash-btn-sm {
+  padding: 6px 14px;
+  font-size: 13px;
+  border-radius: 6px;
+  border: 1px solid #ddd;
+  background: #f5f5f5;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.sdash-btn-sm:hover { background: #e0e0e0; }
+.sdash-btn-secondary {
+  padding: 10px 20px;
+  border-radius: 8px;
+  border: 1px solid #1a237e;
+  background: #fff;
+  color: #1a237e;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+.sdash-btn-secondary:hover { background: #e8eaf6; }
+.sdash-btn-secondary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.sdash-alert-action {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+
+/* ── Employee Profile ───────────────────────────────────── */
+.sdash-profile-info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 20px;
+}
+
+.sdash-profile-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sdash-profile-label {
+  font-size: 12px;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 500;
+}
+
+.sdash-profile-value {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+/* ── Transactions Table ─────────────────────────────────── */
+.sdash-txn-filters {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.sdash-txn-filter-btn {
+  padding: 8px 20px;
+  border: 1.5px solid rgba(148, 163, 184, 0.2);
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  color: #64748b;
+}
+
+.sdash-txn-filter-btn.active {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: #fff;
+  border-color: transparent;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.25);
+}
+
+.sdash-txn-filter-btn:hover:not(.active) {
+  border-color: rgba(99, 102, 241, 0.3);
+  color: #6366f1;
+  background: rgba(99, 102, 241, 0.04);
+}
+
+.sdash-txn-table-wrapper {
+  overflow-x: auto;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+.sdash-txn-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+  min-width: 800px;
+}
+
+.sdash-txn-table thead th {
+  background: rgba(248, 250, 252, 0.8);
+  color: #94a3b8;
+  padding: 13px 16px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  white-space: nowrap;
+  border-bottom: 2px solid rgba(148, 163, 184, 0.12);
+}
+
+.sdash-txn-table tbody tr {
+  border-bottom: 1px solid rgba(148, 163, 184, 0.06);
+  transition: background 0.2s ease;
+}
+
+.sdash-txn-table tbody tr:hover {
+  background: rgba(99, 102, 241, 0.03);
+}
+
+.sdash-txn-table td {
+  padding: 13px 16px;
+  vertical-align: middle;
+  color: #334155;
+}
+
+.sdash-txn-id {
+  font-weight: 700;
+  color: #1e293b !important;
+  font-family: 'JetBrains Mono', 'Courier New', monospace;
+}
+
+.sdash-txn-type-badge {
+  padding: 4px 12px;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.sdash-txn-type-badge.transfer {
+  background: rgba(37, 99, 235, 0.1);
+  color: #2563eb;
+}
+
+.sdash-txn-type-badge.withdraw {
+  background: rgba(217, 119, 6, 0.1);
+  color: #d97706;
+}
+
+.sdash-txn-amount {
+  font-weight: 700;
+  color: #1e293b !important;
+}
+
+.sdash-txn-reason {
+  font-size: 0.84rem;
+  max-width: 180px;
+}
+
+.sdash-txn-reason.sdash-debit { color: #dc2626; }
+.sdash-txn-reason.sdash-credit { color: #16a34a; }
+
+.sdash-txn-status {
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.sdash-txn-status.success {
+  background: rgba(22, 163, 74, 0.1);
+  color: #16a34a;
+}
+
+.sdash-txn-status.failed {
+  background: rgba(220, 38, 38, 0.1);
+  color: #dc2626;
+}
+
+/* ── Responsive ─────────────────────────────────────────── */
+@media (max-width: 1280px) {
+  .sdash-overview-cards {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 1024px) {
+  .sdash-sidebar {
+    width: 70px;
+  }
+  .sdash-sidebar .sdash-brand,
+  .sdash-sidebar .sdash-nav-item span {
+    display: none;
+  }
+  .sdash-main {
+    margin-left: 70px;
+  }
+  .sdash-overview-cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .sdash-action-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .sdash-detail-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .sdash-charges-cards {
+    grid-template-columns: 1fr;
+  }
+  .sdash-schedule-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .sdash-content {
+    padding: 18px 16px;
+  }
+  .sdash-header {
+    padding: 14px 16px;
+  }
+  .sdash-header h1 {
+    font-size: 18px;
+  }
+  .sdash-overview-cards {
+    grid-template-columns: 1fr;
+  }
+  .sdash-action-grid {
+    grid-template-columns: 1fr;
+  }
+  .sdash-detail-grid {
+    grid-template-columns: 1fr;
+  }
+  .sdash-form-grid {
+    grid-template-columns: 1fr;
+  }
+  .sdash-info-banner-row {
+    flex-direction: column;
+    gap: 10px;
+  }
+  .sdash-charge-grid {
+    grid-template-columns: 1fr;
+  }
+  .sdash-fraud-risk-card {
+    flex-direction: column;
+    text-align: center;
+  }
+  .sdash-risk-details {
+    justify-content: center;
+  }
+  .sdash-debit-card-visual {
+    max-width: 100%;
+  }
+  .sdash-card-number {
+    font-size: 18px;
+    letter-spacing: 2px;
+  }
+  .sdash-loan-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .sdash-form-actions-inline {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .sdash-txn-filters {
+    flex-wrap: wrap;
+  }
+  .sdash-txn-table-wrapper {
+    margin: 0 -16px;
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+  }
+}
+
+/* ─── NeoBank QR Verified Badge ────────────────────────────── */
+.sdash-qr-neobank-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: linear-gradient(135deg, #1a237e 0%, #283593 100%);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 5px 10px;
+  border-radius: 20px;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(26,35,126,0.25);
+}
+.sdash-qr-neobank-badge svg {
+  width: 12px;
+  height: 12px;
+  stroke: #fff;
+}
+.sdash-qr-upload-hint strong {
+  color: #1a237e;
+}

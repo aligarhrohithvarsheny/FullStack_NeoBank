@@ -1,0 +1,3165 @@
+<!-- Include Font Awesome -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+<div class="dashboard-wrapper">
+  <!-- Left Sidebar -->
+  <aside class="sidebar" [class.collapsed]="sidebarCollapsed">
+    <div class="sidebar-header">
+      <div class="logo-section">
+        <i class="fa fa-bank"></i>
+        <span class="logo-text" *ngIf="!sidebarCollapsed">NeoBank</span>
+      </div>
+      <button class="sidebar-toggle" (click)="sidebarCollapsed = !sidebarCollapsed">
+        <i class="fa" [ngClass]="sidebarCollapsed ? 'fa-angle-right' : 'fa-angle-left'"></i>
+      </button>
+    </div>
+
+    <!-- Sidebar Search Bar -->
+    <div class="sidebar-search" *ngIf="!sidebarCollapsed">
+      <div class="sidebar-search-box">
+        <i class="fa fa-search sidebar-search-icon"></i>
+        <input type="text" placeholder="Search menu..." [(ngModel)]="sidebarSearchQuery" (input)="onSidebarSearch()" class="sidebar-search-input" />
+        <i class="fa fa-times sidebar-search-clear" *ngIf="sidebarSearchQuery" (click)="sidebarSearchQuery = ''; onSidebarSearch()"></i>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <ng-container *ngFor="let section of getFilteredManagerMenu()">
+        <div class="nav-section" *ngIf="section.items.length > 0">
+          <div class="nav-section-title" *ngIf="!sidebarCollapsed">{{ section.title }}</div>
+          <ng-container *ngFor="let item of section.items">
+            <a class="nav-item" [class.active]="activeSection === item.section" 
+               (click)="setActiveSection(item.section)"
+               [class.search-highlight]="sidebarSearchQuery && isMenuItemMatch(item)">
+              <i class="fa" [ngClass]="item.icon"></i>
+              <span *ngIf="!sidebarCollapsed">{{ item.label }}</span>
+              <span class="badge" *ngIf="!sidebarCollapsed && item.badge && item.badge() > 0">{{ item.badge() }}</span>
+              <span class="badge badge-danger" *ngIf="!sidebarCollapsed && item.badgeDanger && item.badgeDanger() > 0">{{ item.badgeDanger() }}</span>
+            </a>
+          </ng-container>
+        </div>
+      </ng-container>
+      <div class="no-search-results" *ngIf="sidebarSearchQuery && getFilteredManagerMenu().length === 0 && !sidebarCollapsed">
+        <i class="fa fa-search"></i>
+        <span>No matching menu items</span>
+      </div>
+    </nav>
+
+    <div class="sidebar-footer">
+      <button class="logout-btn-sidebar" (click)="logout()">
+        <i class="fa fa-sign-out-alt"></i>
+        <span *ngIf="!sidebarCollapsed">Logout</span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- Main Content Area -->
+  <div class="main-content">
+    <header class="main-header">
+      <div class="header-left">
+        <h2>Manager Dashboard</h2>
+      </div>
+      <div class="header-right">
+          <span class="admin-name">{{ managerName }}</span>
+          <div class="manager-session-info" *ngIf="managerLoginTimeIso">
+            <small>Logged in at: {{ managerLoginTimeIso | date:'short' }}</small>
+            <br>
+            <small>Session: {{ managerSessionDuration }}</small>
+          </div>
+        <button class="mobile-menu-toggle" (click)="sidebarCollapsed = !sidebarCollapsed">
+          <i class="fa fa-bars"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- Feature Access Control Section -->
+    <div class="content-section" *ngIf="activeSection === 'feature-access'">
+      <div class="section-header-inline">
+        <h3><i class="fa fa-shield-alt"></i> Admin Feature Access Control</h3>
+        <p class="section-description">Select an admin and enable or disable features that they can access in their dashboard</p>
+      </div>
+
+      <!-- Admin Selection -->
+      <div class="admin-selection-section">
+        <h4><i class="fa fa-users"></i> Select Admin</h4>
+        <div class="admin-list" *ngIf="!isLoadingAdmins">
+          <div 
+            *ngFor="let admin of allAdmins" 
+            class="admin-card"
+            [class.selected]="selectedAdmin && selectedAdmin.email === admin.email"
+            (click)="selectAdmin(admin)"
+          >
+            <div class="admin-avatar">
+              <i class="fa fa-user"></i>
+            </div>
+            <div class="admin-info">
+              <h5>{{ admin.name || 'Admin' }}</h5>
+              <p class="admin-email">{{ admin.email }}</p>
+              <p class="admin-id" *ngIf="admin.employeeId">ID: {{ admin.employeeId }}</p>
+            </div>
+            <div class="admin-status">
+              <span class="status-badge" [ngClass]="admin.profileComplete ? 'complete' : 'incomplete'">
+                <i class="fa" [ngClass]="admin.profileComplete ? 'fa-check-circle' : 'fa-clock'"></i>
+                {{ admin.profileComplete ? 'Profile Complete' : 'Profile Incomplete' }}
+              </span>
+              <span class="status-badge locked" *ngIf="admin.accountLocked">
+                <i class="fa fa-lock"></i>
+                Account Locked
+              </span>
+            </div>
+            <div class="admin-actions-inline" (click)="$event.stopPropagation()">
+              <button class="btn-reset-password-small" (click)="openAdminPasswordResetModal(admin)" title="Reset Password">
+                <i class="fa fa-key"></i>
+                Reset Password
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="loading-message" *ngIf="isLoadingAdmins">
+          <i class="fa fa-spinner fa-spin"></i> Loading admins...
+        </div>
+        <div class="no-admins" *ngIf="!isLoadingAdmins && allAdmins.length === 0">
+          <i class="fa fa-user-slash"></i>
+          <p>No admin employees found. Create one in the "Create Admin Employee" section.</p>
+        </div>
+      </div>
+
+      <!-- Selected Admin Info -->
+      <div class="selected-admin-info" *ngIf="selectedAdmin">
+        <div class="info-card">
+          <h4><i class="fa fa-user-check"></i> Managing Features for: {{ selectedAdmin.name }}</h4>
+          <p class="admin-details">
+            <span><i class="fa fa-envelope"></i> {{ selectedAdmin.email }}</span>
+            <span *ngIf="selectedAdmin.employeeId"><i class="fa fa-id-card"></i> {{ selectedAdmin.employeeId }}</span>
+          </p>
+        </div>
+        <!-- ID Card Quick Panel -->
+        <div class="info-card idcard-panel">
+          <h4><i class="fa fa-id-card"></i> NeoBank Admin ID Card</h4>
+          <p class="section-description">
+            Generate and manage official NeoBank ID card for this admin. The card can be scanned or searched by ID number.
+          </p>
+          <div class="idcard-layout">
+            <!-- Visual ID card preview -->
+            <div class="idcard-preview">
+              <div class="idcard-top">
+                <div class="bank-name">NEOBANK</div>
+                <div class="bank-tagline">Secure Digital Banking</div>
+              </div>
+              <div class="idcard-middle">
+                <div class="photo-placeholder">
+                  <img *ngIf="selectedAdmin.id && selectedAdmin.profilePhotoPath" 
+                       [src]="apiBaseUrl + '/api/admins/profile-photo/' + selectedAdmin.id" 
+                       alt="Admin photo" 
+                       class="idcard-photo-img" />
+                  <i *ngIf="!selectedAdmin.profilePhotoPath" class="fa fa-user-shield"></i>
+                </div>
+                <div class="idcard-text">
+                  <div class="idcard-name">{{ selectedAdmin.name || 'Admin Employee' }}</div>
+                  <div class="idcard-role">{{ selectedAdmin.idCardDesignation || selectedAdmin.role || 'Administrator' }}</div>
+                  <div class="idcard-dept" *ngIf="selectedAdmin.idCardDepartment">
+                    {{ selectedAdmin.idCardDepartment }}
+                  </div>
+                  <div class="idcard-number" *ngIf="selectedAdmin.idCardNumber">
+                    ID: {{ selectedAdmin.idCardNumber }}
+                  </div>
+                  <div class="idcard-number" *ngIf="!selectedAdmin.idCardNumber">
+                    ID not generated yet
+                  </div>
+                </div>
+              </div>
+              <div class="idcard-bottom">
+                <div class="idcard-barcode">
+                  <!-- simple visual stripes -->
+                  <span></span><span></span><span></span><span></span><span></span>
+                  <span></span><span></span><span></span><span></span><span></span>
+                </div>
+                <div class="idcard-meta" *ngIf="selectedAdmin.idCardGeneratedAt">
+                  Generated: {{ selectedAdmin.idCardGeneratedAt | date:'short' }}
+                </div>
+              </div>
+            </div>
+
+            <!-- ID card details and actions -->
+            <div class="idcard-controls">
+              <div class="details-grid">
+                <div class="detail-item">
+                  <label>Designation on Card</label>
+                  <input
+                    type="text"
+                    [(ngModel)]="idCardDesignationInput"
+                    class="form-input"
+                    placeholder="e.g. Senior Operations Manager"
+                  >
+                </div>
+                <div class="detail-item">
+                  <label>Department on Card</label>
+                  <input
+                    type="text"
+                    [(ngModel)]="idCardDepartmentInput"
+                    class="form-input"
+                    placeholder="e.g. Loans & Credit"
+                  >
+                </div>
+              </div>
+              <div class="details-grid">
+                <div class="detail-item">
+                  <label>Generated Time</label>
+                  <span class="value">
+                    {{ selectedAdmin.idCardGeneratedAt ? (selectedAdmin.idCardGeneratedAt | date:'short') : 'Not generated yet' }}
+                  </span>
+                </div>
+                <div class="detail-item">
+                  <label>Generated Count</label>
+                  <span class="value">
+                    {{ selectedAdmin.idCardGeneratedCount || 0 }}
+                  </span>
+                </div>
+              </div>
+              <div class="details-grid">
+                <div class="detail-item">
+                  <label>Valid Till</label>
+                  <span class="value">
+                    {{ selectedAdmin.idCardValidTill ? (selectedAdmin.idCardValidTill | date:'shortDate') : 'N/A' }}
+                  </span>
+                </div>
+              </div>
+              <div class="details-grid">
+                <div class="detail-item">
+                  <label>Last Updated By</label>
+                  <span class="value">
+                    {{ selectedAdmin.idCardLastUpdatedBy || 'N/A' }}
+                  </span>
+                </div>
+                <div class="detail-item">
+                  <label>Last Updated At</label>
+                  <span class="value">
+                    {{ selectedAdmin.idCardLastUpdatedAt ? (selectedAdmin.idCardLastUpdatedAt | date:'short') : 'N/A' }}
+                  </span>
+                </div>
+              </div>
+              <div class="form-actions">
+                <button class="btn-primary" (click)="generateIdCardForSelectedAdmin()" [disabled]="isGeneratingIdCard">
+                  <i class="fa fa-id-card"></i>
+                  <span *ngIf="!isGeneratingIdCard">
+                    {{ selectedAdmin.idCardNumber ? 'Regenerate ID Card' : 'Generate ID Card' }}
+                  </span>
+                  <span *ngIf="isGeneratingIdCard">Generating...</span>
+                </button>
+                <button class="btn-secondary" (click)="updateIdCardMetaForSelectedAdmin()" [disabled]="isUpdatingIdCard">
+                  <i class="fa fa-save"></i>
+                  <span *ngIf="!isUpdatingIdCard">Save Card Details</span>
+                  <span *ngIf="isUpdatingIdCard">Saving...</span>
+                </button>
+                <button class="btn-secondary" (click)="printIdCardForSelectedAdmin()">
+                  <i class="fa fa-print"></i>
+                  Print PVC Card
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bulk Actions (only show when admin is selected) -->
+      <div class="bulk-actions" *ngIf="selectedAdmin">
+        <button class="btn-primary" (click)="toggleAllFeatures(true)">
+          <i class="fa fa-check-double"></i> Enable All
+        </button>
+        <button class="btn-secondary" (click)="toggleAllFeatures(false)">
+          <i class="fa fa-ban"></i> Disable All
+        </button>
+        <button class="btn-success" (click)="saveFeatureAccess()">
+          <i class="fa fa-save"></i> Save Changes for {{ selectedAdmin.name }}
+        </button>
+      </div>
+
+      <!-- Warning if no admin selected -->
+      <div class="warning-message" *ngIf="!selectedAdmin && !isLoadingAdmins && allAdmins.length > 0">
+        <i class="fa fa-exclamation-triangle"></i>
+        <p>Please select an admin from the list above to manage their feature access.</p>
+      </div>
+
+      <!-- Filters -->
+      <div class="filter-section">
+        <div class="filter-group">
+          <label>Filter by Category:</label>
+          <select [(ngModel)]="featureFilter" (change)="filterFeatures()" class="filter-select">
+            <option *ngFor="let cat of getCategories()" [value]="cat">{{ cat }}</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <input 
+            type="text" 
+            [(ngModel)]="featureSearchQuery" 
+            (input)="filterFeatures()"
+            placeholder="Search features..."
+            class="search-input"
+          >
+        </div>
+      </div>
+
+      <!-- Features List (only show when admin is selected) -->
+      <div class="features-grid" *ngIf="selectedAdmin">
+        <div 
+          *ngFor="let feature of filteredFeatures" 
+          class="feature-card"
+          [class.enabled]="feature.enabled"
+          [class.disabled]="!feature.enabled"
+        >
+          <div class="feature-header">
+            <div class="feature-icon">
+              <i [class]="'fa ' + feature.icon"></i>
+            </div>
+            <div class="feature-info">
+              <h4>{{ feature.name }}</h4>
+              <p class="feature-category">{{ feature.category }}</p>
+            </div>
+            <div class="feature-toggle">
+              <label class="toggle-switch">
+                <input 
+                  type="checkbox" 
+                  [checked]="feature.enabled"
+                  (change)="toggleFeature(feature)"
+                >
+                <span class="slider"></span>
+              </label>
+            </div>
+          </div>
+          <div class="feature-description">
+            <p>{{ feature.description }}</p>
+          </div>
+          <div class="feature-status">
+            <span class="status-badge" [ngClass]="feature.enabled ? 'enabled' : 'disabled'">
+              <i class="fa" [ngClass]="feature.enabled ? 'fa-check' : 'fa-times'"></i>
+              {{ feature.enabled ? 'Enabled' : 'Disabled' }}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div class="no-features" *ngIf="filteredFeatures.length === 0">
+        <i class="fa fa-search"></i>
+        <p>No features found matching your search criteria.</p>
+      </div>
+    </div>
+
+    <!-- Manager Features Section (Features disabled for admins that manager can use) -->
+    <div class="content-section" *ngIf="activeSection === 'manager-features'">
+      <div class="section-header-inline">
+        <h3><i class="fa fa-tools"></i> Manager Feature Access</h3>
+        <p class="section-description">These features are disabled for admins. As manager, you can access and use these features.</p>
+      </div>
+
+      <!-- Info Banner -->
+      <div class="info-banner" *ngIf="managerAccessibleFeatures.length > 0">
+        <i class="fa fa-info-circle"></i>
+        <p>You have access to <strong>{{ managerAccessibleFeatures.length }}</strong> feature(s) that are currently disabled for admins. Click on any feature to use it.</p>
+      </div>
+
+      <!-- No Features Message -->
+      <div class="no-features-message" *ngIf="managerAccessibleFeatures.length === 0">
+        <i class="fa fa-check-circle"></i>
+        <h4>All Features Enabled for Admins</h4>
+        <p>Currently, all features are enabled for admins. When you disable a feature for an admin, it will appear here for you to use.</p>
+      </div>
+
+      <!-- Filters -->
+      <div class="filter-section" *ngIf="managerAccessibleFeatures.length > 0">
+        <div class="filter-group">
+          <label>Filter by Category:</label>
+          <select [(ngModel)]="managerFeatureFilter" (change)="filterManagerFeatures()" class="filter-select">
+            <option value="ALL">All Categories</option>
+            <option *ngFor="let cat of getCategories()" [value]="cat">{{ cat }}</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <input 
+            type="text" 
+            [(ngModel)]="managerFeatureSearchQuery" 
+            (input)="filterManagerFeatures()"
+            placeholder="Search features..."
+            class="search-input"
+          >
+        </div>
+      </div>
+
+      <!-- Manager Accessible Features List -->
+      <div class="manager-features-grid" *ngIf="filteredManagerFeatures.length > 0">
+        <div 
+          *ngFor="let feature of filteredManagerFeatures" 
+          class="manager-feature-card"
+          (click)="navigateToFeature(feature.id)"
+        >
+          <div class="feature-header">
+            <div class="feature-icon manager-icon">
+              <i [class]="'fa ' + feature.icon"></i>
+            </div>
+            <div class="feature-info">
+              <h4>{{ feature.name }}</h4>
+              <p class="feature-category">{{ feature.category }}</p>
+            </div>
+            <div class="feature-action">
+              <i class="fa fa-arrow-right"></i>
+            </div>
+          </div>
+          <div class="feature-description">
+            <p>{{ feature.description }}</p>
+          </div>
+          <div class="feature-status">
+            <span class="status-badge manager-badge">
+              <i class="fa fa-tools"></i>
+              Manager Access Only
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div class="no-features" *ngIf="filteredManagerFeatures.length === 0 && managerAccessibleFeatures.length > 0">
+        <i class="fa fa-search"></i>
+        <p>No features found matching your search criteria.</p>
+      </div>
+    </div>
+
+    <!-- Create Admin Employee Section -->
+    <div class="content-section" *ngIf="activeSection === 'create-admin'">
+      <div class="section-header-inline">
+        <h3><i class="fa fa-user-plus"></i> Create Admin Employee</h3>
+        <p class="section-description">Create new admin employee accounts. Employees will need to complete their profile after first login.</p>
+      </div>
+
+      <div class="create-admin-form">
+        <form (ngSubmit)="createAdminEmployee()">
+          <div class="form-row">
+            <div class="form-group">
+              <label for="employeeName">Employee Name <span class="required">*</span></label>
+              <input 
+                type="text" 
+                id="employeeName"
+                [(ngModel)]="newAdmin.name"
+                name="employeeName"
+                placeholder="Enter employee full name"
+                class="form-input"
+                required
+              >
+            </div>
+            <div class="form-group">
+              <label for="employeeEmail">Email <span class="required">*</span></label>
+              <input 
+                type="email" 
+                id="employeeEmail"
+                [(ngModel)]="newAdmin.email"
+                name="employeeEmail"
+                placeholder="employee@neobank.com"
+                class="form-input"
+                required
+              >
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="employeePassword">Password <span class="required">*</span></label>
+              <input 
+                type="password" 
+                id="employeePassword"
+                [(ngModel)]="newAdmin.password"
+                name="employeePassword"
+                placeholder="Enter password"
+                class="form-input"
+                required
+                minlength="6"
+              >
+              <small class="form-hint">Minimum 6 characters</small>
+            </div>
+            <div class="form-group">
+              <label for="employeeId">Employee ID</label>
+              <input 
+                type="text" 
+                id="employeeId"
+                [(ngModel)]="newAdmin.employeeId"
+                name="employeeId"
+                placeholder="EMP001 (optional)"
+                class="form-input"
+              >
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" class="btn-primary" [disabled]="isCreatingAdmin">
+              <i class="fa fa-user-plus"></i>
+              <span *ngIf="!isCreatingAdmin">Create Admin Employee</span>
+              <span *ngIf="isCreatingAdmin">Creating...</span>
+            </button>
+            <button type="button" class="btn-secondary" (click)="clearAdminForm()">
+              <i class="fa fa-times"></i> Clear
+            </button>
+          </div>
+        </form>
+
+        <!-- Add Existing Admin: search by email or ID card -->
+        <div class="existing-admin-section">
+          <h4><i class="fa fa-user-plus"></i> Add Existing Admin</h4>
+          <p class="section-description">Search an existing account by <strong>email</strong> or <strong>ID card number</strong>. Fetch details first, then add permanently as an admin employee.</p>
+          <div class="form-row">
+            <div class="form-group" style="flex:1">
+              <label for="existingSearch">Email or ID Card</label>
+              <input type="text" id="existingSearch" [(ngModel)]="searchExistingQuery" name="existingSearch" placeholder="admin@neobank.com OR ID12345" class="form-input">
+            </div>
+            <div class="form-group" style="width:200px;align-self:flex-end">
+              <button type="button" class="btn-primary" (click)="searchExistingAdmin()" [disabled]="isSearchingExisting">
+                <i class="fa fa-search"></i>
+                <span *ngIf="!isSearchingExisting">Fetch Details</span>
+                <span *ngIf="isSearchingExisting">Searching...</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="search-result" *ngIf="existingAdminError">
+            <div class="error-message"><i class="fa fa-exclamation-circle"></i> {{ existingAdminError }}</div>
+          </div>
+
+          <div class="search-result" *ngIf="existingAdminResult">
+            <div class="info-card">
+              <h4>Found Account</h4>
+              <p><strong>Name:</strong> {{ existingAdminResult.name || 'N/A' }}</p>
+              <p><strong>Email:</strong> {{ existingAdminResult.email || 'N/A' }}</p>
+              <p *ngIf="existingAdminResult.employeeId"><strong>Employee ID:</strong> {{ existingAdminResult.employeeId }}</p>
+              <p *ngIf="existingAdminResult.idCardNumber"><strong>ID Card:</strong> {{ existingAdminResult.idCardNumber }}</p>
+              <div class="form-actions" style="margin-top:12px">
+                <button class="btn-success" (click)="addExistingAdminPermanently()" [disabled]="isAddingExistingAdmin">
+                  <i class="fa fa-user-plus"></i>
+                  <span *ngIf="!isAddingExistingAdmin">Add Permanently</span>
+                  <span *ngIf="isAddingExistingAdmin">Adding...</span>
+                </button>
+                <button class="btn-secondary" (click)="clearExistingAdminSearch()">Cancel</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="success-message" *ngIf="adminCreationSuccess">
+          <i class="fa fa-check-circle"></i>
+          <div>
+            <p><strong>Admin employee created successfully!</strong></p>
+            <p>Email: {{ newAdmin.email }}</p>
+            <p>Password: {{ newAdmin.password }}</p>
+            <p class="note">Employee will need to complete their profile after first login.</p>
+          </div>
+        </div>
+
+        <div class="error-message" *ngIf="adminCreationError">
+          <i class="fa fa-exclamation-circle"></i>
+          {{ adminCreationError }}
+        </div>
+      </div>
+    </div>
+
+    <!-- Blocked Admins Section -->
+    <div class="content-section" *ngIf="activeSection === 'blocked-admins'">
+      <div class="section-header-inline">
+        <h3><i class="fa fa-lock"></i> Blocked Admin Accounts</h3>
+        <p class="section-description">Manage admin accounts that have been locked due to 3 failed login attempts. You can unblock accounts or reset passwords.</p>
+      </div>
+
+      <!-- Loading State -->
+      <div class="loading-message" *ngIf="isLoadingBlockedAdmins">
+        <i class="fa fa-spinner fa-spin"></i> Loading blocked admins...
+      </div>
+
+      <!-- No Blocked Admins -->
+      <div class="no-blocked-admins" *ngIf="!isLoadingBlockedAdmins && blockedAdmins.length === 0">
+        <i class="fa fa-check-circle"></i>
+        <h4>No Blocked Admins</h4>
+        <p>All admin accounts are currently active. Accounts will appear here after 3 failed login attempts.</p>
+      </div>
+
+      <!-- Blocked Admins List -->
+      <div class="blocked-admins-list" *ngIf="!isLoadingBlockedAdmins && blockedAdmins.length > 0">
+        <div *ngFor="let admin of blockedAdmins" class="blocked-admin-card">
+          <div class="admin-info-section">
+            <div class="admin-avatar blocked">
+              <i class="fa fa-user-lock"></i>
+            </div>
+            <div class="admin-details">
+              <h4>{{ admin.name || 'Admin' }}</h4>
+              <p class="admin-email"><i class="fa fa-envelope"></i> {{ admin.email }}</p>
+              <p class="admin-id" *ngIf="admin.employeeId"><i class="fa fa-id-card"></i> {{ admin.employeeId }}</p>
+              <p class="blocked-info">
+                <i class="fa fa-exclamation-triangle"></i>
+                Account locked due to 3 failed login attempts
+              </p>
+              <p class="failed-attempts" *ngIf="admin.failedLoginAttempts">
+                Failed attempts: {{ admin.failedLoginAttempts }}
+              </p>
+            </div>
+          </div>
+          <div class="admin-actions">
+            <button class="btn-unblock" (click)="unblockAdmin(admin)" [disabled]="isUnblocking">
+              <i class="fa fa-unlock"></i>
+              <span *ngIf="!isUnblocking">Unblock Account</span>
+              <span *ngIf="isUnblocking">Unblocking...</span>
+            </button>
+            <button class="btn-reset-password" (click)="openResetPasswordModal(admin)">
+              <i class="fa fa-key"></i>
+              Reset Password
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Reset Password Modal (for blocked admins) -->
+    <div class="modal-overlay" *ngIf="showResetPasswordModal" (click)="closeResetPasswordModal()">
+      <div class="modal-content" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h3><i class="fa fa-key"></i> Reset Password</h3>
+          <button class="modal-close" (click)="closeResetPasswordModal()">
+            <i class="fa fa-times"></i>
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="admin-info-box">
+            <p><strong>Admin:</strong> {{ selectedBlockedAdmin?.name || 'Admin' }}</p>
+            <p><strong>Email:</strong> {{ selectedBlockedAdmin?.email }}</p>
+          </div>
+          <form (ngSubmit)="resetAdminPassword()">
+            <div class="form-group">
+              <label for="newPasswordBlocked">New Password <span class="required">*</span></label>
+              <input 
+                type="password" 
+                id="newPasswordBlocked"
+                [(ngModel)]="newPassword"
+                name="newPasswordBlocked"
+                placeholder="Enter new password (min 6 characters)"
+                class="form-input"
+                required
+                minlength="6"
+              >
+            </div>
+            <div class="form-group">
+              <label for="confirmPasswordBlocked">Confirm Password <span class="required">*</span></label>
+              <input 
+                type="password" 
+                id="confirmPasswordBlocked"
+                [(ngModel)]="confirmPassword"
+                name="confirmPasswordBlocked"
+                placeholder="Confirm new password"
+                class="form-input"
+                required
+                minlength="6"
+              >
+            </div>
+            <div class="form-actions">
+              <button type="button" class="btn-secondary" (click)="closeResetPasswordModal()">
+                Cancel
+              </button>
+              <button type="submit" class="btn-primary" [disabled]="isResettingPassword">
+                <i class="fa fa-key"></i>
+                <span *ngIf="!isResettingPassword">Reset Password</span>
+                <span *ngIf="isResettingPassword">Resetting...</span>
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════ Blocked Employees Section ═══════════ -->
+    <div class="content-section" *ngIf="activeSection === 'blocked-employees'">
+      <div class="section-header-inline">
+        <h3><i class="fa fa-user-lock"></i> Blocked Employee Accounts</h3>
+        <p class="section-description">Manage employee salary accounts that have been locked due to 3 failed login attempts. You can unblock accounts or reset passwords.</p>
+      </div>
+
+      <!-- Loading State -->
+      <div class="loading-message" *ngIf="isLoadingBlockedEmployees">
+        <i class="fa fa-spinner fa-spin"></i> Loading blocked employees...
+      </div>
+
+      <!-- No Blocked Employees -->
+      <div class="no-blocked-admins" *ngIf="!isLoadingBlockedEmployees && blockedEmployees.length === 0">
+        <i class="fa fa-check-circle"></i>
+        <h4>No Blocked Employees</h4>
+        <p>All employee salary accounts are currently active. Accounts will appear here after 3 failed login attempts.</p>
+      </div>
+
+      <!-- Blocked Employees List -->
+      <div class="blocked-admins-list" *ngIf="!isLoadingBlockedEmployees && blockedEmployees.length > 0">
+        <div *ngFor="let emp of blockedEmployees" class="blocked-admin-card">
+          <div class="admin-info-section">
+            <div class="admin-avatar blocked">
+              <i class="fa fa-user-lock"></i>
+            </div>
+            <div class="admin-details">
+              <h4>{{ emp.employeeName || 'Employee' }}</h4>
+              <p class="admin-email"><i class="fa fa-id-card"></i> Account: {{ emp.accountNumber }}</p>
+              <p class="admin-email" *ngIf="emp.email"><i class="fa fa-envelope"></i> {{ emp.email }}</p>
+              <p class="admin-id" *ngIf="emp.companyName"><i class="fa fa-building"></i> {{ emp.companyName }}</p>
+              <p class="admin-id" *ngIf="emp.designation"><i class="fa fa-briefcase"></i> {{ emp.designation }}</p>
+              <p class="admin-id" *ngIf="emp.employeeId"><i class="fa fa-id-badge"></i> EmpID: {{ emp.employeeId }}</p>
+              <p class="blocked-info">
+                <i class="fa fa-exclamation-triangle"></i>
+                {{ emp.lockReason || 'Account locked due to 3 failed login attempts' }}
+              </p>
+              <p class="failed-attempts" *ngIf="emp.failedLoginAttempts">
+                Failed attempts: {{ emp.failedLoginAttempts }}
+              </p>
+              <p class="failed-attempts" *ngIf="emp.lastFailedLoginTime">
+                Last failed: {{ emp.lastFailedLoginTime | date:'medium' }}
+              </p>
+            </div>
+          </div>
+          <div class="admin-actions">
+            <button class="btn-unblock" (click)="unblockEmployee(emp)" [disabled]="isUnblockingEmployee">
+              <i class="fa fa-unlock"></i>
+              <span *ngIf="!isUnblockingEmployee">Unblock Account</span>
+              <span *ngIf="isUnblockingEmployee">Unblocking...</span>
+            </button>
+            <button class="btn-reset-password" (click)="openEmployeeResetPasswordModal(emp)">
+              <i class="fa fa-key"></i>
+              Reset Password
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Reset Password Modal (for blocked employees) -->
+    <div class="modal-overlay" *ngIf="showEmployeeResetPasswordModal" (click)="closeEmployeeResetPasswordModal()">
+      <div class="modal-content" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h3><i class="fa fa-key"></i> Reset Employee Password</h3>
+          <button class="modal-close" (click)="closeEmployeeResetPasswordModal()">
+            <i class="fa fa-times"></i>
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="admin-info-box">
+            <p><strong>Employee:</strong> {{ selectedBlockedEmployee?.employeeName || 'Employee' }}</p>
+            <p><strong>Account:</strong> {{ selectedBlockedEmployee?.accountNumber }}</p>
+            <p *ngIf="selectedBlockedEmployee?.companyName"><strong>Company:</strong> {{ selectedBlockedEmployee?.companyName }}</p>
+          </div>
+          <form (ngSubmit)="resetEmployeePassword()">
+            <div class="form-group">
+              <label for="empNewPassword">New Password <span class="required">*</span></label>
+              <input 
+                type="password" 
+                id="empNewPassword"
+                [(ngModel)]="employeeNewPassword"
+                name="empNewPassword"
+                placeholder="Enter new password (min 6 characters)"
+                class="form-input"
+                required
+                minlength="6"
+              >
+            </div>
+            <div class="form-group">
+              <label for="empConfirmPassword">Confirm Password <span class="required">*</span></label>
+              <input 
+                type="password" 
+                id="empConfirmPassword"
+                [(ngModel)]="employeeConfirmPassword"
+                name="empConfirmPassword"
+                placeholder="Confirm new password"
+                class="form-input"
+                required
+                minlength="6"
+              >
+            </div>
+            <div class="form-actions">
+              <button type="button" class="btn-secondary" (click)="closeEmployeeResetPasswordModal()">
+                Cancel
+              </button>
+              <button type="submit" class="btn-primary" [disabled]="isResettingEmployeePassword">
+                <i class="fa fa-key"></i>
+                <span *ngIf="!isResettingEmployeePassword">Reset Password</span>
+                <span *ngIf="isResettingEmployeePassword">Resetting...</span>
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Reset Password Modal (for any admin) -->
+    <div class="modal-overlay" *ngIf="showAdminPasswordResetModal" (click)="closeAdminPasswordResetModal()">
+      <div class="modal-content" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h3><i class="fa fa-key"></i> Reset Admin Password</h3>
+          <button class="modal-close" (click)="closeAdminPasswordResetModal()">
+            <i class="fa fa-times"></i>
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="admin-info-box">
+            <p><strong>Admin:</strong> {{ selectedAdminForPasswordReset?.name || 'Admin' }}</p>
+            <p><strong>Email:</strong> {{ selectedAdminForPasswordReset?.email }}</p>
+            <p><strong>Employee ID:</strong> {{ selectedAdminForPasswordReset?.employeeId || 'N/A' }}</p>
+          </div>
+          <form (ngSubmit)="resetAnyAdminPassword()">
+            <div class="form-group">
+              <label for="newPasswordAdmin">New Password <span class="required">*</span></label>
+              <input 
+                type="password" 
+                id="newPasswordAdmin"
+                [(ngModel)]="newPassword"
+                name="newPasswordAdmin"
+                placeholder="Enter new password (min 6 characters)"
+                class="form-input"
+                required
+                minlength="6"
+              >
+            </div>
+            <div class="form-group">
+              <label for="confirmPasswordAdmin">Confirm Password <span class="required">*</span></label>
+              <input 
+                type="password" 
+                id="confirmPasswordAdmin"
+                [(ngModel)]="confirmPassword"
+                name="confirmPasswordAdmin"
+                placeholder="Confirm new password"
+                class="form-input"
+                required
+                minlength="6"
+              >
+            </div>
+            <div class="form-actions">
+              <button type="button" class="btn-secondary" (click)="closeAdminPasswordResetModal()">
+                Cancel
+              </button>
+              <button type="submit" class="btn-primary" [disabled]="isResettingPassword">
+                <i class="fa fa-key"></i>
+                <span *ngIf="!isResettingPassword">Reset Password</span>
+                <span *ngIf="isResettingPassword">Resetting...</span>
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Admin Management Section -->
+    <div class="content-section" *ngIf="activeSection === 'admin-management'">
+      <div class="section-header-inline">
+        <h3><i class="fa fa-user-shield"></i> Admin Management</h3>
+        <p class="section-description">View and manage admin accounts</p>
+      </div>
+
+      <!-- Manager Login Information -->
+      <div class="login-info-card">
+        <div class="card-header">
+          <h4><i class="fa fa-key"></i> Manager Login Information</h4>
+        </div>
+        <div class="card-body">
+          <div class="info-section">
+            <h5>Default Manager Account</h5>
+            <div class="credentials-box">
+              <div class="credential-item">
+                <span class="label">Email:</span>
+                <span class="value">manager@neobank.com</span>
+                <button class="copy-btn" (click)="copyToClipboard('manager@neobank.com')">
+                  <i class="fa fa-copy"></i>
+                </button>
+              </div>
+              <div class="credential-item">
+                <span class="label">Password:</span>
+                <span class="value">manager123</span>
+                <button class="copy-btn" (click)="copyToClipboard('manager123')">
+                  <i class="fa fa-copy"></i>
+                </button>
+              </div>
+              <div class="credential-item">
+                <span class="label">Role:</span>
+                <span class="value">MANAGER</span>
+              </div>
+            </div>
+            <div class="warning-box">
+              <i class="fa fa-exclamation-triangle"></i>
+              <p><strong>Important:</strong> Change the default password after first login for security!</p>
+            </div>
+          </div>
+
+          <div class="action-section">
+            <h5>Create Default Manager Account</h5>
+            <p>If no manager account exists, you can create a default one:</p>
+            <button class="btn-primary" (click)="createDefaultManager()">
+              <i class="fa fa-user-plus"></i> Create Default Manager
+            </button>
+          </div>
+
+          <div class="info-section">
+            <h5>How to Login as Manager</h5>
+            <ol class="steps-list">
+              <li>Navigate to: <code>/admin/login</code></li>
+              <li>Select <strong>"Manager"</strong> from the "Access Role" dropdown</li>
+              <li>Enter the email and password above</li>
+              <li>Click "Login"</li>
+              <li>You will be redirected to the Manager Dashboard</li>
+            </ol>
+          </div>
+
+          <div class="info-section">
+            <h5>Create Custom Manager Account</h5>
+            <p>To create a custom manager account, use the API endpoint:</p>
+            <div class="code-block">
+              <code>
+                POST /api/admins/create<br>
+                Body: {{ '{' }}<br>
+                &nbsp;&nbsp;"name": "Manager Name",<br>
+                &nbsp;&nbsp;"email": "manager@example.com",<br>
+                &nbsp;&nbsp;"password": "secure-password",<br>
+                &nbsp;&nbsp;"role": "MANAGER",<br>
+                &nbsp;&nbsp;"employeeId": "MGR001"<br>
+                {{ '}' }}
+              </code>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Admin Profile Update Requests (submitted by admin employees) -->
+      <div class="login-info-card" style="margin-top: 24px;">
+        <div class="card-header">
+          <h4><i class="fa fa-user-edit"></i> Admin Profile Update Approvals</h4>
+        </div>
+        <div class="card-body">
+          <p class="section-description">
+            When an admin employee edits their profile after first completion, the changes come here for your approval.
+            You can approve to apply the new details or reject with a reason.
+          </p>
+
+          <div class="loading-message" *ngIf="isLoadingAdminProfileUpdates">
+            <i class="fa fa-spinner fa-spin"></i> Loading admin profile update requests...
+          </div>
+
+          <div class="no-blocked-admins" *ngIf="!isLoadingAdminProfileUpdates && adminProfileUpdateRequests.length === 0">
+            <i class="fa fa-check-circle"></i>
+            <h4>No Pending Admin Profile Updates</h4>
+            <p>When admins modify their profile after completion, requests will appear here for your approval.</p>
+          </div>
+
+          <div class="blocked-admins-list" *ngIf="!isLoadingAdminProfileUpdates && adminProfileUpdateRequests.length > 0">
+            <div *ngFor="let req of adminProfileUpdateRequests" class="blocked-admin-card">
+              <div class="admin-info-section">
+                <div class="admin-avatar">
+                  <i class="fa fa-user-edit"></i>
+                </div>
+                <div class="admin-details">
+                  <h4>{{ req.adminName || req.adminEmail || 'Admin' }}</h4>
+                  <p class="admin-email"><i class="fa fa-envelope"></i> {{ req.adminEmail }}</p>
+                  <p class="blocked-info">
+                    <i class="fa fa-clock"></i>
+                    Requested At: {{ req.requestedAt | date:'short' }}
+                  </p>
+                </div>
+              </div>
+              <div class="admin-actions" style="flex-direction: column; align-items: flex-start;">
+                <p style="margin-bottom: 8px;"><strong>Action:</strong> Review and approve to apply new profile details, or reject.</p>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px;">
+                  <button class="btn-unblock" (click)="approveAdminProfileUpdate(req)">
+                    <i class="fa fa-check"></i>
+                    Approve & Apply
+                  </button>
+                  <button class="btn-reset-password" (click)="rejectAdminProfileUpdate(req)">
+                    <i class="fa fa-times"></i>
+                    Reject
+                  </button>
+                  <button class="btn-reset-password-small" (click)="toggleAdminProfileRequestDetails(req)">
+                    <i class="fa" [ngClass]="expandedAdminProfileRequestId === req.id ? 'fa-eye-slash' : 'fa-eye'"></i>
+                    {{ expandedAdminProfileRequestId === req.id ? 'Hide Changes' : 'View Changes' }}
+                  </button>
+                </div>
+                <div class="admin-profile-diff" *ngIf="expandedAdminProfileRequestId === req.id">
+                  <table class="data-table" style="margin-top: 4px;">
+                    <thead>
+                      <tr>
+                        <th>Field</th>
+                        <th>Old Value</th>
+                        <th>New Value</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr *ngFor="let key of getAdminProfileDiffKeys(req)">
+                        <td>{{ key }}</td>
+                        <td>{{ getAdminProfileOldValue(req, key) || '—' }}</td>
+                        <td>{{ getAdminProfileNewValue(req, key) || '—' }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Session History / Login Activity Section -->
+    <div class="content-section" *ngIf="activeSection === 'session-history'">
+      <div class="section-header">
+        <div class="header-content">
+          <div>
+            <h2><i class="fa fa-clock"></i> Login Activity Tracker</h2>
+            <p class="section-subtitle">Real-time tracking of all login/logout activity across Admin, Manager, Savings, Current & Salary accounts</p>
+          </div>
+          <button class="refresh-btn" (click)="loadSessionHistory()" [disabled]="isLoadingSessionHistory">
+            <i class="fa fa-refresh" [class.fa-spin]="isLoadingSessionHistory"></i>
+            Refresh
+          </button>
+        </div>
+      </div>
+
+      <!-- Stats Cards Row -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-icon total"><i class="fa fa-list"></i></div>
+          <div class="stat-content">
+            <div class="stat-number">{{ sessionHistory.length }}</div>
+            <div class="stat-label">Total Logins</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon active"><i class="fa fa-circle"></i></div>
+          <div class="stat-content">
+            <div class="stat-number">{{ getActiveSessionsCount() }}</div>
+            <div class="stat-label">Active Now</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon"><i class="fa fa-user-shield"></i></div>
+          <div class="stat-content">
+            <div class="stat-number">{{ getAccountTypeCount('admin') }}</div>
+            <div class="stat-label">Admin Logins</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon"><i class="fa fa-user-tie"></i></div>
+          <div class="stat-content">
+            <div class="stat-number">{{ getAccountTypeCount('manager') }}</div>
+            <div class="stat-label">Manager Logins</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon"><i class="fa fa-piggy-bank"></i></div>
+          <div class="stat-content">
+            <div class="stat-number">{{ getAccountTypeCount('savings') }}</div>
+            <div class="stat-label">Savings Logins</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon"><i class="fa fa-building"></i></div>
+          <div class="stat-content">
+            <div class="stat-number">{{ getAccountTypeCount('current') }}</div>
+            <div class="stat-label">Current A/c Logins</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon"><i class="fa fa-money-check-alt"></i></div>
+          <div class="stat-content">
+            <div class="stat-number">{{ getAccountTypeCount('salary') }}</div>
+            <div class="stat-label">Salary Logins</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Account Type Filter Buttons -->
+      <div class="login-activity-account-tabs">
+        <button class="login-acct-tab" [class.active]="loginAccountTypeTab === 'all'" (click)="loginAccountTypeTab = 'all'; onFilterChange()">
+          <i class="fa fa-globe"></i> All Logins
+          <span class="tab-badge">{{ getAccountTypeCount('all') }}</span>
+        </button>
+        <button class="login-acct-tab tab-admin" [class.active]="loginAccountTypeTab === 'admin'" (click)="loginAccountTypeTab = 'admin'; onFilterChange()">
+          <i class="fa fa-user-shield"></i> Admin
+          <span class="tab-badge">{{ getAccountTypeCount('admin') }}</span>
+        </button>
+        <button class="login-acct-tab tab-manager" [class.active]="loginAccountTypeTab === 'manager'" (click)="loginAccountTypeTab = 'manager'; onFilterChange()">
+          <i class="fa fa-user-tie"></i> Manager
+          <span class="tab-badge">{{ getAccountTypeCount('manager') }}</span>
+        </button>
+        <button class="login-acct-tab tab-savings" [class.active]="loginAccountTypeTab === 'savings'" (click)="loginAccountTypeTab = 'savings'; onFilterChange()">
+          <i class="fa fa-piggy-bank"></i> Savings
+          <span class="tab-badge">{{ getAccountTypeCount('savings') }}</span>
+        </button>
+        <button class="login-acct-tab tab-current" [class.active]="loginAccountTypeTab === 'current'" (click)="loginAccountTypeTab = 'current'; onFilterChange()">
+          <i class="fa fa-building"></i> Current A/c
+          <span class="tab-badge">{{ getAccountTypeCount('current') }}</span>
+        </button>
+        <button class="login-acct-tab tab-salary" [class.active]="loginAccountTypeTab === 'salary'" (click)="loginAccountTypeTab = 'salary'; onFilterChange()">
+          <i class="fa fa-money-check-alt"></i> Salary
+          <span class="tab-badge">{{ getAccountTypeCount('salary') }}</span>
+        </button>
+      </div>
+      
+      <!-- Session Status Tabs -->
+      <div class="session-tabs">
+        <button class="session-tab" [class.active]="sessionHistoryTab === 'all'" (click)="sessionHistoryTab = 'all'; onFilterChange()">
+          <i class="fa fa-list"></i> All Sessions
+          <span class="tab-badge">{{ sessionHistory.length }}</span>
+        </button>
+        <button class="session-tab" [class.active]="sessionHistoryTab === 'active'" (click)="sessionHistoryTab = 'active'; onFilterChange()">
+          <i class="fa fa-circle active-indicator"></i> Active Sessions
+          <span class="tab-badge">{{ getActiveSessionsCount() }}</span>
+        </button>
+        <button class="session-tab" [class.active]="sessionHistoryTab === 'previous'" (click)="sessionHistoryTab = 'previous'; onFilterChange()">
+          <i class="fa fa-history"></i> Previous Sessions
+          <span class="tab-badge">{{ getPreviousSessionsCount() }}</span>
+        </button>
+      </div>
+      
+      <!-- Search Bar -->
+      <div class="filter-section">
+        <div class="filter-group" style="flex:1">
+          <input type="text" [(ngModel)]="sessionHistorySearchQuery" (ngModelChange)="onFilterChange()" placeholder="Search by email, username, account number, IP, browser..." class="search-input">
+        </div>
+        <div class="filter-group">
+          <button class="refresh-btn" (click)="loadSessionHistory()" [disabled]="isLoadingSessionHistory">
+            <i class="fa fa-sync-alt" [class.fa-spin]="isLoadingSessionHistory"></i> Refresh
+          </button>
+        </div>
+        <div class="filter-group">
+          <button class="download-toggle-btn" (click)="showDownloadPanel = !showDownloadPanel" [class.active]="showDownloadPanel">
+            <i class="fa fa-download"></i> Download Report
+          </button>
+        </div>
+      </div>
+
+      <!-- Download Filter Panel -->
+      <div class="download-panel" *ngIf="showDownloadPanel">
+        <div class="download-panel-header">
+          <h4><i class="fa fa-filter"></i> Download Login/Logout History</h4>
+          <button class="download-panel-close" (click)="showDownloadPanel = false"><i class="fa fa-times"></i></button>
+        </div>
+        <div class="download-filters-grid">
+          <div class="download-filter-item">
+            <label><i class="fa fa-calendar"></i> From Date</label>
+            <input type="date" [(ngModel)]="downloadFilterFromDate" (ngModelChange)="rebuildDownloadFilteredData()" class="download-filter-input">
+          </div>
+          <div class="download-filter-item">
+            <label><i class="fa fa-calendar-check"></i> To Date</label>
+            <input type="date" [(ngModel)]="downloadFilterToDate" (ngModelChange)="rebuildDownloadFilteredData()" class="download-filter-input">
+          </div>
+          <div class="download-filter-item">
+            <label><i class="fa fa-user-tag"></i> Account Type</label>
+            <select [(ngModel)]="downloadFilterAccountType" (ngModelChange)="rebuildDownloadFilteredData()" class="download-filter-input">
+              <option value="all">All Accounts</option>
+              <option value="admin">Admin</option>
+              <option value="manager">Manager</option>
+              <option value="savings">Savings</option>
+              <option value="current">Current Account</option>
+              <option value="salary">Salary</option>
+            </select>
+          </div>
+          <div class="download-filter-item">
+            <label><i class="fa fa-signal"></i> Status</label>
+            <select [(ngModel)]="downloadFilterStatus" (ngModelChange)="rebuildDownloadFilteredData()" class="download-filter-input">
+              <option value="all">All</option>
+              <option value="active">Active Only</option>
+              <option value="logged_out">Logged Out Only</option>
+            </select>
+          </div>
+          <div class="download-filter-item">
+            <label><i class="fa fa-clock"></i> Login Time From</label>
+            <input type="time" [(ngModel)]="downloadFilterFromTime" (ngModelChange)="rebuildDownloadFilteredData()" class="download-filter-input">
+          </div>
+          <div class="download-filter-item">
+            <label><i class="fa fa-clock"></i> Login Time To</label>
+            <input type="time" [(ngModel)]="downloadFilterToTime" (ngModelChange)="rebuildDownloadFilteredData()" class="download-filter-input">
+          </div>
+        </div>
+        <div class="download-filter-summary">
+          <span><i class="fa fa-database"></i> {{ cachedDownloadFilteredData.length }} records match your filters</span>
+        </div>
+        <div class="download-actions">
+          <button class="download-btn download-pdf" (click)="downloadPDF()" [disabled]="cachedDownloadFilteredData.length === 0">
+            <i class="fa fa-file-pdf"></i> Download PDF
+          </button>
+          <button class="download-btn download-xml" (click)="downloadXML()" [disabled]="cachedDownloadFilteredData.length === 0">
+            <i class="fa fa-file-code"></i> Download XML
+          </button>
+          <button class="download-clear-btn" (click)="clearDownloadFilters()">
+            <i class="fa fa-eraser"></i> Clear Filters
+          </button>
+        </div>
+      </div>
+      
+      <!-- Loading -->
+      <div *ngIf="isLoadingSessionHistory" class="loading">
+        <i class="fa fa-spinner fa-spin"></i> Loading login activity...
+      </div>
+      
+      <!-- No Data Message -->
+      <div *ngIf="!isLoadingSessionHistory && cachedFilteredLoginActivity.length === 0" class="no-data-message">
+        <i class="fa fa-info-circle"></i>
+        <p>No login activity found for the selected filter.</p>
+        <p class="hint">Login records will appear here when users and admins log in.</p>
+      </div>
+      
+      <!-- Login Activity Table -->
+      <div *ngIf="!isLoadingSessionHistory && cachedFilteredLoginActivity.length > 0" class="session-history-table-container">
+        <table class="session-history-table">
+          <thead>
+            <tr>
+              <th>Account Type</th>
+              <th>Email / Username</th>
+              <th>Account Number</th>
+              <th>Browser</th>
+              <th>Login Time</th>
+              <th>Logout Time</th>
+              <th>Used Time</th>
+              <th>Login Method</th>
+              <th>IP Address</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let session of cachedFilteredLoginActivity; trackBy: trackBySessionId" [class.active-session]="session.status === 'ACTIVE' && !session.logoutTime">
+              <td>
+                <span class="account-type-badge" [ngClass]="'acct-' + getAccountTypeLabel(session).toLowerCase()">
+                  {{ getAccountTypeLabel(session) }}
+                </span>
+              </td>
+              <td>
+                <div class="user-info-cell">
+                  <strong>{{ session.email || session.username || 'N/A' }}</strong>
+                  <small *ngIf="session.username && session.email">{{ session.username }}</small>
+                </div>
+              </td>
+              <td>{{ session.accountNumber || 'N/A' }}</td>
+              <td>
+                <span class="browser-badge">
+                  <i class="fab" [ngClass]="getBrowserIcon(session.browserName || '')"></i>
+                  {{ session.browserName || 'Unknown' }}
+                </span>
+              </td>
+              <td class="time-cell">
+                <div class="time-detail">
+                  <span class="date-part">{{ formatSessionDate(session.loginTime) }}</span>
+                  <span class="time-part">{{ formatSessionTime(session.loginTime) }}</span>
+                </div>
+              </td>
+              <td class="time-cell">
+                <div *ngIf="session.logoutTime || session.status === 'LOGGED_OUT'" class="time-detail">
+                  <span class="date-part">{{ session.logoutTime ? formatSessionDate(session.logoutTime) : '-' }}</span>
+                  <span class="time-part">{{ session.logoutTime ? formatSessionTime(session.logoutTime) : 'Logged Out' }}</span>
+                </div>
+                <span *ngIf="!session.logoutTime && session.status === 'ACTIVE'" class="still-active-badge">
+                  <i class="fa fa-circle active-indicator"></i> Still Active
+                </span>
+              </td>
+              <td>
+                <span class="duration-badge" [class.active]="session.status === 'ACTIVE' && !session.logoutTime">
+                  <i class="fa fa-stopwatch"></i>
+                  {{ session._usedTime }}
+                  <span *ngIf="session.status === 'ACTIVE' && !session.logoutTime" class="live-tag">LIVE</span>
+                </span>
+              </td>
+              <td>
+                <span class="method-badge" [ngClass]="'method-' + (session.loginMethod || 'PASSWORD').toLowerCase()">
+                  <i class="fa" [ngClass]="getLoginMethodIcon(session.loginMethod)"></i>
+                  {{ session.loginMethod || 'PASSWORD' }}
+                </span>
+              </td>
+              <td>{{ session.ipAddress || 'Unknown' }}</td>
+              <td>
+                <span class="status-badge" [ngClass]="'status-' + (session.status || 'ACTIVE').toLowerCase()">
+                  {{ session.status || 'ACTIVE' }}
+                </span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Fraud Alerts Section (AI Fraud Detection) -->
+    <div class="content-section" *ngIf="activeSection === 'fraud-alerts'">
+      <div class="section-header">
+        <div class="header-content">
+          <div>
+            <h2><i class="fa fa-shield-alt"></i> Fraud Alerts</h2>
+            <p class="section-subtitle">
+              AI fraud detection: login attempts (3 failed), transaction anomalies, behavioral biometrics, phishing, KYC. Review and mark as reviewed or dismissed.
+            </p>
+          </div>
+          <button class="refresh-btn" (click)="loadFraudAlerts()" [disabled]="isLoadingFraudAlerts">
+            <i class="fa fa-sync-alt" [class.fa-spin]="isLoadingFraudAlerts"></i>
+            Refresh
+          </button>
+        </div>
+      </div>
+
+      <div class="stats-grid" *ngIf="fraudAlerts.length > 0 || fraudAlertsPendingCount > 0">
+        <div class="stat-card">
+          <div class="stat-icon disabled">
+            <i class="fa fa-exclamation-triangle"></i>
+          </div>
+          <div class="stat-content">
+            <div class="stat-number">{{ fraudAlertsPendingCount }}</div>
+            <div class="stat-label">Pending Review</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon total">
+            <i class="fa fa-list"></i>
+          </div>
+          <div class="stat-content">
+            <div class="stat-number">{{ fraudAlerts.length }}</div>
+            <div class="stat-label">Loaded Alerts</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="filter-section">
+        <div class="filter-group">
+          <label>Status:</label>
+          <select [(ngModel)]="fraudAlertStatusFilter" (change)="loadFraudAlerts()" class="filter-select">
+            <option value="">All</option>
+            <option value="PENDING_REVIEW">Pending Review</option>
+            <option value="REVIEWED">Reviewed</option>
+            <option value="DISMISSED">Dismissed</option>
+            <option value="CONFIRMED_FRAUD">Confirmed Fraud</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label>Type:</label>
+          <select [(ngModel)]="fraudAlertTypeFilter" (change)="loadFraudAlerts()" class="filter-select">
+            <option value="">All</option>
+            <option value="LOGIN_FRAUD">Login (3 failed)</option>
+            <option value="TRANSACTION_ANOMALY">Transaction</option>
+            <option value="BEHAVIORAL_BIOMETRIC">Behavioral</option>
+            <option value="PHISHING_SUSPECT">Phishing</option>
+            <option value="KYC_DOCUMENT_FRAUD">KYC Document</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label>Source:</label>
+          <select [(ngModel)]="fraudAlertSourceFilter" (change)="loadFraudAlerts()" class="filter-select">
+            <option value="">All</option>
+            <option value="USER">User</option>
+            <option value="ADMIN">Admin</option>
+            <option value="MANAGER">Manager</option>
+          </select>
+        </div>
+      </div>
+
+      <div *ngIf="isLoadingFraudAlerts" class="loading">
+        <i class="fa fa-spinner fa-spin"></i> Loading fraud alerts...
+      </div>
+      <div *ngIf="!isLoadingFraudAlerts && fraudAlerts.length === 0" class="no-data-message">
+        <i class="fa fa-shield-alt"></i>
+        <p>No fraud alerts match the filters.</p>
+      </div>
+
+      <div *ngIf="!isLoadingFraudAlerts && fraudAlerts.length > 0" class="session-history-table-container">
+        <table class="session-history-table">
+          <thead>
+            <tr>
+              <th>Type</th>
+              <th>Source</th>
+              <th>Entity</th>
+              <th>Title</th>
+              <th>Description</th>
+              <th>Severity</th>
+              <th>Status</th>
+              <th>Date</th>
+              <th>IP / Device</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let alert of fraudAlerts">
+              <td>
+                <span class="type-badge" [ngClass]="'fraud-type-' + (alert.alertType || '').toLowerCase()">
+                  {{ alert.alertType }}
+                </span>
+              </td>
+              <td>{{ alert.sourceType }}</td>
+              <td>{{ alert.sourceEntityName || alert.sourceEntityId || 'N/A' }}</td>
+              <td class="title-cell">{{ alert.title }}</td>
+              <td class="description-cell" [title]="alert.description">{{ (alert.description || '') | slice:0:80 }}{{ (alert.description && alert.description.length > 80) ? '...' : '' }}</td>
+              <td><span class="severity-badge" [ngClass]="'severity-' + (alert.severity || 'MEDIUM').toLowerCase()">{{ alert.severity }}</span></td>
+              <td><span class="status-badge" [ngClass]="'status-' + (alert.status || '').toLowerCase()">{{ alert.status }}</span></td>
+              <td class="date-cell">{{ formatSessionDateTime(alert.createdAt) }}</td>
+              <td class="device-info" [title]="alert.deviceInfo">{{ (alert.clientIp || '') + ' / ' + (alert.deviceInfo || '') | slice:0:35 }}{{ (alert.deviceInfo && (alert.clientIp + alert.deviceInfo).length > 35) ? '...' : '' }}</td>
+              <td>
+                <span *ngIf="alert.status === 'PENDING_REVIEW'">
+                  <button class="btn-reset-password-small" (click)="updateFraudAlertStatus(alert.id, 'REVIEWED')" title="Mark Reviewed">Review</button>
+                  <button class="btn-reset-password-small" (click)="updateFraudAlertStatus(alert.id, 'DISMISSED')" title="Dismiss">Dismiss</button>
+                  <button class="btn-reset-password-small" (click)="updateFraudAlertStatus(alert.id, 'CONFIRMED_FRAUD')" title="Confirm Fraud">Confirm</button>
+                </span>
+                <span *ngIf="alert.status !== 'PENDING_REVIEW'">{{ alert.reviewedBy ? 'By ' + alert.reviewedBy : '-' }}</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Loans & Subsidies Overview Section -->
+    <div class="content-section" *ngIf="activeSection === 'loans-overview'">
+      <div class="section-header">
+        <div class="header-content">
+          <div>
+            <h2><i class="fa fa-coins"></i> All Loans & Education Subsidies</h2>
+            <p class="section-subtitle">
+              View all users' loans (term & gold) with subsidy status, paid amounts, balances and sanction details.
+            </p>
+          </div>
+          <button class="refresh-btn" (click)="loadManagerLoanOverview()" [disabled]="isLoadingManagerLoans">
+            <i class="fa fa-sync-alt" [class.fa-spin]="isLoadingManagerLoans"></i>
+            Refresh
+          </button>
+        </div>
+      </div>
+
+      <!-- High level stats -->
+      <div class="stats-grid" *ngIf="managerLoanOverview.length > 0">
+        <div class="stat-card">
+          <div class="stat-icon total">
+            <i class="fa fa-list"></i>
+          </div>
+          <div class="stat-content">
+            <div class="stat-number">{{ getManagerLoanTotals().totalLoans }}</div>
+            <div class="stat-label">Total Loans</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon manager">
+            <i class="fa fa-ring"></i>
+          </div>
+          <div class="stat-content">
+            <div class="stat-number">{{ getManagerLoanTotals().goldLoans }}</div>
+            <div class="stat-label">Gold Loans</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon enabled">
+            <i class="fa fa-graduation-cap"></i>
+          </div>
+          <div class="stat-content">
+            <div class="stat-number">{{ getManagerLoanTotals().withSubsidy }}</div>
+            <div class="stat-label">Loans with Subsidy</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon disabled">
+            <i class="fa fa-rupee-sign"></i>
+          </div>
+          <div class="stat-content">
+            <div class="stat-number">
+              {{ getManagerLoanTotals().totalOutstanding | number:'1.0-0' }}
+            </div>
+            <div class="stat-label">Total Outstanding</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Filters and Search -->
+      <div class="filter-section">
+        <div class="filter-group">
+          <label>Loan Type:</label>
+          <select [(ngModel)]="loanOverviewTypeFilter" (change)="applyLoanOverviewFilters()" class="filter-select">
+            <option value="ALL">All Types</option>
+            <option value="Term Loan">Term Loans</option>
+            <option value="Gold Loan">Gold Loans</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label>Status:</label>
+          <select [(ngModel)]="loanOverviewStatusFilter" (change)="applyLoanOverviewFilters()" class="filter-select">
+            <option value="ALL">All Status</option>
+            <option value="Pending">Pending</option>
+            <option value="Approved">Approved</option>
+            <option value="Rejected">Rejected</option>
+            <option value="Foreclosed">Foreclosed</option>
+            <option value="Paid">Paid</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <input
+            type="text"
+            [(ngModel)]="loanOverviewSearchQuery"
+            (input)="applyLoanOverviewFilters()"
+            placeholder="Search by loan no, SB account, name, customer ID..."
+            class="search-input"
+          >
+        </div>
+      </div>
+
+      <!-- Loading / Error States -->
+      <div *ngIf="isLoadingManagerLoans" class="loading">
+        <i class="fa fa-spinner fa-spin"></i> Loading loans and subsidies...
+      </div>
+      <div *ngIf="!isLoadingManagerLoans && managerLoansError" class="error-message">
+        <i class="fa fa-exclamation-circle"></i> {{ managerLoansError }}
+      </div>
+      <div *ngIf="!isLoadingManagerLoans && !managerLoansError && managerLoanOverview.length === 0" class="no-data-message">
+        <i class="fa fa-info-circle"></i>
+        <p>No loans found.</p>
+      </div>
+
+      <!-- Loans table -->
+      <div *ngIf="!isLoadingManagerLoans && filteredManagerLoanOverview.length > 0" class="session-history-table-container">
+        <table class="session-history-table">
+          <thead>
+            <tr>
+              <th>Type</th>
+              <th>Loan No</th>
+              <th>SB Account</th>
+              <th>Customer ID</th>
+              <th>Name</th>
+              <th>Status</th>
+              <th>Sanctioned Date</th>
+              <th>Sanctioned By</th>
+              <th>Paid (₹)</th>
+              <th>Balance (₹)</th>
+              <th>Subsidy Status</th>
+              <th>Subsidy Amount (₹)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let row of filteredManagerLoanOverview">
+              <td>{{ row.category }}</td>
+              <td>{{ row.loanAccountNumber || '-' }}</td>
+              <td>{{ row.sbAccountNumber || '-' }}</td>
+              <td>{{ row.customerId || '-' }}</td>
+              <td>{{ row.userName || '-' }}</td>
+              <td>{{ row.status || '-' }}</td>
+              <td>{{ formatLoanDate(row.sanctionedDate) }}</td>
+              <td>{{ row.sanctionedBy || '-' }}</td>
+              <td>{{ row.totalPaid || 0 | number:'1.0-0' }}</td>
+              <td>{{ row.outstanding || 0 | number:'1.0-0' }}</td>
+              <td>
+                <span *ngIf="row.subsidyStatus; else noSubsidy">
+                  {{ row.subsidyStatus }}
+                </span>
+                <ng-template #noSubsidy>-</ng-template>
+              </td>
+              <td>
+                <span *ngIf="row.subsidyAmount; else noSubsidyAmt">
+                  {{ row.subsidyAmount | number:'1.0-0' }}
+                </span>
+                <ng-template #noSubsidyAmt>-</ng-template>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      
+      <!-- ID card lookup (scan / enter card number) -->
+      <div class="section-header" style="margin-top: 32px;">
+        <div class="header-content">
+          <div>
+            <h3><i class="fa fa-id-card"></i> Scan / Enter Admin ID Card</h3>
+            <p class="section-subtitle">
+              Manager can scan the QR/barcode or manually enter NeoBank ID card number to quickly view admin details.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div class="filter-section">
+        <div class="filter-group" style="flex: 2;">
+          <input
+            type="text"
+            [(ngModel)]="idCardLookupNumber"
+            placeholder="Enter NeoBank ID card number (e.g. NBID123456789)"
+            class="search-input"
+          >
+        </div>
+        <div class="filter-group">
+          <button class="refresh-btn" (click)="lookupAdminByIdCardNumber()">
+            <i class="fa fa-search"></i> Search
+          </button>
+        </div>
+      </div>
+      <div *ngIf="idCardLookupError" class="error-message">
+        <i class="fa fa-exclamation-circle"></i> {{ idCardLookupError }}
+      </div>
+      <div *ngIf="idCardLookupResult" class="session-history-table-container">
+        <table class="session-history-table">
+          <thead>
+            <tr>
+              <th>ID Card No</th>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Employee ID</th>
+              <th>Role</th>
+              <th>Designation</th>
+              <th>Department</th>
+              <th>Generated At</th>
+              <th>Generated Count</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>{{ idCardLookupResult.idCardNumber }}</td>
+              <td>{{ idCardLookupResult.name }}</td>
+              <td>{{ idCardLookupResult.email }}</td>
+              <td>{{ idCardLookupResult.employeeId || '-' }}</td>
+              <td>{{ idCardLookupResult.role }}</td>
+              <td>{{ idCardLookupResult.idCardDesignation || '-' }}</td>
+              <td>{{ idCardLookupResult.idCardDepartment || '-' }}</td>
+              <td>{{ idCardLookupResult.idCardGeneratedAt | date:'short' }}</td>
+              <td>{{ idCardLookupResult.idCardGeneratedCount || 0 }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Branch Account (Open New) - All charges & interest deposited here -->
+    <div class="content-section branch-account-section" *ngIf="activeSection === 'branch-account'">
+      <div class="section-header">
+        <div class="header-content">
+          <div>
+            <h2><i class="fa fa-university"></i> Branch Account (Open New)</h2>
+            <p class="section-subtitle">
+              All bank transactions, loan charges, KYC charges, debit card charges, and loan interest are deposited in this account. Map NeoBank A/C by entering account details below or in Admin Profile.
+            </p>
+          </div>
+          <button class="refresh-btn" (click)="loadBranchAccountSummary()" [disabled]="isLoadingBranchAccount">
+            <i class="fa fa-sync-alt" [class.fa-spin]="isLoadingBranchAccount"></i>
+            Refresh
+          </button>
+        </div>
+      </div>
+
+      <!-- Loading state so section is never blank -->
+      <div class="info-card" *ngIf="isLoadingBranchAccount && !branchAccountSummary">
+        <p class="section-description"><i class="fa fa-spinner fa-spin"></i> Loading branch account...</p>
+      </div>
+
+      <div class="info-card idcard-panel" *ngIf="branchAccountSummary && !isLoadingBranchAccount">
+        <h4><i class="fa fa-wallet"></i> Current Branch Deposit Account</h4>
+        <div class="details-grid" style="margin-top: 12px;">
+          <div class="detail-item">
+            <label>Account Number</label>
+            <span class="value">{{ branchAccountSummary?.accountNumber || '—' }}</span>
+          </div>
+          <div class="detail-item">
+            <label>Account Name</label>
+            <span class="value">{{ branchAccountSummary?.accountName || 'NeoBank Branch' }}</span>
+          </div>
+          <div class="detail-item">
+            <label>IFSC</label>
+            <span class="value">{{ branchAccountSummary?.ifscCode || 'N/A' }}</span>
+          </div>
+          <div class="detail-item">
+            <label>Current Balance</label>
+            <span class="value">₹ {{ (branchAccountSummary?.balance ?? 0) | number:'1.2-2' }}</span>
+          </div>
+          <div class="detail-item">
+            <label>Status</label>
+            <span class="value">{{ branchAccountSummary?.isConfigured ? 'Configured' : 'Using default (NEOBANK000001)' }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="info-card branch-account-form-card" style="margin-top: 24px;">
+        <h4><i class="fa fa-plus-circle"></i> Open / Set Branch Account</h4>
+        <p class="section-description">
+          Enter the account details where all user charges (monthly bank, loan, CIBIL, debit card) and loan interest should be deposited. This account will receive all NeoBank fee income.
+        </p>
+        <div class="details-grid">
+          <div class="detail-item">
+            <label>Account Number <span class="required">*</span></label>
+            <input type="text" [(ngModel)]="branchAccountNumber" class="form-input" placeholder="e.g. NEOBANK000001 or your branch account">
+          </div>
+          <div class="detail-item">
+            <label>Account Name</label>
+            <input type="text" [(ngModel)]="branchAccountName" class="form-input" placeholder="e.g. NeoBank Main Branch">
+          </div>
+          <div class="detail-item">
+            <label>IFSC (optional)</label>
+            <input type="text" [(ngModel)]="branchAccountIfsc" class="form-input" placeholder="e.g. NEOB0001234">
+          </div>
+        </div>
+        <div class="branch-account-actions" style="margin-top: 16px;">
+          <button type="button" class="btn-open-bank-account" (click)="setBranchAccount()" [disabled]="isSavingBranchAccount || !(branchAccountNumber || '').trim()">
+            <i class="fa" [class.fa-spinner]="isSavingBranchAccount" [class.fa-university]="!isSavingBranchAccount" [class.fa-spin]="isSavingBranchAccount"></i>
+            {{ isSavingBranchAccount ? 'Saving...' : 'Open Bank Account' }}
+          </button>
+          <span class="action-hint" style="margin-left: 12px; font-size: 13px; color: #666;"> or update existing branch account above</span>
+        </div>
+        <p class="section-description" style="margin-top: 12px; font-size: 12px;">
+          You can also set this from <strong>Admin Profile</strong>: enter Branch Account Number, Name and IFSC in your profile and save. All charges and interest will then deposit to that account.
+        </p>
+      </div>
+
+      <!-- Branch Account Transactions (opened bank account) -->
+      <div class="info-card" style="margin-top: 24px;">
+        <h4><i class="fa fa-list-alt"></i> Branch Account Transactions (All)</h4>
+        <p class="section-description">All credits to this branch account (charges and interest from user accounts).</p>
+        <div class="branch-txns-filters details-grid" style="margin-bottom: 16px;">
+          <div class="detail-item">
+            <label>From Date</label>
+            <input type="date" [(ngModel)]="branchTxnsFromDate" class="form-input">
+          </div>
+          <div class="detail-item">
+            <label>To Date</label>
+            <input type="date" [(ngModel)]="branchTxnsToDate" class="form-input">
+          </div>
+          <div class="detail-item">
+            <label>Filter (ID / name / description)</label>
+            <input type="text" [(ngModel)]="branchTxnsSearch" class="form-input" placeholder="Search...">
+          </div>
+          <div class="detail-item" style="display: flex; align-items: flex-end;">
+            <button type="button" class="refresh-btn" (click)="applyBranchTxnsFilter()" [disabled]="isLoadingBranchTxns">
+              <i class="fa fa-filter" [class.fa-spin]="isLoadingBranchTxns"></i> Apply Filter
+            </button>
+          </div>
+        </div>
+        <div *ngIf="isLoadingBranchTxns" class="section-description"><i class="fa fa-spinner fa-spin"></i> Loading transactions...</div>
+        <div *ngIf="!isLoadingBranchTxns && branchAccountTransactions.length === 0" class="section-description">No transactions found.</div>
+        <div *ngIf="!isLoadingBranchTxns && branchAccountTransactions.length > 0" class="table-container" style="overflow-x: auto;">
+          <table class="data-table branch-txns-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Date</th>
+                <th>Debited User Account Name</th>
+                <th>Debited Account No.</th>
+                <th>Amount</th>
+                <th>Type</th>
+                <th>Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let t of branchAccountTransactions">
+                <td>{{ t.id }}</td>
+                <td>{{ t.date | date:'short' }}</td>
+                <td>{{ t.debitedUserAccountName || '—' }}</td>
+                <td>{{ t.debitedUserAccountNumber || '—' }}</td>
+                <td>₹ {{ t.amount | number:'1.2-2' }}</td>
+                <td>{{ t.type }}</td>
+                <td>{{ t.description || t.merchant || '—' }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div *ngIf="!isLoadingBranchTxns && branchTxnsTotalPages > 1" class="pagination-controls" style="margin-top: 12px;">
+          <button type="button" class="refresh-btn" [disabled]="branchTxnsPage === 0" (click)="branchTxnsPagePrev()">Prev</button>
+          <span style="margin: 0 12px;">Page {{ branchTxnsPage + 1 }} of {{ branchTxnsTotalPages }} ({{ branchTxnsTotalElements }} total)</span>
+          <button type="button" class="refresh-btn" [disabled]="branchTxnsPage >= branchTxnsTotalPages - 1" (click)="branchTxnsPageNext()">Next</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Attendance & Salary -->
+    <div class="content-section" *ngIf="activeSection === 'attendance-salary'">
+      <div class="section-header">
+        <div class="header-content">
+          <div>
+            <h2><i class="fa fa-user-check"></i> Attendance & Salary</h2>
+            <p class="section-subtitle">Verify admin attendance by NeoBank ID card and auto-transfer daily salary (₹850) from Manager Branch Account to Admin Salary Account.</p>
+          </div>
+          <button class="refresh-btn" (click)="loadAttendanceSummary()" [disabled]="isLoadingAttendance">
+            <i class="fa fa-sync-alt" [class.fa-spin]="isLoadingAttendance"></i> Refresh
+          </button>
+        </div>
+      </div>
+
+      <div class="info-card">
+        <div class="details-grid">
+          <div class="detail-item">
+            <label>Date</label>
+            <input type="date" [(ngModel)]="attendanceDate" class="form-input" (change)="loadAttendanceSummary()">
+          </div>
+          <div class="detail-item">
+            <label>Verify ID Card Number</label>
+            <input type="text" [(ngModel)]="attendanceIdCardNumber" class="form-input" placeholder="Enter NeoBank ID card number">
+          </div>
+          <div class="detail-item" style="display:flex; align-items:flex-end; gap:12px;">
+            <button type="button" class="refresh-btn" (click)="verifyAttendanceByIdCard()" [disabled]="isVerifyingAttendance">
+              <i class="fa" [class.fa-spinner]="isVerifyingAttendance" [class.fa-id-card]="!isVerifyingAttendance" [class.fa-spin]="isVerifyingAttendance"></i>
+              {{ isVerifyingAttendance ? 'Verifying...' : 'Verify Attendance' }}
+            </button>
+            <button type="button" class="btn-open-bank-account" (click)="payDailySalary()" [disabled]="isPayingSalary">
+              <i class="fa" [class.fa-spinner]="isPayingSalary" [class.fa-money-bill-wave]="!isPayingSalary" [class.fa-spin]="isPayingSalary"></i>
+              {{ isPayingSalary ? 'Paying...' : 'Deposit Salary (Auto)' }}
+            </button>
+          </div>
+        </div>
+        <div style="margin-top: 12px; display:flex; gap: 16px; flex-wrap: wrap;">
+          <span class="status-pill status-red">Red: Absent</span>
+          <span class="status-pill status-green">Green: Present (Verified)</span>
+          <span class="status-pill status-blue">Blue: Salary Paid</span>
+        </div>
+      </div>
+
+      <div class="info-card" style="margin-top: 18px;">
+        <h4><i class="fa fa-list"></i> Attendance List</h4>
+        <div *ngIf="isLoadingAttendance" class="section-description"><i class="fa fa-spinner fa-spin"></i> Loading...</div>
+        <div *ngIf="!isLoadingAttendance && attendanceSummaryRows.length === 0" class="section-description">No admins found.</div>
+        <div *ngIf="!isLoadingAttendance && attendanceSummaryRows.length > 0" class="table-container" style="overflow-x:auto;">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Status</th>
+                <th>Admin Name</th>
+                <th>ID Card</th>
+                <th>Salary Account</th>
+                <th>Verified At</th>
+                <th>Paid</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let r of attendanceSummaryRows">
+                <td (click)="openAdminAttendance(r)" style="cursor:pointer;">
+                  <span class="status-dot" [ngClass]="{'dot-red': r.statusColor === 'red', 'dot-green': r.statusColor === 'green', 'dot-blue': r.statusColor === 'blue'}"></span>
+                  <span style="margin-left:8px;">{{ r.statusColor }}</span>
+                </td>
+                <td (click)="openAdminAttendance(r)" style="cursor:pointer;">{{ r.adminName }}</td>
+                <td>{{ r.idCardNumber || '—' }}</td>
+                <td>{{ r.salaryAccountNumber || 'Not set' }}</td>
+                <td>{{ r.verifiedAt ? (r.verifiedAt | date:'short') : '—' }}</td>
+                <td>{{ r.paid ? 'Yes' : 'No' }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Per-Admin Attendance Detail (Full Year) -->
+    <div class="content-section" *ngIf="activeSection === 'attendance-admin' && attendanceAdminDetail">
+      <div class="section-header">
+        <div class="header-content">
+          <div>
+            <h2><i class="fa fa-calendar-check"></i> {{ attendanceAdminDetail.adminName }} - Attendance Calendar</h2>
+            <p class="section-subtitle">View full-year attendance by month (green = present, blue = paid) and pay salary for selected present days.</p>
+          </div>
+          <div style="display:flex; align-items:center; gap:12px;">
+            <select [(ngModel)]="attendanceCalendarYear" (change)="loadAdminAttendanceCalendar()" class="filter-select">
+              <option *ngFor="let y of [attendanceCalendarYear, attendanceCalendarYear-1, attendanceCalendarYear-2]" [ngValue]="y">{{ y }}</option>
+            </select>
+            <button class="refresh-btn" (click)="activeSection = 'attendance-salary'">
+              <i class="fa fa-arrow-left"></i> Back
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="info-card">
+        <h4><i class="fa fa-user"></i> Admin Details</h4>
+        <div class="details-grid">
+          <div class="detail-item">
+            <label>Name</label>
+            <span class="value">{{ attendanceAdminDetail.adminName }}</span>
+          </div>
+          <div class="detail-item">
+            <label>Email</label>
+            <span class="value">{{ attendanceAdminDetail.adminEmail || '—' }}</span>
+          </div>
+          <div class="detail-item">
+            <label>ID Card</label>
+            <span class="value">{{ attendanceAdminDetail.idCardNumber || '—' }}</span>
+          </div>
+          <div class="detail-item">
+            <label>Salary Account</label>
+            <span class="value">{{ attendanceAdminDetail.salaryAccountNumber || 'Not set' }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="info-card" style="margin-top:18px;">
+        <h4><i class="fa fa-calendar"></i> Year {{ attendanceCalendarYear }} Attendance (Green = Present, Blue = Paid)</h4>
+        <div *ngIf="attendanceCalendarLoading" class="section-description">
+          <i class="fa fa-spinner fa-spin"></i> Loading calendar...
+        </div>
+        <div *ngIf="!attendanceCalendarLoading && attendanceCalendarRows.length === 0" class="section-description">
+          No attendance records found for this year.
+        </div>
+        <div *ngIf="!attendanceCalendarLoading && attendanceCalendarRows.length > 0" class="attendance-calendar">
+          <div class="month-column" *ngFor="let month of attendanceMonthNumbers">
+            <div class="month-header">{{ attendanceMonthNames[month - 1] }}</div>
+            <div class="days-list">
+              <ng-container *ngFor="let row of (attendanceCalendarByMonth[month] || [])">
+                <div
+                  class="day-item"
+                  [ngClass]="{'day-green': row.statusColor === 'green', 'day-blue': row.statusColor === 'blue'}"
+                  (click)="toggleAttendanceDateSelection(row.date)"
+                >
+                  <span class="day-number">{{ row.day }}</span>
+                  <span class="day-dot"></span>
+                </div>
+              </ng-container>
+            </div>
+          </div>
+        </div>
+        <div style="margin-top:16px; display:flex; justify-content:flex-end;">
+          <button type="button" class="btn-open-bank-account" (click)="paySelectedDays()" [disabled]="isPayingSalary">
+            <i class="fa" [class.fa-spinner]="isPayingSalary" [class.fa-money-bill-wave]="!isPayingSalary" [class.fa-spin]="isPayingSalary"></i>
+            {{ isPayingSalary ? 'Paying Selected...' : 'Pay Selected Days' }}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+    <!-- ═══════════════════════ SALARY ACCOUNT OPENING ═══════════════════════ -->
+    <div class="content-section" *ngIf="activeSection === 'salary-accounts'">
+      <div class="sal-page-header">
+        <h3><i class="fa fa-money-check-alt"></i> Salary Account Opening</h3>
+        <p>Create, view, and manage salary accounts for employees.</p>
+      </div>
+
+      <!-- Stats Cards — forced 4-column row -->
+      <div class="sal-stats-row">
+        <div class="sal-stat-card">
+          <div class="sal-stat-icon blue"><i class="fa fa-list"></i></div>
+          <div class="sal-stat-body">
+            <span class="sal-stat-num">{{ salaryStats.totalAccounts || 0 }}</span>
+            <span class="sal-stat-lbl">Total Salary Accounts</span>
+          </div>
+        </div>
+        <div class="sal-stat-card">
+          <div class="sal-stat-icon green"><i class="fa fa-check-circle"></i></div>
+          <div class="sal-stat-body">
+            <span class="sal-stat-num">{{ salaryStats.activeAccounts || 0 }}</span>
+            <span class="sal-stat-lbl">Active</span>
+          </div>
+        </div>
+        <div class="sal-stat-card">
+          <div class="sal-stat-icon red"><i class="fa fa-snowflake"></i></div>
+          <div class="sal-stat-body">
+            <span class="sal-stat-num">{{ salaryStats.frozenAccounts || 0 }}</span>
+            <span class="sal-stat-lbl">Frozen</span>
+          </div>
+        </div>
+        <div class="sal-stat-card">
+          <div class="sal-stat-icon purple"><i class="fa fa-building"></i></div>
+          <div class="sal-stat-body">
+            <span class="sal-stat-num">{{ salaryStats.totalCompanies || 0 }}</span>
+            <span class="sal-stat-lbl">Companies Linked</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Action Bar -->
+      <div class="sal-toolbar">
+        <button class="sal-btn sal-btn-primary" (click)="showSalaryForm = !showSalaryForm">
+          <i class="fa" [class.fa-plus]="!showSalaryForm" [class.fa-times]="showSalaryForm"></i>
+          {{ showSalaryForm ? 'Close Form' : 'Create Salary Account' }}
+        </button>
+        <div class="sal-toolbar-spacer"></div>
+        <div class="sal-search-group">
+          <input type="text" class="sal-search-input" [(ngModel)]="salarySearchQuery" placeholder="Search by name, company, account..." (keyup.enter)="searchSalaryAccounts()" />
+          <button class="sal-btn sal-btn-icon" (click)="searchSalaryAccounts()"><i class="fa fa-search"></i></button>
+        </div>
+        <select class="sal-filter-select" [(ngModel)]="salaryStatusFilter" (change)="filterSalaryAccounts()">
+          <option value="ALL">All Status</option>
+          <option value="Active">Active</option>
+          <option value="Frozen">Frozen</option>
+          <option value="Closed">Closed</option>
+        </select>
+      </div>
+
+      <!-- Create Salary Account Form -->
+      <div *ngIf="showSalaryForm" class="sal-form-card">
+        <h4><i class="fa fa-user-plus"></i> Create Salary Account</h4>
+
+        <!-- Row 1: Employee + Company -->
+        <div class="sal-form-row-2col">
+          <div class="sal-form-block">
+            <h5><i class="fa fa-user"></i> Employee Details</h5>
+            <div class="sal-field-row">
+              <div class="sal-field"><label>Employee Name *</label><input type="text" [(ngModel)]="newSalaryAccount.employeeName" placeholder="Enter full name" /></div>
+              <div class="sal-field"><label>Date of Birth</label><input type="date" [(ngModel)]="newSalaryAccount.dob" /></div>
+            </div>
+            <div class="sal-field-row">
+              <div class="sal-field"><label>Mobile Number</label><input type="text" [(ngModel)]="newSalaryAccount.mobileNumber" placeholder="10-digit mobile" maxlength="10" /></div>
+              <div class="sal-field"><label>Email ID</label><input type="email" [(ngModel)]="newSalaryAccount.email" placeholder="email@example.com" /></div>
+            </div>
+            <div class="sal-field-row">
+              <div class="sal-field"><label>Aadhaar Number</label><input type="text" [(ngModel)]="newSalaryAccount.aadharNumber" placeholder="12-digit Aadhaar" maxlength="12" /></div>
+              <div class="sal-field"><label>PAN Number</label><input type="text" [(ngModel)]="newSalaryAccount.panNumber" placeholder="ABCDE1234F" maxlength="10" /></div>
+            </div>
+          </div>
+
+          <div class="sal-form-block">
+            <h5><i class="fa fa-building"></i> Company Details</h5>
+            <div class="sal-field-row">
+              <div class="sal-field"><label>Company Name</label><input type="text" [(ngModel)]="newSalaryAccount.companyName" placeholder="e.g. Infosys" /></div>
+              <div class="sal-field"><label>Company ID</label><input type="text" [(ngModel)]="newSalaryAccount.companyId" placeholder="Company registration ID" /></div>
+            </div>
+            <div class="sal-field-row">
+              <div class="sal-field"><label>Employer Address</label><input type="text" [(ngModel)]="newSalaryAccount.employerAddress" placeholder="Address" /></div>
+              <div class="sal-field"><label>HR Contact Number</label><input type="text" [(ngModel)]="newSalaryAccount.hrContactNumber" placeholder="HR phone number" maxlength="10" /></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Row 2: Salary + Bank -->
+        <div class="sal-form-row-2col">
+          <div class="sal-form-block">
+            <h5><i class="fa fa-rupee-sign"></i> Salary Details</h5>
+            <div class="sal-field-row">
+              <div class="sal-field"><label>Monthly Salary (₹)</label><input type="number" [(ngModel)]="newSalaryAccount.monthlySalary" placeholder="e.g. 45000" /></div>
+              <div class="sal-field"><label>Salary Credit Date (Day)</label><input type="number" [(ngModel)]="newSalaryAccount.salaryCreditDate" min="1" max="28" placeholder="e.g. 1" /></div>
+            </div>
+            <div class="sal-field-row">
+              <div class="sal-field"><label>Designation</label><input type="text" [(ngModel)]="newSalaryAccount.designation" placeholder="e.g. Software Engineer" /></div>
+              <div class="sal-field"></div>
+            </div>
+          </div>
+
+          <div class="sal-form-block">
+            <h5><i class="fa fa-university"></i> Bank Details</h5>
+            <div class="sal-field-row">
+              <div class="sal-field"><label>Account Type</label><input type="text" value="Salary Account" disabled /></div>
+              <div class="sal-field"><label>Branch Name</label><input type="text" [(ngModel)]="newSalaryAccount.branchName" placeholder="e.g. Hyderabad Main" /></div>
+            </div>
+            <div class="sal-field-row">
+              <div class="sal-field"><label>IFSC Code</label><input type="text" [(ngModel)]="newSalaryAccount.ifscCode" placeholder="e.g. EZYV0001234" /></div>
+              <div class="sal-field"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="sal-form-footer">
+          <button class="sal-btn sal-btn-success" (click)="createSalaryAccount()" [disabled]="isCreatingSalaryAccount">
+            <i class="fa" [class.fa-spinner]="isCreatingSalaryAccount" [class.fa-plus-circle]="!isCreatingSalaryAccount" [class.fa-spin]="isCreatingSalaryAccount"></i>
+            {{ isCreatingSalaryAccount ? 'Creating...' : 'Create Salary Account' }}
+          </button>
+          <button class="sal-btn sal-btn-outline" (click)="showSalaryForm = false">Cancel</button>
+        </div>
+      </div>
+
+      <!-- Salary Accounts Table -->
+      <div class="sal-table-wrap" *ngIf="!isLoadingSalaryAccounts && filteredSalaryAccounts.length > 0">
+        <table class="sal-table">
+          <thead>
+            <tr>
+              <th>Account Number</th>
+              <th>Employee Name</th>
+              <th>Company</th>
+              <th>Designation</th>
+              <th>Salary (₹)</th>
+              <th>Balance (₹)</th>
+              <th>Status</th>
+              <th>Created</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let acc of filteredSalaryAccounts" [class.sal-row-frozen]="acc.status === 'Frozen'">
+              <td class="sal-cell-mono">{{ acc.accountNumber }}</td>
+              <td>{{ acc.employeeName }}</td>
+              <td>{{ acc.companyName || '-' }}</td>
+              <td>{{ acc.designation || '-' }}</td>
+              <td>₹{{ acc.monthlySalary | number:'1.0-0' }}</td>
+              <td>₹{{ acc.balance | number:'1.2-2' }}</td>
+              <td>
+                <span class="sal-badge" [ngClass]="{'sal-badge-green': acc.status==='Active', 'sal-badge-blue': acc.status==='Frozen', 'sal-badge-red': acc.status==='Closed'}">
+                  {{ acc.status }}
+                </span>
+              </td>
+              <td>{{ acc.createdAt | date:'mediumDate' }}</td>
+              <td class="sal-cell-actions">
+                <button class="sal-act-btn sal-act-view" (click)="viewSalaryAccountDetails(acc)" title="View Details"><i class="fa fa-eye"></i></button>
+                <button class="sal-act-btn sal-act-edit" (click)="openEditSalaryAccount(acc)" title="Update Salary"><i class="fa fa-edit"></i></button>
+                <button class="sal-act-btn sal-act-credit" (click)="creditSalaryToAccount(acc)" title="Credit Salary" *ngIf="acc.status==='Active'"><i class="fa fa-rupee-sign"></i></button>
+                <button class="sal-act-btn sal-act-freeze" (click)="toggleFreezeSalaryAccount(acc)" [title]="acc.status==='Frozen' ? 'Unfreeze' : 'Freeze'" *ngIf="acc.status!=='Closed'">
+                  <i class="fa" [class.fa-lock]="acc.status!=='Frozen'" [class.fa-lock-open]="acc.status==='Frozen'"></i>
+                </button>
+                <button class="sal-act-btn sal-act-close" (click)="openCloseAccountModal(acc)" title="Close Account" *ngIf="acc.status!=='Closed'" style="background:#dc3545;color:#fff;">
+                  <i class="fa fa-times-circle"></i>
+                </button>
+                <span *ngIf="acc.status==='Closed'" class="sal-badge sal-badge-red" style="font-size:11px;" title="Closed on {{ acc.closedAt | date:'medium' }}">
+                  <i class="fa fa-ban"></i> Closed
+                </span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div *ngIf="!isLoadingSalaryAccounts && filteredSalaryAccounts.length === 0" class="sal-empty">
+        <i class="fa fa-money-check-alt"></i>
+        <p>No salary accounts found. Create the first one above!</p>
+      </div>
+
+      <div *ngIf="isLoadingSalaryAccounts" class="sal-loading">
+        <i class="fa fa-spinner fa-spin"></i> Loading salary accounts...
+      </div>
+
+      <!-- Salary Account Detail Modal -->
+      <div *ngIf="selectedSalaryAccount" class="sal-modal-overlay" (click)="selectedSalaryAccount = null">
+        <div class="sal-modal" (click)="$event.stopPropagation()">
+          <div class="sal-modal-head">
+            <h4><i class="fa fa-id-card"></i> Salary Account Details</h4>
+            <button class="sal-modal-close" (click)="selectedSalaryAccount = null"><i class="fa fa-times"></i></button>
+          </div>
+          <div class="sal-detail-grid">
+            <div class="sal-detail-item"><strong>Account Number</strong><span>{{ selectedSalaryAccount.accountNumber }}</span></div>
+            <div class="sal-detail-item"><strong>Customer ID</strong><span>{{ selectedSalaryAccount.customerId }}</span></div>
+            <div class="sal-detail-item"><strong>Account Type</strong><span>Salary Account</span></div>
+            <div class="sal-detail-item"><strong>Employee Name</strong><span>{{ selectedSalaryAccount.employeeName }}</span></div>
+            <div class="sal-detail-item"><strong>DOB</strong><span>{{ selectedSalaryAccount.dob || '-' }}</span></div>
+            <div class="sal-detail-item"><strong>Mobile</strong><span>{{ selectedSalaryAccount.mobileNumber || '-' }}</span></div>
+            <div class="sal-detail-item"><strong>Email</strong><span>{{ selectedSalaryAccount.email || '-' }}</span></div>
+            <div class="sal-detail-item"><strong>Aadhaar</strong><span>{{ selectedSalaryAccount.aadharNumber || '-' }}</span></div>
+            <div class="sal-detail-item"><strong>PAN</strong><span>{{ selectedSalaryAccount.panNumber || '-' }}</span></div>
+            <div class="sal-detail-item"><strong>Company</strong><span>{{ selectedSalaryAccount.companyName || '-' }}</span></div>
+            <div class="sal-detail-item"><strong>Company ID</strong><span>{{ selectedSalaryAccount.companyId || '-' }}</span></div>
+            <div class="sal-detail-item"><strong>Designation</strong><span>{{ selectedSalaryAccount.designation || '-' }}</span></div>
+            <div class="sal-detail-item"><strong>Monthly Salary</strong><span>₹{{ selectedSalaryAccount.monthlySalary | number:'1.0-0' }}</span></div>
+            <div class="sal-detail-item"><strong>Salary Credit Date</strong><span>{{ selectedSalaryAccount.salaryCreditDate }}th of every month</span></div>
+            <div class="sal-detail-item"><strong>Balance</strong><span>₹{{ selectedSalaryAccount.balance | number:'1.2-2' }}</span></div>
+            <div class="sal-detail-item"><strong>Debit Card</strong><span>{{ selectedSalaryAccount.debitCardNumber || '-' }}</span></div>
+            <div class="sal-detail-item"><strong>Net Banking</strong><span>{{ selectedSalaryAccount.netBankingEnabled ? 'Enabled' : 'Disabled' }}</span></div>
+            <div class="sal-detail-item"><strong>Branch</strong><span>{{ selectedSalaryAccount.branchName || '-' }}</span></div>
+            <div class="sal-detail-item"><strong>IFSC</strong><span>{{ selectedSalaryAccount.ifscCode || '-' }}</span></div>
+            <div class="sal-detail-item"><strong>Status</strong>
+              <span class="sal-badge" [ngClass]="{'sal-badge-green': selectedSalaryAccount.status==='Active', 'sal-badge-blue': selectedSalaryAccount.status==='Frozen', 'sal-badge-red': selectedSalaryAccount.status==='Closed'}">{{ selectedSalaryAccount.status }}</span>
+            </div>
+            <div class="sal-detail-item" *ngIf="selectedSalaryAccount.closedAt"><strong>Closed At</strong><span>{{ selectedSalaryAccount.closedAt | date:'medium' }}</span></div>
+            <div class="sal-detail-item" *ngIf="selectedSalaryAccount.closedReason"><strong>Closure Reason</strong><span>{{ selectedSalaryAccount.closedReason }}</span></div>
+            <div class="sal-detail-item" *ngIf="selectedSalaryAccount.closedBy"><strong>Closed By</strong><span>{{ selectedSalaryAccount.closedBy }}</span></div>
+          </div>
+
+          <h5 class="sal-txn-heading"><i class="fa fa-history"></i> Salary Transactions</h5>
+          <div *ngIf="isLoadingSalaryTxns" class="sal-loading"><i class="fa fa-spinner fa-spin"></i> Loading...</div>
+          <table class="sal-table" *ngIf="!isLoadingSalaryTxns && salaryTransactions.length > 0">
+            <thead>
+              <tr><th>Date</th><th>Type</th><th>Amount (₹)</th><th>Description</th><th>Prev Balance</th><th>New Balance</th><th>Status</th></tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let tx of salaryTransactions">
+                <td>{{ tx.creditDate | date:'mediumDate' }}</td>
+                <td>{{ tx.type }}</td>
+                <td>₹{{ tx.salaryAmount | number:'1.0-0' }}</td>
+                <td>{{ tx.description }}</td>
+                <td>₹{{ tx.previousBalance | number:'1.2-2' }}</td>
+                <td>₹{{ tx.newBalance | number:'1.2-2' }}</td>
+                <td><span class="sal-badge sal-badge-green">{{ tx.status }}</span></td>
+              </tr>
+            </tbody>
+          </table>
+          <div *ngIf="!isLoadingSalaryTxns && salaryTransactions.length === 0" class="sal-empty">
+            <p>No transactions yet.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Edit Salary Account Modal -->
+      <div *ngIf="editingSalaryAccount" class="sal-modal-overlay" (click)="editingSalaryAccount = null">
+        <div class="sal-modal" (click)="$event.stopPropagation()">
+          <div class="sal-modal-head">
+            <h4><i class="fa fa-edit"></i> Update Salary Details</h4>
+            <button class="sal-modal-close" (click)="editingSalaryAccount = null"><i class="fa fa-times"></i></button>
+          </div>
+          <div class="sal-edit-grid">
+            <div class="sal-field-row">
+              <div class="sal-field"><label>Employee Name</label><input type="text" [(ngModel)]="editingSalaryAccount.employeeName" /></div>
+              <div class="sal-field"><label>Designation</label><input type="text" [(ngModel)]="editingSalaryAccount.designation" /></div>
+            </div>
+            <div class="sal-field-row">
+              <div class="sal-field"><label>Monthly Salary (₹)</label><input type="number" [(ngModel)]="editingSalaryAccount.monthlySalary" /></div>
+              <div class="sal-field"><label>Salary Credit Date</label><input type="number" [(ngModel)]="editingSalaryAccount.salaryCreditDate" min="1" max="28" /></div>
+            </div>
+            <div class="sal-field-row">
+              <div class="sal-field"><label>Company Name</label><input type="text" [(ngModel)]="editingSalaryAccount.companyName" /></div>
+              <div class="sal-field"><label>Company ID</label><input type="text" [(ngModel)]="editingSalaryAccount.companyId" /></div>
+            </div>
+            <div class="sal-field-row">
+              <div class="sal-field"><label>Branch Name</label><input type="text" [(ngModel)]="editingSalaryAccount.branchName" /></div>
+              <div class="sal-field"><label>IFSC Code</label><input type="text" [(ngModel)]="editingSalaryAccount.ifscCode" /></div>
+            </div>
+          </div>
+          <div class="sal-form-footer">
+            <button class="sal-btn sal-btn-success" (click)="saveSalaryAccountEdit()" [disabled]="isSavingSalaryAccount">
+              <i class="fa" [class.fa-spinner]="isSavingSalaryAccount" [class.fa-save]="!isSavingSalaryAccount" [class.fa-spin]="isSavingSalaryAccount"></i>
+              {{ isSavingSalaryAccount ? 'Saving...' : 'Save Changes' }}
+            </button>
+            <button class="sal-btn sal-btn-outline" (click)="editingSalaryAccount = null">Cancel</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Close Salary Account Modal -->
+      <div *ngIf="closingAccount" class="sal-modal-overlay" (click)="closingAccount = null; closeAccountPreCheck = null">
+        <div class="sal-modal" (click)="$event.stopPropagation()" style="max-width:600px;">
+          <div class="sal-modal-head" style="background:linear-gradient(135deg,#dc3545,#c82333);">
+            <h4><i class="fa fa-times-circle"></i> Close Salary Account</h4>
+            <button class="sal-modal-close" (click)="closingAccount = null; closeAccountPreCheck = null"><i class="fa fa-times"></i></button>
+          </div>
+
+          <div style="padding:20px;">
+            <!-- Account Info -->
+            <div style="background:#f8f9fa;border-radius:8px;padding:15px;margin-bottom:18px;">
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:14px;">
+                <div><strong>Employee:</strong> {{ closingAccount.employeeName }}</div>
+                <div><strong>Account:</strong> {{ closingAccount.accountNumber }}</div>
+                <div><strong>Company:</strong> {{ closingAccount.companyName || '-' }}</div>
+                <div><strong>Status:</strong> <span class="sal-badge" [ngClass]="{'sal-badge-green': closingAccount.status==='Active', 'sal-badge-blue': closingAccount.status==='Frozen'}">{{ closingAccount.status }}</span></div>
+              </div>
+            </div>
+
+            <!-- Loading Pre-check -->
+            <div *ngIf="isLoadingClosePreCheck" style="text-align:center;padding:20px;">
+              <i class="fa fa-spinner fa-spin" style="font-size:24px;color:#6c757d;"></i>
+              <p style="margin-top:8px;color:#6c757d;">Checking account closure eligibility...</p>
+            </div>
+
+            <!-- Pre-check Results -->
+            <div *ngIf="!isLoadingClosePreCheck && closeAccountPreCheck">
+              <!-- Condition Cards -->
+              <div style="display:grid;gap:10px;margin-bottom:18px;">
+                <!-- Balance Check -->
+                <div style="display:flex;align-items:center;gap:12px;padding:12px;border-radius:8px;" [style.background]="closeAccountPreCheck.balance <= 0 && closeAccountPreCheck.savingsBalance <= 0 ? '#d4edda' : '#f8d7da'">
+                  <i class="fa" [class.fa-check-circle]="closeAccountPreCheck.balance <= 0 && closeAccountPreCheck.savingsBalance <= 0" [class.fa-exclamation-circle]="closeAccountPreCheck.balance > 0 || closeAccountPreCheck.savingsBalance > 0" [style.color]="closeAccountPreCheck.balance <= 0 && closeAccountPreCheck.savingsBalance <= 0 ? '#28a745' : '#dc3545'" style="font-size:20px;"></i>
+                  <div>
+                    <strong>Account Balance</strong>
+                    <div style="font-size:13px;">Balance: ₹{{ closeAccountPreCheck.balance | number:'1.2-2' }}<span *ngIf="closeAccountPreCheck.savingsBalance > 0"> | Savings: ₹{{ closeAccountPreCheck.savingsBalance | number:'1.2-2' }}</span></div>
+                    <div *ngIf="closeAccountPreCheck.balance > 0 || closeAccountPreCheck.savingsBalance > 0" style="font-size:12px;color:#dc3545;">Must be ₹0.00 to close</div>
+                  </div>
+                </div>
+
+                <!-- Loans/Advances Check -->
+                <div style="display:flex;align-items:center;gap:12px;padding:12px;border-radius:8px;" [style.background]="closeAccountPreCheck.outstandingLoans <= 0 ? '#d4edda' : '#f8d7da'">
+                  <i class="fa" [class.fa-check-circle]="closeAccountPreCheck.outstandingLoans <= 0" [class.fa-exclamation-circle]="closeAccountPreCheck.outstandingLoans > 0" [style.color]="closeAccountPreCheck.outstandingLoans <= 0 ? '#28a745' : '#dc3545'" style="font-size:20px;"></i>
+                  <div>
+                    <strong>Outstanding Loans/Advances</strong>
+                    <div style="font-size:13px;">{{ closeAccountPreCheck.activeAdvanceCount }} active advance(s) — ₹{{ closeAccountPreCheck.outstandingLoans | number:'1.2-2' }}</div>
+                    <div *ngIf="closeAccountPreCheck.outstandingLoans > 0" style="font-size:12px;color:#dc3545;">All advances must be repaid</div>
+                  </div>
+                </div>
+
+                <!-- Cheques Check -->
+                <div style="display:flex;align-items:center;gap:12px;padding:12px;border-radius:8px;" [style.background]="closeAccountPreCheck.pendingCheques === 0 ? '#d4edda' : '#f8d7da'">
+                  <i class="fa" [class.fa-check-circle]="closeAccountPreCheck.pendingCheques === 0" [class.fa-exclamation-circle]="closeAccountPreCheck.pendingCheques > 0" [style.color]="closeAccountPreCheck.pendingCheques === 0 ? '#28a745' : '#dc3545'" style="font-size:20px;"></i>
+                  <div>
+                    <strong>Pending Cheques</strong>
+                    <div style="font-size:13px;">{{ closeAccountPreCheck.pendingCheques }} pending/approved cheque(s)</div>
+                    <div *ngIf="closeAccountPreCheck.pendingCheques > 0" style="font-size:12px;color:#dc3545;">All cheques must be settled first</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Closure Reason -->
+              <div *ngIf="closeAccountPreCheck.canClose" style="margin-bottom:15px;">
+                <label style="font-weight:600;margin-bottom:5px;display:block;">Reason for Closure *</label>
+                <textarea [(ngModel)]="closeAccountReason" rows="3" placeholder="Enter reason for account closure..." style="width:100%;padding:10px;border:1px solid #ddd;border-radius:6px;font-size:14px;resize:vertical;"></textarea>
+              </div>
+
+              <!-- Overall Eligibility -->
+              <div *ngIf="!closeAccountPreCheck.canClose" style="background:#fff3cd;border:1px solid #ffc107;border-radius:8px;padding:15px;margin-bottom:15px;">
+                <strong style="color:#856404;"><i class="fa fa-exclamation-triangle"></i> Account cannot be closed</strong>
+                <p style="font-size:13px;color:#856404;margin-top:5px;">Please resolve the issues highlighted above before closing this account.</p>
+              </div>
+            </div>
+
+            <!-- Actions -->
+            <div style="display:flex;gap:10px;justify-content:flex-end;padding-top:10px;border-top:1px solid #eee;">
+              <button class="sal-btn sal-btn-outline" (click)="closingAccount = null; closeAccountPreCheck = null">Cancel</button>
+              <button class="sal-btn" style="background:#dc3545;color:#fff;border:none;padding:10px 24px;border-radius:6px;cursor:pointer;font-weight:600;" (click)="confirmCloseAccount()" [disabled]="isClosingAccount || !closeAccountPreCheck?.canClose || !closeAccountReason.trim()">
+                <i class="fa" [class.fa-spinner]="isClosingAccount" [class.fa-times-circle]="!isClosingAccount" [class.fa-spin]="isClosingAccount"></i>
+                {{ isClosingAccount ? 'Closing...' : 'Close Account Permanently' }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!-- MANAGER PERMISSIONS — Admin Salary Account Linking & View  -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <div class="content-section" *ngIf="activeSection === 'manager-permissions'">
+      <div class="mp-page-header">
+        <h3><i class="fa fa-user-lock"></i> Manager Permissions</h3>
+        <p>Link admin accounts to NeoBank salary accounts, view salary details, monitor transactions, and generate reports.</p>
+      </div>
+
+      <!-- Permissions Info Cards -->
+      <div class="mp-permissions-info">
+        <div class="mp-perm-card mp-perm-allowed">
+          <h5><i class="fa fa-check-circle"></i> Manager Can</h5>
+          <ul>
+            <li><i class="fa fa-link"></i> Link admin account &amp; NeoBank salary account (one-time only)</li>
+            <li><i class="fa fa-eye"></i> View admin salary account details</li>
+            <li><i class="fa fa-chart-line"></i> Monitor salary transactions</li>
+            <li><i class="fa fa-file-alt"></i> Generate salary reports</li>
+          </ul>
+        </div>
+        <div class="mp-perm-card mp-perm-denied">
+          <h5><i class="fa fa-times-circle"></i> Manager Cannot</h5>
+          <ul>
+            <li><i class="fa fa-ban"></i> Modify admin salary</li>
+            <li><i class="fa fa-ban"></i> Delete admin account</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Admin Selection -->
+      <div class="mp-admin-select-section">
+        <h4><i class="fa fa-users"></i> Select an Admin</h4>
+        <div class="mp-admin-grid" *ngIf="allAdmins.length > 0">
+          <div class="mp-admin-card" *ngFor="let admin of allAdmins"
+               [class.mp-admin-selected]="mpSelectedAdmin?.id === admin.id"
+               (click)="mpSelectAdmin(admin)">
+            <div class="mp-admin-avatar">
+              <i class="fa fa-user-circle"></i>
+            </div>
+            <div class="mp-admin-info">
+              <strong>{{ admin.name }}</strong>
+              <small>{{ admin.email }}</small>
+              <span class="mp-link-badge" *ngIf="admin.salaryAccountLinked || admin.salaryAccountNumber">
+                <i class="fa fa-link"></i> Linked
+              </span>
+              <span class="mp-link-badge mp-not-linked" *ngIf="!admin.salaryAccountLinked && !admin.salaryAccountNumber">
+                <i class="fa fa-unlink"></i> Not Linked
+              </span>
+            </div>
+          </div>
+        </div>
+        <div *ngIf="allAdmins.length === 0" class="mp-empty">
+          <i class="fa fa-users"></i>
+          <p>No admins found.</p>
+        </div>
+      </div>
+
+      <!-- Selected Admin Panel -->
+      <div *ngIf="mpSelectedAdmin" class="mp-selected-panel">
+        <div class="mp-selected-header">
+          <h4><i class="fa fa-user-shield"></i> {{ mpSelectedAdmin.name }}</h4>
+          <span class="mp-email">{{ mpSelectedAdmin.email }}</span>
+          <span class="mp-role-badge">{{ mpSelectedAdmin.role }}</span>
+        </div>
+
+        <!-- Link Salary Account (only if not linked) -->
+        <div *ngIf="!mpLinked" class="mp-link-section">
+          <div class="mp-link-card">
+            <h5><i class="fa fa-link"></i> Link NeoBank Salary Account</h5>
+            <p class="mp-link-warning"><i class="fa fa-exclamation-triangle"></i> This is a <strong>one-time operation</strong>. Once linked, the salary account cannot be changed.</p>
+            <div class="mp-link-form">
+              <div class="mp-field">
+                <label>Salary Account Number</label>
+                <input type="text" [(ngModel)]="mpLinkAccountNumber" placeholder="Enter NeoBank salary account number" />
+              </div>
+              <button class="mp-btn mp-btn-primary" (click)="mpLinkSalaryAccount()" [disabled]="mpIsLinking || !mpLinkAccountNumber">
+                <i class="fa" [class.fa-spinner]="mpIsLinking" [class.fa-link]="!mpIsLinking" [class.fa-spin]="mpIsLinking"></i>
+                {{ mpIsLinking ? 'Linking...' : 'Link Account' }}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Linked Account Tabs -->
+        <div *ngIf="mpLinked" class="mp-tabs-container">
+          <div class="mp-tabs">
+            <button class="mp-tab" [class.active]="mpActiveTab === 'overview'" (click)="mpSetTab('overview')">
+              <i class="fa fa-eye"></i> Account Overview
+            </button>
+            <button class="mp-tab" [class.active]="mpActiveTab === 'transactions'" (click)="mpSetTab('transactions')">
+              <i class="fa fa-exchange-alt"></i> Transactions
+            </button>
+            <button class="mp-tab" [class.active]="mpActiveTab === 'report'" (click)="mpSetTab('report')">
+              <i class="fa fa-file-alt"></i> Salary Report
+            </button>
+          </div>
+
+          <!-- Overview Tab -->
+          <div class="mp-tab-content" *ngIf="mpActiveTab === 'overview'">
+            <div *ngIf="mpIsLoadingSalary" class="mp-loading"><i class="fa fa-spinner fa-spin"></i> Loading salary account...</div>
+            <div *ngIf="!mpIsLoadingSalary && mpAdminSalaryAccount" class="mp-account-overview">
+              <div class="mp-overview-grid">
+                <div class="mp-ov-item"><span class="mp-ov-label">Account Number</span><span class="mp-ov-value mp-mono">{{ mpAdminSalaryAccount.accountNumber }}</span></div>
+                <div class="mp-ov-item"><span class="mp-ov-label">Customer ID</span><span class="mp-ov-value mp-mono">{{ mpAdminSalaryAccount.customerId }}</span></div>
+                <div class="mp-ov-item"><span class="mp-ov-label">Employee Name</span><span class="mp-ov-value">{{ mpAdminSalaryAccount.employeeName }}</span></div>
+                <div class="mp-ov-item"><span class="mp-ov-label">Designation</span><span class="mp-ov-value">{{ mpAdminSalaryAccount.designation || '-' }}</span></div>
+                <div class="mp-ov-item"><span class="mp-ov-label">Company</span><span class="mp-ov-value">{{ mpAdminSalaryAccount.companyName || '-' }}</span></div>
+                <div class="mp-ov-item"><span class="mp-ov-label">Monthly Salary</span><span class="mp-ov-value mp-green">₹{{ mpAdminSalaryAccount.monthlySalary | number:'1.0-0' }}</span></div>
+                <div class="mp-ov-item"><span class="mp-ov-label">Balance</span><span class="mp-ov-value mp-green">₹{{ mpAdminSalaryAccount.balance | number:'1.2-2' }}</span></div>
+                <div class="mp-ov-item"><span class="mp-ov-label">Status</span>
+                  <span class="sal-badge" [ngClass]="{'sal-badge-green': mpAdminSalaryAccount.status==='Active', 'sal-badge-blue': mpAdminSalaryAccount.status==='Frozen', 'sal-badge-red': mpAdminSalaryAccount.status==='Closed'}">
+                    {{ mpAdminSalaryAccount.status }}
+                  </span>
+                </div>
+                <div class="mp-ov-item"><span class="mp-ov-label">Branch</span><span class="mp-ov-value">{{ mpAdminSalaryAccount.branchName || '-' }}</span></div>
+                <div class="mp-ov-item"><span class="mp-ov-label">IFSC Code</span><span class="mp-ov-value mp-mono">{{ mpAdminSalaryAccount.ifscCode || '-' }}</span></div>
+                <div class="mp-ov-item"><span class="mp-ov-label">DOB</span><span class="mp-ov-value">{{ mpAdminSalaryAccount.dob || '-' }}</span></div>
+                <div class="mp-ov-item"><span class="mp-ov-label">Mobile</span><span class="mp-ov-value">{{ mpAdminSalaryAccount.mobileNumber || '-' }}</span></div>
+                <div class="mp-ov-item"><span class="mp-ov-label">Email</span><span class="mp-ov-value">{{ mpAdminSalaryAccount.email || '-' }}</span></div>
+                <div class="mp-ov-item"><span class="mp-ov-label">Salary Credit Date</span><span class="mp-ov-value">{{ mpAdminSalaryAccount.salaryCreditDate || '-' }}th of every month</span></div>
+              </div>
+              <div class="mp-readonly-notice">
+                <i class="fa fa-info-circle"></i> This information is <strong>read-only</strong>. Manager cannot modify admin salary or delete admin accounts.
+              </div>
+            </div>
+            <div *ngIf="!mpIsLoadingSalary && !mpAdminSalaryAccount" class="mp-empty">
+              <i class="fa fa-money-check-alt"></i>
+              <p>Salary account details not available.</p>
+            </div>
+          </div>
+
+          <!-- Transactions Tab -->
+          <div class="mp-tab-content" *ngIf="mpActiveTab === 'transactions'">
+            <div *ngIf="mpIsLoadingTxns" class="mp-loading"><i class="fa fa-spinner fa-spin"></i> Loading transactions...</div>
+            <div *ngIf="!mpIsLoadingTxns">
+              <div class="mp-txn-tabs">
+                <button class="mp-txn-tab" [class.active]="mpTxnTab === 'salary'" (click)="mpTxnTab = 'salary'">
+                  <i class="fa fa-rupee-sign"></i> Salary Credits ({{ mpSalaryTransactions.length }})
+                </button>
+                <button class="mp-txn-tab" [class.active]="mpTxnTab === 'normal'" (click)="mpTxnTab = 'normal'">
+                  <i class="fa fa-exchange-alt"></i> Transfers & Withdrawals ({{ mpNormalTransactions.length }})
+                </button>
+              </div>
+
+              <!-- Salary Transactions -->
+              <div *ngIf="mpTxnTab === 'salary'">
+                <table class="sal-table" *ngIf="mpSalaryTransactions.length > 0">
+                  <thead>
+                    <tr><th>Date</th><th>Type</th><th>Amount (₹)</th><th>Description</th><th>Prev Balance</th><th>New Balance</th><th>Status</th></tr>
+                  </thead>
+                  <tbody>
+                    <tr *ngFor="let tx of mpSalaryTransactions">
+                      <td>{{ tx.creditDate | date:'mediumDate' }}</td>
+                      <td>{{ tx.type }}</td>
+                      <td class="mp-green">₹{{ tx.salaryAmount | number:'1.0-0' }}</td>
+                      <td>{{ tx.description }}</td>
+                      <td>₹{{ tx.previousBalance | number:'1.2-2' }}</td>
+                      <td>₹{{ tx.newBalance | number:'1.2-2' }}</td>
+                      <td><span class="sal-badge sal-badge-green">{{ tx.status }}</span></td>
+                    </tr>
+                  </tbody>
+                </table>
+                <div *ngIf="mpSalaryTransactions.length === 0" class="mp-empty"><p>No salary transactions found.</p></div>
+              </div>
+
+              <!-- Normal Transactions -->
+              <div *ngIf="mpTxnTab === 'normal'">
+                <table class="sal-table" *ngIf="mpNormalTransactions.length > 0">
+                  <thead>
+                    <tr><th>Date</th><th>Type</th><th>Amount (₹)</th><th>Charge (₹)</th><th>Recipient</th><th>Remark</th><th>Status</th></tr>
+                  </thead>
+                  <tbody>
+                    <tr *ngFor="let tx of mpNormalTransactions">
+                      <td>{{ tx.createdAt | date:'mediumDate' }}</td>
+                      <td>
+                        <span class="sal-badge" [ngClass]="{'sal-badge-green': tx.type==='TRANSFER', 'sal-badge-blue': tx.type==='WITHDRAWAL'}">
+                          {{ tx.type }}
+                        </span>
+                      </td>
+                      <td>₹{{ tx.amount | number:'1.2-2' }}</td>
+                      <td>₹{{ tx.charge | number:'1.2-2' }}</td>
+                      <td class="mp-mono">{{ tx.recipientAccount || '-' }}</td>
+                      <td>{{ tx.remark || '-' }}</td>
+                      <td><span class="sal-badge sal-badge-green">{{ tx.status }}</span></td>
+                    </tr>
+                  </tbody>
+                </table>
+                <div *ngIf="mpNormalTransactions.length === 0" class="mp-empty"><p>No transfer/withdrawal transactions found.</p></div>
+              </div>
+
+              <div class="mp-readonly-notice">
+                <i class="fa fa-info-circle"></i> Transaction monitoring is <strong>read-only</strong>. Manager cannot modify or reverse transactions.
+              </div>
+            </div>
+          </div>
+
+          <!-- Report Tab -->
+          <div class="mp-tab-content" *ngIf="mpActiveTab === 'report'">
+            <div *ngIf="mpIsLoadingReport" class="mp-loading"><i class="fa fa-spinner fa-spin"></i> Generating report...</div>
+            <div *ngIf="!mpIsLoadingReport && mpSalaryReport" class="mp-report-section">
+              <div class="mp-report-header-card">
+                <div class="mp-report-summary">
+                  <div class="mp-report-stat">
+                    <span class="mp-report-stat-value mp-green">₹{{ mpSalaryReport.totalSalaryCredited | number:'1.0-0' }}</span>
+                    <span class="mp-report-stat-label">Total Salary Credited</span>
+                  </div>
+                  <div class="mp-report-stat">
+                    <span class="mp-report-stat-value">{{ mpSalaryReport.totalCredits }}</span>
+                    <span class="mp-report-stat-label">Total Credits</span>
+                  </div>
+                  <div class="mp-report-stat">
+                    <span class="mp-report-stat-value mp-green">₹{{ mpSalaryReport.currentBalance | number:'1.2-2' }}</span>
+                    <span class="mp-report-stat-label">Current Balance</span>
+                  </div>
+                  <div class="mp-report-stat">
+                    <span class="mp-report-stat-value">₹{{ mpSalaryReport.monthlySalary | number:'1.0-0' }}</span>
+                    <span class="mp-report-stat-label">Monthly Salary</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="mp-report-details">
+                <div class="mp-report-row"><span class="mp-report-label">Admin Name</span><span>{{ mpSalaryReport.adminName }}</span></div>
+                <div class="mp-report-row"><span class="mp-report-label">Email</span><span>{{ mpSalaryReport.adminEmail }}</span></div>
+                <div class="mp-report-row"><span class="mp-report-label">Account Number</span><span class="mp-mono">{{ mpSalaryReport.accountNumber }}</span></div>
+                <div class="mp-report-row"><span class="mp-report-label">Company</span><span>{{ mpSalaryReport.companyName || '-' }}</span></div>
+                <div class="mp-report-row"><span class="mp-report-label">Designation</span><span>{{ mpSalaryReport.designation || '-' }}</span></div>
+                <div class="mp-report-row"><span class="mp-report-label">Account Status</span><span>{{ mpSalaryReport.accountStatus }}</span></div>
+                <div class="mp-report-row"><span class="mp-report-label">Latest Credit</span><span>{{ mpSalaryReport.latestCreditDate | date:'mediumDate' }}</span></div>
+              </div>
+
+              <div class="mp-report-actions">
+                <button class="mp-btn mp-btn-primary" (click)="mpPrintSalaryReport()">
+                  <i class="fa fa-print"></i> Print Report
+                </button>
+                <button class="mp-btn mp-btn-outline" (click)="mpLoadReport()">
+                  <i class="fa fa-sync"></i> Refresh
+                </button>
+              </div>
+            </div>
+            <div *ngIf="!mpIsLoadingReport && !mpSalaryReport" class="mp-empty">
+              <i class="fa fa-file-alt"></i>
+              <p>No report data available.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Document Verification Section -->
+    <div class="content-section" *ngIf="activeSection === 'document-verification'">
+      <app-document-verification></app-document-verification>
+    </div>
+
+    <!-- Employee-Salary Link Section -->
+    <div class="content-section" *ngIf="activeSection === 'employee-salary-link'">
+      <app-employee-salary-link></app-employee-salary-link>
+    </div>
+
+    <!-- ─── GOLD LOAN MANAGEMENT ──────────────────────── -->
+    <div class="content-section" *ngIf="activeSection === 'gold-loan-management'">
+      <div class="section-header">
+        <h2><i class="fa fa-gem"></i> Gold Loan Management</h2>
+        <button class="btn-refresh" (click)="loadMgrGoldLoans(); loadMgrGoldRate(); loadMgrGoldRateHistory()"><i class="fa fa-sync-alt"></i> Refresh</button>
+      </div>
+
+      <!-- Gold Rate Management Card -->
+      <div class="stats-grid" style="margin-bottom: 24px;">
+        <div class="stat-card">
+          <div class="stat-icon" style="background: linear-gradient(135deg, #ff8f00, #ffa726);"><i class="fa fa-coins"></i></div>
+          <div class="stat-info"><span class="stat-label">Current Gold Rate/gram</span><span class="stat-value">&#8377;{{ (mgrCurrentGoldRate?.ratePerGram || 0) | number:'1.2-2' }}</span></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon" style="background: linear-gradient(135deg, #1565c0, #42a5f5);"><i class="fa fa-clock"></i></div>
+          <div class="stat-info"><span class="stat-label">Last Updated</span><span class="stat-value" style="font-size: 14px;">{{ mgrCurrentGoldRate?.lastUpdated | date:'dd MMM yyyy, hh:mm a' }}</span></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon" style="background: linear-gradient(135deg, #2e7d32, #66bb6a);"><i class="fa fa-file-alt"></i></div>
+          <div class="stat-info"><span class="stat-label">Total Applications</span><span class="stat-value">{{ mgrGoldLoans.length }}</span></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon" style="background: linear-gradient(135deg, #e65100, #ff9800);"><i class="fa fa-hourglass-half"></i></div>
+          <div class="stat-info"><span class="stat-label">Pending Approvals</span><span class="stat-value">{{ getMgrPendingGoldLoansCount() }}</span></div>
+        </div>
+      </div>
+
+      <!-- Update Gold Rate -->
+      <div class="card" style="margin-bottom: 24px;">
+        <div class="card-header"><h3><i class="fa fa-edit"></i> Update Daily Gold Rate</h3></div>
+        <div class="card-body">
+          <div style="display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap;">
+            <div style="flex: 1; min-width: 200px;">
+              <label style="display: block; margin-bottom: 6px; font-weight: 500; color: #555;">New Rate per Gram (&#8377;)</label>
+              <input type="number" [(ngModel)]="mgrNewGoldRate" placeholder="Enter gold rate per gram" style="width: 100%; padding: 10px 14px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px;" min="1">
+            </div>
+            <button (click)="updateMgrGoldRate()" [disabled]="isUpdatingGoldRate || !mgrNewGoldRate" style="padding: 10px 24px; background: linear-gradient(135deg, #ff8f00, #ffa726); color: #fff; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; white-space: nowrap;">
+              <span *ngIf="!isUpdatingGoldRate"><i class="fa fa-save"></i> Update Rate</span>
+              <span *ngIf="isUpdatingGoldRate"><i class="fa fa-spinner fa-spin"></i> Updating...</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Gold Rate History -->
+      <div class="card" style="margin-bottom: 24px;">
+        <div class="card-header"><h3><i class="fa fa-history"></i> Gold Rate History</h3></div>
+        <div class="card-body">
+          <div *ngIf="isLoadingGoldRateHistory" style="text-align: center; padding: 20px;"><i class="fa fa-spinner fa-spin"></i> Loading history...</div>
+          <div *ngIf="!isLoadingGoldRateHistory && mgrGoldRateHistory.length === 0" style="text-align: center; padding: 20px; color: #999;">No rate history available.</div>
+          <table class="sal-table" *ngIf="!isLoadingGoldRateHistory && mgrGoldRateHistory.length > 0">
+            <thead>
+              <tr><th>Date</th><th>Rate/gram</th><th>Previous Rate</th><th>Change</th><th>Updated By</th></tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let rate of mgrGoldRateHistory | slice:0:15">
+                <td>{{ rate.changedAt | date:'dd MMM yyyy, hh:mm a' }}</td>
+                <td style="font-weight: 600;">&#8377;{{ (rate.ratePerGram || 0) | number:'1.2-2' }}</td>
+                <td>&#8377;{{ (rate.previousRate || 0) | number:'1.2-2' }}</td>
+                <td>
+                  <span *ngIf="rate.ratePerGram > rate.previousRate" style="color: #2e7d32; font-weight: 600;"><i class="fa fa-arrow-up"></i> +&#8377;{{ (rate.ratePerGram - rate.previousRate) | number:'1.2-2' }}</span>
+                  <span *ngIf="rate.ratePerGram < rate.previousRate" style="color: #c62828; font-weight: 600;"><i class="fa fa-arrow-down"></i> -&#8377;{{ (rate.previousRate - rate.ratePerGram) | number:'1.2-2' }}</span>
+                  <span *ngIf="rate.ratePerGram === rate.previousRate" style="color: #999;">No change</span>
+                </td>
+                <td>{{ rate.changedBy }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Gold Loan Applications -->
+      <div class="card">
+        <div class="card-header">
+          <h3><i class="fa fa-list"></i> Gold Loan Applications</h3>
+          <div style="display: flex; gap: 8px;">
+            <button *ngFor="let f of ['ALL','Pending','Approved','Rejected']" (click)="mgrGoldLoanFilter = f; filterMgrGoldLoans()"
+              [style.background]="mgrGoldLoanFilter === f ? '#1a237e' : '#f5f5f5'"
+              [style.color]="mgrGoldLoanFilter === f ? '#fff' : '#333'"
+              style="padding: 6px 16px; border: none; border-radius: 6px; cursor: pointer; font-weight: 500; font-size: 13px;">
+              {{ f }}
+            </button>
+          </div>
+        </div>
+        <div class="card-body">
+          <div *ngIf="isLoadingMgrGoldLoans" style="text-align: center; padding: 20px;"><i class="fa fa-spinner fa-spin"></i> Loading gold loans...</div>
+          <div *ngIf="!isLoadingMgrGoldLoans && mgrFilteredGoldLoans.length === 0" style="text-align: center; padding: 20px; color: #999;">No gold loan applications found.</div>
+          <table class="sal-table" *ngIf="!isLoadingMgrGoldLoans && mgrFilteredGoldLoans.length > 0">
+            <thead>
+              <tr><th>#</th><th>Date</th><th>Applicant</th><th>Account</th><th>Gold (g)</th><th>Gold Value</th><th>Loan Amount</th><th>Status</th><th>Actions</th></tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let loan of mgrFilteredGoldLoans; let i = index">
+                <td>{{ i + 1 }}</td>
+                <td>{{ loan.applicationDate | date:'dd MMM yyyy' }}</td>
+                <td>{{ loan.userName }}</td>
+                <td style="font-family: monospace; font-size: 12px;">{{ loan.accountNumber }}</td>
+                <td>{{ loan.goldGrams }}g</td>
+                <td>&#8377;{{ (loan.goldValue || 0) | number:'1.2-2' }}</td>
+                <td style="font-weight: 600; color: #1a237e;">&#8377;{{ (loan.loanAmount || 0) | number:'1.2-2' }}</td>
+                <td>
+                  <span style="padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600;"
+                    [style.background]="loan.status === 'Approved' ? '#e8f5e9' : loan.status === 'Rejected' ? '#ffebee' : '#fff3e0'"
+                    [style.color]="loan.status === 'Approved' ? '#2e7d32' : loan.status === 'Rejected' ? '#c62828' : '#e65100'">
+                    {{ loan.status }}
+                  </span>
+                </td>
+                <td style="display: flex; gap: 6px;">
+                  <button (click)="viewMgrGoldLoanDetails(loan)" style="padding: 4px 10px; border: 1px solid #ddd; border-radius: 6px; background: #f5f5f5; cursor: pointer; font-size: 12px;" title="View Details"><i class="fa fa-eye"></i></button>
+                  <button *ngIf="loan.status === 'Pending'" (click)="viewMgrGoldLoanDetails(loan)" style="padding: 4px 10px; border: none; border-radius: 6px; background: #2e7d32; color: #fff; cursor: pointer; font-size: 12px;" title="Review & Approve"><i class="fa fa-check"></i></button>
+                  <button (click)="printMgrGoldLoanReceipt(loan)" style="padding: 4px 10px; border: 1px solid #ddd; border-radius: 6px; background: #f5f5f5; cursor: pointer; font-size: 12px;" title="Print Receipt"><i class="fa fa-print"></i></button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Gold Loan Detail/Approval Modal -->
+      <div *ngIf="mgrSelectedGoldLoan" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000;" (click)="closeMgrGoldLoanDetails()">
+        <div (click)="$event.stopPropagation()" style="background: #fff; border-radius: 16px; width: 90%; max-width: 800px; max-height: 85vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 20px 24px; border-bottom: 1px solid #eee;">
+            <h3 style="margin: 0; color: #1a237e;"><i class="fa fa-gem"></i> Gold Loan Details</h3>
+            <button (click)="closeMgrGoldLoanDetails()" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #666;">&times;</button>
+          </div>
+          <div style="padding: 24px;">
+            <!-- Loan Info Grid -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 24px;">
+              <div style="padding: 12px; background: #f5f5f5; border-radius: 8px;"><span style="color: #666; font-size: 12px;">Loan Account</span><br><strong>{{ mgrSelectedGoldLoan.loanAccountNumber || 'Pending' }}</strong></div>
+              <div style="padding: 12px; background: #f5f5f5; border-radius: 8px;"><span style="color: #666; font-size: 12px;">Status</span><br>
+                <span style="padding: 2px 10px; border-radius: 10px; font-size: 12px; font-weight: 600;" [style.background]="mgrSelectedGoldLoan.status === 'Approved' ? '#e8f5e9' : mgrSelectedGoldLoan.status === 'Rejected' ? '#ffebee' : '#fff3e0'" [style.color]="mgrSelectedGoldLoan.status === 'Approved' ? '#2e7d32' : mgrSelectedGoldLoan.status === 'Rejected' ? '#c62828' : '#e65100'">{{ mgrSelectedGoldLoan.status }}</span>
+              </div>
+              <div style="padding: 12px; background: #f5f5f5; border-radius: 8px;"><span style="color: #666; font-size: 12px;">Application Date</span><br><strong>{{ mgrSelectedGoldLoan.applicationDate | date:'dd MMM yyyy' }}</strong></div>
+              <div style="padding: 12px; background: #f5f5f5; border-radius: 8px;"><span style="color: #666; font-size: 12px;">Applicant</span><br><strong>{{ mgrSelectedGoldLoan.userName }}</strong></div>
+              <div style="padding: 12px; background: #f5f5f5; border-radius: 8px;"><span style="color: #666; font-size: 12px;">Account</span><br><strong style="font-family: monospace;">{{ mgrSelectedGoldLoan.accountNumber }}</strong></div>
+              <div style="padding: 12px; background: #f5f5f5; border-radius: 8px;"><span style="color: #666; font-size: 12px;">Email</span><br><strong>{{ mgrSelectedGoldLoan.userEmail || 'N/A' }}</strong></div>
+              <div style="padding: 12px; background: #fff8e1; border-radius: 8px; border: 1px solid #ffe082;"><span style="color: #666; font-size: 12px;">Gold Weight</span><br><strong>{{ mgrSelectedGoldLoan.goldGrams }} grams</strong></div>
+              <div style="padding: 12px; background: #fff8e1; border-radius: 8px; border: 1px solid #ffe082;"><span style="color: #666; font-size: 12px;">Gold Rate/gram</span><br><strong>&#8377;{{ (mgrSelectedGoldLoan.goldRatePerGram || 0) | number:'1.2-2' }}</strong></div>
+              <div style="padding: 12px; background: #fff8e1; border-radius: 8px; border: 1px solid #ffe082;"><span style="color: #666; font-size: 12px;">Gold Value</span><br><strong>&#8377;{{ (mgrSelectedGoldLoan.goldValue || 0) | number:'1.2-2' }}</strong></div>
+              <div style="padding: 12px; background: #e8f5e9; border-radius: 8px; border: 1px solid #a5d6a7; grid-column: span 2;"><span style="color: #666; font-size: 12px;">Loan Amount (75%)</span><br><strong style="font-size: 20px; color: #2e7d32;">&#8377;{{ (mgrSelectedGoldLoan.loanAmount || 0) | number:'1.2-2' }}</strong></div>
+              <div style="padding: 12px; background: #f5f5f5; border-radius: 8px;"><span style="color: #666; font-size: 12px;">Tenure</span><br><strong>{{ mgrSelectedGoldLoan.tenure || 12 }} months</strong></div>
+            </div>
+
+            <!-- Gold Verification Form (for Pending loans) -->
+            <div *ngIf="mgrSelectedGoldLoan.status === 'Pending'" style="background: #fafafa; border: 1px solid #e0e0e0; border-radius: 12px; padding: 20px; margin-bottom: 20px;">
+              <h4 style="margin: 0 0 16px; color: #1a237e;"><i class="fa fa-search"></i> Gold Verification</h4>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                <div>
+                  <label style="display: block; font-size: 13px; color: #555; margin-bottom: 4px;">Gold Items Description</label>
+                  <input type="text" [(ngModel)]="mgrGoldVerification.goldItems" placeholder="e.g., 2 bangles, 1 chain" style="width: 100%; padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px;">
+                </div>
+                <div>
+                  <label style="display: block; font-size: 13px; color: #555; margin-bottom: 4px;">Gold Purity</label>
+                  <select [(ngModel)]="mgrGoldVerification.goldPurity" style="width: 100%; padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px;">
+                    <option value="24K">24K (99.9%)</option>
+                    <option value="22K">22K (91.6%)</option>
+                    <option value="18K">18K (75%)</option>
+                    <option value="14K">14K (58.5%)</option>
+                  </select>
+                </div>
+                <div>
+                  <label style="display: block; font-size: 13px; color: #555; margin-bottom: 4px;">Verified Gold Weight (grams)</label>
+                  <input type="number" [(ngModel)]="mgrGoldVerification.verifiedGoldGrams" placeholder="Verified weight" style="width: 100%; padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px;" step="0.1" min="0.1">
+                </div>
+                <div>
+                  <label style="display: block; font-size: 13px; color: #555; margin-bottom: 4px;">Storage Location</label>
+                  <input type="text" [(ngModel)]="mgrGoldVerification.storageLocation" placeholder="e.g., Vault A-12" style="width: 100%; padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px;">
+                </div>
+                <div style="grid-column: span 2;">
+                  <label style="display: block; font-size: 13px; color: #555; margin-bottom: 4px;">Verification Notes</label>
+                  <input type="text" [(ngModel)]="mgrGoldVerification.verificationNotes" placeholder="Any notes about verification" style="width: 100%; padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px;">
+                </div>
+              </div>
+              <div style="display: flex; gap: 10px; margin-top: 16px;">
+                <button (click)="approveMgrGoldLoan(mgrSelectedGoldLoan)" style="padding: 10px 24px; background: #2e7d32; color: #fff; border: none; border-radius: 8px; font-weight: 600; cursor: pointer;"><i class="fa fa-check"></i> Approve Loan</button>
+                <button (click)="rejectMgrGoldLoan(mgrSelectedGoldLoan)" style="padding: 10px 24px; background: #c62828; color: #fff; border: none; border-radius: 8px; font-weight: 600; cursor: pointer;"><i class="fa fa-times"></i> Reject Loan</button>
+              </div>
+            </div>
+
+            <!-- Approved Loan Details -->
+            <div *ngIf="mgrSelectedGoldLoan.status === 'Approved'" style="margin-bottom: 20px;">
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                <div *ngIf="mgrSelectedGoldLoan.approvedBy" style="padding: 10px; background: #f5f5f5; border-radius: 8px;"><span style="color: #666; font-size: 12px;">Approved By</span><br><strong>{{ mgrSelectedGoldLoan.approvedBy }}</strong></div>
+                <div *ngIf="mgrSelectedGoldLoan.approvalDate" style="padding: 10px; background: #f5f5f5; border-radius: 8px;"><span style="color: #666; font-size: 12px;">Approval Date</span><br><strong>{{ mgrSelectedGoldLoan.approvalDate | date:'dd MMM yyyy' }}</strong></div>
+                <div *ngIf="mgrSelectedGoldLoan.goldPurity" style="padding: 10px; background: #f5f5f5; border-radius: 8px;"><span style="color: #666; font-size: 12px;">Gold Purity</span><br><strong>{{ mgrSelectedGoldLoan.goldPurity }}</strong></div>
+                <div *ngIf="mgrSelectedGoldLoan.verifiedGoldGrams" style="padding: 10px; background: #f5f5f5; border-radius: 8px;"><span style="color: #666; font-size: 12px;">Verified Weight</span><br><strong>{{ mgrSelectedGoldLoan.verifiedGoldGrams }} grams</strong></div>
+                <div *ngIf="mgrSelectedGoldLoan.storageLocation" style="padding: 10px; background: #f5f5f5; border-radius: 8px;"><span style="color: #666; font-size: 12px;">Storage</span><br><strong>{{ mgrSelectedGoldLoan.storageLocation }}</strong></div>
+                <div *ngIf="mgrSelectedGoldLoan.goldItems" style="padding: 10px; background: #f5f5f5; border-radius: 8px;"><span style="color: #666; font-size: 12px;">Gold Items</span><br><strong>{{ mgrSelectedGoldLoan.goldItems }}</strong></div>
+              </div>
+            </div>
+
+            <!-- EMI Schedule -->
+            <div *ngIf="mgrGoldLoanEmiSchedule.length > 0" style="margin-top: 16px;">
+              <h4 style="margin-bottom: 10px; color: #1a237e;"><i class="fa fa-calendar-alt"></i> EMI Schedule</h4>
+              <table class="sal-table">
+                <thead><tr><th>EMI #</th><th>Due Date</th><th>Principal</th><th>Interest</th><th>Total</th><th>Status</th></tr></thead>
+                <tbody>
+                  <tr *ngFor="let emi of mgrGoldLoanEmiSchedule">
+                    <td>{{ emi.emiNumber }}</td>
+                    <td>{{ emi.dueDate | date:'dd MMM yyyy' }}</td>
+                    <td>&#8377;{{ (emi.principalAmount||0) | number:'1.2-2' }}</td>
+                    <td>&#8377;{{ (emi.interestAmount||0) | number:'1.2-2' }}</td>
+                    <td style="font-weight: 600;">&#8377;{{ (emi.totalAmount||0) | number:'1.2-2' }}</td>
+                    <td><span style="padding: 2px 10px; border-radius: 10px; font-size: 12px; font-weight: 600;" [style.background]="emi.status === 'Paid' ? '#e8f5e9' : '#fff3e0'" [style.color]="emi.status === 'Paid' ? '#2e7d32' : '#e65100'">{{ emi.status }}</span></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div *ngIf="isLoadingMgrEmi" style="text-align: center; padding: 16px;"><i class="fa fa-spinner fa-spin"></i> Loading EMI schedule...</div>
+          </div>
+          <div style="display: flex; gap: 8px; justify-content: flex-end; padding: 16px 24px; border-top: 1px solid #eee;">
+            <button (click)="printMgrGoldLoanReceipt(mgrSelectedGoldLoan)" style="padding: 8px 16px; border: 1px solid #ddd; border-radius: 6px; background: #f5f5f5; cursor: pointer;"><i class="fa fa-print"></i> Print Receipt</button>
+            <button (click)="closeMgrGoldLoanDetails()" style="padding: 8px 16px; border: 1px solid #ddd; border-radius: 6px; background: #f5f5f5; cursor: pointer;">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── TIME TRACKING & MANAGEMENT ──────────────────────── -->
+    <div class="content-section" *ngIf="activeSection === 'time-tracking'">
+      <app-time-tracking></app-time-tracking>
+    </div>
+
+    <!-- ─── CUSTOMER DATA UPLOAD (EXCEL) ──────────────────────── -->
+    <div class="content-section" *ngIf="activeSection === 'customer-data-upload'">
+      <div class="section-header">
+        <h2><i class="fa fa-file-excel"></i> Customer Data Upload</h2>
+        <p>Upload Excel sheets with customer data. Admins can auto-fill Open Account forms using Aadhaar/PAN lookup.</p>
+      </div>
+
+      <!-- Stats Cards -->
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 24px;">
+        <div style="background: linear-gradient(135deg, #667eea, #764ba2); color: white; padding: 20px; border-radius: 12px; text-align: center;">
+          <div style="font-size: 2rem; font-weight: 700;">{{ customerDataStats.total || 0 }}</div>
+          <div style="font-size: 0.85rem; opacity: 0.9;">Total Records</div>
+        </div>
+        <div style="background: linear-gradient(135deg, #11998e, #38ef7d); color: white; padding: 20px; border-radius: 12px; text-align: center;">
+          <div style="font-size: 2rem; font-weight: 700;">{{ customerDataStats.unused || 0 }}</div>
+          <div style="font-size: 0.85rem; opacity: 0.9;">Available (Unused)</div>
+        </div>
+        <div style="background: linear-gradient(135deg, #fc5c7d, #6a82fb); color: white; padding: 20px; border-radius: 12px; text-align: center;">
+          <div style="font-size: 2rem; font-weight: 700;">{{ customerDataStats.used || 0 }}</div>
+          <div style="font-size: 0.85rem; opacity: 0.9;">Used Records</div>
+        </div>
+      </div>
+
+      <!-- Upload Section -->
+      <div class="card" style="margin-bottom: 24px;">
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+          <h3><i class="fa fa-upload"></i> Upload Customer Excel</h3>
+          <div style="display: flex; gap: 6px;">
+            <button (click)="downloadCustomerTemplate('Savings')" style="padding: 7px 14px; background: #dbeafe; color: #1e40af; border: 1px solid #93c5fd; border-radius: 8px; cursor: pointer; font-size: 0.8rem; font-weight: 600;">
+              <i class="fa fa-download"></i> Savings Template
+            </button>
+            <button (click)="downloadCustomerTemplate('Current')" style="padding: 7px 14px; background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; border-radius: 8px; cursor: pointer; font-size: 0.8rem; font-weight: 600;">
+              <i class="fa fa-download"></i> Current Template
+            </button>
+            <button (click)="downloadCustomerTemplate('Salary')" style="padding: 7px 14px; background: #d1fae5; color: #065f46; border: 1px solid #6ee7b7; border-radius: 8px; cursor: pointer; font-size: 0.8rem; font-weight: 600;">
+              <i class="fa fa-download"></i> Salary Template
+            </button>
+          </div>
+        </div>
+        <div class="card-body" style="padding: 20px;">
+          <div style="display: flex; gap: 12px; align-items: center; margin-bottom: 16px;">
+            <input type="file" accept=".xlsx,.xls" (change)="onCustomerDataFileSelect($event)"
+              style="padding: 10px; border: 2px dashed #d1d5db; border-radius: 8px; flex: 1; cursor: pointer;">
+            <button (click)="uploadCustomerDataExcel()" [disabled]="!customerDataFile || isUploadingCustomerData"
+              style="padding: 10px 24px; background: #1e40af; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 0.9rem; white-space: nowrap;"
+              [style.opacity]="!customerDataFile || isUploadingCustomerData ? '0.5' : '1'">
+              <i class="fa" [ngClass]="isUploadingCustomerData ? 'fa-spinner fa-spin' : 'fa-cloud-upload-alt'"></i>
+              {{ isUploadingCustomerData ? 'Uploading...' : 'Upload Excel' }}
+            </button>
+          </div>
+          <div style="font-size: 0.8rem; color: #6b7280;">
+            <i class="fa fa-info-circle"></i>
+            Supported format: .xlsx / .xls. First row must be headers. Required column: <strong>aadhar_number</strong>. 
+            Other columns: pan_number, account_type, full_name, date_of_birth, age, gender, occupation, income, phone, email, address, city, state, pincode, etc.
+          </div>
+
+          <!-- Upload Result -->
+          <div *ngIf="customerDataUploadResult" style="margin-top: 16px; padding: 16px; border-radius: 8px;"
+            [style.background]="customerDataUploadResult.success ? '#ecfdf5' : '#fef2f2'"
+            [style.border]="customerDataUploadResult.success ? '1px solid #a7f3d0' : '1px solid #fecaca'">
+            <div style="font-weight: 600; margin-bottom: 8px;">
+              <i class="fa" [ngClass]="customerDataUploadResult.success ? 'fa-check-circle' : 'fa-exclamation-circle'"
+                [style.color]="customerDataUploadResult.success ? '#059669' : '#dc2626'"></i>
+              {{ customerDataUploadResult.message }}
+            </div>
+            <div *ngIf="customerDataUploadResult.success" style="font-size: 0.85rem; color: #374151;">
+              Batch: <strong>{{ customerDataUploadResult.batchId }}</strong> |
+              Saved: <strong>{{ customerDataUploadResult.savedCount }}</strong> |
+              Skipped: <strong>{{ customerDataUploadResult.skippedCount }}</strong> |
+              Total rows: <strong>{{ customerDataUploadResult.totalRows }}</strong>
+            </div>
+            <div *ngIf="customerDataUploadResult.errors?.length" style="margin-top: 8px; font-size: 0.8rem; color: #991b1b;">
+              <div *ngFor="let err of customerDataUploadResult.errors">{{ err }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Uploaded Records Table -->
+      <div class="card">
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+          <h3><i class="fa fa-database"></i> Uploaded Customer Data</h3>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <input type="text" [(ngModel)]="customerDataSearchQuery" placeholder="Search by Aadhaar, PAN, Name..."
+              style="padding: 8px 14px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 0.85rem; min-width: 200px;">
+            <button *ngFor="let mode of ['all', 'unused']" (click)="customerDataViewMode = mode; loadUploadedCustomerData()"
+              [style.background]="customerDataViewMode === mode ? '#1e40af' : '#f5f5f5'"
+              [style.color]="customerDataViewMode === mode ? '#fff' : '#333'"
+              style="padding: 6px 16px; border: none; border-radius: 6px; cursor: pointer; font-weight: 500; font-size: 0.85rem; text-transform: capitalize;">
+              {{ mode }}
+            </button>
+            <button (click)="loadUploadedCustomerData(); loadCustomerDataStats()" style="padding: 6px 12px; background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; border-radius: 6px; cursor: pointer;">
+              <i class="fa fa-sync"></i>
+            </button>
+            <button (click)="deleteAllCustomerData()" [disabled]="isLoadingCustomerData || (customerDataStats.total || 0) === 0"
+              style="padding: 6px 14px; background: #dc2626; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.82rem;"
+              [style.opacity]="isLoadingCustomerData || (customerDataStats.total || 0) === 0 ? '0.4' : '1'">
+              <i class="fa fa-trash-alt"></i> Delete All Data
+            </button>
+          </div>
+        </div>
+        <!-- Template Downloads -->
+        <div style="padding: 12px 20px; background: #f8fafc; border-top: 1px solid #e5e7eb; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+          <span style="font-size: 0.82rem; color: #6b7280; font-weight: 600;"><i class="fa fa-download"></i> Download Templates:</span>
+          <button (click)="downloadCustomerTemplate('Savings')" style="padding: 6px 14px; background: #dbeafe; color: #1e40af; border: 1px solid #93c5fd; border-radius: 6px; cursor: pointer; font-size: 0.8rem; font-weight: 600;">
+            <i class="fa fa-piggy-bank"></i> Savings
+          </button>
+          <button (click)="downloadCustomerTemplate('Current')" style="padding: 6px 14px; background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; border-radius: 6px; cursor: pointer; font-size: 0.8rem; font-weight: 600;">
+            <i class="fa fa-building"></i> Current
+          </button>
+          <button (click)="downloadCustomerTemplate('Salary')" style="padding: 6px 14px; background: #d1fae5; color: #065f46; border: 1px solid #6ee7b7; border-radius: 6px; cursor: pointer; font-size: 0.8rem; font-weight: 600;">
+            <i class="fa fa-money-check-alt"></i> Salary
+          </button>
+        </div>
+        <div class="card-body" style="padding: 0; overflow-x: auto;">
+          <div *ngIf="isLoadingCustomerData" style="text-align: center; padding: 30px;">
+            <i class="fa fa-spinner fa-spin"></i> Loading customer data...
+          </div>
+          <div *ngIf="!isLoadingCustomerData && getFilteredCustomerData().length === 0" style="text-align: center; padding: 30px; color: #9ca3af;">
+            No customer data found. Upload an Excel sheet to get started.
+          </div>
+          <table class="sal-table" *ngIf="!isLoadingCustomerData && getFilteredCustomerData().length > 0" style="width: 100%; font-size: 0.83rem;">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Aadhaar</th>
+                <th>PAN</th>
+                <th>Name</th>
+                <th>Type</th>
+                <th>Phone</th>
+                <th>City</th>
+                <th>Status</th>
+                <th>Batch</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let record of getFilteredCustomerData(); let i = index">
+                <td>{{ i + 1 }}</td>
+                <td style="font-family: monospace;">{{ record.aadharNumber }}</td>
+                <td style="font-family: monospace;">{{ record.panNumber }}</td>
+                <td>{{ record.fullName }}</td>
+                <td><span style="padding: 2px 8px; border-radius: 4px; font-size: 0.78rem; font-weight: 600;"
+                  [style.background]="record.accountType === 'Savings' ? '#dbeafe' : record.accountType === 'Current' ? '#fef3c7' : '#d1fae5'"
+                  [style.color]="record.accountType === 'Savings' ? '#1e40af' : record.accountType === 'Current' ? '#92400e' : '#065f46'">
+                  {{ record.accountType }}</span></td>
+                <td>{{ record.phone }}</td>
+                <td>{{ record.city }}</td>
+                <td>
+                  <span *ngIf="!record.used" style="color: #059669; font-weight: 600;"><i class="fa fa-check-circle"></i> Available</span>
+                  <span *ngIf="record.used" style="color: #9ca3af; font-weight: 500;"><i class="fa fa-times-circle"></i> Used</span>
+                </td>
+                <td style="font-size: 0.75rem; color: #6b7280;">{{ record.uploadBatchId }}</td>
+                <td>
+                  <button *ngIf="!record.used" (click)="deleteCustomerDataRecord(record.id)" title="Delete"
+                    style="padding: 4px 10px; background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; border-radius: 6px; cursor: pointer; font-size: 0.8rem;">
+                    <i class="fa fa-trash"></i>
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── CIBIL REPORTS UPLOAD ──────────────────────────────── -->
+    <div class="content-section" *ngIf="activeSection === 'cibil-reports'">
+      <div class="section-header">
+        <h2><i class="fa fa-chart-bar"></i> CIBIL Reports Upload</h2>
+        <p>Upload bulk CIBIL credit reports via Excel, PDF, or Image. ML-based analysis auto-evaluates eligibility and risk.</p>
+      </div>
+
+      <!-- Stats Cards -->
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; margin-bottom: 24px;">
+        <div style="background: linear-gradient(135deg, #667eea, #764ba2); color: white; padding: 20px; border-radius: 12px; text-align: center;">
+          <div style="font-size: 2rem; font-weight: 700;">{{ cibilStats.total || 0 }}</div>
+          <div style="font-size: 0.85rem; opacity: 0.9;">Total Reports</div>
+        </div>
+        <div style="background: linear-gradient(135deg, #11998e, #38ef7d); color: white; padding: 20px; border-radius: 12px; text-align: center;">
+          <div style="font-size: 2rem; font-weight: 700;">{{ cibilStats.approved || 0 }}</div>
+          <div style="font-size: 0.85rem; opacity: 0.9;">Approved</div>
+        </div>
+        <div style="background: linear-gradient(135deg, #fc5c7d, #6a82fb); color: white; padding: 20px; border-radius: 12px; text-align: center;">
+          <div style="font-size: 2rem; font-weight: 700;">{{ cibilStats.rejected || 0 }}</div>
+          <div style="font-size: 0.85rem; opacity: 0.9;">Rejected</div>
+        </div>
+        <div style="background: linear-gradient(135deg, #f093fb, #f5576c); color: white; padding: 20px; border-radius: 12px; text-align: center;">
+          <div style="font-size: 2rem; font-weight: 700;">{{ cibilStats.notEligible || 0 }}</div>
+          <div style="font-size: 0.85rem; opacity: 0.9;">Not Eligible</div>
+        </div>
+        <div style="background: linear-gradient(135deg, #ffecd2, #fcb69f); color: #92400e; padding: 20px; border-radius: 12px; text-align: center;">
+          <div style="font-size: 2rem; font-weight: 700;">{{ cibilStats.pending || 0 }}</div>
+          <div style="font-size: 0.85rem; opacity: 0.9;">Pending</div>
+        </div>
+      </div>
+
+      <!-- Upload Section -->
+      <div class="card" style="margin-bottom: 24px;">
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+          <h3><i class="fa fa-upload"></i> Upload CIBIL Report</h3>
+          <button (click)="downloadCibilTemplate()" style="padding: 7px 14px; background: #dbeafe; color: #1e40af; border: 1px solid #93c5fd; border-radius: 8px; cursor: pointer; font-size: 0.8rem; font-weight: 600;">
+            <i class="fa fa-download"></i> Download Excel Template
+          </button>
+        </div>
+        <div class="card-body" style="padding: 20px;">
+          <!-- Upload Type Selector -->
+          <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+            <button *ngFor="let type of ['excel', 'pdf', 'image']" (click)="cibilUploadType = type; cibilFile = null; cibilUploadResult = null;"
+              [style.background]="cibilUploadType === type ? '#1e40af' : '#f3f4f6'"
+              [style.color]="cibilUploadType === type ? '#fff' : '#374151'"
+              style="padding: 8px 20px; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 0.9rem; text-transform: uppercase;">
+              <i class="fa" [ngClass]="type === 'excel' ? 'fa-file-excel' : type === 'pdf' ? 'fa-file-pdf' : 'fa-image'"></i>
+              {{ type }}
+            </button>
+          </div>
+
+          <!-- File Input -->
+          <div style="display: flex; gap: 12px; align-items: center; margin-bottom: 16px;">
+            <input type="file"
+              [accept]="cibilUploadType === 'excel' ? '.xlsx,.xls' : cibilUploadType === 'pdf' ? '.pdf' : 'image/*'"
+              (change)="onCibilFileSelect($event)"
+              style="padding: 10px; border: 2px dashed #d1d5db; border-radius: 8px; flex: 1; cursor: pointer;">
+            <button (click)="uploadCibilReport()" [disabled]="!cibilFile || isUploadingCibil || (cibilUploadType === 'image' && !cibilImagePan)"
+              style="padding: 10px 24px; background: #1e40af; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 0.9rem; white-space: nowrap;"
+              [style.opacity]="!cibilFile || isUploadingCibil ? '0.5' : '1'">
+              <i class="fa" [ngClass]="isUploadingCibil ? 'fa-spinner fa-spin' : 'fa-cloud-upload-alt'"></i>
+              {{ isUploadingCibil ? 'Uploading...' : 'Upload' }}
+            </button>
+          </div>
+
+          <!-- Image Upload: Manual Data Fields -->
+          <div *ngIf="cibilUploadType === 'image'" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+            <h4 style="margin: 0 0 12px 0; font-size: 0.9rem; color: #475569;"><i class="fa fa-keyboard"></i> Enter CIBIL Details (with image)</h4>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
+              <div>
+                <label style="font-size: 0.8rem; font-weight: 600; color: #374151;">PAN Number *</label>
+                <input type="text" [(ngModel)]="cibilImagePan" placeholder="ABCDE1234F" maxlength="10"
+                  style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.85rem; text-transform: uppercase;"
+                  (input)="cibilImagePan = cibilImagePan.toUpperCase()">
+              </div>
+              <div>
+                <label style="font-size: 0.8rem; font-weight: 600; color: #374151;">Name</label>
+                <input type="text" [(ngModel)]="cibilImageName" placeholder="Full Name"
+                  style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.85rem;">
+              </div>
+              <div>
+                <label style="font-size: 0.8rem; font-weight: 600; color: #374151;">Salary</label>
+                <input type="number" [(ngModel)]="cibilImageSalary" placeholder="Monthly salary"
+                  style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.85rem;">
+              </div>
+              <div>
+                <label style="font-size: 0.8rem; font-weight: 600; color: #374151;">CIBIL Score</label>
+                <input type="number" [(ngModel)]="cibilImageScore" placeholder="300-900"
+                  style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.85rem;">
+              </div>
+              <div>
+                <label style="font-size: 0.8rem; font-weight: 600; color: #374151;">Approval Limit</label>
+                <input type="number" [(ngModel)]="cibilImageLimit" placeholder="Credit limit"
+                  style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.85rem;">
+              </div>
+              <div>
+                <label style="font-size: 0.8rem; font-weight: 600; color: #374151;">Status</label>
+                <select [(ngModel)]="cibilImageStatus"
+                  style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.85rem;">
+                  <option value="">Auto-detect</option>
+                  <option value="APPROVED">Approved</option>
+                  <option value="REJECTED">Rejected</option>
+                  <option value="NOT_ELIGIBLE">Not Eligible</option>
+                  <option value="PENDING">Pending</option>
+                </select>
+              </div>
+              <div style="grid-column: 1 / -1;">
+                <label style="font-size: 0.8rem; font-weight: 600; color: #374151;">Remarks</label>
+                <input type="text" [(ngModel)]="cibilImageRemarks" placeholder="Optional remarks"
+                  style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.85rem;">
+              </div>
+            </div>
+          </div>
+
+          <div style="font-size: 0.8rem; color: #6b7280;">
+            <i class="fa fa-info-circle"></i>
+            <span *ngIf="cibilUploadType === 'excel'">Excel columns: <strong>PAN Number, Name, Salary, CIBIL Score, Approval Limit, Status, Remarks</strong>. Download template for exact format.</span>
+            <span *ngIf="cibilUploadType === 'pdf'">PDF must contain PAN numbers and credit data. System extracts records automatically.</span>
+            <span *ngIf="cibilUploadType === 'image'">Upload CIBIL report image and enter details manually. PAN Number is required.</span>
+          </div>
+
+          <!-- Upload Result -->
+          <div *ngIf="cibilUploadResult" style="margin-top: 16px; padding: 16px; border-radius: 8px;"
+            [style.background]="cibilUploadResult.success ? '#ecfdf5' : '#fef2f2'"
+            [style.border]="cibilUploadResult.success ? '1px solid #a7f3d0' : '1px solid #fecaca'">
+            <div style="font-weight: 600; margin-bottom: 8px;">
+              <i class="fa" [ngClass]="cibilUploadResult.success ? 'fa-check-circle' : 'fa-exclamation-circle'"
+                [style.color]="cibilUploadResult.success ? '#059669' : '#dc2626'"></i>
+              {{ cibilUploadResult.success ? 'Upload Successful' : 'Upload Failed' }}
+            </div>
+            <div *ngIf="cibilUploadResult.success" style="font-size: 0.85rem; color: #374151;">
+              Batch: <strong>{{ cibilUploadResult.batchId }}</strong> |
+              Saved: <strong>{{ cibilUploadResult.savedCount }}</strong>
+              <span *ngIf="cibilUploadResult.skippedCount"> | Skipped: <strong>{{ cibilUploadResult.skippedCount }}</strong></span>
+            </div>
+            <div *ngIf="!cibilUploadResult.success" style="font-size: 0.85rem; color: #991b1b;">
+              {{ cibilUploadResult.error }}
+            </div>
+            <div *ngIf="cibilUploadResult.errors?.length" style="margin-top: 8px; font-size: 0.8rem; color: #991b1b;">
+              <div *ngFor="let err of cibilUploadResult.errors">{{ err }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CIBIL Reports Table -->
+      <div class="card">
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+          <h3><i class="fa fa-database"></i> CIBIL Reports ({{ getFilteredCibilReports().length }})</h3>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <input type="text" [(ngModel)]="cibilSearchQuery" placeholder="Search PAN, Name..."
+              style="padding: 8px 14px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 0.85rem; min-width: 180px;">
+            <select [(ngModel)]="cibilStatusFilter"
+              style="padding: 8px 14px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 0.85rem;">
+              <option value="ALL">All Status</option>
+              <option value="APPROVED">Approved</option>
+              <option value="REJECTED">Rejected</option>
+              <option value="NOT_ELIGIBLE">Not Eligible</option>
+              <option value="PENDING">Pending</option>
+            </select>
+            <button (click)="loadCibilReports(); loadCibilStats()" style="padding: 6px 12px; background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; border-radius: 6px; cursor: pointer;">
+              <i class="fa fa-sync"></i>
+            </button>
+          </div>
+        </div>
+        <div class="card-body" style="padding: 0; overflow-x: auto;">
+          <div *ngIf="isLoadingCibil" style="text-align: center; padding: 30px;">
+            <i class="fa fa-spinner fa-spin"></i> Loading CIBIL reports...
+          </div>
+          <div *ngIf="!isLoadingCibil && getFilteredCibilReports().length === 0" style="text-align: center; padding: 30px; color: #9ca3af;">
+            <i class="fa fa-chart-bar" style="font-size: 2rem; margin-bottom: 8px;"></i>
+            <p>No CIBIL reports found. Upload an Excel/PDF/Image to get started.</p>
+          </div>
+          <table class="sal-table" *ngIf="!isLoadingCibil && getFilteredCibilReports().length > 0" style="width: 100%; font-size: 0.83rem;">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>PAN Number</th>
+                <th>Name</th>
+                <th>Salary</th>
+                <th>CIBIL Score</th>
+                <th>Approval Limit</th>
+                <th>Status</th>
+                <th>Risk</th>
+                <th>Recommended Limit</th>
+                <th>Accounts</th>
+                <th>Upload Type</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let report of getFilteredCibilReports(); let i = index">
+                <td>{{ i + 1 }}</td>
+                <td style="font-family: monospace; font-weight: 600;">{{ report.panNumber }}</td>
+                <td>{{ report.name }}</td>
+                <td>{{ report.salary ? '₹' + (report.salary | number:'1.0-0') : '-' }}</td>
+                <td>
+                  <span style="padding: 2px 10px; border-radius: 12px; font-weight: 700; font-size: 0.85rem;"
+                    [style.background]="(report.cibilScore || 0) >= 750 ? '#dcfce7' : (report.cibilScore || 0) >= 700 ? '#fef9c3' : (report.cibilScore || 0) >= 650 ? '#ffedd5' : '#fef2f2'"
+                    [style.color]="(report.cibilScore || 0) >= 750 ? '#166534' : (report.cibilScore || 0) >= 700 ? '#854d0e' : (report.cibilScore || 0) >= 650 ? '#9a3412' : '#991b1b'">
+                    {{ report.cibilScore || 'N/A' }}
+                  </span>
+                </td>
+                <td>{{ report.approvalLimit ? '₹' + (report.approvalLimit | number:'1.0-0') : '-' }}</td>
+                <td>
+                  <span style="padding: 3px 10px; border-radius: 12px; font-weight: 600; font-size: 0.78rem;"
+                    [style.background]="report.status === 'APPROVED' ? '#dcfce7' : report.status === 'REJECTED' ? '#fef2f2' : report.status === 'NOT_ELIGIBLE' ? '#fef3c7' : '#f3f4f6'"
+                    [style.color]="report.status === 'APPROVED' ? '#166534' : report.status === 'REJECTED' ? '#991b1b' : report.status === 'NOT_ELIGIBLE' ? '#92400e' : '#6b7280'">
+                    {{ report.status === 'NOT_ELIGIBLE' ? 'NOT ELIGIBLE' : report.status }}
+                  </span>
+                </td>
+                <td>
+                  <span style="padding: 2px 8px; border-radius: 10px; font-size: 0.75rem; font-weight: 600;"
+                    [style.background]="report.riskCategory === 'LOW' ? '#dcfce7' : report.riskCategory === 'MEDIUM' ? '#fef9c3' : report.riskCategory === 'HIGH' ? '#ffedd5' : '#fef2f2'"
+                    [style.color]="report.riskCategory === 'LOW' ? '#166534' : report.riskCategory === 'MEDIUM' ? '#854d0e' : report.riskCategory === 'HIGH' ? '#9a3412' : '#991b1b'">
+                    {{ report.riskCategory || '-' }}
+                  </span>
+                </td>
+                <td>{{ report.recommendedLimit ? '₹' + (report.recommendedLimit | number:'1.0-0') : '-' }}</td>
+                <td>
+                  <div style="display: flex; gap: 4px; flex-wrap: wrap;">
+                    <span *ngIf="report.savingsAccountNumber" style="padding: 1px 6px; background: #dbeafe; color: #1e40af; border-radius: 4px; font-size: 0.7rem;" title="Savings">S</span>
+                    <span *ngIf="report.salaryAccountNumber" style="padding: 1px 6px; background: #d1fae5; color: #065f46; border-radius: 4px; font-size: 0.7rem;" title="Salary">SA</span>
+                    <span *ngIf="report.currentAccountNumber" style="padding: 1px 6px; background: #fef3c7; color: #92400e; border-radius: 4px; font-size: 0.7rem;" title="Current">C</span>
+                    <span *ngIf="!report.savingsAccountNumber && !report.salaryAccountNumber && !report.currentAccountNumber" style="color: #9ca3af; font-size: 0.75rem;">None</span>
+                  </div>
+                </td>
+                <td>
+                  <span style="padding: 2px 8px; border-radius: 6px; font-size: 0.75rem; font-weight: 500;"
+                    [style.background]="report.uploadType === 'EXCEL' ? '#dbeafe' : report.uploadType === 'PDF' ? '#fce7f3' : '#fef3c7'"
+                    [style.color]="report.uploadType === 'EXCEL' ? '#1e40af' : report.uploadType === 'PDF' ? '#9d174d' : '#92400e'">
+                    {{ report.uploadType }}
+                  </span>
+                </td>
+                <td>
+                  <button (click)="deleteCibilReport(report.id)" title="Delete"
+                    style="padding: 4px 10px; background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; border-radius: 6px; cursor: pointer; font-size: 0.8rem;">
+                    <i class="fa fa-trash"></i>
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+</div>
+

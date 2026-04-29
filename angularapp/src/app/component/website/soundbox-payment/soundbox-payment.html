@@ -1,0 +1,372 @@
+<div class="sbp-page" *ngIf="merchant">
+  <!-- Sidebar -->
+  <aside class="sbp-sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-icon">🔊</div>
+      <div class="brand-text">
+        <strong>SoundBox</strong>
+        <small>Merchant Portal</small>
+      </div>
+    </div>
+
+    <div class="merchant-info">
+      <div class="merchant-avatar">{{ merchant.businessName?.charAt(0) || 'M' }}</div>
+      <div class="merchant-details">
+        <strong>{{ merchant.businessName }}</strong>
+        <small>{{ merchant.accountNumber }}</small>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <button [class.active]="activeTab === 'overview'" (click)="activeTab = 'overview'">
+        <span class="nav-icon">📊</span> Overview
+      </button>
+      <button [class.active]="activeTab === 'receive'" (click)="activeTab = 'receive'">
+        <span class="nav-icon">💰</span> Receive Payment
+      </button>
+      <button [class.active]="activeTab === 'transactions'" (click)="activeTab = 'transactions'">
+        <span class="nav-icon">📋</span> Transactions
+      </button>
+      <button [class.active]="activeTab === 'device'" (click)="activeTab = 'device'">
+        <span class="nav-icon">⚙️</span> Device Settings
+      </button>
+    </nav>
+
+    <button class="logout-btn" (click)="logout()">
+      <span>🚪</span> Logout
+    </button>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="sbp-main">
+    <!-- Top Bar -->
+    <header class="sbp-topbar">
+      <h1 class="page-title">
+        <ng-container [ngSwitch]="activeTab">
+          <span *ngSwitchCase="'overview'">Dashboard Overview</span>
+          <span *ngSwitchCase="'receive'">Receive Payment</span>
+          <span *ngSwitchCase="'transactions'">Transaction History</span>
+          <span *ngSwitchCase="'device'">Device Settings</span>
+        </ng-container>
+      </h1>
+      <div class="topbar-right">
+        <div class="device-badge" [class]="getDeviceStatusClass()" *ngIf="device">
+          <span class="badge-dot"></span>
+          {{ device.status }}
+        </div>
+        <span class="merchant-name">{{ merchant.ownerName }}</span>
+      </div>
+    </header>
+
+    <!-- ==================== OVERVIEW TAB ==================== -->
+    <div class="tab-content" *ngIf="activeTab === 'overview'">
+      <div class="stats-grid">
+        <div class="stat-card stat-primary">
+          <div class="stat-icon">💰</div>
+          <div class="stat-info">
+            <span class="stat-label">Total Received</span>
+            <span class="stat-value">{{ formatCurrency(stats?.totalReceived || stats?.totalCredit || 0) }}</span>
+          </div>
+        </div>
+        <div class="stat-card stat-success">
+          <div class="stat-icon">📅</div>
+          <div class="stat-info">
+            <span class="stat-label">Today's Collection</span>
+            <span class="stat-value">{{ formatCurrency(stats?.todayReceived || stats?.totalDebitCharges || 0) }}</span>
+          </div>
+        </div>
+        <div class="stat-card stat-info">
+          <div class="stat-icon">📊</div>
+          <div class="stat-info">
+            <span class="stat-label">Total Transactions</span>
+            <span class="stat-value">{{ stats?.todayTransactions || stats?.totalTransactions || 0 }}</span>
+          </div>
+        </div>
+        <div class="stat-card stat-warning">
+          <div class="stat-icon">🔊</div>
+          <div class="stat-info">
+            <span class="stat-label">Speaker Status</span>
+            <span class="stat-value">{{ device?.status || (stats?.speakerActive ? 'ACTIVE' : 'N/A') }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Device Info Card -->
+      <div class="section-card" *ngIf="device">
+        <h3 class="section-title">Soundbox Device</h3>
+        <div class="device-info-grid">
+          <div class="info-item">
+            <span class="info-label">Device ID</span>
+            <span class="info-value">{{ device.deviceId }}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Voice</span>
+            <span class="info-value">{{ device.voiceEnabled ? 'Enabled' : 'Disabled' }}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Language</span>
+            <span class="info-value">{{ device.voiceLanguage || 'en-IN' }}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Volume</span>
+            <span class="info-value">{{ device.volumeMode || 'NORMAL' }}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Linked UPI</span>
+            <span class="info-value">{{ device.linkedUpi || 'Not linked' }}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Monthly Charge</span>
+            <span class="info-value">{{ formatCurrency(device.monthlyCharge || 0) }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recent Transactions -->
+      <div class="section-card">
+        <h3 class="section-title">Recent Transactions</h3>
+        <div class="txn-list" *ngIf="transactions.length > 0">
+          <div class="txn-item" *ngFor="let txn of transactions.slice(0, 5)">
+            <div class="txn-left">
+              <div class="txn-icon" [class]="getTxnStatusClass(txn.status)">
+                {{ txn.txnType === 'CREDIT' ? '↓' : '↑' }}
+              </div>
+              <div class="txn-details">
+                <strong>{{ txn.payerName || 'Unknown' }}</strong>
+                <small>{{ txn.paymentMethod }} · {{ txn.createdAt | date:'short' }}</small>
+              </div>
+            </div>
+            <div class="txn-right">
+              <span class="txn-amount" [class.credit]="txn.txnType === 'CREDIT'" [class.debit]="txn.txnType === 'DEBIT'">
+                {{ txn.txnType === 'CREDIT' ? '+' : '-' }}{{ formatCurrency(txn.amount) }}
+              </span>
+              <small class="txn-status" [class]="getTxnStatusClass(txn.status)">{{ txn.status }}</small>
+            </div>
+          </div>
+        </div>
+        <div class="empty-state" *ngIf="transactions.length === 0 && !loadingTransactions">
+          <span>📭</span>
+          <p>No transactions yet</p>
+        </div>
+        <div class="loading-state" *ngIf="loadingTransactions">
+          <div class="spinner"></div>
+          <p>Loading transactions...</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== RECEIVE PAYMENT TAB ==================== -->
+    <div class="tab-content" *ngIf="activeTab === 'receive'">
+      <div class="payment-container">
+        <!-- Payment Success State -->
+        <div class="payment-success-card" *ngIf="paymentSuccess">
+          <div class="success-animation">
+            <div class="success-circle">✓</div>
+          </div>
+          <h2>Payment Received!</h2>
+          <p class="success-amount">{{ formatCurrency(lastPaymentTxn?.amount || paymentAmount) }}</p>
+          <p class="success-payer">from {{ payerName }}</p>
+          <p class="success-txn" *ngIf="lastPaymentTxn?.txnId">Txn ID: {{ lastPaymentTxn.txnId }}</p>
+        </div>
+
+        <!-- Payment Form -->
+        <div class="payment-form-card" *ngIf="!paymentSuccess">
+          <div class="payment-header">
+            <h2>Receive Payment</h2>
+            <p>Process incoming payment to your soundbox</p>
+          </div>
+
+          <div class="payment-error" *ngIf="paymentError">
+            <span>!</span> {{ paymentError }}
+          </div>
+
+          <div class="payment-form">
+            <div class="amount-input-wrapper">
+              <span class="currency-symbol">₹</span>
+              <input
+                type="number"
+                [(ngModel)]="paymentAmount"
+                placeholder="0"
+                class="amount-input"
+                min="1"
+              />
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label>Payer Name</label>
+                <input type="text" [(ngModel)]="payerName" placeholder="Enter payer name" class="form-input" />
+              </div>
+              <div class="form-group">
+                <label>Payer UPI (Optional)</label>
+                <input type="text" [(ngModel)]="payerUpi" placeholder="payer@upi" class="form-input" />
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label>Payment Method</label>
+              <div class="method-options">
+                <button [class.active]="paymentMethod === 'UPI'" (click)="paymentMethod = 'UPI'">UPI</button>
+                <button [class.active]="paymentMethod === 'QR'" (click)="paymentMethod = 'QR'">QR Code</button>
+                <button [class.active]="paymentMethod === 'NFC'" (click)="paymentMethod = 'NFC'">NFC</button>
+              </div>
+            </div>
+
+            <button class="pay-btn" (click)="processPayment()" [disabled]="processingPayment || !paymentAmount || paymentAmount <= 0 || !payerName.trim()">
+              <span class="btn-loader" *ngIf="processingPayment"></span>
+              <span *ngIf="!processingPayment">Process Payment</span>
+              <span *ngIf="processingPayment">Processing...</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== TRANSACTIONS TAB ==================== -->
+    <div class="tab-content" *ngIf="activeTab === 'transactions'">
+      <div class="section-card">
+        <div class="txn-header">
+          <h3 class="section-title">All Transactions</h3>
+          <div class="txn-search">
+            <input
+              type="text"
+              [(ngModel)]="txnSearchQuery"
+              placeholder="Search transactions..."
+              (input)="filterTransactions()"
+              class="search-input"
+            />
+          </div>
+        </div>
+
+        <div class="txn-table-wrapper" *ngIf="filteredTransactions.length > 0">
+          <table class="txn-table">
+            <thead>
+              <tr>
+                <th>Txn ID</th>
+                <th>Payer</th>
+                <th>Method</th>
+                <th>Amount</th>
+                <th>Status</th>
+                <th>Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let txn of filteredTransactions">
+                <td class="txn-id">{{ txn.txnId || '-' }}</td>
+                <td>
+                  <div class="payer-info">
+                    <strong>{{ txn.payerName || 'Unknown' }}</strong>
+                    <small *ngIf="txn.payerUpi">{{ txn.payerUpi }}</small>
+                  </div>
+                </td>
+                <td><span class="method-badge">{{ txn.paymentMethod }}</span></td>
+                <td>
+                  <span [class.credit]="txn.txnType === 'CREDIT'" [class.debit]="txn.txnType === 'DEBIT'" class="txn-amount">
+                    {{ txn.txnType === 'CREDIT' ? '+' : '-' }}{{ formatCurrency(txn.amount) }}
+                  </span>
+                </td>
+                <td><span class="status-badge" [class]="getTxnStatusClass(txn.status)">{{ txn.status }}</span></td>
+                <td class="txn-date">{{ txn.createdAt | date:'medium' }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="empty-state" *ngIf="filteredTransactions.length === 0 && !loadingTransactions">
+          <span>📭</span>
+          <p>{{ txnSearchQuery ? 'No matching transactions' : 'No transactions yet' }}</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== DEVICE SETTINGS TAB ==================== -->
+    <div class="tab-content" *ngIf="activeTab === 'device'">
+      <div class="settings-grid" *ngIf="device">
+        <!-- Device Info -->
+        <div class="section-card">
+          <h3 class="section-title">Device Information</h3>
+          <div class="settings-list">
+            <div class="settings-item">
+              <span class="settings-label">Device ID</span>
+              <span class="settings-value">{{ device.deviceId }}</span>
+            </div>
+            <div class="settings-item">
+              <span class="settings-label">Status</span>
+              <span class="settings-value"><span class="status-badge" [class]="getDeviceStatusClass()">{{ device.status }}</span></span>
+            </div>
+            <div class="settings-item">
+              <span class="settings-label">Linked UPI</span>
+              <span class="settings-value">{{ device.linkedUpi || 'Not linked' }}</span>
+            </div>
+            <div class="settings-item">
+              <span class="settings-label">Monthly Charge</span>
+              <span class="settings-value">{{ formatCurrency(device.monthlyCharge || 0) }}</span>
+            </div>
+            <div class="settings-item">
+              <span class="settings-label">Device Charge</span>
+              <span class="settings-value">{{ formatCurrency(device.deviceCharge || 0) }}</span>
+            </div>
+            <div class="settings-item">
+              <span class="settings-label">Charge Status</span>
+              <span class="settings-value">{{ device.chargeStatus || 'N/A' }}</span>
+            </div>
+            <div class="settings-item">
+              <span class="settings-label">Activated On</span>
+              <span class="settings-value">{{ device.activatedAt ? (device.activatedAt | date:'mediumDate') : 'N/A' }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Voice Settings -->
+        <div class="section-card">
+          <div class="settings-header">
+            <h3 class="section-title">Voice Settings</h3>
+            <button class="edit-btn" *ngIf="!editingSettings" (click)="editingSettings = true">Edit</button>
+            <button class="save-btn" *ngIf="editingSettings" (click)="saveDeviceSettings()" [disabled]="savingSettings">
+              {{ savingSettings ? 'Saving...' : 'Save' }}
+            </button>
+          </div>
+
+          <div class="settings-list">
+            <div class="settings-item">
+              <span class="settings-label">Voice Alerts</span>
+              <span class="settings-value" *ngIf="!editingSettings">{{ settingsForm.voiceEnabled ? 'Enabled' : 'Disabled' }}</span>
+              <label class="toggle" *ngIf="editingSettings">
+                <input type="checkbox" [(ngModel)]="settingsForm.voiceEnabled">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div class="settings-item">
+              <span class="settings-label">Language</span>
+              <span class="settings-value" *ngIf="!editingSettings">{{ settingsForm.voiceLanguage }}</span>
+              <select [(ngModel)]="settingsForm.voiceLanguage" *ngIf="editingSettings" class="settings-select">
+                <option value="en-IN">English (India)</option>
+                <option value="hi-IN">Hindi</option>
+                <option value="te-IN">Telugu</option>
+              </select>
+            </div>
+            <div class="settings-item">
+              <span class="settings-label">Volume Mode</span>
+              <span class="settings-value" *ngIf="!editingSettings">{{ settingsForm.volumeMode }}</span>
+              <select [(ngModel)]="settingsForm.volumeMode" *ngIf="editingSettings" class="settings-select">
+                <option value="NORMAL">Normal</option>
+                <option value="LOUD">Loud</option>
+                <option value="SILENT">Silent</option>
+              </select>
+            </div>
+          </div>
+
+          <button class="test-voice-btn" (click)="testVoiceAlert()" *ngIf="voiceSupported">
+            🔊 Test Voice Alert
+          </button>
+          <p class="voice-note" *ngIf="!voiceSupported">Voice alerts are not supported in this browser</p>
+        </div>
+      </div>
+
+      <div class="empty-state" *ngIf="!device">
+        <span>🔇</span>
+        <p>No soundbox device linked to your account</p>
+      </div>
+    </div>
+  </main>
+</div>

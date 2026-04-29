@@ -1,0 +1,405 @@
+<div class="agent-mgmt-container">
+  <!-- Header -->
+  <div class="agent-mgmt-header">
+    <div class="header-left">
+      <button class="back-btn" (click)="goBack()">
+        <i class="fas fa-arrow-left"></i>
+      </button>
+      <div>
+        <h1><i class="fas fa-user-tie"></i> Agent Management</h1>
+        <p>Create, manage, freeze and deactivate agent accounts</p>
+      </div>
+    </div>
+    <button class="create-agent-btn" (click)="openCreateModal()">
+      <i class="fas fa-plus"></i> Create Agent
+    </button>
+  </div>
+
+  <!-- Stats Cards -->
+  <div class="stats-grid">
+    <div class="stat-card stat-total">
+      <i class="fas fa-users"></i>
+      <div class="stat-info">
+        <span class="stat-value">{{ stats.total }}</span>
+        <span class="stat-label">Total Agents</span>
+      </div>
+    </div>
+    <div class="stat-card stat-active">
+      <i class="fas fa-check-circle"></i>
+      <div class="stat-info">
+        <span class="stat-value">{{ stats.active }}</span>
+        <span class="stat-label">Active</span>
+      </div>
+    </div>
+    <div class="stat-card stat-frozen">
+      <i class="fas fa-snowflake"></i>
+      <div class="stat-info">
+        <span class="stat-value">{{ stats.frozen }}</span>
+        <span class="stat-label">Frozen</span>
+      </div>
+    </div>
+    <div class="stat-card stat-deactivated">
+      <i class="fas fa-ban"></i>
+      <div class="stat-info">
+        <span class="stat-value">{{ stats.deactivated }}</span>
+        <span class="stat-label">Deactivated</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="filters-bar">
+    <div class="search-box">
+      <i class="fas fa-search"></i>
+      <input type="text" [(ngModel)]="searchTerm" placeholder="Search agents by name, ID, email, mobile..." />
+    </div>
+    <div class="status-filters">
+      <button [class.active]="statusFilter === 'ALL'" (click)="statusFilter = 'ALL'">All</button>
+      <button [class.active]="statusFilter === 'ACTIVE'" (click)="statusFilter = 'ACTIVE'">Active</button>
+      <button [class.active]="statusFilter === 'FROZEN'" (click)="statusFilter = 'FROZEN'">Frozen</button>
+      <button [class.active]="statusFilter === 'DEACTIVATED'" (click)="statusFilter = 'DEACTIVATED'">Deactivated</button>
+    </div>
+  </div>
+
+  <!-- Agents Table -->
+  <div class="agents-table-wrapper">
+    <table class="agents-table" *ngIf="filteredAgents.length > 0">
+      <thead>
+        <tr>
+          <th>Agent ID</th>
+          <th>Name</th>
+          <th>Email</th>
+          <th>Mobile</th>
+          <th>Role</th>
+          <th>Region</th>
+          <th>Status</th>
+          <th>Created</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let agent of filteredAgents">
+          <td class="agent-id">{{ agent.agentId }}</td>
+          <td class="agent-name">
+            <div class="name-cell">
+              <div class="avatar">{{ agent.name?.charAt(0) }}</div>
+              <span>{{ agent.name }}</span>
+            </div>
+          </td>
+          <td>{{ agent.email }}</td>
+          <td>{{ agent.mobile }}</td>
+          <td><span class="role-badge" [ngClass]="getRoleBadge(agent.role)">{{ agent.role?.replace('_', ' ') }}</span></td>
+          <td>{{ agent.region || '—' }}</td>
+          <td><span class="status-badge" [ngClass]="getStatusClass(agent.status)">{{ agent.status }}</span></td>
+          <td>{{ formatDate(agent.createdAt) }}</td>
+          <td class="actions-cell">
+            <button class="action-btn view-btn" (click)="viewAgent(agent)" title="View Details">
+              <i class="fas fa-eye"></i>
+            </button>
+            <button class="action-btn otp-btn" (click)="openOtpModal(agent.agentId)" title="Generate OTP">
+              <i class="fas fa-key"></i>
+            </button>
+            <button *ngIf="agent.status === 'ACTIVE'" class="action-btn freeze-btn" (click)="freezeAgent(agent.agentId)" title="Freeze">
+              <i class="fas fa-snowflake"></i>
+            </button>
+            <button *ngIf="agent.status === 'FROZEN'" class="action-btn unfreeze-btn" (click)="unfreezeAgent(agent.agentId)" title="Unfreeze">
+              <i class="fas fa-fire"></i>
+            </button>
+            <button *ngIf="agent.status === 'ACTIVE'" class="action-btn deactivate-btn" (click)="deactivateAgent(agent.agentId)" title="Deactivate">
+              <i class="fas fa-ban"></i>
+            </button>
+            <button *ngIf="agent.status === 'DEACTIVATED' || agent.status === 'FROZEN'" class="action-btn reactivate-btn" (click)="reactivateAgent(agent.agentId)" title="Reactivate">
+              <i class="fas fa-undo"></i>
+            </button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="empty-state" *ngIf="filteredAgents.length === 0">
+      <i class="fas fa-user-slash"></i>
+      <p>No agents found</p>
+    </div>
+  </div>
+
+  <!-- ==================== Create Agent Modal ==================== -->
+  <div class="modal-overlay" *ngIf="showCreateModal" (click)="closeCreateModal()">
+    <div class="modal-content create-modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2><i class="fas fa-user-plus"></i> Create Agent Account</h2>
+        <button class="close-btn" (click)="closeCreateModal()"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="modal-body">
+        <div class="form-grid">
+          <!-- Name -->
+          <div class="form-group">
+            <label>Full Name *</label>
+            <input type="text" [(ngModel)]="newAgent.name" placeholder="Enter agent name" />
+            <span class="error" *ngIf="createErrors['name']">{{ createErrors['name'] }}</span>
+          </div>
+
+          <!-- Email -->
+          <div class="form-group">
+            <label>Email Address *</label>
+            <input type="email" [(ngModel)]="newAgent.email" placeholder="agent@neobank.com" />
+            <span class="error" *ngIf="createErrors['email']">{{ createErrors['email'] }}</span>
+          </div>
+
+          <!-- Mobile -->
+          <div class="form-group">
+            <label>Mobile Number *</label>
+            <input type="text" [(ngModel)]="newAgent.mobile" placeholder="10-digit mobile" maxlength="10" />
+            <span class="error" *ngIf="createErrors['mobile']">{{ createErrors['mobile'] }}</span>
+          </div>
+
+          <!-- Role -->
+          <div class="form-group">
+            <label>Role *</label>
+            <select [(ngModel)]="newAgent.role">
+              <option *ngFor="let role of roles" [value]="role">{{ role.replace('_', ' ') }}</option>
+            </select>
+            <span class="error" *ngIf="createErrors['role']">{{ createErrors['role'] }}</span>
+          </div>
+
+          <!-- Password -->
+          <div class="form-group">
+            <label>Password *</label>
+            <input type="password" [(ngModel)]="newAgent.password" placeholder="Min 6 characters" />
+            <span class="error" *ngIf="createErrors['password']">{{ createErrors['password'] }}</span>
+          </div>
+
+          <!-- Confirm Password -->
+          <div class="form-group">
+            <label>Confirm Password *</label>
+            <input type="password" [(ngModel)]="newAgent.confirmPassword" placeholder="Re-enter password" />
+            <span class="error" *ngIf="createErrors['confirmPassword']">{{ createErrors['confirmPassword'] }}</span>
+          </div>
+
+          <!-- Region -->
+          <div class="form-group">
+            <label>Region</label>
+            <input type="text" [(ngModel)]="newAgent.region" placeholder="e.g. Delhi NCR" />
+          </div>
+
+          <!-- Bio -->
+          <div class="form-group full-width">
+            <label>Bio</label>
+            <textarea [(ngModel)]="newAgent.bio" placeholder="Brief description about the agent..." rows="3"></textarea>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="cancel-btn" (click)="closeCreateModal()">Cancel</button>
+        <button class="submit-btn" (click)="submitCreate()" [disabled]="loading">
+          <i class="fas fa-spinner fa-spin" *ngIf="loading"></i>
+          {{ loading ? 'Creating...' : 'Create Agent' }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== Agent Detail Panel ==================== -->
+  <div class="modal-overlay" *ngIf="selectedAgent" (click)="closeAgent()">
+    <div class="modal-content detail-modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2><i class="fas fa-user-tie"></i> Agent Profile</h2>
+        <button class="close-btn" (click)="closeAgent()"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="modal-body">
+        <!-- Agent Header -->
+        <div class="agent-profile-header">
+          <div class="agent-avatar-large">
+            {{ selectedAgent.name?.charAt(0) }}
+          </div>
+          <div class="agent-header-info">
+            <h3>{{ selectedAgent.name }}</h3>
+            <span class="agent-id-text">{{ selectedAgent.agentId }}</span>
+            <div class="header-badges">
+              <span class="status-badge" [ngClass]="getStatusClass(selectedAgent.status)">{{ selectedAgent.status }}</span>
+              <span class="role-badge" [ngClass]="getRoleBadge(selectedAgent.role)">{{ selectedAgent.role?.replace('_', ' ') }}</span>
+            </div>
+          </div>
+          <div class="agent-header-actions">
+            <button class="edit-toggle-btn" (click)="toggleEdit()">
+              <i [class]="editMode ? 'fas fa-times' : 'fas fa-edit'"></i>
+              {{ editMode ? 'Cancel Edit' : 'Edit Profile' }}
+            </button>
+          </div>
+        </div>
+
+        <!-- Profile Details -->
+        <div class="detail-sections">
+          <!-- Personal Info -->
+          <div class="detail-section">
+            <h4><i class="fas fa-user"></i> Personal Information</h4>
+            <div class="detail-grid" *ngIf="!editMode">
+              <div class="detail-item">
+                <span class="detail-label">Full Name</span>
+                <span class="detail-value">{{ selectedAgent.name }}</span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">Email</span>
+                <span class="detail-value">{{ selectedAgent.email }}</span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">Mobile</span>
+                <span class="detail-value">{{ selectedAgent.mobile }}</span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">Role</span>
+                <span class="detail-value">{{ selectedAgent.role?.replace('_', ' ') }}</span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">Region</span>
+                <span class="detail-value">{{ selectedAgent.region || 'Not assigned' }}</span>
+              </div>
+              <div class="detail-item full-width">
+                <span class="detail-label">Bio</span>
+                <span class="detail-value">{{ selectedAgent.bio || 'No bio provided' }}</span>
+              </div>
+            </div>
+
+            <!-- Edit Form -->
+            <div class="edit-form" *ngIf="editMode">
+              <div class="form-grid">
+                <div class="form-group">
+                  <label>Full Name</label>
+                  <input type="text" [(ngModel)]="editAgent.name" />
+                </div>
+                <div class="form-group">
+                  <label>Email</label>
+                  <input type="email" [(ngModel)]="editAgent.email" />
+                </div>
+                <div class="form-group">
+                  <label>Mobile</label>
+                  <input type="text" [(ngModel)]="editAgent.mobile" maxlength="10" />
+                </div>
+                <div class="form-group">
+                  <label>Role</label>
+                  <select [(ngModel)]="editAgent.role">
+                    <option *ngFor="let role of roles" [value]="role">{{ role.replace('_', ' ') }}</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>Region</label>
+                  <input type="text" [(ngModel)]="editAgent.region" />
+                </div>
+                <div class="form-group full-width">
+                  <label>Bio</label>
+                  <textarea [(ngModel)]="editAgent.bio" rows="3"></textarea>
+                </div>
+              </div>
+              <button class="save-edit-btn" (click)="saveEdit()" [disabled]="loading">
+                <i class="fas fa-save"></i> Save Changes
+              </button>
+            </div>
+          </div>
+
+          <!-- ID Card Section -->
+          <div class="detail-section">
+            <h4><i class="fas fa-id-card"></i> ID Card (Admin ID Card)</h4>
+            <div class="id-card-section">
+              <div *ngIf="selectedAgent.idCardPath" class="id-card-preview">
+                <i class="fas fa-file-image"></i>
+                <span>ID Card uploaded</span>
+              </div>
+              <div *ngIf="!selectedAgent.idCardPath" class="no-id-card">
+                <i class="fas fa-exclamation-triangle"></i>
+                <span>No ID card uploaded</span>
+              </div>
+              <div class="upload-row">
+                <input type="file" accept="image/*,.pdf" (change)="onIdCardSelect($event)" />
+                <button class="upload-btn" (click)="uploadIdCard()" [disabled]="!idCardFile || loading">
+                  <i class="fas fa-upload"></i> Upload ID Card
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Profile Photo Section -->
+          <div class="detail-section">
+            <h4><i class="fas fa-camera"></i> Profile Photo</h4>
+            <div class="id-card-section">
+              <div *ngIf="selectedAgent.profilePhotoPath" class="id-card-preview">
+                <i class="fas fa-user-circle"></i>
+                <span>Photo uploaded</span>
+              </div>
+              <div *ngIf="!selectedAgent.profilePhotoPath" class="no-id-card">
+                <i class="fas fa-user-slash"></i>
+                <span>No photo uploaded</span>
+              </div>
+              <div class="upload-row">
+                <input type="file" accept="image/*" (change)="onPhotoSelect($event)" />
+                <button class="upload-btn" (click)="uploadPhoto()" [disabled]="!photoFile || loading">
+                  <i class="fas fa-upload"></i> Upload Photo
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Timestamps & Status -->
+          <div class="detail-section">
+            <h4><i class="fas fa-clock"></i> Account Info</h4>
+            <div class="detail-grid">
+              <div class="detail-item">
+                <span class="detail-label">Created At</span>
+                <span class="detail-value">{{ formatDate(selectedAgent.createdAt) }}</span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">Updated At</span>
+                <span class="detail-value">{{ formatDate(selectedAgent.updatedAt) }}</span>
+              </div>
+              <div class="detail-item" *ngIf="selectedAgent.frozenAt">
+                <span class="detail-label">Frozen At</span>
+                <span class="detail-value frozen-text">{{ formatDate(selectedAgent.frozenAt) }}</span>
+              </div>
+              <div class="detail-item" *ngIf="selectedAgent.deactivatedAt">
+                <span class="detail-label">Deactivated At</span>
+                <span class="detail-value deactivated-text">{{ formatDate(selectedAgent.deactivatedAt) }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="agent-actions-bar">
+          <button class="otp-action-btn" (click)="openOtpModal(selectedAgent.agentId)">
+            <i class="fas fa-key"></i> Generate OTP
+          </button>
+          <button *ngIf="selectedAgent.status === 'ACTIVE'" class="freeze-action-btn" (click)="freezeAgent(selectedAgent.agentId)">
+            <i class="fas fa-snowflake"></i> Freeze Account
+          </button>
+          <button *ngIf="selectedAgent.status === 'FROZEN'" class="unfreeze-action-btn" (click)="unfreezeAgent(selectedAgent.agentId)">
+            <i class="fas fa-fire"></i> Unfreeze Account
+          </button>
+          <button *ngIf="selectedAgent.status === 'ACTIVE'" class="deactivate-action-btn" (click)="deactivateAgent(selectedAgent.agentId)">
+            <i class="fas fa-ban"></i> Deactivate Account
+          </button>
+          <button *ngIf="selectedAgent.status === 'DEACTIVATED' || selectedAgent.status === 'FROZEN'" class="reactivate-action-btn" (click)="reactivateAgent(selectedAgent.agentId)">
+            <i class="fas fa-undo"></i> Reactivate Account
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== OTP Modal ==================== -->
+  <div class="modal-overlay" *ngIf="showOtpModal" (click)="closeOtpModal()">
+    <div class="modal-content otp-modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2><i class="fas fa-key"></i> Generate Agent OTP</h2>
+        <button class="close-btn" (click)="closeOtpModal()"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="modal-body otp-body">
+        <p>Generate a one-time password for agent <strong>{{ otpAgentId }}</strong></p>
+        <div class="otp-display" *ngIf="generatedOtp">
+          <span class="otp-code">{{ generatedOtp }}</span>
+          <p class="otp-note">This OTP is valid for 5 minutes. Share it securely with the agent.</p>
+        </div>
+        <button class="generate-otp-btn" (click)="generateOtp()" [disabled]="loading">
+          <i class="fas fa-sync-alt" [class.fa-spin]="loading"></i>
+          {{ generatedOtp ? 'Regenerate OTP' : 'Generate OTP' }}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

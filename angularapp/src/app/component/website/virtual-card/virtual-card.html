@@ -1,0 +1,129 @@
+<div class="virtual-card-container">
+  <div class="section-header">
+    <h2>💳 Virtual Debit Cards</h2>
+    <button class="btn-primary" (click)="showCreateForm = !showCreateForm" *ngIf="!showCreateForm">+ New Card</button>
+  </div>
+
+  <!-- Create Card Form -->
+  <div class="form-card" *ngIf="showCreateForm">
+    <h3>Create Virtual Card</h3>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Cardholder Name</label>
+        <input type="text" [(ngModel)]="newCard.cardholderName" placeholder="Name on card" />
+      </div>
+      <div class="form-group">
+        <label>Daily Limit (₹)</label>
+        <input type="number" [(ngModel)]="newCard.dailyLimit" min="1000" max="500000" />
+      </div>
+      <div class="form-group">
+        <label>Monthly Limit (₹)</label>
+        <input type="number" [(ngModel)]="newCard.monthlyLimit" min="5000" max="2000000" />
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn-primary" (click)="createCard()" [disabled]="creating || !newCard.cardholderName">
+        {{creating ? 'Creating...' : 'Create Card'}}
+      </button>
+      <button class="btn-secondary" (click)="showCreateForm = false">Cancel</button>
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <div class="loading-state" *ngIf="loading">
+    <div class="spinner"></div>
+    <p>Loading cards...</p>
+  </div>
+
+  <!-- Empty -->
+  <div class="empty-state" *ngIf="!loading && cards.length === 0 && !showCreateForm">
+    <span class="empty-icon">💳</span>
+    <h3>No Virtual Cards</h3>
+    <p>Create your first virtual debit card for secure online transactions.</p>
+    <button class="btn-primary" (click)="showCreateForm = true">Create Card</button>
+  </div>
+
+  <!-- Cards Grid -->
+  <div class="cards-grid" *ngIf="!loading && cards.length > 0">
+    <div class="card-wrapper" *ngFor="let card of cards">
+      <!-- Visual Card -->
+      <div class="debit-card" [class]="getStatusClass(card.status)" (click)="selectCard(card)">
+        <div class="card-top">
+          <span class="bank-name">NeoBank</span>
+          <span class="card-type">VIRTUAL</span>
+        </div>
+        <div class="card-chip">
+          <svg width="40" height="30" viewBox="0 0 40 30"><rect x="2" y="2" width="36" height="26" rx="4" fill="#d4af37" stroke="#b8960c" stroke-width="1"/><line x1="2" y1="10" x2="38" y2="10" stroke="#b8960c" stroke-width="0.5"/><line x1="2" y1="20" x2="38" y2="20" stroke="#b8960c" stroke-width="0.5"/><line x1="14" y1="2" x2="14" y2="28" stroke="#b8960c" stroke-width="0.5"/><line x1="26" y1="2" x2="26" y2="28" stroke="#b8960c" stroke-width="0.5"/></svg>
+        </div>
+        <div class="card-number">{{maskCardNumber(card.cardNumber)}}</div>
+        <div class="card-bottom">
+          <div>
+            <span class="label">CARDHOLDER</span>
+            <span class="value">{{card.cardholderName}}</span>
+          </div>
+          <div>
+            <span class="label">EXPIRES</span>
+            <span class="value">{{card.expiryDate}}</span>
+          </div>
+          <div class="status-chip">{{card.status}}</div>
+        </div>
+      </div>
+
+      <!-- Card Details Panel -->
+      <div class="card-details" *ngIf="selectedCard?.id === card.id">
+        <div class="details-grid">
+          <div class="detail-item">
+            <span class="label">Card Number</span>
+            <span class="value mono">{{formatCardNumber(card.cardNumber)}}</span>
+          </div>
+          <div class="detail-item">
+            <span class="label">CVV</span>
+            <span class="value mono" (click)="showCvv = !showCvv" style="cursor:pointer">
+              {{showCvv ? card.cvv : '***'}} 👁
+            </span>
+          </div>
+          <div class="detail-item">
+            <span class="label">Daily Limit</span>
+            <span class="value">{{formatCurrency(card.dailyLimit)}}</span>
+          </div>
+          <div class="detail-item">
+            <span class="label">Monthly Limit</span>
+            <span class="value">{{formatCurrency(card.monthlyLimit)}}</span>
+          </div>
+          <div class="detail-item">
+            <span class="label">Total Spent</span>
+            <span class="value">{{formatCurrency(card.totalSpent)}}</span>
+          </div>
+          <div class="detail-item">
+            <span class="label">Created</span>
+            <span class="value">{{formatDate(card.createdAt)}}</span>
+          </div>
+        </div>
+
+        <div class="toggle-section" *ngIf="card.status !== 'CANCELLED'">
+          <div class="toggle-row">
+            <span>Online Payments</span>
+            <label class="switch">
+              <input type="checkbox" [checked]="card.onlinePaymentsEnabled" (change)="toggleOnlinePayments(card)" />
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="toggle-row">
+            <span>International Payments</span>
+            <label class="switch">
+              <input type="checkbox" [checked]="card.internationalPaymentsEnabled" (change)="toggleInternationalPayments(card)" />
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="card-actions" *ngIf="card.status !== 'CANCELLED'">
+          <button class="btn-warning" (click)="toggleStatus(card)">
+            {{card.status === 'ACTIVE' ? '❄️ Freeze' : '☀️ Unfreeze'}}
+          </button>
+          <button class="btn-danger" (click)="cancelCard(card)">🗑 Cancel Card</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

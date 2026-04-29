@@ -1,0 +1,748 @@
+<div class="pgd-wrapper">
+  <!-- Background -->
+  <div class="pgd-bg-grid"></div>
+  <div class="pgd-bg-orb pgd-orb-1"></div>
+  <div class="pgd-bg-orb pgd-orb-2"></div>
+
+  <!-- Top Bar -->
+  <header class="pgd-header">
+    <div class="pgd-header-left">
+      <button class="pgd-back-btn" (click)="goToLanding()"><i class="fa fa-arrow-left"></i></button>
+      <div class="pgd-brand">
+        <div class="pgd-brand-icon"><i class="fa fa-bolt"></i></div>
+        <div>
+          <div class="pgd-brand-title">EzyVault Pay</div>
+          <div class="pgd-brand-sub">Merchant Dashboard</div>
+        </div>
+      </div>
+    </div>
+    <div class="pgd-header-center">
+      <nav class="pgd-nav">
+        <button [class.active]="activeTab==='dashboard'" (click)="activeTab='dashboard'"><i class="fa fa-th-large"></i> Dashboard</button>
+        <button [class.active]="activeTab==='orders'" (click)="activeTab='orders'"><i class="fa fa-file-text"></i> Orders</button>
+        <button [class.active]="activeTab==='payments'" (click)="activeTab='payments'"><i class="fa fa-exchange"></i> Payments</button>
+        <button [class.active]="activeTab==='refunds'" (click)="activeTab='refunds'"><i class="fa fa-undo"></i> Refunds</button>
+        <button [class.active]="activeTab==='settlements'" (click)="activeTab='settlements'"><i class="fa fa-university"></i> Settlements</button>
+      </nav>
+    </div>
+    <div class="pgd-header-right">
+      <div class="pgd-merchant-badge" *ngIf="merchant">
+        <div class="pgd-merchant-avatar"><i class="fa fa-building"></i></div>
+        <div>
+          <div class="pgd-merchant-name">{{merchant.businessName}}</div>
+          <div class="pgd-merchant-mid">{{merchant.merchantId}}</div>
+        </div>
+      </div>
+      <button class="pgd-logout-btn" (click)="logout()"><i class="fa fa-sign-out"></i> Logout</button>
+    </div>
+  </header>
+
+  <!-- Main -->
+  <main class="pgd-main">
+
+    <!-- ===== DASHBOARD ===== -->
+    <div *ngIf="activeTab==='dashboard'" class="pgd-tab-content">
+      <div class="pgd-stats-grid">
+        <div class="pgd-stat-card pgd-stat-volume">
+          <div class="pgd-stat-icon"><i class="fa fa-inr"></i></div>
+          <div class="pgd-stat-info">
+            <div class="pgd-stat-value">&#8377;{{totalVolume | number:'1.2-2'}}</div>
+            <div class="pgd-stat-label">Total Volume</div>
+          </div>
+        </div>
+        <div class="pgd-stat-card pgd-stat-success">
+          <div class="pgd-stat-icon"><i class="fa fa-check-circle"></i></div>
+          <div class="pgd-stat-info">
+            <div class="pgd-stat-value">{{successCount}}</div>
+            <div class="pgd-stat-label">Successful</div>
+          </div>
+        </div>
+        <div class="pgd-stat-card pgd-stat-failed">
+          <div class="pgd-stat-icon"><i class="fa fa-times-circle"></i></div>
+          <div class="pgd-stat-info">
+            <div class="pgd-stat-value">{{failedCount}}</div>
+            <div class="pgd-stat-label">Failed</div>
+          </div>
+        </div>
+        <div class="pgd-stat-card pgd-stat-fees">
+          <div class="pgd-stat-icon"><i class="fa fa-percent"></i></div>
+          <div class="pgd-stat-info">
+            <div class="pgd-stat-value">&#8377;{{totalFees | number:'1.2-2'}}</div>
+            <div class="pgd-stat-label">Total Fees</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Actions -->
+      <div class="pgd-section-title"><i class="fa fa-rocket"></i> Quick Actions</div>
+      <div class="pgd-quick-actions">
+        <button class="pgd-action-btn" (click)="showCreateOrder=true"><i class="fa fa-plus-circle"></i> New Order</button>
+        <button class="pgd-action-btn" (click)="activeTab='payments'"><i class="fa fa-qrcode"></i> UPI QR Payment</button>
+        <button class="pgd-action-btn" (click)="activeTab='settlements'"><i class="fa fa-university"></i> View Settlements</button>
+        <button class="pgd-action-btn" (click)="activeTab='refunds'"><i class="fa fa-undo"></i> Process Refund</button>
+      </div>
+
+      <!-- Linked Account Info -->
+      <div class="pgd-section-title"><i class="fa fa-link"></i> Linked Business Account</div>
+      <div class="pgd-account-card" *ngIf="merchant">
+        <div class="pgd-account-row">
+          <span class="pgd-acc-label">Account Number</span>
+          <span class="pgd-acc-value">{{merchant.linkedAccountNumber || 'Not Linked'}}</span>
+        </div>
+        <div class="pgd-account-row">
+          <span class="pgd-acc-label">Account Holder</span>
+          <span class="pgd-acc-value">{{merchant.linkedAccountHolderName || '-'}}</span>
+        </div>
+        <div class="pgd-account-row">
+          <span class="pgd-acc-label">Account Type</span>
+          <span class="pgd-acc-value">{{merchant.linkedAccountType || 'CURRENT'}}</span>
+        </div>
+        <div class="pgd-account-row">
+          <span class="pgd-acc-label">Verified</span>
+          <span class="pgd-acc-value" [ngClass]="merchant.linkedAccountVerified ? 'pgd-verified' : 'pgd-unverified'">
+            <i class="fa" [ngClass]="merchant.linkedAccountVerified ? 'fa-check-circle' : 'fa-exclamation-circle'"></i>
+            {{merchant.linkedAccountVerified ? 'Verified' : 'Pending'}}
+          </span>
+        </div>
+      </div>
+
+      <!-- Recent Orders -->
+      <div class="pgd-section-title"><i class="fa fa-clock-o"></i> Recent Orders</div>
+      <div class="pgd-table-wrap">
+        <table class="pgd-table" *ngIf="orders.length > 0">
+          <thead>
+            <tr>
+              <th>Order ID</th>
+              <th>Customer</th>
+              <th>Amount</th>
+              <th>Status</th>
+              <th>Created</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let o of orders.slice(0, 5)">
+              <td class="pgd-mono">{{o.orderId}}</td>
+              <td>{{o.customerName || '-'}}</td>
+              <td class="pgd-mono">&#8377;{{o.amount | number:'1.2-2'}}</td>
+              <td><span class="pgd-status" [ngClass]="getStatusClass(o.status)">{{o.status}}</span></td>
+              <td>{{o.createdAt | date:'short'}}</td>
+            </tr>
+          </tbody>
+        </table>
+        <div *ngIf="orders.length === 0" class="pgd-empty">No orders yet. Create your first order to get started.</div>
+      </div>
+    </div>
+
+    <!-- ===== ORDERS TAB ===== -->
+    <div *ngIf="activeTab==='orders'" class="pgd-tab-content">
+      <div class="pgd-tab-header">
+        <h2><i class="fa fa-file-text"></i> Orders</h2>
+        <button class="pgd-primary-btn" (click)="showCreateOrder=true"><i class="fa fa-plus"></i> Create Order</button>
+      </div>
+
+      <!-- Order ID Dropdown -->
+      <div class="pgd-order-dropdown-section">
+        <label>Select Order</label>
+        <select [(ngModel)]="selectedOrderId" (change)="onOrderSelect()">
+          <option value="">-- Select an Order --</option>
+          <option *ngFor="let o of orders" [value]="o.orderId">
+            {{o.orderId}} | {{o.customerName || 'N/A'}} | &#8377;{{o.amount}} | {{o.status}} | {{o.createdAt | date:'short'}}
+          </option>
+        </select>
+      </div>
+
+      <!-- Selected Order Detail -->
+      <div class="pgd-order-detail" *ngIf="selectedOrder">
+        <div class="pgd-detail-grid">
+          <div class="pgd-detail-item">
+            <span class="pgd-detail-label">Order ID</span>
+            <span class="pgd-detail-value pgd-mono">{{selectedOrder.orderId}}</span>
+          </div>
+          <div class="pgd-detail-item">
+            <span class="pgd-detail-label">Customer Name</span>
+            <span class="pgd-detail-value">{{selectedOrder.customerName || '-'}}</span>
+          </div>
+          <div class="pgd-detail-item">
+            <span class="pgd-detail-label">Email</span>
+            <span class="pgd-detail-value">{{selectedOrder.customerEmail || '-'}}</span>
+          </div>
+          <div class="pgd-detail-item">
+            <span class="pgd-detail-label">Phone</span>
+            <span class="pgd-detail-value">{{selectedOrder.customerPhone || '-'}}</span>
+          </div>
+          <div class="pgd-detail-item">
+            <span class="pgd-detail-label">Amount</span>
+            <span class="pgd-detail-value pgd-mono">&#8377;{{selectedOrder.amount | number:'1.2-2'}}</span>
+          </div>
+          <div class="pgd-detail-item">
+            <span class="pgd-detail-label">Status</span>
+            <span class="pgd-detail-value"><span class="pgd-status" [ngClass]="getStatusClass(selectedOrder.status)">{{selectedOrder.status}}</span></span>
+          </div>
+          <div class="pgd-detail-item">
+            <span class="pgd-detail-label">Created</span>
+            <span class="pgd-detail-value">{{selectedOrder.createdAt | date:'medium'}}</span>
+          </div>
+          <div class="pgd-detail-item">
+            <span class="pgd-detail-label">Description</span>
+            <span class="pgd-detail-value">{{selectedOrder.description || '-'}}</span>
+          </div>
+        </div>
+        <div class="pgd-detail-actions" *ngIf="selectedOrder.status === 'CREATED'">
+          <button class="pgd-action-btn pgd-btn-qr" (click)="generateQr(selectedOrder)"><i class="fa fa-qrcode"></i> Generate UPI QR</button>
+          <button class="pgd-action-btn pgd-btn-pay" (click)="openPayOrder(selectedOrder)"><i class="fa fa-money"></i> Account Pay</button>
+          <button class="pgd-action-btn pgd-btn-card" (click)="openCardPayment(selectedOrder)"><i class="fa fa-credit-card"></i> Card Payment</button>
+          <button class="pgd-action-btn pgd-btn-verify" (click)="openNameVerify(selectedOrder)"><i class="fa fa-user-check"></i> Verify Name</button>
+        </div>
+      </div>
+
+      <!-- Orders Table -->
+      <div class="pgd-table-wrap">
+        <table class="pgd-table" *ngIf="orders.length > 0">
+          <thead>
+            <tr>
+              <th>Order ID</th>
+              <th>Customer</th>
+              <th>Amount</th>
+              <th>Status</th>
+              <th>Created</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let o of orders" [class.pgd-row-selected]="o.orderId === selectedOrderId">
+              <td class="pgd-mono">{{o.orderId}}</td>
+              <td>{{o.customerName || '-'}}</td>
+              <td class="pgd-mono">&#8377;{{o.amount | number:'1.2-2'}}</td>
+              <td><span class="pgd-status" [ngClass]="getStatusClass(o.status)">{{o.status}}</span></td>
+              <td>{{o.createdAt | date:'short'}}</td>
+              <td class="pgd-actions">
+                <button *ngIf="o.status==='CREATED'" class="pgd-icon-btn" title="Generate QR" (click)="generateQr(o)"><i class="fa fa-qrcode"></i> QR</button>
+                <button *ngIf="o.status==='CREATED'" class="pgd-icon-btn" title="Account Pay" (click)="openPayOrder(o)"><i class="fa fa-money"></i> Pay</button>
+                <button *ngIf="o.status==='CREATED'" class="pgd-icon-btn" title="Card Payment" (click)="openCardPayment(o)"><i class="fa fa-credit-card"></i> Card</button>
+                <button *ngIf="o.status==='CREATED'" class="pgd-icon-btn" title="Verify Name" (click)="openNameVerify(o)"><i class="fa fa-user"></i> Verify</button>
+                <button *ngIf="o.status==='CREATED'" class="pgd-icon-btn pgd-icon-btn-upi" title="Pay with UPI ID" (click)="openUpiPayModal(o)"><i class="fa fa-mobile"></i> UPI ID</button>
+                <button *ngIf="o.status==='CREATED'" class="pgd-icon-btn pgd-icon-btn-danger" title="Delete order" (click)="deleteOrder(o)"><i class="fa fa-trash"></i></button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <div *ngIf="orders.length === 0" class="pgd-empty">No orders found.</div>
+      </div>
+    </div>
+
+    <!-- ===== PAYMENTS TAB ===== -->
+    <div *ngIf="activeTab==='payments'" class="pgd-tab-content">
+      <div class="pgd-tab-header">
+        <h2><i class="fa fa-exchange"></i> Transactions</h2>
+      </div>
+      <div class="pgd-table-wrap">
+        <table class="pgd-table" *ngIf="transactions.length > 0">
+          <thead>
+            <tr>
+              <th>Transaction ID</th>
+              <th>Order ID</th>
+              <th>Amount</th>
+              <th>Method</th>
+              <th>Status</th>
+              <th>Date</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let t of transactions">
+              <td class="pgd-mono">{{t.transactionId}}</td>
+              <td class="pgd-mono">{{t.orderId}}</td>
+              <td class="pgd-mono">&#8377;{{t.amount | number:'1.2-2'}}</td>
+              <td><span class="pgd-method-badge">{{t.paymentMethod}}</span></td>
+              <td><span class="pgd-status" [ngClass]="getStatusClass(t.status)">{{t.status}}</span></td>
+              <td>{{t.createdAt | date:'short'}}</td>
+              <td class="pgd-actions">
+                <button *ngIf="t.status==='SUCCESS'" class="pgd-icon-btn pgd-btn-settle" title="Settle" 
+                  (click)="settleTransaction(t.transactionId)" [disabled]="settlingTxn===t.transactionId">
+                  <i class="fa" [ngClass]="settlingTxn===t.transactionId ? 'fa-spinner fa-spin' : 'fa-university'"></i>
+                </button>
+                <button *ngIf="t.status==='SUCCESS'" class="pgd-icon-btn pgd-btn-refund" title="Refund" (click)="openRefund(t)">
+                  <i class="fa fa-undo"></i>
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <div *ngIf="transactions.length === 0" class="pgd-empty">No transactions yet.</div>
+      </div>
+    </div>
+
+    <!-- ===== REFUNDS TAB ===== -->
+    <div *ngIf="activeTab==='refunds'" class="pgd-tab-content">
+      <div class="pgd-tab-header">
+        <h2><i class="fa fa-undo"></i> Refunds</h2>
+      </div>
+
+      <!-- Refund via Order Dropdown -->
+      <div class="pgd-refund-selector">
+        <div class="pgd-section-title"><i class="fa fa-list"></i> Refund by Order</div>
+        <div class="pgd-order-dropdown-section">
+          <label>Select Order to Refund</label>
+          <select [(ngModel)]="selectedOrderId" (change)="onOrderSelect()">
+            <option value="">-- Select Order --</option>
+            <option *ngFor="let o of orders" [value]="o.orderId">
+              {{o.orderId}} | {{o.customerName || 'N/A'}} | &#8377;{{o.amount}} | {{o.createdAt | date:'short'}}
+            </option>
+          </select>
+        </div>
+        <div *ngIf="selectedOrder" class="pgd-refund-order-info">
+          <div class="pgd-detail-grid pgd-detail-compact">
+            <div class="pgd-detail-item">
+              <span class="pgd-detail-label">Customer</span>
+              <span class="pgd-detail-value">{{selectedOrder.customerName || '-'}}</span>
+            </div>
+            <div class="pgd-detail-item">
+              <span class="pgd-detail-label">Amount</span>
+              <span class="pgd-detail-value pgd-mono">&#8377;{{selectedOrder.amount | number:'1.2-2'}}</span>
+            </div>
+            <div class="pgd-detail-item">
+              <span class="pgd-detail-label">Time</span>
+              <span class="pgd-detail-value">{{selectedOrder.createdAt | date:'medium'}}</span>
+            </div>
+            <div class="pgd-detail-item">
+              <span class="pgd-detail-label">Status</span>
+              <span class="pgd-detail-value"><span class="pgd-status" [ngClass]="getStatusClass(selectedOrder.status)">{{selectedOrder.status}}</span></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Refund History -->
+      <div class="pgd-section-title" style="margin-top:24px"><i class="fa fa-history"></i> Refund History</div>
+      <div class="pgd-table-wrap">
+        <table class="pgd-table" *ngIf="refunds.length > 0">
+          <thead>
+            <tr>
+              <th>Refund ID</th>
+              <th>Transaction ID</th>
+              <th>Amount</th>
+              <th>Reason</th>
+              <th>Status</th>
+              <th>Date</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let r of refunds">
+              <td class="pgd-mono">{{r.refundId}}</td>
+              <td class="pgd-mono">{{r.transactionId}}</td>
+              <td class="pgd-mono">&#8377;{{r.amount | number:'1.2-2'}}</td>
+              <td>{{r.reason || '-'}}</td>
+              <td><span class="pgd-status" [ngClass]="getStatusClass(r.status)">{{r.status}}</span></td>
+              <td>{{r.createdAt | date:'short'}}</td>
+            </tr>
+          </tbody>
+        </table>
+        <div *ngIf="refunds.length === 0" class="pgd-empty">No refunds processed yet.</div>
+      </div>
+    </div>
+
+    <!-- ===== SETTLEMENTS TAB ===== -->
+    <div *ngIf="activeTab==='settlements'" class="pgd-tab-content">
+      <div class="pgd-tab-header">
+        <h2><i class="fa fa-university"></i> Settlement Ledger</h2>
+      </div>
+      <div class="pgd-table-wrap">
+        <table class="pgd-table" *ngIf="ledger.length > 0">
+          <thead>
+            <tr>
+              <th>Ledger ID</th>
+              <th>Transaction</th>
+              <th>Gross</th>
+              <th>Fee</th>
+              <th>Net</th>
+              <th>Balance Before</th>
+              <th>Balance After</th>
+              <th>Status</th>
+              <th>Date</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let l of ledger">
+              <td class="pgd-mono">{{l.ledgerId}}</td>
+              <td class="pgd-mono">{{l.transactionId}}</td>
+              <td class="pgd-mono">&#8377;{{l.grossAmount | number:'1.2-2'}}</td>
+              <td class="pgd-mono pgd-fee">&#8377;{{l.feeAmount | number:'1.2-2'}}</td>
+              <td class="pgd-mono pgd-net">&#8377;{{l.netAmount | number:'1.2-2'}}</td>
+              <td class="pgd-mono">&#8377;{{l.balanceBefore | number:'1.2-2'}}</td>
+              <td class="pgd-mono pgd-net">&#8377;{{l.balanceAfter | number:'1.2-2'}}</td>
+              <td><span class="pgd-status" [ngClass]="getStatusClass(l.creditStatus)">{{l.creditStatus}}</span></td>
+              <td>{{l.createdAt | date:'short'}}</td>
+            </tr>
+          </tbody>
+        </table>
+        <div *ngIf="ledger.length === 0" class="pgd-empty">No settlements yet. Process payments and settle to see entries here.</div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ===== MODALS ===== -->
+
+  <!-- Create Order Modal -->
+  <div class="pgd-modal-overlay" *ngIf="showCreateOrder" (click)="showCreateOrder=false">
+    <div class="pgd-modal" (click)="$event.stopPropagation()">
+      <div class="pgd-modal-header">
+        <h3><i class="fa fa-plus-circle"></i> Create New Order</h3>
+        <button class="pgd-modal-close" (click)="showCreateOrder=false"><i class="fa fa-times"></i></button>
+      </div>
+      <div class="pgd-modal-body">
+        <div class="pgd-form-group">
+          <label>Amount (&#8377;) *</label>
+          <input type="number" [(ngModel)]="orderForm.amount" placeholder="Enter amount" min="1" />
+        </div>
+        <div class="pgd-form-group">
+          <label>Description</label>
+          <input type="text" [(ngModel)]="orderForm.description" placeholder="Order description" />
+        </div>
+        <div class="pgd-form-row">
+          <div class="pgd-form-group">
+            <label>Customer Name *</label>
+            <input type="text" [(ngModel)]="orderForm.customerName" placeholder="Full name" />
+          </div>
+          <div class="pgd-form-group">
+            <label>Customer Email</label>
+            <input type="email" [(ngModel)]="orderForm.customerEmail" placeholder="Email address" />
+          </div>
+        </div>
+        <div class="pgd-form-row">
+          <div class="pgd-form-group">
+            <label>Customer Phone</label>
+            <input type="text" [(ngModel)]="orderForm.customerPhone" placeholder="Phone number" />
+          </div>
+          <div class="pgd-form-group">
+            <label>Receipt</label>
+            <input type="text" [(ngModel)]="orderForm.receipt" placeholder="Auto-generated if blank" />
+          </div>
+        </div>
+      </div>
+      <div class="pgd-modal-footer">
+        <button class="pgd-cancel-btn" (click)="showCreateOrder=false">Cancel</button>
+        <button class="pgd-primary-btn" (click)="createOrder()" [disabled]="isLoading || !orderForm.amount || !orderForm.customerName">
+          <i class="fa" [ngClass]="isLoading ? 'fa-spinner fa-spin' : 'fa-check'"></i> Create Order
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- UPI QR Modal -->
+  <div class="pgd-modal-overlay" *ngIf="showQrPayment" (click)="showQrPayment=false">
+    <div class="pgd-modal pgd-qr-modal" (click)="$event.stopPropagation()">
+      <div class="pgd-modal-header pgd-qr-header">
+        <h3><i class="fa fa-qrcode"></i> UPI QR Payment</h3>
+        <button class="pgd-modal-close" (click)="showQrPayment=false"><i class="fa fa-times"></i></button>
+      </div>
+      <div class="pgd-modal-body pgd-qr-body">
+        <div class="pgd-qr-info">
+          <div class="pgd-qr-order">Order: <strong>{{qrOrderId}}</strong></div>
+          <div class="pgd-qr-amount" *ngIf="qrSession">&#8377;{{qrSession.amount | number:'1.2-2'}}</div>
+        </div>
+        <div class="pgd-qr-code-wrap">
+          <div class="pgd-qr-code-image" *ngIf="qrImageUrl">
+            <img [src]="qrImageUrl" alt="UPI QR Code" class="pgd-qr-img" />
+          </div>
+          <div class="pgd-qr-code-placeholder" *ngIf="!qrImageUrl">
+            <i class="fa fa-spinner fa-spin"></i>
+            <div class="pgd-qr-text">Generating QR Code...</div>
+          </div>
+          <div class="pgd-qr-data-box">
+            <span class="pgd-qr-data-label">UPI Data</span>
+            <code class="pgd-qr-data">{{qrData}}</code>
+          </div>
+        </div>
+        <div class="pgd-qr-session-info" *ngIf="qrSession">
+          <div><strong>Session ID:</strong> {{qrSession.sessionId}}</div>
+          <div><strong>Status:</strong> <span class="pgd-status" [ngClass]="getStatusClass(qrSession.status)">{{qrSession.status}}</span></div>
+          <div><strong>Expires:</strong> {{qrSession.expiresAt | date:'medium'}}</div>
+        </div>
+        <div class="pgd-qr-steps">
+          <div class="pgd-step"><span class="pgd-step-num">1</span> Open any UPI app</div>
+          <div class="pgd-step"><span class="pgd-step-num">2</span> Scan the QR code</div>
+          <div class="pgd-step"><span class="pgd-step-num">3</span> Confirm payment in app</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Card Payment Modal -->
+  <div class="pgd-modal-overlay" *ngIf="showCardPayment" (click)="showCardPayment=false">
+    <div class="pgd-modal pgd-card-modal" (click)="$event.stopPropagation()">
+      <div class="pgd-modal-header pgd-card-header">
+        <h3><i class="fa fa-credit-card"></i> Card Payment</h3>
+        <button class="pgd-modal-close" (click)="showCardPayment=false"><i class="fa fa-times"></i></button>
+      </div>
+      <div class="pgd-modal-body">
+        <!-- Step Indicator -->
+        <div class="pgd-card-steps-indicator">
+          <div class="pgd-card-step-dot" [class.active]="cardPaymentStep >= 1" [class.done]="cardPaymentStep > 1">
+            <span>1</span> <small>Card Details</small>
+          </div>
+          <div class="pgd-card-step-line" [class.active]="cardPaymentStep > 1"></div>
+          <div class="pgd-card-step-dot" [class.active]="cardPaymentStep >= 2" [class.done]="cardPaymentStep > 2">
+            <span>2</span> <small>OTP Verify</small>
+          </div>
+          <div class="pgd-card-step-line" [class.active]="cardPaymentStep > 2"></div>
+          <div class="pgd-card-step-dot" [class.active]="cardPaymentStep >= 3">
+            <span>3</span> <small>Payment</small>
+          </div>
+        </div>
+
+        <div class="pgd-card-alert pgd-card-error" *ngIf="cardError">
+          <i class="fa fa-exclamation-circle"></i> {{cardError}}
+        </div>
+        <div class="pgd-card-alert pgd-card-success" *ngIf="cardSuccess">
+          <i class="fa fa-check-circle"></i> {{cardSuccess}}
+        </div>
+
+        <!-- Step 1: Card Details -->
+        <div *ngIf="cardPaymentStep === 1" class="pgd-card-step-content">
+          <div class="pgd-card-preview">
+            <div class="pgd-card-chip"></div>
+            <div class="pgd-card-brand">{{getCardBrand() || 'CARD'}}</div>
+            <div class="pgd-card-preview-number">{{cardForm.cardNumber || '**** **** **** ****'}}</div>
+            <div class="pgd-card-preview-bottom">
+              <div><small>CARDHOLDER</small><br/>{{cardForm.cardHolderName || 'YOUR NAME'}}</div>
+              <div><small>EXPIRES</small><br/>{{cardForm.cardExpiry || 'MM/YY'}}</div>
+            </div>
+          </div>
+
+          <div class="pgd-form-group">
+            <label>Card Type</label>
+            <div class="pgd-card-type-toggle">
+              <button [class.active]="cardForm.cardType==='DEBIT'" (click)="cardForm.cardType='DEBIT'"><i class="fa fa-id-card"></i> Debit Card</button>
+              <button [class.active]="cardForm.cardType==='CREDIT'" (click)="cardForm.cardType='CREDIT'"><i class="fa fa-credit-card"></i> Credit Card</button>
+            </div>
+          </div>
+          <div class="pgd-form-group">
+            <label>Card Number *</label>
+            <input type="text" [(ngModel)]="cardForm.cardNumber" (input)="formatCardNumber()" placeholder="1234 5678 9012 3456" maxlength="19" />
+          </div>
+          <div class="pgd-form-row">
+            <div class="pgd-form-group pgd-half">
+              <label>Expiry Date *</label>
+              <input type="text" [(ngModel)]="cardForm.cardExpiry" (input)="formatExpiry()" placeholder="MM/YY" maxlength="5" />
+            </div>
+            <div class="pgd-form-group pgd-half">
+              <label>CVV *</label>
+              <input type="password" [(ngModel)]="cardForm.cardCvv" placeholder="***" maxlength="4" />
+            </div>
+          </div>
+          <div class="pgd-form-group">
+            <label>Cardholder Name *</label>
+            <input type="text" [(ngModel)]="cardForm.cardHolderName" placeholder="Name on card" />
+          </div>
+        </div>
+
+        <!-- Step 2: OTP Verification -->
+        <div *ngIf="cardPaymentStep === 2" class="pgd-card-step-content">
+          <div class="pgd-card-otp-info">
+            <div class="pgd-card-otp-icon"><i class="fa fa-shield"></i></div>
+            <h4>Secure OTP Verification</h4>
+            <p>A 6-digit OTP has been sent to <strong>{{cardOtpEmail}}</strong> for card ending in <strong>****{{getCardLast4()}}</strong></p>
+          </div>
+          <div class="pgd-form-group pgd-otp-input-group">
+            <label>Enter OTP *</label>
+            <input type="text" [(ngModel)]="cardOtp" placeholder="Enter 6-digit OTP" maxlength="6" class="pgd-otp-input" />
+          </div>
+        </div>
+
+        <!-- Step 3: Processing / Success -->
+        <div *ngIf="cardPaymentStep === 3" class="pgd-card-step-content pgd-card-processing">
+          <div *ngIf="cardProcessing" class="pgd-card-proc-anim">
+            <i class="fa fa-spinner fa-spin fa-3x"></i>
+            <h4>Processing Payment...</h4>
+            <p>Please do not close this window</p>
+          </div>
+          <div *ngIf="!cardProcessing && cardSuccess" class="pgd-card-proc-success">
+            <i class="fa fa-check-circle fa-3x"></i>
+            <h4>Payment Successful!</h4>
+            <p>{{cardSuccess}}</p>
+          </div>
+        </div>
+      </div>
+      <div class="pgd-modal-footer" *ngIf="cardPaymentStep < 3">
+        <button class="pgd-cancel-btn" (click)="showCardPayment=false">Cancel</button>
+        <button *ngIf="cardPaymentStep === 1" class="pgd-primary-btn pgd-btn-card-proceed" (click)="sendCardOtp()" [disabled]="cardProcessing">
+          <i class="fa" [ngClass]="cardProcessing ? 'fa-spinner fa-spin' : 'fa-lock'"></i> Verify & Send OTP
+        </button>
+        <button *ngIf="cardPaymentStep === 2" class="pgd-primary-btn pgd-btn-card-pay" (click)="verifyCardOtpAndPay()" [disabled]="cardProcessing || cardOtp.length !== 6">
+          <i class="fa" [ngClass]="cardProcessing ? 'fa-spinner fa-spin' : 'fa-check'"></i> Verify OTP & Pay
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pay Order Modal -->
+  <div class="pgd-modal-overlay" *ngIf="showPayOrder" (click)="showPayOrder=false">
+    <div class="pgd-modal" (click)="$event.stopPropagation()">
+      <div class="pgd-modal-header">
+        <h3><i class="fa fa-credit-card"></i> Process Payment</h3>
+        <button class="pgd-modal-close" (click)="showPayOrder=false"><i class="fa fa-times"></i></button>
+      </div>
+      <div class="pgd-modal-body">
+        <div class="pgd-form-group">
+          <label>Order ID</label>
+          <input type="text" [value]="payForm.orderId" readonly />
+        </div>
+        <div class="pgd-form-group">
+          <label>Payer Name *</label>
+          <input type="text" [(ngModel)]="payForm.payerName" placeholder="Enter payer's name" />
+        </div>
+        <div class="pgd-form-group">
+          <label>Payer Account / UPI ID *</label>
+          <input type="text" [(ngModel)]="payForm.payerAccount" placeholder="Enter account or UPI ID" />
+        </div>
+        <div class="pgd-form-group">
+          <label>Payment Method</label>
+          <select [(ngModel)]="payForm.paymentMethod">
+            <option value="UPI">UPI</option>
+            <option value="CARD">Card</option>
+            <option value="NET_BANKING">Net Banking</option>
+            <option value="WALLET">Wallet</option>
+          </select>
+        </div>
+      </div>
+      <div class="pgd-modal-footer">
+        <button class="pgd-cancel-btn" (click)="showPayOrder=false">Cancel</button>
+        <button class="pgd-primary-btn" (click)="processPayment()" [disabled]="isLoading || !payForm.payerAccount">
+          <i class="fa" [ngClass]="isLoading ? 'fa-spinner fa-spin' : 'fa-check'"></i> Process Payment
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Name Verify Modal -->
+  <div class="pgd-modal-overlay" *ngIf="showNameVerify" (click)="showNameVerify=false">
+    <div class="pgd-modal" (click)="$event.stopPropagation()">
+      <div class="pgd-modal-header">
+        <h3><i class="fa fa-user-check"></i> Verify Payer Name</h3>
+        <button class="pgd-modal-close" (click)="showNameVerify=false"><i class="fa fa-times"></i></button>
+      </div>
+      <div class="pgd-modal-body">
+        <div class="pgd-form-group">
+          <label>Order ID</label>
+          <input type="text" [value]="nameVerifyForm.orderId" readonly />
+        </div>
+        <div class="pgd-form-group">
+          <label>Payer Name *</label>
+          <input type="text" [(ngModel)]="nameVerifyForm.payerName" placeholder="Enter payer's name to verify" />
+        </div>
+        <div class="pgd-form-group">
+          <label>Payer Account *</label>
+          <input type="text" [(ngModel)]="nameVerifyForm.payerAccount" placeholder="Enter payer's account number" />
+        </div>
+        <button class="pgd-primary-btn pgd-verify-btn" (click)="verifyName()" [disabled]="nameVerifyLoading || !nameVerifyForm.payerName || !nameVerifyForm.payerAccount">
+          <i class="fa" [ngClass]="nameVerifyLoading ? 'fa-spinner fa-spin' : 'fa-search'"></i> Verify Name
+        </button>
+
+        <!-- Verification Result -->
+        <div *ngIf="nameVerifyResult" class="pgd-verify-result" [ngClass]="nameVerifyResult.verified ? 'pgd-verify-pass' : 'pgd-verify-fail'">
+          <div class="pgd-verify-icon">
+            <i class="fa" [ngClass]="nameVerifyResult.verified ? 'fa-check-circle' : 'fa-exclamation-triangle'"></i>
+          </div>
+          <div class="pgd-verify-info">
+            <div class="pgd-verify-title">{{nameVerifyResult.verified ? 'Name Verified' : 'Name Mismatch'}}</div>
+            <div class="pgd-verify-msg">{{nameVerifyResult.message}}</div>
+            <div class="pgd-verify-score" *ngIf="nameVerifyResult.matchScore !== undefined">
+              Match Score: <strong>{{(nameVerifyResult.matchScore * 100) | number:'1.0-0'}}%</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Refund Modal -->
+  <div class="pgd-modal-overlay" *ngIf="showRefundModal" (click)="showRefundModal=false">
+    <div class="pgd-modal" (click)="$event.stopPropagation()">
+      <div class="pgd-modal-header">
+        <h3><i class="fa fa-undo"></i> Process Refund</h3>
+        <button class="pgd-modal-close" (click)="showRefundModal=false"><i class="fa fa-times"></i></button>
+      </div>
+      <div class="pgd-modal-body">
+        <div class="pgd-form-group">
+          <label>Transaction ID</label>
+          <input type="text" [value]="refundForm.transactionId" readonly />
+        </div>
+        <div class="pgd-form-group">
+          <label>Refund Amount (&#8377;) *</label>
+          <input type="number" [(ngModel)]="refundForm.amount" placeholder="Refund amount" min="1" />
+        </div>
+        <div class="pgd-form-group">
+          <label>Reason</label>
+          <textarea [(ngModel)]="refundForm.reason" placeholder="Reason for refund" rows="3"></textarea>
+        </div>
+      </div>
+      <div class="pgd-modal-footer">
+        <button class="pgd-cancel-btn" (click)="showRefundModal=false">Cancel</button>
+        <button class="pgd-primary-btn pgd-btn-refund-submit" (click)="processRefund()" [disabled]="isLoading || !refundForm.amount">
+          <i class="fa" [ngClass]="isLoading ? 'fa-spinner fa-spin' : 'fa-undo'"></i> Process Refund
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pay with UPI ID Modal -->
+  <div class="pgd-modal-overlay" *ngIf="showUpiPayModal" (click)="showUpiPayModal=false">
+    <div class="pgd-modal" (click)="$event.stopPropagation()">
+      <div class="pgd-modal-header">
+        <h3><i class="fa fa-mobile"></i> Send Payment Request via UPI</h3>
+        <button class="pgd-modal-close" (click)="showUpiPayModal=false"><i class="fa fa-times"></i></button>
+      </div>
+      <div class="pgd-modal-body" *ngIf="!upiPaySuccess">
+        <div class="pgd-form-group">
+          <label>Order ID</label>
+          <input type="text" [value]="upiPayOrder?.orderId" readonly />
+        </div>
+        <div class="pgd-form-group">
+          <label>Amount</label>
+          <input type="text" [value]="'₹' + (upiPayOrder?.amount | number:'1.2-2')" readonly />
+        </div>
+        <div class="pgd-form-group">
+          <label>Payer UPI ID *</label>
+          <div style="display:flex; gap:8px;">
+            <input type="text" [(ngModel)]="upiPayForm.upiId" placeholder="e.g. name@upi"
+                   (input)="upiPayVerified=false; upiPayVerifiedName=''; upiPayVerifyError=''"
+                   style="flex:1;" />
+            <button class="pgd-primary-btn" (click)="verifyUpiForPayment()"
+                    [disabled]="!upiPayForm.upiId || isVerifyingUpiPay || isSubmittingUpiPay"
+                    style="white-space:nowrap;">
+              <i class="fa" [ngClass]="isVerifyingUpiPay ? 'fa-spinner fa-spin' : 'fa-check-circle'"></i>
+              {{ isVerifyingUpiPay ? 'Checking...' : 'Verify' }}
+            </button>
+          </div>
+        </div>
+        <div *ngIf="upiPayVerified" class="pgd-upi-verified">
+          <i class="fa fa-check-circle"></i> <strong>{{upiPayVerifiedName}}</strong>
+        </div>
+        <div *ngIf="upiPayVerifyError" class="pgd-upi-error">
+          <i class="fa fa-exclamation-triangle"></i> {{upiPayVerifyError}}
+        </div>
+        <div *ngIf="upiPayVerified" class="pgd-upi-verified" style="margin-top:4px;">
+          <i class="fa fa-info-circle"></i> Payment request will be sent to the user's dashboard. They will authorize with their UPI PIN.
+        </div>
+      </div>
+      <div class="pgd-modal-body pgd-upi-success-body" *ngIf="upiPaySuccess">
+        <div class="pgd-upi-success-icon"><i class="fa fa-check-circle"></i></div>
+        <p>{{upiPaySuccess}}</p>
+        <small>The user will see this request in their dashboard and can pay with their UPI PIN.</small>
+      </div>
+      <div class="pgd-modal-footer" *ngIf="!upiPaySuccess">
+        <button class="pgd-cancel-btn" (click)="showUpiPayModal=false">Cancel</button>
+        <button class="pgd-primary-btn" (click)="submitUpiPay()"
+                [disabled]="!upiPayVerified || isSubmittingUpiPay">
+          <i class="fa" [ngClass]="isSubmittingUpiPay ? 'fa-spinner fa-spin' : 'fa-paper-plane'"></i>
+          {{ isSubmittingUpiPay ? 'Sending...' : 'Send Payment Request' }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading Overlay -->
+  <div class="pgd-loading-overlay" *ngIf="isLoading">
+    <div class="pgd-loading-spinner"><i class="fa fa-spinner fa-spin"></i></div>
+  </div>
+</div>
