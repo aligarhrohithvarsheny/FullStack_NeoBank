@@ -13,6 +13,6 @@ WORKDIR /app
 
 COPY --from=build /workspace/target/*.jar app.jar
 
-EXPOSE 8080
+EXPOSE 10000
 
-CMD ["java", "-jar", "app.jar"]
+CMD ["java", "-Dserver.port=10000", "-jar", "app.jar"]
