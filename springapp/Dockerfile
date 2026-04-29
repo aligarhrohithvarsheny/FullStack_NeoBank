@@ -1,11 +1,9 @@
-FROM maven:3.9.4-eclipse-temurin-21 AS build
-WORKDIR /workspace
-COPY pom.xml .
-COPY src ./src
-RUN mvn -B -DskipTests package
+FROM eclipse-temurin:21-jdk
 
-FROM eclipse-temurin:21-jre
 WORKDIR /app
-COPY --from=build /workspace/target/*.jar app.jar
-EXPOSE 8080
-ENTRYPOINT ["java", "-Dspring.profiles.active=production", "-Xms256m", "-Xmx1024m", "-XX:+UseG1GC", "-jar", "/app/app.jar"]
+
+COPY target/springapp-0.0.1-SNAPSHOT.jar app.jar
+
+EXPOSE 10000
+
+CMD ["java", "-Dserver.port=10000", "-jar", "app.jar"]
