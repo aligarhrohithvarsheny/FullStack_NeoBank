@@ -23,6 +23,11 @@ import java.util.stream.Collectors;
  */
 @Configuration
 public class CorsConfig {
+    private static final List<String> DEFAULT_ALLOWED_ORIGINS = Arrays.asList(
+        "https://neo-bank-669.web.app",
+        "https://neo-bank-669.firebaseapp.com",
+        "http://localhost:4200"
+    );
 
     /**
      * Read allowed origins from SPRING_WEB_CORS_ALLOWED_ORIGINS environment variable.
@@ -35,7 +40,8 @@ public class CorsConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         
-        // Parse allowed origins from environment variable
+        // Parse allowed origins from environment variable.
+        // If not provided, fall back to Firebase Hosting + local dev origins.
         if (allowedOrigins != null && !allowedOrigins.trim().isEmpty()) {
             List<String> origins = Arrays.stream(allowedOrigins.split(","))
                 .map(String::trim)
@@ -43,15 +49,15 @@ public class CorsConfig {
                 .collect(Collectors.toList());
             
             if (!origins.isEmpty()) {
-                configuration.setAllowedOrigins(origins);
+                configuration.setAllowedOriginPatterns(origins);
                 System.out.println("✅ CORS configured with origins: " + origins);
             } else {
-                configuration.setAllowedOrigins(List.of());
-                System.out.println("⚠️ CORS: No valid origins found in SPRING_WEB_CORS_ALLOWED_ORIGINS");
+                configuration.setAllowedOriginPatterns(DEFAULT_ALLOWED_ORIGINS);
+                System.out.println("⚠️ CORS: No valid origins found in SPRING_WEB_CORS_ALLOWED_ORIGINS, using defaults: " + DEFAULT_ALLOWED_ORIGINS);
             }
         } else {
-            configuration.setAllowedOrigins(List.of());
-            System.out.println("⚠️ CORS: SPRING_WEB_CORS_ALLOWED_ORIGINS not set - CORS disabled");
+            configuration.setAllowedOriginPatterns(DEFAULT_ALLOWED_ORIGINS);
+            System.out.println("⚠️ CORS: SPRING_WEB_CORS_ALLOWED_ORIGINS not set, using defaults: " + DEFAULT_ALLOWED_ORIGINS);
         }
         
         // Allow all HTTP methods including OPTIONS for preflight
