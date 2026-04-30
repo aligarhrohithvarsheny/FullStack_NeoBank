@@ -80,6 +80,8 @@ public class FastagLoginController {
         Map<String, Object> response = new HashMap<>();
 
         String gmailId = request.get("gmailId");
+        System.out.println("OTP API HIT: /api/fastag/send-otp");
+        System.out.println("Email: " + gmailId);
         if (gmailId == null || gmailId.trim().isEmpty()) {
             response.put("success", false);
             response.put("message", "Gmail ID is required.");

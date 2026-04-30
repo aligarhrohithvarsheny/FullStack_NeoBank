@@ -28,7 +28,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Arrays;
@@ -871,7 +870,6 @@ public class UserController {
     public ResponseEntity<Map<String, Object>> sendSignupOtp(@RequestBody Map<String, String> request) {
         try {
             String email = request.get("email");
-            String name = request.get("name");
             String phone = request.get("phone");
             Map<String, Object> response = new HashMap<>();
 
@@ -1690,39 +1688,15 @@ public class UserController {
             
             System.out.println("[SEND-RESET-OTP] User found. Generating OTP...");
             
-            // Step 4: Generate and store OTP (fast, in-memory operation)
-            String otp = otpService.generateOtp();
-            otpService.storeOtp(finalEmail, otp);
-            System.out.println("[SEND-RESET-OTP] OTP generated and stored for email: " + finalEmail);
-            
-            // Create final variable for lambda (OTP is generated and stored)
-            final String finalOtp = otp;
-            
-            // Step 5: Send email ASYNCHRONOUSLY (truly non-blocking)
-            // Return success immediately, send email in background without waiting
-            System.out.println("[SEND-RESET-OTP] Initiating async email send (non-blocking)...");
-            
-            CompletableFuture.runAsync(() -> {
-                try {
-                    System.out.println("[SEND-RESET-OTP-ASYNC] Starting email send for: " + finalEmail);
-                    long emailStartTime = System.currentTimeMillis();
-                    boolean emailSent = emailService.sendPasswordResetOtpEmail(finalEmail, finalOtp);
-                    long emailTime = System.currentTimeMillis() - emailStartTime;
-                    System.out.println("[SEND-RESET-OTP-ASYNC] Email send completed in " + emailTime + "ms. Success: " + emailSent);
-                    
-                    if (!emailSent) {
-                        System.err.println("[SEND-RESET-OTP-ASYNC] WARNING: Email send failed, but OTP is stored. User can still use OTP.");
-                    }
-                } catch (Exception e) {
-                    System.err.println("[SEND-RESET-OTP-ASYNC] Email send error: " + e.getMessage());
-                    e.printStackTrace();
-                    System.err.println("[SEND-RESET-OTP-ASYNC] OTP is still stored and valid despite email error.");
-                }
-            });
-            
-            // Step 6: Return success response immediately (OTP is stored, email is being sent in background)
+            // Step 4: Generate/store/send OTP through centralized service (synchronous, no fake success).
+            System.out.println("OTP API HIT: /api/users/send-reset-otp");
+            System.out.println("Email: " + finalEmail);
+            otpService.sendOtp(finalEmail, "RESET_PASSWORD");
+            System.out.println("[SEND-RESET-OTP] OTP generated, stored, and email sent for: " + finalEmail);
+
+            // Step 5: Return success only after email dispatch succeeds.
             long totalTime = System.currentTimeMillis() - startTime;
-            System.out.println("[SEND-RESET-OTP] Request completed in " + totalTime + "ms. Returning success response immediately.");
+            System.out.println("[SEND-RESET-OTP] Request completed in " + totalTime + "ms. Returning success response.");
             
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);

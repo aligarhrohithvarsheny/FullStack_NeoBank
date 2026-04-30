@@ -1,5 +1,6 @@
 package com.neo.springapp.service;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.Map;
@@ -8,6 +9,8 @@ import java.util.Random;
 
 @Service
 public class OtpService {
+    @Autowired
+    private EmailService emailService;
     
     // Store OTPs temporarily in memory (email -> OTP)
     // In production, consider using Redis or database with expiration
@@ -26,6 +29,58 @@ public class OtpService {
     public String generateOtp() {
         int otp = 100000 + random.nextInt(900000); // Generates 6-digit number
         return String.valueOf(otp);
+    }
+
+    /**
+     * Centralized OTP generation + storage + email sending for email-based flows.
+     * Throws RuntimeException when delivery fails to avoid fake 200 responses.
+     */
+    public String sendOtp(String email, String purpose) {
+        String normalizedEmail = email != null ? email.toLowerCase().trim() : null;
+        if (normalizedEmail == null || normalizedEmail.isEmpty()) {
+            throw new RuntimeException("Email is required for OTP sending");
+        }
+
+        String otp = generateOtp();
+        storeOtp(normalizedEmail, otp);
+
+        System.out.println("🔔 OTP API flow trigger [" + purpose + "] for email: " + normalizedEmail);
+        System.out.println("🔐 OTP generated for [" + purpose + "] (masked): ****" + otp.substring(otp.length() - 2));
+
+        boolean sent = emailService.sendOtpEmail(normalizedEmail, otp);
+        if (!sent) {
+            throw new RuntimeException("Failed to send OTP email for " + purpose);
+        }
+
+        System.out.println("✅ OTP email dispatch completed for [" + purpose + "] to " + normalizedEmail);
+        return otp;
+    }
+
+    /**
+     * Centralized OTP generation + key storage + email sending for key-based flows.
+     */
+    public String sendOtpForKey(String email, String key, String purpose) {
+        String normalizedEmail = email != null ? email.toLowerCase().trim() : null;
+        if (normalizedEmail == null || normalizedEmail.isEmpty()) {
+            throw new RuntimeException("Email is required for OTP sending");
+        }
+        if (key == null || key.trim().isEmpty()) {
+            throw new RuntimeException("OTP key is required");
+        }
+
+        String otp = generateOtp();
+        storeOtpForKey(key, otp);
+
+        System.out.println("🔔 OTP API flow trigger [" + purpose + "] for email: " + normalizedEmail + " key: " + key);
+        System.out.println("🔐 OTP generated for [" + purpose + "] (masked): ****" + otp.substring(otp.length() - 2));
+
+        boolean sent = emailService.sendOtpEmailWithReason(normalizedEmail, otp, purpose);
+        if (!sent) {
+            throw new RuntimeException("Failed to send OTP email for " + purpose);
+        }
+
+        System.out.println("✅ OTP email dispatch completed for [" + purpose + "] to " + normalizedEmail);
+        return otp;
     }
     
     /**

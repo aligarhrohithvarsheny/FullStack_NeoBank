@@ -21,14 +21,13 @@ public class FastagLoginService {
     @Autowired
     private OtpService otpService;
 
-    @Autowired
-    private EmailService emailService;
-
     /**
      * Send OTP to given Gmail ID. Auto-creates FastagUser if new.
      */
     public FastagUser sendOtp(String gmailId) {
         String normalizedEmail = gmailId.toLowerCase().trim();
+        System.out.println("OTP API HIT: /api/fastag/send-otp");
+        System.out.println("Email: " + normalizedEmail);
 
         // Find or create user
         FastagUser user = fastagUserRepository.findByGmailId(normalizedEmail)
@@ -39,22 +38,13 @@ public class FastagLoginService {
                     return newUser;
                 });
 
-        // Generate and store OTP
-        String otp = otpService.generateOtp();
+        // Generate/store/send OTP through centralized flow.
+        String otp = otpService.sendOtp(normalizedEmail, "FASTag Login");
         user.setOtp(otp);
         user.setOtpExpiry(LocalDateTime.now().plusMinutes(OTP_VALIDITY_MINUTES));
         user.setOtpAttempts(0);
 
         fastagUserRepository.save(user);
-
-        // Also store in OtpService (for consistency with existing pattern)
-        otpService.storeOtp(normalizedEmail, otp);
-
-        // Send OTP via email
-        boolean sent = emailService.sendFastagOtpEmail(normalizedEmail, otp);
-        if (!sent) {
-            System.out.println("⚠️ FASTag OTP email sending reported failure, but OTP is stored. Check console for OTP.");
-        }
 
         return user;
     }

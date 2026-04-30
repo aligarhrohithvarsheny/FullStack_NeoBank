@@ -32,9 +32,6 @@ public class FixedDepositService {
     private OtpService otpService;
 
     @Autowired
-    private EmailService emailService;
-
-    @Autowired
     private UserService userService;
 
     private static final String OTP_REASON_FD_FORECLOSURE = "FD (Fixed Deposit) Withdrawal / Foreclosure";
@@ -57,15 +54,10 @@ public class FixedDepositService {
                 response.put("message", "User email not found. Cannot send OTP.");
                 return response;
             }
-            String otp = otpService.generateOtp();
             String key = "FD_FORECLOSURE:" + fdId;
-            otpService.storeOtpForKey(key, otp);
-            boolean sent = emailService.sendOtpEmailWithReason(userEmail, otp, OTP_REASON_FD_FORECLOSURE);
-            if (!sent) {
-                response.put("success", false);
-                response.put("message", "Failed to send OTP. Please try again.");
-                return response;
-            }
+            System.out.println("OTP API HIT: /api/fixed-deposits/" + fdId + "/foreclosure/request-otp");
+            System.out.println("Email: " + userEmail);
+            otpService.sendOtpForKey(userEmail, key, OTP_REASON_FD_FORECLOSURE);
             response.put("success", true);
             response.put("message", "OTP sent to your registered email.");
         } catch (Exception e) {
