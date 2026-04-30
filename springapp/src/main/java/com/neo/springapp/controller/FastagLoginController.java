@@ -45,6 +45,33 @@ public class FastagLoginController {
     private FastagLinkedAccountRepository fastagLinkedAccountRepository;
 
     /**
+     * POST /api/fastag/test-email
+     * Manual SMTP verification endpoint (for Render log debugging).
+     */
+    @PostMapping("/test-email")
+    public ResponseEntity<Map<String, Object>> testEmail(@RequestBody Map<String, String> request) {
+        Map<String, Object> response = new HashMap<>();
+        String email = request.get("email");
+
+        if (email == null || email.trim().isEmpty()) {
+            response.put("success", false);
+            response.put("message", "Email is required.");
+            return ResponseEntity.badRequest().body(response);
+        }
+
+        String targetEmail = email.trim().toLowerCase();
+        String testOtp = "654321";
+        System.out.println("🧪 Fastag test-email endpoint invoked for: " + targetEmail);
+        boolean sent = emailService.sendOtpEmail(targetEmail, testOtp);
+        response.put("success", sent);
+        response.put("message", sent
+                ? "Test email send attempted successfully. Check inbox/spam."
+                : "Test email failed. Check Render logs for SMTP/auth error details.");
+        response.put("email", targetEmail);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
      * POST /api/fastag/send-otp
      * Send OTP to Gmail ID for FASTag login
      */

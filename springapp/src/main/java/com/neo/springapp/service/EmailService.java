@@ -3,7 +3,13 @@ package com.neo.springapp.service;
 import com.neo.springapp.model.Loan;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
+import org.springframework.core.env.Environment;
+import org.springframework.mail.MailAuthenticationException;
+import org.springframework.mail.MailSendException;
+import org.springframework.mail.SimpleMailMessage;
+import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
+import jakarta.mail.AuthenticationFailedException;
 
 import java.lang.reflect.Method;
 
@@ -11,6 +17,12 @@ import java.lang.reflect.Method;
 @SuppressWarnings("null")
 public class EmailService {
     
+    @Autowired(required = false)
+    private JavaMailSender javaMailSender;
+
+    @Autowired(required = false)
+    private Environment environment;
+
     private Object mailSender;
     private boolean mailAvailable = false;
     
@@ -23,6 +35,13 @@ public class EmailService {
     private void initializeMailSender() {
         if (mailAvailable) {
             return; // Already initialized
+        }
+
+        if (javaMailSender != null) {
+            this.mailSender = javaMailSender;
+            this.mailAvailable = true;
+            System.out.println("✅ Email service initialized with JavaMailSender bean");
+            return;
         }
         
         System.out.println("==========================================");
@@ -71,59 +90,41 @@ public class EmailService {
         initializeMailSender();
         
         try {
-            // If mail sender is not configured, log OTP to console (for development)
             if (!mailAvailable || mailSender == null) {
-                System.out.println("==========================================");
-                System.out.println("EMAIL OTP (Mail not configured - Development Mode)");
-                System.out.println("To: " + toEmail);
-                System.out.println("OTP: " + otp);
-                System.out.println("==========================================");
-                return true; // Return true for development
+                System.err.println("❌ OTP email sending skipped: JavaMailSender is not configured.");
+                return false;
             }
-            
-            // Use reflection to send email if mail dependency is available
-            Class<?> simpleMailMessageClass = Class.forName("org.springframework.mail.SimpleMailMessage");
-            Object message = simpleMailMessageClass.getDeclaredConstructor().newInstance();
-            
-            Method setToMethod = simpleMailMessageClass.getMethod("setTo", String.class);
-            Method setSubjectMethod = simpleMailMessageClass.getMethod("setSubject", String.class);
-            Method setTextMethod = simpleMailMessageClass.getMethod("setText", String.class);
-            Method setFromMethod = simpleMailMessageClass.getMethod("setFrom", String.class);
-            
-            setToMethod.invoke(message, toEmail);
-            setSubjectMethod.invoke(message, "NeoBank - Login OTP Verification");
-            setTextMethod.invoke(message, buildOtpEmailBody(otp));
-            // Use the configured email username as the "from" address
+
             String fromEmail = getFromEmail();
-            setFromMethod.invoke(message, fromEmail);
-            System.out.println("Email 'From' address set to: " + fromEmail);
-            
-            System.out.println("Attempting to send email...");
-            System.out.println("Mail sender available: " + (mailSender != null));
-            System.out.println("Mail sender class: " + (mailSender != null ? mailSender.getClass().getName() : "null"));
-            
-            // Try to find the send method - it might be send(SimpleMailMessage) or send(MimeMessage)
-            Method sendMethod = null;
-            try {
-                sendMethod = mailSender.getClass().getMethod("send", Object.class);
-            } catch (NoSuchMethodException e) {
-                // Try with SimpleMailMessage class
-                try {
-                    sendMethod = mailSender.getClass().getMethod("send", simpleMailMessageClass);
-                } catch (Exception e2) {
-                    throw new RuntimeException("Could not find send method", e2);
-                }
-            }
-            
-            System.out.println("Invoking send method...");
-            sendMethod.invoke(mailSender, message);
+            SimpleMailMessage message = new SimpleMailMessage();
+            message.setTo(toEmail);
+            message.setFrom(fromEmail);
+            message.setSubject("NeoBank - Login OTP Verification");
+            message.setText(buildOtpEmailBody(otp));
+
+            // OTP value is masked in logs to avoid leaking sensitive data.
+            System.out.println("📧 OTP generated for: " + toEmail + " | length=" + (otp != null ? otp.length() : 0));
+            System.out.println("📨 Sending OTP email via SMTP host: " + getMailHostForLogs() + " as user: " + fromEmail);
+            javaMailSender.send(message);
             
             System.out.println("==========================================");
             System.out.println("✅ OTP email sent successfully!");
             System.out.println("To: " + toEmail);
-            System.out.println("From: " + (applicationContext != null ? getFromEmail() : "noreply@neobank.com"));
+            System.out.println("From: " + fromEmail);
             System.out.println("==========================================");
             return true;
+        } catch (MailAuthenticationException e) {
+            System.err.println("❌ SMTP authentication failed while sending OTP email: " + e.getMessage());
+            Throwable cause = e.getCause();
+            if (cause instanceof AuthenticationFailedException) {
+                System.err.println("❌ Root cause: Gmail authentication failed (check App Password).");
+            } else if (cause != null) {
+                System.err.println("❌ Authentication cause: " + cause.getMessage());
+            }
+            return false;
+        } catch (MailSendException e) {
+            System.err.println("❌ MailSendException while sending OTP email: " + e.getMessage());
+            return false;
         } catch (Exception e) {
             System.err.println("==========================================");
             System.err.println("FAILED TO SEND OTP EMAIL");
@@ -136,15 +137,7 @@ public class EmailService {
             e.printStackTrace();
             System.err.println("==========================================");
             
-            // In development, still log the OTP even if email fails
-            System.out.println("==========================================");
-            System.out.println("EMAIL OTP (Email sending failed - Development Mode)");
-            System.out.println("To: " + toEmail);
-            System.out.println("OTP: " + otp);
-            System.out.println("Please check the error above for email configuration issues.");
-            System.out.println("==========================================");
-            
-            return true; // Return true for development (allow login even if email fails)
+            return false;
         }
     }
     
@@ -152,20 +145,19 @@ public class EmailService {
      * Get the 'from' email address from configuration
      */
     private String getFromEmail() {
-        try {
-            Class<?> environmentClass = Class.forName("org.springframework.core.env.Environment");
-            if (applicationContext != null) {
-                Object environment = applicationContext.getBean(environmentClass);
-                Method getPropertyMethod = environmentClass.getMethod("getProperty", String.class);
-                String fromEmail = (String) getPropertyMethod.invoke(environment, "spring.mail.username");
-                if (fromEmail != null && !fromEmail.isEmpty()) {
-                    return fromEmail;
-                }
+        if (environment != null) {
+            String fromEmail = environment.getProperty("spring.mail.username");
+            if (fromEmail != null && !fromEmail.isBlank()) {
+                return fromEmail;
             }
-        } catch (Exception e) {
-            System.out.println("Could not get from email from config: " + e.getMessage());
         }
         return "noreply@neobank.com";
+    }
+
+    private String getMailHostForLogs() {
+        if (environment == null) return "unknown";
+        String host = environment.getProperty("spring.mail.host");
+        return host != null ? host : "unknown";
     }
     
     /**
@@ -1467,54 +1459,7 @@ public class EmailService {
      * Send FASTag Login OTP email
      */
     public boolean sendFastagOtpEmail(String toEmail, String otp) {
-        initializeMailSender();
-        
-        try {
-            if (!mailAvailable || mailSender == null) {
-                System.out.println("==========================================");
-                System.out.println("FASTAG LOGIN OTP (Mail not configured - Development Mode)");
-                System.out.println("To: " + toEmail);
-                System.out.println("OTP: " + otp);
-                System.out.println("==========================================");
-                return true;
-            }
-            
-            Class<?> simpleMailMessageClass = Class.forName("org.springframework.mail.SimpleMailMessage");
-            Object message = simpleMailMessageClass.getDeclaredConstructor().newInstance();
-            
-            Method setToMethod = simpleMailMessageClass.getMethod("setTo", String.class);
-            Method setSubjectMethod = simpleMailMessageClass.getMethod("setSubject", String.class);
-            Method setTextMethod = simpleMailMessageClass.getMethod("setText", String.class);
-            Method setFromMethod = simpleMailMessageClass.getMethod("setFrom", String.class);
-            
-            setToMethod.invoke(message, toEmail);
-            setSubjectMethod.invoke(message, "NeoBank - FASTag Login OTP Verification");
-            setTextMethod.invoke(message, buildFastagOtpEmailBody(otp));
-            String fromEmail = getFromEmail();
-            setFromMethod.invoke(message, fromEmail);
-            
-            Method sendMethod;
-            try {
-                sendMethod = mailSender.getClass().getMethod("send", Object.class);
-            } catch (NoSuchMethodException e) {
-                sendMethod = mailSender.getClass().getMethod("send", simpleMailMessageClass);
-            }
-            sendMethod.invoke(mailSender, message);
-            
-            System.out.println("✅ FASTag OTP email sent to: " + toEmail);
-            return true;
-        } catch (Exception e) {
-            System.err.println("Failed to send FASTag OTP email to: " + toEmail);
-            System.err.println("Error: " + e.getMessage());
-            e.printStackTrace();
-            
-            System.out.println("==========================================");
-            System.out.println("FASTAG LOGIN OTP (Email sending failed - Development Mode)");
-            System.out.println("To: " + toEmail);
-            System.out.println("OTP: " + otp);
-            System.out.println("==========================================");
-            return true;
-        }
+        return sendOtpEmail(toEmail, otp);
     }
 
     private String buildFastagOtpEmailBody(String otp) {
