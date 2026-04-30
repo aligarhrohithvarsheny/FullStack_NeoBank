@@ -407,9 +407,24 @@ export class FasttagDashboard implements OnInit {
   }
 
   sendLinkOtp() {
-    if (!this.linkAccountNumber.trim()) {
+    const accountNumber = this.linkAccountNumber.trim();
+    const gmailId = this.user?.gmailId?.trim();
+
+    console.log('[FASTag] sendLinkOtp clicked', {
+      hasAccountNumber: !!accountNumber,
+      hasGmailId: !!gmailId,
+      apiBaseUrl: environment.apiBaseUrl
+    });
+
+    if (!accountNumber) {
       this.linkMessage = 'Please enter your account number.';
       this.linkSuccess = false;
+      return;
+    }
+    if (!gmailId) {
+      this.linkMessage = 'Session expired. Please login again and retry.';
+      this.linkSuccess = false;
+      this.linkLoading = false;
       return;
     }
 
@@ -417,10 +432,11 @@ export class FasttagDashboard implements OnInit {
     this.linkMessage = '';
 
     this.http.post<any>(`${environment.apiBaseUrl}/api/fastag/link-account`, {
-      gmailId: this.user.gmailId,
-      accountNumber: this.linkAccountNumber.trim()
+      gmailId,
+      accountNumber
     }).subscribe({
       next: (res) => {
+        console.log('[FASTag] sendLinkOtp response', res);
         this.linkLoading = false;
         if (res.success) {
           this.linkOtpSent = true;
@@ -436,6 +452,7 @@ export class FasttagDashboard implements OnInit {
         }
       },
       error: (err) => {
+        console.error('[FASTag] sendLinkOtp error', err);
         this.linkLoading = false;
         this.linkMessage = err.error?.message || 'Failed to verify account. Try again.';
         this.linkSuccess = false;
@@ -444,9 +461,25 @@ export class FasttagDashboard implements OnInit {
   }
 
   verifyLinkOtp() {
-    if (!this.linkOtp.trim() || this.linkOtp.trim().length !== 6) {
+    const accountNumber = this.linkAccountNumber.trim();
+    const gmailId = this.user?.gmailId?.trim();
+    const otp = this.linkOtp.trim();
+
+    console.log('[FASTag] verifyLinkOtp clicked', {
+      hasAccountNumber: !!accountNumber,
+      hasGmailId: !!gmailId,
+      otpLength: otp.length
+    });
+
+    if (!otp || otp.length !== 6) {
       this.linkMessage = 'Please enter a valid 6-digit OTP.';
       this.linkSuccess = false;
+      return;
+    }
+    if (!accountNumber || !gmailId) {
+      this.linkMessage = 'Session expired. Please login again and retry.';
+      this.linkSuccess = false;
+      this.linkLoading = false;
       return;
     }
 
@@ -454,11 +487,12 @@ export class FasttagDashboard implements OnInit {
     this.linkMessage = '';
 
     this.http.post<any>(`${environment.apiBaseUrl}/api/fastag/verify-link-account`, {
-      gmailId: this.user.gmailId,
-      accountNumber: this.linkAccountNumber.trim(),
-      otp: this.linkOtp.trim()
+      gmailId,
+      accountNumber,
+      otp
     }).subscribe({
       next: (res) => {
+        console.log('[FASTag] verifyLinkOtp response', res);
         this.linkLoading = false;
         if (res.success) {
           this.linkMessage = res.message;
@@ -474,6 +508,7 @@ export class FasttagDashboard implements OnInit {
         }
       },
       error: (err) => {
+        console.error('[FASTag] verifyLinkOtp error', err);
         this.linkLoading = false;
         this.linkMessage = err.error?.message || 'Verification failed. Try again.';
         this.linkSuccess = false;

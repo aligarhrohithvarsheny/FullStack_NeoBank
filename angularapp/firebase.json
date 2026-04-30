@@ -6,21 +6,10 @@
       "**/.*",
       "**/node_modules/**"
     ],
-    "headers": [
-      {
-        "source": "**/*.@(js|css)",
-        "headers": [
-          {
-            "key": "Content-Type",
-            "value": "application/javascript"
-          }
-        ]
-      }
-    ],
     "rewrites": [
       {
-        "source": "!/@(main-*|polyfills-*|styles-*|chunk-*|assets)/**",
-        "destination": "/index.csr.html"
+        "source": "**",
+        "destination": "/index.html"
       }
     ]
   }

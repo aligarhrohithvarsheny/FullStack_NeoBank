@@ -559,7 +559,7 @@
           <div class="form-alert error" *ngIf="linkMessage && !linkSuccess">{{ linkMessage }}</div>
           <div class="form-actions">
             <button class="btn-cancel" (click)="closeLinkAccountModal()">Cancel</button>
-            <button class="btn-submit" (click)="sendLinkOtp()" [disabled]="linkLoading || !linkAccountNumber">
+            <button type="button" class="btn-submit" (click)="sendLinkOtp()" [disabled]="linkLoading || !linkAccountNumber">
               <span *ngIf="!linkLoading">Verify Account</span>
               <span *ngIf="linkLoading">Verifying...</span>
             </button>
@@ -587,7 +587,7 @@
           <div class="form-alert" *ngIf="linkMessage" [class.success]="linkSuccess" [class.error]="!linkSuccess">{{ linkMessage }}</div>
           <div class="form-actions">
             <button class="btn-cancel" (click)="closeLinkAccountModal()">Cancel</button>
-            <button class="btn-submit" (click)="verifyLinkOtp()" [disabled]="linkLoading || !linkOtp">
+            <button type="button" class="btn-submit" (click)="verifyLinkOtp()" [disabled]="linkLoading || !linkOtp">
               <span *ngIf="!linkLoading">Verify & Link</span>
               <span *ngIf="linkLoading">Linking...</span>
             </button>
