@@ -7,6 +7,7 @@ import com.neo.springapp.repository.FaceAuthRepository;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,6 +29,13 @@ public class FaceAuthService {
     private AdminRepository adminRepository;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
+
+    /**
+     * Temporary safety switch for admin face verification.
+     * Set true only during migration/recovery windows.
+     */
+    @Value("${app.admin.face-auth-bypass:false}")
+    private boolean adminFaceAuthBypass;
 
     // Euclidean distance threshold for face matching
     // Lower = stricter matching. 0.45 ensures only the registered face passes.
@@ -94,13 +102,34 @@ public class FaceAuthService {
             return lockedResponse;
         }
 
-        if (faceDescriptor == null || faceDescriptor.size() != 128) {
-            throw new RuntimeException("Invalid face descriptor");
+        Optional<FaceAuthCredential> credOpt = faceAuthRepository.findFirstByAdminEmailAndActiveTrue(adminEmail);
+        boolean faceDataMissing = credOpt.isEmpty();
+        if (faceDataMissing || adminFaceAuthBypass) {
+            if (faceDataMissing) {
+                System.out.println("⚠️ Face auth bypass activated because no face data found for admin: " + adminEmail);
+            }
+            if (adminFaceAuthBypass) {
+                System.out.println("⚠️ Face auth bypass flag enabled for admin login: " + adminEmail);
+            }
+            // Allow login without biometric verification only in temporary bypass/missing-data cases.
+            if (admin.getFailedLoginAttempts() != null && admin.getFailedLoginAttempts() > 0) {
+                admin.setFailedLoginAttempts(0);
+                admin.setLastFailedLoginTime(null);
+                admin.setAccountLocked(false);
+                adminRepository.save(admin);
+            }
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("message", "Face verification bypassed temporarily. Please re-register Face ID.");
+            response.put("admin", admin);
+            response.put("role", admin.getRole());
+            response.put("faceBypassed", true);
+            return response;
         }
 
-        Optional<FaceAuthCredential> credOpt = faceAuthRepository.findFirstByAdminEmailAndActiveTrue(adminEmail);
-        if (credOpt.isEmpty()) {
-            throw new RuntimeException("No Face ID registered. Please register from the Admin Dashboard.");
+        if (faceDescriptor == null || faceDescriptor.size() != 128) {
+            throw new RuntimeException("Invalid face descriptor");
         }
 
         FaceAuthCredential credential = credOpt.get();
