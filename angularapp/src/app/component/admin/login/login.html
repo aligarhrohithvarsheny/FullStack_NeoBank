@@ -42,8 +42,8 @@
         <div class="credential-status success" *ngIf="email && !checkingCredentials && hasFaceRegistered && selectedRole === 'ADMIN'">
           <i class="fa fa-check-circle"></i> Face ID registered ✓
         </div>
-        <div class="credential-status warning" *ngIf="email && !checkingCredentials && !hasFaceRegistered && selectedRole === 'ADMIN'">
-          <i class="fa fa-exclamation-triangle"></i> No Face ID registered — register from Admin Dashboard
+        <div class="credential-status warning" *ngIf="email && !checkingCredentials && faceStatusMessage && selectedRole === 'ADMIN' && !hasFaceRegistered">
+          <i class="fa fa-info-circle"></i> {{ faceStatusMessage }}
         </div>
       </div>
 
@@ -62,8 +62,8 @@
       <!-- Admin Face ID Notice -->
       <div class="fingerprint-notice" *ngIf="selectedRole === 'ADMIN'">
         <i class="fa fa-camera"></i>
-        <p><strong>Face ID authentication is mandatory for Admin login.</strong></p>
-        <p>Your laptop camera will be used to verify your identity. Register your Face ID from the Admin Dashboard.</p>
+        <p><strong>Face ID is recommended for Admin login.</strong></p>
+        <p>If Face ID is not registered yet, you can still continue and register it later from the Admin Dashboard.</p>
       </div>
 
       <!-- Error Message -->

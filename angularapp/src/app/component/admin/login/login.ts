@@ -32,6 +32,7 @@ export class Login implements OnDestroy {
   cameraStream: MediaStream | null = null;
   faceDetectionStatus: string = '';
   modelsLoading: boolean = false;
+  faceStatusMessage: string = '';
 
   constructor(
     private router: Router,
@@ -55,11 +56,13 @@ export class Login implements OnDestroy {
   checkFaceCredentials() {
     if (!this.email) {
       this.hasFaceRegistered = false;
+      this.faceStatusMessage = '';
       return;
     }
 
     if (this.selectedRole !== 'ADMIN') {
       this.hasFaceRegistered = false;
+      this.faceStatusMessage = '';
       return;
     }
 
@@ -69,20 +72,16 @@ export class Login implements OnDestroy {
         this.checkingCredentials = false;
         if (response && response.success && response.registered) {
           this.hasFaceRegistered = true;
-          this.errorMessage = '';
+          this.faceStatusMessage = 'Face ID registered.';
         } else {
           this.hasFaceRegistered = false;
-          if (this.email) {
-            this.errorMessage = 'No Face ID registered. Please register from the Admin Dashboard first.';
-          }
+          this.faceStatusMessage = 'Face not registered. You can login and register later from Admin Dashboard.';
         }
       },
       error: (err: any) => {
         this.checkingCredentials = false;
         this.hasFaceRegistered = false;
-        if (this.email) {
-          this.errorMessage = 'No Face ID registered. Please register from the Admin Dashboard.';
-        }
+        this.faceStatusMessage = 'Face status unavailable. You can still continue login and register later.';
       }
     });
   }
@@ -202,11 +201,6 @@ export class Login implements OnDestroy {
       return;
     }
 
-    if (this.selectedRole === 'ADMIN' && !this.hasFaceRegistered) {
-      this.errorMessage = 'No Face ID registered. Please register from the Admin Dashboard first.';
-      return;
-    }
-
     this.isAuthenticatingFace = true;
     this.errorMessage = '';
     this.showCamera = true;
@@ -281,7 +275,11 @@ export class Login implements OnDestroy {
                 this.alertService.success('Welcome', 'Please complete your profile to continue');
                 this.router.navigate(['/admin/complete-profile']);
               } else {
-                this.alertService.success('Face ID Verified', 'Welcome back! Face authentication successful.');
+                if (response.faceBypassed) {
+                  this.alertService.success('Login successful', 'Face not registered. You can login and register later.');
+                } else {
+                  this.alertService.success('Face ID Verified', 'Welcome back! Face authentication successful.');
+                }
                 this.router.navigate(['/admin/dashboard']);
               }
             } else {
