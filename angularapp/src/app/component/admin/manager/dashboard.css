@@ -1,6 +1,29 @@
 /* Manager Dashboard Styles - Reusing Admin Dashboard Sidebar Styles */
 @import '../dashboard/dashboard.css';
 
+/* Manager layout fix: keep sidebar in normal flow on desktop */
+.dashboard-wrapper .sidebar {
+  position: sticky;
+  top: 0;
+  left: auto;
+  flex-shrink: 0;
+}
+
+.dashboard-wrapper .main-content,
+.dashboard-wrapper .sidebar.collapsed ~ .main-content {
+  margin-left: 0;
+  width: 100%;
+}
+
+/* Mobile keeps overlay-style behavior */
+@media (max-width: 768px) {
+  .dashboard-wrapper .sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+  }
+}
+
 /* Manager Specific Styles */
 .welcome-section {
   text-align: center;

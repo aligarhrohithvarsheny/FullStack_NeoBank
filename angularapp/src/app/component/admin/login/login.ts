@@ -63,30 +63,16 @@ export class Login {
 
           if (response.admin) {
             const serverAdmin = response.admin;
-            const emailOk =
-              serverAdmin.email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(serverAdmin.email);
-            if (emailOk) {
-              sessionStorage.setItem('admin', JSON.stringify(serverAdmin));
-              sessionStorage.setItem('userRole', role);
-              try {
-                sessionStorage.setItem('adminLoginTime', new Date().toISOString());
-              } catch (e) {
-                console.error('Failed to store adminLoginTime in sessionStorage', e);
-              }
-            } else {
-              console.error(
-                'Refusing to store invalid admin.email from server:',
-                serverAdmin?.email
-              );
+            // Backend has already authenticated this admin; always persist session
+            // so guarded routes like /admin/complete-profile can open.
+            sessionStorage.setItem('admin', JSON.stringify(serverAdmin));
+            sessionStorage.setItem('userRole', role);
+            try {
+              sessionStorage.setItem('adminLoginTime', new Date().toISOString());
+            } catch (e) {
+              console.error('Failed to store adminLoginTime in sessionStorage', e);
             }
           }
-
-          const profileComplete =
-            response.profileComplete !== undefined
-              ? response.profileComplete
-              : response.admin?.profileComplete !== undefined
-                ? response.admin.profileComplete
-                : true;
 
           if (role === 'MANAGER') {
             this.alertService.loginSuccess('Manager');
@@ -94,13 +80,26 @@ export class Login {
             return;
           }
 
-          if (!profileComplete) {
-            this.alertService.success('Welcome', 'Please complete your profile to continue');
-            this.router.navigate(['/admin/complete-profile']);
-          } else {
-            this.alertService.loginSuccess('Admin');
-            this.router.navigate(['/admin/dashboard']);
+          const profileComplete =
+            response.profileComplete !== undefined
+              ? !!response.profileComplete
+              : response.admin?.profileComplete !== undefined
+                ? !!response.admin.profileComplete
+                : true;
+          const profileRequired =
+            response.profileRequired !== undefined
+              ? !!response.profileRequired
+              : !profileComplete;
+
+          if (profileRequired) {
+            this.alertService.info(
+              'Profile Incomplete',
+              'Profile is incomplete. You can continue and update it later from dashboard.'
+            );
           }
+
+          // Admin login should go directly to dashboard without dialog/toast.
+          this.router.navigate(['/admin/dashboard']);
         },
         error: (err: any) => {
           this.isLoading = false;

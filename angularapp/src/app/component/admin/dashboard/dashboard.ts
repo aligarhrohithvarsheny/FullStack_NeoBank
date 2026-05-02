@@ -711,20 +711,14 @@ export class Dashboard implements OnInit, OnDestroy {
         try {
           const admin = JSON.parse(adminData);
           
-          // Validate admin email - if corrupted, clear session
-          if (admin.email && (admin.email.includes('/') || admin.email.includes('api') || !admin.email.includes('@'))) {
+          // Validate obvious corruption markers only
+          if (admin.email && (admin.email.includes('/') || admin.email.includes('api'))) {
             console.error('Detected corrupted admin email in session, clearing:', admin.email);
             sessionStorage.removeItem('admin');
             this.router.navigate(['/admin/login']);
             return;
           }
           
-          // Check profile completion
-          if (admin.profileComplete === false || admin.profileComplete === null) {
-            // Redirect to profile completion page
-            this.router.navigate(['/admin/complete-profile']);
-            return;
-          }
           // Set admin name
           this.adminName = admin.username || admin.name || 'Admin';
         } catch (e) {
