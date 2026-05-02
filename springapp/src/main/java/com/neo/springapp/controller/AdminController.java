@@ -10,7 +10,6 @@ import com.neo.springapp.service.AdminService;
 import com.neo.springapp.service.UserLoginHistoryService;
 import com.neo.springapp.service.ProfileUpdateService;
 import com.neo.springapp.service.SalaryAccountService;
-import com.neo.springapp.service.FaceAuthService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpHeaders;
@@ -73,9 +72,6 @@ public class AdminController {
 
     @Autowired
     private SalaryAccountService salaryAccountService;
-
-    @Autowired
-    private FaceAuthService faceAuthService;
 
     /**
      * Assign mandatory Customer ID (9 digits: PAN 4 + DOB 5) to all existing accounts
@@ -502,10 +498,6 @@ public class AdminController {
                 response.put("role", userRole);
                 response.put("admin", adminResponse);
                 response.put("profileComplete", loggedInAdmin.getProfileComplete() != null ? loggedInAdmin.getProfileComplete() : false);
-                boolean faceRegistered = faceAuthService.hasFaceRegistered(email);
-                response.put("faceAuthEnabled", faceAuthService.isFaceAuthEnabled());
-                response.put("faceRegistered", faceRegistered);
-                response.put("faceRequired", false);
                 response.put("message", (userRole.equals("MANAGER") ? "Manager" : "Admin") + " login successful");
                 System.out.println((userRole.equals("MANAGER") ? "Manager" : "Admin") + " login successful for: " + email);
                 System.out.println("Profile complete: " + (loggedInAdmin.getProfileComplete() != null ? loggedInAdmin.getProfileComplete() : false));

@@ -1,10 +1,9 @@
-import { Component, ViewChild, ElementRef, OnDestroy, OnInit } from '@angular/core';
+import { Component } from '@angular/core';
 import { Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { AlertService } from '../../../service/alert.service';
-import { FaceAuthService } from '../../../service/face-auth.service';
 import { environment } from '../../../../environment/environment';
 
 @Component({
@@ -14,125 +13,27 @@ import { environment } from '../../../../environment/environment';
   imports: [CommonModule, FormsModule],
   standalone: true
 })
-
-
-export class Login implements OnInit, OnDestroy {
-  @ViewChild('loginVideo') videoRef!: ElementRef<HTMLVideoElement>;
-
-  email: string = '';
-  password: string = '';
-  selectedRole: string = 'ADMIN';
-  errorMessage: string = '';
-  isLoading: boolean = false;
-  isCameraSupported: boolean = false;
-  /** Mirrors server app.admin.face-auth-enabled */
-  faceAuthEnabled: boolean = true;
-  isAuthenticatingFace: boolean = false;
-  hasFaceRegistered: boolean = false;
-  checkingCredentials: boolean = false;
-  showCamera: boolean = false;
-  cameraStream: MediaStream | null = null;
-  faceDetectionStatus: string = '';
-  modelsLoading: boolean = false;
-  faceStatusMessage: string = '';
+export class Login {
+  email = '';
+  password = '';
+  selectedRole = 'ADMIN';
+  errorMessage = '';
+  isLoading = false;
 
   constructor(
     private router: Router,
     private alertService: AlertService,
-    private http: HttpClient,
-    private faceAuthService: FaceAuthService
-  ) {
-    this.isCameraSupported = this.faceAuthService.isCameraSupported();
-  }
-
-  ngOnInit(): void {
-    this.faceAuthService.getFaceAuthConfig().subscribe({
-      next: (cfg) => {
-        this.faceAuthEnabled = cfg?.faceAuthEnabled !== false;
-        this.applyCameraRequirementMessage();
-        if (this.faceAuthEnabled && this.email && this.selectedRole === 'ADMIN') {
-          this.checkFaceCredentials();
-        }
-      },
-      error: () => {
-        this.faceAuthEnabled = true;
-        this.applyCameraRequirementMessage();
-      }
-    });
-  }
-
-  private applyCameraRequirementMessage(): void {
-    if (!this.faceAuthEnabled) {
-      if (this.errorMessage?.includes('Camera access is required for Face ID')) {
-        this.errorMessage = '';
-      }
-      return;
-    }
-    if (!this.isCameraSupported) {
-      this.errorMessage = 'Camera access is required for Face ID login. Please use a device with a camera.';
-    }
-  }
-
-  ngOnDestroy() {
-    this.stopCamera();
-  }
+    private http: HttpClient
+  ) {}
 
   /**
-   * Check if Face ID credentials exist for the entered email
+   * Same model for Admin and Manager: POST /api/admins/login with email, password, role.
    */
-  checkFaceCredentials() {
-    if (!this.faceAuthEnabled) {
-      this.hasFaceRegistered = false;
-      this.faceStatusMessage = '';
-      return;
-    }
-
-    if (!this.email) {
-      this.hasFaceRegistered = false;
-      this.faceStatusMessage = '';
-      return;
-    }
-
-    if (this.selectedRole !== 'ADMIN') {
-      this.hasFaceRegistered = false;
-      this.faceStatusMessage = '';
-      return;
-    }
-
-    this.checkingCredentials = true;
-    this.faceAuthService.getFaceStatus(this.email).subscribe({
-      next: (response: any) => {
-        this.checkingCredentials = false;
-        if (response && response.success && response.registered) {
-          this.hasFaceRegistered = true;
-          this.faceStatusMessage = 'Face ID registered.';
-        } else {
-          this.hasFaceRegistered = false;
-          this.faceStatusMessage = 'Face ID not registered. You can login and register later.';
-        }
-      },
-      error: (err: any) => {
-        this.checkingCredentials = false;
-        this.hasFaceRegistered = false;
-        this.faceStatusMessage = 'Face ID not registered. You can login and register later.';
-      }
-    });
-  }
-
-  stopCamera() {
-    this.faceAuthService.stopCamera(this.cameraStream);
-    this.cameraStream = null;
-    this.showCamera = false;
-    this.faceDetectionStatus = '';
-  }
-
-  onSubmit() {
-    // Prevent multiple submissions
+  onSubmit(): void {
     if (this.isLoading) {
       return;
     }
-
-    if (!this.email || !this.password) {
+    if (!this.email?.trim() || !this.password) {
       this.errorMessage = 'Please enter email and password';
       return;
     }
@@ -140,213 +41,77 @@ export class Login implements OnInit, OnDestroy {
     this.isLoading = true;
     this.errorMessage = '';
 
-    // Try manager login (only for MANAGER role)
-    this.http.post(`${environment.apiBaseUrl}/api/admins/login`, {
-      email: this.email,
-      password: this.password,
-      role: this.selectedRole
-    }).subscribe({
-      next: (response: any) => {
-        this.isLoading = false;
-        if (response && response.success) {
-          const role = response.role || response.admin?.role;
-          
-          // Check if selected role matches the user's actual role
-          if (role === this.selectedRole) {
-            this.errorMessage = '';
-            // Store admin/manager data in session storage (validate email first)
-            if (response.admin) {
-              const serverAdmin = response.admin;
-              const emailOk = serverAdmin.email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(serverAdmin.email);
-              if (emailOk) {
-                sessionStorage.setItem('admin', JSON.stringify(serverAdmin));
-                sessionStorage.setItem('userRole', role);
-                // Store login timestamp for session duration tracking
-                try {
-                  sessionStorage.setItem('adminLoginTime', new Date().toISOString());
-                } catch (e) {
-                  console.error('Failed to store adminLoginTime in sessionStorage', e);
-                }
-              } else {
-                console.error('Refusing to store invalid admin.email from server:', serverAdmin && serverAdmin.email);
-              }
-            }
-            
-            // Check if profile is complete (for ADMIN role only)
-            const profileComplete = response.profileComplete !== undefined ? response.profileComplete : 
-                                   (response.admin?.profileComplete !== undefined ? response.admin.profileComplete : true);
-            
-            if (role === 'MANAGER') {
-              this.alertService.loginSuccess('Manager');
-              this.router.navigate(['/manager/dashboard']);
-            } else if (role === 'ADMIN') {
-              if (response.faceAuthEnabled && response.faceRegistered === false) {
-                this.alertService.info(
-                  'Face ID',
-                  'Face ID not registered. You can login and register later.'
-                );
-              }
-              // Check if admin profile is complete
-              if (!profileComplete) {
-                // Redirect to profile completion page
-                this.alertService.success('Welcome', 'Please complete your profile to continue');
-                this.router.navigate(['/admin/complete-profile']);
-              } else {
-                this.alertService.loginSuccess('Admin');
-                this.router.navigate(['/admin/dashboard']);
-              }
-            } else {
-              this.alertService.loginSuccess('Admin');
-              this.router.navigate(['/admin/dashboard']);
-            }
-          } else {
-            this.errorMessage = `Invalid ${this.selectedRole.toLowerCase()} credentials ❌`;
-          }
-        } else {
-          this.errorMessage = `Invalid ${this.selectedRole.toLowerCase()} credentials ❌`;
-        }
-      },
-      error: (err: any) => {
-        // If admin login fails with 401 or 404, it means invalid credentials
-        // Don't try user login - show error immediately
-        this.isLoading = false;
-        if (err.status === 401 || err.status === 404) {
-          this.errorMessage = `Invalid ${this.selectedRole.toLowerCase()} credentials ❌`;
-        } else if (err.status === 0) {
-          this.errorMessage = 'Unable to connect to server. Please check your connection.';
-        } else {
-          this.errorMessage = `Login failed. Please try again.`;
-        }
-      }
-    });
-  }
-
-  /**
-   * Login with Face ID using laptop camera
-   */
-  async loginWithFaceID() {
-    if (!this.faceAuthEnabled) {
-      this.errorMessage = 'Face ID is disabled on this server.';
-      return;
-    }
-
-    if (!this.email) {
-      this.errorMessage = 'Please enter your email first';
-      return;
-    }
-
-    if (!this.isCameraSupported) {
-      this.errorMessage = 'Camera is not available on this device.';
-      return;
-    }
-
-    this.isAuthenticatingFace = true;
-    this.errorMessage = '';
-    this.showCamera = true;
-    this.faceDetectionStatus = 'Loading face recognition models...';
-    this.modelsLoading = true;
-
-    try {
-      await this.faceAuthService.loadModels();
-      this.modelsLoading = false;
-      this.faceDetectionStatus = 'Starting camera...';
-
-      // Wait for video element to be available
-      await new Promise(resolve => setTimeout(resolve, 100));
-      const video = this.videoRef.nativeElement;
-      this.cameraStream = await this.faceAuthService.openCamera(video);
-
-      this.faceDetectionStatus = 'Look at the camera with eyes open...';
-
-      // Wait for camera to stabilize
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      this.faceDetectionStatus = 'Detecting face... Keep eyes open and look at camera.';
-
-      const result = await this.faceAuthService.captureMultipleDescriptors(
-        video, 3, 600,
-        (status: string) => { this.faceDetectionStatus = status; }
-      );
-      this.stopCamera();
-
-      if (!result) {
-        this.isAuthenticatingFace = false;
-        this.errorMessage = 'Face not detected or eyes were closed. Please ensure your face is clearly visible with eyes open.';
-        return;
-      }
-
-      if (result.captureCount < 2) {
-        this.isAuthenticatingFace = false;
-        this.errorMessage = 'Could not get enough clear face captures. Ensure good lighting and keep eyes open.';
-        return;
-      }
-
-      this.faceDetectionStatus = 'Verifying face identity...';
-
-      this.faceAuthService.verifyFace(this.email, result.descriptor).subscribe({
+    this.http
+      .post(`${environment.apiBaseUrl}/api/admins/login`, {
+        email: this.email.trim(),
+        password: this.password,
+        role: this.selectedRole
+      })
+      .subscribe({
         next: (response: any) => {
-          this.isAuthenticatingFace = false;
-          if (response && response.success) {
-            const role = response.role || response.admin?.role;
+          this.isLoading = false;
+          if (!response?.success) {
+            this.errorMessage = `Invalid ${this.selectedRole.toLowerCase()} credentials ❌`;
+            return;
+          }
 
-            if (response.admin) {
-              const serverAdmin = response.admin;
-              const emailOk = serverAdmin.email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(serverAdmin.email);
-              if (emailOk) {
-                sessionStorage.setItem('admin', JSON.stringify(serverAdmin));
-                sessionStorage.setItem('userRole', role);
-                try {
-                  sessionStorage.setItem('adminLoginTime', new Date().toISOString());
-                } catch (e) {
-                  console.error('Failed to store adminLoginTime in sessionStorage', e);
-                }
-              }
-            }
+          const role = response.role || response.admin?.role;
+          if (role !== this.selectedRole) {
+            this.errorMessage = `Invalid ${this.selectedRole.toLowerCase()} credentials ❌`;
+            return;
+          }
 
-            const profileComplete = response.profileComplete !== undefined ? response.profileComplete :
-                                   (response.admin?.profileComplete !== undefined ? response.admin.profileComplete : true);
-
-            if (role === 'MANAGER') {
-              this.alertService.loginSuccess('Manager');
-              this.router.navigate(['/manager/dashboard']);
-            } else if (role === 'ADMIN') {
-              if (!profileComplete) {
-                this.alertService.success('Welcome', 'Please complete your profile to continue');
-                this.router.navigate(['/admin/complete-profile']);
-              } else {
-                if (response.faceBypassed) {
-                  this.alertService.success('Login successful', 'Face ID not registered. You can login and register later.');
-                } else {
-                  this.alertService.success('Face ID Verified', 'Welcome back! Face authentication successful.');
-                }
-                this.router.navigate(['/admin/dashboard']);
+          if (response.admin) {
+            const serverAdmin = response.admin;
+            const emailOk =
+              serverAdmin.email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(serverAdmin.email);
+            if (emailOk) {
+              sessionStorage.setItem('admin', JSON.stringify(serverAdmin));
+              sessionStorage.setItem('userRole', role);
+              try {
+                sessionStorage.setItem('adminLoginTime', new Date().toISOString());
+              } catch (e) {
+                console.error('Failed to store adminLoginTime in sessionStorage', e);
               }
             } else {
-              this.alertService.success('Face ID Verified', 'Authentication successful!');
-              this.router.navigate(['/admin/dashboard']);
+              console.error(
+                'Refusing to store invalid admin.email from server:',
+                serverAdmin?.email
+              );
             }
+          }
+
+          const profileComplete =
+            response.profileComplete !== undefined
+              ? response.profileComplete
+              : response.admin?.profileComplete !== undefined
+                ? response.admin.profileComplete
+                : true;
+
+          if (role === 'MANAGER') {
+            this.alertService.loginSuccess('Manager');
+            this.router.navigate(['/manager/dashboard']);
+            return;
+          }
+
+          if (!profileComplete) {
+            this.alertService.success('Welcome', 'Please complete your profile to continue');
+            this.router.navigate(['/admin/complete-profile']);
           } else {
-            this.errorMessage = response.message || 'Face does not match. Please try again.';
-            if (response.accountLocked) {
-              this.errorMessage = 'Account locked due to failed attempts. Contact manager to unlock.';
-            }
+            this.alertService.loginSuccess('Admin');
+            this.router.navigate(['/admin/dashboard']);
           }
         },
         error: (err: any) => {
-          this.isAuthenticatingFace = false;
-          this.errorMessage = err.error?.message || 'Face ID verification failed. Please try again.';
+          this.isLoading = false;
+          if (err.status === 401 || err.status === 404) {
+            this.errorMessage = `Invalid ${this.selectedRole.toLowerCase()} credentials ❌`;
+          } else if (err.status === 0) {
+            this.errorMessage = 'Unable to connect to server. Please check your connection.';
+          } else {
+            this.errorMessage = 'Login failed. Please try again.';
+          }
         }
       });
-    } catch (err: any) {
-      this.stopCamera();
-      this.isAuthenticatingFace = false;
-      this.modelsLoading = false;
-      if (err.name === 'NotAllowedError') {
-        this.errorMessage = 'Camera access denied. Please allow camera permission and try again.';
-      } else {
-        this.errorMessage = 'Failed to access camera. Please check your camera and try again.';
-      }
-    }
   }
-
 }

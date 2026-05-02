@@ -41,7 +41,7 @@ public class FaceAuthService {
      * When false, Face ID endpoints reject verification and the UI should hide Face ID.
      * When true, verification runs only if face data exists; missing face data allows bypass with flags.
      */
-    @Value("${app.admin.face-auth-enabled:true}")
+    @Value("${app.admin.face-auth-enabled:false}")
     private boolean faceAuthEnabled;
 
     // Euclidean distance threshold for face matching

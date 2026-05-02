@@ -7,7 +7,6 @@
     <h2> Admin / Manager Login</h2>
 
     <form (ngSubmit)="onSubmit()">
-      <!-- Role Selection -->
       <div class="form-group">
         <label>Access Role</label>
         <select
@@ -16,14 +15,12 @@
           name="role"
           required
           class="role-select"
-          (change)="checkFaceCredentials()"
         >
           <option value="ADMIN">Admin</option>
           <option value="MANAGER">Manager</option>
         </select>
       </div>
 
-      <!-- Email -->
       <div class="form-group">
         <label>Email</label>
         <input
@@ -33,21 +30,9 @@
           name="email"
           required
           placeholder="Enter email"
-          (blur)="checkFaceCredentials()"
-          (input)="checkFaceCredentials()"
         />
-        <div class="credential-status" *ngIf="faceAuthEnabled && email && checkingCredentials && selectedRole === 'ADMIN'">
-          <i class="fa fa-spinner fa-spin"></i> Checking Face ID status...
-        </div>
-        <div class="credential-status success" *ngIf="faceAuthEnabled && email && !checkingCredentials && hasFaceRegistered && selectedRole === 'ADMIN'">
-          <i class="fa fa-check-circle"></i> Face ID registered ✓
-        </div>
-        <div class="credential-status warning" *ngIf="faceAuthEnabled && email && !checkingCredentials && faceStatusMessage && selectedRole === 'ADMIN' && !hasFaceRegistered">
-          <i class="fa fa-info-circle"></i> {{ faceStatusMessage }}
-        </div>
       </div>
 
-      <!-- Password — Admin and Manager -->
       <div class="form-group">
         <label>Password</label>
         <input
@@ -59,70 +44,14 @@
         />
       </div>
 
-      <!-- Admin Face ID optional notice (only when Face ID is enabled on server) -->
-      <div class="fingerprint-notice" *ngIf="faceAuthEnabled && selectedRole === 'ADMIN'">
-        <i class="fa fa-camera"></i>
-        <p><strong>Face ID is optional.</strong> Sign in with email and password, or use Face ID if registered.</p>
-        <p *ngIf="!hasFaceRegistered && email">Face ID not registered. You can login and register later.</p>
-      </div>
-
-      <!-- Error Message -->
       <div *ngIf="errorMessage" class="error-message">
         {{ errorMessage }}
       </div>
 
-      <!-- Password login -->
-      <button 
-        type="submit" 
-        [disabled]="isLoading || isAuthenticatingFace" 
-        class="login-btn">
-        <span *ngIf="!isLoading">Login with Password</span>
+      <button type="submit" [disabled]="isLoading" class="login-btn">
+        <span *ngIf="!isLoading">Login</span>
         <span *ngIf="isLoading">Logging in...</span>
       </button>
-
-      <!-- Divider before Face ID -->
-      <div class="divider" *ngIf="faceAuthEnabled && isCameraSupported">
-        <span>OR</span>
-      </div>
-
-      <!-- Camera Face ID Section (hidden when Face ID disabled on server) -->
-      <div class="face-id-section" *ngIf="faceAuthEnabled && isCameraSupported">
-        <!-- Camera Feed -->
-        <div class="camera-container" *ngIf="showCamera">
-          <div class="camera-frame">
-            <video #loginVideo autoplay playsinline muted class="camera-video"></video>
-            <div class="face-overlay"></div>
-            <div class="scan-line"></div>
-          </div>
-          <div class="camera-status">
-            <i class="fa fa-circle-notch fa-spin" *ngIf="isAuthenticatingFace"></i>
-            {{ faceDetectionStatus }}
-          </div>
-          <button type="button" class="cancel-camera-btn" (click)="stopCamera(); isAuthenticatingFace = false;">
-            <i class="fa fa-times"></i> Cancel
-          </button>
-        </div>
-
-        <!-- Face ID Login Button -->
-        <button 
-          type="button" 
-          class="face-id-btn"
-          [class.face-id-btn-primary]="selectedRole === 'ADMIN'"
-          (click)="loginWithFaceID()"
-          [disabled]="isLoading || isAuthenticatingFace || !email || (selectedRole === 'ADMIN' && checkingCredentials)"
-          *ngIf="!showCamera">
-          <i class="fa fa-user-circle"></i>
-          <span>
-            {{ selectedRole === 'ADMIN' ? 'Login with Face ID' : 'Login with Face ID' }}
-          </span>
-        </button>
-      </div>
-
-      <!-- Camera not available (only matters when Face ID is enabled) -->
-      <div class="webauthn-not-supported" *ngIf="faceAuthEnabled && !isCameraSupported">
-        <p><i class="fa fa-exclamation-circle"></i> Camera not available — use password login.</p>
-        <p>Face ID requires a device with a camera when enabled.</p>
-      </div>
     </form>
   </div>
 </div>
