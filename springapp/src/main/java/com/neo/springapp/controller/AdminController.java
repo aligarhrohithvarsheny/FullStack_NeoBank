@@ -409,7 +409,7 @@ public class AdminController {
                 return ResponseEntity.badRequest().body(response);
             }
             
-            String email = credentials.get("email");
+            String email = credentials.get("email") != null ? credentials.get("email").trim().toLowerCase() : null;
             String password = credentials.get("password");
             String requestedRole = credentials.get("role"); // ADMIN or MANAGER (optional)
             

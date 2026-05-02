@@ -16,6 +16,9 @@ public interface AdminRepository extends JpaRepository<Admin, Long> {
     // Find admin by email only
     Admin findByEmail(String email);
     
+    // Case-insensitive lookup for normalized login/create flows
+    Admin findByEmailIgnoreCase(String email);
+    
     // Find admin by generated NeoBank ID card number
     Admin findByIdCardNumber(String idCardNumber);
     

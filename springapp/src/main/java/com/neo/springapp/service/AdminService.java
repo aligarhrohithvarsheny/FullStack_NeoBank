@@ -11,6 +11,10 @@ import java.time.LocalDateTime;
 @SuppressWarnings("null")
 public class AdminService {
 
+    private String normalizeEmail(String email) {
+        return email == null ? null : email.trim().toLowerCase();
+    }
+
     @Autowired
     private AdminRepository adminRepository;
     
@@ -18,6 +22,9 @@ public class AdminService {
     private PasswordService passwordService;
 
     public Admin saveAdmin(Admin admin) {
+        // Normalize email so manager-created admins can always login consistently.
+        admin.setEmail(normalizeEmail(admin.getEmail()));
+
         // Encrypt password before saving
         if (admin.getPassword() != null && !admin.getPassword().isEmpty()) {
             if (!passwordService.isEncrypted(admin.getPassword())) {
@@ -56,7 +63,7 @@ public class AdminService {
                 admin.setName(adminDetails.getName());
             }
             if (adminDetails.getEmail() != null) {
-                admin.setEmail(adminDetails.getEmail());
+                admin.setEmail(normalizeEmail(adminDetails.getEmail()));
             }
             if (adminDetails.getPassword() != null) {
                 // Encrypt password before updating
@@ -118,7 +125,11 @@ public class AdminService {
      * Get admin by email (for profile retrieval)
      */
     public Admin getAdminByEmail(String email) {
-        return adminRepository.findByEmail(email);
+        String normalizedEmail = normalizeEmail(email);
+        if (normalizedEmail == null || normalizedEmail.isEmpty()) {
+            return null;
+        }
+        return adminRepository.findByEmailIgnoreCase(normalizedEmail);
     }
 
     /**
@@ -204,7 +215,8 @@ public class AdminService {
     }
 
     public Admin login(String email, String password) {
-        Admin admin = adminRepository.findByEmail(email);
+        String normalizedEmail = normalizeEmail(email);
+        Admin admin = adminRepository.findByEmailIgnoreCase(normalizedEmail);
         if (admin != null) {
             // Initialize failed attempts if null (for existing admins)
             if (admin.getFailedLoginAttempts() == null) {
@@ -290,7 +302,7 @@ public class AdminService {
                 return null;
             }
         }
-        System.out.println("❌ Admin not found for email: " + email);
+        System.out.println("❌ Admin not found for email: " + normalizedEmail);
         return null;
     }
     
