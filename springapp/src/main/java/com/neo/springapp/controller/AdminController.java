@@ -506,14 +506,22 @@ public class AdminController {
                 // Create a safe admin response (exclude password)
                 Map<String, Object> adminResponse = createSafeAdminResponse(loggedInAdmin);
                 
+                boolean profileComplete = loggedInAdmin.getProfileComplete() != null ? loggedInAdmin.getProfileComplete() : false;
+                boolean profileRequired = !profileComplete;
+
                 Map<String, Object> response = new HashMap<>();
                 response.put("success", true);
                 response.put("role", userRole);
                 response.put("admin", adminResponse);
-                response.put("profileComplete", loggedInAdmin.getProfileComplete() != null ? loggedInAdmin.getProfileComplete() : false);
-                response.put("message", (userRole.equals("MANAGER") ? "Manager" : "Admin") + " login successful");
+                response.put("profileComplete", profileComplete);
+                response.put("profileRequired", profileRequired);
+                if (profileRequired && "ADMIN".equals(userRole)) {
+                    response.put("message", "Admin login successful. Profile is incomplete; please complete it from dashboard.");
+                } else {
+                    response.put("message", (userRole.equals("MANAGER") ? "Manager" : "Admin") + " login successful");
+                }
                 System.out.println((userRole.equals("MANAGER") ? "Manager" : "Admin") + " login successful for: " + email);
-                System.out.println("Profile complete: " + (loggedInAdmin.getProfileComplete() != null ? loggedInAdmin.getProfileComplete() : false));
+                System.out.println("Profile complete: " + profileComplete);
                 return ResponseEntity.ok(response);
             } else {
                 // After failed login, check if account got locked
