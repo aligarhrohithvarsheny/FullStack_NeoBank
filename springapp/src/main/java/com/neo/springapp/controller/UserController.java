@@ -423,13 +423,6 @@ public class UserController {
                 return ResponseEntity.badRequest().body(response);
             }
             
-            if (user.isPasswordSet()) {
-                Map<String, Object> response = new HashMap<>();
-                response.put("success", false);
-                response.put("message", "Password has already been set. Please use the login page if you forgot your password.");
-                return ResponseEntity.badRequest().body(response);
-            }
-            
             // Encrypt and set the password
             String encryptedPassword = passwordService.encryptPassword(newPassword);
             user.setPassword(encryptedPassword);
@@ -898,13 +891,29 @@ public class UserController {
                 }
             }
 
-            // Check if phone already registered
+            // Check if phone already registered.
+            // For first-time activation users, allow their own already-linked phone number.
             if (phone != null && !phone.trim().isEmpty()) {
-                if (!accountService.isPhoneUnique(phone.trim())) {
-                    response.put("success", false);
-                    response.put("message", "This phone number is already registered.");
-                    response.put("errorType", "PHONE_EXISTS");
-                    return ResponseEntity.badRequest().body(response);
+                String normalizedPhone = phone.trim();
+                if (!accountService.isPhoneUnique(normalizedPhone)) {
+                    boolean allowExistingActivationPhone = false;
+                    if (existingUserOpt.isPresent()) {
+                        User existingUser = existingUserOpt.get();
+                        boolean approved = "APPROVED".equalsIgnoreCase(existingUser.getStatus());
+                        boolean requiresPasswordSetup = !existingUser.isPasswordSet();
+                        boolean matchesUserPhone = normalizedPhone.equals(existingUser.getPhone());
+                        boolean matchesAccountPhone = existingUser.getAccount() != null
+                                && normalizedPhone.equals(existingUser.getAccount().getPhone());
+                        allowExistingActivationPhone = approved && requiresPasswordSetup
+                                && (matchesUserPhone || matchesAccountPhone);
+                    }
+
+                    if (!allowExistingActivationPhone) {
+                        response.put("success", false);
+                        response.put("message", "This phone number is already registered.");
+                        response.put("errorType", "PHONE_EXISTS");
+                        return ResponseEntity.badRequest().body(response);
+                    }
                 }
             }
 

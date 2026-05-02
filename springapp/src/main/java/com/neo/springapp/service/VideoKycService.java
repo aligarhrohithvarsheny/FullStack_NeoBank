@@ -311,10 +311,8 @@ public class VideoKycService {
             user.setAccountNumber(accNumber);
             user.setStatus("APPROVED"); // Ensure status is APPROVED
             
-            // ✅ Ensure passwordSet is false for password setup flow
-            if (!user.isPasswordSet()) {
-                user.setPasswordSet(false);
-            }
+            // ✅ Always require fresh password setup after KYC approval
+            user.setPasswordSet(false);
 
             Account account = user.getAccount();
             if (account == null) {
@@ -435,6 +433,8 @@ public class VideoKycService {
                         user = userOpt.get();
                     }
                     user.setStatus("APPROVED");
+                    // Enforce first-login password setup for approved accounts
+                    user.setPasswordSet(false);
                     user.setJoinDate(LocalDateTime.now());
                     userRepository.save(user);
                 } catch (Exception e) {
@@ -472,6 +472,8 @@ public class VideoKycService {
                         user = userOpt.get();
                     }
                     user.setStatus("APPROVED");
+                    // Enforce first-login password setup for approved accounts
+                    user.setPasswordSet(false);
                     user.setJoinDate(LocalDateTime.now());
                     userRepository.save(user);
                 } catch (Exception e) {
