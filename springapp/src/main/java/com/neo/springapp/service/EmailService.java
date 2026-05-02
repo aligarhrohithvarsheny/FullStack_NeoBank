@@ -16,7 +16,10 @@ import java.lang.reflect.Method;
 @Service
 @SuppressWarnings("null")
 public class EmailService {
-    
+
+    @Autowired(required = false)
+    private GmailApiOtpService gmailApiOtpService;
+
     @Autowired(required = false)
     private JavaMailSender javaMailSender;
 
@@ -81,11 +84,41 @@ public class EmailService {
         System.out.println("Mail available: " + this.mailAvailable);
         System.out.println("==========================================");
     }
+
+    /**
+     * Exchanges {@code GMAIL_REFRESH_TOKEN} for a short-lived access token (Gmail API).
+     * Requires all Gmail env vars; throws if OAuth is not configured or Google returns an error.
+     */
+    public String refreshGmailAccessToken() {
+        if (gmailApiOtpService == null || !gmailApiOtpService.isConfigured()) {
+            throw new IllegalStateException(
+                    "Gmail API OAuth is not configured. Set GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN, GMAIL_FROM_EMAIL.");
+        }
+        return gmailApiOtpService.fetchAccessToken();
+    }
+
+    private boolean sendOtpViaGmailApi(String toEmail, String subject, String body) {
+        if (gmailApiOtpService == null || !gmailApiOtpService.isConfigured()) {
+            return false;
+        }
+        try {
+            gmailApiOtpService.sendPlainTextEmail(toEmail.trim(), subject, body);
+            System.out.println("✅ OTP email sent via Gmail API to " + toEmail);
+            return true;
+        } catch (GmailApiException e) {
+            System.err.println("❌ Gmail API OTP send failed [" + e.getOAuthError() + "]: " + e.getMessage());
+            return false;
+        }
+    }
     
     /**
      * Send OTP email to user
      */
     public boolean sendOtpEmail(String toEmail, String otp) {
+        if (gmailApiOtpService != null && gmailApiOtpService.isConfigured()) {
+            return sendOtpViaGmailApi(toEmail, "NeoBank - Login OTP Verification", buildOtpEmailBody(otp));
+        }
+
         // Initialize mail sender if not already done
         initializeMailSender();
         
@@ -368,6 +401,10 @@ public class EmailService {
      * The reason is included in subject and body so the user knows what the OTP is for.
      */
     public boolean sendOtpEmailWithReason(String toEmail, String otp, String reason) {
+        if (gmailApiOtpService != null && gmailApiOtpService.isConfigured()) {
+            return sendOtpViaGmailApi(toEmail, "NeoBank - OTP for " + reason, buildOtpEmailBodyWithReason(otp, reason));
+        }
+
         initializeMailSender();
         try {
             if (!mailAvailable || mailSender == null) {

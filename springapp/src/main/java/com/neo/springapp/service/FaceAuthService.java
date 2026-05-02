@@ -37,6 +37,13 @@ public class FaceAuthService {
     @Value("${app.admin.face-auth-bypass:false}")
     private boolean adminFaceAuthBypass;
 
+    /**
+     * When false, Face ID endpoints reject verification and the UI should hide Face ID.
+     * When true, verification runs only if face data exists; missing face data allows bypass with flags.
+     */
+    @Value("${app.admin.face-auth-enabled:true}")
+    private boolean faceAuthEnabled;
+
     // Euclidean distance threshold for face matching
     // Lower = stricter matching. 0.45 ensures only the registered face passes.
     private static final double MATCH_THRESHOLD = 0.45;
@@ -83,6 +90,14 @@ public class FaceAuthService {
         return response;
     }
 
+    public boolean isFaceAuthEnabled() {
+        return faceAuthEnabled;
+    }
+
+    public boolean hasFaceRegistered(String adminEmail) {
+        return faceAuthRepository.findFirstByAdminEmailAndActiveTrue(adminEmail).isPresent();
+    }
+
     /**
      * Verify a face descriptor against the stored one for an admin
      */
@@ -91,6 +106,16 @@ public class FaceAuthService {
         Admin admin = adminRepository.findByEmail(adminEmail);
         if (admin == null) {
             throw new RuntimeException("Admin not found");
+        }
+
+        if (!faceAuthEnabled) {
+            Map<String, Object> disabled = new HashMap<>();
+            disabled.put("success", false);
+            disabled.put("message", "Face authentication is disabled.");
+            disabled.put("faceAuthEnabled", false);
+            disabled.put("faceRegistered", hasFaceRegistered(adminEmail));
+            disabled.put("faceRequired", false);
+            return disabled;
         }
 
         // Check account lock
@@ -106,7 +131,7 @@ public class FaceAuthService {
         boolean faceDataMissing = credOpt.isEmpty();
         if (faceDataMissing || adminFaceAuthBypass) {
             if (faceDataMissing) {
-                System.out.println("⚠️ Face auth bypass activated because no face data found for admin: " + adminEmail);
+                System.out.println("⚠️ No face data for admin — allowing verification step to complete: " + adminEmail);
             }
             if (adminFaceAuthBypass) {
                 System.out.println("⚠️ Face auth bypass flag enabled for admin login: " + adminEmail);
@@ -121,10 +146,18 @@ public class FaceAuthService {
 
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);
-            response.put("message", "Face verification bypassed temporarily. Please re-register Face ID.");
+            if (faceDataMissing) {
+                response.put("message", "Face ID not registered. You can login and register later.");
+            } else {
+                response.put("message", "Face verification bypassed (temporary bypass flag).");
+            }
             response.put("admin", admin);
             response.put("role", admin.getRole());
             response.put("faceBypassed", true);
+            response.put("faceAuthEnabled", true);
+            response.put("faceRegistered", !faceDataMissing);
+            response.put("faceRequired", false);
+            response.put("profileComplete", admin.getProfileComplete() != null ? admin.getProfileComplete() : false);
             return response;
         }
 
@@ -163,6 +196,10 @@ public class FaceAuthService {
             response.put("admin", admin);
             response.put("role", admin.getRole());
             response.put("distance", distance);
+            response.put("faceAuthEnabled", true);
+            response.put("faceRegistered", true);
+            response.put("faceRequired", false);
+            response.put("profileComplete", admin.getProfileComplete() != null ? admin.getProfileComplete() : false);
             return response;
         } else {
             // Face did not match
@@ -193,6 +230,7 @@ public class FaceAuthService {
         List<FaceAuthCredential> credentials = faceAuthRepository.findByAdminEmailAndActiveTrue(adminEmail);
         Map<String, Object> response = new HashMap<>();
         response.put("success", true);
+        response.put("faceAuthEnabled", faceAuthEnabled);
         response.put("registered", !credentials.isEmpty());
         if (!credentials.isEmpty()) {
             FaceAuthCredential cred = credentials.get(0);

@@ -258,6 +258,13 @@ export class FaceAuthService {
   }
 
   /**
+   * Server toggle: whether Face ID is enabled (false = hide UI, verify rejects).
+   */
+  getFaceAuthConfig(): Observable<{ faceAuthEnabled: boolean }> {
+    return this.http.get<{ faceAuthEnabled: boolean }>(`${environment.apiBaseUrl}/api/face-auth/config`);
+  }
+
+  /**
    * Get face auth status for an admin
    */
   getFaceStatus(email: string): Observable<any> {

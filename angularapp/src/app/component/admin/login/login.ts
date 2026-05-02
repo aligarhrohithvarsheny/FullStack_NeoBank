@@ -1,4 +1,4 @@
-import { Component, ViewChild, ElementRef, OnDestroy } from '@angular/core';
+import { Component, ViewChild, ElementRef, OnDestroy, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -16,7 +16,7 @@ import { environment } from '../../../../environment/environment';
 })
 
 
-export class Login implements OnDestroy {
+export class Login implements OnInit, OnDestroy {
   @ViewChild('loginVideo') videoRef!: ElementRef<HTMLVideoElement>;
 
   email: string = '';
@@ -25,6 +25,8 @@ export class Login implements OnDestroy {
   errorMessage: string = '';
   isLoading: boolean = false;
   isCameraSupported: boolean = false;
+  /** Mirrors server app.admin.face-auth-enabled */
+  faceAuthEnabled: boolean = true;
   isAuthenticatingFace: boolean = false;
   hasFaceRegistered: boolean = false;
   checkingCredentials: boolean = false;
@@ -41,6 +43,31 @@ export class Login implements OnDestroy {
     private faceAuthService: FaceAuthService
   ) {
     this.isCameraSupported = this.faceAuthService.isCameraSupported();
+  }
+
+  ngOnInit(): void {
+    this.faceAuthService.getFaceAuthConfig().subscribe({
+      next: (cfg) => {
+        this.faceAuthEnabled = cfg?.faceAuthEnabled !== false;
+        this.applyCameraRequirementMessage();
+        if (this.faceAuthEnabled && this.email && this.selectedRole === 'ADMIN') {
+          this.checkFaceCredentials();
+        }
+      },
+      error: () => {
+        this.faceAuthEnabled = true;
+        this.applyCameraRequirementMessage();
+      }
+    });
+  }
+
+  private applyCameraRequirementMessage(): void {
+    if (!this.faceAuthEnabled) {
+      if (this.errorMessage?.includes('Camera access is required for Face ID')) {
+        this.errorMessage = '';
+      }
+      return;
+    }
     if (!this.isCameraSupported) {
       this.errorMessage = 'Camera access is required for Face ID login. Please use a device with a camera.';
     }
@@ -54,6 +81,12 @@ export class Login implements OnDestroy {
    * Check if Face ID credentials exist for the entered email
    */
   checkFaceCredentials() {
+    if (!this.faceAuthEnabled) {
+      this.hasFaceRegistered = false;
+      this.faceStatusMessage = '';
+      return;
+    }
+
     if (!this.email) {
       this.hasFaceRegistered = false;
       this.faceStatusMessage = '';
@@ -75,13 +108,13 @@ export class Login implements OnDestroy {
           this.faceStatusMessage = 'Face ID registered.';
         } else {
           this.hasFaceRegistered = false;
-          this.faceStatusMessage = 'Face not registered. You can login and register later from Admin Dashboard.';
+          this.faceStatusMessage = 'Face ID not registered. You can login and register later.';
         }
       },
       error: (err: any) => {
         this.checkingCredentials = false;
         this.hasFaceRegistered = false;
-        this.faceStatusMessage = 'Face status unavailable. You can still continue login and register later.';
+        this.faceStatusMessage = 'Face ID not registered. You can login and register later.';
       }
     });
   }
@@ -94,11 +127,6 @@ export class Login implements OnDestroy {
   }
 
   onSubmit() {
-    if (this.selectedRole === 'ADMIN') {
-      this.errorMessage = 'Face ID is required for Admin login. Please use the "Login with Face ID" button.';
-      return;
-    }
-
     // Prevent multiple submissions
     if (this.isLoading) {
       return;
@@ -152,6 +180,12 @@ export class Login implements OnDestroy {
               this.alertService.loginSuccess('Manager');
               this.router.navigate(['/manager/dashboard']);
             } else if (role === 'ADMIN') {
+              if (response.faceAuthEnabled && response.faceRegistered === false) {
+                this.alertService.info(
+                  'Face ID',
+                  'Face ID not registered. You can login and register later.'
+                );
+              }
               // Check if admin profile is complete
               if (!profileComplete) {
                 // Redirect to profile completion page
@@ -191,6 +225,11 @@ export class Login implements OnDestroy {
    * Login with Face ID using laptop camera
    */
   async loginWithFaceID() {
+    if (!this.faceAuthEnabled) {
+      this.errorMessage = 'Face ID is disabled on this server.';
+      return;
+    }
+
     if (!this.email) {
       this.errorMessage = 'Please enter your email first';
       return;
@@ -276,7 +315,7 @@ export class Login implements OnDestroy {
                 this.router.navigate(['/admin/complete-profile']);
               } else {
                 if (response.faceBypassed) {
-                  this.alertService.success('Login successful', 'Face not registered. You can login and register later.');
+                  this.alertService.success('Login successful', 'Face ID not registered. You can login and register later.');
                 } else {
                   this.alertService.success('Face ID Verified', 'Welcome back! Face authentication successful.');
                 }

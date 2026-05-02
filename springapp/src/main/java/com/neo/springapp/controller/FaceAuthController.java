@@ -17,6 +17,16 @@ public class FaceAuthController {
     private FaceAuthService faceAuthService;
 
     /**
+     * Public toggle for Angular: whether Face ID UI should be shown.
+     */
+    @GetMapping("/config")
+    public ResponseEntity<Map<String, Object>> getFaceAuthConfig() {
+        Map<String, Object> body = new HashMap<>();
+        body.put("faceAuthEnabled", faceAuthService.isFaceAuthEnabled());
+        return ResponseEntity.ok(body);
+    }
+
+    /**
      * Register a face descriptor for an admin
      * Expects: { email, faceDescriptor: number[128], deviceName? }
      */
