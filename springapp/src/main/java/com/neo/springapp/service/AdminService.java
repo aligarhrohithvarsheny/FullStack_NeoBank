@@ -132,6 +132,14 @@ public class AdminService {
         return adminRepository.findByEmailIgnoreCase(normalizedEmail);
     }
 
+    public boolean emailExists(String email) {
+        String normalizedEmail = normalizeEmail(email);
+        if (normalizedEmail == null || normalizedEmail.isEmpty()) {
+            return false;
+        }
+        return adminRepository.existsByEmailIgnoreCase(normalizedEmail);
+    }
+
     /**
      * Get admin by NeoBank ID card number
      */

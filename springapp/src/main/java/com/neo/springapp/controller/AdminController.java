@@ -95,12 +95,25 @@ public class AdminController {
     }
 
     @PostMapping("/create")
-    public Admin createAdmin(@RequestBody Admin admin) {
+    public ResponseEntity<?> createAdmin(@RequestBody Admin admin) {
+        if (admin == null || admin.getEmail() == null || admin.getEmail().trim().isEmpty()) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("message", "Admin email is required");
+            return ResponseEntity.badRequest().body(response);
+        }
+        if (adminService.emailExists(admin.getEmail())) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("message", "Admin with this email already exists. Use reset password instead.");
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+        }
         // When creating new admin employee, set profileComplete to false
         if (admin.getProfileComplete() == null) {
             admin.setProfileComplete(false);
         }
-        return adminService.saveAdmin(admin);
+        Admin saved = adminService.saveAdmin(admin);
+        return ResponseEntity.ok(saved);
     }
     
     /**
