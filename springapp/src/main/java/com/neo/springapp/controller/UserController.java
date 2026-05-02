@@ -881,12 +881,21 @@ public class UserController {
 
             email = email.trim().toLowerCase();
 
-            // Check if email already registered
-            if (!userService.isEmailUnique(email)) {
-                response.put("success", false);
-                response.put("message", "This email is already registered. Please login instead.");
-                response.put("errorType", "EMAIL_EXISTS");
-                return ResponseEntity.badRequest().body(response);
+            // Check existing user state:
+            // - allow OTP if account is approved but password is not set yet (first-time activation)
+            // - reject for fully registered accounts
+            Optional<User> existingUserOpt = userService.findByEmail(email);
+            if (existingUserOpt.isPresent()) {
+                User existingUser = existingUserOpt.get();
+                boolean approved = "APPROVED".equalsIgnoreCase(existingUser.getStatus());
+                boolean requiresPasswordSetup = !existingUser.isPasswordSet();
+
+                if (!(approved && requiresPasswordSetup)) {
+                    response.put("success", false);
+                    response.put("message", "This email is already registered. Please login instead.");
+                    response.put("errorType", "EMAIL_EXISTS");
+                    return ResponseEntity.badRequest().body(response);
+                }
             }
 
             // Check if phone already registered
