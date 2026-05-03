@@ -371,7 +371,7 @@ public class AdminAccountApplicationService {
             // Create User entity so the account appears in Manage Users and can login
             User user = new User();
             user.setUsername(app.getFullName());
-            user.setEmail(app.getEmail());
+            user.setEmail(UserService.normalizeEmail(app.getEmail()));
             // Generate a temporary password from last 4 digits of Aadhaar + first 4 of PAN
             String tempPassword = "";
             if (app.getAadharNumber() != null && app.getAadharNumber().length() >= 4) {

@@ -979,10 +979,19 @@ public class UserController {
             System.out.println("Username: " + user.getUsername());
             
             Map<String, Object> response = new HashMap<>();
+
+            String emailNorm = UserService.normalizeEmail(user.getEmail());
+            if (emailNorm == null) {
+                response.put("success", false);
+                response.put("message", "Email is required");
+                response.put("errorType", "EMAIL_REQUIRED");
+                return ResponseEntity.badRequest().body(response);
+            }
+            user.setEmail(emailNorm);
             
-            // Validate unique fields
-            if (!userService.isEmailUnique(user.getEmail())) {
-                System.out.println("❌ Email already exists: " + user.getEmail());
+            // Validate unique fields (case-insensitive)
+            if (!userService.isEmailUnique(emailNorm)) {
+                System.out.println("❌ Email already exists: " + emailNorm);
                 response.put("success", false);
                 response.put("message", "Email address is already registered. Please use a different email or try logging in.");
                 response.put("errorType", "EMAIL_EXISTS");
@@ -1197,25 +1206,31 @@ public class UserController {
             }
             
             User user = userOpt.get();
-            
-            // Check if email is the same
-            if (newEmail.equals(user.getEmail())) {
+
+            String normalizedNew = UserService.normalizeEmail(newEmail);
+            if (normalizedNew == null) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", false);
+                response.put("message", "Email is required");
+                return ResponseEntity.badRequest().body(response);
+            }
+
+            String normalizedCurrent = UserService.normalizeEmail(user.getEmail());
+            if (normalizedNew.equals(normalizedCurrent)) {
                 Map<String, Object> response = new HashMap<>();
                 response.put("success", false);
                 response.put("message", "New email is the same as current email");
                 return ResponseEntity.badRequest().body(response);
             }
             
-            // Check if email is unique
-            if (!userService.isEmailUnique(newEmail)) {
+            if (!userService.isEmailUnique(normalizedNew, user.getId())) {
                 Map<String, Object> response = new HashMap<>();
                 response.put("success", false);
                 response.put("message", "Email already exists. Please use a different email.");
                 return ResponseEntity.badRequest().body(response);
             }
             
-            // Update email
-            user.setEmail(newEmail);
+            user.setEmail(normalizedNew);
             User updatedUser = userService.saveUser(user);
             
             Map<String, Object> response = new HashMap<>();
@@ -2348,12 +2363,19 @@ public class UserController {
             }
             if (updateData.containsKey("email")) {
                 String newEmail = (String) updateData.get("email");
-                if (!newEmail.equals(user.getEmail()) && !userService.isEmailUnique(newEmail)) {
+                String normalizedNew = UserService.normalizeEmail(newEmail);
+                if (normalizedNew == null) {
+                    response.put("success", false);
+                    response.put("message", "Email is invalid or empty");
+                    return ResponseEntity.badRequest().body(response);
+                }
+                String normalizedCurrent = UserService.normalizeEmail(user.getEmail());
+                if (!normalizedNew.equals(normalizedCurrent) && !userService.isEmailUnique(normalizedNew, user.getId())) {
                     response.put("success", false);
                     response.put("message", "Email already exists");
                     return ResponseEntity.badRequest().body(response);
                 }
-                user.setEmail(newEmail);
+                user.setEmail(normalizedNew);
             }
             if (updateData.containsKey("status")) {
                 user.setStatus((String) updateData.get("status"));
@@ -2664,10 +2686,15 @@ public class UserController {
             
             // Update email if provided
             if (updates.containsKey("email") && !updates.get("email").isEmpty()) {
-                String newEmail = updates.get("email").toLowerCase().trim();
-                if (!newEmail.equals(user.getEmail())) {
-                    // Check if new email is unique
-                    if (!userService.isEmailUnique(newEmail)) {
+                String newEmail = UserService.normalizeEmail(updates.get("email"));
+                if (newEmail == null) {
+                    response.put("success", false);
+                    response.put("message", "Invalid email");
+                    return ResponseEntity.badRequest().body(response);
+                }
+                String currentNorm = UserService.normalizeEmail(user.getEmail());
+                if (!newEmail.equals(currentNorm)) {
+                    if (!userService.isEmailUnique(newEmail, user.getId())) {
                         response.put("success", false);
                         response.put("message", "Email already in use by another account");
                         return ResponseEntity.badRequest().body(response);

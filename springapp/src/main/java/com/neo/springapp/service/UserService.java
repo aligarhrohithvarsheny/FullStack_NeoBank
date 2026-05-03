@@ -23,6 +23,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 
 @Service
@@ -72,7 +73,7 @@ public class UserService {
     }
 
     public Optional<User> getUserByEmail(String email) {
-        return userRepository.findByEmail(email);
+        return findByEmail(email);
     }
 
     public Optional<User> getUserById(Long id) {
@@ -433,13 +434,16 @@ public class UserService {
         if (userOpt.isPresent()) {
             User user = userOpt.get();
             
-            // Update email with uniqueness validation
-            if (userDetails.getEmail() != null && !userDetails.getEmail().equals(user.getEmail())) {
-                // Check if new email is unique
-                if (!isEmailUnique(userDetails.getEmail())) {
-                    throw new RuntimeException("Email already exists. Please use a different email.");
+            // Update email with uniqueness validation (normalized; allow same user / case-only change)
+            if (userDetails.getEmail() != null) {
+                String newNorm = normalizeEmail(userDetails.getEmail());
+                String currentNorm = normalizeEmail(user.getEmail());
+                if (newNorm != null && !newNorm.equals(currentNorm)) {
+                    if (!isEmailUnique(userDetails.getEmail(), user.getId())) {
+                        throw new RuntimeException("Email already exists. Please use a different email.");
+                    }
+                    user.setEmail(newNorm);
                 }
-                user.setEmail(userDetails.getEmail());
             }
             if (userDetails.getStatus() != null) user.setStatus(userDetails.getStatus());
             
@@ -465,9 +469,36 @@ public class UserService {
 
     // Utility methods - account number generation moved to AccountService for single source of truth
 
-    // Validation methods
+    /** Trim + lowercase for consistent storage and duplicate checks. */
+    public static String normalizeEmail(String email) {
+        if (email == null) {
+            return null;
+        }
+        String t = email.trim();
+        return t.isEmpty() ? null : t.toLowerCase(Locale.ROOT);
+    }
+
+    /**
+     * True if no other user holds this email (case-insensitive).
+     */
     public boolean isEmailUnique(String email) {
-        return !userRepository.findByEmail(email).isPresent();
+        String normalized = normalizeEmail(email);
+        if (normalized == null) {
+            return false;
+        }
+        return userRepository.findByEmailIgnoreCase(normalized).isEmpty();
+    }
+
+    /**
+     * True if the email is free for this user to use (ignores row belonging to {@code excludeUserId}).
+     */
+    public boolean isEmailUnique(String email, Long excludeUserId) {
+        String normalized = normalizeEmail(email);
+        if (normalized == null || excludeUserId == null) {
+            return false;
+        }
+        Optional<User> found = userRepository.findByEmailIgnoreCase(normalized);
+        return found.isEmpty() || found.get().getId().equals(excludeUserId);
     }
 
     public boolean isPanUnique(String pan) {
@@ -480,7 +511,11 @@ public class UserService {
 
 
     public Optional<User> findByEmail(String email) {
-        return userRepository.findByEmail(email);
+        String n = normalizeEmail(email);
+        if (n == null) {
+            return Optional.empty();
+        }
+        return userRepository.findByEmailIgnoreCase(n);
     }
     
     // Helper method to calculate age from DOB

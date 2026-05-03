@@ -947,7 +947,7 @@ export class User implements OnInit, OnDestroy {
     // Create user account in MySQL database
     const newUser = {
       username: this.signupName,
-      email: this.signupEmail,
+      email: (this.signupEmail || '').trim().toLowerCase(),
       password: this.signupPassword,
       phoneNumber: this.signupMobile,
       status: 'PENDING',

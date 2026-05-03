@@ -18,6 +18,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByUsername(String username);
     Optional<User> findByAccountNumber(String accountNumber);
     Optional<User> findByEmail(String email);
+
+    Optional<User> findByEmailIgnoreCase(String email);
     
     // PAN and Aadhar queries through account relationship
     @Query("SELECT u FROM User u LEFT JOIN u.account a WHERE a.pan = :pan")
