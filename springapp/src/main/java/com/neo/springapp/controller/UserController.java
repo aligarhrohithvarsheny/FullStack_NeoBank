@@ -988,8 +988,36 @@ public class UserController {
                 return ResponseEntity.badRequest().body(response);
             }
             user.setEmail(emailNorm);
+
+            // If this email already belongs to an APPROVED user who has not set a password yet
+            // (e.g. admin-opened or KYC-approved account), complete first-time password setup instead
+            // of failing as "duplicate email". This matches /send-signup-otp which allows OTP for the same case.
+            Optional<User> existingOpt = userService.getUserByEmail(emailNorm);
+            if (existingOpt.isPresent()) {
+                User existing = existingOpt.get();
+                boolean needsPassword = "APPROVED".equalsIgnoreCase(existing.getStatus()) && !existing.isPasswordSet();
+                String rawPw = user.getPassword();
+                if (needsPassword && rawPw != null && !rawPw.isBlank()) {
+                    if (!passwordService.isEncrypted(rawPw)) {
+                        existing.setPassword(passwordService.encryptPassword(rawPw));
+                    } else {
+                        existing.setPassword(rawPw);
+                    }
+                    existing.setPasswordSet(true);
+                    if (user.getUsername() != null && !user.getUsername().isBlank()) {
+                        existing.setUsername(user.getUsername().trim());
+                    }
+                    User saved = userService.saveUser(existing);
+                    System.out.println("✅ First-time password set for existing user: " + emailNorm);
+                    response.put("success", true);
+                    response.put("activationCompleted", true);
+                    response.put("message", "Password set successfully! You can now sign in with your email and password.");
+                    response.put("user", saved);
+                    return ResponseEntity.ok(response);
+                }
+            }
             
-            // Validate unique fields (case-insensitive)
+            // Validate unique fields (case-insensitive) for new registrations
             if (!userService.isEmailUnique(emailNorm)) {
                 System.out.println("❌ Email already exists: " + emailNorm);
                 response.put("success", false);

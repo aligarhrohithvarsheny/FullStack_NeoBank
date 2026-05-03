@@ -654,6 +654,17 @@ export class User implements OnInit, OnDestroy {
       error: (err: any) => {
         console.error('Authentication error:', err);
         console.error('Error details:', JSON.stringify(err, null, 2));
+
+        // Approved but password not set: API returns 400 with requiresPasswordSetup — route to setup, no duplicate "Login Failed" + inline error
+        if (err.error?.requiresPasswordSetup || err.error?.passwordNotSet) {
+          const msg = err.error.message || 'Please set your password before signing in.';
+          this.errorMessage = '';
+          this.successMessage = msg;
+          sessionStorage.setItem('setupEmail', normalizedEmail);
+          this.alertService.userSuccess('Set your password', msg);
+          setTimeout(() => this.router.navigate(['/password-setup']), 400);
+          return;
+        }
         
         if (err.error && err.error.netBankingDisabled) {
           this.errorMessage = err.error.message || 'Net Banking is currently disabled by the administrator.';
@@ -965,7 +976,11 @@ export class User implements OnInit, OnDestroy {
         console.log('User account created successfully:', response);
         
         if (response.success) {
-          this.alertService.userSuccess('Account Created', `Welcome ${this.signupName}! Please wait for admin approval.`);
+          if (response.activationCompleted) {
+            this.alertService.userSuccess('Password set', response.message || 'You can now sign in.');
+          } else {
+            this.alertService.userSuccess('Account Created', `Welcome ${this.signupName}! Please wait for admin approval.`);
+          }
           
           // Reset form
           this.signupName = '';
