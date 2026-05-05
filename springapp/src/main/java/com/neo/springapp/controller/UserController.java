@@ -1104,9 +1104,12 @@ public class UserController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<User> getUserById(@PathVariable Long id) {
+    public ResponseEntity<Map<String, Object>> getUserById(@PathVariable Long id) {
         Optional<User> user = userService.getUserById(id);
-        return user.map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
+        if (!user.isPresent()) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(createUserResponse(user.get()));
     }
 
     @GetMapping("/username/{username}")
@@ -1151,9 +1154,12 @@ public class UserController {
     }
 
     @GetMapping("/account/{accountNumber}")
-    public ResponseEntity<User> getUserByAccountNumber(@PathVariable String accountNumber) {
+    public ResponseEntity<Map<String, Object>> getUserByAccountNumber(@PathVariable String accountNumber) {
         Optional<User> user = userService.getUserByAccountNumber(accountNumber);
-        return user.map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
+        if (!user.isPresent()) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(createUserResponse(user.get()));
     }
 
     @GetMapping("/email/{email}")

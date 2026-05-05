@@ -96,51 +96,32 @@ export class Card implements OnInit {
     const currentUser = sessionStorage.getItem('currentUser');
     if (currentUser) {
       const user = JSON.parse(currentUser);
-      
-      // Load full user profile from MySQL database
-      this.http.get(`${environment.apiBaseUrl}/api/users/${user.id}`).subscribe({
-        next: (userData: any) => {
-          console.log('User profile loaded from MySQL:', userData);
-          this.userProfile = {
-            name: userData.account?.name || userData.username,
-            email: userData.email,
-            accountNumber: userData.accountNumber,
-            phoneNumber: userData.account?.phone || '',
-            address: userData.account?.address || '',
-            dateOfBirth: userData.account?.dob || '',
-            accountType: 'Savings Account',
-            joinDate: userData.createdAt ? new Date(userData.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-            pan: userData.account?.pan || '',
-            aadhar: userData.account?.aadharNumber || '',
-            occupation: userData.account?.occupation || '',
-            income: userData.account?.income || 0
-          };
-          
-          // Load user card after profile is loaded
-          this.loadUserCard();
-        },
-        error: (err: any) => {
-          console.error('Error loading user profile from MySQL:', err);
-          // Use fallback profile instead of showing alert
-          this.userProfile = {
-            name: 'User',
-            email: 'user@example.com',
-            accountNumber: 'ACC001',
-            phoneNumber: '',
-            address: '',
-            dateOfBirth: '',
-            accountType: 'Savings Account',
-            joinDate: new Date().toISOString().split('T')[0],
-            pan: '',
-            aadhar: '',
-            occupation: '',
-            income: 0
-          };
-          
-          // Load user card after setting fallback profile
-          this.loadUserCard();
-        }
-      });
+
+      // Populate quickly from session first so account-scoped APIs can work
+      this.userProfile = {
+        name: user.name || 'User',
+        email: user.email || 'user@example.com',
+        accountNumber: user.accountNumber || 'ACC001',
+        phoneNumber: '',
+        address: '',
+        dateOfBirth: '',
+        accountType: 'Savings Account',
+        joinDate: new Date().toISOString().split('T')[0],
+        pan: '',
+        aadhar: '',
+        occupation: '',
+        income: 0
+      };
+
+      const userIdNum = typeof user.id === 'number' ? user.id : Number(user.id);
+      if (!isNaN(userIdNum)) {
+        this.fetchAndApplyUserProfile(`${environment.apiBaseUrl}/api/users/${userIdNum}`);
+      } else if (user.accountNumber) {
+        // Fallback for stale sessions that don't contain id
+        this.fetchAndApplyUserProfile(`${environment.apiBaseUrl}/api/users/account/${user.accountNumber}`);
+      } else {
+        this.loadUserCard();
+      }
     } else {
       console.log('No user session found - trying fallback methods');
       // Try to get user from localStorage as fallback
@@ -171,6 +152,51 @@ export class Card implements OnInit {
       // Load user card after setting profile
       this.loadUserCard();
     }
+  }
+
+  private fetchAndApplyUserProfile(url: string) {
+    this.http.get(url).subscribe({
+      next: (userData: any) => {
+        console.log('User profile loaded from MySQL:', userData);
+        this.userProfile = {
+          name: userData.account?.name || userData.username || this.userProfile?.name || 'User',
+          email: userData.email || this.userProfile?.email || 'user@example.com',
+          accountNumber: userData.accountNumber || this.userProfile?.accountNumber || 'ACC001',
+          phoneNumber: userData.account?.phone || '',
+          address: userData.account?.address || '',
+          dateOfBirth: userData.account?.dob || '',
+          accountType: userData.account?.accountType || 'Savings Account',
+          joinDate: userData.joinDate ? new Date(userData.joinDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+          pan: userData.account?.pan || '',
+          aadhar: userData.account?.aadharNumber || '',
+          occupation: userData.account?.occupation || '',
+          income: userData.account?.income || 0
+        };
+
+        this.loadUserCard();
+      },
+      error: (err: any) => {
+        console.error('Error loading user profile from MySQL:', err);
+        // Keep session-derived profile and continue loading card data
+        if (!this.userProfile) {
+          this.userProfile = {
+            name: 'User',
+            email: 'user@example.com',
+            accountNumber: 'ACC001',
+            phoneNumber: '',
+            address: '',
+            dateOfBirth: '',
+            accountType: 'Savings Account',
+            joinDate: new Date().toISOString().split('T')[0],
+            pan: '',
+            aadhar: '',
+            occupation: '',
+            income: 0
+          };
+        }
+        this.loadUserCard();
+      }
+    });
   }
 
   loadUserCard() {

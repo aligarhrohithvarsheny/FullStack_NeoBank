@@ -234,13 +234,16 @@ export class Profile implements OnInit, AfterViewInit {
         // Load full user profile from MySQL database in background
         // Ensure ID is a number
         const userIdNum = typeof user.id === 'number' ? user.id : Number(user.id);
-        if (isNaN(userIdNum)) {
-          console.error('Invalid user ID:', user.id);
-          return; // Already showed profile from session, so just return
+        const profileUrl = !isNaN(userIdNum)
+          ? `${environment.apiBaseUrl}/api/users/${userIdNum}`
+          : (user.accountNumber ? `${environment.apiBaseUrl}/api/users/account/${user.accountNumber}` : null);
+        if (!profileUrl) {
+          console.error('Invalid session data: missing user id and account number');
+          return;
         }
         
         // Load full profile from API in background
-        this.http.get(`${environment.apiBaseUrl}/api/users/${userIdNum}`)
+        this.http.get(profileUrl)
         .pipe(
           timeout(10000), // 10 second timeout
           catchError(err => {
