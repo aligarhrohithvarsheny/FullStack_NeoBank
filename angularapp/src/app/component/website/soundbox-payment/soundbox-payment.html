@@ -176,6 +176,18 @@
             <p>Process incoming payment to your soundbox</p>
           </div>
 
+          <div class="pgd-form-group" *ngIf="merchant?.merchantId">
+            <label>Linked Receiving Account Number</label>
+            <div style="display:flex; gap:8px;">
+              <input type="text" [(ngModel)]="receiveAccountNumber" class="form-input" placeholder="Enter NeoBank account number" style="flex:1;" />
+              <button class="pgd-primary-btn" (click)="linkReceiveAccount()" [disabled]="linkingReceiveAccount || !receiveAccountNumber">
+                <i class="fa" [ngClass]="linkingReceiveAccount ? 'fa-spinner fa-spin' : 'fa-link'"></i>
+                {{linkingReceiveAccount ? 'Linking...' : 'Link'}}
+              </button>
+            </div>
+            <small *ngIf="receiveAccountMessage">{{ receiveAccountMessage }}</small>
+          </div>
+
           <div class="payment-error" *ngIf="paymentError">
             <span>!</span> {{ paymentError }}
           </div>

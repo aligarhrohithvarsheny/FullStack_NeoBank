@@ -5,6 +5,7 @@ import { Router } from '@angular/router';
 import { SoundboxService } from '../../../service/soundbox.service';
 import { SoundboxDevice, SoundboxTransaction } from '../../../model/soundbox/soundbox.model';
 import { MerchantOnboardingService } from '../../../service/merchant-onboarding.service';
+import { PaymentGatewayService } from '../../../service/payment-gateway.service';
 
 @Component({
   selector: 'app-soundbox-payment',
@@ -52,6 +53,9 @@ export class SoundboxPayment implements OnInit, OnDestroy {
   paymentSuccess = false;
   paymentError = '';
   lastPaymentTxn: any = null;
+  receiveAccountNumber = '';
+  linkingReceiveAccount = false;
+  receiveAccountMessage = '';
 
   // Voice alert
   voiceSupported = false;
@@ -60,6 +64,7 @@ export class SoundboxPayment implements OnInit, OnDestroy {
     private router: Router,
     private soundboxService: SoundboxService,
     private merchantService: MerchantOnboardingService,
+    private pgService: PaymentGatewayService,
     @Inject(PLATFORM_ID) private platformId: Object
   ) {
     this.isBrowser = isPlatformBrowser(this.platformId);
@@ -76,6 +81,7 @@ export class SoundboxPayment implements OnInit, OnDestroy {
       }
 
       this.merchant = JSON.parse(merchantStr);
+      this.receiveAccountNumber = this.merchant?.linkedAccountNumber || this.merchant?.accountNumber || '';
       if (deviceStr) {
         this.device = JSON.parse(deviceStr);
         this.settingsForm.voiceEnabled = this.device?.voiceEnabled ?? true;
@@ -183,7 +189,7 @@ export class SoundboxPayment implements OnInit, OnDestroy {
     this.processingPayment = true;
 
     const transaction: SoundboxTransaction = {
-      accountNumber: this.merchant.accountNumber,
+      accountNumber: this.receiveAccountNumber || this.merchant.accountNumber,
       deviceId: this.device?.deviceId,
       amount: this.paymentAmount,
       txnType: 'CREDIT',
@@ -216,6 +222,31 @@ export class SoundboxPayment implements OnInit, OnDestroy {
       error: (err) => {
         this.processingPayment = false;
         this.paymentError = err.error?.error || 'Payment processing failed.';
+      }
+    });
+  }
+
+  linkReceiveAccount() {
+    if (!this.merchant?.merchantId || !this.receiveAccountNumber?.trim()) return;
+    this.linkingReceiveAccount = true;
+    this.receiveAccountMessage = '';
+    this.pgService.linkMerchantReceivingAccount(this.merchant.merchantId, this.receiveAccountNumber.trim()).subscribe({
+      next: (res: any) => {
+        this.linkingReceiveAccount = false;
+        if (res.success && res.merchant) {
+          this.merchant = { ...this.merchant, ...res.merchant };
+          this.receiveAccountNumber = this.merchant.linkedAccountNumber || this.receiveAccountNumber;
+          this.receiveAccountMessage = 'Account linked successfully for receiving payments.';
+          if (this.isBrowser) {
+            sessionStorage.setItem('merchantSoundbox', JSON.stringify(this.merchant));
+          }
+        } else {
+          this.receiveAccountMessage = res.error || 'Unable to link account.';
+        }
+      },
+      error: (err: any) => {
+        this.linkingReceiveAccount = false;
+        this.receiveAccountMessage = err.error?.error || 'Unable to link account.';
       }
     });
   }

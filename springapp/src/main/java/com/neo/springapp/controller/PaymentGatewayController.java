@@ -59,6 +59,25 @@ public class PaymentGatewayController {
         return ResponseEntity.ok(paymentGatewayService.getAllMerchants());
     }
 
+    @PostMapping("/merchants/{merchantId}/link-account")
+    public ResponseEntity<Map<String, Object>> linkMerchantAccount(
+            @PathVariable String merchantId,
+            @RequestBody Map<String, String> request) {
+        try {
+            String accountNumber = request.get("accountNumber");
+            Map<String, Object> result = paymentGatewayService.linkMerchantReceivingAccount(merchantId, accountNumber);
+            if (Boolean.TRUE.equals(result.get("success"))) {
+                return ResponseEntity.ok(result);
+            }
+            return ResponseEntity.badRequest().body(result);
+        } catch (Exception e) {
+            Map<String, Object> error = new HashMap<>();
+            error.put("success", false);
+            error.put("error", e.getMessage());
+            return ResponseEntity.badRequest().body(error);
+        }
+    }
+
     // ==================== ORDER ENDPOINTS ====================
 
     @PostMapping("/orders/create")

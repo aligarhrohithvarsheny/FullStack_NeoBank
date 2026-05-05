@@ -101,6 +101,85 @@ public class PaymentGatewayService {
         return merchantRepository.findByApiKey(apiKey);
     }
 
+    @Transactional
+    public Map<String, Object> linkMerchantReceivingAccount(String merchantId, String accountNumber) {
+        Map<String, Object> result = new HashMap<>();
+        if (merchantId == null || merchantId.trim().isEmpty()) {
+            result.put("success", false);
+            result.put("error", "merchantId is required");
+            return result;
+        }
+        if (accountNumber == null || accountNumber.trim().isEmpty()) {
+            result.put("success", false);
+            result.put("error", "accountNumber is required");
+            return result;
+        }
+
+        PgMerchant merchant = merchantRepository.findByMerchantId(merchantId)
+                .orElseThrow(() -> new RuntimeException("Merchant not found"));
+        String normalizedAccount = accountNumber.trim();
+
+        Optional<PgMerchant> existing = merchantRepository.findByLinkedAccountNumber(normalizedAccount);
+        if (existing.isPresent() && !existing.get().getMerchantId().equals(merchantId)) {
+            result.put("success", false);
+            result.put("error", "This account is already linked to another merchant");
+            return result;
+        }
+
+        String holderName = null;
+        String accountType = null;
+
+        Optional<CurrentAccount> currentOpt = currentAccountRepository.findByAccountNumber(normalizedAccount);
+        if (currentOpt.isPresent()) {
+            CurrentAccount ca = currentOpt.get();
+            if (!"ACTIVE".equalsIgnoreCase(ca.getStatus())) {
+                result.put("success", false);
+                result.put("error", "Current account is not active");
+                return result;
+            }
+            holderName = ca.getOwnerName();
+            accountType = "CURRENT";
+        }
+
+        if (holderName == null) {
+            Account acc = accountRepository.findByAccountNumber(normalizedAccount);
+            if (acc != null) {
+                if (!"ACTIVE".equalsIgnoreCase(acc.getStatus())) {
+                    result.put("success", false);
+                    result.put("error", "Savings account is not active");
+                    return result;
+                }
+                holderName = acc.getName();
+                accountType = "SAVINGS";
+            }
+        }
+
+        if (holderName == null) {
+            SalaryAccount salAcc = salaryAccountRepository.findByAccountNumber(normalizedAccount);
+            if (salAcc != null) {
+                holderName = salAcc.getEmployeeName();
+                accountType = "SALARY";
+            }
+        }
+
+        if (holderName == null) {
+            result.put("success", false);
+            result.put("error", "NeoBank account not found");
+            return result;
+        }
+
+        merchant.setLinkedAccountNumber(normalizedAccount);
+        merchant.setLinkedAccountHolderName(holderName);
+        merchant.setLinkedAccountType(accountType);
+        merchant.setLinkedAccountVerified(true);
+        PgMerchant saved = merchantRepository.save(merchant);
+
+        result.put("success", true);
+        result.put("merchant", saved);
+        result.put("message", "Receiving account linked successfully");
+        return result;
+    }
+
     public List<PgMerchant> getAllMerchants() {
         return merchantRepository.findAll();
     }

@@ -20,6 +20,10 @@ export class PaymentGatewayService {
     return this.http.get(`${this.apiUrl}/merchants/${merchantId}`);
   }
 
+  linkMerchantReceivingAccount(merchantId: string, accountNumber: string): Observable<any> {
+    return this.http.post(`${this.apiUrl}/merchants/${merchantId}/link-account`, { accountNumber });
+  }
+
   getAllMerchants(): Observable<any> {
     return this.http.get(`${this.apiUrl}/merchants`);
   }

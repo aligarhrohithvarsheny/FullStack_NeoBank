@@ -1,4 +1,4 @@
-import { Component, OnInit, Inject, PLATFORM_ID, ViewEncapsulation } from '@angular/core';
+import { Component, OnInit, OnDestroy, Inject, PLATFORM_ID, ViewEncapsulation } from '@angular/core';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -13,7 +13,7 @@ import QRCode from 'qrcode';
   styleUrls: ['./pg-dashboard.css'],
   encapsulation: ViewEncapsulation.None
 })
-export class PgDashboard implements OnInit {
+export class PgDashboard implements OnInit, OnDestroy {
   isBrowser = false;
   merchant: any = null;
   activeTab = 'dashboard';
@@ -24,6 +24,7 @@ export class PgDashboard implements OnInit {
   transactions: any[] = [];
   refunds: any[] = [];
   ledger: any[] = [];
+  paymentLinks: any[] = [];
   analytics: any = {};
 
   // Stats
@@ -113,6 +114,14 @@ export class PgDashboard implements OnInit {
 
   // Settlement
   settlingTxn = '';
+  refreshTimer: any = null;
+
+  // Link receiving account
+  showLinkAccountModal = false;
+  linkAccountNumber = '';
+  linkingAccount = false;
+  linkAccountMessage = '';
+  linkAccountSuccess = false;
 
   constructor(
     private router: Router,
@@ -131,7 +140,12 @@ export class PgDashboard implements OnInit {
       }
       this.merchant = JSON.parse(stored);
       this.loadData();
+      this.startAutoRefresh();
     }
+  }
+
+  ngOnDestroy(): void {
+    this.stopAutoRefresh();
   }
 
   loadData() {
@@ -162,6 +176,11 @@ export class PgDashboard implements OnInit {
       error: () => this.ledger = []
     });
 
+    this.pgService.getMerchantPaymentLinks(mid).subscribe({
+      next: (data: any[]) => this.paymentLinks = data || [],
+      error: () => this.paymentLinks = []
+    });
+
     this.pgService.getMerchantAnalytics(mid).subscribe({
       next: (data: any) => {
         this.analytics = data;
@@ -172,6 +191,22 @@ export class PgDashboard implements OnInit {
       },
       error: () => {}
     });
+  }
+
+  startAutoRefresh() {
+    this.stopAutoRefresh();
+    this.refreshTimer = setInterval(() => {
+      if (this.merchant?.merchantId) {
+        this.loadData();
+      }
+    }, 5000);
+  }
+
+  stopAutoRefresh() {
+    if (this.refreshTimer) {
+      clearInterval(this.refreshTimer);
+      this.refreshTimer = null;
+    }
   }
 
   // ---- Create Order ----
@@ -537,6 +572,7 @@ export class PgDashboard implements OnInit {
           // Update order status in list
           const o = this.orders.find(x => x.orderId === this.upiPayOrder.orderId);
           if (o) o.status = 'ATTEMPTED';
+          this.loadData();
           setTimeout(() => { this.showUpiPayModal = false; this.upiPaySuccess = ''; }, 4000);
         }
       },
@@ -557,6 +593,38 @@ export class PgDashboard implements OnInit {
         }
       },
       error: (err: any) => alert(err.error?.error || 'Failed to delete order')
+    });
+  }
+
+  openLinkAccountModal() {
+    this.showLinkAccountModal = true;
+    this.linkAccountNumber = this.merchant?.linkedAccountNumber || '';
+    this.linkAccountMessage = '';
+    this.linkAccountSuccess = false;
+  }
+
+  linkReceivingAccount() {
+    if (!this.linkAccountNumber?.trim() || !this.merchant?.merchantId) return;
+    this.linkingAccount = true;
+    this.linkAccountMessage = '';
+    this.linkAccountSuccess = false;
+    this.pgService.linkMerchantReceivingAccount(this.merchant.merchantId, this.linkAccountNumber.trim()).subscribe({
+      next: (res: any) => {
+        this.linkingAccount = false;
+        if (res.success && res.merchant) {
+          this.merchant = res.merchant;
+          if (this.isBrowser) sessionStorage.setItem('pgMerchant', JSON.stringify(this.merchant));
+          this.linkAccountSuccess = true;
+          this.linkAccountMessage = res.message || 'Account linked successfully.';
+          this.loadData();
+        } else {
+          this.linkAccountMessage = res.error || 'Failed to link account.';
+        }
+      },
+      error: (err: any) => {
+        this.linkingAccount = false;
+        this.linkAccountMessage = err.error?.error || 'Failed to link account.';
+      }
     });
   }
 }
