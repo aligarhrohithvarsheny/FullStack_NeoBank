@@ -11,9 +11,15 @@ import com.neo.springapp.service.OtpService;
 import com.neo.springapp.service.EmailService;
 import com.neo.springapp.repository.FastagLinkedAccountRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.InputStreamResource;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.nio.file.Files;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -570,6 +576,52 @@ public class FastagLoginController {
             response.put("success", false);
             response.put("message", "Failed to fetch linked accounts.");
             return ResponseEntity.internalServerError().body(response);
+        }
+    }
+
+    /**
+     * GET /api/fastag/sticker/{id}?gmailId=user@gmail.com
+     * Download FASTag sticker for approved tag owned by this Gmail ID.
+     */
+    @GetMapping("/sticker/{id}")
+    public ResponseEntity<?> downloadStickerForFastagUser(@PathVariable Long id, @RequestParam("gmailId") String gmailId) {
+        if (gmailId == null || gmailId.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "gmailId is required."));
+        }
+        Fasttag tag = fasttagService.getById(id);
+        if (tag == null) {
+            return ResponseEntity.notFound().build();
+        }
+        String normalizedGmail = gmailId.trim().toLowerCase();
+        String tagEmail = tag.getEmail() == null ? "" : tag.getEmail().trim().toLowerCase();
+        if (!tagEmail.equals(normalizedGmail)) {
+            return ResponseEntity.status(403).body(Map.of("success", false, "message", "You are not allowed to download this FASTag sticker."));
+        }
+        if (!"Approved".equalsIgnoreCase(tag.getStatus())) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "FASTag sticker is available only for approved FASTag."));
+        }
+        if (tag.getStickerPath() == null || tag.getStickerPath().isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Sticker not available for this FASTag."));
+        }
+
+        try {
+            File file = new File(tag.getStickerPath());
+            if (!file.exists()) {
+                return ResponseEntity.notFound().build();
+            }
+            String contentType = Files.probeContentType(file.toPath());
+            if (contentType == null || contentType.isBlank()) {
+                contentType = "application/octet-stream";
+            }
+            HttpHeaders headers = new HttpHeaders();
+            headers.add(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + file.getName());
+            return ResponseEntity.ok()
+                    .headers(headers)
+                    .contentLength(file.length())
+                    .contentType(MediaType.parseMediaType(contentType))
+                    .body(new InputStreamResource(new FileInputStream(file)));
+        } catch (Exception ex) {
+            return ResponseEntity.internalServerError().body(Map.of("success", false, "message", "Failed to download FASTag sticker."));
         }
     }
 

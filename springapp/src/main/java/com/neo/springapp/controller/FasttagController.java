@@ -160,6 +160,7 @@ public class FasttagController {
     public ResponseEntity<?> downloadSticker(@PathVariable Long id) {
         Fasttag f = fasttagService.getById(id);
         if (f == null) return ResponseEntity.notFound().build();
+        if (!"Approved".equalsIgnoreCase(f.getStatus())) return ResponseEntity.badRequest().body("Sticker is available only for approved FASTag.");
         String path = f.getStickerPath();
         if (path == null || path.isEmpty()) return ResponseEntity.badRequest().body("Sticker not available");
         try {
@@ -168,10 +169,14 @@ public class FasttagController {
             InputStreamResource resource = new InputStreamResource(new FileInputStream(file));
             HttpHeaders headers = new HttpHeaders();
             headers.add(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + file.getName());
+            String contentType = Files.probeContentType(file.toPath());
+            if (contentType == null || contentType.isBlank()) {
+                contentType = "application/octet-stream";
+            }
             return ResponseEntity.ok()
                     .headers(headers)
                     .contentLength(file.length())
-                    .contentType(MediaType.APPLICATION_PDF)
+                    .contentType(MediaType.parseMediaType(contentType))
                     .body(resource);
         } catch (Exception e) {
             return ResponseEntity.status(500).body("Failed to read sticker");
