@@ -161,6 +161,7 @@ public class FasttagController {
         Fasttag f = fasttagService.getById(id);
         if (f == null) return ResponseEntity.notFound().build();
         if (!"Approved".equalsIgnoreCase(f.getStatus())) return ResponseEntity.badRequest().body("Sticker is available only for approved FASTag.");
+        f = fasttagService.ensureStickerForApprovedTag(f);
         String path = f.getStickerPath();
         if (path == null || path.isEmpty()) return ResponseEntity.badRequest().body("Sticker not available");
         try {

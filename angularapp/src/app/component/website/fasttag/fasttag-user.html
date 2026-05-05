@@ -298,6 +298,11 @@
           <div><i class="fa fa-wallet"></i> Balance: ₹{{ t.balance || 0 }}</div>
           <div *ngIf="t.make"><i class="fa fa-industry"></i> {{ t.make }} {{ t.model }}</div>
         </div>
+        <div class="ft-tag-card-actions" *ngIf="t.status === 'Approved'">
+          <button class="ft-download-btn small" (click)="downloadSticker(t.id); $event.stopPropagation()">
+            <i class="fa fa-download"></i> Download
+          </button>
+        </div>
       </div>
       <div *ngIf="getFilteredTags().length === 0" class="ft-no-results">
         No FASTags found. Purchase a new FASTag to get started.

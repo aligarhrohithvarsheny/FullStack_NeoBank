@@ -600,6 +600,7 @@ public class FastagLoginController {
         if (!"Approved".equalsIgnoreCase(tag.getStatus())) {
             return ResponseEntity.badRequest().body(Map.of("success", false, "message", "FASTag sticker is available only for approved FASTag."));
         }
+        tag = fasttagService.ensureStickerForApprovedTag(tag);
         if (tag.getStickerPath() == null || tag.getStickerPath().isBlank()) {
             return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Sticker not available for this FASTag."));
         }

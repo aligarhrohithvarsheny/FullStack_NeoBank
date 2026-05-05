@@ -1,9 +1,11 @@
 import { Component, OnInit, Inject, PLATFORM_ID, ViewEncapsulation } from '@angular/core';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { HttpClient } from '@angular/common/http';
 import { FasttagService, FasttagApplication } from '../../../service/fasttag.service';
 import { AccountService } from '../../../service/account';
 import { AlertService } from '../../../service/alert.service';
+import { environment } from '../../../../environment/environment';
 
 @Component({
   selector: 'app-fasttag-user',
@@ -83,11 +85,13 @@ export class FasttagUser implements OnInit {
   fuelTypes = ['Petrol', 'Diesel', 'CNG', 'Electric', 'Hybrid'];
 
   private currentUserId = 'guest';
+  private fastagGmailId = '';
   isSubmitting = false;
   today = new Date();
 
   constructor(
     public fasttagService: FasttagService,
+    private http: HttpClient,
     private accountService: AccountService,
     private alertService: AlertService,
     @Inject(PLATFORM_ID) private platformId: Object
@@ -96,12 +100,22 @@ export class FasttagUser implements OnInit {
   ngOnInit() {
     if (isPlatformBrowser(this.platformId) && typeof sessionStorage !== 'undefined') {
       try {
-        const currentUserRaw = sessionStorage.getItem('currentUser');
-        const user = currentUserRaw ? JSON.parse(currentUserRaw) : { id: 'guest' };
-        this.currentUserId = user.id || 'guest';
-        this.customerName = user.username || user.name || '';
-        this.mobileNumber = user.phone || user.mobileNumber || '';
-        this.emailId = user.email || '';
+        const fastagUserRaw = sessionStorage.getItem('fastagUser');
+        if (fastagUserRaw) {
+          const fastagUser = JSON.parse(fastagUserRaw);
+          this.fastagGmailId = (fastagUser.gmailId || '').trim().toLowerCase();
+          this.currentUserId = fastagUser.id || this.fastagGmailId || 'guest';
+          this.customerName = fastagUser.userName || fastagUser.username || fastagUser.name || '';
+          this.mobileNumber = fastagUser.phone || fastagUser.mobileNumber || '';
+          this.emailId = this.fastagGmailId;
+        } else {
+          const currentUserRaw = sessionStorage.getItem('currentUser');
+          const user = currentUserRaw ? JSON.parse(currentUserRaw) : { id: 'guest' };
+          this.currentUserId = user.id || 'guest';
+          this.customerName = user.username || user.name || '';
+          this.mobileNumber = user.phone || user.mobileNumber || '';
+          this.emailId = user.email || '';
+        }
 
         // Load user profile for address fields
         const profileRaw = sessionStorage.getItem('userProfile');
@@ -125,6 +139,13 @@ export class FasttagUser implements OnInit {
   }
 
   loadMyTags() {
+    if (this.fastagGmailId) {
+      this.http.get<any>(`${environment.apiBaseUrl}/api/fastag/user-details/${encodeURIComponent(this.fastagGmailId)}`).subscribe({
+        next: (res) => { this.myTags = (res?.fasttags || []) as FasttagApplication[]; },
+        error: (err) => { console.error('Failed to load FASTags by Gmail', err); this.myTags = []; }
+      });
+      return;
+    }
     this.fasttagService.listForUser(this.currentUserId).subscribe({
       next: (res) => { this.myTags = res || []; },
       error: (err) => { console.error('Failed to load FASTags', err); }
@@ -132,6 +153,22 @@ export class FasttagUser implements OnInit {
   }
 
   loadUserAccounts() {
+    if (this.fastagGmailId) {
+      this.http.get<any>(`${environment.apiBaseUrl}/api/fastag/linked-accounts/${encodeURIComponent(this.fastagGmailId)}`).subscribe({
+        next: (res) => {
+          const accounts = res?.linkedAccounts || [];
+          this.userAccounts = accounts.map((acc: any) => ({
+            accountNumber: acc.accountNumber,
+            id: acc.accountNumber,
+            name: acc.accountHolderName || 'Linked Account',
+            balance: 0
+          }));
+        },
+        error: () => { this.userAccounts = []; }
+      });
+      return;
+    }
+
     // Fetch only the logged-in user's account
     if (isPlatformBrowser(this.platformId) && typeof sessionStorage !== 'undefined') {
       try {
@@ -335,10 +372,13 @@ export class FasttagUser implements OnInit {
     });
   }
 
-  downloadSticker(tagId: string) {
+  downloadSticker(tagId: any) {
     if (!tagId) return;
     if (isPlatformBrowser(this.platformId)) {
-      const url = this.fasttagService.downloadSticker(tagId);
+      const id = String(tagId);
+      const url = this.fastagGmailId
+        ? this.fasttagService.downloadStickerForFastagUser(id, this.fastagGmailId)
+        : this.fasttagService.downloadSticker(id);
       window.open(url, '_blank');
     }
   }

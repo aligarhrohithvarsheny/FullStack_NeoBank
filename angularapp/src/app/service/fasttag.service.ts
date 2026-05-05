@@ -131,4 +131,9 @@ export class FasttagService {
   downloadSticker(id: string): string {
     return `${environment.apiBaseUrl}/api/fasttags/${id}/sticker`;
   }
+
+  // Get sticker download URL for FASTag login users (gmail protected)
+  downloadStickerForFastagUser(id: string, gmailId: string): string {
+    return `${environment.apiBaseUrl}/api/fastag/sticker/${id}?gmailId=${encodeURIComponent(gmailId)}`;
+  }
 }

@@ -62,15 +62,7 @@ public class FasttagService {
         t.setBarcodeNumber(barcode);
         t.setIssueDate(LocalDateTime.now());
         t.setBalance(t.getAmount() != null ? t.getAmount() : 0.0);
-        // generate sticker PDF and store path
-        try {
-            String outputDir = "uploads/fasttag-stickers";
-            String stickerPath = stickerGenerator.generateStickerPdf(t.getFasttagNumber(), t.getBarcodeNumber(), t.getUserName() == null ? "" : t.getUserName(), t.getVehicleNumber() == null ? "" : t.getVehicleNumber(), t.getBank() == null ? "NeoBank" : t.getBank(), t.getIssueDate(), outputDir);
-            t.setStickerPath(stickerPath);
-        } catch (Exception e) {
-            // log and proceed; sticker generation failure shouldn't block approval
-            System.err.println("Failed to generate FASTag sticker: " + e.getMessage());
-        }
+        generateAndAttachSticker(t);
         Fasttag saved = fasttagRepository.save(t);
 
         // record initial allocation as transaction
@@ -231,6 +223,29 @@ public class FasttagService {
         return fasttagRepository.findById(id).orElse(null);
     }
 
+    public Fasttag ensureStickerForApprovedTag(Fasttag tag) {
+        if (tag == null || !"Approved".equalsIgnoreCase(tag.getStatus())) {
+            return tag;
+        }
+        if (tag.getStickerPath() != null && !tag.getStickerPath().isBlank()) {
+            java.io.File existingFile = new java.io.File(tag.getStickerPath());
+            if (existingFile.exists()) {
+                return tag;
+            }
+        }
+        if (tag.getFasttagNumber() == null || tag.getFasttagNumber().isBlank()) {
+            tag.setFasttagNumber("FT" + (int) (10000000 + Math.random() * 90000000));
+        }
+        if (tag.getBarcodeNumber() == null || tag.getBarcodeNumber().isBlank()) {
+            tag.setBarcodeNumber(generateBarcodeDigits(12));
+        }
+        if (tag.getIssueDate() == null) {
+            tag.setIssueDate(LocalDateTime.now());
+        }
+        generateAndAttachSticker(tag);
+        return fasttagRepository.save(tag);
+    }
+
     public Fasttag save(Fasttag fasttag) {
         return fasttagRepository.save(fasttag);
     }
@@ -262,5 +277,24 @@ public class FasttagService {
      */
     public List<Fasttag> findByEmail(String email) {
         return fasttagRepository.findByEmail(email);
+    }
+
+    private void generateAndAttachSticker(Fasttag tag) {
+        try {
+            String outputDir = "uploads/fasttag-stickers";
+            String stickerPath = stickerGenerator.generateStickerPdf(
+                    tag.getFasttagNumber(),
+                    tag.getBarcodeNumber(),
+                    tag.getUserName() == null ? "" : tag.getUserName(),
+                    tag.getVehicleNumber() == null ? "" : tag.getVehicleNumber(),
+                    tag.getBank() == null ? "NeoBank" : tag.getBank(),
+                    tag.getIssueDate() == null ? LocalDateTime.now() : tag.getIssueDate(),
+                    outputDir
+            );
+            tag.setStickerPath(stickerPath);
+        } catch (Exception e) {
+            // Sticker generation failure should not block FASTag business flows.
+            System.err.println("Failed to generate FASTag sticker: " + e.getMessage());
+        }
     }
 }
