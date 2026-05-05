@@ -322,6 +322,26 @@ export class FasttagDashboard implements OnInit {
       });
   }
 
+  downloadSticker(tag: any) {
+    if (!tag || tag.status !== 'Approved') {
+      this.showGlobalAlert('FASTag download is available only for approved tags.', 'error');
+      return;
+    }
+    if (!this.user?.gmailId) {
+      this.showGlobalAlert('Session expired. Please login again.', 'error');
+      return;
+    }
+
+    const url = `${environment.apiBaseUrl}/api/fastag/sticker/${tag.id}?gmailId=${encodeURIComponent(this.user.gmailId)}`;
+    if (this.isBrowser) {
+      const link = document.createElement('a');
+      link.href = url;
+      link.target = '_blank';
+      link.rel = 'noopener';
+      link.click();
+    }
+  }
+
   closeTransactions() {
     this.showTransactions = false;
     this.transactionTag = null;

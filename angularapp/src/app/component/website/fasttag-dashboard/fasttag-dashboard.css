@@ -703,6 +703,9 @@
 .btn-recharge { color: #10B981; border-color: #A7F3D0; }
 .btn-recharge:hover { background: #ECFDF5; }
 
+.btn-download { color: #7C3AED; border-color: #DDD6FE; }
+.btn-download:hover { background: #F5F3FF; }
+
 .btn-close-tag { color: #EF4444; border-color: #FECACA; }
 .btn-close-tag:hover { background: #FEF2F2; }
 .btn-close-tag.disabled { opacity: 0.4; cursor: not-allowed; pointer-events: none; }

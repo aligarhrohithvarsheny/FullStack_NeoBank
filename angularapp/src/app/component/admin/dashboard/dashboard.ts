@@ -6240,7 +6240,7 @@ export class Dashboard implements OnInit, OnDestroy {
         (a.accountNumber && a.accountNumber.toLowerCase().includes(q)) ||
         (a.name && a.name.toLowerCase().includes(q)) ||
         (a.phone && a.phone.toLowerCase().includes(q)) ||
-        (a.customerId && a.customerId.toLowerCase().includes(q))
+        (a.customerId !== null && a.customerId !== undefined && String(a.customerId).toLowerCase().includes(q))
       );
     }
 
@@ -6407,6 +6407,11 @@ export class Dashboard implements OnInit, OnDestroy {
 
     this.http.get(url, { responseType: 'blob' }).subscribe({
       next: (blob) => {
+        if (blob.type && blob.type.includes('application/json')) {
+          this.passbookGeneratingFor = '';
+          this.alertService.error('Error', 'Passbook generation failed for this account.');
+          return;
+        }
         const downloadUrl = window.URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = downloadUrl;
@@ -6434,12 +6439,27 @@ export class Dashboard implements OnInit, OnDestroy {
     if (this.selectedPassbookAccounts.length === 0) return;
     this.isBulkGenerating = true;
     let completed = 0;
+    let failed = 0;
     const total = this.selectedPassbookAccounts.length;
 
     this.selectedPassbookAccounts.forEach(acc => {
       const url = `${environment.apiBaseUrl}/api/passbook/generate/${acc.accountNumber}?accountType=${acc.type}`;
       this.http.get(url, { responseType: 'blob' }).subscribe({
         next: (blob) => {
+          if (blob.type && blob.type.includes('application/json')) {
+            failed++;
+            completed++;
+            if (completed >= total) {
+              this.isBulkGenerating = false;
+              this.selectedPassbookAccounts = [];
+              if (failed === 0) {
+                this.alertService.success('Bulk Complete', `${total} passbooks generated successfully!`);
+              } else {
+                this.alertService.error('Partial Failure', `${failed} passbook(s) failed out of ${total}.`);
+              }
+            }
+            return;
+          }
           const downloadUrl = window.URL.createObjectURL(blob);
           const link = document.createElement('a');
           link.href = downloadUrl;
@@ -6451,14 +6471,20 @@ export class Dashboard implements OnInit, OnDestroy {
           if (completed >= total) {
             this.isBulkGenerating = false;
             this.selectedPassbookAccounts = [];
-            this.alertService.success('Bulk Complete', `${total} passbooks generated successfully!`);
+            if (failed === 0) {
+              this.alertService.success('Bulk Complete', `${total} passbooks generated successfully!`);
+            } else {
+              this.alertService.error('Partial Failure', `${failed} passbook(s) failed out of ${total}.`);
+            }
           }
         },
         error: () => {
+          failed++;
           completed++;
           if (completed >= total) {
             this.isBulkGenerating = false;
-            this.alertService.error('Partial Failure', `Some passbooks failed. ${completed - total} errors.`);
+            this.selectedPassbookAccounts = [];
+            this.alertService.error('Partial Failure', `${failed} passbook(s) failed out of ${total}.`);
           }
         }
       });
