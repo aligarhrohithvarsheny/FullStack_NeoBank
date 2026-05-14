@@ -123,9 +123,14 @@ public class EmailService {
         initializeMailSender();
         
         try {
-            if (!mailAvailable || mailSender == null) {
-                System.err.println("❌ OTP email sending skipped: JavaMailSender is not configured.");
-                return false;
+            if (!mailAvailable || mailSender == null || !isSmtpCredentialsConfigured()) {
+                System.out.println("==========================================");
+                System.out.println("LOGIN OTP EMAIL (SMTP credentials not set — console fallback)");
+                System.out.println("To: " + toEmail);
+                System.out.println("OTP: " + otp);
+                System.out.println("Set SPRING_MAIL_USERNAME/SPRING_MAIL_PASSWORD or Gmail API env vars to send real email.");
+                System.out.println("==========================================");
+                return true;
             }
 
             String fromEmail = getFromEmail();
@@ -191,6 +196,19 @@ public class EmailService {
         if (environment == null) return "unknown";
         String host = environment.getProperty("spring.mail.host");
         return host != null ? host : "unknown";
+    }
+
+    /**
+     * Spring Boot may still expose a {@link JavaMailSender} bean when only host/port defaults are set.
+     * Login OTP must not attempt SMTP without real credentials (always fails on hosts like Render).
+     */
+    private boolean isSmtpCredentialsConfigured() {
+        if (environment == null) {
+            return false;
+        }
+        String user = environment.getProperty("spring.mail.username");
+        String pass = environment.getProperty("spring.mail.password");
+        return user != null && !user.isBlank() && pass != null && !pass.isBlank();
     }
     
     /**

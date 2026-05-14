@@ -176,6 +176,8 @@ export class ManagerDashboard implements OnInit, OnDestroy {
   // ID card management (for selected admin)
   isGeneratingIdCard: boolean = false;
   isUpdatingIdCard: boolean = false;
+  isUploadingIdCardPhoto: boolean = false;
+  idCardPhotoCacheBuster: number = Date.now();
   idCardDesignationInput: string = '';
   idCardDepartmentInput: string = '';
   idCardLookupNumber: string = '';
@@ -2156,6 +2158,57 @@ export class ManagerDashboard implements OnInit, OnDestroy {
       });
   }
 
+  onIdCardPhotoSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input?.files && input.files.length ? input.files[0] : null;
+    if (!file || !this.selectedAdmin?.id) {
+      if (input) input.value = '';
+      return;
+    }
+    const allowed = ['image/jpeg', 'image/png', 'image/webp'];
+    if (file.type && !allowed.includes(file.type)) {
+      this.alertService.error('Validation Error', 'Please select a JPG, PNG, or WEBP image');
+      input.value = '';
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      this.alertService.error('Validation Error', 'Image must be less than 2MB');
+      input.value = '';
+      return;
+    }
+    const idNum = typeof this.selectedAdmin.id === 'number' ? this.selectedAdmin.id : Number(this.selectedAdmin.id);
+    if (isNaN(idNum)) {
+      this.alertService.error('Error', 'Invalid admin ID');
+      input.value = '';
+      return;
+    }
+    const formData = new FormData();
+    formData.append('file', file);
+    this.isUploadingIdCardPhoto = true;
+    this.http.post<any>(`${environment.apiBaseUrl}/api/admins/profile-photo/${idNum}`, formData).subscribe({
+      next: (resp: any) => {
+        this.isUploadingIdCardPhoto = false;
+        input.value = '';
+        if (resp?.success && resp.admin) {
+          this.alertService.success('Photo updated', 'ID card photo uploaded successfully.');
+          this.selectedAdmin = { ...this.selectedAdmin, ...resp.admin };
+          this.idCardPhotoCacheBuster = Date.now();
+          const idx = this.allAdmins.findIndex((a: any) => a.id === this.selectedAdmin.id);
+          if (idx >= 0) {
+            this.allAdmins[idx] = { ...this.allAdmins[idx], ...resp.admin };
+          }
+        } else {
+          this.alertService.error('Error', resp?.message || 'Failed to upload photo');
+        }
+      },
+      error: (err: any) => {
+        this.isUploadingIdCardPhoto = false;
+        input.value = '';
+        this.alertService.error('Error', err.error?.message || 'Failed to upload photo');
+      }
+    });
+  }
+
   updateIdCardMetaForSelectedAdmin() {
     if (!this.selectedAdmin || !this.selectedAdmin.id) {
       this.alertService.error('Error', 'Please select an admin first');
@@ -2370,7 +2423,7 @@ export class ManagerDashboard implements OnInit, OnDestroy {
       qrDataUrl = await QRCode.toDataURL(qrPayload, {
         errorCorrectionLevel: 'M',
         margin: 1,
-        width: 220,
+        width: 180,
         color: { dark: '#0b3a8c', light: '#ffffff' }
       });
     } catch (e) {
@@ -2386,7 +2439,7 @@ export class ManagerDashboard implements OnInit, OnDestroy {
   <title>NeoBank Admin ID Card</title>
   <style>
     @page {
-      size: 85.6mm 54mm;
+      size: 54mm 86mm;
       margin: 0;
     }
     body {
@@ -2396,66 +2449,64 @@ export class ManagerDashboard implements OnInit, OnDestroy {
       background: #ffffff;
     }
     .page {
-      width: 85.6mm;
-      height: 54mm;
+      width: 54mm;
+      height: 86mm;
       margin: 0 auto;
       display: flex;
       align-items: center;
       justify-content: center;
+      box-sizing: border-box;
     }
     .page.break {
       page-break-before: always;
     }
+    /* Front — portrait PVC */
     .id-card {
-      width: 80mm;
-      height: 49mm;
-      border-radius: 6px;
+      width: 50mm;
+      height: 82mm;
+      border-radius: 3mm;
       overflow: hidden;
-      background: linear-gradient(135deg, #0f4ab8, #1f7ae0);
+      background: linear-gradient(180deg, #0f4ab8 0%, #1f7ae0 35%, #38bdf8 100%);
       color: #fff;
       display: flex;
       flex-direction: column;
       box-shadow: 0 2px 4px rgba(0,0,0,0.25);
+      box-sizing: border-box;
     }
     .id-top {
-      padding: 4px 6px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-size: 8px;
+      padding: 3mm 3mm 2mm;
+      text-align: center;
+      flex-shrink: 0;
     }
     .bank-name {
-      font-weight: 700;
-      letter-spacing: 1px;
+      font-weight: 800;
+      letter-spacing: 2px;
+      font-size: 9px;
     }
     .bank-tagline {
-      font-size: 7px;
-      opacity: 0.85;
+      font-size: 6.5px;
+      opacity: 0.9;
+      margin-top: 1px;
     }
-    .id-middle {
-      flex: 1;
+    .id-photo-wrap {
       display: flex;
-      padding: 4px 6px;
-      background: #ffffff;
-      color: #12315b;
-    }
-    .photo-box {
-      width: 22mm;
-      display: flex;
-      align-items: center;
       justify-content: center;
+      padding: 2mm 0;
+      flex-shrink: 0;
     }
     .photo-circle {
-      width: 18mm;
-      height: 24mm;
-      border-radius: 6mm;
-      background: #dbeafe;
+      width: 26mm;
+      height: 32mm;
+      border-radius: 2mm;
+      background: #ffffff;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 18px;
+      font-size: 22px;
       color: #0f4ab8;
       overflow: hidden;
+      border: 2px solid rgba(255,255,255,0.85);
+      box-sizing: border-box;
     }
     .photo-img {
       width: 100%;
@@ -2463,60 +2514,75 @@ export class ManagerDashboard implements OnInit, OnDestroy {
       object-fit: cover;
       display: block;
     }
-    .info-box {
+    .id-info {
       flex: 1;
-      padding-left: 4px;
-      font-size: 7px;
+      margin: 0 3mm 2mm;
+      padding: 2.5mm 2.5mm;
+      background: #ffffff;
+      color: #12315b;
+      border-radius: 2mm;
+      font-size: 6.5px;
+      line-height: 1.25;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
     }
     .info-name {
-      font-size: 9px;
-      font-weight: 700;
+      font-size: 8.5px;
+      font-weight: 800;
       margin-bottom: 2px;
+      text-align: center;
     }
     .info-role {
-      font-size: 8px;
-      font-weight: 600;
+      font-size: 7.5px;
+      font-weight: 700;
       color: #0f4ab8;
       margin-bottom: 2px;
+      text-align: center;
     }
     .info-row {
-      margin-bottom: 1px;
-      line-height: 1.2;
+      margin-bottom: 1.5px;
+      word-break: break-word;
     }
     .label {
-      font-weight: 600;
+      font-weight: 700;
+      color: #0b3a8c;
     }
     .id-bottom {
-      padding: 3px 6px 3px 6px;
+      padding: 2mm 3mm 2.5mm;
       display: flex;
-      justify-content: space-between;
+      flex-direction: column;
       align-items: center;
+      gap: 1mm;
       background: #0b3a8c;
       color: #e5f0ff;
-      font-size: 6px;
+      font-size: 5.5px;
+      flex-shrink: 0;
     }
     .barcode {
       display: flex;
-      gap: 1px;
-      height: 7mm;
+      gap: 0.4mm;
+      height: 5mm;
       align-items: flex-end;
     }
     .barcode span {
       display: inline-block;
-      width: 1px;
+      width: 0.35mm;
       background: #e5f0ff;
     }
-    .barcode span:nth-child(2n) { height: 5mm; }
-    .barcode span:nth-child(2n+1) { height: 7mm; }
+    .barcode span:nth-child(2n) { height: 3.5mm; }
+    .barcode span:nth-child(2n+1) { height: 5mm; }
     .dates {
-      text-align: right;
+      text-align: center;
+      line-height: 1.35;
     }
 
-    /* Back side */
+    /* Back — portrait */
     .back-card {
-      width: 80mm;
-      height: 49mm;
-      border-radius: 6px;
+      width: 50mm;
+      height: 82mm;
+      border-radius: 3mm;
       overflow: hidden;
       background: #ffffff;
       color: #12315b;
@@ -2524,34 +2590,37 @@ export class ManagerDashboard implements OnInit, OnDestroy {
       flex-direction: column;
       box-shadow: 0 2px 4px rgba(0,0,0,0.25);
       border: 1px solid #dbeafe;
+      box-sizing: border-box;
     }
     .back-top {
-      background: linear-gradient(135deg, #0f4ab8, #1f7ae0);
+      background: linear-gradient(180deg, #0f4ab8, #1f7ae0);
       color: #fff;
-      padding: 5px 6px;
-      display: flex;
-      justify-content: space-between;
-      align-items: baseline;
-      font-size: 8px;
+      padding: 3mm;
+      text-align: center;
+      flex-shrink: 0;
     }
     .back-title {
       font-weight: 800;
-      letter-spacing: 1px;
+      letter-spacing: 2px;
+      font-size: 9px;
     }
     .back-subtitle {
       opacity: 0.9;
-      font-size: 7px;
+      font-size: 6.5px;
+      margin-top: 1px;
     }
     .back-body {
       flex: 1;
       display: flex;
-      gap: 6px;
-      padding: 6px;
+      flex-direction: column;
+      align-items: center;
+      padding: 3mm;
+      gap: 3mm;
+      font-size: 6.5px;
+      line-height: 1.3;
     }
     .back-left {
-      flex: 1;
-      font-size: 7px;
-      line-height: 1.25;
+      width: 100%;
     }
     .back-row {
       margin-bottom: 2px;
@@ -2561,23 +2630,15 @@ export class ManagerDashboard implements OnInit, OnDestroy {
       color: #0b3a8c;
     }
     .back-note {
-      margin-top: 4px;
-      font-size: 6.5px;
+      margin-top: 2mm;
+      font-size: 6px;
       color: #334155;
     }
-    .back-right {
-      width: 22mm;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: flex-start;
-      gap: 4px;
-    }
     .qr {
-      width: 20mm;
-      height: 20mm;
+      width: 28mm;
+      height: 28mm;
       border: 1px solid #dbeafe;
-      border-radius: 4px;
+      border-radius: 2mm;
       background: #ffffff;
       object-fit: contain;
     }
@@ -2588,15 +2649,17 @@ export class ManagerDashboard implements OnInit, OnDestroy {
       font-weight: 700;
     }
     .sign-box {
-      padding: 0 6px 6px 6px;
+      padding: 0 3mm 3mm;
       display: flex;
-      justify-content: space-between;
-      align-items: flex-end;
-      font-size: 6.5px;
+      flex-direction: column;
+      align-items: center;
+      gap: 2mm;
+      font-size: 6px;
       color: #334155;
+      flex-shrink: 0;
     }
     .sign-line {
-      width: 35mm;
+      width: 38mm;
       border-top: 1px solid #94a3b8;
       padding-top: 2px;
       text-align: center;
@@ -2605,30 +2668,28 @@ export class ManagerDashboard implements OnInit, OnDestroy {
   </style>
 </head>
 <body>
-  <!-- FRONT -->
+  <!-- FRONT — vertical -->
   <div class="page">
     <div class="id-card">
       <div class="id-top">
         <div class="bank-name">NEOBANK</div>
         <div class="bank-tagline">Admin Identification Card</div>
       </div>
-      <div class="id-middle">
-        <div class="photo-box">
-          <div class="photo-circle">
+      <div class="id-photo-wrap">
+        <div class="photo-circle">
             ${photoUrl
               ? `<img class="photo-img" src="${photoUrl}" alt="Photo" />`
               : `<span>👤</span>`}
-          </div>
         </div>
-        <div class="info-box">
-          <div class="info-name">${name}</div>
-          <div class="info-role">${designation}</div>
-          ${department ? `<div class="info-row"><span class="label">Dept:</span> ${department}</div>` : ''}
-          ${employeeId ? `<div class="info-row"><span class="label">Emp ID:</span> ${employeeId}</div>` : ''}
-          <div class="info-row"><span class="label">ID:</span> ${idNumber}</div>
-          ${email ? `<div class="info-row"><span class="label">Email:</span> ${email}</div>` : ''}
-          <div class="info-row"><span class="label">Address:</span> ${address || 'N/A'}</div>
-        </div>
+      </div>
+      <div class="id-info">
+        <div class="info-name">${name}</div>
+        <div class="info-role">${designation}</div>
+        ${department ? `<div class="info-row" style="text-align:center;"><span class="label">Dept:</span> ${department}</div>` : ''}
+        ${employeeId ? `<div class="info-row"><span class="label">Emp ID:</span> ${employeeId}</div>` : ''}
+        <div class="info-row"><span class="label">ID:</span> ${idNumber}</div>
+        ${email ? `<div class="info-row"><span class="label">Email:</span> ${email}</div>` : ''}
+        <div class="info-row"><span class="label">Address:</span> ${address || 'N/A'}</div>
       </div>
       <div class="id-bottom">
         <div class="barcode">
@@ -2643,7 +2704,7 @@ export class ManagerDashboard implements OnInit, OnDestroy {
     </div>
   </div>
 
-  <!-- BACK -->
+  <!-- BACK — vertical -->
   <div class="page break">
     <div class="back-card">
       <div class="back-top">
@@ -2662,10 +2723,8 @@ export class ManagerDashboard implements OnInit, OnDestroy {
             This card is the property of NeoBank. If found, please return to the nearest NeoBank branch.
           </div>
         </div>
-        <div class="back-right">
-          ${qrDataUrl ? `<img class="qr" src="${qrDataUrl}" alt="QR" />` : `<div class="qr"></div>`}
-          <div class="qr-label">NEOBANK QR</div>
-        </div>
+        ${qrDataUrl ? `<img class="qr" src="${qrDataUrl}" alt="QR" />` : `<div class="qr"></div>`}
+        <div class="qr-label">NEOBANK QR</div>
       </div>
       <div class="sign-box">
         <div>Issued By: ${escapeHtml(this.managerName || 'Manager')}</div>

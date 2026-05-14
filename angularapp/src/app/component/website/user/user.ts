@@ -71,6 +71,9 @@ export class User implements OnInit, OnDestroy {
   unlockDob: string = '';
   unlockingAccount: boolean = false;
 
+  // For Privacy Policy modal
+  showPrivacyModal: boolean = false;
+
   // For forgot password
   showForgotPasswordModalFlag: boolean = false;
   showResetSuccessScreen: boolean = false;

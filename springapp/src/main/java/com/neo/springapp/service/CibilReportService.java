@@ -346,23 +346,39 @@ public class CibilReportService {
     private void crossReferenceAccounts(CibilReport report) {
         String pan = report.getPanNumber();
 
+        final String[] savingsHolderName = { null };
+
         // Check savings accounts (via User → Account)
         userRepository.findByPan(pan).ifPresent(user -> {
             Account acc = user.getAccount();
             if (acc != null) {
                 report.setSavingsAccountNumber(acc.getAccountNumber());
                 report.setSavingsBalance(acc.getBalance());
+                savingsHolderName[0] = acc.getName();
             }
         });
 
-        // Check salary accounts
+        // Salary account: same PAN may exist for savings + salary — only link both when holder names match
         SalaryAccount salAcc = salaryAccountRepository.findByPanNumber(pan);
         if (salAcc != null) {
-            report.setSalaryAccountNumber(salAcc.getAccountNumber());
-            report.setSalaryBalance(salAcc.getBalance());
-            // Auto-fill salary if not set
-            if (report.getSalary() == null && salAcc.getBalance() != null) {
-                report.setSalary(salAcc.getBalance());
+            String savingsName = savingsHolderName[0];
+            String employeeName = salAcc.getEmployeeName();
+            boolean linkSalaryWithSavings;
+            if (savingsName == null || savingsName.isBlank()) {
+                linkSalaryWithSavings = true;
+            } else {
+                linkSalaryWithSavings = employeeName != null && !employeeName.isBlank()
+                        && normalizePersonName(savingsName).equals(normalizePersonName(employeeName));
+            }
+            if (linkSalaryWithSavings) {
+                report.setSalaryAccountNumber(salAcc.getAccountNumber());
+                report.setSalaryBalance(salAcc.getBalance());
+                if (report.getSalary() == null && salAcc.getMonthlySalary() != null) {
+                    report.setSalary(salAcc.getMonthlySalary());
+                }
+            } else {
+                report.setSalaryAccountNumber(null);
+                report.setSalaryBalance(null);
             }
         }
 
@@ -371,6 +387,14 @@ public class CibilReportService {
             report.setCurrentAccountNumber(ca.getAccountNumber());
             report.setCurrentBalance(ca.getBalance());
         });
+    }
+
+    /** Trim, lowercase, collapse internal whitespace for comparing account holder vs salary employee name. */
+    private static String normalizePersonName(String name) {
+        if (name == null) {
+            return "";
+        }
+        return name.trim().toLowerCase(Locale.ROOT).replaceAll("\\s+", " ");
     }
 
     // ==================== ML ANALYSIS (Rule-based ML Simulation) ====================

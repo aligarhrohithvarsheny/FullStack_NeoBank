@@ -1686,6 +1686,43 @@
   border: 1px solid rgba(59, 130, 246, 0.2);
 }
 
+/* Portrait (vertical) PVC-style preview — matches print orientation */
+.idcard-preview-vertical {
+  width: 220px;
+  min-width: 220px;
+  max-width: 220px;
+  min-height: 360px;
+  display: flex;
+  flex-direction: column;
+}
+
+.idcard-middle-vertical {
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  flex: 1;
+  gap: 14px;
+}
+
+.idcard-photo-vertical {
+  width: 96px;
+  height: 120px;
+  border-radius: 10px;
+}
+
+.idcard-text-vertical {
+  width: 100%;
+}
+
+.idcard-text-vertical .idcard-name {
+  font-size: 15px;
+}
+
+.idcard-text-vertical .idcard-role,
+.idcard-text-vertical .idcard-dept {
+  font-size: 12px;
+}
+
 .idcard-top {
   text-align: center;
   margin-bottom: 12px;

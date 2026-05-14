@@ -427,13 +427,13 @@
     <!-- Footer Links (like JPM) -->
     <div class="jpm-footer">
       <div class="jpm-footer-links">
-        <a href="javascript:void(0)" class="jpm-footer-link">Language</a>
+        <button type="button" class="jpm-footer-link jpm-footer-btn">Language</button>
         <span class="jpm-footer-sep">|</span>
-        <a href="javascript:void(0)" class="jpm-footer-link">Cookies Policy</a>
+        <button type="button" class="jpm-footer-link jpm-footer-btn">Cookies Policy</button>
         <span class="jpm-footer-sep">|</span>
-        <a href="javascript:void(0)" class="jpm-footer-link">Privacy Policy</a>
+        <button type="button" (click)="showPrivacyModal = true" class="jpm-footer-link jpm-footer-btn">Privacy Policy</button>
         <span class="jpm-footer-sep">|</span>
-        <a href="javascript:void(0)" class="jpm-footer-link">NeoBank Private Bank</a>
+        <button type="button" class="jpm-footer-link jpm-footer-btn">NeoBank Private Bank</button>
       </div>
       <p class="jpm-footer-security">System Requirement & Security Precautions</p>
       <p class="jpm-footer-copy">&copy; 2026 "NeoBank Private Bank" is the marketing name of the private banking activities of NeoBank, N.A. & its affiliates worldwide</p>
@@ -778,6 +778,36 @@
             Your information is secure and encrypted. We use this data only for password reset verification.
           </p>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Privacy Policy Modal -->
+  <div class="privacy-modal-overlay" *ngIf="showPrivacyModal" (click)="showPrivacyModal = false">
+    <div class="privacy-modal-content" (click)="$event.stopPropagation()">
+      <div class="privacy-modal-header">
+        <h2>Privacy Policy</h2>
+        <button class="privacy-close-btn" (click)="showPrivacyModal = false">×</button>
+      </div>
+      
+      <div class="privacy-modal-body">
+        <div class="privacy-policy-content">
+          <p>NeoBank Private Bank is committed to protecting the privacy and confidentiality of customer information in Internet Banking services. All personal details, banking records, and transaction information are secured using encryption technology and secure authentication systems.</p>
+
+          <p>Customers should never share passwords, OTPs, PINs, or account credentials with anyone. NeoBank will never ask for confidential banking credentials through calls, SMS, or email.</p>
+
+          <p>The Bank may use cookies, security monitoring systems, fraud detection mechanisms, and secure session technologies to improve customer experience and online banking security.</p>
+
+          <p>Customer information is not shared with unauthorized third parties except where required under banking regulations, payment processing requirements, or legal obligations.</p>
+
+          <p>Customers are advised to use updated browsers, secure internet connections, and trusted devices while accessing Internet Banking services.</p>
+
+          <p>NeoBank Private Bank reserves the right to update this Privacy Policy according to banking regulations and cybersecurity standards.</p>
+        </div>
+      </div>
+
+      <div class="privacy-modal-footer">
+        <button class="privacy-close-btn-bottom" (click)="showPrivacyModal = false">Close</button>
       </div>
     </div>
   </div>

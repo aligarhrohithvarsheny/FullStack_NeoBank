@@ -140,21 +140,21 @@
             Generate and manage official NeoBank ID card for this admin. The card can be scanned or searched by ID number.
           </p>
           <div class="idcard-layout">
-            <!-- Visual ID card preview -->
-            <div class="idcard-preview">
+            <!-- Visual ID card preview (portrait / vertical PVC style) -->
+            <div class="idcard-preview idcard-preview-vertical">
               <div class="idcard-top">
                 <div class="bank-name">NEOBANK</div>
                 <div class="bank-tagline">Secure Digital Banking</div>
               </div>
-              <div class="idcard-middle">
-                <div class="photo-placeholder">
-                  <img *ngIf="selectedAdmin.id && selectedAdmin.profilePhotoPath" 
-                       [src]="apiBaseUrl + '/api/admins/profile-photo/' + selectedAdmin.id" 
-                       alt="Admin photo" 
+              <div class="idcard-middle idcard-middle-vertical">
+                <div class="photo-placeholder idcard-photo-vertical">
+                  <img *ngIf="selectedAdmin.id && selectedAdmin.profilePhotoPath"
+                       [src]="apiBaseUrl + '/api/admins/profile-photo/' + selectedAdmin.id + '?t=' + idCardPhotoCacheBuster"
+                       alt="Admin photo"
                        class="idcard-photo-img" />
                   <i *ngIf="!selectedAdmin.profilePhotoPath" class="fa fa-user-shield"></i>
                 </div>
-                <div class="idcard-text">
+                <div class="idcard-text idcard-text-vertical">
                   <div class="idcard-name">{{ selectedAdmin.name || 'Admin Employee' }}</div>
                   <div class="idcard-role">{{ selectedAdmin.idCardDesignation || selectedAdmin.role || 'Administrator' }}</div>
                   <div class="idcard-dept" *ngIf="selectedAdmin.idCardDepartment">
@@ -170,7 +170,6 @@
               </div>
               <div class="idcard-bottom">
                 <div class="idcard-barcode">
-                  <!-- simple visual stripes -->
                   <span></span><span></span><span></span><span></span><span></span>
                   <span></span><span></span><span></span><span></span><span></span>
                 </div>
@@ -183,6 +182,17 @@
             <!-- ID card details and actions -->
             <div class="idcard-controls">
               <div class="details-grid">
+                <div class="detail-item" style="grid-column: 1 / -1;">
+                  <label>Photo on ID card</label>
+                  <input type="file" #idCardPhotoFileInput accept="image/jpeg,image/png,image/webp" style="display: none" (change)="onIdCardPhotoSelected($event)" />
+                  <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center;">
+                    <button type="button" class="btn-secondary" (click)="idCardPhotoFileInput.click()" [disabled]="isUploadingIdCardPhoto || !selectedAdmin?.id">
+                      <i class="fa" [class.fa-spinner]="isUploadingIdCardPhoto" [class.fa-upload]="!isUploadingIdCardPhoto" [class.fa-spin]="isUploadingIdCardPhoto"></i>
+                      {{ isUploadingIdCardPhoto ? 'Uploading...' : 'Upload image' }}
+                    </button>
+                    <span class="section-description" style="margin: 0; font-size: 12px;">JPG, PNG or WEBP, max 2&nbsp;MB. Used on screen preview and print.</span>
+                  </div>
+                </div>
                 <div class="detail-item">
                   <label>Designation on Card</label>
                   <input
@@ -3133,11 +3143,12 @@
                   </span>
                 </td>
                 <td>{{ report.recommendedLimit ? '₹' + (report.recommendedLimit | number:'1.0-0') : '-' }}</td>
-                <td>
-                  <div style="display: flex; gap: 4px; flex-wrap: wrap;">
-                    <span *ngIf="report.savingsAccountNumber" style="padding: 1px 6px; background: #dbeafe; color: #1e40af; border-radius: 4px; font-size: 0.7rem;" title="Savings">S</span>
-                    <span *ngIf="report.salaryAccountNumber" style="padding: 1px 6px; background: #d1fae5; color: #065f46; border-radius: 4px; font-size: 0.7rem;" title="Salary">SA</span>
-                    <span *ngIf="report.currentAccountNumber" style="padding: 1px 6px; background: #fef3c7; color: #92400e; border-radius: 4px; font-size: 0.7rem;" title="Current">C</span>
+                <td title="Savings + Salary appear together only when savings account name matches salary employee name (same PAN).">
+                  <div style="display: flex; gap: 4px; flex-wrap: wrap; align-items: center;">
+                    <span *ngIf="report.savingsAccountNumber" style="padding: 1px 6px; background: #dbeafe; color: #1e40af; border-radius: 4px; font-size: 0.7rem;">S</span>
+                    <span *ngIf="report.savingsAccountNumber && report.salaryAccountNumber" style="font-size: 0.65rem; color: #059669;" aria-hidden="true"><i class="fa fa-link"></i></span>
+                    <span *ngIf="report.salaryAccountNumber" style="padding: 1px 6px; background: #d1fae5; color: #065f46; border-radius: 4px; font-size: 0.7rem;">SA</span>
+                    <span *ngIf="report.currentAccountNumber" style="padding: 1px 6px; background: #fef3c7; color: #92400e; border-radius: 4px; font-size: 0.7rem;">C</span>
                     <span *ngIf="!report.savingsAccountNumber && !report.salaryAccountNumber && !report.currentAccountNumber" style="color: #9ca3af; font-size: 0.75rem;">None</span>
                   </div>
                 </td>
