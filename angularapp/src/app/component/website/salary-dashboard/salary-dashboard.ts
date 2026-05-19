@@ -166,6 +166,11 @@ export class SalaryDashboard implements OnInit, OnDestroy {
   isGeneratingCard = false;
   showFullCardNumber = false;
   showCvv = false;
+  showSetPinForm = false;
+  newDebitCardPin = '';
+  confirmDebitCardPin = '';
+  cardTransactions: any[] = [];
+  isLoadingCardTransactions = false;
 
   // ─── AI Fraud Detection ───────────────────────────────────
   fraudSummary: any = {};
@@ -1248,8 +1253,84 @@ export class SalaryDashboard implements OnInit, OnDestroy {
     if (!this.account?.id) return;
     this.isLoadingCard = true;
     this.salaryService.getDebitCardInfo(this.account.id).subscribe({
-      next: (data) => { this.debitCardInfo = data; this.isLoadingCard = false; },
+      next: (data) => {
+        this.debitCardInfo = data;
+        this.isLoadingCard = false;
+        this.loadCardTransactions();
+        this.loadCardLimitHistory();
+      },
       error: () => { this.isLoadingCard = false; }
+    });
+  }
+
+  loadCardLimitHistory() {
+    if (!this.account?.id) return;
+    this.salaryService.getDebitCardLimitHistory(this.account.id).subscribe({
+      next: (history) => { this.cardLimitHistory = history || []; },
+      error: () => { this.cardLimitHistory = []; }
+    });
+  }
+
+  isCardActive(): boolean {
+    return (this.debitCardInfo?.status || '').toUpperCase() === 'ACTIVE';
+  }
+
+  toggleLimitIncrease(enabled: boolean) {
+    this.updateCardSetting('limitIncreaseEnabled', enabled);
+  }
+
+  toggleBlockCard() {
+    this.updateCardSetting('status', this.isCardActive() ? 'Blocked' : 'Active');
+  }
+
+  loadCardTransactions() {
+    if (!this.account?.id) return;
+    this.isLoadingCardTransactions = true;
+    this.salaryService.getDebitCardTransactions(this.account.id).subscribe({
+      next: (data) => { this.cardTransactions = data || []; this.isLoadingCardTransactions = false; },
+      error: () => { this.cardTransactions = []; this.isLoadingCardTransactions = false; }
+    });
+  }
+
+  setDebitCardPin() {
+    if (!this.account?.id) return;
+    if (!this.newDebitCardPin || this.newDebitCardPin.length < 4) {
+      this.alertService.userError('Invalid PIN', 'PIN must be at least 4 digits');
+      return;
+    }
+    if (this.newDebitCardPin !== this.confirmDebitCardPin) {
+      this.alertService.userError('Mismatch', 'PIN and confirm PIN do not match');
+      return;
+    }
+    this.salaryService.setDebitCardPin(this.account.id, this.newDebitCardPin).subscribe({
+      next: (res) => {
+        if (res.success) {
+          this.alertService.userSuccess('PIN Set', res.message);
+          this.showSetPinForm = false;
+          this.newDebitCardPin = '';
+          this.confirmDebitCardPin = '';
+          this.loadDebitCardInfo();
+        } else {
+          this.alertService.userError('Error', res.message);
+        }
+      },
+      error: (err) => this.alertService.userError('Error', err.error?.message || 'Failed to set PIN')
+    });
+  }
+
+  replaceDebitCard() {
+    if (!this.account?.id) return;
+    if (!confirm('Replace your debit card? Your current card will be deactivated and you must set a new PIN.')) return;
+    this.salaryService.replaceDebitCard(this.account.id).subscribe({
+      next: (res) => {
+        if (res.success) {
+          this.alertService.userSuccess('Replaced', res.message);
+          this.loadDebitCardInfo();
+        } else {
+          this.alertService.userError('Error', res.message);
+        }
+      },
+      error: (err) => this.alertService.userError('Error', err.error?.message || 'Failed to replace card')
     });
   }
 

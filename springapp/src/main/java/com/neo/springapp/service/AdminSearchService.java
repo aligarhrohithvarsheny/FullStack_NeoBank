@@ -85,6 +85,15 @@ public class AdminSearchService {
     @Autowired(required = false)
     private MerchantApplicationRepository merchantApplicationRepository;
 
+    @Autowired(required = false)
+    private PgTransactionRepository pgTransactionRepository;
+
+    @Autowired(required = false)
+    private AdminAccountApplicationRepository adminAccountApplicationRepository;
+
+    @Autowired(required = false)
+    private ChequeRequestRepository chequeRequestRepository;
+
     /**
      * Comprehensive search across ALL entities - A to Z
      */
@@ -221,6 +230,16 @@ public class AdminSearchService {
         results.put("onboardingApplications", onboardingApps);
         results.put("onboardingCount", onboardingApps.size());
 
+        // Search PG Payments
+        List<Map<String, Object>> pgPayments = searchPgPayments(term);
+        results.put("pgPayments", pgPayments);
+        results.put("pgPaymentCount", pgPayments.size());
+
+        // Search Account Opening Applications
+        List<Map<String, Object>> accountApplications = searchAccountApplications(term);
+        results.put("accountApplications", accountApplications);
+        results.put("accountApplicationCount", accountApplications.size());
+
         // Total results
         int totalCount = accounts.size() + users.size() + loans.size() + 
                         cheques.size() + transactions.size() + cards.size() +
@@ -229,7 +248,8 @@ public class AdminSearchService {
                         salaryAccounts.size() + currentAccounts.size() + soundboxes.size() +
                         videoKyc.size() + merchants.size() + agents.size() +
                         goldLoans.size() + educationLoans.size() + subsidyClaims.size() +
-                        kycRequests.size() + supportTickets.size() + onboardingApps.size();
+                        kycRequests.size() + supportTickets.size() + onboardingApps.size() +
+                        pgPayments.size() + accountApplications.size();
         results.put("totalCount", totalCount);
 
         return results;
@@ -528,54 +548,52 @@ public class AdminSearchService {
      */
     private List<Map<String, Object>> searchTransactions(String term) {
         List<Map<String, Object>> results = new ArrayList<>();
-        
-        // Search by transaction ID (if term is numeric)
-        try {
-            Long transactionId = Long.parseLong(term);
-            Optional<Transaction> transactionById = transactionRepository.findById(transactionId);
-            if (transactionById.isPresent()) {
-                results.add(createTransactionResult(transactionById.get(), "Transaction ID"));
-            }
-        } catch (NumberFormatException e) {
-            // Not a number, skip
+        Set<Long> seenIds = new HashSet<>();
+
+        // Search by custom transaction ID string (e.g. TXN123456)
+        transactionRepository.findByTransactionId(term).ifPresent(t -> {
+            if (seenIds.add(t.getId())) results.add(createTransactionResult(t, "Transaction ID"));
+        });
+        for (Transaction t : transactionRepository.findByTransactionIdContainingIgnoreCase(term)) {
+            if (seenIds.add(t.getId())) results.add(createTransactionResult(t, "Transaction ID (Partial)"));
         }
 
-        // Search by account number
+        // Search by numeric database ID
+        try {
+            Long dbId = Long.parseLong(term);
+            transactionRepository.findById(dbId).ifPresent(t -> {
+                if (seenIds.add(t.getId())) results.add(createTransactionResult(t, "Database ID"));
+            });
+        } catch (NumberFormatException e) { /* not numeric */ }
+
+        // Multi-field search via repository
         Pageable txPageable = PageRequest.of(0, 50);
+        Page<Transaction> searchPage = transactionRepository.searchTransactions(term, txPageable);
+        for (Transaction transaction : searchPage.getContent()) {
+            if (seenIds.add(transaction.getId())) {
+                results.add(createTransactionResult(transaction, "Multi-field Match"));
+            }
+        }
+
+        // Search by exact account number
         Page<Transaction> transactionsByAccount = transactionRepository.findByAccountNumberOrderByDateDesc(term, txPageable);
         for (Transaction transaction : transactionsByAccount.getContent()) {
-            if (!results.stream().anyMatch(r -> r.get("transactionId").equals(transaction.getId()))) {
+            if (seenIds.add(transaction.getId())) {
                 results.add(createTransactionResult(transaction, "Account Number"));
             }
         }
 
-        // Search by description (partial match)
-        if (term.length() >= 3) {
-            List<Transaction> allTransactions = transactionRepository.findAll();
-            for (Transaction transaction : allTransactions) {
-                if (results.stream().anyMatch(r -> r.get("transactionId").equals(transaction.getId()))) {
-                    continue;
-                }
-                
-                if (transaction.getDescription() != null && 
-                    transaction.getDescription().toLowerCase().contains(term.toLowerCase())) {
-                    results.add(createTransactionResult(transaction, "Description"));
-                }
-            }
-        }
-
-        // Limit to 50 most recent
         if (results.size() > 50) {
-            results = results.subList(0, 50);
+            return new ArrayList<>(results.subList(0, 50));
         }
-
         return results;
     }
 
     private Map<String, Object> createTransactionResult(Transaction transaction, String matchType) {
         Map<String, Object> result = new HashMap<>();
         result.put("type", "Transaction");
-        result.put("transactionId", transaction.getId());
+        result.put("transactionId", transaction.getTransactionId() != null ? transaction.getTransactionId() : String.valueOf(transaction.getId()));
+        result.put("databaseId", transaction.getId());
         result.put("accountNumber", transaction.getAccountNumber());
         result.put("amount", transaction.getAmount());
         result.put("transactionType", transaction.getType());
@@ -593,28 +611,51 @@ public class AdminSearchService {
      */
     private List<Map<String, Object>> searchCards(String term) {
         List<Map<String, Object>> results = new ArrayList<>();
-        
-        // Search by card number (last 4 digits or full)
-        List<Card> allCards = cardRepository.findAll();
-        for (Card card : allCards) {
+        Set<Long> seenCardIds = new HashSet<>();
+
+        List<Card> cardsByAccount = cardRepository.findByAccountNumber(term);
+        for (Card card : cardsByAccount) {
+            if (seenCardIds.add(card.getId())) results.add(createCardResult(card, "Account Number"));
+        }
+
+        Pageable cardPage = PageRequest.of(0, 50);
+        Page<Card> cardPageResult = cardRepository.findAll(cardPage);
+        for (Card card : cardPageResult.getContent()) {
             if (card.getCardNumber() != null) {
                 String cardNumber = card.getCardNumber();
-                // Check if term matches last 4 digits or full card number
-                if (cardNumber.endsWith(term) || cardNumber.contains(term)) {
-                    results.add(createCardResult(card, "Card Number"));
+                if (cardNumber.contains(term) || cardNumber.endsWith(term)) {
+                    if (seenCardIds.add(card.getId())) results.add(createCardResult(card, "Card Number"));
                 }
             }
         }
 
-        // Search by account number
-        List<Card> cardsByAccount = cardRepository.findByAccountNumber(term);
-        for (Card card : cardsByAccount) {
-            if (!results.stream().anyMatch(r -> r.get("cardId").equals(card.getId()))) {
-                results.add(createCardResult(card, "Account Number"));
+        if (salaryAccountRepository != null) {
+            SalaryAccount byCard = salaryAccountRepository.findByDebitCardNumber(term);
+            if (byCard != null) results.add(createSalaryDebitCardResult(byCard, "Salary Debit Card Number"));
+            for (SalaryAccount sa : salaryAccountRepository.search(term)) {
+                if (sa.getDebitCardNumber() != null && sa.getDebitCardNumber().contains(term)) {
+                    boolean alreadyAdded = results.stream().anyMatch(r ->
+                            "SalaryDebitCard".equals(r.get("type")) && sa.getId().equals(r.get("cardId")));
+                    if (!alreadyAdded) results.add(createSalaryDebitCardResult(sa, "Salary Debit Card (Partial)"));
+                }
             }
         }
 
-        return results;
+        return results.size() > 50 ? new ArrayList<>(results.subList(0, 50)) : results;
+    }
+
+    private Map<String, Object> createSalaryDebitCardResult(SalaryAccount sa, String matchType) {
+        Map<String, Object> result = new HashMap<>();
+        result.put("type", "SalaryDebitCard");
+        result.put("cardId", sa.getId());
+        result.put("cardNumber", sa.getDebitCardNumber());
+        result.put("accountNumber", sa.getAccountNumber());
+        result.put("cardHolderName", sa.getEmployeeName());
+        result.put("cardType", "Salary Debit");
+        result.put("status", sa.getDebitCardStatus());
+        result.put("pinSet", sa.getDebitCardPinSet());
+        result.put("matchType", matchType);
+        return result;
     }
 
     private Map<String, Object> createCardResult(Card card, String matchType) {
@@ -692,6 +733,12 @@ public class AdminSearchService {
                     }
                 });
             } catch (NumberFormatException e) { }
+
+            for (FixedDeposit fd : fixedDepositRepository.findByFdAccountNumberContainingIgnoreCase(term)) {
+                if (results.stream().noneMatch(r -> r.get("id").equals(fd.getId()))) {
+                    results.add(createFixedDepositResult(fd, "FD Account Number (Partial)"));
+                }
+            }
         } catch (Exception e) { /* skip on error */ }
         return results;
     }
@@ -810,8 +857,95 @@ public class AdminSearchService {
                     }
                 });
             } catch (NumberFormatException e) { }
+
+            for (InsuranceApplication ins : insuranceApplicationRepository.findByApplicationNumberContainingIgnoreCase(term)) {
+                if (results.stream().noneMatch(r -> r.get("id").equals(ins.getId()))) {
+                    results.add(createInsuranceResult(ins, "Insurance Application (Partial)"));
+                }
+            }
         } catch (Exception e) { /* skip on error */ }
         return results;
+    }
+
+    private List<Map<String, Object>> searchPgPayments(String term) {
+        List<Map<String, Object>> results = new ArrayList<>();
+        if (pgTransactionRepository == null) return results;
+        try {
+            pgTransactionRepository.findByTransactionId(term).ifPresent(pg -> results.add(createPgPaymentResult(pg, "PG Transaction ID")));
+            pgTransactionRepository.findByOrderId(term).ifPresent(pg -> {
+                if (results.stream().noneMatch(r -> r.get("pgId").equals(pg.getId()))) {
+                    results.add(createPgPaymentResult(pg, "PG Order ID"));
+                }
+            });
+            for (PgTransaction pg : pgTransactionRepository.findByTransactionIdContainingIgnoreCase(term)) {
+                if (results.stream().noneMatch(r -> r.get("pgId").equals(pg.getId()))) {
+                    results.add(createPgPaymentResult(pg, "PG Transaction ID (Partial)"));
+                }
+            }
+            for (PgTransaction pg : pgTransactionRepository.findByOrderIdContainingIgnoreCase(term)) {
+                if (results.stream().noneMatch(r -> r.get("pgId").equals(pg.getId()))) {
+                    results.add(createPgPaymentResult(pg, "PG Order ID (Partial)"));
+                }
+            }
+            try {
+                Long pgId = Long.parseLong(term);
+                pgTransactionRepository.findById(pgId).ifPresent(pg -> {
+                    if (results.stream().noneMatch(r -> r.get("pgId").equals(pg.getId()))) {
+                        results.add(createPgPaymentResult(pg, "PG Database ID"));
+                    }
+                });
+            } catch (NumberFormatException e) { }
+        } catch (Exception e) { /* skip on error */ }
+        return results.size() > 50 ? new ArrayList<>(results.subList(0, 50)) : results;
+    }
+
+    private Map<String, Object> createPgPaymentResult(PgTransaction pg, String matchType) {
+        Map<String, Object> result = new HashMap<>();
+        result.put("type", "PgPayment");
+        result.put("pgId", pg.getId());
+        result.put("transactionId", pg.getTransactionId());
+        result.put("orderId", pg.getOrderId());
+        result.put("merchantId", pg.getMerchantId());
+        result.put("amount", pg.getAmount());
+        result.put("status", pg.getStatus());
+        result.put("paymentMethod", pg.getPaymentMethod());
+        result.put("matchType", matchType);
+        return result;
+    }
+
+    private List<Map<String, Object>> searchAccountApplications(String term) {
+        List<Map<String, Object>> results = new ArrayList<>();
+        if (adminAccountApplicationRepository == null) return results;
+        try {
+            adminAccountApplicationRepository.findByApplicationNumber(term).ifPresent(app -> results.add(createAccountApplicationResult(app, "Application Number")));
+            try {
+                Long appId = Long.parseLong(term);
+                adminAccountApplicationRepository.findById(appId).ifPresent(app -> {
+                    if (results.stream().noneMatch(r -> r.get("applicationId").equals(app.getId()))) {
+                        results.add(createAccountApplicationResult(app, "Application ID"));
+                    }
+                });
+            } catch (NumberFormatException e) { }
+            for (AdminAccountApplication app : adminAccountApplicationRepository.searchApplications(term)) {
+                if (results.stream().noneMatch(r -> r.get("applicationId").equals(app.getId()))) {
+                    results.add(createAccountApplicationResult(app, "Application Search"));
+                }
+            }
+        } catch (Exception e) { /* skip on error */ }
+        return results;
+    }
+
+    private Map<String, Object> createAccountApplicationResult(AdminAccountApplication app, String matchType) {
+        Map<String, Object> result = new HashMap<>();
+        result.put("type", "AccountApplication");
+        result.put("applicationId", app.getId());
+        result.put("applicationNumber", app.getApplicationNumber());
+        result.put("accountType", app.getAccountType());
+        result.put("fullName", app.getFullName());
+        result.put("phone", app.getPhone());
+        result.put("status", app.getStatus());
+        result.put("matchType", matchType);
+        return result;
     }
 
     private Map<String, Object> createInsuranceResult(InsuranceApplication ins, String matchType) {

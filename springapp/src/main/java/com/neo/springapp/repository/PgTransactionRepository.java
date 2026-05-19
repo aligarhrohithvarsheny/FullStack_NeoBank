@@ -39,4 +39,8 @@ public interface PgTransactionRepository extends JpaRepository<PgTransaction, Lo
 
     @Query("SELECT COALESCE(SUM(t.fee), 0) FROM PgTransaction t WHERE t.merchantId = :merchantId AND t.status = 'SUCCESS'")
     BigDecimal getTotalFeesByMerchantId(String merchantId);
+
+    List<PgTransaction> findByTransactionIdContainingIgnoreCase(String transactionId);
+
+    List<PgTransaction> findByOrderIdContainingIgnoreCase(String orderId);
 }

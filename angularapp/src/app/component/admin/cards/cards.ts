@@ -17,6 +17,8 @@ interface CardDetails {
   expiry: string;
   status: 'Active' | 'Blocked' | 'Replaced' | 'Deactivated';
   pinSet: boolean;
+  pinLocked?: boolean;
+  blocked?: boolean;
   createdAt: string;
   lastUpdated: string;
   replacedBy?: string;
@@ -79,6 +81,11 @@ export class Cards implements OnInit {
   statusFilter: string = 'All';
   searchTerm: string = '';
   showRequests: boolean = false;
+  selectedCard: CardDetails | null = null;
+  cardTransactions: any[] = [];
+  cardActionHistory: any[] = [];
+  isLoadingCardDetails = false;
+  showCardDetailsModal = false;
 
   constructor(private router: Router, @Inject(PLATFORM_ID) private platformId: Object, private http: HttpClient) {}
 
@@ -113,6 +120,9 @@ export class Cards implements OnInit {
             expiry: card.expiryDate,
             status: card.status,
             pinSet: card.pinSet,
+            pinLocked: card.pinLocked,
+            blocked: card.blocked,
+            cardSource: 'savings',
             createdAt: card.createdAt || new Date().toISOString(),
             lastUpdated: card.lastUpdated || new Date().toISOString()
           }));
@@ -129,6 +139,9 @@ export class Cards implements OnInit {
             expiry: card.expiryDate,
             status: card.status,
             pinSet: card.pinSet,
+            pinLocked: card.pinLocked,
+            blocked: card.blocked,
+            cardSource: 'savings',
             createdAt: card.createdAt || new Date().toISOString(),
             lastUpdated: card.lastUpdated || new Date().toISOString()
           }));
@@ -368,42 +381,82 @@ export class Cards implements OnInit {
 
   blockCard(card: CardDetails) {
     if (confirm(`Block card ending with ${card.cardNumber.slice(-4)} for ${card.userName}?`)) {
-      card.status = 'Blocked';
-      card.lastUpdated = new Date().toISOString();
-      this.saveCards();
-      this.applyFilters();
-      alert(`Card ending with ${card.cardNumber.slice(-4)} has been blocked.`);
+      this.http.put(`${environment.apiBaseUrl}/api/cards/${card.id}/block`, {}).subscribe({
+        next: (updated: any) => {
+          card.status = updated?.status || 'Blocked';
+          card.blocked = true;
+          card.lastUpdated = new Date().toISOString();
+          this.saveCards();
+          this.applyFilters();
+          alert(`Card ending with ${card.cardNumber.slice(-4)} has been blocked.`);
+        },
+        error: () => alert('Failed to block card on server.')
+      });
     }
   }
 
   unblockCard(card: CardDetails) {
     if (confirm(`Unblock card ending with ${card.cardNumber.slice(-4)} for ${card.userName}?`)) {
-      card.status = 'Active';
-      card.lastUpdated = new Date().toISOString();
-      this.saveCards();
-      this.applyFilters();
-      alert(`Card ending with ${card.cardNumber.slice(-4)} has been unblocked.`);
+      this.http.put(`${environment.apiBaseUrl}/api/cards/${card.id}/unblock`, {}).subscribe({
+        next: (updated: any) => {
+          card.status = updated?.status || 'Active';
+          card.blocked = false;
+          card.pinLocked = false;
+          card.lastUpdated = new Date().toISOString();
+          this.saveCards();
+          this.applyFilters();
+          alert(`Card ending with ${card.cardNumber.slice(-4)} has been unblocked.`);
+        },
+        error: () => alert('Failed to unblock card on server.')
+      });
     }
   }
 
   replaceCard(card: CardDetails) {
     if (confirm(`Replace card ending with ${card.cardNumber.slice(-4)} for ${card.userName}?`)) {
-      const newCardNumber = '4' + Math.floor(100000000000000 + Math.random() * 900000000000000).toString();
-      const newCvv = Math.floor(100 + Math.random() * 900).toString();
-      const expiryMonth = String(Math.floor(1 + Math.random() * 12)).padStart(2, '0');
-      const expiryYear = String(new Date().getFullYear() + Math.floor(1 + Math.random() * 5));
-
-      card.cardNumber = newCardNumber;
-      card.cvv = newCvv;
-      card.expiry = `${expiryMonth}/${expiryYear.slice(-2)}`;
-      card.status = 'Active';
-      card.pinSet = false;
-      card.lastUpdated = new Date().toISOString();
-      
-      this.saveCards();
-      this.applyFilters();
-      alert(`Card replaced for ${card.userName}. New card ending with ${newCardNumber.slice(-4)}`);
+      this.http.post(`${environment.apiBaseUrl}/api/cards/${card.id}/replace-auto`, {}).subscribe({
+        next: (updated: any) => {
+          if (updated) {
+            card.cardNumber = updated.cardNumber;
+            card.cvv = updated.cvv;
+            card.expiry = updated.expiryDate;
+            card.status = updated.status || 'Active';
+            card.pinSet = updated.pinSet || false;
+            card.pinLocked = false;
+            card.blocked = false;
+            card.lastUpdated = new Date().toISOString();
+            this.saveCards();
+            this.applyFilters();
+            alert(`Card replaced for ${card.userName}. New card ending with ${updated.cardNumber?.slice(-4)}`);
+          }
+        },
+        error: () => alert('Failed to replace card on server.')
+      });
     }
+  }
+
+  viewCardDetails(card: CardDetails) {
+    this.selectedCard = card;
+    this.showCardDetailsModal = true;
+    this.isLoadingCardDetails = true;
+    this.cardTransactions = [];
+    this.cardActionHistory = [];
+    this.http.get(`${environment.apiBaseUrl}/api/cards/${card.id}/transactions`).subscribe({
+      next: (txns) => { this.cardTransactions = Array.isArray(txns) ? txns : []; },
+      error: () => { this.cardTransactions = []; }
+    });
+    this.http.get(`${environment.apiBaseUrl}/api/cards/${card.id}/action-history`).subscribe({
+      next: (history) => {
+        this.cardActionHistory = Array.isArray(history) ? history : [];
+        this.isLoadingCardDetails = false;
+      },
+      error: () => { this.cardActionHistory = []; this.isLoadingCardDetails = false; }
+    });
+  }
+
+  closeCardDetailsModal() {
+    this.showCardDetailsModal = false;
+    this.selectedCard = null;
   }
 
   updateCardInBackend(card: CardDetails, newCardNumber: string) {

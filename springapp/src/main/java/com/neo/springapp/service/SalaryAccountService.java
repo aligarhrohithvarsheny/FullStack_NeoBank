@@ -20,6 +20,8 @@ import com.neo.springapp.repository.SalaryUpiTransactionRepository;
 import com.neo.springapp.repository.SalaryAdvanceRequestRepository;
 import com.neo.springapp.repository.ChequeRequestRepository;
 import com.neo.springapp.repository.SalaryFraudAlertRepository;
+import com.neo.springapp.repository.SalaryCardLimitHistoryRepository;
+import com.neo.springapp.model.SalaryCardLimitHistory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -63,6 +65,9 @@ public class SalaryAccountService {
 
     @Autowired
     private ChequeRequestRepository chequeRequestRepository;
+
+    @Autowired
+    private SalaryCardLimitHistoryRepository salaryCardLimitHistoryRepository;
 
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder(10);
 
@@ -1145,8 +1150,22 @@ public class SalaryAccountService {
             acc.setOnlineEnabled((Boolean) settings.get("onlineEnabled"));
         if (settings.containsKey("contactlessEnabled"))
             acc.setContactlessEnabled((Boolean) settings.get("contactlessEnabled"));
-        if (settings.containsKey("dailyLimit"))
-            acc.setDailyLimit(((Number) settings.get("dailyLimit")).doubleValue());
+        if (settings.containsKey("limitIncreaseEnabled")) {
+            Boolean enabled = (Boolean) settings.get("limitIncreaseEnabled");
+            acc.setLimitIncreaseEnabled(enabled);
+            recordLimitHistory(acc, acc.getDailyLimit(), acc.getDailyLimit(), enabled ? "LIMIT_INCREASE_ENABLED" : "LIMIT_INCREASE_DISABLED", "USER");
+        }
+        if (settings.containsKey("dailyLimit")) {
+            Double newLimit = ((Number) settings.get("dailyLimit")).doubleValue();
+            Double oldLimit = acc.getDailyLimit();
+            if (Boolean.FALSE.equals(acc.getLimitIncreaseEnabled()) && newLimit > oldLimit) {
+                result.put("success", false);
+                result.put("message", "Enable limit increase toggle to raise your daily limit");
+                return result;
+            }
+            acc.setDailyLimit(newLimit);
+            recordLimitHistory(acc, oldLimit, newLimit, "LIMIT_UPDATE", "USER");
+        }
         if (settings.containsKey("status"))
             acc.setDebitCardStatus((String) settings.get("status"));
 
@@ -1156,6 +1175,89 @@ public class SalaryAccountService {
         result.put("success", true);
         result.put("message", "Card settings updated successfully");
         return result;
+    }
+
+    private void recordLimitHistory(SalaryAccount acc, Double oldLimit, Double newLimit, String changeType, String changedBy) {
+        SalaryCardLimitHistory history = new SalaryCardLimitHistory();
+        history.setSalaryAccountId(acc.getId());
+        history.setAccountNumber(acc.getAccountNumber());
+        history.setOldLimit(oldLimit);
+        history.setNewLimit(newLimit);
+        history.setChangeType(changeType);
+        history.setChangedBy(changedBy);
+        history.setCreatedAt(LocalDateTime.now());
+        salaryCardLimitHistoryRepository.save(history);
+    }
+
+    public Map<String, Object> setDebitCardPin(Long accountId, String pin) {
+        Map<String, Object> result = new HashMap<>();
+        if (pin == null || !pin.matches("\\d{4,6}")) {
+            result.put("success", false);
+            result.put("message", "PIN must be 4-6 digits");
+            return result;
+        }
+        Optional<SalaryAccount> opt = salaryAccountRepository.findById(accountId);
+        if (opt.isEmpty()) { result.put("success", false); result.put("message", "Account not found"); return result; }
+        SalaryAccount acc = opt.get();
+        if (Boolean.TRUE.equals(acc.getDebitCardPinLocked())) {
+            result.put("success", false);
+            result.put("message", "Card PIN is locked. Contact support to unlock.");
+            return result;
+        }
+        acc.setDebitCardPin(passwordEncoder.encode(pin));
+        acc.setDebitCardPinSet(true);
+        acc.setDebitCardPinLocked(false);
+        acc.setUpdatedAt(LocalDateTime.now());
+        salaryAccountRepository.save(acc);
+        result.put("success", true);
+        result.put("message", "Debit card PIN set successfully");
+        return result;
+    }
+
+    public Map<String, Object> replaceDebitCard(Long accountId) {
+        Map<String, Object> result = new HashMap<>();
+        Optional<SalaryAccount> opt = salaryAccountRepository.findById(accountId);
+        if (opt.isEmpty()) { result.put("success", false); result.put("message", "Account not found"); return result; }
+        SalaryAccount acc = opt.get();
+        String oldCardLast4 = acc.getDebitCardNumber() != null && acc.getDebitCardNumber().length() >= 4
+                ? acc.getDebitCardNumber().substring(acc.getDebitCardNumber().length() - 4) : "****";
+        acc.setDebitCardNumber(generateDebitCardNumber());
+        acc.setDebitCardCvv(generateCvv());
+        acc.setDebitCardExpiry(generateExpiryDate());
+        acc.setDebitCardPin(null);
+        acc.setDebitCardPinSet(false);
+        acc.setDebitCardPinLocked(false);
+        acc.setDebitCardStatus("Active");
+        acc.setUpdatedAt(LocalDateTime.now());
+        salaryAccountRepository.save(acc);
+        recordLimitHistory(acc, acc.getDailyLimit(), acc.getDailyLimit(), "REPLACE_CARD", "USER");
+        result.put("success", true);
+        result.put("message", "Card replaced successfully. Old card ending " + oldCardLast4 + " is deactivated.");
+        result.put("cardNumber", acc.getDebitCardNumber());
+        result.put("cvv", acc.getDebitCardCvv());
+        result.put("expiryDate", acc.getDebitCardExpiry());
+        return result;
+    }
+
+    public List<SalaryCardLimitHistory> getDebitCardLimitHistory(Long accountId) {
+        return salaryCardLimitHistoryRepository.findBySalaryAccountIdOrderByCreatedAtDesc(accountId);
+    }
+
+    public List<SalaryNormalTransaction> getDebitCardTransactions(Long accountId) {
+        List<SalaryNormalTransaction> all = normalTransactionRepository.findBySalaryAccountIdOrderByCreatedAtDesc(accountId);
+        List<SalaryNormalTransaction> cardTxns = new ArrayList<>();
+        for (SalaryNormalTransaction t : all) {
+            String type = t.getType() != null ? t.getType().toUpperCase() : "";
+            String remark = t.getRemark() != null ? t.getRemark().toUpperCase() : "";
+            if (type.contains("CARD") || type.contains("ATM") || type.contains("POS") ||
+                    remark.contains("CARD") || remark.contains("DEBIT CARD") || remark.contains("ATM")) {
+                cardTxns.add(t);
+            }
+        }
+        if (cardTxns.isEmpty()) {
+            return all.size() > 20 ? all.subList(0, 20) : all;
+        }
+        return cardTxns.size() > 50 ? cardTxns.subList(0, 50) : cardTxns;
     }
 
     // ─── Get Debit Card Info ─────────────────────────────────
@@ -1200,6 +1302,9 @@ public class SalaryAccountService {
         result.put("internationalEnabled", acc.getInternationalEnabled());
         result.put("onlineEnabled", acc.getOnlineEnabled());
         result.put("contactlessEnabled", acc.getContactlessEnabled());
+        result.put("pinSet", Boolean.TRUE.equals(acc.getDebitCardPinSet()));
+        result.put("pinLocked", Boolean.TRUE.equals(acc.getDebitCardPinLocked()));
+        result.put("limitIncreaseEnabled", Boolean.TRUE.equals(acc.getLimitIncreaseEnabled()));
         return result;
     }
 

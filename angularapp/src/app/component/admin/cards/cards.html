@@ -131,6 +131,7 @@
             <th>Expiry</th>
             <th>Status</th>
             <th>PIN Set</th>
+            <th>PIN Locked</th>
             <th>Created</th>
             <th>Actions</th>
           </tr>
@@ -147,12 +148,16 @@
             </td>
             <td class="pin-status">
               <span [class.pin-set]="card.pinSet" [class.pin-not-set]="!card.pinSet">
-                {{ card.pinSet ? ' Set' : ' Not Set' }}
+                {{ card.pinSet ? 'Set' : 'Not Set' }}
               </span>
+            </td>
+            <td class="pin-status">
+              <span [class.pin-not-set]="card.pinLocked">{{ card.pinLocked ? 'Locked' : 'No' }}</span>
             </td>
             <td class="created-date">{{ card.createdAt | date:'short' }}</td>
             <td class="actions">
               <div class="action-buttons">
+                <button (click)="viewCardDetails(card)" class="view-btn">Details</button>
                 <button 
                   *ngIf="card.status === 'Active'"
                   (click)="blockCard(card)" 
@@ -290,6 +295,54 @@
           <p>No new card requests found.</p>
         </div>
       </ng-template>
+    </div>
+  </div>
+
+  <!-- Card Details Modal -->
+  <div class="modal-overlay" *ngIf="showCardDetailsModal && selectedCard" (click)="closeCardDetailsModal()" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:1000;">
+    <div class="modal-content card-details-modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3>Card Details — {{ selectedCard.userName }}</h3>
+        <button class="close-btn" (click)="closeCardDetailsModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="detail-grid">
+          <p><strong>Account:</strong> {{ selectedCard.userAccountNumber }}</p>
+          <p><strong>Card:</strong> **** **** **** {{ selectedCard.cardNumber.slice(-4) }}</p>
+          <p><strong>Status:</strong> {{ selectedCard.status }}</p>
+          <p><strong>PIN Set:</strong> {{ selectedCard.pinSet ? 'Yes' : 'No' }}</p>
+          <p><strong>PIN Locked:</strong> {{ selectedCard.pinLocked ? 'Yes' : 'No' }}</p>
+        </div>
+        <h4>All Transactions</h4>
+        <div *ngIf="isLoadingCardDetails">Loading...</div>
+        <table *ngIf="!isLoadingCardDetails && cardTransactions.length > 0" class="requests-table">
+          <thead><tr><th>Date</th><th>Type</th><th>Amount</th><th>Description</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr *ngFor="let t of cardTransactions">
+              <td>{{ t.date | date:'short' }}</td>
+              <td>{{ t.type }}</td>
+              <td>₹{{ t.amount }}</td>
+              <td>{{ t.description || t.merchant }}</td>
+              <td>{{ t.status }}</td>
+            </tr>
+          </tbody>
+        </table>
+        <p *ngIf="!isLoadingCardDetails && cardTransactions.length === 0">No transactions found for this account.</p>
+        <h4>Replace / Usage History</h4>
+        <table *ngIf="cardActionHistory.length > 0" class="requests-table">
+          <thead><tr><th>Date</th><th>Action</th><th>Old</th><th>New</th><th>By</th></tr></thead>
+          <tbody>
+            <tr *ngFor="let h of cardActionHistory">
+              <td>{{ h.createdAt | date:'short' }}</td>
+              <td>{{ h.actionType || h.changeType }}</td>
+              <td>{{ h.oldValue ?? h.oldLimit }}</td>
+              <td>{{ h.newValue ?? h.newLimit }}</td>
+              <td>{{ h.changedBy }}</td>
+            </tr>
+          </tbody>
+        </table>
+        <p *ngIf="cardActionHistory.length === 0">No action history recorded.</p>
+      </div>
     </div>
   </div>
 

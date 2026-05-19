@@ -77,7 +77,7 @@ public class AccountController {
         }
     }
 
-    @GetMapping("/{id}")
+    @GetMapping("/{id:\\d+}")
     public ResponseEntity<Account> getAccountById(@PathVariable Long id) {
         Optional<Account> account = accountService.getAccountById(id);
         return account.map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());

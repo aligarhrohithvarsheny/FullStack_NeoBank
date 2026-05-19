@@ -111,6 +111,27 @@ public class CardController {
         return cardService.blockCard(cardId);
     }
 
+    // Unblock a card
+    @PutMapping("/{cardId}/unblock")
+    public Card unblockCard(@PathVariable Long cardId) {
+        return cardService.unblockCard(cardId);
+    }
+
+    @GetMapping("/{cardId}/transactions")
+    public List<com.neo.springapp.model.Transaction> getCardTransactions(@PathVariable Long cardId) {
+        return cardService.getCardTransactions(cardId);
+    }
+
+    @GetMapping("/{cardId}/action-history")
+    public List<com.neo.springapp.model.CardActionHistory> getCardActionHistory(@PathVariable Long cardId) {
+        return cardService.getCardActionHistory(cardId);
+    }
+
+    @PostMapping("/{cardId}/replace-auto")
+    public Card replaceCardAuto(@PathVariable Long cardId) {
+        return cardService.replaceCardAuto(cardId);
+    }
+
     // Deactivate a card
     @PutMapping("/{cardId}/deactivate")
     public Card deactivateCard(@PathVariable Long cardId) {
@@ -185,9 +206,6 @@ public class CardController {
     // Get card by ID
     @GetMapping("/{cardId}")
     public Card getCardById(@PathVariable Long cardId) {
-        return cardService.getCardsByAccountNumber("").stream()
-                .filter(card -> card.getId().equals(cardId))
-                .findFirst()
-                .orElse(null);
+        return cardService.getCardById(cardId);
     }
 }

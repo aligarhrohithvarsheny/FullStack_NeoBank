@@ -136,6 +136,22 @@ public class UserController {
         return userResponse;
     }
 
+    /** Resolve savings user by email or account number (unified login). */
+    private Optional<User> resolveUserForLogin(String loginId) {
+        if (loginId == null || loginId.trim().isEmpty()) {
+            return Optional.empty();
+        }
+        String normalized = loginId.trim();
+        if (normalized.contains("@")) {
+            return userService.findByEmail(normalized.toLowerCase());
+        }
+        Optional<User> byEmail = userService.findByEmail(normalized.toLowerCase());
+        if (byEmail.isPresent()) {
+            return byEmail;
+        }
+        return userService.getUserByAccountNumber(normalized);
+    }
+
     // Authentication endpoint - Step 1: Verify password and send OTP
     @PostMapping("/authenticate")
     public ResponseEntity<Map<String, Object>> authenticateUser(
@@ -192,9 +208,10 @@ public class UserController {
                 return ResponseEntity.badRequest().body(response);
             }
             
-            Optional<User> userOpt = userService.findByEmail(email);
+            Optional<User> userOpt = resolveUserForLogin(email);
             if (userOpt.isPresent()) {
                 User user = userOpt.get();
+                String otpEmail = user.getEmail() != null ? user.getEmail().toLowerCase().trim() : email.toLowerCase().trim();
                 System.out.println("User found: " + user.getUsername() + ", Status: " + user.getStatus());
                 System.out.println("Account locked: " + user.isAccountLocked());
                 System.out.println("Failed login attempts: " + user.getFailedLoginAttempts());
@@ -287,17 +304,24 @@ public class UserController {
 
                     // Password is correct - generate and send OTP
                     String otp = otpService.generateOtp();
-                    otpService.storeOtp(email, otp);
+                    otpService.storeOtp(otpEmail, otp);
                     
-                    // Send OTP via email
-                    boolean emailSent = emailService.sendOtpEmail(email, otp);
+                    // Send OTP via email (to registered email, not account number)
+                    boolean emailSent = emailService.sendOtpEmail(otpEmail, otp);
+                    boolean otpReady = emailSent || otpService.hasValidOtp(otpEmail);
                     
-                    if (emailSent) {
+                    if (otpReady) {
                         Map<String, Object> response = new HashMap<>();
                         response.put("success", true);
                         response.put("requiresOtp", true);
-                        response.put("message", "Password verified. OTP has been sent to your email. Please enter the OTP to complete login.");
-                        System.out.println("Password verified for user: " + user.getUsername() + ". OTP sent to email.");
+                        response.put("loginEmail", otpEmail);
+                        if (emailSent) {
+                            response.put("message", "Password verified. OTP has been sent to your email. Please enter the OTP to complete login.");
+                        } else {
+                            response.put("otpEmailSent", false);
+                            response.put("message", "Password verified. OTP could not be emailed — use Resend OTP or contact support.");
+                        }
+                        System.out.println("Password verified for user: " + user.getUsername() + ". OTP " + (emailSent ? "sent" : "stored only") + " for " + otpEmail);
                         return ResponseEntity.ok(response);
                     } else {
                         Map<String, Object> response = new HashMap<>();
@@ -1103,7 +1127,23 @@ public class UserController {
         }
     }
 
-    @GetMapping("/{id}")
+    /** Resolve current user by email (use ?email= instead of putting email in /{id}) */
+    @GetMapping("/me")
+    public ResponseEntity<Map<String, Object>> getCurrentUserByEmail(@RequestParam String email) {
+        if (email == null || email.trim().isEmpty()) {
+            Map<String, Object> err = new HashMap<>();
+            err.put("success", false);
+            err.put("message", "email query parameter is required");
+            return ResponseEntity.badRequest().body(err);
+        }
+        Optional<User> user = userService.findByEmail(email.trim());
+        if (user.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(createUserResponse(user.get()));
+    }
+
+    @GetMapping("/{id:\\d+}")
     public ResponseEntity<Map<String, Object>> getUserById(@PathVariable Long id) {
         Optional<User> user = userService.getUserById(id);
         if (!user.isPresent()) {

@@ -3783,7 +3783,7 @@ export class Dashboard implements OnInit, OnDestroy {
 
     this.http.get(`${environment.apiBaseUrl}/api/admin/search?q=${encodeURIComponent(query)}`)
       .pipe(
-        timeout(10000), // 10 second timeout
+        timeout(30000),
         catchError(err => {
           console.error('Error performing universal search:', err);
           let errorMessage = 'Failed to perform search. ';

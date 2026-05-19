@@ -2,6 +2,8 @@ package com.neo.springapp.repository;
 
 import com.neo.springapp.model.FixedDeposit;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import java.util.List;
 import java.util.Optional;
@@ -22,5 +24,8 @@ public interface FixedDepositRepository extends JpaRepository<FixedDeposit, Long
     List<FixedDeposit> findByStatusIn(List<String> statuses);
     
     List<FixedDeposit> findByIsMaturedFalseAndMaturityDateBefore(java.time.LocalDate date);
+
+    @Query("SELECT f FROM FixedDeposit f WHERE LOWER(f.fdAccountNumber) LIKE LOWER(CONCAT('%', :term, '%'))")
+    List<FixedDeposit> findByFdAccountNumberContainingIgnoreCase(@Param("term") String term);
 }
 

@@ -63,7 +63,8 @@
         </div>
         <div class="search-hints">
           <span class="hint-item">💡 Account Number, Name, Phone, Aadhaar, PAN</span>
-          <span class="hint-item">💡 Loan, Cheque, Card, Transaction, UTR</span>
+          <span class="hint-item">💡 Transaction ID (TXN...), Cheque Number, Application ID</span>
+          <span class="hint-item">💡 PG Payment ID, FD ID, Insurance ID</span>
           <span class="hint-item">💡 FD, EMI, Insurance, FASTag, KYC, Video KYC</span>
           <span class="hint-item">💡 Merchant ID, Agent ID, Soundbox ID, Subsidy ID</span>
         </div>
@@ -102,6 +103,8 @@
           <span class="badge kyc-requests" *ngIf="universalSearchResults.kycCount > 0">{{ universalSearchResults.kycCount }} KYC</span>
           <span class="badge support-tickets" *ngIf="universalSearchResults.supportTicketCount > 0">{{ universalSearchResults.supportTicketCount }} Ticket(s)</span>
           <span class="badge onboarding" *ngIf="universalSearchResults.onboardingCount > 0">{{ universalSearchResults.onboardingCount }} Onboarding</span>
+          <span class="badge pg-payments" *ngIf="universalSearchResults.pgPaymentCount > 0">{{ universalSearchResults.pgPaymentCount }} PG Payment(s)</span>
+          <span class="badge applications" *ngIf="universalSearchResults.accountApplicationCount > 0">{{ universalSearchResults.accountApplicationCount }} Application(s)</span>
         </div>
       </div>
 
@@ -622,12 +625,45 @@
           </div>
         </div>
       </div>
+
+      <!-- PG Payments Results -->
+      <div class="results-group" *ngIf="universalSearchResults.pgPayments && universalSearchResults.pgPayments.length > 0">
+        <h5 class="group-header"><i class="fa fa-credit-card"></i> PG Payments ({{ universalSearchResults.pgPayments.length }})</h5>
+        <div class="results-grid">
+          <div *ngFor="let pg of universalSearchResults.pgPayments" class="result-card">
+            <div class="card-header"><span class="card-type">PG Payment</span><span class="match-type">{{ pg.matchType }}</span></div>
+            <div class="card-body">
+              <div class="card-field"><label>PG Transaction ID:</label><span class="value highlight">{{ pg.transactionId }}</span></div>
+              <div class="card-field"><label>Order ID:</label><span class="value">{{ pg.orderId }}</span></div>
+              <div class="card-field"><label>Amount:</label><span class="value">₹{{ pg.amount }}</span></div>
+              <div class="card-field"><label>Status:</label><span class="value">{{ pg.status }}</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Account Applications Results -->
+      <div class="results-group" *ngIf="universalSearchResults.accountApplications && universalSearchResults.accountApplications.length > 0">
+        <h5 class="group-header"><i class="fa fa-file-alt"></i> Account Applications ({{ universalSearchResults.accountApplications.length }})</h5>
+        <div class="results-grid">
+          <div *ngFor="let app of universalSearchResults.accountApplications" class="result-card">
+            <div class="card-header"><span class="card-type">Application</span><span class="match-type">{{ app.matchType }}</span></div>
+            <div class="card-body">
+              <div class="card-field"><label>Application ID:</label><span class="value highlight">{{ app.applicationId }}</span></div>
+              <div class="card-field"><label>Application No:</label><span class="value">{{ app.applicationNumber }}</span></div>
+              <div class="card-field"><label>Name:</label><span class="value">{{ app.fullName }}</span></div>
+              <div class="card-field"><label>Type:</label><span class="value">{{ app.accountType }}</span></div>
+              <div class="card-field"><label>Status:</label><span class="value">{{ app.status }}</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div class="no-results" *ngIf="universalSearchQuery && universalSearchResults && universalSearchResults.totalCount === 0 && !isUniversalSearching">
       <i class="fa fa-search"></i>
       <p>No results found for "{{ universalSearchQuery }}"</p>
-      <p class="hint">Try searching with different keywords or ID numbers</p>
+      <p class="hint">Try Transaction ID (TXN...), Cheque Number, Application ID, PG Payment ID, FD ID, or Insurance ID</p>
     </div>
 
     <!-- ===== FEATURE BOX GRID ===== -->

@@ -1420,13 +1420,49 @@
                   <label>Daily Transaction Limit (&#8377;)</label>
                   <input type="number" [(ngModel)]="debitCardInfo.dailyLimit" name="dailyLimit" min="1000" max="500000">
                 </div>
-                <div class="sdash-form-group sdash-form-actions-inline">
+                <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;">
+                  <span class="sdash-badge" [class.active]="debitCardInfo.pinSet">PIN: {{ debitCardInfo.pinSet ? 'Set' : 'Not Set' }}</span>
+                  <span class="sdash-badge" [class.frozen]="debitCardInfo.pinLocked">PIN Locked: {{ debitCardInfo.pinLocked ? 'Yes' : 'No' }}</span>
+                </div>
+                <div class="sdash-form-group sdash-form-actions-inline" style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;">
                   <button class="sdash-btn sdash-btn-primary" (click)="updateCardSetting('dailyLimit', debitCardInfo.dailyLimit)" [disabled]="isUpdatingCard">Update Limit</button>
-                  <button class="sdash-btn" [class.sdash-btn-danger]="debitCardInfo.status === 'ACTIVE'" [class.sdash-btn-success]="debitCardInfo.status !== 'ACTIVE'" (click)="updateCardSetting('status', debitCardInfo.status === 'ACTIVE' ? 'BLOCKED' : 'ACTIVE')" [disabled]="isUpdatingCard">
-                    {{ debitCardInfo.status === 'ACTIVE' ? 'Block Card' : 'Unblock Card' }}
+                  <button class="sdash-btn sdash-btn-secondary" (click)="showSetPinForm = !showSetPinForm" [disabled]="isUpdatingCard || debitCardInfo.pinLocked"><i class="fa fa-lock"></i> Set PIN</button>
+                  <button class="sdash-btn sdash-btn-secondary" (click)="replaceDebitCard()" [disabled]="isUpdatingCard"><i class="fa fa-refresh"></i> Replace Card</button>
+                  <button class="sdash-btn" [class.sdash-btn-danger]="isCardActive()" [class.sdash-btn-success]="!isCardActive()" (click)="toggleBlockCard()" [disabled]="isUpdatingCard">
+                    {{ isCardActive() ? 'Block Card' : 'Unblock Card' }}
                   </button>
                 </div>
               </div>
+              <div *ngIf="showSetPinForm" style="margin-top:16px;padding:16px;background:#f8f9fa;border-radius:8px;">
+                <div class="sdash-form-grid">
+                  <div class="sdash-form-group"><label>New PIN (4-6 digits)</label><input type="password" [(ngModel)]="newDebitCardPin" maxlength="6"></div>
+                  <div class="sdash-form-group"><label>Confirm PIN</label><input type="password" [(ngModel)]="confirmDebitCardPin" maxlength="6"></div>
+                  <div class="sdash-form-group"><button class="sdash-btn sdash-btn-primary" (click)="setDebitCardPin()">Save PIN</button> <button class="sdash-btn" (click)="showSetPinForm = false">Cancel</button></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="sdash-overview-cards sdash-mb" style="margin-top:16px;">
+            <div class="sdash-stat-card" [class.sdash-card-active]="debitCardInfo.limitIncreaseEnabled">
+              <div class="sdash-stat-info"><span class="sdash-stat-label">Limit Increase</span><span class="sdash-stat-value">{{ debitCardInfo.limitIncreaseEnabled ? 'Enabled' : 'Disabled' }}</span></div>
+              <label class="sdash-toggle"><input type="checkbox" [checked]="debitCardInfo.limitIncreaseEnabled" (change)="updateCardSetting('limitIncreaseEnabled', !debitCardInfo.limitIncreaseEnabled)" [disabled]="isUpdatingCard"><span class="sdash-toggle-slider"></span></label>
+            </div>
+          </div>
+
+          <div class="sdash-card" style="margin-top:16px;">
+            <div class="sdash-card-header"><h3>Card Transactions</h3></div>
+            <div class="sdash-card-body">
+              <div *ngIf="isLoadingCardTransactions">Loading transactions...</div>
+              <div *ngIf="!isLoadingCardTransactions && cardTransactions.length === 0">No card transactions found.</div>
+              <table *ngIf="!isLoadingCardTransactions && cardTransactions.length > 0" class="sdash-table">
+                <thead><tr><th>Date</th><th>Type</th><th>Amount</th><th>Remark</th><th>Status</th></tr></thead>
+                <tbody>
+                  <tr *ngFor="let txn of cardTransactions">
+                    <td>{{ txn.createdAt | date:'dd MMM yyyy' }}</td><td>{{ txn.type }}</td><td>&#8377;{{ txn.amount | number:'1.2-2' }}</td><td>{{ txn.remark || '-' }}</td><td>{{ txn.status }}</td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </div>
           </ng-container>

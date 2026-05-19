@@ -13,6 +13,8 @@ public interface InsuranceApplicationRepository extends JpaRepository<InsuranceA
 
     Optional<InsuranceApplication> findByApplicationNumber(String applicationNumber);
 
+    List<InsuranceApplication> findByApplicationNumberContainingIgnoreCase(String applicationNumber);
+
     List<InsuranceApplication> findByUserId(Long userId);
 
     List<InsuranceApplication> findByAccountNumber(String accountNumber);

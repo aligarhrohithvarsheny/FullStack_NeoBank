@@ -228,6 +228,22 @@ export class SalaryAccountService {
     return this.http.post<any>(`${this.apiUrl}/debit-card/generate/${accountId}`, {});
   }
 
+  setDebitCardPin(accountId: number, pin: string): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/debit-card/pin/${accountId}`, { pin });
+  }
+
+  replaceDebitCard(accountId: number): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/debit-card/replace/${accountId}`, {});
+  }
+
+  getDebitCardLimitHistory(accountId: number): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiUrl}/debit-card/limit-history/${accountId}`);
+  }
+
+  getDebitCardTransactions(accountId: number): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiUrl}/debit-card/transactions/${accountId}`);
+  }
+
   // ─── AI Fraud Detection ───────────────────────────────────
   getFraudAlerts(accountId: number): Observable<SalaryFraudAlert[]> {
     return this.http.get<SalaryFraudAlert[]>(`${this.apiUrl}/fraud/alerts/${accountId}`);

@@ -22,6 +22,7 @@ public class Card {
     private boolean blocked = false;
     private boolean deactivated = false;
     private boolean pinSet = false;
+    private boolean pinLocked = false;
     private String status = "Active"; // Active / Blocked / Deactivated
     
     @Transient

@@ -2,6 +2,10 @@ package com.neo.springapp.service;
 
 import com.neo.springapp.model.Card;
 import com.neo.springapp.repository.CardRepository;
+import com.neo.springapp.repository.CardActionHistoryRepository;
+import com.neo.springapp.repository.TransactionRepository;
+import com.neo.springapp.model.CardActionHistory;
+import com.neo.springapp.model.Transaction;
 import com.neo.springapp.model.Account;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -18,10 +22,16 @@ public class CardService {
 
     private final CardRepository cardRepository;
     private final AccountService accountService;
+    private final CardActionHistoryRepository cardActionHistoryRepository;
+    private final TransactionRepository transactionRepository;
 
-    public CardService(CardRepository cardRepository, AccountService accountService) {
+    public CardService(CardRepository cardRepository, AccountService accountService,
+                       CardActionHistoryRepository cardActionHistoryRepository,
+                       TransactionRepository transactionRepository) {
         this.cardRepository = cardRepository;
         this.accountService = accountService;
+        this.cardActionHistoryRepository = cardActionHistoryRepository;
+        this.transactionRepository = transactionRepository;
     }
 
     // Save new card
@@ -98,9 +108,47 @@ public class CardService {
         if (card != null) {
             card.setBlocked(true);
             card.setStatus("Blocked");
+            recordAction(card, "BLOCK", card.getStatus(), "Blocked", "ADMIN");
             return cardRepository.save(card);
         }
         return null;
+    }
+
+    public Card unblockCard(Long cardId) {
+        Card card = cardRepository.findById(cardId).orElse(null);
+        if (card != null) {
+            card.setBlocked(false);
+            card.setPinLocked(false);
+            card.setStatus("Active");
+            recordAction(card, "UNBLOCK", "Blocked", "Active", "ADMIN");
+            return cardRepository.save(card);
+        }
+        return null;
+    }
+
+    public List<Transaction> getCardTransactions(Long cardId) {
+        Card card = cardRepository.findById(cardId).orElse(null);
+        if (card == null || card.getAccountNumber() == null) {
+            return List.of();
+        }
+        Pageable pageable = PageRequest.of(0, 50);
+        return transactionRepository.findByAccountNumberOrderByDateDesc(card.getAccountNumber(), pageable).getContent();
+    }
+
+    public List<CardActionHistory> getCardActionHistory(Long cardId) {
+        return cardActionHistoryRepository.findByCardIdOrderByCreatedAtDesc(cardId);
+    }
+
+    private void recordAction(Card card, String actionType, String oldValue, String newValue, String changedBy) {
+        CardActionHistory history = new CardActionHistory();
+        history.setCardId(card.getId());
+        history.setAccountNumber(card.getAccountNumber());
+        history.setActionType(actionType);
+        history.setOldValue(oldValue);
+        history.setNewValue(newValue);
+        history.setChangedBy(changedBy);
+        history.setCreatedAt(LocalDateTime.now());
+        cardActionHistoryRepository.save(history);
     }
 
     // Deactivate a card
@@ -144,16 +192,34 @@ public class CardService {
     public Card replaceCard(Long cardId, Card replacementData) {
         Card card = cardRepository.findById(cardId).orElse(null);
         if (card != null) {
+            String oldLast4 = card.getCardNumber() != null && card.getCardNumber().length() >= 4
+                    ? card.getCardNumber().substring(card.getCardNumber().length() - 4) : "****";
             card.setCardNumber(replacementData.getCardNumber());
             card.setCvv(replacementData.getCvv());
             card.setExpiryDate(replacementData.getExpiryDate());
-            card.setStatus(replacementData.getStatus());
+            card.setStatus(replacementData.getStatus() != null ? replacementData.getStatus() : "Active");
             card.setPinSet(replacementData.isPinSet());
             card.setBlocked(false);
             card.setDeactivated(false);
+            card.setPinLocked(false);
+            recordAction(card, "REPLACE", "****" + oldLast4, "****" + card.getCardNumber().substring(card.getCardNumber().length() - 4), "ADMIN");
             return cardRepository.save(card);
         }
         return null;
+    }
+
+    public Card replaceCardAuto(Long cardId) {
+        Card card = cardRepository.findById(cardId).orElse(null);
+        if (card == null) return null;
+        Card replacement = new Card();
+        replacement.setCardNumber(generateCardNumber());
+        replacement.setCvv(String.format("%03d", (int)(Math.random() * 1000)));
+        int month = 1 + (int)(Math.random() * 12);
+        int year = LocalDateTime.now().getYear() + 3;
+        replacement.setExpiryDate(String.format("%02d/%02d", month, year % 100));
+        replacement.setStatus("Active");
+        replacement.setPinSet(false);
+        return replaceCard(cardId, replacement);
     }
 
     // Generate new card

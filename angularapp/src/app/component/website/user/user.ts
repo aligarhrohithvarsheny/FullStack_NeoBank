@@ -578,14 +578,21 @@ export class User implements OnInit, OnDestroy {
       password: this.loginPassword
     }).subscribe({
       next: (authResponse: any) => {
+        this.isUnifiedLoggingIn = false;
         console.log('Authentication response:', authResponse);
         
         if (authResponse.success && authResponse.requiresOtp) {
           // Password verified, now show OTP input
+          if (authResponse.loginEmail) {
+            this.loginUserId = authResponse.loginEmail;
+          }
           this.showOtpInput = true;
           this.successMessage = authResponse.message || 'OTP has been sent to your email. Please enter the OTP to complete login.';
           this.errorMessage = '';
-          this.alertService.userSuccess('Password Verified', 'OTP has been sent to your email. Please check and enter the OTP.');
+          const otpHint = authResponse.otpEmailSent === false
+            ? 'OTP could not be emailed. Use Resend OTP or check with your bank.'
+            : 'OTP has been sent to your email. Please check and enter the OTP.';
+          this.alertService.userSuccess('Password Verified', otpHint);
         } else if (authResponse.success && authResponse.requiresPasswordSetup) {
           // New password setup required for newly approved accounts
           this.successMessage = authResponse.message || 'Your account has been approved. Please set up your password to proceed.';
@@ -655,6 +662,7 @@ export class User implements OnInit, OnDestroy {
         }
       },
       error: (err: any) => {
+        this.isUnifiedLoggingIn = false;
         console.error('Authentication error:', err);
         console.error('Error details:', JSON.stringify(err, null, 2));
 
@@ -678,6 +686,8 @@ export class User implements OnInit, OnDestroy {
           this.unlockEmail = this.loginUserId; // Pre-fill email
         } else if (err.error && err.error.failedAttempts !== undefined) {
           this.errorMessage = err.error.message || 'Invalid credentials.';
+        } else if (err.error && err.error.error === 'TYPE_MISMATCH') {
+          this.errorMessage = 'Invalid login request. Use your registered email or account number only (do not use special paths). If this persists, contact support.';
         } else if (err.error && err.error.message) {
           // Show the actual error message from backend
           this.errorMessage = err.error.message;
@@ -1173,11 +1183,11 @@ export class User implements OnInit, OnDestroy {
         }
       });
     } else {
-      // Savings account (default) - use email/userId based login
+      // Savings account (default) - email or account number
       this.loginUserId = accNum;
       this.loginPassword = this.unifiedPassword;
+      this.isUnifiedLoggingIn = true;
       this.fetchUserDataAndLogin();
-      this.isUnifiedLoggingIn = false;
     }
   }
 

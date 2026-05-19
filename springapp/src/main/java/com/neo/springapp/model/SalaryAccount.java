@@ -123,6 +123,19 @@ public class SalaryAccount {
     @Column(name = "contactless_enabled")
     private Boolean contactlessEnabled = true;
 
+    @JsonIgnore
+    @Column(name = "debit_card_pin")
+    private String debitCardPin;
+
+    @Column(name = "debit_card_pin_set")
+    private Boolean debitCardPinSet = false;
+
+    @Column(name = "debit_card_pin_locked")
+    private Boolean debitCardPinLocked = false;
+
+    @Column(name = "limit_increase_enabled")
+    private Boolean limitIncreaseEnabled = false;
+
     @Column(name = "employee_id", unique = true)
     private String employeeId;
 

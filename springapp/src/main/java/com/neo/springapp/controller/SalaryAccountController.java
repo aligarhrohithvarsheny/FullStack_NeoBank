@@ -53,7 +53,7 @@ public class SalaryAccountController {
         return ResponseEntity.ok(salaryAccountService.getAll());
     }
 
-    @GetMapping("/{id}")
+    @GetMapping("/{id:\\d+}")
     public ResponseEntity<Map<String, Object>> getById(@PathVariable Long id) {
         Map<String, Object> response = new HashMap<>();
         Optional<SalaryAccount> opt = salaryAccountService.getById(id);
@@ -537,6 +537,26 @@ public class SalaryAccountController {
             return ResponseEntity.ok(result);
         }
         return ResponseEntity.badRequest().body(result);
+    }
+
+    @PostMapping("/debit-card/pin/{id}")
+    public ResponseEntity<Map<String, Object>> setDebitCardPin(@PathVariable Long id, @RequestBody Map<String, String> body) {
+        return ResponseEntity.ok(salaryAccountService.setDebitCardPin(id, body.get("pin")));
+    }
+
+    @PostMapping("/debit-card/replace/{id}")
+    public ResponseEntity<Map<String, Object>> replaceDebitCard(@PathVariable Long id) {
+        return ResponseEntity.ok(salaryAccountService.replaceDebitCard(id));
+    }
+
+    @GetMapping("/debit-card/limit-history/{id}")
+    public ResponseEntity<?> getDebitCardLimitHistory(@PathVariable Long id) {
+        return ResponseEntity.ok(salaryAccountService.getDebitCardLimitHistory(id));
+    }
+
+    @GetMapping("/debit-card/transactions/{id}")
+    public ResponseEntity<?> getDebitCardTransactions(@PathVariable Long id) {
+        return ResponseEntity.ok(salaryAccountService.getDebitCardTransactions(id));
     }
 
     // ─── AI Fraud Detection ──────────────────────────────────

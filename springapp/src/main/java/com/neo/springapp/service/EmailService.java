@@ -116,7 +116,11 @@ public class EmailService {
      */
     public boolean sendOtpEmail(String toEmail, String otp) {
         if (gmailApiOtpService != null && gmailApiOtpService.isConfigured()) {
-            return sendOtpViaGmailApi(toEmail, "NeoBank - Login OTP Verification", buildOtpEmailBody(otp));
+            boolean gmailSent = sendOtpViaGmailApi(toEmail, "NeoBank - Login OTP Verification", buildOtpEmailBody(otp));
+            if (gmailSent) {
+                return true;
+            }
+            System.err.println("⚠️ Gmail API OTP failed; falling back to SMTP/console for: " + toEmail);
         }
 
         // Initialize mail sender if not already done
