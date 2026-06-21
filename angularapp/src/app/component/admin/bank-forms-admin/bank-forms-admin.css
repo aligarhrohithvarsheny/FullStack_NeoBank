@@ -20,6 +20,12 @@
   gap: 8px;
   flex-wrap: wrap;
   margin-bottom: 20px;
+  position: sticky;
+  top: 78px;
+  z-index: 50;
+  background: #f8fafc;
+  padding: 12px 0;
+  border-bottom: 2px solid #e2e8f0;
 }
 
 .forms-main-tabs button {
@@ -31,6 +37,12 @@
   font-weight: 700;
   color: #475569;
   font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  visibility: visible;
+  opacity: 1;
 }
 
 .forms-main-tabs button.active {

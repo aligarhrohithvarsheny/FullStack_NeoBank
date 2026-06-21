@@ -517,6 +517,18 @@
   background: linear-gradient(135deg, #5a67d8, #6b46c1);
 }
 
+.bank-forms-section-wrapper {
+  margin-top: 20px;
+  min-height: calc(100vh - 120px);
+}
+
+.bank-forms-section-wrapper.section-content {
+  display: block;
+  visibility: visible;
+  opacity: 1;
+  overflow: visible;
+}
+
 .back-to-home-btn:hover {
   transform: translateY(-2px);
   box-shadow: 0 6px 25px rgba(59, 130, 246, 0.5);
@@ -1077,6 +1089,7 @@
   display: flex;
   align-items: center;
   gap: 15px;
+  flex-wrap: wrap;
 }
 
 .header-left h2 {

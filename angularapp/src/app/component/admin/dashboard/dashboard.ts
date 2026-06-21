@@ -298,7 +298,8 @@ export class Dashboard implements OnInit, OnDestroy {
         { section: 'profile', icon: 'fa-user-shield', label: 'Admin Profile' },
         { section: 'users', icon: 'fa-users', label: 'Manage Users', featureKey: 'manage-users' },
         { section: 'user-control', icon: 'fa-user-cog', label: 'Full User Control', featureKey: 'user-control' },
-        { section: 'bulk-export', icon: 'fa-file-download', label: 'Bulk Data Export', featureKey: 'manage-users' }
+        { section: 'bulk-export', icon: 'fa-file-download', label: 'Bulk Data Export', featureKey: 'manage-users' },
+        { section: 'bank-forms', icon: 'fa-file-alt', label: 'Bank Forms' }
       ]
     },
     {
@@ -1497,7 +1498,11 @@ export class Dashboard implements OnInit, OnDestroy {
       this.loadUsers(200);
       return;
     } else if (section === 'bank-forms') {
+      this.closeUserDetails();
       this.activeSection = section;
+      if (isPlatformBrowser(this.platformId)) {
+        setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 0);
+      }
       return;
     } else if (section === 'cards') {
       this.navigateTo('cards');

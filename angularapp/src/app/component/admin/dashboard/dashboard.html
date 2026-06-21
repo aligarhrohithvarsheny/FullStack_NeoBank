@@ -694,6 +694,11 @@
   </div>
   <!-- End Home Feature View -->
 
+  <!-- Bank Forms Center (60 forms — PDF download & upload) -->
+  <div class="bank-forms-section-wrapper section-content" *ngIf="activeSection === 'bank-forms'">
+    <app-bank-forms-admin [adminName]="adminName"></app-bank-forms-admin>
+  </div>
+
   <!-- User Details Modal -->
   <div class="user-details-modal" *ngIf="selectedSearchedUser">
     <div class="modal-content">
@@ -848,7 +853,7 @@
   </div>
 
   <!-- Quick Actions Section -->
-  <div class="quick-actions" *ngIf="hasFeatureAccess('deposit-withdraw')">
+  <div class="quick-actions" *ngIf="hasFeatureAccess('deposit-withdraw') && activeSection === 'deposit-withdraw'">
     <div class="section-header">
       <h3><i class="fa fa-bolt"></i> Quick Actions</h3>
       <button class="close-btn" (click)="setActiveSection('home')">
@@ -2186,11 +2191,6 @@
         </div>
       </div>
     </div>
-  </div>
-
-  <!-- Bank Forms Center (60 forms — PDF download & upload) -->
-  <div class="bank-forms-section-wrapper section-content" *ngIf="activeSection === 'bank-forms'">
-    <app-bank-forms-admin [adminName]="adminName"></app-bank-forms-admin>
   </div>
 
   <!-- Bulk Data Export (PDF / Excel) -->
