@@ -494,6 +494,29 @@
   box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
 }
 
+.header-forms-tab {
+  padding: 10px 22px;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.35);
+}
+
+.header-forms-tab:hover,
+.header-forms-tab.active {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 25px rgba(102, 126, 234, 0.5);
+  background: linear-gradient(135deg, #5a67d8, #6b46c1);
+}
+
 .back-to-home-btn:hover {
   transform: translateY(-2px);
   box-shadow: 0 6px 25px rgba(59, 130, 246, 0.5);

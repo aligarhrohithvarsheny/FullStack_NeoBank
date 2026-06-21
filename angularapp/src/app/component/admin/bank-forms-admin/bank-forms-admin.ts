@@ -19,11 +19,10 @@ export class BankFormsAdminComponent implements OnInit {
   uploads: BankFormUploadRecord[] = [];
 
   selectedCategory = 'All';
-  searchQuery = '';
-  activeTab: 'catalog' | 'uploads' = 'catalog';
+  formSearchQuery = '';
+  activeTab: 'submit' | 'catalog' | 'uploads' = 'submit';
 
-  showUploadModal = false;
-  selectedForm: BankFormDefinition | null = null;
+  selectedFormCode = '';
   uploadAccountNumber = '';
   uploadAccountType: 'regular' | 'loan' | 'goldloan' | 'cheque' | 'salary' | 'current' = 'regular';
   uploadRemarks = '';
@@ -35,7 +34,9 @@ export class BankFormsAdminComponent implements OnInit {
   isUploading = false;
   isDownloading = false;
   isLoading = false;
+  isDeleting = false;
   filterAccountNumber = '';
+  filterFormCode = '';
 
   accountTypes = [
     { value: 'regular', label: 'Savings / Regular' },
@@ -44,6 +45,11 @@ export class BankFormsAdminComponent implements OnInit {
     { value: 'loan', label: 'Loan Account' },
     { value: 'goldloan', label: 'Gold Loan Account' },
     { value: 'cheque', label: 'Cheque Account' }
+  ];
+
+  readonly defaultCommonFields = [
+    'Account Number', 'Name', 'Customer ID', 'Aadhaar Number',
+    'Signature', 'Bank Name (NeoBank)', 'Terms and Conditions (I Accept)'
   ];
 
   constructor(
@@ -56,34 +62,26 @@ export class BankFormsAdminComponent implements OnInit {
     this.loadUploads();
   }
 
-  loadCatalog(): void {
-    this.isLoading = true;
-    this.bankFormService.getCatalog().subscribe({
-      next: (res) => {
-        this.forms = res.forms || [];
-        this.categories = ['All', ...(res.categories || [])];
-        this.isLoading = false;
-      },
-      error: () => {
-        this.isLoading = false;
-        this.alertService.error('Error', 'Failed to load bank forms catalog.');
-      }
+  get selectedForm(): BankFormDefinition | null {
+    if (!this.selectedFormCode) return null;
+    return this.forms.find((f) => f.code === this.selectedFormCode) || null;
+  }
+
+  get formSelectOptions(): BankFormDefinition[] {
+    const q = this.formSearchQuery.trim().toLowerCase();
+    return this.forms.filter((f) => {
+      if (!q) return true;
+      return (
+        f.name.toLowerCase().includes(q) ||
+        f.code.toLowerCase().includes(q) ||
+        f.category.toLowerCase().includes(q) ||
+        String(f.id).includes(q)
+      );
     });
   }
 
-  loadUploads(): void {
-    this.bankFormService.listUploads(this.filterAccountNumber || undefined).subscribe({
-      next: (res) => {
-        this.uploads = res.uploads || [];
-      },
-      error: () => {
-        this.uploads = [];
-      }
-    });
-  }
-
-  get filteredForms(): BankFormDefinition[] {
-    const q = this.searchQuery.trim().toLowerCase();
+  get filteredCatalogForms(): BankFormDefinition[] {
+    const q = this.formSearchQuery.trim().toLowerCase();
     return this.forms.filter((f) => {
       const categoryMatch = this.selectedCategory === 'All' || f.category === this.selectedCategory;
       if (!categoryMatch) return false;
@@ -97,42 +95,69 @@ export class BankFormsAdminComponent implements OnInit {
     });
   }
 
-  downloadPdf(form: BankFormDefinition): void {
+  loadCatalog(): void {
+    this.isLoading = true;
+    this.bankFormService.getCatalog().subscribe({
+      next: (res) => {
+        this.forms = (res.forms || []).map((f) => ({
+          ...f,
+          commonFields: f.commonFields?.length ? f.commonFields : this.defaultCommonFields,
+          allFields: f.allFields?.length ? f.allFields : [...this.defaultCommonFields, ...(f.fields || [])]
+        }));
+        this.categories = ['All', ...(res.categories || [])];
+        this.isLoading = false;
+      },
+      error: () => {
+        this.isLoading = false;
+        this.alertService.error('Error', 'Failed to load bank forms catalog.');
+      }
+    });
+  }
+
+  loadUploads(): void {
+    this.bankFormService.listUploads(
+      this.filterAccountNumber || undefined,
+      this.filterFormCode || undefined
+    ).subscribe({
+      next: (res) => {
+        this.uploads = res.uploads || [];
+      },
+      error: () => {
+        this.uploads = [];
+      }
+    });
+  }
+
+  onFormSelected(): void {
+    this.isAccountVerified = false;
+    this.verifiedHolderName = '';
+    this.accountVerificationError = '';
+    this.selectedFile = null;
+  }
+
+  downloadPdf(form?: BankFormDefinition | null): void {
+    const target = form || this.selectedForm;
+    if (!target) {
+      this.alertService.error('Validation', 'Please select a form first.');
+      return;
+    }
     this.isDownloading = true;
-    this.bankFormService.downloadBlankPdf(form.code, this.adminName).subscribe({
+    this.bankFormService.downloadBlankPdf(target.code, this.adminName).subscribe({
       next: (blob) => {
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `NeoBank-${form.code}.pdf`;
+        a.download = `NeoBank-${target.code}.pdf`;
         a.click();
         window.URL.revokeObjectURL(url);
         this.isDownloading = false;
-        this.alertService.success('Downloaded', `${form.name} PDF downloaded.`);
+        this.alertService.success('Downloaded', `${target.name} PDF downloaded.`);
       },
       error: () => {
         this.isDownloading = false;
         this.alertService.error('Error', 'Failed to download PDF.');
       }
     });
-  }
-
-  openUploadModal(form: BankFormDefinition): void {
-    this.selectedForm = form;
-    this.uploadAccountNumber = '';
-    this.uploadAccountType = 'regular';
-    this.uploadRemarks = '';
-    this.selectedFile = null;
-    this.isAccountVerified = false;
-    this.verifiedHolderName = '';
-    this.accountVerificationError = '';
-    this.showUploadModal = true;
-  }
-
-  closeUploadModal(): void {
-    this.showUploadModal = false;
-    this.selectedForm = null;
-    this.selectedFile = null;
   }
 
   onFileSelected(event: Event): void {
@@ -170,13 +195,16 @@ export class BankFormsAdminComponent implements OnInit {
   }
 
   submitUpload(): void {
-    if (!this.selectedForm) return;
+    if (!this.selectedForm) {
+      this.alertService.error('Validation', 'Please search and select a form name.');
+      return;
+    }
     if (!this.isAccountVerified) {
       this.alertService.error('Validation', 'Please verify the account number first.');
       return;
     }
     if (!this.selectedFile) {
-      this.alertService.error('Validation', 'Please select a file to upload.');
+      this.alertService.error('Validation', 'Please select the application file to upload.');
       return;
     }
 
@@ -192,9 +220,11 @@ export class BankFormsAdminComponent implements OnInit {
       next: (res) => {
         this.isUploading = false;
         if (res.success) {
-          this.alertService.success('Saved', 'Form uploaded and saved to database.');
-          this.closeUploadModal();
+          this.alertService.success('Saved', 'Application uploaded and saved to database.');
+          this.selectedFile = null;
+          this.uploadRemarks = '';
           this.loadUploads();
+          this.activeTab = 'uploads';
         } else {
           this.alertService.error('Error', res.message || 'Upload failed.');
         }
@@ -206,8 +236,48 @@ export class BankFormsAdminComponent implements OnInit {
     });
   }
 
-  filterUploadsByAccount(): void {
-    this.loadUploads();
+  deleteUpload(record: BankFormUploadRecord): void {
+    if (!confirm(`Delete uploaded application for ${record.formName} (${record.accountNumber})?`)) return;
+    this.isDeleting = true;
+    this.bankFormService.deleteUpload(record.id).subscribe({
+      next: (res) => {
+        this.isDeleting = false;
+        if (res.success) {
+          this.alertService.success('Deleted', 'Upload removed.');
+          this.loadUploads();
+        }
+      },
+      error: () => {
+        this.isDeleting = false;
+        this.alertService.error('Error', 'Failed to delete upload.');
+      }
+    });
+  }
+
+  clearAllUploads(): void {
+    if (!this.uploads.length) return;
+    if (!confirm(`Clear all ${this.uploads.length} uploaded application(s)? This cannot be undone.`)) return;
+    this.isDeleting = true;
+    this.bankFormService.clearAllUploads().subscribe({
+      next: (res) => {
+        this.isDeleting = false;
+        if (res.success) {
+          this.alertService.success('Cleared', res.message || 'All uploads cleared.');
+          this.loadUploads();
+        }
+      },
+      error: () => {
+        this.isDeleting = false;
+        this.alertService.error('Error', 'Failed to clear uploads.');
+      }
+    });
+  }
+
+  selectFormFromCatalog(form: BankFormDefinition): void {
+    this.selectedFormCode = form.code;
+    this.formSearchQuery = form.name;
+    this.activeTab = 'submit';
+    this.onFormSelected();
   }
 
   formatDate(value: string): string {

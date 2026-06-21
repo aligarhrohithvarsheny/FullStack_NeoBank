@@ -1496,6 +1496,9 @@ export class Dashboard implements OnInit, OnDestroy {
       this.activeSection = section;
       this.loadUsers(200);
       return;
+    } else if (section === 'bank-forms') {
+      this.activeSection = section;
+      return;
     } else if (section === 'cards') {
       this.navigateTo('cards');
       return;

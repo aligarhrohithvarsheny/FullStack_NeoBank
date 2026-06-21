@@ -171,6 +171,7 @@ export class SalaryDashboard implements OnInit, OnDestroy {
   confirmDebitCardPin = '';
   cardTransactions: any[] = [];
   isLoadingCardTransactions = false;
+  cardLimitHistory: any[] = [];
 
   // ─── AI Fraud Detection ───────────────────────────────────
   fraudSummary: any = {};

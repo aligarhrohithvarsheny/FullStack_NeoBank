@@ -106,4 +106,28 @@ public class BankFormController {
         response.put("count", uploads.size());
         return ResponseEntity.ok(response);
     }
+
+    @DeleteMapping("/uploads/{id}")
+    public ResponseEntity<Map<String, Object>> deleteUpload(@PathVariable Long id) {
+        Map<String, Object> response = new HashMap<>();
+        boolean deleted = bankFormService.deleteUpload(id);
+        if (!deleted) {
+            response.put("success", false);
+            response.put("message", "Upload record not found");
+            return ResponseEntity.status(404).body(response);
+        }
+        response.put("success", true);
+        response.put("message", "Upload deleted successfully");
+        return ResponseEntity.ok(response);
+    }
+
+    @DeleteMapping("/uploads")
+    public ResponseEntity<Map<String, Object>> clearAllUploads() {
+        Map<String, Object> response = new HashMap<>();
+        int count = bankFormService.clearAllUploads();
+        response.put("success", true);
+        response.put("message", "Cleared " + count + " uploaded form(s)");
+        response.put("deletedCount", count);
+        return ResponseEntity.ok(response);
+    }
 }

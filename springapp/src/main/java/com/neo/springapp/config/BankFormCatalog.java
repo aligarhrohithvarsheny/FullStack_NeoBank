@@ -6,6 +6,23 @@ public final class BankFormCatalog {
 
     public record FormDefinition(int id, String code, String name, String category, List<String> fields) {}
 
+    /** Fields present on every NeoBank form */
+    public static final List<String> COMMON_FIELDS = List.of(
+            "Account Number",
+            "Name",
+            "Customer ID",
+            "Aadhaar Number",
+            "Signature",
+            "Bank Name (NeoBank)",
+            "Terms and Conditions (I Accept)"
+    );
+
+    public static List<String> allFieldsFor(FormDefinition form) {
+        LinkedHashSet<String> merged = new LinkedHashSet<>(COMMON_FIELDS);
+        merged.addAll(form.fields());
+        return new ArrayList<>(merged);
+    }
+
     private static final List<String> LOAN_FIELDS = List.of(
             "Loan Amount", "Income", "Employment Details", "Documents Upload", "Loan Tenure", "EMI Details"
     );

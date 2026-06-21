@@ -13,6 +13,9 @@
         <button *ngIf="isFromManager" class="back-to-manager-btn" (click)="goBackToManager()" title="Back to Manager Dashboard">
           <i class="fa fa-arrow-left"></i> Back to Manager
         </button>
+        <button class="header-forms-tab" [class.active]="activeSection === 'bank-forms'" (click)="setActiveSection('bank-forms')" title="Bank Forms">
+          <i class="fa fa-file-alt"></i> Forms
+        </button>
         <button *ngIf="activeSection !== 'home'" class="back-to-home-btn" (click)="setActiveSection('home')">
           <i class="fa fa-th-large"></i> Dashboard Home
         </button>

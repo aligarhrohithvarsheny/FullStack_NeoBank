@@ -9,6 +9,8 @@ export interface BankFormDefinition {
   name: string;
   category: string;
   fields: string[];
+  commonFields: string[];
+  allFields: string[];
 }
 
 export interface BankFormUploadRecord {
@@ -78,5 +80,13 @@ export class BankFormService {
     if (accountNumber) params = params.set('accountNumber', accountNumber);
     if (formCode) params = params.set('formCode', formCode);
     return this.http.get<any>(`${this.baseUrl}/uploads`, { params });
+  }
+
+  deleteUpload(id: number): Observable<any> {
+    return this.http.delete(`${this.baseUrl}/uploads/${id}`);
+  }
+
+  clearAllUploads(): Observable<any> {
+    return this.http.delete(`${this.baseUrl}/uploads`);
   }
 }

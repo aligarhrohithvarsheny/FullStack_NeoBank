@@ -61,6 +61,8 @@ public class BankFormService {
             row.put("name", f.name());
             row.put("category", f.category());
             row.put("fields", f.fields());
+            row.put("commonFields", BankFormCatalog.COMMON_FIELDS);
+            row.put("allFields", BankFormCatalog.allFieldsFor(f));
             result.add(row);
         }
         return result;
@@ -266,15 +268,52 @@ public class BankFormService {
         return null;
     }
 
+    @Transactional
+    public boolean deleteUpload(Long id) {
+        if (id == null) return false;
+        Optional<BankFormUpload> opt = bankFormUploadRepository.findById(id);
+        if (opt.isEmpty()) return false;
+        BankFormUpload upload = opt.get();
+        try {
+            Path path = Paths.get(upload.getStoredFilePath()).normalize();
+            Files.deleteIfExists(path);
+        } catch (IOException ignored) {
+            // DB record still removed even if file missing
+        }
+        bankFormUploadRepository.delete(upload);
+        return true;
+    }
+
+    @Transactional
+    public int clearAllUploads() {
+        List<BankFormUpload> all = bankFormUploadRepository.findAll();
+        for (BankFormUpload upload : all) {
+            try {
+                Path path = Paths.get(upload.getStoredFilePath()).normalize();
+                Files.deleteIfExists(path);
+            } catch (IOException ignored) {
+                // continue
+            }
+        }
+        int count = all.size();
+        bankFormUploadRepository.deleteAll();
+        return count;
+    }
+
     private String buildFormHtml(FormDefinition form, String adminName) {
         String generatedAt = LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss"));
+        List<String> common = BankFormCatalog.COMMON_FIELDS;
+        List<String> specific = form.fields();
+
         StringBuilder fieldsHtml = new StringBuilder();
+        fieldsHtml.append("<tr><td colspan=\"2\" style=\"padding:12px 0 6px;font-weight:700;color:#1e3a8a;font-size:14px;\">Common Information (All Forms)</td></tr>");
         int i = 1;
-        for (String field : form.fields()) {
-            fieldsHtml.append("<tr><td style=\"width:35px;padding:8px 0;color:#555;\">").append(i++).append(".</td>")
-                    .append("<td style=\"padding:8px 0;font-weight:600;color:#1a1a2e;\">").append(escapeHtml(field))
-                    .append("</td></tr>")
-                    .append("<tr><td></td><td style=\"border-bottom:1px solid #ccc;height:28px;\"></td></tr>");
+        for (String field : common) {
+            fieldsHtml.append(fieldRow(i++, field));
+        }
+        fieldsHtml.append("<tr><td colspan=\"2\" style=\"padding:16px 0 6px;font-weight:700;color:#1e3a8a;font-size:14px;\">Form Specific Information</td></tr>");
+        for (String field : specific) {
+            fieldsHtml.append(fieldRow(i++, field));
         }
 
         return """
@@ -287,7 +326,15 @@ public class BankFormService {
                 <h2 style="color:#111;font-size:18px;margin:0 0 4px;">%s</h2>
                 <p style="color:#666;margin:0 0 18px;font-size:13px;">Form #%d &nbsp;|&nbsp; Category: %s</p>
                 <table style="width:100%%;border-collapse:collapse;">%s</table>
-                <div style="margin-top:36px;display:flex;justify-content:space-between;">
+                <div style="margin-top:24px;padding:12px;border:1px solid #ddd;border-radius:6px;background:#f8fafc;">
+                  <p style="margin:0;font-size:11px;color:#475569;line-height:1.5;">
+                    <strong>Terms and Conditions:</strong> By submitting this form I confirm that all information provided is true and correct.
+                    I authorize NeoBank to verify my identity using Aadhaar and other KYC documents. I accept NeoBank's terms of service,
+                    privacy policy, and applicable banking regulations. False information may lead to account closure and legal action.
+                  </p>
+                  <p style="margin:10px 0 0;font-size:12px;">☐ I Accept Terms and Conditions</p>
+                </div>
+                <div style="margin-top:28px;display:flex;justify-content:space-between;">
                   <div><p style="margin:0;font-size:12px;color:#555;">Customer Signature</p><div style="width:180px;border-top:1px solid #333;margin-top:40px;"></div></div>
                   <div><p style="margin:0;font-size:12px;color:#555;">Bank Official</p><div style="width:180px;border-top:1px solid #333;margin-top:40px;"></div></div>
                 </div>
@@ -302,6 +349,13 @@ public class BankFormService {
                 generatedAt,
                 escapeHtml(adminName != null ? adminName : "Admin")
         );
+    }
+
+    private static String fieldRow(int index, String field) {
+        return "<tr><td style=\"width:35px;padding:8px 0;color:#555;\">" + index + ".</td>"
+                + "<td style=\"padding:8px 0;font-weight:600;color:#1a1a2e;\">" + escapeHtml(field)
+                + "</td></tr>"
+                + "<tr><td></td><td style=\"border-bottom:1px solid #ccc;height:28px;\"></td></tr>";
     }
 
     private static String normalizeAccountType(String accountType) {
