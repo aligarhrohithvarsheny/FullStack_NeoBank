@@ -1,0 +1,140 @@
+<div class="bank-forms-section">
+  <div class="section-header">
+    <h2><i class="fa fa-file-alt"></i> Bank Forms Center</h2>
+    <p class="section-sub">
+      All 60 NeoBank forms — download blank PDF templates or upload completed forms linked to any account type (Savings, Salary, Current, Loan, Gold Loan, Cheque).
+      Uploads are saved in the database with account number and form metadata.
+    </p>
+  </div>
+
+  <div class="forms-toolbar">
+    <div class="tab-buttons">
+      <button type="button" [class.active]="activeTab === 'catalog'" (click)="activeTab = 'catalog'">
+        <i class="fa fa-list"></i> Forms Catalog ({{ forms.length }})
+      </button>
+      <button type="button" [class.active]="activeTab === 'uploads'" (click)="activeTab = 'uploads'; loadUploads()">
+        <i class="fa fa-cloud-upload-alt"></i> Uploaded Forms ({{ uploads.length }})
+      </button>
+    </div>
+    <div class="filters" *ngIf="activeTab === 'catalog'">
+      <select [(ngModel)]="selectedCategory">
+        <option *ngFor="let cat of categories" [value]="cat">{{ cat }}</option>
+      </select>
+      <input type="text" [(ngModel)]="searchQuery" placeholder="Search form name, code, or #..." />
+    </div>
+    <div class="filters" *ngIf="activeTab === 'uploads'">
+      <input type="text" [(ngModel)]="filterAccountNumber" placeholder="Filter by account number..." />
+      <button type="button" class="refresh-btn" (click)="filterUploadsByAccount()">
+        <i class="fa fa-search"></i> Search
+      </button>
+    </div>
+  </div>
+
+  <div class="loading" *ngIf="isLoading">Loading forms...</div>
+
+  <!-- Forms Catalog -->
+  <div class="forms-grid" *ngIf="activeTab === 'catalog' && !isLoading">
+    <div class="form-card" *ngFor="let form of filteredForms">
+      <div class="form-card-head">
+        <span class="form-id">#{{ form.id }}</span>
+        <span class="form-category">{{ form.category }}</span>
+      </div>
+      <h3>{{ form.name }}</h3>
+      <p class="form-code">{{ form.code }}</p>
+      <ul class="form-fields-preview">
+        <li *ngFor="let field of form.fields.slice(0, 4)">{{ field }}</li>
+        <li *ngIf="form.fields.length > 4" class="more-fields">+{{ form.fields.length - 4 }} more fields</li>
+      </ul>
+      <div class="form-actions">
+        <button type="button" class="btn-pdf" (click)="downloadPdf(form)" [disabled]="isDownloading">
+          <i class="fa fa-file-pdf"></i> Download PDF
+        </button>
+        <button type="button" class="btn-upload" (click)="openUploadModal(form)">
+          <i class="fa fa-upload"></i> Upload
+        </button>
+      </div>
+    </div>
+    <p class="empty-msg" *ngIf="filteredForms.length === 0">No forms match your search.</p>
+  </div>
+
+  <!-- Upload History -->
+  <div class="uploads-table-wrap" *ngIf="activeTab === 'uploads'">
+    <table class="uploads-table" *ngIf="uploads.length > 0">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Form</th>
+          <th>Account #</th>
+          <th>Type</th>
+          <th>Holder</th>
+          <th>File</th>
+          <th>Admin</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let u of uploads">
+          <td>{{ formatDate(u.uploadedAt) }}</td>
+          <td>
+            <strong>{{ u.formName }}</strong>
+            <small>{{ u.formCode }}</small>
+          </td>
+          <td>{{ u.accountNumber }}</td>
+          <td>{{ u.accountType }}</td>
+          <td>{{ u.accountHolderName || '-' }}</td>
+          <td>
+            {{ u.originalFileName }}
+            <small>{{ formatFileSize(u.fileSizeBytes) }}</small>
+          </td>
+          <td>{{ u.uploadedByAdmin }}</td>
+        </tr>
+      </tbody>
+    </table>
+    <p class="empty-msg" *ngIf="uploads.length === 0">No uploaded forms yet.</p>
+  </div>
+</div>
+
+<!-- Upload Modal -->
+<div class="modal-overlay" *ngIf="showUploadModal" (click)="closeUploadModal()">
+  <div class="modal-content" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3><i class="fa fa-upload"></i> Upload Form — {{ selectedForm?.name }}</h3>
+      <button type="button" class="close-btn" (click)="closeUploadModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Account Type</label>
+        <select [(ngModel)]="uploadAccountType" (change)="isAccountVerified = false; verifiedHolderName = ''">
+          <option *ngFor="let t of accountTypes" [value]="t.value">{{ t.label }}</option>
+        </select>
+      </div>
+      <div class="form-group account-verify-row">
+        <div class="account-input">
+          <label>Account Number</label>
+          <input type="text" [(ngModel)]="uploadAccountNumber" placeholder="Enter account number" />
+        </div>
+        <button type="button" class="verify-btn" (click)="verifyAccount()" [disabled]="isVerifyingAccount">
+          {{ isVerifyingAccount ? 'Verifying...' : 'Verify' }}
+        </button>
+      </div>
+      <p class="verify-success" *ngIf="isAccountVerified">
+        <i class="fa fa-check-circle"></i> Verified: {{ verifiedHolderName }}
+      </p>
+      <p class="verify-error" *ngIf="accountVerificationError">{{ accountVerificationError }}</p>
+
+      <div class="form-group">
+        <label>Select File (PDF / Image)</label>
+        <input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" (change)="onFileSelected($event)" />
+      </div>
+      <div class="form-group">
+        <label>Remarks (optional)</label>
+        <textarea [(ngModel)]="uploadRemarks" rows="2" placeholder="Notes about this upload"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="cancel-btn" (click)="closeUploadModal()">Cancel</button>
+      <button type="button" class="submit-btn" (click)="submitUpload()" [disabled]="isUploading || !isAccountVerified || !selectedFile">
+        {{ isUploading ? 'Saving...' : 'Save to Database' }}
+      </button>
+    </div>
+  </div>
+</div>

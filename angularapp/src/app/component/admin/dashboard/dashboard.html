@@ -2185,6 +2185,11 @@
     </div>
   </div>
 
+  <!-- Bank Forms Center (60 forms — PDF download & upload) -->
+  <div class="bank-forms-section-wrapper section-content" *ngIf="activeSection === 'bank-forms'">
+    <app-bank-forms-admin [adminName]="adminName"></app-bank-forms-admin>
+  </div>
+
   <!-- Bulk Data Export (PDF / Excel) -->
   <div class="bulk-export-section section-content" *ngIf="activeSection === 'bulk-export'">
     <div class="section-header">
