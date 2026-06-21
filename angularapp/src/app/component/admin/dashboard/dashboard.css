@@ -495,26 +495,39 @@
 }
 
 .header-forms-tab {
-  padding: 10px 22px;
-  background: linear-gradient(135deg, #667eea, #764ba2);
-  color: white;
-  border: none;
+  padding: 12px 24px !important;
+  background: linear-gradient(135deg, #667eea, #764ba2) !important;
+  color: white !important;
+  border: none !important;
   border-radius: 12px;
   cursor: pointer;
-  display: flex;
+  display: flex !important;
   align-items: center;
+  justify-content: center;
   gap: 8px;
-  font-size: 14px;
-  font-weight: 700;
+  font-size: 14px !important;
+  font-weight: 700 !important;
   transition: all 0.3s ease;
   box-shadow: 0 4px 15px rgba(102, 126, 234, 0.35);
+  min-width: 120px;
+  height: 44px;
+  white-space: nowrap;
+  z-index: 100;
+  visibility: visible !important;
+  opacity: 1 !important;
+  position: relative;
+}
+
+.header-forms-tab i {
+  font-size: 16px;
+  display: inline-block;
 }
 
 .header-forms-tab:hover,
 .header-forms-tab.active {
   transform: translateY(-2px);
   box-shadow: 0 6px 25px rgba(102, 126, 234, 0.5);
-  background: linear-gradient(135deg, #5a67d8, #6b46c1);
+  background: linear-gradient(135deg, #5a67d8, #6b46c1) !important;
 }
 
 .bank-forms-section-wrapper {
@@ -1075,7 +1088,7 @@
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 250, 252, 0.98) 100%);
   padding: 24px 40px;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-  display: flex;
+  display: flex !important;
   justify-content: space-between;
   align-items: center;
   position: sticky;
@@ -1083,13 +1096,19 @@
   z-index: 100;
   backdrop-filter: blur(20px);
   border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  overflow: visible !important;
+  width: 100%;
+  max-height: none !important;
 }
 
 .header-left {
-  display: flex;
+  display: flex !important;
   align-items: center;
   gap: 15px;
   flex-wrap: wrap;
+  overflow: visible !important;
+  width: auto !important;
+  max-width: none !important;
 }
 
 .header-left h2 {
