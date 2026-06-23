@@ -1,11 +1,14 @@
 package com.neo.springapp.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.Data;
 import java.time.LocalDateTime;
 
 @Entity
 @Data
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 @Table(name = "users")
 public class User {
 
@@ -14,6 +17,8 @@ public class User {
     private Long id;
 
     private String username;
+
+    @JsonIgnore
     private String password;
     
     @Column(unique = true, nullable = false)
@@ -76,9 +81,11 @@ public class User {
     // Parent-child relationship for child accounts
     @ManyToOne
     @JoinColumn(name = "parent_user_id")
+    @JsonIgnore
     private User parentUser; // Reference to parent user if this is a child account
 
     @OneToMany(mappedBy = "parentUser", cascade = CascadeType.ALL)
+    @JsonIgnore
     private java.util.List<User> childUsers; // List of child users if this is a parent account
 
     // Constructors

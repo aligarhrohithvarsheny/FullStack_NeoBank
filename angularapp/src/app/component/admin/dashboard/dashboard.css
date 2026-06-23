@@ -1091,6 +1091,7 @@
   display: flex !important;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: nowrap !important;
   position: sticky;
   top: 0;
   z-index: 100;
@@ -1099,16 +1100,19 @@
   overflow: visible !important;
   width: 100%;
   max-height: none !important;
+  min-height: 60px;
 }
 
 .header-left {
   display: flex !important;
   align-items: center;
-  gap: 15px;
-  flex-wrap: wrap;
+  gap: 12px;
+  flex-wrap: nowrap !important;
   overflow: visible !important;
   width: auto !important;
   max-width: none !important;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .header-left h2 {
