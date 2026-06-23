@@ -1,6 +1,7 @@
 package com.neo.springapp;
 
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.context.annotation.Profile;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -17,6 +18,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
  * - Don't contain a dot (static files like .js, .css, .png)
  */
 @Controller
+@Profile("!production")
 @Order(Integer.MAX_VALUE)  // Lowest priority - only matches if no other controller matches
 public class SpaForwardingController {
     

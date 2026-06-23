@@ -64,8 +64,9 @@ public class SpringSecurityConfig {
                 .requestMatchers("/swagger-ui/**").permitAll()
                 .requestMatchers("/swagger-ui.html").permitAll()
                 
-                // Allow GET and POST for all other requests (static resources, SPA routes, etc.)
+                // Allow GET, HEAD, and POST for all other requests (static resources, SPA routes, etc.)
                 .requestMatchers(HttpMethod.GET, "/**").permitAll()
+                .requestMatchers(HttpMethod.HEAD, "/**").permitAll()
                 .requestMatchers(HttpMethod.POST, "/**").permitAll()
                 
                 // Allow all other requests (static resources, SPA routes, etc.)

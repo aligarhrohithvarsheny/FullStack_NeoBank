@@ -1,5 +1,7 @@
 package com.neo.springapp.exception;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -25,12 +27,14 @@ import java.util.Map;
 @SuppressWarnings("null")
 public class GlobalExceptionHandler {
 
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
     /**
      * Handle JSON parsing errors
      */
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<Map<String, Object>> handleHttpMessageNotReadableException(HttpMessageNotReadableException e) {
-        System.err.println("[GLOBAL-EXCEPTION-HANDLER] HttpMessageNotReadableException: " + e.getMessage());
+        log.warn("Invalid request body: {}", e.getMessage());
         
         Map<String, Object> response = new HashMap<>();
         response.put("success", false);
@@ -50,7 +54,7 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
     public ResponseEntity<Map<String, Object>> handleMethodNotSupported(HttpRequestMethodNotSupportedException e) {
-        System.err.println("[GLOBAL-EXCEPTION-HANDLER] Method not supported: " + e.getMethod());
+        log.warn("HTTP method not supported: {}", e.getMethod());
         
         Map<String, Object> response = new HashMap<>();
         response.put("success", false);
@@ -72,7 +76,7 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(NoHandlerFoundException.class)
     public ResponseEntity<Map<String, Object>> handleNoHandlerFound(NoHandlerFoundException e) {
-        System.err.println("[GLOBAL-EXCEPTION-HANDLER] No handler found: " + e.getRequestURL());
+        log.debug("No handler found: {}", e.getRequestURL());
         
         Map<String, Object> response = new HashMap<>();
         response.put("success", false);
@@ -154,9 +158,7 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, Object>> handleGenericException(Exception e) {
-        System.err.println("[GLOBAL-EXCEPTION-HANDLER] Unhandled exception: " + e.getClass().getSimpleName());
-        System.err.println("[GLOBAL-EXCEPTION-HANDLER] Message: " + e.getMessage());
-        e.printStackTrace();
+        log.error("Unhandled exception: {} - {}", e.getClass().getSimpleName(), e.getMessage(), e);
         
         Map<String, Object> response = new HashMap<>();
         response.put("success", false);
