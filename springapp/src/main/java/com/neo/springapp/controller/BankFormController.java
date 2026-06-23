@@ -15,6 +15,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @RestController
@@ -39,11 +40,18 @@ public class BankFormController {
     }
 
     @GetMapping("/download/{formCode}")
-    public ResponseEntity<byte[]> downloadBlankForm(
+    public ResponseEntity<?> downloadBlankForm(
             @PathVariable String formCode,
-            @RequestParam(value = "adminName", required = false, defaultValue = "Admin") String adminName) {
+            @RequestParam(value = "adminName", required = false, defaultValue = "Admin") String adminName,
+            @RequestParam(value = "accountNumber", required = false) String accountNumber,
+            @RequestParam(value = "accountType", required = false) String accountType,
+            @RequestParam(value = "holderName", required = false) String holderName) {
         try {
-            byte[] pdf = bankFormService.buildBlankFormPdf(formCode, adminName);
+            byte[] pdf = bankFormService.buildBlankFormPdf(
+                    formCode, adminName, accountNumber, accountType, holderName);
+            if (pdf == null || pdf.length == 0) {
+                return errorResponse(500, "PDF generation returned empty content");
+            }
             String stamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"));
             String filename = "NeoBank-" + formCode + "-" + stamp + ".pdf";
             return ResponseEntity.ok()
@@ -52,10 +60,9 @@ public class BankFormController {
                     .contentType(MediaType.APPLICATION_PDF)
                     .body(pdf);
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(e.getMessage().getBytes(StandardCharsets.UTF_8));
+            return errorResponse(400, e.getMessage());
         } catch (Exception e) {
-            return ResponseEntity.internalServerError()
-                    .body(("PDF generation failed: " + e.getMessage()).getBytes(StandardCharsets.UTF_8));
+            return errorResponse(500, "PDF generation failed: " + e.getMessage());
         }
     }
 
@@ -107,6 +114,34 @@ public class BankFormController {
         return ResponseEntity.ok(response);
     }
 
+    @GetMapping("/uploads/{id}/file")
+    public ResponseEntity<?> downloadUploadedFile(@PathVariable Long id) {
+        try {
+            Optional<BankFormUpload> uploadOpt = bankFormService.findUpload(id);
+            if (uploadOpt.isEmpty()) {
+                return errorResponse(404, "Upload record not found");
+            }
+            BankFormUpload upload = uploadOpt.get();
+            byte[] fileBytes = bankFormService.readUploadedFile(upload);
+            MediaType mediaType = MediaType.APPLICATION_OCTET_STREAM;
+            if (upload.getContentType() != null && !upload.getContentType().isBlank()) {
+                mediaType = MediaType.parseMediaType(upload.getContentType());
+            }
+            String filename = upload.getOriginalFileName() != null
+                    ? upload.getOriginalFileName()
+                    : "NeoBank-upload-" + id;
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
+                            .filename(filename, StandardCharsets.UTF_8).build().toString())
+                    .contentType(mediaType)
+                    .body(fileBytes);
+        } catch (IllegalArgumentException e) {
+            return errorResponse(404, e.getMessage());
+        } catch (Exception e) {
+            return errorResponse(500, "Failed to download uploaded file: " + e.getMessage());
+        }
+    }
+
     @DeleteMapping("/uploads/{id}")
     public ResponseEntity<Map<String, Object>> deleteUpload(@PathVariable Long id) {
         Map<String, Object> response = new HashMap<>();
@@ -129,5 +164,12 @@ public class BankFormController {
         response.put("message", "Cleared " + count + " uploaded form(s)");
         response.put("deletedCount", count);
         return ResponseEntity.ok(response);
+    }
+
+    private ResponseEntity<Map<String, Object>> errorResponse(int status, String message) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("success", false);
+        body.put("message", message);
+        return ResponseEntity.status(status).contentType(MediaType.APPLICATION_JSON).body(body);
     }
 }

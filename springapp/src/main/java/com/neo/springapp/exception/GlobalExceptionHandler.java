@@ -2,6 +2,9 @@ package com.neo.springapp.exception;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataAccessException;
+import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.jdbc.CannotGetJdbcConnectionException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -149,6 +152,45 @@ public class GlobalExceptionHandler {
         
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(response);
+    }
+
+    /**
+     * Database connection temporarily unavailable (common during cloud cold start).
+     */
+    @ExceptionHandler({
+            CannotGetJdbcConnectionException.class,
+            DataAccessResourceFailureException.class
+    })
+    public ResponseEntity<Map<String, Object>> handleDatabaseConnectionFailure(DataAccessException e) {
+        log.warn("Database connection failure: {}", e.getMessage());
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", false);
+        response.put("message", "Database is temporarily unavailable. Please retry in a few seconds.");
+        response.put("error", "SERVICE_UNAVAILABLE");
+        response.put("status", HttpStatus.SERVICE_UNAVAILABLE.value());
+        response.put("retryable", true);
+        return ResponseEntity
+                .status(HttpStatus.SERVICE_UNAVAILABLE)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(response);
+    }
+
+    /**
+     * Handle all other database errors
+     */
+    @ExceptionHandler(DataAccessException.class)
+    public ResponseEntity<Map<String, Object>> handleDataAccessException(DataAccessException e) {
+        log.error("Database error: {}", e.getMessage(), e);
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", false);
+        response.put("message", "A database error occurred. Please try again.");
+        response.put("error", "DATABASE_ERROR");
+        response.put("status", HttpStatus.INTERNAL_SERVER_ERROR.value());
+        response.put("retryable", true);
+        return ResponseEntity
+                .status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(response);
     }

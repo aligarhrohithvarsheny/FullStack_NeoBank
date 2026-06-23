@@ -30,6 +30,13 @@ export interface BankFormUploadRecord {
   uploadedAt: string;
 }
 
+export interface BankFormDownloadOptions {
+  adminName: string;
+  accountNumber?: string;
+  accountType?: string;
+  holderName?: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class BankFormService {
   private readonly baseUrl = `${environment.apiBaseUrl}/api/admin/bank-forms`;
@@ -47,11 +54,21 @@ export class BankFormService {
     return this.http.get(`${this.baseUrl}/verify-account`, { params });
   }
 
-  downloadBlankPdf(formCode: string, adminName: string): Observable<Blob> {
-    const params = new HttpParams().set('adminName', adminName);
-    return this.http.get(`${this.baseUrl}/download/${formCode}`, {
+  downloadBlankPdf(formCode: string, options: BankFormDownloadOptions) {
+    let params = new HttpParams().set('adminName', options.adminName || 'Admin');
+    if (options.accountNumber) {
+      params = params.set('accountNumber', options.accountNumber);
+    }
+    if (options.accountType) {
+      params = params.set('accountType', options.accountType);
+    }
+    if (options.holderName) {
+      params = params.set('holderName', options.holderName);
+    }
+    return this.http.get(`${this.baseUrl}/download/${encodeURIComponent(formCode)}`, {
       params,
-      responseType: 'blob'
+      responseType: 'blob',
+      observe: 'response'
     });
   }
 
@@ -73,6 +90,13 @@ export class BankFormService {
       formData.append('remarks', remarks);
     }
     return this.http.post(`${this.baseUrl}/upload`, formData);
+  }
+
+  downloadUploadedFile(id: number) {
+    return this.http.get(`${this.baseUrl}/uploads/${id}/file`, {
+      responseType: 'blob',
+      observe: 'response'
+    });
   }
 
   listUploads(accountNumber?: string, formCode?: string): Observable<{ success: boolean; uploads: BankFormUploadRecord[]; count: number }> {

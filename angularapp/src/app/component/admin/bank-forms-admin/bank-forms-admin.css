@@ -365,6 +365,16 @@
   margin-top: 2px;
 }
 
+.download-btn {
+  background: #dbeafe;
+  color: #1d4ed8;
+  border: none;
+  padding: 8px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  margin-right: 6px;
+}
+
 .delete-btn {
   background: #fee2e2;
   color: #b91c1c;

@@ -5,6 +5,7 @@ import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { AlertService } from '../../../service/alert.service';
+import { BackendWakeupService } from '../../../service/backend-wakeup.service';
 import { FaceAuthService } from '../../../service/face-auth.service';
 import { PaymentGatewayService } from '../../../service/payment-gateway.service';
 import { FasttagAdmin } from '../fasttag/fasttag-admin';
@@ -698,6 +699,7 @@ export class Dashboard implements OnInit, OnDestroy {
     @Inject(PLATFORM_ID) private platformId: Object,
     private http: HttpClient,
     private alertService: AlertService,
+    private backendWakeup: BackendWakeupService,
     private faceAuthService: FaceAuthService,
     private pgService: PaymentGatewayService
   ) {}
@@ -809,8 +811,8 @@ export class Dashboard implements OnInit, OnDestroy {
         }
       });
       
-      // Load all data in parallel for better performance
-      this.loadInitialData();
+      // Wake Render backend first, then load dashboard data
+      this.backendWakeup.ensureAwake().finally(() => this.loadInitialData());
     }
   }
 
@@ -1094,7 +1096,7 @@ export class Dashboard implements OnInit, OnDestroy {
     // Create parallel API calls with timeouts and error handling
     const apiCalls = {
       users: this.http.get(`${environment.apiBaseUrl}/api/users/admin/all?page=0&size=100`).pipe(
-        timeout(15000), // 15 second timeout
+        timeout(60000),
         catchError(err => {
           console.error('Error loading users:', err);
           let errorMessage = 'Failed to load users. ';

@@ -1,8 +1,9 @@
-import { Component, Input, OnInit } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, Input, OnInit, PLATFORM_ID, inject } from '@angular/core';
+import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { BankFormDefinition, BankFormService, BankFormUploadRecord } from '../../../service/bank-form.service';
 import { AlertService } from '../../../service/alert.service';
+import { BackendWakeupService } from '../../../service/backend-wakeup.service';
 
 @Component({
   selector: 'app-bank-forms-admin',
@@ -13,6 +14,8 @@ import { AlertService } from '../../../service/alert.service';
 })
 export class BankFormsAdminComponent implements OnInit {
   @Input() adminName = 'Admin';
+
+  private readonly platformId = inject(PLATFORM_ID);
 
   forms: BankFormDefinition[] = [];
   categories: string[] = [];
@@ -33,6 +36,7 @@ export class BankFormsAdminComponent implements OnInit {
   accountVerificationError = '';
   isUploading = false;
   isDownloading = false;
+  isDownloadingUploadId: number | null = null;
   isLoading = false;
   isDeleting = false;
   filterAccountNumber = '';
@@ -54,12 +58,15 @@ export class BankFormsAdminComponent implements OnInit {
 
   constructor(
     private bankFormService: BankFormService,
-    private alertService: AlertService
+    private alertService: AlertService,
+    private backendWakeup: BackendWakeupService
   ) {}
 
   ngOnInit(): void {
-    this.loadCatalog();
-    this.loadUploads();
+    this.backendWakeup.ensureAwake().finally(() => {
+      this.loadCatalog();
+      this.loadUploads();
+    });
   }
 
   get selectedForm(): BankFormDefinition | null {
@@ -109,7 +116,10 @@ export class BankFormsAdminComponent implements OnInit {
       },
       error: () => {
         this.isLoading = false;
-        this.alertService.error('Error', 'Failed to load bank forms catalog.');
+        this.alertService.error(
+          'Error',
+          'Failed to load bank forms catalog. The backend may be waking up — click Refresh or wait a moment and reopen this page.'
+        );
       }
     });
   }
@@ -142,22 +152,109 @@ export class BankFormsAdminComponent implements OnInit {
       return;
     }
     this.isDownloading = true;
-    this.bankFormService.downloadBlankPdf(target.code, this.adminName).subscribe({
-      next: (blob) => {
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `NeoBank-${target.code}.pdf`;
-        a.click();
-        window.URL.revokeObjectURL(url);
+    this.bankFormService.downloadBlankPdf(target.code, {
+      adminName: this.adminName,
+      accountNumber: this.isAccountVerified ? this.uploadAccountNumber.trim() : undefined,
+      accountType: this.isAccountVerified ? this.uploadAccountType : undefined,
+      holderName: this.isAccountVerified ? this.verifiedHolderName : undefined
+    }).subscribe({
+      next: (resp) => {
         this.isDownloading = false;
-        this.alertService.success('Downloaded', `${target.name} PDF downloaded.`);
+        const blob = resp.body;
+        if (!blob || blob.size === 0) {
+          this.alertService.error('Error', 'Empty PDF response from server.');
+          return;
+        }
+        const contentType = resp.headers.get('Content-Type') || '';
+        if (contentType.includes('application/json')) {
+          blob.text().then((text) => {
+            try {
+              const err = JSON.parse(text);
+              this.alertService.error('Error', err.message || 'Failed to download PDF.');
+            } catch {
+              this.alertService.error('Error', 'Failed to download PDF.');
+            }
+          });
+          return;
+        }
+        const filename = this.extractFilename(resp.headers.get('Content-Disposition'), `NeoBank-${target.code}.pdf`);
+        this.triggerBrowserDownload(blob, filename);
+        this.alertService.success('Downloaded', `${target.name} PDF downloaded with NeoBank details.`);
       },
-      error: () => {
+      error: async (err) => {
         this.isDownloading = false;
-        this.alertService.error('Error', 'Failed to download PDF.');
+        const message = await this.readBlobErrorMessage(err);
+        this.alertService.error('Error', message || 'Failed to download PDF. Check that the backend is running.');
       }
     });
+  }
+
+  downloadUploadedFile(record: BankFormUploadRecord): void {
+    this.isDownloadingUploadId = record.id;
+    this.bankFormService.downloadUploadedFile(record.id).subscribe({
+      next: (resp) => {
+        this.isDownloadingUploadId = null;
+        const blob = resp.body;
+        if (!blob || blob.size === 0) {
+          this.alertService.error('Error', 'Uploaded file could not be downloaded.');
+          return;
+        }
+        const filename = this.extractFilename(
+          resp.headers.get('Content-Disposition'),
+          record.originalFileName || `NeoBank-upload-${record.id}`
+        );
+        this.triggerBrowserDownload(blob, filename);
+        this.alertService.success('Downloaded', filename);
+      },
+      error: async (err) => {
+        this.isDownloadingUploadId = null;
+        const message = await this.readBlobErrorMessage(err);
+        this.alertService.error('Error', message || 'Failed to download uploaded file.');
+      }
+    });
+  }
+
+  private triggerBrowserDownload(blob: Blob, filename: string): void {
+    if (!isPlatformBrowser(this.platformId)) {
+      return;
+    }
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+  }
+
+  private extractFilename(contentDisposition: string | null, fallback: string): string {
+    if (!contentDisposition) {
+      return fallback;
+    }
+    const match =
+      /filename\*=(?:UTF-8'')?([^;\n]+)/i.exec(contentDisposition) ||
+      /filename="([^"]+)"/i.exec(contentDisposition) ||
+      /filename=([^;\s]+)/i.exec(contentDisposition);
+    if (match?.[1]) {
+      return decodeURIComponent(match[1].trim().replace(/^["']|["']$/g, ''));
+    }
+    return fallback;
+  }
+
+  private async readBlobErrorMessage(err: any): Promise<string> {
+    const blob = err?.error;
+    if (blob instanceof Blob) {
+      try {
+        const text = await blob.text();
+        const parsed = JSON.parse(text);
+        return parsed.message || parsed.error || text;
+      } catch {
+        return '';
+      }
+    }
+    return err?.error?.message || err?.message || '';
   }
 
   onFileSelected(event: Event): void {
@@ -229,9 +326,10 @@ export class BankFormsAdminComponent implements OnInit {
           this.alertService.error('Error', res.message || 'Upload failed.');
         }
       },
-      error: (err) => {
+      error: async (err) => {
         this.isUploading = false;
-        this.alertService.error('Error', err.error?.message || 'Upload failed.');
+        const message = await this.readBlobErrorMessage(err);
+        this.alertService.error('Error', message || err.error?.message || 'Upload failed.');
       }
     });
   }

@@ -3,7 +3,7 @@
     <h2><i class="fa fa-file-alt"></i> Bank Forms Center</h2>
     <p class="section-sub">
       Search and select any of 60 NeoBank forms, enter account number, and upload the application.
-      Every form includes common fields: Account Number, Name, Customer ID, Aadhaar, Signature, Bank Name, and Terms &amp; Conditions.
+      Download PDF includes NeoBank logo, branch/IFSC details, all common + form-specific fields, and full terms &amp; conditions.
     </p>
   </div>
 
@@ -71,7 +71,7 @@
           </div>
         </div>
         <button type="button" class="btn-pdf-inline" (click)="downloadPdf()" [disabled]="isDownloading">
-          <i class="fa fa-file-pdf"></i> Download Blank PDF
+          <i class="fa fa-file-pdf"></i> {{ isDownloading ? 'Generating PDF...' : 'Download Form PDF (NeoBank)' }}
         </button>
       </div>
     </div>
@@ -147,7 +147,7 @@
           </ul>
         </div>
         <div class="form-actions">
-          <button type="button" class="btn-pdf" (click)="downloadPdf(form)" [disabled]="isDownloading">
+          <button type="button" class="btn-pdf" (click)="downloadPdf(form)" [disabled]="isDownloading" title="Download PDF with all form fields and NeoBank details">
             <i class="fa fa-file-pdf"></i> PDF
           </button>
           <button type="button" class="btn-upload" (click)="selectFormFromCatalog(form)">
@@ -201,6 +201,15 @@
             </td>
             <td>{{ u.uploadedByAdmin }}</td>
             <td>
+              <button
+                type="button"
+                class="download-btn"
+                (click)="downloadUploadedFile(u)"
+                [disabled]="isDownloadingUploadId === u.id"
+                title="Download uploaded file"
+              >
+                <i class="fa fa-download"></i>
+              </button>
               <button type="button" class="delete-btn" (click)="deleteUpload(u)" [disabled]="isDeleting" title="Delete">
                 <i class="fa fa-trash"></i>
               </button>
