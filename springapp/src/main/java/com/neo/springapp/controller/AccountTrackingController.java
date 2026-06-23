@@ -12,6 +12,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/tracking")
@@ -23,17 +24,57 @@ public class AccountTrackingController {
     @Autowired
     private AccountService accountService;
 
+    private Map<String, Object> toSafeUserSummary(com.neo.springapp.model.User user) {
+        if (user == null) {
+            return null;
+        }
+        Map<String, Object> userSummary = new HashMap<>();
+        userSummary.put("id", user.getId());
+        userSummary.put("username", user.getUsername());
+        userSummary.put("email", user.getEmail());
+        userSummary.put("accountNumber", user.getAccountNumber());
+        userSummary.put("status", user.getStatus());
+        return userSummary;
+    }
+
+    private Map<String, Object> toSafeTracking(AccountTracking tracking) {
+        Map<String, Object> response = new HashMap<>();
+        response.put("id", tracking.getId());
+        response.put("trackingId", tracking.getTrackingId());
+        response.put("aadharNumber", tracking.getAadharNumber());
+        response.put("mobileNumber", tracking.getMobileNumber());
+        response.put("status", tracking.getStatus());
+        response.put("createdAt", tracking.getCreatedAt());
+        response.put("updatedAt", tracking.getUpdatedAt());
+        response.put("statusChangedAt", tracking.getStatusChangedAt());
+        response.put("updatedBy", tracking.getUpdatedBy());
+        response.put("user", toSafeUserSummary(tracking.getUser()));
+        return response;
+    }
+
+    private Map<String, Object> toSafeTrackingPage(Page<AccountTracking> trackingPage) {
+        Map<String, Object> response = new HashMap<>();
+        response.put("content", trackingPage.getContent().stream()
+            .map(this::toSafeTracking)
+            .collect(Collectors.toList()));
+        response.put("totalElements", trackingPage.getTotalElements());
+        response.put("totalPages", trackingPage.getTotalPages());
+        response.put("number", trackingPage.getNumber());
+        response.put("size", trackingPage.getSize());
+        return response;
+    }
+
     /**
      * Get all tracking records with pagination
      */
     @GetMapping
-    public ResponseEntity<Page<AccountTracking>> getAllTracking(
+    public ResponseEntity<Map<String, Object>> getAllTracking(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "createdAt") String sortBy,
             @RequestParam(defaultValue = "desc") String sortDir) {
         Page<AccountTracking> tracking = accountTrackingService.getAllTracking(page, size, sortBy, sortDir);
-        return ResponseEntity.ok(tracking);
+        return ResponseEntity.ok(toSafeTrackingPage(tracking));
     }
 
     /**
@@ -84,7 +125,7 @@ public class AccountTrackingController {
             if (tracking.isPresent()) {
                 Map<String, Object> response = new HashMap<>();
                 response.put("success", true);
-                response.put("tracking", tracking.get());
+                response.put("tracking", toSafeTracking(tracking.get()));
                 return ResponseEntity.ok(response);
             } else {
                 Map<String, Object> response = new HashMap<>();
@@ -113,33 +154,33 @@ public class AccountTrackingController {
      * Get tracking by status
      */
     @GetMapping("/status/{status}")
-    public ResponseEntity<List<AccountTracking>> getTrackingByStatus(@PathVariable String status) {
+    public ResponseEntity<List<Map<String, Object>>> getTrackingByStatus(@PathVariable String status) {
         List<AccountTracking> tracking = accountTrackingService.getTrackingByStatus(status);
-        return ResponseEntity.ok(tracking);
+        return ResponseEntity.ok(tracking.stream().map(this::toSafeTracking).collect(Collectors.toList()));
     }
 
     /**
      * Get tracking by status with pagination
      */
     @GetMapping("/status/{status}/paginated")
-    public ResponseEntity<Page<AccountTracking>> getTrackingByStatusWithPagination(
+    public ResponseEntity<Map<String, Object>> getTrackingByStatusWithPagination(
             @PathVariable String status,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         Page<AccountTracking> tracking = accountTrackingService.getTrackingByStatusWithPagination(status, page, size);
-        return ResponseEntity.ok(tracking);
+        return ResponseEntity.ok(toSafeTrackingPage(tracking));
     }
 
     /**
      * Search tracking records
      */
     @GetMapping("/search")
-    public ResponseEntity<Page<AccountTracking>> searchTracking(
+    public ResponseEntity<Map<String, Object>> searchTracking(
             @RequestParam String searchTerm,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         Page<AccountTracking> tracking = accountTrackingService.searchTracking(searchTerm, page, size);
-        return ResponseEntity.ok(tracking);
+        return ResponseEntity.ok(toSafeTrackingPage(tracking));
     }
 
     /**
@@ -177,7 +218,7 @@ public class AccountTrackingController {
             if (updatedTracking != null) {
                 Map<String, Object> response = new HashMap<>();
                 response.put("success", true);
-                response.put("tracking", updatedTracking);
+                response.put("tracking", toSafeTracking(updatedTracking));
                 response.put("message", "Tracking status updated successfully");
                 System.out.println("✅ Tracking status updated successfully");
                 return ResponseEntity.ok(response);
@@ -212,7 +253,7 @@ public class AccountTrackingController {
             if (updatedTracking != null) {
                 Map<String, Object> response = new HashMap<>();
                 response.put("success", true);
-                response.put("tracking", updatedTracking);
+                response.put("tracking", toSafeTracking(updatedTracking));
                 response.put("message", "Tracking status updated successfully");
                 return ResponseEntity.ok(response);
             } else {
@@ -233,10 +274,10 @@ public class AccountTrackingController {
      * Get recent tracking records
      */
     @GetMapping("/recent")
-    public ResponseEntity<List<AccountTracking>> getRecentTracking(
+    public ResponseEntity<List<Map<String, Object>>> getRecentTracking(
             @RequestParam(defaultValue = "10") int limit) {
         List<AccountTracking> tracking = accountTrackingService.getRecentTracking(limit);
-        return ResponseEntity.ok(tracking);
+        return ResponseEntity.ok(tracking.stream().map(this::toSafeTracking).collect(Collectors.toList()));
     }
 
     /**

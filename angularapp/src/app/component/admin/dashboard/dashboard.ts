@@ -1114,7 +1114,7 @@ export class Dashboard implements OnInit, OnDestroy {
         timeout(12000), // 12 second timeout
         catchError(err => {
           console.error('Error loading account trackings:', err);
-          return of([]);
+          return of({ content: [] });
         })
       ),
       goldRate: this.http.get<any>(`${environment.apiBaseUrl}/api/gold-rates/current`).pipe(
@@ -1187,8 +1187,11 @@ export class Dashboard implements OnInit, OnDestroy {
         }
 
         // Process account trackings - load full list
-        if (results.accountTrackings && Array.isArray(results.accountTrackings)) {
-          this.accountTrackings = results.accountTrackings;
+        const trackingsRaw = results.accountTrackings as { content?: AccountTracking[] } | AccountTracking[] | undefined;
+        if (Array.isArray(trackingsRaw)) {
+          this.accountTrackings = trackingsRaw;
+        } else if (trackingsRaw?.content) {
+          this.accountTrackings = trackingsRaw.content;
         }
 
         // Note: Pending Aadhar verifications are loaded on-demand when the section is opened

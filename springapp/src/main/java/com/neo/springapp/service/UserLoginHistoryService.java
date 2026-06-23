@@ -5,6 +5,7 @@ import com.neo.springapp.model.UserLoginHistory;
 import com.neo.springapp.repository.UserLoginHistoryRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -83,6 +84,7 @@ public class UserLoginHistoryService {
     /**
      * Get recent login history (last N records)
      */
+    @Transactional(readOnly = true)
     public List<UserLoginHistory> getRecentLoginHistory(int limit) {
         List<UserLoginHistory> all = loginHistoryRepository.findAllByOrderByLoginTimeDesc();
         return all.stream().limit(limit).collect(java.util.stream.Collectors.toList());

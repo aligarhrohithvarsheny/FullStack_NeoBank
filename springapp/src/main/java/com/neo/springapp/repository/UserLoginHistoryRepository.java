@@ -1,6 +1,7 @@
 package com.neo.springapp.repository;
 
 import com.neo.springapp.model.UserLoginHistory;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
@@ -18,6 +19,7 @@ public interface UserLoginHistoryRepository extends JpaRepository<UserLoginHisto
     List<UserLoginHistory> findByAccountNumberOrderByLoginTimeDesc(String accountNumber);
     
     // Find all login history (for admin dashboard)
+    @EntityGraph(attributePaths = {"user"})
     List<UserLoginHistory> findAllByOrderByLoginTimeDesc();
     
     // Find recent login history (last N records)

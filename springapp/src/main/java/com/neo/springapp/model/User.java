@@ -37,6 +37,7 @@ public class User {
     private LocalDateTime lastFailedLoginTime;
 
     // Profile photo and signature fields
+    @JsonIgnore
     @Lob
     @Column(name = "profile_photo", columnDefinition = "LONGBLOB")
     private byte[] profilePhoto; // Profile photo (JPEG, PNG, PDF - max 5MB)
@@ -44,6 +45,7 @@ public class User {
     private String profilePhotoType; // "image/jpeg", "image/png", "application/pdf"
     private String profilePhotoName; // Original filename
     
+    @JsonIgnore
     @Lob
     @Column(name = "signature", columnDefinition = "LONGBLOB")
     private byte[] signature; // Signature (PDF, IMAGE, PNG, JPEG)
@@ -57,6 +59,7 @@ public class User {
     private String signatureRejectionReason; // Reason if rejected
 
     // Graphical password field - stores the sequence of image IDs as JSON string
+    @JsonIgnore
     @Column(name = "graphical_password", columnDefinition = "TEXT")
     private String graphicalPassword; // JSON array of image IDs: [1,5,3,7,2]
 
@@ -76,6 +79,7 @@ public class User {
 
     @OneToOne(cascade = CascadeType.ALL)
     @JoinColumn(name = "account_id")
+    @JsonIgnore
     private Account account;
 
     // Parent-child relationship for child accounts
@@ -100,43 +104,53 @@ public class User {
         this.email = email;
     }
 
-    // Convenience methods to access account fields
+    // Convenience methods to access account fields (ignored in JSON; use explicit DTOs instead)
+    @JsonIgnore
     public String getName() {
         return account != null ? account.getName() : null;
     }
 
+    @JsonIgnore
     public String getPhone() {
         return account != null ? account.getPhone() : null;
     }
 
+    @JsonIgnore
     public String getAddress() {
         return account != null ? account.getAddress() : null;
     }
 
+    @JsonIgnore
     public String getDob() {
         return account != null ? account.getDob() : null;
     }
 
+    @JsonIgnore
     public String getOccupation() {
         return account != null ? account.getOccupation() : null;
     }
 
+    @JsonIgnore
     public Double getIncome() {
         return account != null ? account.getIncome() : null;
     }
 
+    @JsonIgnore
     public String getPan() {
         return account != null ? account.getPan() : null;
     }
 
+    @JsonIgnore
     public String getAadhar() {
         return account != null ? account.getAadharNumber() : null;
     }
 
+    @JsonIgnore
     public String getAccountType() {
         return account != null ? account.getAccountType() : null;
     }
 
+    @JsonIgnore
     public Double getBalance() {
         return account != null ? account.getBalance() : null;
     }
