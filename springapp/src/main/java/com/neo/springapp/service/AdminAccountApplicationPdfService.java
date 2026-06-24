@@ -36,13 +36,6 @@ public class AdminAccountApplicationPdfService {
             .append(getStyles())
             .append("</style></head><body>")
 
-            // Watermark
-            .append("<div class=\"watermark\">").append(BANK_NAME).append("</div>")
-            .append("<div class=\"watermark-secondary\">CONFIDENTIAL</div>")
-
-            // Main container
-            .append("<div class=\"application-container\">")
-
             // Header with bank logo and details
             .append("<div class=\"header\">")
             .append("<div class=\"bank-logo\">⭐ ").append(BANK_NAME).append("</div>")
@@ -50,9 +43,9 @@ public class AdminAccountApplicationPdfService {
             .append("<div class=\"bank-address\">").append(BANK_ADDRESS).append("</div>")
             .append("<div class=\"app-title\">").append(accountTypeLabel).append(" ACCOUNT OPENING APPLICATION FORM</div>")
             .append("<div class=\"app-meta\">")
-            .append("<span>Application No: <strong>").append(safe(app.getApplicationNumber())).append("</strong></span>")
-            .append("<span>Date: <strong>").append(dateOnly).append("</strong></span>")
-            .append("<span>Time: <strong>").append(now).append("</strong></span>")
+            .append("Application No: <strong>").append(safe(app.getApplicationNumber())).append("</strong>")
+            .append(" &nbsp;|&nbsp; Date: <strong>").append(dateOnly).append("</strong>")
+            .append(" &nbsp;|&nbsp; Generated: <strong>").append(now).append("</strong>")
             .append("</div>")
             .append("</div>")
 
@@ -66,7 +59,7 @@ public class AdminAccountApplicationPdfService {
         // Section 1: Personal Details
         html.append("<div class=\"section\">")
             .append("<div class=\"section-title\">1. PERSONAL / APPLICANT DETAILS</div>")
-            .append("<table class=\"detail-table\">")
+            .append("<table class=\"detail-table\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\">")
             .append(row("Full Name", safe(app.getFullName())))
             .append(row("Date of Birth", safe(app.getDateOfBirth())))
             .append(row("Age", app.getAge() != null ? String.valueOf(app.getAge()) : ""))
@@ -80,7 +73,7 @@ public class AdminAccountApplicationPdfService {
         // Section 2: Address
         html.append("<div class=\"section\">")
             .append("<div class=\"section-title\">2. ADDRESS DETAILS</div>")
-            .append("<table class=\"detail-table\">")
+            .append("<table class=\"detail-table\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\">")
             .append(row("Address", safe(app.getAddress())))
             .append(row("City", safe(app.getCity())))
             .append(row("State", safe(app.getState())))
@@ -90,7 +83,7 @@ public class AdminAccountApplicationPdfService {
         // Section 3: Identity Documents
         html.append("<div class=\"section\">")
             .append("<div class=\"section-title\">3. IDENTITY DOCUMENTS (KYC)</div>")
-            .append("<table class=\"detail-table\">")
+            .append("<table class=\"detail-table\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\">")
             .append(row("Aadhaar Number", maskAadhar(app.getAadharNumber())))
             .append(row("PAN Number", safe(app.getPanNumber())))
             .append(row("KYC Verification", "Admin Verified (Without Video KYC)"))
@@ -100,7 +93,7 @@ public class AdminAccountApplicationPdfService {
         if ("Current".equalsIgnoreCase(app.getAccountType())) {
             html.append("<div class=\"section\">")
                 .append("<div class=\"section-title\">4. BUSINESS DETAILS</div>")
-                .append("<table class=\"detail-table\">")
+                .append("<table class=\"detail-table\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\">")
                 .append(row("Business Name", safe(app.getBusinessName())))
                 .append(row("Business Type", safe(app.getBusinessType())))
                 .append(row("Registration Number", safe(app.getBusinessRegistrationNumber())))
@@ -113,7 +106,7 @@ public class AdminAccountApplicationPdfService {
         if ("Salary".equalsIgnoreCase(app.getAccountType())) {
             html.append("<div class=\"section\">")
                 .append("<div class=\"section-title\">4. EMPLOYMENT DETAILS</div>")
-                .append("<table class=\"detail-table\">")
+                .append("<table class=\"detail-table\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\">")
                 .append(row("Company Name", safe(app.getCompanyName())))
                 .append(row("Company ID", safe(app.getCompanyId())))
                 .append(row("Designation", safe(app.getDesignation())))
@@ -127,7 +120,7 @@ public class AdminAccountApplicationPdfService {
         // Section: Bank Details
         html.append("<div class=\"section\">")
             .append("<div class=\"section-title\">").append("Current".equalsIgnoreCase(app.getAccountType()) || "Salary".equalsIgnoreCase(app.getAccountType()) ? "5" : "4").append(". BANK DETAILS</div>")
-            .append("<table class=\"detail-table\">")
+            .append("<table class=\"detail-table\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\">")
             .append(row("Branch Name", safe(app.getBranchName())))
             .append(row("IFSC Code", safe(app.getIfscCode())))
             .append(row("Account Number", app.getAccountNumber() != null ? app.getAccountNumber() : "To be assigned upon approval"))
@@ -154,38 +147,30 @@ public class AdminAccountApplicationPdfService {
         String sigSection = "Current".equalsIgnoreCase(app.getAccountType()) || "Salary".equalsIgnoreCase(app.getAccountType()) ? "7" : "6";
         html.append("<div class=\"section signature-section\">")
             .append("<div class=\"section-title\">").append(sigSection).append(". SIGNATURES</div>")
-            .append("<div class=\"signature-grid\">")
-
-            // Applicant signature
-            .append("<div class=\"signature-box\">")
+            .append("<table width=\"100%\" cellspacing=\"0\" cellpadding=\"0\"><tr>")
+            .append("<td class=\"signature-box\" width=\"33%\">")
             .append("<div class=\"signature-line\"></div>")
             .append("<div class=\"signature-label\">Applicant's Signature</div>")
             .append("<div class=\"signature-name\">").append(safe(app.getFullName())).append("</div>")
             .append("<div class=\"signature-date\">Date: ").append(dateOnly).append("</div>")
-            .append("</div>")
-
-            // Bank Officer signature
-            .append("<div class=\"signature-box\">")
+            .append("</td>")
+            .append("<td class=\"signature-box\" width=\"33%\">")
             .append("<div class=\"signature-line\"></div>")
             .append("<div class=\"signature-label\">Bank Officer's Signature</div>")
             .append("<div class=\"signature-name\">").append(safe(app.getBankOfficerSignature() != null ? app.getBankOfficerSignature() : app.getCreatedBy())).append("</div>")
             .append("<div class=\"signature-date\">Date: ").append(dateOnly).append("</div>")
-            .append("</div>")
-
-            // Manager signature
-            .append("<div class=\"signature-box\">")
+            .append("</td>")
+            .append("<td class=\"signature-box\" width=\"33%\">")
             .append("<div class=\"signature-line\"></div>")
-            .append("<div class=\"signature-label\">Manager's Signature & Seal</div>")
+            .append("<div class=\"signature-label\">Manager's Signature &amp; Seal</div>")
             .append("<div class=\"signature-name\">").append(safe(app.getManagerApprovedBy() != null ? app.getManagerApprovedBy() : "Pending Approval")).append("</div>")
             .append("<div class=\"signature-date\">Date: ").append(app.getManagerApprovedDate() != null ? app.getManagerApprovedDate().format(DateTimeFormatter.ofPattern("dd-MM-yyyy")) : "_____________").append("</div>")
-            .append("</div>")
-
-            .append("</div></div>");
+            .append("</td></tr></table></div>");
 
         // Verification Section
         html.append("<div class=\"section verification-section\">")
             .append("<div class=\"section-title\">VERIFICATION STATUS</div>")
-            .append("<table class=\"detail-table\">")
+            .append("<table class=\"detail-table\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\">")
             .append(row("Admin Verified", app.getAdminVerified() != null && app.getAdminVerified() ? "✓ Yes - by " + safe(app.getAdminVerifiedBy()) : "Pending"))
             .append(row("Admin Verification Date", app.getAdminVerifiedDate() != null ? app.getAdminVerifiedDate().format(DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm")) : "Pending"))
             .append(row("Manager Approved", app.getManagerApproved() != null && app.getManagerApproved() ? "✓ Yes - by " + safe(app.getManagerApprovedBy()) : "Pending"))
@@ -204,56 +189,56 @@ public class AdminAccountApplicationPdfService {
             .append("<div class=\"footer-ref\">Ref: ").append(safe(app.getApplicationNumber())).append(" | Generated: ").append(now).append("</div>")
             .append("</div>")
 
-            .append("</div>") // close application-container
             .append("</body></html>");
 
         return html.toString();
     }
 
     private String getStyles() {
-        return "* { margin: 0; padding: 0; box-sizing: border-box; }"
-            + "body { font-family: 'Arial', sans-serif; font-size: 11px; color: #333; background: #fff; padding: 15px; position: relative; }"
-            + ".watermark { position: fixed; top: 45%; left: 50%; transform: translate(-50%, -50%) rotate(-45deg); font-size: 80px; color: rgba(30, 64, 175, 0.06); font-weight: bold; z-index: -1; pointer-events: none; white-space: nowrap; letter-spacing: 15px; }"
-            + ".watermark-secondary { position: fixed; top: 70%; left: 25%; transform: rotate(-30deg); font-size: 50px; color: rgba(200, 0, 0, 0.04); font-weight: bold; z-index: -1; pointer-events: none; letter-spacing: 10px; }"
-            + ".application-container { max-width: 750px; margin: 0 auto; position: relative; z-index: 1; }"
-            + ".header { text-align: center; padding: 15px; border: 2px solid #1e40af; border-radius: 8px; margin-bottom: 15px; background: linear-gradient(135deg, #f0f4ff, #e8eeff); }"
-            + ".bank-logo { font-size: 22px; font-weight: bold; color: #1e40af; margin-bottom: 3px; }"
-            + ".bank-tagline { font-size: 11px; color: #4b5563; font-style: italic; margin-bottom: 3px; }"
-            + ".bank-address { font-size: 9px; color: #6b7280; margin-bottom: 10px; }"
-            + ".app-title { font-size: 14px; font-weight: bold; color: #1e40af; padding: 8px; background: #1e40af; color: white; border-radius: 4px; margin: 8px 0; letter-spacing: 1px; }"
-            + ".app-meta { display: flex; justify-content: space-between; font-size: 10px; color: #555; margin-top: 8px; }"
-            + ".type-badge-row { display: flex; justify-content: center; gap: 15px; margin-bottom: 15px; }"
-            + ".type-badge { background: #e0e7ff; color: #3730a3; padding: 4px 12px; border-radius: 12px; font-size: 10px; font-weight: 600; }"
-            + ".section { margin-bottom: 12px; border: 1px solid #e5e7eb; border-radius: 6px; overflow: hidden; }"
-            + ".section-title { background: #1e40af; color: white; padding: 6px 12px; font-size: 11px; font-weight: bold; letter-spacing: 0.5px; }"
-            + ".detail-table { width: 100%; border-collapse: collapse; }"
-            + ".detail-table td { padding: 5px 12px; border-bottom: 1px solid #f3f4f6; font-size: 10px; }"
-            + ".detail-table td:first-child { font-weight: 600; color: #4b5563; width: 35%; background: #f9fafb; }"
-            + ".detail-table td:last-child { color: #111; }"
-            + ".declaration-section .declaration-text { padding: 12px; font-size: 10px; line-height: 1.6; }"
-            + ".declaration-section ol { margin-left: 20px; margin-top: 8px; }"
-            + ".declaration-section li { margin-bottom: 4px; }"
-            + ".signature-section .signature-grid { display: flex; justify-content: space-between; padding: 15px; gap: 20px; }"
-            + ".signature-box { flex: 1; text-align: center; }"
-            + ".signature-line { border-bottom: 1px solid #333; width: 100%; height: 50px; margin-bottom: 5px; }"
+        return "body { font-family: Arial, sans-serif; font-size: 11px; color: #333; background: #fff; margin: 16px; }"
+            + ".header { text-align: center; padding: 12px; border: 2px solid #1e40af; margin-bottom: 12px; background: #eef2ff; }"
+            + ".bank-logo { font-size: 20px; font-weight: bold; color: #1e40af; margin-bottom: 4px; }"
+            + ".bank-tagline { font-size: 11px; color: #4b5563; font-style: italic; margin-bottom: 4px; }"
+            + ".bank-address { font-size: 9px; color: #6b7280; margin-bottom: 8px; }"
+            + ".app-title { font-size: 13px; font-weight: bold; color: #fff; padding: 8px; background: #1e40af; margin: 8px 0; }"
+            + ".app-meta { font-size: 10px; color: #555; margin-top: 8px; }"
+            + ".type-badge-row { text-align: center; margin-bottom: 12px; }"
+            + ".type-badge { background: #e0e7ff; color: #3730a3; padding: 4px 10px; font-size: 10px; font-weight: 600; margin: 0 6px; }"
+            + ".section { margin-bottom: 10px; border: 1px solid #e5e7eb; }"
+            + ".section-title { background: #1e40af; color: white; padding: 6px 10px; font-size: 11px; font-weight: bold; }"
+            + ".detail-table { border-collapse: collapse; }"
+            + ".detail-table td { padding: 5px 10px; border-bottom: 1px solid #f3f4f6; font-size: 10px; vertical-align: top; }"
+            + ".label-cell { font-weight: 600; color: #4b5563; width: 180px; background: #f9fafb; }"
+            + ".value-cell { color: #111; }"
+            + ".declaration-text { padding: 10px; font-size: 10px; line-height: 1.5; }"
+            + ".signature-box { text-align: center; padding: 10px; vertical-align: top; }"
+            + ".signature-line { border-bottom: 1px solid #333; height: 40px; margin-bottom: 5px; }"
             + ".signature-label { font-weight: bold; font-size: 10px; color: #1e40af; }"
             + ".signature-name { font-size: 9px; color: #555; margin-top: 2px; }"
             + ".signature-date { font-size: 9px; color: #777; margin-top: 2px; }"
             + ".verification-section { border: 2px solid #059669; }"
             + ".verification-section .section-title { background: #059669; }"
-            + ".footer { margin-top: 15px; padding: 12px; text-align: center; border-top: 2px solid #1e40af; font-size: 9px; color: #666; }"
+            + ".footer { margin-top: 12px; padding: 10px; text-align: center; border-top: 2px solid #1e40af; font-size: 9px; color: #666; }"
             + ".footer-bank { font-size: 12px; color: #1e40af; margin-bottom: 3px; }"
-            + ".footer-address { margin-bottom: 5px; }"
+            + ".footer-address { margin-bottom: 4px; }"
             + ".footer-note { font-style: italic; margin-bottom: 3px; color: #999; }"
             + ".footer-ref { font-size: 8px; color: #aaa; }";
     }
 
     private String row(String label, String value) {
-        return "<tr><td>" + label + "</td><td>" + (value != null ? value : "") + "</td></tr>";
+        return "<tr><td class=\"label-cell\">" + escapeHtml(label) + "</td><td class=\"value-cell\">"
+                + escapeHtml(value != null ? value : "") + "</td></tr>";
     }
 
     private String safe(String value) {
-        return value != null ? value.replace("<", "&lt;").replace(">", "&gt;").replace("&", "&amp;") : "";
+        return escapeHtml(value);
+    }
+
+    private String escapeHtml(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;");
     }
 
     private String maskAadhar(String aadhar) {

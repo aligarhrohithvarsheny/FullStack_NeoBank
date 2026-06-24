@@ -40,6 +40,7 @@ public class BankFormService {
             "NeoBank Tower, Bandra Kurla Complex, Mumbai - 400051, Maharashtra, India";
 
     private final BankFormUploadRepository bankFormUploadRepository;
+    private final BankFormUploadHistoryRepository bankFormUploadHistoryRepository;
     private final AccountRepository accountRepository;
     private final SalaryAccountRepository salaryAccountRepository;
     private final CurrentAccountRepository currentAccountRepository;
@@ -49,6 +50,7 @@ public class BankFormService {
 
     public BankFormService(
             BankFormUploadRepository bankFormUploadRepository,
+            BankFormUploadHistoryRepository bankFormUploadHistoryRepository,
             AccountRepository accountRepository,
             SalaryAccountRepository salaryAccountRepository,
             CurrentAccountRepository currentAccountRepository,
@@ -56,6 +58,7 @@ public class BankFormService {
             GoldLoanRepository goldLoanRepository,
             ChequeRepository chequeRepository) {
         this.bankFormUploadRepository = bankFormUploadRepository;
+        this.bankFormUploadHistoryRepository = bankFormUploadHistoryRepository;
         this.accountRepository = accountRepository;
         this.salaryAccountRepository = salaryAccountRepository;
         this.currentAccountRepository = currentAccountRepository;
@@ -89,14 +92,50 @@ public class BankFormService {
             String adminName,
             String accountNumber,
             String accountType,
-            String holderName) throws IOException {
+            String holderName,
+            String customerId,
+            String aadhaarNumber,
+            String panNumber,
+            String phone,
+            String email) throws IOException {
         FormDefinition form = BankFormCatalog.findByCode(formCode)
                 .orElseThrow(() -> new IllegalArgumentException("Unknown form code: " + formCode));
 
-        String html = buildFormHtml(form, adminName, accountNumber, accountType, holderName);
+        String html = buildFormHtml(
+                form,
+                adminName,
+                accountNumber,
+                accountType,
+                holderName,
+                customerId,
+                aadhaarNumber,
+                panNumber,
+                phone,
+                email);
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         HtmlConverter.convertToPdf(html, out);
         return out.toByteArray();
+    }
+
+    /** Backward-compatible overload used by existing callers. */
+    public byte[] buildBlankFormPdf(
+            String formCode,
+            String adminName,
+            String accountNumber,
+            String accountType,
+            String holderName) throws IOException {
+        Map<String, Object> profile = resolveAccount(accountNumber, accountType);
+        return buildBlankFormPdf(
+                formCode,
+                adminName,
+                accountNumber,
+                accountType,
+                holderName,
+                stringValue(profile, "customerId"),
+                stringValue(profile, "aadhaarNumber"),
+                stringValue(profile, "panNumber"),
+                stringValue(profile, "phone"),
+                stringValue(profile, "email"));
     }
 
     public Optional<BankFormUpload> findUpload(Long id) {
@@ -167,7 +206,63 @@ public class BankFormService {
         upload.setRemarks(remarks);
         upload.setUploadedAt(LocalDateTime.now());
 
-        return bankFormUploadRepository.save(upload);
+        BankFormUpload saved = bankFormUploadRepository.save(upload);
+        recordHistory(saved.getId(), "UPLOAD", null, saved, uploadedByAdmin, "Initial upload");
+        return saved;
+    }
+
+    @Transactional
+    public BankFormUpload replaceUploadedForm(
+            Long uploadId,
+            MultipartFile file,
+            String replacedByAdmin,
+            String remarks) throws IOException {
+        BankFormUpload upload = bankFormUploadRepository.findById(uploadId)
+                .orElseThrow(() -> new IllegalArgumentException("Upload record not found"));
+
+        if (file == null || file.isEmpty()) {
+            throw new IllegalArgumentException("Please select a replacement file");
+        }
+        if (file.getSize() > MAX_FILE_SIZE) {
+            throw new IllegalArgumentException("File size exceeds 15MB limit");
+        }
+
+        String originalName = file.getOriginalFilename() != null ? file.getOriginalFilename() : "upload";
+        String ext = extension(originalName);
+        if (!ALLOWED_EXTENSIONS.contains(ext)) {
+            throw new IllegalArgumentException("Only PDF, JPG, JPEG, PNG, or WEBP files are allowed");
+        }
+
+        BankFormUpload previousSnapshot = snapshotUpload(upload);
+
+        Path uploadDir = Paths.get(UPLOAD_DIR).normalize();
+        Files.createDirectories(uploadDir);
+
+        String safeAccount = upload.getAccountNumber().replaceAll("[^a-zA-Z0-9]", "");
+        String filename = upload.getFormCode() + "-" + safeAccount + "-replace-" + System.currentTimeMillis() + "." + ext;
+        Path target = uploadDir.resolve(filename).normalize();
+        Files.copy(file.getInputStream(), target, StandardCopyOption.REPLACE_EXISTING);
+
+        upload.setOriginalFileName(originalName);
+        upload.setStoredFilePath(UPLOAD_DIR + "/" + filename);
+        upload.setContentType(file.getContentType());
+        upload.setFileSizeBytes(file.getSize());
+        upload.setUploadedByAdmin(replacedByAdmin);
+        if (remarks != null && !remarks.isBlank()) {
+            upload.setRemarks(remarks);
+        }
+        upload.setUploadedAt(LocalDateTime.now());
+
+        BankFormUpload saved = bankFormUploadRepository.save(upload);
+        recordHistory(saved.getId(), "REPLACE", previousSnapshot, saved, replacedByAdmin, remarks);
+        return saved;
+    }
+
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> listUploadHistory(Long uploadId) {
+        return bankFormUploadHistoryRepository.findByUploadIdOrderByPerformedAtDesc(uploadId).stream()
+                .map(this::toHistoryDto)
+                .toList();
     }
 
     @Transactional(readOnly = true)
@@ -182,12 +277,17 @@ public class BankFormService {
     }
 
     @Transactional(readOnly = true)
-    public Map<String, Object> verifyAccount(String accountNumber, String accountType) {
-        Map<String, Object> info = resolveAccount(accountNumber, accountType);
+    public Map<String, Object> verifyAccount(String accountNumber, String accountType, String customerId) {
+        Map<String, Object> info = null;
+        if (customerId != null && !customerId.isBlank()) {
+            info = resolveByCustomerId(customerId.trim());
+        } else if (accountNumber != null && !accountNumber.isBlank()) {
+            info = resolveAccount(accountNumber, accountType);
+        }
         Map<String, Object> response = new LinkedHashMap<>();
         if (info == null) {
             response.put("success", false);
-            response.put("message", "Account not found");
+            response.put("message", "Account not found for the given account number or customer ID");
             return response;
         }
         response.put("success", true);
@@ -230,6 +330,11 @@ public class BankFormService {
                     m.put("holderName", a.getName());
                     m.put("accountType", "regular");
                     m.put("balance", a.getBalance());
+                    m.put("customerId", a.getCustomerId());
+                    m.put("aadhaarNumber", a.getAadharNumber());
+                    m.put("panNumber", a.getPan());
+                    m.put("phone", a.getPhone());
+                    m.put("email", "");
                     return m;
                 }
             }
@@ -241,6 +346,11 @@ public class BankFormService {
                     m.put("holderName", a.getEmployeeName());
                     m.put("accountType", "salary");
                     m.put("balance", a.getBalance());
+                    m.put("customerId", a.getCustomerId());
+                    m.put("aadhaarNumber", a.getAadharNumber());
+                    m.put("panNumber", a.getPanNumber());
+                    m.put("phone", a.getMobileNumber());
+                    m.put("email", a.getEmail());
                     return m;
                 }
             }
@@ -253,6 +363,11 @@ public class BankFormService {
                     m.put("holderName", a.getBusinessName() != null ? a.getBusinessName() : a.getOwnerName());
                     m.put("accountType", "current");
                     m.put("balance", a.getBalance());
+                    m.put("customerId", a.getCustomerId());
+                    m.put("aadhaarNumber", a.getAadharNumber());
+                    m.put("panNumber", a.getPanNumber());
+                    m.put("phone", a.getMobile());
+                    m.put("email", a.getEmail());
                     return m;
                 }
             }
@@ -307,6 +422,7 @@ public class BankFormService {
             // DB record still removed even if file missing
         }
         bankFormUploadRepository.delete(upload);
+        recordHistory(upload.getId(), "DELETE", upload, null, "Admin", "Upload deleted");
         return true;
     }
 
@@ -331,7 +447,12 @@ public class BankFormService {
             String adminName,
             String accountNumber,
             String accountType,
-            String holderName) {
+            String holderName,
+            String customerId,
+            String aadhaarNumber,
+            String panNumber,
+            String phone,
+            String email) {
         String generatedAt = LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss"));
         List<String> common = BankFormCatalog.COMMON_FIELDS;
         List<String> specific = form.fields();
@@ -340,11 +461,13 @@ public class BankFormService {
         fieldsHtml.append(sectionHeader("Common Information (All Forms)"));
         int i = 1;
         for (String field : common) {
-            fieldsHtml.append(fieldRow(i++, field, prefillValue(field, accountNumber, holderName)));
+            fieldsHtml.append(fieldRow(i++, field, prefillValue(
+                    field, accountNumber, holderName, customerId, aadhaarNumber, panNumber, phone, email)));
         }
         fieldsHtml.append(sectionHeader("Form Specific Information"));
         for (String field : specific) {
-            fieldsHtml.append(fieldRow(i++, field, prefillValue(field, accountNumber, holderName)));
+            fieldsHtml.append(fieldRow(i++, field, prefillValue(
+                    field, accountNumber, holderName, customerId, aadhaarNumber, panNumber, phone, email)));
         }
 
         String accountBlock = "";
@@ -355,6 +478,10 @@ public class BankFormService {
                       <tr><td style="width:35%%;font-size:12px;color:#475569;padding:4px 10px;">Account Number</td><td style="font-size:12px;font-weight:700;color:#111;padding:4px 10px;">%s</td></tr>
                       <tr><td style="font-size:12px;color:#475569;padding:4px 10px;">Account Type</td><td style="font-size:12px;color:#111;padding:4px 10px;">%s</td></tr>
                       <tr><td style="font-size:12px;color:#475569;padding:4px 10px;">Account Holder</td><td style="font-size:12px;color:#111;padding:4px 10px;">%s</td></tr>
+                      <tr><td style="font-size:12px;color:#475569;padding:4px 10px;">Customer ID</td><td style="font-size:12px;color:#111;padding:4px 10px;">%s</td></tr>
+                      <tr><td style="font-size:12px;color:#475569;padding:4px 10px;">Mobile</td><td style="font-size:12px;color:#111;padding:4px 10px;">%s</td></tr>
+                      <tr><td style="font-size:12px;color:#475569;padding:4px 10px;">Email</td><td style="font-size:12px;color:#111;padding:4px 10px;">%s</td></tr>
+                      <tr><td style="font-size:12px;color:#475569;padding:4px 10px;">Aadhaar</td><td style="font-size:12px;color:#111;padding:4px 10px;">%s</td></tr>
                       <tr><td style="font-size:12px;color:#475569;padding:4px 10px;">IFSC Code</td><td style="font-size:12px;color:#111;padding:4px 10px;">%s</td></tr>
                       <tr><td style="font-size:12px;color:#475569;padding:4px 10px;">Branch</td><td style="font-size:12px;color:#111;padding:4px 10px;">%s (%s)</td></tr>
                     </table>
@@ -362,6 +489,10 @@ public class BankFormService {
                     escapeHtml(accountNumber.trim()),
                     escapeHtml(accountType != null && !accountType.isBlank() ? accountType : "regular"),
                     escapeHtml(holderName != null && !holderName.isBlank() ? holderName : "________________________"),
+                    escapeHtml(customerId != null && !customerId.isBlank() ? customerId : "________________________"),
+                    escapeHtml(phone != null && !phone.isBlank() ? phone : "________________________"),
+                    escapeHtml(email != null && !email.isBlank() ? email : "________________________"),
+                    escapeHtml(maskAadhaar(aadhaarNumber)),
                     escapeHtml(BANK_IFSC),
                     escapeHtml(BANK_BRANCH),
                     escapeHtml(BANK_BRANCH_CODE)
@@ -474,13 +605,36 @@ public class BankFormService {
                 + "</td></tr>";
     }
 
-    private static String prefillValue(String field, String accountNumber, String holderName) {
+    private static String prefillValue(
+            String field,
+            String accountNumber,
+            String holderName,
+            String customerId,
+            String aadhaarNumber,
+            String panNumber,
+            String phone,
+            String email) {
         if (field == null) {
             return "";
         }
         String normalized = field.toLowerCase(Locale.ROOT);
         if (normalized.contains("account number") && accountNumber != null && !accountNumber.isBlank()) {
             return accountNumber.trim();
+        }
+        if (normalized.contains("customer id") && customerId != null && !customerId.isBlank()) {
+            return customerId.trim();
+        }
+        if (normalized.contains("aadhaar") && aadhaarNumber != null && !aadhaarNumber.isBlank()) {
+            return aadhaarNumber.trim();
+        }
+        if (normalized.contains("pan") && panNumber != null && !panNumber.isBlank()) {
+            return panNumber.trim();
+        }
+        if ((normalized.contains("mobile") || normalized.contains("phone")) && phone != null && !phone.isBlank()) {
+            return phone.trim();
+        }
+        if (normalized.contains("email") && email != null && !email.isBlank()) {
+            return email.trim();
         }
         if ((normalized.equals("name") || normalized.startsWith("name(") || normalized.contains("holder"))
                 && holderName != null && !holderName.isBlank()) {
@@ -490,6 +644,94 @@ public class BankFormService {
             return BANK_NAME;
         }
         return "";
+    }
+
+    private Map<String, Object> resolveByCustomerId(String customerId) {
+        if (customerId == null || customerId.isBlank()) {
+            return null;
+        }
+        String cid = customerId.trim();
+
+        Account regular = accountRepository.findByCustomerId(cid);
+        if (regular != null) {
+            return resolveAccount(regular.getAccountNumber(), "regular");
+        }
+
+        SalaryAccount salary = salaryAccountRepository.findByCustomerId(cid);
+        if (salary != null) {
+            return resolveAccount(salary.getAccountNumber(), "salary");
+        }
+
+        Optional<CurrentAccount> current = currentAccountRepository.findByCustomerId(cid);
+        if (current.isPresent()) {
+            return resolveAccount(current.get().getAccountNumber(), "current");
+        }
+
+        return null;
+    }
+
+    private void recordHistory(
+            Long uploadId,
+            String action,
+            BankFormUpload previous,
+            BankFormUpload current,
+            String performedByAdmin,
+            String remarks) {
+        BankFormUploadHistory history = new BankFormUploadHistory();
+        history.setUploadId(uploadId);
+        history.setAction(action);
+        if (previous != null) {
+            history.setPreviousFileName(previous.getOriginalFileName());
+            history.setPreviousStoredPath(previous.getStoredFilePath());
+            history.setPreviousContentType(previous.getContentType());
+            history.setPreviousFileSizeBytes(previous.getFileSizeBytes());
+        }
+        if (current != null) {
+            history.setNewFileName(current.getOriginalFileName());
+            history.setNewStoredPath(current.getStoredFilePath());
+            history.setNewContentType(current.getContentType());
+            history.setNewFileSizeBytes(current.getFileSizeBytes());
+        }
+        history.setPerformedByAdmin(performedByAdmin);
+        history.setRemarks(remarks);
+        bankFormUploadHistoryRepository.save(history);
+    }
+
+    private BankFormUpload snapshotUpload(BankFormUpload upload) {
+        BankFormUpload copy = new BankFormUpload();
+        copy.setOriginalFileName(upload.getOriginalFileName());
+        copy.setStoredFilePath(upload.getStoredFilePath());
+        copy.setContentType(upload.getContentType());
+        copy.setFileSizeBytes(upload.getFileSizeBytes());
+        return copy;
+    }
+
+    public Map<String, Object> toHistoryDto(BankFormUploadHistory history) {
+        Map<String, Object> dto = new LinkedHashMap<>();
+        dto.put("id", history.getId());
+        dto.put("uploadId", history.getUploadId());
+        dto.put("action", history.getAction());
+        dto.put("previousFileName", history.getPreviousFileName());
+        dto.put("newFileName", history.getNewFileName());
+        dto.put("performedByAdmin", history.getPerformedByAdmin());
+        dto.put("remarks", history.getRemarks());
+        dto.put("performedAt", history.getPerformedAt());
+        return dto;
+    }
+
+    private static String stringValue(Map<String, Object> map, String key) {
+        if (map == null) {
+            return null;
+        }
+        Object value = map.get(key);
+        return value != null ? String.valueOf(value) : null;
+    }
+
+    private static String maskAadhaar(String aadhaar) {
+        if (aadhaar == null || aadhaar.length() < 4) {
+            return aadhaar != null ? aadhaar : "________________________";
+        }
+        return "XXXX-XXXX-" + aadhaar.substring(aadhaar.length() - 4);
     }
 
     private static Map<String, Object> loanInfo(Loan loan) {

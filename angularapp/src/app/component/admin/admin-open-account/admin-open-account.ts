@@ -488,7 +488,25 @@ export class AdminOpenAccount implements OnInit {
     if (!app.id) return;
     this.isDownloading = true;
     this.appService.downloadApplication(app.id).subscribe({
-      next: (blob) => {
+      next: (resp: any) => {
+        this.isDownloading = false;
+        const blob = resp.body;
+        if (!blob || blob.size === 0) {
+          this.showAlertMessage('Empty PDF response from server', 'error');
+          return;
+        }
+        const contentType = resp.headers?.get('Content-Type') || '';
+        if (contentType.includes('application/json')) {
+          blob.text().then((text: string) => {
+            try {
+              const err = JSON.parse(text);
+              this.showAlertMessage(err.message || 'Failed to download application', 'error');
+            } catch {
+              this.showAlertMessage('Failed to download application', 'error');
+            }
+          });
+          return;
+        }
         const url = window.URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
@@ -496,11 +514,23 @@ export class AdminOpenAccount implements OnInit {
         link.click();
         window.URL.revokeObjectURL(url);
         this.showAlertMessage('Application form downloaded successfully', 'success');
-        this.isDownloading = false;
       },
-      error: (err) => {
-        this.showAlertMessage('Failed to download application', 'error');
+      error: async (err) => {
         this.isDownloading = false;
+        let message = 'Failed to download application';
+        const blob = err?.error;
+        if (blob instanceof Blob) {
+          try {
+            const text = await blob.text();
+            const parsed = JSON.parse(text);
+            message = parsed.message || parsed.error || message;
+          } catch {
+            // keep default message
+          }
+        } else if (err?.error?.message) {
+          message = err.error.message;
+        }
+        this.showAlertMessage(message, 'error');
       }
     });
   }

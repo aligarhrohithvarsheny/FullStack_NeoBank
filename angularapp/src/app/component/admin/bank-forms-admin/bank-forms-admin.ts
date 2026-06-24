@@ -1,7 +1,13 @@
 import { Component, Input, OnInit, PLATFORM_ID, inject } from '@angular/core';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { BankFormDefinition, BankFormService, BankFormUploadRecord } from '../../../service/bank-form.service';
+import {
+  BankFormDefinition,
+  BankFormService,
+  BankFormUploadHistoryRecord,
+  BankFormUploadRecord,
+  VerifiedAccountDetails
+} from '../../../service/bank-form.service';
 import { AlertService } from '../../../service/alert.service';
 import { BackendWakeupService } from '../../../service/backend-wakeup.service';
 
@@ -26,10 +32,13 @@ export class BankFormsAdminComponent implements OnInit {
   activeTab: 'submit' | 'catalog' | 'uploads' = 'submit';
 
   selectedFormCode = '';
+  lookupMode: 'accountNumber' | 'customerId' = 'accountNumber';
   uploadAccountNumber = '';
+  uploadCustomerId = '';
   uploadAccountType: 'regular' | 'loan' | 'goldloan' | 'cheque' | 'salary' | 'current' = 'regular';
   uploadRemarks = '';
   selectedFile: File | null = null;
+  verifiedAccount: VerifiedAccountDetails | null = null;
   isVerifyingAccount = false;
   isAccountVerified = false;
   verifiedHolderName = '';
@@ -37,10 +46,14 @@ export class BankFormsAdminComponent implements OnInit {
   isUploading = false;
   isDownloading = false;
   isDownloadingUploadId: number | null = null;
+  isViewingUploadId: number | null = null;
+  isReplacingUploadId: number | null = null;
   isLoading = false;
   isDeleting = false;
   filterAccountNumber = '';
   filterFormCode = '';
+  selectedHistoryUploadId: number | null = null;
+  uploadHistory: BankFormUploadHistoryRecord[] = [];
 
   accountTypes = [
     { value: 'regular', label: 'Savings / Regular' },
@@ -72,6 +85,10 @@ export class BankFormsAdminComponent implements OnInit {
   get selectedForm(): BankFormDefinition | null {
     if (!this.selectedFormCode) return null;
     return this.forms.find((f) => f.code === this.selectedFormCode) || null;
+  }
+
+  get canDownloadPdf(): boolean {
+    return !!this.selectedForm && this.isAccountVerified && !!this.verifiedAccount;
   }
 
   get formSelectOptions(): BankFormDefinition[] {
@@ -139,10 +156,19 @@ export class BankFormsAdminComponent implements OnInit {
   }
 
   onFormSelected(): void {
+    this.resetVerification();
+    this.selectedFile = null;
+  }
+
+  onLookupModeChange(): void {
+    this.resetVerification();
+  }
+
+  resetVerification(): void {
     this.isAccountVerified = false;
     this.verifiedHolderName = '';
+    this.verifiedAccount = null;
     this.accountVerificationError = '';
-    this.selectedFile = null;
   }
 
   downloadPdf(form?: BankFormDefinition | null): void {
@@ -151,12 +177,22 @@ export class BankFormsAdminComponent implements OnInit {
       this.alertService.error('Validation', 'Please select a form first.');
       return;
     }
+    if (!this.isAccountVerified || !this.verifiedAccount) {
+      this.alertService.error('Validation', 'Verify account number or customer ID before downloading the PDF.');
+      return;
+    }
+
     this.isDownloading = true;
     this.bankFormService.downloadBlankPdf(target.code, {
       adminName: this.adminName,
-      accountNumber: this.isAccountVerified ? this.uploadAccountNumber.trim() : undefined,
-      accountType: this.isAccountVerified ? this.uploadAccountType : undefined,
-      holderName: this.isAccountVerified ? this.verifiedHolderName : undefined
+      accountNumber: this.verifiedAccount.accountNumber,
+      accountType: this.verifiedAccount.accountType,
+      holderName: this.verifiedAccount.holderName,
+      customerId: this.verifiedAccount.customerId,
+      aadhaarNumber: this.verifiedAccount.aadhaarNumber,
+      panNumber: this.verifiedAccount.panNumber,
+      phone: this.verifiedAccount.phone,
+      email: this.verifiedAccount.email
     }).subscribe({
       next: (resp) => {
         this.isDownloading = false;
@@ -179,7 +215,7 @@ export class BankFormsAdminComponent implements OnInit {
         }
         const filename = this.extractFilename(resp.headers.get('Content-Disposition'), `NeoBank-${target.code}.pdf`);
         this.triggerBrowserDownload(blob, filename);
-        this.alertService.success('Downloaded', `${target.name} PDF downloaded with NeoBank details.`);
+        this.alertService.success('Downloaded', `${target.name} PDF downloaded with customer details auto-filled.`);
       },
       error: async (err) => {
         this.isDownloading = false;
@@ -210,6 +246,80 @@ export class BankFormsAdminComponent implements OnInit {
         this.isDownloadingUploadId = null;
         const message = await this.readBlobErrorMessage(err);
         this.alertService.error('Error', message || 'Failed to download uploaded file.');
+      }
+    });
+  }
+
+  viewUploadedFile(record: BankFormUploadRecord): void {
+    if (!isPlatformBrowser(this.platformId)) return;
+    this.isViewingUploadId = record.id;
+    this.bankFormService.viewUploadedFile(record.id).subscribe({
+      next: (resp) => {
+        this.isViewingUploadId = null;
+        const blob = resp.body;
+        if (!blob || blob.size === 0) {
+          this.alertService.error('Error', 'Uploaded file could not be opened.');
+          return;
+        }
+        const url = window.URL.createObjectURL(blob);
+        window.open(url, '_blank');
+        setTimeout(() => window.URL.revokeObjectURL(url), 60000);
+      },
+      error: async (err) => {
+        this.isViewingUploadId = null;
+        const message = await this.readBlobErrorMessage(err);
+        this.alertService.error('Error', message || 'Failed to view uploaded file.');
+      }
+    });
+  }
+
+  onReplaceFileSelected(record: BankFormUploadRecord, event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+
+    this.isReplacingUploadId = record.id;
+    this.bankFormService.replaceUpload(record.id, file, this.adminName, 'Replaced from admin dashboard').subscribe({
+      next: (res) => {
+        this.isReplacingUploadId = null;
+        input.value = '';
+        if (res.success) {
+          this.alertService.success('Replaced', 'Uploaded file replaced and history saved.');
+          this.loadUploads();
+          if (this.selectedHistoryUploadId === record.id) {
+            this.loadUploadHistory(record.id);
+          }
+        } else {
+          this.alertService.error('Error', res.message || 'Replace failed.');
+        }
+      },
+      error: async (err) => {
+        this.isReplacingUploadId = null;
+        input.value = '';
+        const message = await this.readBlobErrorMessage(err);
+        this.alertService.error('Error', message || 'Failed to replace uploaded file.');
+      }
+    });
+  }
+
+  toggleUploadHistory(record: BankFormUploadRecord): void {
+    if (this.selectedHistoryUploadId === record.id) {
+      this.selectedHistoryUploadId = null;
+      this.uploadHistory = [];
+      return;
+    }
+    this.selectedHistoryUploadId = record.id;
+    this.loadUploadHistory(record.id);
+  }
+
+  loadUploadHistory(uploadId: number): void {
+    this.bankFormService.getUploadHistory(uploadId).subscribe({
+      next: (res) => {
+        this.uploadHistory = res.history || [];
+      },
+      error: () => {
+        this.uploadHistory = [];
+        this.alertService.error('Error', 'Failed to load upload history.');
       }
     });
   }
@@ -263,29 +373,52 @@ export class BankFormsAdminComponent implements OnInit {
   }
 
   verifyAccount(): void {
-    if (!this.uploadAccountNumber.trim()) {
-      this.isAccountVerified = false;
-      this.accountVerificationError = 'Enter an account number.';
+    const hasAccount = this.lookupMode === 'accountNumber' && this.uploadAccountNumber.trim();
+    const hasCustomerId = this.lookupMode === 'customerId' && this.uploadCustomerId.trim();
+
+    if (!hasAccount && !hasCustomerId) {
+      this.resetVerification();
+      this.accountVerificationError = this.lookupMode === 'customerId'
+        ? 'Enter a customer ID.'
+        : 'Enter an account number.';
       return;
     }
+
     this.isVerifyingAccount = true;
-    this.isAccountVerified = false;
-    this.accountVerificationError = '';
-    this.bankFormService.verifyAccount(this.uploadAccountNumber.trim(), this.uploadAccountType).subscribe({
+    this.resetVerification();
+    this.bankFormService.verifyAccount({
+      accountNumber: hasAccount ? this.uploadAccountNumber.trim() : undefined,
+      accountType: this.uploadAccountType,
+      customerId: hasCustomerId ? this.uploadCustomerId.trim() : undefined
+    }).subscribe({
       next: (res) => {
         this.isVerifyingAccount = false;
-        if (res.success) {
+        if (res.success && res.account) {
           this.isAccountVerified = true;
-          this.verifiedHolderName = res.account?.holderName || '';
+          this.verifiedAccount = {
+            accountNumber: res.account.accountNumber,
+            holderName: res.account.holderName || '',
+            accountType: res.account.accountType || this.uploadAccountType,
+            customerId: res.account.customerId,
+            aadhaarNumber: res.account.aadhaarNumber,
+            panNumber: res.account.panNumber,
+            phone: res.account.phone,
+            email: res.account.email,
+            balance: res.account.balance
+          };
+          this.verifiedHolderName = this.verifiedAccount.holderName;
+          this.uploadAccountNumber = this.verifiedAccount.accountNumber;
+          this.uploadCustomerId = this.verifiedAccount.customerId || this.uploadCustomerId;
+          if (this.verifiedAccount.accountType) {
+            this.uploadAccountType = this.verifiedAccount.accountType;
+          }
           this.accountVerificationError = '';
         } else {
-          this.isAccountVerified = false;
           this.accountVerificationError = res.message || 'Account not found.';
         }
       },
       error: () => {
         this.isVerifyingAccount = false;
-        this.isAccountVerified = false;
         this.accountVerificationError = 'Account verification failed.';
       }
     });
@@ -296,8 +429,8 @@ export class BankFormsAdminComponent implements OnInit {
       this.alertService.error('Validation', 'Please search and select a form name.');
       return;
     }
-    if (!this.isAccountVerified) {
-      this.alertService.error('Validation', 'Please verify the account number first.');
+    if (!this.isAccountVerified || !this.verifiedAccount) {
+      this.alertService.error('Validation', 'Please verify the account number or customer ID first.');
       return;
     }
     if (!this.selectedFile) {
@@ -308,8 +441,8 @@ export class BankFormsAdminComponent implements OnInit {
     this.isUploading = true;
     this.bankFormService.uploadForm(
       this.selectedForm.code,
-      this.uploadAccountNumber.trim(),
-      this.uploadAccountType,
+      this.verifiedAccount.accountNumber,
+      this.verifiedAccount.accountType,
       this.selectedFile,
       this.adminName,
       this.uploadRemarks
@@ -342,6 +475,10 @@ export class BankFormsAdminComponent implements OnInit {
         this.isDeleting = false;
         if (res.success) {
           this.alertService.success('Deleted', 'Upload removed.');
+          if (this.selectedHistoryUploadId === record.id) {
+            this.selectedHistoryUploadId = null;
+            this.uploadHistory = [];
+          }
           this.loadUploads();
         }
       },
@@ -361,6 +498,8 @@ export class BankFormsAdminComponent implements OnInit {
         this.isDeleting = false;
         if (res.success) {
           this.alertService.success('Cleared', res.message || 'All uploads cleared.');
+          this.selectedHistoryUploadId = null;
+          this.uploadHistory = [];
           this.loadUploads();
         }
       },

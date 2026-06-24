@@ -70,35 +70,61 @@
             </ul>
           </div>
         </div>
-        <button type="button" class="btn-pdf-inline" (click)="downloadPdf()" [disabled]="isDownloading">
-          <i class="fa fa-file-pdf"></i> {{ isDownloading ? 'Generating PDF...' : 'Download Form PDF (NeoBank)' }}
+        <button type="button" class="btn-pdf-inline" (click)="downloadPdf()" [disabled]="isDownloading || !canDownloadPdf">
+          <i class="fa fa-file-pdf"></i>
+          {{
+            isDownloading
+              ? 'Generating PDF...'
+              : (canDownloadPdf ? 'Download Auto-Filled PDF' : 'Verify Account to Enable PDF Download')
+          }}
         </button>
+        <p class="pdf-hint" *ngIf="selectedForm && !canDownloadPdf">
+          Enter account number or customer ID in Step 2 and verify to unlock PDF download with auto-filled customer details.
+        </p>
       </div>
     </div>
 
     <div class="submit-card">
-      <h3><i class="fa fa-user-check"></i> Step 2 — Enter Account Number</h3>
+      <h3><i class="fa fa-user-check"></i> Step 2 — Verify Customer</h3>
+      <div class="lookup-mode-row">
+        <label><input type="radio" name="lookupMode" [(ngModel)]="lookupMode" value="accountNumber" (change)="onLookupModeChange()" /> Account Number</label>
+        <label><input type="radio" name="lookupMode" [(ngModel)]="lookupMode" value="customerId" (change)="onLookupModeChange()" /> Customer ID</label>
+      </div>
       <div class="submit-row">
-        <div class="field-block">
+        <div class="field-block" *ngIf="lookupMode === 'accountNumber'">
           <label>Account Type</label>
-          <select [(ngModel)]="uploadAccountType" (change)="isAccountVerified = false; verifiedHolderName = ''">
+          <select [(ngModel)]="uploadAccountType" (change)="resetVerification()">
             <option *ngFor="let t of accountTypes" [value]="t.value">{{ t.label }}</option>
           </select>
         </div>
-        <div class="field-block grow">
+        <div class="field-block grow" *ngIf="lookupMode === 'accountNumber'">
           <label>Account Number</label>
-          <input type="text" [(ngModel)]="uploadAccountNumber" placeholder="Enter account number" />
+          <input type="text" [(ngModel)]="uploadAccountNumber" placeholder="Enter account number" (input)="resetVerification()" />
+        </div>
+        <div class="field-block grow" *ngIf="lookupMode === 'customerId'">
+          <label>Customer ID</label>
+          <input type="text" [(ngModel)]="uploadCustomerId" placeholder="Enter 9-digit customer ID" (input)="resetVerification()" />
         </div>
         <div class="field-block action-col">
           <label>&nbsp;</label>
           <button type="button" class="verify-btn" (click)="verifyAccount()" [disabled]="isVerifyingAccount">
-            {{ isVerifyingAccount ? 'Verifying...' : 'Verify Account' }}
+            {{ isVerifyingAccount ? 'Fetching...' : 'Fetch & Verify' }}
           </button>
         </div>
       </div>
-      <p class="verify-success" *ngIf="isAccountVerified">
-        <i class="fa fa-check-circle"></i> Account verified — {{ verifiedHolderName }}
-      </p>
+      <div class="verified-details" *ngIf="isAccountVerified && verifiedAccount">
+        <h4><i class="fa fa-check-circle"></i> Auto-filled Customer Details</h4>
+        <div class="details-grid">
+          <div><span>Name</span><strong>{{ verifiedAccount.holderName }}</strong></div>
+          <div><span>Account #</span><strong>{{ verifiedAccount.accountNumber }}</strong></div>
+          <div><span>Customer ID</span><strong>{{ verifiedAccount.customerId || '-' }}</strong></div>
+          <div><span>Account Type</span><strong>{{ verifiedAccount.accountType }}</strong></div>
+          <div><span>Mobile</span><strong>{{ verifiedAccount.phone || '-' }}</strong></div>
+          <div><span>Email</span><strong>{{ verifiedAccount.email || '-' }}</strong></div>
+          <div><span>Aadhaar</span><strong>{{ verifiedAccount.aadhaarNumber || '-' }}</strong></div>
+          <div><span>PAN</span><strong>{{ verifiedAccount.panNumber || '-' }}</strong></div>
+        </div>
+      </div>
       <p class="verify-error" *ngIf="accountVerificationError">{{ accountVerificationError }}</p>
     </div>
 
@@ -147,7 +173,7 @@
           </ul>
         </div>
         <div class="form-actions">
-          <button type="button" class="btn-pdf" (click)="downloadPdf(form)" [disabled]="isDownloading" title="Download PDF with all form fields and NeoBank details">
+          <button type="button" class="btn-pdf" (click)="downloadPdf(form)" [disabled]="isDownloading || !canDownloadPdf" title="Download PDF with auto-filled customer details">
             <i class="fa fa-file-pdf"></i> PDF
           </button>
           <button type="button" class="btn-upload" (click)="selectFormFromCatalog(form)">
@@ -186,35 +212,70 @@
           </tr>
         </thead>
         <tbody>
-          <tr *ngFor="let u of uploads">
-            <td>{{ formatDate(u.uploadedAt) }}</td>
-            <td>
-              <strong>{{ u.formName }}</strong>
-              <small>{{ u.formCode }}</small>
-            </td>
-            <td>{{ u.accountNumber }}</td>
-            <td>{{ u.accountType }}</td>
-            <td>{{ u.accountHolderName || '-' }}</td>
-            <td>
-              {{ u.originalFileName }}
-              <small>{{ formatFileSize(u.fileSizeBytes) }}</small>
-            </td>
-            <td>{{ u.uploadedByAdmin }}</td>
-            <td>
-              <button
-                type="button"
-                class="download-btn"
-                (click)="downloadUploadedFile(u)"
-                [disabled]="isDownloadingUploadId === u.id"
-                title="Download uploaded file"
-              >
-                <i class="fa fa-download"></i>
-              </button>
-              <button type="button" class="delete-btn" (click)="deleteUpload(u)" [disabled]="isDeleting" title="Delete">
-                <i class="fa fa-trash"></i>
-              </button>
-            </td>
-          </tr>
+          <ng-container *ngFor="let u of uploads">
+            <tr>
+              <td>{{ formatDate(u.uploadedAt) }}</td>
+              <td>
+                <strong>{{ u.formName }}</strong>
+                <small>{{ u.formCode }}</small>
+              </td>
+              <td>{{ u.accountNumber }}</td>
+              <td>{{ u.accountType }}</td>
+              <td>{{ u.accountHolderName || '-' }}</td>
+              <td>
+                {{ u.originalFileName }}
+                <small>{{ formatFileSize(u.fileSizeBytes) }}</small>
+              </td>
+              <td>{{ u.uploadedByAdmin }}</td>
+              <td>
+                <button
+                  type="button"
+                  class="view-btn"
+                  (click)="viewUploadedFile(u)"
+                  [disabled]="isViewingUploadId === u.id"
+                  title="View uploaded file"
+                >
+                  <i class="fa fa-eye"></i>
+                </button>
+                <button
+                  type="button"
+                  class="download-btn"
+                  (click)="downloadUploadedFile(u)"
+                  [disabled]="isDownloadingUploadId === u.id"
+                  title="Download uploaded file"
+                >
+                  <i class="fa fa-download"></i>
+                </button>
+                <label class="replace-btn" [class.disabled]="isReplacingUploadId === u.id" title="Replace uploaded file">
+                  <i class="fa fa-sync-alt"></i>
+                  <input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" hidden (change)="onReplaceFileSelected(u, $event)" />
+                </label>
+                <button type="button" class="history-btn" (click)="toggleUploadHistory(u)" title="View upload history">
+                  <i class="fa fa-history"></i>
+                </button>
+                <button type="button" class="delete-btn" (click)="deleteUpload(u)" [disabled]="isDeleting" title="Delete">
+                  <i class="fa fa-trash"></i>
+                </button>
+              </td>
+            </tr>
+            <tr *ngIf="selectedHistoryUploadId === u.id">
+              <td colspan="8" class="history-panel">
+                <h4>Upload History</h4>
+                <div class="history-list" *ngIf="uploadHistory.length > 0; else noHistory">
+                  <div class="history-item" *ngFor="let h of uploadHistory">
+                    <strong>{{ h.action }}</strong>
+                    <span>{{ formatDate(h.performedAt) }}</span>
+                    <span>{{ h.previousFileName || '-' }} → {{ h.newFileName || '-' }}</span>
+                    <span>{{ h.performedByAdmin || 'Admin' }}</span>
+                    <small *ngIf="h.remarks">{{ h.remarks }}</small>
+                  </div>
+                </div>
+                <ng-template #noHistory>
+                  <p class="empty-msg">No history recorded yet.</p>
+                </ng-template>
+              </td>
+            </tr>
+          </ng-container>
         </tbody>
       </table>
       <p class="empty-msg" *ngIf="uploads.length === 0">No uploaded applications yet. Use Submit Application tab.</p>

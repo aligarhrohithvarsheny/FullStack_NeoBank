@@ -104,9 +104,10 @@ export class AdminAccountApplicationService {
   }
 
   // PDF Download
-  downloadApplication(id: number): Observable<Blob> {
+  downloadApplication(id: number) {
     return this.http.get(`${this.apiUrl}/download-application/${id}`, {
-      responseType: 'blob'
+      responseType: 'blob',
+      observe: 'response'
     });
   }
 

@@ -45,10 +45,24 @@ public class BankFormController {
             @RequestParam(value = "adminName", required = false, defaultValue = "Admin") String adminName,
             @RequestParam(value = "accountNumber", required = false) String accountNumber,
             @RequestParam(value = "accountType", required = false) String accountType,
-            @RequestParam(value = "holderName", required = false) String holderName) {
+            @RequestParam(value = "holderName", required = false) String holderName,
+            @RequestParam(value = "customerId", required = false) String customerId,
+            @RequestParam(value = "aadhaarNumber", required = false) String aadhaarNumber,
+            @RequestParam(value = "panNumber", required = false) String panNumber,
+            @RequestParam(value = "phone", required = false) String phone,
+            @RequestParam(value = "email", required = false) String email) {
         try {
             byte[] pdf = bankFormService.buildBlankFormPdf(
-                    formCode, adminName, accountNumber, accountType, holderName);
+                    formCode,
+                    adminName,
+                    accountNumber,
+                    accountType,
+                    holderName,
+                    customerId,
+                    aadhaarNumber,
+                    panNumber,
+                    phone,
+                    email);
             if (pdf == null || pdf.length == 0) {
                 return errorResponse(500, "PDF generation returned empty content");
             }
@@ -68,9 +82,16 @@ public class BankFormController {
 
     @GetMapping("/verify-account")
     public ResponseEntity<Map<String, Object>> verifyAccount(
-            @RequestParam String accountNumber,
-            @RequestParam(defaultValue = "regular") String accountType) {
-        return ResponseEntity.ok(bankFormService.verifyAccount(accountNumber, accountType));
+            @RequestParam(required = false) String accountNumber,
+            @RequestParam(defaultValue = "regular") String accountType,
+            @RequestParam(required = false) String customerId) {
+        if ((accountNumber == null || accountNumber.isBlank()) && (customerId == null || customerId.isBlank())) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("message", "Enter account number or customer ID");
+            return ResponseEntity.badRequest().body(response);
+        }
+        return ResponseEntity.ok(bankFormService.verifyAccount(accountNumber, accountType, customerId));
     }
 
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -116,6 +137,47 @@ public class BankFormController {
 
     @GetMapping("/uploads/{id}/file")
     public ResponseEntity<?> downloadUploadedFile(@PathVariable Long id) {
+        return serveUploadedFile(id, false);
+    }
+
+    @GetMapping("/uploads/{id}/view")
+    public ResponseEntity<?> viewUploadedFile(@PathVariable Long id) {
+        return serveUploadedFile(id, true);
+    }
+
+    @PutMapping(value = "/uploads/{id}/replace", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<Map<String, Object>> replaceUploadedFile(
+            @PathVariable Long id,
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "replacedByAdmin", required = false, defaultValue = "Admin") String replacedByAdmin,
+            @RequestParam(value = "remarks", required = false) String remarks) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            BankFormUpload saved = bankFormService.replaceUploadedForm(id, file, replacedByAdmin, remarks);
+            response.put("success", true);
+            response.put("message", "Upload replaced and history saved");
+            response.put("upload", bankFormService.toUploadDto(saved));
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(response);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "Replace failed: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(response);
+        }
+    }
+
+    @GetMapping("/uploads/{id}/history")
+    public ResponseEntity<Map<String, Object>> getUploadHistory(@PathVariable Long id) {
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", true);
+        response.put("history", bankFormService.listUploadHistory(id));
+        return ResponseEntity.ok(response);
+    }
+
+    private ResponseEntity<?> serveUploadedFile(Long id, boolean inline) {
         try {
             Optional<BankFormUpload> uploadOpt = bankFormService.findUpload(id);
             if (uploadOpt.isEmpty()) {
@@ -130,15 +192,17 @@ public class BankFormController {
             String filename = upload.getOriginalFileName() != null
                     ? upload.getOriginalFileName()
                     : "NeoBank-upload-" + id;
+            ContentDisposition disposition = inline
+                    ? ContentDisposition.inline().filename(filename, StandardCharsets.UTF_8).build()
+                    : ContentDisposition.attachment().filename(filename, StandardCharsets.UTF_8).build();
             return ResponseEntity.ok()
-                    .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
-                            .filename(filename, StandardCharsets.UTF_8).build().toString())
+                    .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
                     .contentType(mediaType)
                     .body(fileBytes);
         } catch (IllegalArgumentException e) {
             return errorResponse(404, e.getMessage());
         } catch (Exception e) {
-            return errorResponse(500, "Failed to download uploaded file: " + e.getMessage());
+            return errorResponse(500, "Failed to read uploaded file: " + e.getMessage());
         }
     }
 

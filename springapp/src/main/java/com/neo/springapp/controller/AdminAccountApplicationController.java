@@ -329,12 +329,20 @@ public class AdminAccountApplicationController {
     // ==================== PDF Generation ====================
 
     @GetMapping("/download-application/{id}")
-    public ResponseEntity<byte[]> downloadApplication(@PathVariable Long id) {
+    public ResponseEntity<?> downloadApplication(@PathVariable Long id) {
         try {
             AdminAccountApplication app = applicationService.getById(id)
                     .orElseThrow(() -> new RuntimeException("Application not found"));
 
             byte[] pdfBytes = pdfService.generateApplicationForm(app);
+            if (pdfBytes == null || pdfBytes.length == 0) {
+                Map<String, Object> error = new HashMap<>();
+                error.put("success", false);
+                error.put("message", "PDF generation returned empty content");
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body(error);
+            }
 
             // Save PDF path
             String fileName = "application_" + app.getApplicationNumber() + ".pdf";
@@ -352,7 +360,12 @@ public class AdminAccountApplicationController {
 
             return new ResponseEntity<>(pdfBytes, headers, HttpStatus.OK);
         } catch (Exception e) {
-            return ResponseEntity.badRequest().build();
+            Map<String, Object> error = new HashMap<>();
+            error.put("success", false);
+            error.put("message", "Failed to generate application PDF: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(error);
         }
     }
 
