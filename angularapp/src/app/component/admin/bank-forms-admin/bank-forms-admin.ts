@@ -6,7 +6,8 @@ import {
   BankFormService,
   BankFormUploadHistoryRecord,
   BankFormUploadRecord,
-  VerifiedAccountDetails
+  VerifiedAccountDetails,
+  BankFormAccountType
 } from '../../../service/bank-form.service';
 import { AlertService } from '../../../service/alert.service';
 import { BackendWakeupService } from '../../../service/backend-wakeup.service';
@@ -35,7 +36,7 @@ export class BankFormsAdminComponent implements OnInit {
   lookupMode: 'accountNumber' | 'customerId' = 'accountNumber';
   uploadAccountNumber = '';
   uploadCustomerId = '';
-  uploadAccountType: 'regular' | 'loan' | 'goldloan' | 'cheque' | 'salary' | 'current' = 'regular';
+  uploadAccountType: BankFormAccountType = 'regular';
   uploadRemarks = '';
   selectedFile: File | null = null;
   verifiedAccount: VerifiedAccountDetails | null = null;
@@ -410,7 +411,7 @@ export class BankFormsAdminComponent implements OnInit {
           this.uploadAccountNumber = this.verifiedAccount.accountNumber;
           this.uploadCustomerId = this.verifiedAccount.customerId || this.uploadCustomerId;
           if (this.verifiedAccount.accountType) {
-            this.uploadAccountType = this.verifiedAccount.accountType;
+            this.uploadAccountType = this.normalizeAccountType(this.verifiedAccount.accountType);
           }
           this.accountVerificationError = '';
         } else {
@@ -527,5 +528,11 @@ export class BankFormsAdminComponent implements OnInit {
     if (bytes < 1024) return bytes + ' B';
     if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
     return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  }
+
+  private normalizeAccountType(value?: string): BankFormAccountType {
+    const allowed: BankFormAccountType[] = ['regular', 'salary', 'current', 'loan', 'goldloan', 'cheque'];
+    const normalized = (value || 'regular').trim().toLowerCase() as BankFormAccountType;
+    return allowed.includes(normalized) ? normalized : 'regular';
   }
 }

@@ -179,12 +179,9 @@ public class BankFormController {
 
     private ResponseEntity<?> serveUploadedFile(Long id, boolean inline) {
         try {
-            Optional<BankFormUpload> uploadOpt = bankFormService.findUpload(id);
-            if (uploadOpt.isEmpty()) {
-                return errorResponse(404, "Upload record not found");
-            }
-            BankFormUpload upload = uploadOpt.get();
-            byte[] fileBytes = bankFormService.readUploadedFile(upload);
+            byte[] fileBytes = bankFormService.readUploadedFileById(id);
+            BankFormUpload upload = bankFormService.findUpload(id)
+                    .orElseThrow(() -> new IllegalArgumentException("Upload record not found"));
             MediaType mediaType = MediaType.APPLICATION_OCTET_STREAM;
             if (upload.getContentType() != null && !upload.getContentType().isBlank()) {
                 mediaType = MediaType.parseMediaType(upload.getContentType());

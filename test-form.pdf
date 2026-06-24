@@ -1,0 +1,1 @@
+{"success":false,"details":"Handler dispatch failed: java.lang.OutOfMemoryError: Java heap space","message":"An error occurred processing your request","error":"INTERNAL_SERVER_ERROR","status":500}

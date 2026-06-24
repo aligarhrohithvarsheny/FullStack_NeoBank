@@ -3,6 +3,8 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../environment/environment';
 
+export type BankFormAccountType = 'regular' | 'loan' | 'goldloan' | 'cheque' | 'salary' | 'current';
+
 export interface BankFormDefinition {
   id: number;
   code: string;

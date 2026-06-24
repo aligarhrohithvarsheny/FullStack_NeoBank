@@ -40,6 +40,11 @@ public class BankFormUpload {
     @Column(nullable = false)
     private String storedFilePath;
 
+    @Lob
+    @Basic(fetch = FetchType.LAZY)
+    @Column(name = "file_content")
+    private byte[] fileContent;
+
     private String contentType;
 
     private Long fileSizeBytes;
