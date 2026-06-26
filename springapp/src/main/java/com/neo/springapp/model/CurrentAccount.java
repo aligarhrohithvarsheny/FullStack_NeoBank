@@ -2,6 +2,7 @@ package com.neo.springapp.model;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.time.LocalDateTime;
 
 @Entity
@@ -89,6 +90,7 @@ public class CurrentAccount {
     private LocalDateTime frozenDate;
 
     // Authentication
+    @JsonIgnore
     private String password;
     private Boolean passwordSet = false;
 

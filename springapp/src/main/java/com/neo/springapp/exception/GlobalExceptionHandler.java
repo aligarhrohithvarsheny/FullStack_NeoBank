@@ -1,5 +1,6 @@
 package com.neo.springapp.exception;
 
+import org.hibernate.LazyInitializationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessException;
@@ -173,6 +174,23 @@ public class GlobalExceptionHandler {
         response.put("retryable", true);
         return ResponseEntity
                 .status(HttpStatus.SERVICE_UNAVAILABLE)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(response);
+    }
+
+    /**
+     * Hibernate lazy-load outside an active persistence context (common with open-in-view=false).
+     */
+    @ExceptionHandler(LazyInitializationException.class)
+    public ResponseEntity<Map<String, Object>> handleLazyInitialization(LazyInitializationException e) {
+        log.error("Lazy initialization error: {}", e.getMessage(), e);
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", false);
+        response.put("message", "A data loading error occurred. Please try again.");
+        response.put("error", "LAZY_INIT_ERROR");
+        response.put("status", HttpStatus.INTERNAL_SERVER_ERROR.value());
+        return ResponseEntity
+                .status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(response);
     }

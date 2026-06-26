@@ -4,6 +4,7 @@ import com.neo.springapp.model.Admin;
 import com.neo.springapp.repository.AdminRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.time.LocalDateTime;
 
@@ -124,6 +125,7 @@ public class AdminService {
     /**
      * Get admin by email (for profile retrieval)
      */
+    @Transactional(readOnly = true)
     public Admin getAdminByEmail(String email) {
         String normalizedEmail = normalizeEmail(email);
         if (normalizedEmail == null || normalizedEmail.isEmpty()) {
@@ -222,6 +224,7 @@ public class AdminService {
         return adminRepository.save(admin);
     }
 
+    @Transactional
     public Admin login(String email, String password) {
         String normalizedEmail = normalizeEmail(email);
         Admin admin = adminRepository.findByEmailIgnoreCase(normalizedEmail);

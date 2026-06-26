@@ -713,6 +713,7 @@ public class CurrentAccountService {
         return result;
     }
 
+    @Transactional(readOnly = true)
     public Map<String, Object> authenticate(String accountNumber, String password) {
         Map<String, Object> result = new HashMap<>();
         Optional<CurrentAccount> opt = accountRepository.findByAccountNumber(accountNumber);
@@ -740,8 +741,42 @@ public class CurrentAccountService {
 
         result.put("success", true);
         result.put("message", "Login successful");
-        result.put("account", account);
+        result.put("account", toSafeAccountResponse(account));
         return result;
+    }
+
+    private Map<String, Object> toSafeAccountResponse(CurrentAccount account) {
+        Map<String, Object> safe = new HashMap<>();
+        safe.put("id", account.getId());
+        safe.put("accountNumber", account.getAccountNumber());
+        safe.put("customerId", account.getCustomerId());
+        safe.put("businessName", account.getBusinessName());
+        safe.put("businessType", account.getBusinessType());
+        safe.put("ownerName", account.getOwnerName());
+        safe.put("mobile", account.getMobile());
+        safe.put("email", account.getEmail());
+        safe.put("aadharNumber", account.getAadharNumber());
+        safe.put("panNumber", account.getPanNumber());
+        safe.put("shopAddress", account.getShopAddress());
+        safe.put("city", account.getCity());
+        safe.put("state", account.getState());
+        safe.put("pincode", account.getPincode());
+        safe.put("branchName", account.getBranchName());
+        safe.put("ifscCode", account.getIfscCode());
+        safe.put("balance", account.getBalance());
+        safe.put("overdraftLimit", account.getOverdraftLimit());
+        safe.put("overdraftEnabled", account.getOverdraftEnabled());
+        safe.put("minimumBalance", account.getMinimumBalance());
+        safe.put("status", account.getStatus());
+        safe.put("kycVerified", account.getKycVerified());
+        safe.put("passwordSet", account.getPasswordSet());
+        safe.put("netBankingEnabled", account.getNetBankingEnabled());
+        safe.put("upiId", account.getUpiId());
+        safe.put("upiEnabled", account.getUpiEnabled());
+        safe.put("createdAt", account.getCreatedAt());
+        safe.put("approvedAt", account.getApprovedAt());
+        safe.put("lastUpdated", account.getLastUpdated());
+        return safe;
     }
 
     @Transactional

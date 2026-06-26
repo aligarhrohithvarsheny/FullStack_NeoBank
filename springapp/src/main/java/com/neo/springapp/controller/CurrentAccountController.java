@@ -448,79 +448,101 @@ public class CurrentAccountController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<Map<String, Object>> login(@RequestBody Map<String, String> body,
+    public ResponseEntity<Map<String, Object>> login(@RequestBody(required = false) Map<String, String> body,
             @RequestHeader(value = "X-Forwarded-For", required = false) String forwardedFor,
             @RequestHeader(value = "User-Agent", required = false) String userAgent) {
-        String accountNumber = body.get("accountNumber");
-        String password = body.get("password");
-        if (accountNumber == null || password == null || accountNumber.isEmpty() || password.isEmpty()) {
-            Map<String, Object> err = new HashMap<>();
-            err.put("success", false);
-            err.put("message", "Account number and password are required");
-            return ResponseEntity.badRequest().body(err);
-        }
-        // Check if Current Account net banking is enabled
         try {
-            var currentControl = netBankingServiceControlRepository.findByServiceType("CURRENT_ACCOUNT");
-            if (currentControl.isPresent() && !currentControl.get().getEnabled()) {
+            if (body == null) {
                 Map<String, Object> err = new HashMap<>();
                 err.put("success", false);
-                err.put("netBankingDisabled", true);
-                err.put("message", "Net Banking for Current Account is currently disabled by the administrator. Please try again later.");
+                err.put("message", "Request body is required");
                 return ResponseEntity.badRequest().body(err);
             }
-        } catch (Exception e) {
-            System.err.println("Error checking net banking status: " + e.getMessage());
-        }
-        Map<String, Object> result = currentAccountService.authenticate(accountNumber, password);
-        // Check per-customer net banking status on successful login
-        if (result.containsKey("success") && Boolean.TRUE.equals(result.get("success"))) {
+            String accountNumber = body.get("accountNumber");
+            String password = body.get("password");
+            if (accountNumber == null || password == null || accountNumber.isEmpty() || password.isEmpty()) {
+                Map<String, Object> err = new HashMap<>();
+                err.put("success", false);
+                err.put("message", "Account number and password are required");
+                return ResponseEntity.badRequest().body(err);
+            }
+            // Check if Current Account net banking is enabled
             try {
-                Object accountObj = result.get("account");
-                CurrentAccount ca = null;
-                if (accountObj instanceof CurrentAccount) {
-                    ca = (CurrentAccount) accountObj;
-                }
-                if (ca != null && ca.getNetBankingEnabled() != null && !ca.getNetBankingEnabled()) {
+                var currentControl = netBankingServiceControlRepository.findByServiceType("CURRENT_ACCOUNT");
+                if (currentControl.isPresent() && !currentControl.get().getEnabled()) {
                     Map<String, Object> err = new HashMap<>();
                     err.put("success", false);
                     err.put("netBankingDisabled", true);
-                    err.put("message", "Net Banking for your account has been disabled by the administrator. Please contact the bank for assistance.");
+                    err.put("message", "Net Banking for Current Account is currently disabled by the administrator. Please try again later.");
                     return ResponseEntity.badRequest().body(err);
                 }
             } catch (Exception e) {
-                System.err.println("Error checking per-customer net banking status: " + e.getMessage());
+                System.err.println("Error checking net banking status: " + e.getMessage());
             }
-        }
-        // Record session history on successful login
-        if (result.containsKey("success") && Boolean.TRUE.equals(result.get("success"))) {
-            try {
-                String clientIp = forwardedFor != null ? forwardedFor.split(",")[0].trim() : "Unknown";
-                String deviceInfo = userAgent != null ? userAgent : "Unknown";
-                Object accountObj = result.get("account");
-                Long accountId = null;
-                String email = "";
-                String ownerName = "Current Account User";
-                if (accountObj instanceof CurrentAccount) {
-                    CurrentAccount ca = (CurrentAccount) accountObj;
-                    accountId = ca.getId();
-                    email = ca.getEmail() != null ? ca.getEmail() : "";
-                    ownerName = ca.getOwnerName() != null ? ca.getOwnerName() : ownerName;
-                } else if (accountObj instanceof Map) {
-                    @SuppressWarnings("unchecked")
-                    Map<String, Object> accMap = (Map<String, Object>) accountObj;
-                    accountId = accMap.get("id") != null ? Long.parseLong(accMap.get("id").toString()) : null;
-                    email = accMap.get("email") != null ? accMap.get("email").toString() : "";
-                    ownerName = accMap.get("ownerName") != null ? accMap.get("ownerName").toString() : ownerName;
+            Map<String, Object> result = currentAccountService.authenticate(accountNumber, password);
+            // Check per-customer net banking status on successful login
+            if (result.containsKey("success") && Boolean.TRUE.equals(result.get("success"))) {
+                try {
+                    Object accountObj = result.get("account");
+                    Boolean netBankingEnabled = null;
+                    if (accountObj instanceof CurrentAccount) {
+                        netBankingEnabled = ((CurrentAccount) accountObj).getNetBankingEnabled();
+                    } else if (accountObj instanceof Map) {
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> accMap = (Map<String, Object>) accountObj;
+                        Object enabled = accMap.get("netBankingEnabled");
+                        if (enabled instanceof Boolean) {
+                            netBankingEnabled = (Boolean) enabled;
+                        }
+                    }
+                    if (Boolean.FALSE.equals(netBankingEnabled)) {
+                        Map<String, Object> err = new HashMap<>();
+                        err.put("success", false);
+                        err.put("netBankingDisabled", true);
+                        err.put("message", "Net Banking for your account has been disabled by the administrator. Please contact the bank for assistance.");
+                        return ResponseEntity.badRequest().body(err);
+                    }
+                } catch (Exception e) {
+                    System.err.println("Error checking per-customer net banking status: " + e.getMessage());
                 }
-                sessionHistoryService.recordCurrentAccountLogin(
-                    accountId != null ? accountId : 0L, email, accountNumber, ownerName,
-                    "Unknown", clientIp, deviceInfo, "PASSWORD");
-            } catch (Exception e) {
-                System.err.println("Error recording current account session: " + e.getMessage());
             }
+            // Record session history on successful login
+            if (result.containsKey("success") && Boolean.TRUE.equals(result.get("success"))) {
+                try {
+                    String clientIp = forwardedFor != null ? forwardedFor.split(",")[0].trim() : "Unknown";
+                    String deviceInfo = userAgent != null ? userAgent : "Unknown";
+                    Object accountObj = result.get("account");
+                    Long accountId = null;
+                    String email = "";
+                    String ownerName = "Current Account User";
+                    if (accountObj instanceof CurrentAccount) {
+                        CurrentAccount ca = (CurrentAccount) accountObj;
+                        accountId = ca.getId();
+                        email = ca.getEmail() != null ? ca.getEmail() : "";
+                        ownerName = ca.getOwnerName() != null ? ca.getOwnerName() : ownerName;
+                    } else if (accountObj instanceof Map) {
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> accMap = (Map<String, Object>) accountObj;
+                        accountId = accMap.get("id") != null ? Long.parseLong(accMap.get("id").toString()) : null;
+                        email = accMap.get("email") != null ? accMap.get("email").toString() : "";
+                        ownerName = accMap.get("ownerName") != null ? accMap.get("ownerName").toString() : ownerName;
+                    }
+                    sessionHistoryService.recordCurrentAccountLogin(
+                        accountId != null ? accountId : 0L, email, accountNumber, ownerName,
+                        "Unknown", clientIp, deviceInfo, "PASSWORD");
+                } catch (Exception e) {
+                    System.err.println("Error recording current account session: " + e.getMessage());
+                }
+            }
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            System.err.println("Current account login error: " + e.getMessage());
+            e.printStackTrace();
+            Map<String, Object> err = new HashMap<>();
+            err.put("success", false);
+            err.put("message", "An error occurred during login. Please try again.");
+            return ResponseEntity.status(org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR).body(err);
         }
-        return ResponseEntity.ok(result);
     }
 
     @GetMapping("/verify-customer/{customerId}")
