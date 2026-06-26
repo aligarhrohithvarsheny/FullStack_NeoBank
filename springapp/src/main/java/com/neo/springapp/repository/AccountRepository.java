@@ -93,4 +93,7 @@ public interface AccountRepository extends JpaRepository<Account, Long> {
     // Accounts without customer ID (for migration - assign customer ID to existing accounts)
     @Query("SELECT a FROM Account a WHERE a.customerId IS NULL OR a.customerId = ''")
     List<Account> findAccountsWithoutCustomerId();
+
+    @Query("SELECT COUNT(a) FROM Account a WHERE a.customerId IS NULL OR a.customerId = ''")
+    long countAccountsWithoutCustomerId();
 }

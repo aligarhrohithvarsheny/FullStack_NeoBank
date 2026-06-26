@@ -28,4 +28,6 @@ public interface AdminRepository extends JpaRepository<Admin, Long> {
     // Find all blocked admins (using custom query to handle Boolean wrapper type)
     @Query("SELECT a FROM Admin a WHERE a.accountLocked = true")
     java.util.List<Admin> findBlockedAdmins();
+
+    boolean existsByRoleIgnoreCase(String role);
 }

@@ -1,13 +1,12 @@
 package com.neo.springapp.config;
 
+import com.neo.springapp.repository.AccountRepository;
 import com.neo.springapp.service.AccountService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
-
-import java.util.List;
 
 /**
  * Assigns mandatory Customer ID (9 digits: PAN 4 + DOB 5) to all existing accounts
@@ -20,13 +19,15 @@ public class CustomerIdMigrationRunner implements ApplicationRunner {
     @Autowired
     private AccountService accountService;
 
+    @Autowired
+    private AccountRepository accountRepository;
+
     @Override
     public void run(ApplicationArguments args) throws Exception {
         try {
-            List<com.neo.springapp.model.Account> accountsWithoutCustomerId =
-                accountService.getAccountsWithoutCustomerId();
-            if (!accountsWithoutCustomerId.isEmpty()) {
-                System.out.println("🔄 Assigning Customer IDs to " + accountsWithoutCustomerId.size() + " existing account(s)...");
+            long pending = accountRepository.countAccountsWithoutCustomerId();
+            if (pending > 0) {
+                System.out.println("🔄 Assigning Customer IDs to " + pending + " existing account(s)...");
                 int count = accountService.assignCustomerIdsToExistingAccounts();
                 System.out.println("✅ Assigned Customer ID to " + count + " account(s)");
             }

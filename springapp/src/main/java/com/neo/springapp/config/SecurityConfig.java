@@ -2,7 +2,6 @@ package com.neo.springapp.config;
 
 import org.springframework.context.annotation.Configuration;
 import jakarta.persistence.EntityManager;
-import jakarta.persistence.PersistenceContext;
 import jakarta.persistence.Query;
 import java.util.List;
 import java.util.Map;
@@ -10,9 +9,6 @@ import java.util.Map;
 
 @Configuration
 public class SecurityConfig {
-
-    @PersistenceContext
-    private EntityManager entityManager;
 
     // Note: CORS configuration has been moved to CorsConfig.java
     // to provide a dedicated, production-ready CORS setup

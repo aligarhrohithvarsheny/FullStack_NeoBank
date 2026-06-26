@@ -1,14 +1,13 @@
 package com.neo.springapp.config;
 
 import com.neo.springapp.model.Admin;
+import com.neo.springapp.repository.AdminRepository;
 import com.neo.springapp.service.AdminService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
-
-import java.util.List;
 
 /**
  * Default Manager Initializer
@@ -24,6 +23,9 @@ import java.util.List;
 public class DefaultManagerInitializer implements ApplicationRunner {
 
     @Autowired
+    private AdminRepository adminRepository;
+
+    @Autowired
     private AdminService adminService;
 
     private static final String DEFAULT_MANAGER_EMAIL = "manager@neobank.com";
@@ -35,12 +37,7 @@ public class DefaultManagerInitializer implements ApplicationRunner {
     @Override
     public void run(ApplicationArguments args) throws Exception {
         try {
-            // Check if any manager exists using AdminService
-            List<Admin> allAdmins = adminService.getAllAdmins();
-            boolean managerExists = allAdmins.stream()
-                .anyMatch(admin -> DEFAULT_MANAGER_ROLE.equalsIgnoreCase(admin.getRole()));
-
-            if (!managerExists) {
+            if (!adminRepository.existsByRoleIgnoreCase(DEFAULT_MANAGER_ROLE)) {
                 System.out.println("========================================");
                 System.out.println("🔄 Creating default manager account...");
                 
