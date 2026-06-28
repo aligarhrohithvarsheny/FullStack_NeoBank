@@ -1,11 +1,14 @@
 package com.neo.springapp.config;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.Ordered;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.web.filter.CorsFilter;
 
 import java.util.Arrays;
 import java.util.List;
@@ -26,7 +29,8 @@ public class CorsConfig {
     private static final List<String> DEFAULT_ALLOWED_ORIGINS = Arrays.asList(
         "https://neo-bank-669.web.app",
         "https://neo-bank-669.firebaseapp.com",
-        "http://localhost:4200"
+        "http://localhost:4200",
+        "http://localhost:4000"
     );
 
     /**
@@ -38,8 +42,29 @@ public class CorsConfig {
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = buildCorsConfiguration();
+
+        // Apply CORS configuration to all endpoints
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+
+        return source;
+    }
+
+    @Bean
+    public FilterRegistrationBean<CorsFilter> corsFilterRegistrationBean() {
+        CorsConfiguration configuration = buildCorsConfiguration();
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+
+        FilterRegistrationBean<CorsFilter> registrationBean = new FilterRegistrationBean<>(new CorsFilter(source));
+        registrationBean.setOrder(Ordered.HIGHEST_PRECEDENCE);
+        return registrationBean;
+    }
+
+    private CorsConfiguration buildCorsConfiguration() {
         CorsConfiguration configuration = new CorsConfiguration();
-        
+
         // Parse allowed origins from environment variable.
         // If not provided, fall back to Firebase Hosting + local dev origins.
         if (allowedOrigins != null && !allowedOrigins.trim().isEmpty()) {
@@ -47,7 +72,7 @@ public class CorsConfig {
                 .map(String::trim)
                 .filter(origin -> !origin.isEmpty())
                 .collect(Collectors.toList());
-            
+
             if (!origins.isEmpty()) {
                 configuration.setAllowedOriginPatterns(origins);
                 System.out.println("✅ CORS configured with origins: " + origins);
@@ -59,25 +84,22 @@ public class CorsConfig {
             configuration.setAllowedOriginPatterns(DEFAULT_ALLOWED_ORIGINS);
             System.out.println("⚠️ CORS: SPRING_WEB_CORS_ALLOWED_ORIGINS not set, using defaults: " + DEFAULT_ALLOWED_ORIGINS);
         }
-        
-        // Allow all HTTP methods including OPTIONS for preflight
-        configuration.setAllowedMethods(Arrays.asList(
-            "GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"
+
+        // Allow browser preflight and regular API calls from the frontend.
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
+        configuration.setAllowedHeaders(Arrays.asList(
+            "Origin",
+            "Content-Type",
+            "Accept",
+            "Authorization",
+            "X-Requested-With",
+            "Access-Control-Request-Method",
+            "Access-Control-Request-Headers"
         ));
-        
-        // Allow all headers
-        configuration.setAllowedHeaders(Arrays.asList("*"));
-        
-        // Allow credentials (cookies, authorization headers)
+        configuration.setExposedHeaders(Arrays.asList("Authorization", "Content-Type"));
         configuration.setAllowCredentials(true);
-        
-        // Cache preflight response for 1 hour
         configuration.setMaxAge(3600L);
-        
-        // Apply CORS configuration to all endpoints
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", configuration);
-        
-        return source;
+
+        return configuration;
     }
 }
