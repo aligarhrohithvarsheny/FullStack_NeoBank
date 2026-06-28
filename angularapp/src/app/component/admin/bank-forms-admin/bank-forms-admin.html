@@ -133,7 +133,7 @@
       <div class="submit-row">
         <div class="field-block grow">
           <label>Application File (PDF / Image)</label>
-          <input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" (change)="onFileSelected($event)" />
+          <input #fileInput type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" (change)="onFileSelected($event)" />
         </div>
         <div class="field-block grow">
           <label>Remarks (optional)</label>
@@ -148,6 +148,33 @@
       >
         <i class="fa fa-save"></i> {{ isUploading ? 'Saving...' : 'Upload & Save Application' }}
       </button>
+
+      <div class="account-uploads-panel" *ngIf="isAccountVerified && verifiedAccount">
+        <h4><i class="fa fa-folder-open"></i> Uploaded forms for this account</h4>
+        <div class="account-upload-item" *ngFor="let upload of accountUploads">
+          <div class="upload-meta">
+            <strong>{{ upload.formName }}</strong>
+            <span>{{ upload.originalFileName }} • {{ formatFileSize(upload.fileSizeBytes) }}</span>
+          </div>
+          <div class="upload-actions">
+            <button type="button" class="small-btn view" (click)="viewUploadedFile(upload)">
+              <i class="fa fa-eye"></i> Open
+            </button>
+            <button type="button" class="small-btn download" (click)="downloadUploadedFile(upload)">
+              <i class="fa fa-download"></i> Download
+            </button>
+            <label class="small-btn replace">
+              <i class="fa fa-sync-alt"></i> Replace
+              <input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" hidden (change)="onReplaceFileSelected(upload, $event)" />
+            </label>
+            <button type="button" class="small-btn delete" (click)="deleteUpload(upload)">
+              <i class="fa fa-trash"></i> Delete
+            </button>
+          </div>
+        </div>
+        <p class="empty-msg" *ngIf="!isLoadingAccountUploads && accountUploads.length === 0">No uploaded forms found for this account yet.</p>
+        <p class="loading" *ngIf="isLoadingAccountUploads">Loading uploaded forms...</p>
+      </div>
     </div>
   </div>
 

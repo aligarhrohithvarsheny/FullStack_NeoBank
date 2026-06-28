@@ -141,7 +141,7 @@ public class BankFormService {
         if (upload.getStoredFilePath() == null || upload.getStoredFilePath().isBlank()) {
             throw new IllegalArgumentException("Uploaded file not found on server");
         }
-        Path path = Paths.get(upload.getStoredFilePath()).normalize();
+        Path path = resolveStoredPath(upload.getStoredFilePath());
         if (!Files.exists(path)) {
             throw new IllegalArgumentException("Uploaded file not found on server");
         }
@@ -178,7 +178,7 @@ public class BankFormService {
             throw new IllegalArgumentException("Account not found for the given account number and type");
         }
 
-        Path uploadDir = Paths.get(UPLOAD_DIR).normalize();
+        Path uploadDir = resolveUploadDirectory(UPLOAD_DIR);
         Files.createDirectories(uploadDir);
 
         String safeAccount = accountNumber.replaceAll("[^a-zA-Z0-9]", "");
@@ -195,7 +195,7 @@ public class BankFormService {
         upload.setAccountType(normalizeAccountType(accountType));
         upload.setAccountHolderName(String.valueOf(accountInfo.getOrDefault("holderName", "")));
         upload.setOriginalFileName(originalName);
-        upload.setStoredFilePath(UPLOAD_DIR + "/" + filename);
+        upload.setStoredFilePath(target.toString());
         upload.setFileContent(fileBytes);
         upload.setContentType(file.getContentType());
         upload.setFileSizeBytes(file.getSize());
@@ -232,7 +232,7 @@ public class BankFormService {
 
         BankFormUpload previousSnapshot = snapshotUpload(upload);
 
-        Path uploadDir = Paths.get(UPLOAD_DIR).normalize();
+        Path uploadDir = resolveUploadDirectory(UPLOAD_DIR);
         Files.createDirectories(uploadDir);
 
         String safeAccount = upload.getAccountNumber().replaceAll("[^a-zA-Z0-9]", "");
@@ -242,7 +242,7 @@ public class BankFormService {
         Files.write(target, fileBytes);
 
         upload.setOriginalFileName(originalName);
-        upload.setStoredFilePath(UPLOAD_DIR + "/" + filename);
+        upload.setStoredFilePath(target.toString());
         upload.setFileContent(fileBytes);
         upload.setContentType(file.getContentType());
         upload.setFileSizeBytes(file.getSize());
@@ -415,7 +415,7 @@ public class BankFormService {
         if (opt.isEmpty()) return false;
         BankFormUpload upload = opt.get();
         try {
-            Path path = Paths.get(upload.getStoredFilePath()).normalize();
+            Path path = resolveStoredPath(upload.getStoredFilePath());
             Files.deleteIfExists(path);
         } catch (IOException ignored) {
             // DB record still removed even if file missing
@@ -431,7 +431,7 @@ public class BankFormService {
         for (BankFormUpload upload : all) {
             try {
                 if (upload.getStoredFilePath() != null && !upload.getStoredFilePath().isBlank()) {
-                    Path path = Paths.get(upload.getStoredFilePath()).normalize();
+                    Path path = resolveStoredPath(upload.getStoredFilePath());
                     Files.deleteIfExists(path);
                 }
             } catch (IOException ignored) {
@@ -514,6 +514,28 @@ public class BankFormService {
         dto.put("remarks", history.getRemarks());
         dto.put("performedAt", history.getPerformedAt());
         return dto;
+    }
+
+    public static Path resolveUploadDirectory(String configuredDirectory) {
+        if (configuredDirectory != null && !configuredDirectory.isBlank()) {
+            Path configured = Paths.get(configuredDirectory).normalize();
+            if (configured.isAbsolute()) {
+                return configured;
+            }
+            return Paths.get(System.getProperty("user.dir")).resolve(configured).normalize();
+        }
+        return Paths.get(System.getProperty("user.dir"), "uploads", "bank-forms").normalize();
+    }
+
+    private Path resolveStoredPath(String storedFilePath) {
+        if (storedFilePath == null || storedFilePath.isBlank()) {
+            throw new IllegalArgumentException("Uploaded file not found on server");
+        }
+        Path path = Paths.get(storedFilePath).normalize();
+        if (!path.isAbsolute()) {
+            path = Paths.get(System.getProperty("user.dir")).resolve(path).normalize();
+        }
+        return path;
     }
 
     private static String stringValue(Map<String, Object> map, String key) {

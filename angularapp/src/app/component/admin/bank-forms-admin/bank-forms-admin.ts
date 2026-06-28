@@ -1,4 +1,4 @@
-import { Component, Input, OnInit, PLATFORM_ID, inject } from '@angular/core';
+import { Component, ElementRef, Input, OnInit, PLATFORM_ID, ViewChild, inject } from '@angular/core';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import {
@@ -22,11 +22,14 @@ import { BackendWakeupService } from '../../../service/backend-wakeup.service';
 export class BankFormsAdminComponent implements OnInit {
   @Input() adminName = 'Admin';
 
+  @ViewChild('fileInput') fileInput?: ElementRef<HTMLInputElement>;
+
   private readonly platformId = inject(PLATFORM_ID);
 
   forms: BankFormDefinition[] = [];
   categories: string[] = [];
   uploads: BankFormUploadRecord[] = [];
+  accountUploads: BankFormUploadRecord[] = [];
 
   selectedCategory = 'All';
   formSearchQuery = '';
@@ -51,6 +54,7 @@ export class BankFormsAdminComponent implements OnInit {
   isReplacingUploadId: number | null = null;
   isLoading = false;
   isDeleting = false;
+  isLoadingAccountUploads = false;
   filterAccountNumber = '';
   filterFormCode = '';
   selectedHistoryUploadId: number | null = null;
@@ -170,6 +174,7 @@ export class BankFormsAdminComponent implements OnInit {
     this.verifiedHolderName = '';
     this.verifiedAccount = null;
     this.accountVerificationError = '';
+    this.accountUploads = [];
   }
 
   downloadPdf(form?: BankFormDefinition | null): void {
@@ -274,6 +279,26 @@ export class BankFormsAdminComponent implements OnInit {
     });
   }
 
+  loadAccountUploads(): void {
+    const accountNumber = this.verifiedAccount?.accountNumber || this.uploadAccountNumber.trim();
+    if (!accountNumber) {
+      this.accountUploads = [];
+      return;
+    }
+
+    this.isLoadingAccountUploads = true;
+    this.bankFormService.listUploads(accountNumber, undefined).subscribe({
+      next: (res) => {
+        this.accountUploads = res.uploads || [];
+        this.isLoadingAccountUploads = false;
+      },
+      error: () => {
+        this.accountUploads = [];
+        this.isLoadingAccountUploads = false;
+      }
+    });
+  }
+
   onReplaceFileSelected(record: BankFormUploadRecord, event: Event): void {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
@@ -287,6 +312,7 @@ export class BankFormsAdminComponent implements OnInit {
         if (res.success) {
           this.alertService.success('Replaced', 'Uploaded file replaced and history saved.');
           this.loadUploads();
+          this.loadAccountUploads();
           if (this.selectedHistoryUploadId === record.id) {
             this.loadUploadHistory(record.id);
           }
@@ -410,6 +436,7 @@ export class BankFormsAdminComponent implements OnInit {
           this.verifiedHolderName = this.verifiedAccount.holderName;
           this.uploadAccountNumber = this.verifiedAccount.accountNumber;
           this.uploadCustomerId = this.verifiedAccount.customerId || this.uploadCustomerId;
+          this.loadAccountUploads();
           if (this.verifiedAccount.accountType) {
             this.uploadAccountType = this.normalizeAccountType(this.verifiedAccount.accountType);
           }
@@ -454,8 +481,12 @@ export class BankFormsAdminComponent implements OnInit {
           this.alertService.success('Saved', 'Application uploaded and saved to database.');
           this.selectedFile = null;
           this.uploadRemarks = '';
+          if (this.fileInput?.nativeElement) {
+            this.fileInput.nativeElement.value = '';
+          }
           this.loadUploads();
-          this.activeTab = 'uploads';
+          this.loadAccountUploads();
+          this.activeTab = 'submit';
         } else {
           this.alertService.error('Error', res.message || 'Upload failed.');
         }
@@ -481,6 +512,7 @@ export class BankFormsAdminComponent implements OnInit {
             this.uploadHistory = [];
           }
           this.loadUploads();
+          this.loadAccountUploads();
         }
       },
       error: () => {
@@ -502,6 +534,7 @@ export class BankFormsAdminComponent implements OnInit {
           this.selectedHistoryUploadId = null;
           this.uploadHistory = [];
           this.loadUploads();
+          this.loadAccountUploads();
         }
       },
       error: () => {

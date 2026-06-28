@@ -29,7 +29,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
      * Read allowed origins from SPRING_WEB_CORS_ALLOWED_ORIGINS environment variable.
      * Same as CorsConfig to ensure consistency between HTTP and WebSocket CORS.
      */
-    @Value("${SPRING_WEB_CORS_ALLOWED_ORIGINS:${spring.web.cors.allowed-origins:}}")
+    @Value("${spring.web.cors.allowed-origins:}")
     private String allowedOrigins;
 
     @Override

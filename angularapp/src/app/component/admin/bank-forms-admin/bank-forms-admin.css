@@ -213,6 +213,78 @@
   margin: 10px 0 0;
 }
 
+.account-uploads-panel {
+  margin-top: 16px;
+  padding: 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.account-uploads-panel h4 {
+  margin: 0 0 10px;
+  color: #1e3a8a;
+  font-size: 14px;
+}
+
+.account-upload-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.account-upload-item:last-child {
+  border-bottom: none;
+}
+
+.upload-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.upload-meta span {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.upload-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.small-btn {
+  border: none;
+  border-radius: 6px;
+  padding: 7px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.small-btn.view {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.small-btn.download {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.small-btn.replace {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.small-btn.delete {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
 .catalog-filters {
   display: flex;
   gap: 10px;

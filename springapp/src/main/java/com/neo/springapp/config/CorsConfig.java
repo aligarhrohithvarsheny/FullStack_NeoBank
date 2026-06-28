@@ -37,7 +37,7 @@ public class CorsConfig {
      * Read allowed origins from SPRING_WEB_CORS_ALLOWED_ORIGINS environment variable.
      * Spring Boot automatically maps SPRING_WEB_CORS_ALLOWED_ORIGINS to spring.web.cors.allowed-origins
      */
-    @Value("${SPRING_WEB_CORS_ALLOWED_ORIGINS:${spring.web.cors.allowed-origins:}}")
+    @Value("${spring.web.cors.allowed-origins:}")
     private String allowedOrigins;
 
     @Bean
