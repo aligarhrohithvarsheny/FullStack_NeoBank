@@ -1,6 +1,5 @@
 package com.neo.springapp.config;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -29,16 +28,10 @@ public class CorsConfig {
     private static final List<String> DEFAULT_ALLOWED_ORIGINS = Arrays.asList(
         "https://neo-bank-669.web.app",
         "https://neo-bank-669.firebaseapp.com",
+        "https://fullstack-neobank.onrender.com",
         "http://localhost:4200",
         "http://localhost:4000"
     );
-
-    /**
-     * Read allowed origins from SPRING_WEB_CORS_ALLOWED_ORIGINS environment variable.
-     * Spring Boot automatically maps SPRING_WEB_CORS_ALLOWED_ORIGINS to spring.web.cors.allowed-origins
-     */
-    @Value("${spring.web.cors.allowed-origins:}")
-    private String allowedOrigins;
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
@@ -65,10 +58,15 @@ public class CorsConfig {
     private CorsConfiguration buildCorsConfiguration() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        // Parse allowed origins from environment variable.
-        // If not provided, fall back to Firebase Hosting + local dev origins.
-        if (allowedOrigins != null && !allowedOrigins.trim().isEmpty()) {
-            List<String> origins = Arrays.stream(allowedOrigins.split(","))
+        // Parse allowed origins from environment variable or system property.
+        // If not provided, fall back to the known Firebase, Render, and local dev origins.
+        String configuredOrigins = System.getenv("SPRING_WEB_CORS_ALLOWED_ORIGINS");
+        if (configuredOrigins == null || configuredOrigins.trim().isEmpty()) {
+            configuredOrigins = System.getProperty("spring.web.cors.allowed-origins");
+        }
+
+        if (configuredOrigins != null && !configuredOrigins.trim().isEmpty()) {
+            List<String> origins = Arrays.stream(configuredOrigins.split(","))
                 .map(String::trim)
                 .filter(origin -> !origin.isEmpty())
                 .collect(Collectors.toList());
@@ -82,7 +80,7 @@ public class CorsConfig {
             }
         } else {
             configuration.setAllowedOriginPatterns(DEFAULT_ALLOWED_ORIGINS);
-            System.out.println("⚠️ CORS: SPRING_WEB_CORS_ALLOWED_ORIGINS not set, using defaults: " + DEFAULT_ALLOWED_ORIGINS);
+            System.out.println("⚠️ CORS: No configured origins found, using defaults: " + DEFAULT_ALLOWED_ORIGINS);
         }
 
         // Allow browser preflight and regular API calls from the frontend.

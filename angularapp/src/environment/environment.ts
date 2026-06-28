@@ -1,5 +1,5 @@
 export const environment = {
   production: false,
   // Shared backend endpoint (Render deployment)
-  apiBaseUrl: 'http://localhost:8080'
+  apiBaseUrl: 'https://fullstack-neobank.onrender.com'
 };
