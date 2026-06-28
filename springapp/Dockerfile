@@ -24,14 +24,15 @@ USER appuser
 # Render injects PORT at runtime; application.properties binds server.port=${PORT:8080}
 ENV PORT=8080
 
-# 512 MB container budget: ~300 MB heap + ~96 MB metaspace + ~100 MB native/thread stacks.
-# Do NOT set -Xmx512m — that excludes metaspace/native and causes OOM kills.
+# Keep enough headroom for Spring Boot class loading and generated proxy classes.
+# The previous 96m cap was too small for this app's dependency footprint.
 ENV JAVA_OPTS="\
 -XX:+UseContainerSupport \
--XX:InitialRAMPercentage=15.0 \
--XX:MaxRAMPercentage=58.0 \
--XX:MaxMetaspaceSize=96m \
--XX:ReservedCodeCacheSize=48m \
+-XX:InitialRAMPercentage=25.0 \
+-XX:MaxRAMPercentage=70.0 \
+-XX:MetaspaceSize=256m \
+-XX:MaxMetaspaceSize=512m \
+-XX:ReservedCodeCacheSize=256m \
 -XX:+UseG1GC \
 -XX:MaxGCPauseMillis=200 \
 -XX:+UseStringDeduplication \
