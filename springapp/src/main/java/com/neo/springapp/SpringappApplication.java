@@ -12,6 +12,8 @@ public class SpringappApplication {
 	public static void main(String[] args) {
 		SpringApplication app = new SpringApplication(SpringappApplication.class);
 		app.setBannerMode(Banner.Mode.OFF);
+		app.setLazyInitialization(Boolean.parseBoolean(
+				System.getenv().getOrDefault("SPRING_MAIN_LAZY_INITIALIZATION", "false")));
 		app.run(args);
 	}
 
