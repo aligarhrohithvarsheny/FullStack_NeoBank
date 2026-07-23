@@ -48,17 +48,22 @@ export class AdminAuditDocumentUploadComponent {
   onFileSelected(event: any): void {
     const file: File = event.target.files[0];
     if (file) {
-      // Validate file type (PDF, Excel, Images)
+      // Validate file type (PDF, Excel, Images) — extension fallback for browsers that send octet-stream
       const validTypes = [
         'application/pdf',
         'application/vnd.ms-excel',
         'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         'image/jpeg',
         'image/png',
-        'image/gif'
+        'image/gif',
+        'image/webp',
+        'application/octet-stream'
       ];
-      if (!validTypes.includes(file.type)) {
-        this.errorMessage = 'Invalid file type. Only PDF, Excel (XLS/XLSX), JPEG, PNG, GIF are allowed.';
+      const validExtensions = ['.pdf', '.xls', '.xlsx', '.jpg', '.jpeg', '.png', '.gif', '.webp'];
+      const lowerName = file.name.toLowerCase();
+      const hasValidExtension = validExtensions.some((ext) => lowerName.endsWith(ext));
+      if (!validTypes.includes(file.type) && !hasValidExtension) {
+        this.errorMessage = 'Invalid file type. Only PDF, Excel (XLS/XLSX), JPEG, PNG, GIF, WEBP are allowed.';
         this.selectedFile = null;
         return;
       }

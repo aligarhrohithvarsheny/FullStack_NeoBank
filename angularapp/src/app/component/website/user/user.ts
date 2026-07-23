@@ -51,7 +51,7 @@ export class User implements OnInit, OnDestroy {
   termsAccepted: boolean = false;
 
   // Signup OTP verification
-  signupStep: number = 1; // 1 = enter details, 2 = verify OTP, 3 = set password
+  signupStep: number = 1; // 1 = enter details, 2 = set password
   signupOtp: string = '';
   signupOtpSending: boolean = false;
   signupOtpVerifying: boolean = false;
@@ -803,13 +803,8 @@ export class User implements OnInit, OnDestroy {
     });
   }
 
-  // Step 3: Create account after OTP verified
+  // Create savings account after password is set
   createAccount() {
-    if (!this.signupEmailVerified) {
-      this.alertService.userError('Validation Error', 'Please verify your email first');
-      return;
-    }
-
     if (!this.signupPassword || !this.confirmPassword) {
       this.alertService.userError('Validation Error', 'Please fill in all fields');
       return;
@@ -1682,11 +1677,6 @@ export class User implements OnInit, OnDestroy {
       password: this.loginPassword
     };
     
-    // Add OTP if provided
-    if (this.showOtpInput && this.otpCode) {
-      loginData.otp = this.otpCode;
-    }
-    
     this.http.post(`${environment.apiBaseUrl}/api/users/complete-qr-login`, loginData).subscribe({
       next: (response: any) => {
         if (response.success && response.user) {
@@ -1709,11 +1699,6 @@ export class User implements OnInit, OnDestroy {
           } else {
             this.alertService.userError('Account Pending', 'Account not approved yet. Please wait for admin approval');
           }
-        } else if (response.requiresOtp) {
-          // OTP required
-          this.showOtpInput = true;
-          this.successMessage = response.message || 'OTP has been sent to your email. Please enter the OTP to complete login.';
-          this.errorMessage = '';
         } else {
           this.errorMessage = response.message || 'Login failed';
         }

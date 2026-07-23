@@ -31,6 +31,8 @@ public class AdminAuditService {
     
     private static final String UPLOAD_DIR = "uploads/admin-audit/";
     private static final long MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
+    private static final Set<String> ALLOWED_EXTENSIONS = Set.of(
+            "pdf", "xls", "xlsx", "jpg", "jpeg", "png", "gif", "webp");
     // Allow PDF, Excel (XLS/XLSX), and common image types
     private static final List<String> ALLOWED_TYPES = Arrays.asList(
             "application/pdf",
@@ -38,7 +40,9 @@ public class AdminAuditService {
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             "image/jpeg",
             "image/png",
-            "image/gif"
+            "image/gif",
+            "image/webp",
+            "application/octet-stream"
     );
     
     /**
@@ -94,33 +98,46 @@ public class AdminAuditService {
             throw new IllegalArgumentException("File size exceeds maximum limit of 10MB");
         }
         
-        if (!ALLOWED_TYPES.contains(file.getContentType())) {
-            throw new IllegalArgumentException("Invalid file type. Allowed types: PDF, Excel (XLS/XLSX), JPEG, PNG, GIF");
+        if (!isAllowedUpload(file.getContentType(), file.getOriginalFilename())) {
+            throw new IllegalArgumentException("Invalid file type. Allowed types: PDF, Excel (XLS/XLSX), JPEG, PNG, GIF, WEBP");
         }
         
+        byte[] fileBytes = file.getBytes();
+        String resolvedMimeType = resolveMimeType(file.getContentType(), file.getOriginalFilename());
+        
         // Create upload directory if not exists
-        Files.createDirectories(Paths.get(UPLOAD_DIR));
+        try {
+            Files.createDirectories(Paths.get(UPLOAD_DIR));
+        } catch (IOException diskDirError) {
+            System.err.println("Admin audit upload directory unavailable: " + diskDirError.getMessage());
+        }
         
         // Generate unique filename
         String originalFilename = file.getOriginalFilename();
-        String fileExtension = originalFilename != null ? originalFilename.substring(originalFilename.lastIndexOf(".")) : "";
-        String uniqueFileName = UUID.randomUUID() + fileExtension;
+        String fileExtension = extension(originalFilename);
+        String uniqueFileName = UUID.randomUUID() + (fileExtension.isEmpty() ? "" : "." + fileExtension);
         Path filePath = Paths.get(UPLOAD_DIR).resolve(uniqueFileName);
         
-        // Save file
-        Files.write(filePath, file.getBytes());
+        // Save file to disk when available (DB copy is the source of truth on ephemeral hosts)
+        try {
+            Files.write(filePath, fileBytes);
+        } catch (IOException diskError) {
+            System.err.println("Admin audit upload stored in database only (disk unavailable): " + diskError.getMessage());
+            filePath = Paths.get("db://" + uniqueFileName);
+        }
         
         // Calculate file hash
-        String fileHash = calculateHash(file.getBytes());
+        String fileHash = calculateHash(fileBytes);
         
         // Create document record
         AdminAuditDocument document = new AdminAuditDocument();
         document.setAuditLogId(auditLogId);
         document.setDocumentName(originalFilename);
-        document.setDocumentType(getDocumentType(file.getContentType()));
+        document.setDocumentType(getDocumentType(resolvedMimeType, originalFilename));
         document.setFilePath(filePath.toString());
         document.setFileSize(file.getSize());
         document.setFileUrl("/api/audit/documents/" + uniqueFileName);
+        document.setFileBase64(Base64.getEncoder().encodeToString(fileBytes));
         document.setUploadedBy(adminId);
         document.setUploadedByName(adminName);
         document.setDocumentHash(fileHash);
@@ -157,20 +174,31 @@ public class AdminAuditService {
             throw new IllegalArgumentException("File size exceeds maximum limit of 10MB");
         }
         
-        if (!ALLOWED_TYPES.contains(mimeType)) {
-            throw new IllegalArgumentException("Invalid file type. Allowed types: PDF, Excel (XLS/XLSX), JPEG, PNG, GIF");
+        if (!isAllowedUpload(mimeType, fileName)) {
+            throw new IllegalArgumentException("Invalid file type. Allowed types: PDF, Excel (XLS/XLSX), JPEG, PNG, GIF, WEBP");
         }
         
+        String resolvedMimeType = resolveMimeType(mimeType, fileName);
+        
         // Create upload directory if not exists
-        Files.createDirectories(Paths.get(UPLOAD_DIR));
+        try {
+            Files.createDirectories(Paths.get(UPLOAD_DIR));
+        } catch (IOException diskDirError) {
+            System.err.println("Admin audit upload directory unavailable: " + diskDirError.getMessage());
+        }
         
         // Generate unique filename
-        String fileExtension = fileName.substring(fileName.lastIndexOf("."));
-        String uniqueFileName = UUID.randomUUID() + fileExtension;
+        String fileExtension = extension(fileName);
+        String uniqueFileName = UUID.randomUUID() + (fileExtension.isEmpty() ? "" : "." + fileExtension);
         Path filePath = Paths.get(UPLOAD_DIR).resolve(uniqueFileName);
         
         // Save file
-        Files.write(filePath, decodedBytes);
+        try {
+            Files.write(filePath, decodedBytes);
+        } catch (IOException diskError) {
+            System.err.println("Admin audit base64 upload stored in database only (disk unavailable): " + diskError.getMessage());
+            filePath = Paths.get("db://" + uniqueFileName);
+        }
         
         // Calculate file hash
         String fileHash = calculateHash(decodedBytes);
@@ -179,7 +207,7 @@ public class AdminAuditService {
         AdminAuditDocument document = new AdminAuditDocument();
         document.setAuditLogId(auditLogId);
         document.setDocumentName(fileName);
-        document.setDocumentType(getDocumentType(mimeType));
+        document.setDocumentType(getDocumentType(resolvedMimeType, fileName));
         document.setFilePath(filePath.toString());
         document.setFileSize((long) decodedBytes.length);
         document.setFileUrl("/api/audit/documents/" + uniqueFileName);
@@ -247,17 +275,40 @@ public class AdminAuditService {
     public long getPendingDocumentCount() {
         return auditLogRepository.countPendingDocuments();
     }
+
+    public Optional<AdminAuditDocument> findDocument(Long documentId) {
+        return documentRepository.findById(documentId);
+    }
     
     /**
      * Download document file
      */
     public byte[] downloadDocument(Long documentId) throws IOException {
         Optional<AdminAuditDocument> optional = documentRepository.findById(documentId);
-        if (optional.isPresent()) {
-            AdminAuditDocument document = optional.get();
-            return Files.readAllBytes(Paths.get(document.getFilePath()));
+        if (optional.isEmpty()) {
+            throw new IllegalArgumentException("Document not found");
         }
-        throw new IllegalArgumentException("Document not found");
+        AdminAuditDocument document = optional.get();
+        byte[] fromDb = readDocumentBytes(document);
+        if (fromDb != null && fromDb.length > 0) {
+            return fromDb;
+        }
+        throw new IllegalArgumentException("Document file not found on server");
+    }
+    
+    public String resolveDownloadContentType(AdminAuditDocument document) {
+        String name = document.getDocumentName();
+        String ext = extension(name);
+        return switch (ext) {
+            case "pdf" -> "application/pdf";
+            case "jpg", "jpeg" -> "image/jpeg";
+            case "png" -> "image/png";
+            case "gif" -> "image/gif";
+            case "webp" -> "image/webp";
+            case "xls" -> "application/vnd.ms-excel";
+            case "xlsx" -> "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+            default -> "application/octet-stream";
+        };
     }
     
     /**
@@ -267,7 +318,10 @@ public class AdminAuditService {
         Optional<AdminAuditDocument> optional = documentRepository.findById(documentId);
         if (optional.isPresent()) {
             AdminAuditDocument document = optional.get();
-            byte[] fileBytes = Files.readAllBytes(Paths.get(document.getFilePath()));
+            byte[] fileBytes = readDocumentBytes(document);
+            if (fileBytes == null || fileBytes.length == 0) {
+                return false;
+            }
             String currentHash = calculateHash(fileBytes);
             
             if (currentHash.equals(document.getDocumentHash())) {
@@ -308,15 +362,72 @@ public class AdminAuditService {
     
     // Helper methods
     
-    private String getDocumentType(String mimeType) {
-        if ("application/pdf".equals(mimeType)) {
+    private byte[] readDocumentBytes(AdminAuditDocument document) throws IOException {
+        if (document.getFileBase64() != null && !document.getFileBase64().isBlank()) {
+            return Base64.getDecoder().decode(document.getFileBase64());
+        }
+        String filePath = document.getFilePath();
+        if (filePath == null || filePath.isBlank() || filePath.startsWith("db://")) {
+            return null;
+        }
+        Path path = Paths.get(filePath).normalize();
+        if (!path.isAbsolute()) {
+            path = Paths.get(System.getProperty("user.dir")).resolve(path).normalize();
+        }
+        if (!Files.exists(path)) {
+            return null;
+        }
+        return Files.readAllBytes(path);
+    }
+
+    private boolean isAllowedUpload(String contentType, String filename) {
+        if (ALLOWED_EXTENSIONS.contains(extension(filename))) {
+            return true;
+        }
+        return contentType != null && ALLOWED_TYPES.contains(contentType);
+    }
+
+    private String resolveMimeType(String contentType, String filename) {
+        if (contentType != null && !contentType.isBlank() && !"application/octet-stream".equals(contentType)) {
+            return contentType;
+        }
+        return switch (extension(filename)) {
+            case "pdf" -> "application/pdf";
+            case "jpg", "jpeg" -> "image/jpeg";
+            case "png" -> "image/png";
+            case "gif" -> "image/gif";
+            case "webp" -> "image/webp";
+            case "xls" -> "application/vnd.ms-excel";
+            case "xlsx" -> "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+            default -> "application/octet-stream";
+        };
+    }
+
+    private static String extension(String filename) {
+        if (filename == null || filename.isBlank()) {
+            return "";
+        }
+        String lower = filename.toLowerCase();
+        int dot = lower.lastIndexOf('.');
+        return dot >= 0 ? lower.substring(dot + 1) : "";
+    }
+    
+    private String getDocumentType(String mimeType, String filename) {
+        if ("application/pdf".equals(mimeType) || "pdf".equals(extension(filename))) {
             return "PDF";
-        } else if ("image/jpeg".equals(mimeType)) {
+        } else if ("image/jpeg".equals(mimeType) || Set.of("jpg", "jpeg").contains(extension(filename))) {
             return "IMAGE_JPG";
-        } else if ("image/png".equals(mimeType)) {
+        } else if ("image/png".equals(mimeType) || "png".equals(extension(filename))) {
             return "IMAGE_PNG";
-        } else if ("image/gif".equals(mimeType)) {
+        } else if ("image/gif".equals(mimeType) || "gif".equals(extension(filename))) {
             return "IMAGE_GIF";
+        } else if ("image/webp".equals(mimeType) || "webp".equals(extension(filename))) {
+            return "IMAGE_WEBP";
+        } else if ("application/vnd.ms-excel".equals(mimeType) || "xls".equals(extension(filename))) {
+            return "EXCEL_XLS";
+        } else if ("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet".equals(mimeType)
+                || "xlsx".equals(extension(filename))) {
+            return "EXCEL_XLSX";
         }
         return "UNKNOWN";
     }

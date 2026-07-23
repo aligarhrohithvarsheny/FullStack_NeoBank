@@ -5,6 +5,7 @@ import com.neo.springapp.model.AdminAuditDocument;
 import com.neo.springapp.service.AdminAuditService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -13,6 +14,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.*;
 
@@ -185,13 +187,26 @@ public class AdminAuditController {
      * Download document file
      */
     @GetMapping("/documents/{documentId}/download")
-    public ResponseEntity<byte[]> downloadDocument(@PathVariable Long documentId) {
+    public ResponseEntity<?> downloadDocument(@PathVariable Long documentId) {
         try {
+            Optional<AdminAuditDocument> optional = auditService.findDocument(documentId);
+            if (optional.isEmpty()) {
+                return ResponseEntity.notFound().build();
+            }
+            AdminAuditDocument document = optional.get();
             byte[] fileContent = auditService.downloadDocument(documentId);
+            String filename = document.getDocumentName() != null ? document.getDocumentName() : "document";
+            MediaType mediaType = MediaType.parseMediaType(auditService.resolveDownloadContentType(document));
             return ResponseEntity.ok()
-                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=document.pdf")
-                    .contentType(MediaType.APPLICATION_PDF)
+                    .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
+                            .filename(filename, StandardCharsets.UTF_8).build().toString())
+                    .contentType(mediaType)
                     .body(fileContent);
+        } catch (IllegalArgumentException e) {
+            Map<String, Object> body = new HashMap<>();
+            body.put("success", false);
+            body.put("message", e.getMessage());
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).contentType(MediaType.APPLICATION_JSON).body(body);
         } catch (IOException e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }

@@ -1,10 +1,17 @@
 package com.neo.springapp.config;
 
+import com.neo.springapp.model.BankFormUpload;
+import com.neo.springapp.repository.BankFormUploadRepository;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.core.annotation.Order;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.List;
 
 /**
  * Ensures bank form upload tables support database-backed file storage on hosts
@@ -15,9 +22,13 @@ import org.springframework.stereotype.Component;
 public class BankFormUploadMigrationRunner implements ApplicationRunner {
 
     private final JdbcTemplate jdbcTemplate;
+    private final BankFormUploadRepository bankFormUploadRepository;
 
-    public BankFormUploadMigrationRunner(JdbcTemplate jdbcTemplate) {
+    public BankFormUploadMigrationRunner(
+            JdbcTemplate jdbcTemplate,
+            BankFormUploadRepository bankFormUploadRepository) {
         this.jdbcTemplate = jdbcTemplate;
+        this.bankFormUploadRepository = bankFormUploadRepository;
     }
 
     @Override
@@ -25,6 +36,7 @@ public class BankFormUploadMigrationRunner implements ApplicationRunner {
         try {
             ensureUploadFileContentColumn();
             ensureUploadHistoryTable();
+            backfillFileContentFromDisk();
         } catch (Exception e) {
             System.err.println("Bank form upload migration warning: " + e.getMessage());
         }
@@ -93,5 +105,40 @@ public class BankFormUploadMigrationRunner implements ApplicationRunner {
                 tableName,
                 columnName);
         return count != null && count > 0;
+    }
+
+    /** Copy disk files into DB for uploads created before database-backed storage. */
+    private void backfillFileContentFromDisk() {
+        if (!tableExists("bank_form_uploads") || !columnExists("bank_form_uploads", "file_content")) {
+            return;
+        }
+        List<BankFormUpload> uploads = bankFormUploadRepository.findAll();
+        int backfilled = 0;
+        for (BankFormUpload upload : uploads) {
+            if (upload.getFileContent() != null && upload.getFileContent().length > 0) {
+                continue;
+            }
+            String storedPath = upload.getStoredFilePath();
+            if (storedPath == null || storedPath.isBlank() || storedPath.startsWith("db://")) {
+                continue;
+            }
+            try {
+                Path path = Paths.get(storedPath).normalize();
+                if (!path.isAbsolute()) {
+                    path = Paths.get(System.getProperty("user.dir")).resolve(path).normalize();
+                }
+                if (!Files.exists(path)) {
+                    continue;
+                }
+                upload.setFileContent(Files.readAllBytes(path));
+                bankFormUploadRepository.save(upload);
+                backfilled++;
+            } catch (Exception e) {
+                System.err.println("Bank form backfill skipped id=" + upload.getId() + ": " + e.getMessage());
+            }
+        }
+        if (backfilled > 0) {
+            System.out.println("Backfilled file_content for " + backfilled + " bank form upload(s)");
+        }
     }
 }
