@@ -9,7 +9,7 @@
       </div>
 
       <!-- ═══════════ UNIFIED LOGIN (Default View) ═══════════ -->
-      <div *ngIf="currentPage === 'login' && !showOtpInput" class="jpm-form-section">
+      <div *ngIf="currentPage === 'login'" class="jpm-form-section">
         <!-- Account Type Hint -->
         <p class="jpm-account-hint">
           Savings, Current or Salary — sign in with your Account Number / Email
@@ -85,47 +85,7 @@
         </div>
       </div>
 
-      <!-- ═══════════ OTP VERIFICATION ═══════════ -->
-      <div *ngIf="showOtpInput" class="jpm-form-section">
-        <h3 class="jpm-section-title">Enter OTP</h3>
-        <p class="jpm-hint">We've sent a 6-digit OTP to your email. Enter it below to complete login.</p>
-
-        <form (ngSubmit)="verifyOtp()" class="jpm-otp-form">
-          <div class="jpm-field">
-            <label class="jpm-label">OTP Code</label>
-            <input
-              type="text"
-              class="jpm-input"
-              [(ngModel)]="otpCode"
-              name="otpCode"
-              placeholder="Enter 6-digit OTP"
-              maxlength="6"
-              pattern="[0-9]{6}"
-              autocomplete="off"
-            />
-          </div>
-
-          <div class="jpm-otp-actions">
-            <button type="button" class="jpm-cancel-btn" (click)="cancelOtpVerification()" [disabled]="verifyingOtp">Cancel</button>
-            <button type="submit" class="jpm-signin-btn" [disabled]="verifyingOtp || !otpCode || otpCode.length !== 6">
-              {{ verifyingOtp ? 'Verifying...' : 'Verify OTP' }}
-            </button>
-          </div>
-
-          <div class="jpm-resend">
-            <a href="javascript:void(0)" (click)="resendOtp()" class="jpm-link" [class.disabled]="resendingOtp">
-              {{ resendingOtp ? 'Sending...' : 'Resend OTP' }}
-            </a>
-          </div>
-        </form>
-
-        <div class="jpm-message-section" *ngIf="errorMessage || successMessage">
-          <div class="jpm-error" *ngIf="errorMessage">{{ errorMessage }}</div>
-          <div class="jpm-success" *ngIf="successMessage">{{ successMessage }}</div>
-        </div>
-      </div>
-
-      <!-- ═══════════ SIGNUP FORM (3-Step with Email OTP) ═══════════ -->
+      <!-- ═══════════ SIGNUP FORM ═══════════ -->
       <div *ngIf="currentPage === 'signup'" class="jpm-form-section">
         <h3 class="jpm-section-title">Create Savings Account</h3>
 
@@ -136,13 +96,8 @@
             <span class="jpm-step-text">Your Details</span>
           </div>
           <div class="jpm-step-line" [class.active]="signupStep > 1"></div>
-          <div class="jpm-step-indicator" [class.active]="signupStep >= 2" [class.completed]="signupStep > 2">
+          <div class="jpm-step-indicator" [class.active]="signupStep >= 2">
             <span class="jpm-step-num">2</span>
-            <span class="jpm-step-text">Verify Email</span>
-          </div>
-          <div class="jpm-step-line" [class.active]="signupStep > 2"></div>
-          <div class="jpm-step-indicator" [class.active]="signupStep >= 3">
-            <span class="jpm-step-num">3</span>
             <span class="jpm-step-text">Set Password</span>
           </div>
         </div>
@@ -162,35 +117,16 @@
             <label class="jpm-label">Mobile Number</label>
             <input type="tel" class="jpm-input" [(ngModel)]="signupMobile" name="signupMobile" placeholder="Enter 10-digit mobile number" maxlength="10" required />
           </div>
-          <button type="button" class="jpm-signin-btn" (click)="sendSignupOtp()" [disabled]="signupOtpSending">
-            {{ signupOtpSending ? 'Sending OTP...' : 'Verify Email & Continue' }}
+          <button type="button" class="jpm-signin-btn" (click)="proceedToPasswordSetup()">
+            Continue to Set Password
           </button>
         </div>
 
-        <!-- STEP 2: Email OTP Verification -->
+        <!-- STEP 2: Set Password & Create Account -->
         <div *ngIf="signupStep === 2">
-          <p class="jpm-hint">We've sent a 6-digit OTP to <strong>{{ signupEmail }}</strong>. Enter it below to verify your email.</p>
-          <div class="jpm-field">
-            <label class="jpm-label">Enter OTP</label>
-            <input type="text" class="jpm-input" [(ngModel)]="signupOtp" name="signupOtp" placeholder="Enter 6-digit OTP" maxlength="6" (keyup.enter)="verifySignupOtp()" />
-          </div>
-          <button type="button" class="jpm-signin-btn" (click)="verifySignupOtp()" [disabled]="signupOtpVerifying">
-            {{ signupOtpVerifying ? 'Verifying...' : 'Verify OTP' }}
-          </button>
-          <div class="jpm-more-options" style="margin-top: 12px;">
-            <a href="javascript:void(0)" (click)="resendSignupOtp()" class="jpm-link" [class.disabled]="signupResending">
-              {{ signupResending ? 'Resending...' : 'Resend OTP' }}
-            </a>
-            <span class="jpm-separator">|</span>
-            <a href="javascript:void(0)" (click)="signupStep = 1" class="jpm-link">Change Email</a>
-          </div>
-        </div>
-
-        <!-- STEP 3: Set Password & Create Account -->
-        <div *ngIf="signupStep === 3">
-          <p class="jpm-hint">Email verified! Set your password to complete Savings Account signup.</p>
+          <p class="jpm-hint">Set your password to complete Savings Account signup.</p>
           <div class="jpm-verified-badge">
-            <i class="fa fa-check-circle"></i> {{ signupEmail }} — Verified
+            <i class="fa fa-check-circle"></i> {{ signupEmail }}
           </div>
           <div class="jpm-field">
             <label class="jpm-label">Full Name</label>

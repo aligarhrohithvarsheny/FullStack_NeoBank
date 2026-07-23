@@ -1,5 +1,6 @@
 package com.neo.springapp.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.Data;
 
@@ -42,6 +43,7 @@ public class BankFormUpload {
 
     @Lob
     @Basic(fetch = FetchType.LAZY)
+    @JsonIgnore
     @Column(name = "file_content")
     private byte[] fileContent;
 

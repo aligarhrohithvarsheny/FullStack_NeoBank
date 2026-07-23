@@ -4,6 +4,7 @@ import com.neo.springapp.config.BankFormCatalog;
 import com.neo.springapp.config.BankFormCatalog.FormDefinition;
 import com.neo.springapp.model.*;
 import com.neo.springapp.repository.*;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -128,6 +129,10 @@ public class BankFormService {
 
     @Transactional(readOnly = true)
     public byte[] readUploadedFileById(Long id) throws IOException {
+        Optional<byte[]> content = bankFormUploadRepository.findFileContentById(id);
+        if (content.isPresent() && content.get() != null && content.get().length > 0) {
+            return content.get();
+        }
         BankFormUpload upload = bankFormUploadRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Upload record not found"));
         return readUploadedFile(upload);
@@ -138,7 +143,8 @@ public class BankFormService {
         if (upload.getFileContent() != null && upload.getFileContent().length > 0) {
             return upload.getFileContent();
         }
-        if (upload.getStoredFilePath() == null || upload.getStoredFilePath().isBlank()) {
+        if (upload.getStoredFilePath() == null || upload.getStoredFilePath().isBlank()
+                || upload.getStoredFilePath().startsWith("db://")) {
             throw new IllegalArgumentException("Uploaded file not found on server");
         }
         Path path = resolveStoredPath(upload.getStoredFilePath());
@@ -178,14 +184,19 @@ public class BankFormService {
             throw new IllegalArgumentException("Account not found for the given account number and type");
         }
 
-        Path uploadDir = resolveUploadDirectory(UPLOAD_DIR);
-        Files.createDirectories(uploadDir);
-
         String safeAccount = accountNumber.replaceAll("[^a-zA-Z0-9]", "");
         String filename = form.code() + "-" + safeAccount + "-" + System.currentTimeMillis() + "." + ext;
-        Path target = uploadDir.resolve(filename).normalize();
         byte[] fileBytes = file.getBytes();
-        Files.write(target, fileBytes);
+        String storedPath = "db://" + filename;
+        try {
+            Path uploadDir = resolveUploadDirectory(UPLOAD_DIR);
+            Files.createDirectories(uploadDir);
+            Path target = uploadDir.resolve(filename).normalize();
+            Files.write(target, fileBytes);
+            storedPath = target.toString();
+        } catch (IOException diskError) {
+            System.err.println("Bank form upload stored in database only (disk unavailable): " + diskError.getMessage());
+        }
 
         BankFormUpload upload = new BankFormUpload();
         upload.setFormCode(form.code());
@@ -195,9 +206,9 @@ public class BankFormService {
         upload.setAccountType(normalizeAccountType(accountType));
         upload.setAccountHolderName(String.valueOf(accountInfo.getOrDefault("holderName", "")));
         upload.setOriginalFileName(originalName);
-        upload.setStoredFilePath(target.toString());
+        upload.setStoredFilePath(storedPath);
         upload.setFileContent(fileBytes);
-        upload.setContentType(file.getContentType());
+        upload.setContentType(resolveContentType(file.getContentType(), ext));
         upload.setFileSizeBytes(file.getSize());
         upload.setUploadedByAdmin(uploadedByAdmin);
         upload.setRemarks(remarks);
@@ -232,19 +243,24 @@ public class BankFormService {
 
         BankFormUpload previousSnapshot = snapshotUpload(upload);
 
-        Path uploadDir = resolveUploadDirectory(UPLOAD_DIR);
-        Files.createDirectories(uploadDir);
-
         String safeAccount = upload.getAccountNumber().replaceAll("[^a-zA-Z0-9]", "");
         String filename = upload.getFormCode() + "-" + safeAccount + "-replace-" + System.currentTimeMillis() + "." + ext;
-        Path target = uploadDir.resolve(filename).normalize();
         byte[] fileBytes = file.getBytes();
-        Files.write(target, fileBytes);
+        String storedPath = "db://" + filename;
+        try {
+            Path uploadDir = resolveUploadDirectory(UPLOAD_DIR);
+            Files.createDirectories(uploadDir);
+            Path target = uploadDir.resolve(filename).normalize();
+            Files.write(target, fileBytes);
+            storedPath = target.toString();
+        } catch (IOException diskError) {
+            System.err.println("Bank form replace stored in database only (disk unavailable): " + diskError.getMessage());
+        }
 
         upload.setOriginalFileName(originalName);
-        upload.setStoredFilePath(target.toString());
+        upload.setStoredFilePath(storedPath);
         upload.setFileContent(fileBytes);
-        upload.setContentType(file.getContentType());
+        upload.setContentType(resolveContentType(file.getContentType(), ext));
         upload.setFileSizeBytes(file.getSize());
         upload.setUploadedByAdmin(replacedByAdmin);
         if (remarks != null && !remarks.isBlank()) {
@@ -415,8 +431,11 @@ public class BankFormService {
         if (opt.isEmpty()) return false;
         BankFormUpload upload = opt.get();
         try {
-            Path path = resolveStoredPath(upload.getStoredFilePath());
-            Files.deleteIfExists(path);
+            if (upload.getStoredFilePath() != null && !upload.getStoredFilePath().isBlank()
+                    && !upload.getStoredFilePath().startsWith("db://")) {
+                Path path = resolveStoredPath(upload.getStoredFilePath());
+                Files.deleteIfExists(path);
+            }
         } catch (IOException ignored) {
             // DB record still removed even if file missing
         }
@@ -430,7 +449,8 @@ public class BankFormService {
         List<BankFormUpload> all = bankFormUploadRepository.findAll();
         for (BankFormUpload upload : all) {
             try {
-                if (upload.getStoredFilePath() != null && !upload.getStoredFilePath().isBlank()) {
+                if (upload.getStoredFilePath() != null && !upload.getStoredFilePath().isBlank()
+                        && !upload.getStoredFilePath().startsWith("db://")) {
                     Path path = resolveStoredPath(upload.getStoredFilePath());
                     Files.deleteIfExists(path);
                 }
@@ -575,5 +595,28 @@ public class BankFormService {
         String lower = filename.toLowerCase();
         int dot = lower.lastIndexOf('.');
         return dot >= 0 ? lower.substring(dot + 1) : "";
+    }
+
+    public static String resolveContentType(String contentType, String ext) {
+        if (contentType != null && !contentType.isBlank()) {
+            return contentType;
+        }
+        return switch (ext.toLowerCase()) {
+            case "pdf" -> "application/pdf";
+            case "jpg", "jpeg" -> "image/jpeg";
+            case "png" -> "image/png";
+            case "webp" -> "image/webp";
+            default -> "application/octet-stream";
+        };
+    }
+
+    public static MediaType resolveMediaType(String contentType, String filename) {
+        String ext = extension(filename != null ? filename : "");
+        String resolved = resolveContentType(contentType, ext);
+        try {
+            return MediaType.parseMediaType(resolved);
+        } catch (Exception ignored) {
+            return MediaType.APPLICATION_OCTET_STREAM;
+        }
     }
 }

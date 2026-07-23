@@ -22,11 +22,6 @@ export class User implements OnInit, OnDestroy {
   // For login
   loginUserId: string = '';
   loginPassword: string = '';
-  showOtpInput: boolean = false;
-  otpCode: string = '';
-  verifyingOtp: boolean = false;
-  resendingOtp: boolean = false;
-  
   // For graphical password
   useGraphicalPassword: boolean = false;
   graphicalPasswordSequence: number[] = [];
@@ -235,13 +230,7 @@ export class User implements OnInit, OnDestroy {
       next: (authResponse: any) => {
         console.log('Graphical password authentication response:', authResponse);
         
-        if (authResponse.success && authResponse.requiresOtp) {
-          // Graphical password verified, now show OTP input
-          this.showOtpInput = true;
-          this.successMessage = authResponse.message || 'Graphical password verified. OTP has been sent to your email.';
-          this.errorMessage = '';
-          this.alertService.userSuccess('Graphical Password Verified', 'OTP has been sent to your email.');
-        } else if (authResponse.requiresPasswordSetup) {
+        if (authResponse.requiresPasswordSetup) {
           // New password setup required for newly approved accounts
           this.successMessage = authResponse.message || 'Your account has been approved. Please set up your password to proceed.';
           this.errorMessage = '';
@@ -581,19 +570,7 @@ export class User implements OnInit, OnDestroy {
         this.isUnifiedLoggingIn = false;
         console.log('Authentication response:', authResponse);
         
-        if (authResponse.success && authResponse.requiresOtp) {
-          // Password verified, now show OTP input
-          if (authResponse.loginEmail) {
-            this.loginUserId = authResponse.loginEmail;
-          }
-          this.showOtpInput = true;
-          this.successMessage = authResponse.message || 'OTP has been sent to your email. Please enter the OTP to complete login.';
-          this.errorMessage = '';
-          const otpHint = authResponse.otpEmailSent === false
-            ? 'OTP could not be emailed. Use Resend OTP or check with your bank.'
-            : 'OTP has been sent to your email. Please check and enter the OTP.';
-          this.alertService.userSuccess('Password Verified', otpHint);
-        } else if (authResponse.success && authResponse.requiresPasswordSetup) {
+        if (authResponse.success && authResponse.requiresPasswordSetup) {
           // New password setup required for newly approved accounts
           this.successMessage = authResponse.message || 'Your account has been approved. Please set up your password to proceed.';
           this.errorMessage = '';
@@ -706,150 +683,30 @@ export class User implements OnInit, OnDestroy {
     });
   }
 
-  verifyOtp() {
-    // Trim and validate OTP
-    const trimmedOtp = this.otpCode ? this.otpCode.trim() : '';
-    
-    if (!trimmedOtp || trimmedOtp.length !== 6 || !/^\d{6}$/.test(trimmedOtp)) {
-      this.alertService.userError('Validation Error', 'Please enter a valid 6-digit OTP');
+  proceedToPasswordSetup() {
+    if (!this.signupName || !this.signupEmail || !this.signupMobile) {
+      this.alertService.userError('Validation Error', 'Please fill in all fields');
       return;
     }
 
-    // Normalize email to lowercase and trim
-    const normalizedEmail = this.loginUserId ? this.loginUserId.toLowerCase().trim() : '';
-    
-    if (!normalizedEmail) {
-      this.alertService.userError('Validation Error', 'Email is required');
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(this.signupEmail)) {
+      this.alertService.userError('Validation Error', 'Please enter a valid email address');
       return;
     }
 
-    this.verifyingOtp = true;
-    this.errorMessage = '';
-    this.successMessage = '';
+    if (this.signupMobile.length < 10) {
+      this.alertService.userError('Validation Error', 'Please enter a valid 10-digit mobile number');
+      return;
+    }
 
-    // Get device info and location
-    const deviceInfo = navigator.userAgent || 'Unknown';
-    const loginMethod = this.useGraphicalPassword ? 'GRAPHICAL_PASSWORD' : 'PASSWORD';
-    
-    console.log('🔐 Verifying OTP:', {
-      email: normalizedEmail,
-      otpLength: trimmedOtp.length,
-      loginMethod: loginMethod
-    });
-    
-    this.http.post(`${environment.apiBaseUrl}/api/users/verify-otp`, {
-      email: normalizedEmail,
-      otp: trimmedOtp,
-      loginMethod: loginMethod,
-      deviceInfo: deviceInfo,
-      location: 'Browser Location' // Can be enhanced with geolocation API
-    }).subscribe({
-      next: (response: any) => {
-        console.log('OTP verification response:', response);
-        this.verifyingOtp = false;
-
-        if (response.success && response.role === 'ADMIN') {
-          // Admin login detected - redirect to admin login page
-          this.alertService.userSuccess('Admin Account Detected', 'Please use the admin login page.');
-          this.router.navigate(['/admin/login']);
-        } else if (response.success && response.user) {
-          const userData = response.user;
-
-          if (userData.status === 'APPROVED') {
-            // Store user session data
-            const sessionData = {
-              id: userData.id,
-              name: userData.account?.name || userData.username,
-              email: userData.email,
-              accountNumber: userData.accountNumber,
-              status: userData.status,
-              loginTime: new Date().toISOString()
-            };
-
-            sessionStorage.setItem('currentUser', JSON.stringify(sessionData));
-
-            console.log('OTP verified and user logged in successfully:', userData);
-            this.alertService.userSuccess('Login Successful', `Welcome ${userData.account?.name || userData.username}!`);
-            this.router.navigate(['/website/userdashboard']);
-          } else {
-            this.alertService.userError('Account Pending', 'Account not approved yet. Please wait for admin approval');
-            this.showOtpInput = false;
-            this.otpCode = '';
-          }
-        } else {
-          this.errorMessage = response.message || 'Invalid OTP. Please try again.';
-          this.otpCode = ''; // Clear OTP input
-        }
-      },
-      error: (err: any) => {
-        console.error('❌ OTP verification error:', err);
-        console.error('Error details:', {
-          status: err.status,
-          statusText: err.statusText,
-          error: err.error,
-          message: err.error?.message || err.message
-        });
-        
-        this.verifyingOtp = false;
-        
-        // Provide more specific error messages
-        let errorMessage = 'OTP verification failed. Please try again.';
-        
-        if (err.error?.message) {
-          errorMessage = err.error.message;
-        } else if (err.status === 0) {
-          errorMessage = 'Unable to connect to server. Please check your connection.';
-        } else if (err.status === 400) {
-          errorMessage = err.error?.message || 'Invalid OTP. Please check and try again.';
-        } else if (err.status === 401) {
-          errorMessage = 'Authentication failed. Please try logging in again.';
-        } else if (err.status >= 500) {
-          errorMessage = 'Server error. Please try again later.';
-        }
-        
-        this.errorMessage = errorMessage;
-        this.alertService.userError('OTP Verification Failed', errorMessage);
-        this.otpCode = ''; // Clear OTP input
-      }
-    });
-  }
-
-  resendOtp() {
-    this.resendingOtp = true;
-    this.errorMessage = '';
-    this.successMessage = '';
-
-    this.http.post(`${environment.apiBaseUrl}/api/users/resend-otp`, {
-      email: this.loginUserId
-    }).subscribe({
-      next: (response: any) => {
-        console.log('Resend OTP response:', response);
-        this.resendingOtp = false;
-
-        if (response.success) {
-          this.successMessage = response.message || 'OTP has been resent to your email.';
-          this.alertService.userSuccess('OTP Resent', 'A new OTP has been sent to your email. Please check and enter the OTP.');
-          this.otpCode = ''; // Clear previous OTP
-        } else {
-          this.errorMessage = response.message || 'Failed to resend OTP. Please try again.';
-        }
-      },
-      error: (err: any) => {
-        console.error('Resend OTP error:', err);
-        this.resendingOtp = false;
-        this.errorMessage = err.error?.message || 'Failed to resend OTP. Please try again.';
-      }
-    });
-  }
-
-  cancelOtpVerification() {
-    this.showOtpInput = false;
-    this.otpCode = '';
+    this.signupEmailVerified = true;
+    this.signupStep = 2;
     this.errorMessage = '';
     this.successMessage = '';
   }
 
-  // Step 1: Send OTP to email for signup verification
+  // Legacy signup OTP helpers (unused — signup goes directly to password step)
   sendSignupOtp() {
     if (!this.signupName || !this.signupEmail || !this.signupMobile) {
       this.alertService.userError('Validation Error', 'Please fill in all fields');

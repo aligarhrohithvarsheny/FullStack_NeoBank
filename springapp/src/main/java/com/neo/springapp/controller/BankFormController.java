@@ -182,10 +182,9 @@ public class BankFormController {
             byte[] fileBytes = bankFormService.readUploadedFileById(id);
             BankFormUpload upload = bankFormService.findUpload(id)
                     .orElseThrow(() -> new IllegalArgumentException("Upload record not found"));
-            MediaType mediaType = MediaType.APPLICATION_OCTET_STREAM;
-            if (upload.getContentType() != null && !upload.getContentType().isBlank()) {
-                mediaType = MediaType.parseMediaType(upload.getContentType());
-            }
+            MediaType mediaType = BankFormService.resolveMediaType(
+                    upload.getContentType(),
+                    upload.getOriginalFileName());
             String filename = upload.getOriginalFileName() != null
                     ? upload.getOriginalFileName()
                     : "NeoBank-upload-" + id;

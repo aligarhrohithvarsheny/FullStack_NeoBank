@@ -136,6 +136,37 @@ public class UserController {
         return userResponse;
     }
 
+    private ResponseEntity<Map<String, Object>> completeUserLogin(
+            User user,
+            String loginMethod,
+            String clientIp,
+            String deviceInfo,
+            String location) {
+        user.setFailedLoginAttempts(0);
+        user.setAccountLocked(false);
+        user.setLastFailedLoginTime(null);
+        userService.saveUser(user);
+
+        try {
+            loginHistoryService.recordLogin(user, location, clientIp, deviceInfo, loginMethod);
+            sessionHistoryService.recordUserLogin(user, location, clientIp, deviceInfo, loginMethod);
+        } catch (Exception e) {
+            System.err.println("Error recording login history: " + e.getMessage());
+        }
+
+        LocalDateTime loginTime = LocalDateTime.now();
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+        emailService.sendLoginNotificationEmail(user.getEmail(), user.getUsername(), loginTime.format(formatter));
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", true);
+        response.put("user", createUserResponse(user));
+        response.put("role", "USER");
+        response.put("message", "Login successful");
+        System.out.println("Login successful for user: " + user.getUsername());
+        return ResponseEntity.ok(response);
+    }
+
     /** Resolve savings user by email or account number (unified login). */
     private Optional<User> resolveUserForLogin(String loginId) {
         if (loginId == null || loginId.trim().isEmpty()) {
@@ -152,7 +183,7 @@ public class UserController {
         return userService.getUserByAccountNumber(normalized);
     }
 
-    // Authentication endpoint - Step 1: Verify password and send OTP
+    // Authentication endpoint — verify password and complete login (no OTP)
     @PostMapping("/authenticate")
     public ResponseEntity<Map<String, Object>> authenticateUser(
             @RequestBody Map<String, String> credentials,
@@ -161,6 +192,12 @@ public class UserController {
         try {
             String email = credentials.get("email");
             String password = credentials.get("password");
+            String clientIp = forwardedFor != null ? forwardedFor.split(",")[0].trim() :
+                    credentials.get("ipAddress") != null ? credentials.get("ipAddress") : "Unknown";
+            String deviceInfo = credentials.get("deviceInfo") != null ? credentials.get("deviceInfo") :
+                    userAgent != null ? userAgent : "Unknown";
+            String location = credentials.get("location") != null ? credentials.get("location") :
+                    "IP: " + clientIp;
             
             System.out.println("Authentication attempt for email: " + email);
             
@@ -302,34 +339,7 @@ public class UserController {
                         System.err.println("Error checking per-customer net banking status: " + e.getMessage());
                     }
 
-                    // Password is correct - generate and send OTP
-                    String otp = otpService.generateOtp();
-                    otpService.storeOtp(otpEmail, otp);
-                    
-                    // Send OTP via email (to registered email, not account number)
-                    boolean emailSent = emailService.sendOtpEmail(otpEmail, otp);
-                    boolean otpReady = emailSent || otpService.hasValidOtp(otpEmail);
-                    
-                    if (otpReady) {
-                        Map<String, Object> response = new HashMap<>();
-                        response.put("success", true);
-                        response.put("requiresOtp", true);
-                        response.put("loginEmail", otpEmail);
-                        if (emailSent) {
-                            response.put("message", "Password verified. OTP has been sent to your email. Please enter the OTP to complete login.");
-                        } else {
-                            response.put("otpEmailSent", false);
-                            response.put("message", "Password verified. OTP could not be emailed — use Resend OTP or contact support.");
-                        }
-                        System.out.println("Password verified for user: " + user.getUsername() + ". OTP " + (emailSent ? "sent" : "stored only") + " for " + otpEmail);
-                        return ResponseEntity.ok(response);
-                    } else {
-                        Map<String, Object> response = new HashMap<>();
-                        response.put("success", false);
-                        response.put("message", "Password verified but failed to send OTP. Please try again.");
-                        System.out.println("Password verified but OTP email failed for user: " + user.getUsername());
-                        return ResponseEntity.badRequest().body(response);
-                    }
+                    return completeUserLogin(user, "PASSWORD", clientIp, deviceInfo, location);
                 } else {
                     // Increment failed login attempts
                     user.setFailedLoginAttempts(user.getFailedLoginAttempts() + 1);
@@ -348,8 +358,6 @@ public class UserController {
                     if (user.getFailedLoginAttempts() >= 3) {
                         user.setAccountLocked(true);
                         userService.saveUser(user);
-                        String clientIp = forwardedFor != null ? forwardedFor.split(",")[0].trim() : "Unknown";
-                        String deviceInfo = userAgent != null ? userAgent : "Unknown";
                         try {
                             fraudAlertService.recordLoginFraud(user.getEmail(), user.getUsername(), com.neo.springapp.model.FraudAlert.SourceType.USER, clientIp, "IP: " + clientIp, deviceInfo);
                         } catch (Exception e) {
@@ -606,10 +614,19 @@ public class UserController {
 
     // Graphical Password Authentication endpoint
     @PostMapping("/authenticate-graphical")
-    public ResponseEntity<Map<String, Object>> authenticateWithGraphicalPassword(@RequestBody Map<String, Object> credentials) {
+    public ResponseEntity<Map<String, Object>> authenticateWithGraphicalPassword(
+            @RequestBody Map<String, Object> credentials,
+            @RequestHeader(value = "X-Forwarded-For", required = false) String forwardedFor,
+            @RequestHeader(value = "User-Agent", required = false) String userAgent) {
         try {
             String email = (String) credentials.get("email");
             Object graphicalPasswordObj = credentials.get("graphicalPassword");
+            String clientIp = forwardedFor != null ? forwardedFor.split(",")[0].trim() :
+                    credentials.get("ipAddress") != null ? (String) credentials.get("ipAddress") : "Unknown";
+            String deviceInfo = credentials.get("deviceInfo") != null ? (String) credentials.get("deviceInfo") :
+                    userAgent != null ? userAgent : "Unknown";
+            String location = credentials.get("location") != null ? (String) credentials.get("location") :
+                    "IP: " + clientIp;
             
             System.out.println("Graphical password authentication attempt for email: " + email);
             
@@ -701,29 +718,7 @@ public class UserController {
             boolean passwordMatches = storedPassword.equals(graphicalPassword);
             
             if (passwordMatches) {
-                // Graphical password is correct - generate and send OTP
-                String otp = otpService.generateOtp();
-                otpService.storeOtp(email, otp);
-                
-                boolean emailSent = emailService.sendOtpEmail(email, otp);
-                
-                if (emailSent) {
-                    // Reset failed login attempts
-                    user.setFailedLoginAttempts(0);
-                    userService.saveUser(user);
-                    
-                    Map<String, Object> response = new HashMap<>();
-                    response.put("success", true);
-                    response.put("requiresOtp", true);
-                    response.put("message", "Graphical password verified. OTP has been sent to your email.");
-                    System.out.println("Graphical password verified for user: " + user.getUsername());
-                    return ResponseEntity.ok(response);
-                } else {
-                    Map<String, Object> response = new HashMap<>();
-                    response.put("success", false);
-                    response.put("message", "Password verified but failed to send OTP. Please try again.");
-                    return ResponseEntity.badRequest().body(response);
-                }
+                return completeUserLogin(user, "GRAPHICAL_PASSWORD", clientIp, deviceInfo, location);
             } else {
                 // Increment failed login attempts
                 user.setFailedLoginAttempts(user.getFailedLoginAttempts() + 1);
@@ -732,10 +727,8 @@ public class UserController {
                 if (user.getFailedLoginAttempts() >= 3) {
                     user.setAccountLocked(true);
                     userService.saveUser(user);
-                    String deviceInfo = (String) credentials.get("deviceInfo");
-                    if (deviceInfo == null) deviceInfo = "Unknown";
                     try {
-                        fraudAlertService.recordLoginFraud(user.getEmail(), user.getUsername(), com.neo.springapp.model.FraudAlert.SourceType.USER, "Unknown", "Graphical login", deviceInfo);
+                        fraudAlertService.recordLoginFraud(user.getEmail(), user.getUsername(), com.neo.springapp.model.FraudAlert.SourceType.USER, clientIp, "Graphical login", deviceInfo);
                     } catch (Exception e) {
                         System.err.println("Failed to record login fraud alert: " + e.getMessage());
                     }
@@ -2035,35 +2028,14 @@ public class UserController {
                 return ResponseEntity.badRequest().body(response);
             }
             
-            // Verify password
+            // Verify password — direct login after password check (no OTP)
             if (!passwordService.verifyPassword(password, user.getPassword())) {
                 Map<String, Object> response = new HashMap<>();
                 response.put("success", false);
                 response.put("message", "Invalid password");
                 return ResponseEntity.badRequest().body(response);
             }
-            
-            // If OTP is provided, verify it
-            if (otp != null && !otp.isEmpty()) {
-                if (!otpService.verifyOtp(email, otp)) {
-                    Map<String, Object> response = new HashMap<>();
-                    response.put("success", false);
-                    response.put("message", "Invalid or expired OTP");
-                    return ResponseEntity.badRequest().body(response);
-                }
-            } else {
-                // Generate and send OTP for QR login
-                String generatedOtp = otpService.generateOtp();
-                otpService.storeOtp(email, generatedOtp);
-                emailService.sendOtpEmail(email, generatedOtp);
-                
-                Map<String, Object> response = new HashMap<>();
-                response.put("success", false);
-                response.put("requiresOtp", true);
-                response.put("message", "OTP has been sent to your email. Please enter the OTP to complete login.");
-                return ResponseEntity.ok(response);
-            }
-            
+
             // Check if account is approved
             if (!"APPROVED".equals(user.getStatus())) {
                 Map<String, Object> response = new HashMap<>();
