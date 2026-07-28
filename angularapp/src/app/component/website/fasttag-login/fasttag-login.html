@@ -30,10 +30,10 @@
     <!-- Right Panel - Form -->
     <div class="login-right">
       <div class="form-card">
-        <h2 class="form-title">Let's Get Started</h2>
+        <h2 class="form-title">{{ step === 'login' ? "Let's Get Started" : 'Set Your Password' }}</h2>
 
         <!-- Info Banner -->
-        <div class="info-banner">
+        <div class="info-banner" *ngIf="step === 'login'">
           <svg viewBox="0 0 24 24" fill="none" width="22" height="22">
             <rect x="2" y="6" width="20" height="12" rx="3" stroke="#1E40AF" stroke-width="1.5"/>
             <path d="M7 12h4m2 0h4" stroke="#1E40AF" stroke-width="1.5" stroke-linecap="round"/>
@@ -42,20 +42,18 @@
           <span>Please note, keep your <strong>Vehicle RC</strong> document ready to get FASTag.</span>
         </div>
 
-        <!-- Success message -->
         <div class="alert alert-success" *ngIf="successMessage">
           <span class="alert-icon">✓</span>
           {{ successMessage }}
         </div>
 
-        <!-- Error message -->
         <div class="alert alert-error" *ngIf="errorMessage">
           <span class="alert-icon">!</span>
           {{ errorMessage }}
         </div>
 
-        <!-- Step 1: Enter Gmail -->
-        <div class="form-step" *ngIf="!otpSent">
+        <!-- Login: Gmail + Password -->
+        <div class="form-step" *ngIf="step === 'login'">
           <div class="input-row">
             <div class="input-group input-email">
               <div class="input-wrapper">
@@ -72,7 +70,7 @@
                   placeholder="yourname&#64;gmail.com"
                   class="form-input"
                   [class.invalid]="gmailId && !isValidGmail()"
-                  (keydown.enter)="sendOtp()"
+                  (keydown.enter)="login()"
                   autocomplete="email"
                 />
               </div>
@@ -80,44 +78,6 @@
                 Please enter a valid Gmail address
               </small>
             </div>
-          </div>
-
-          <!-- Consent Checkboxes -->
-          <div class="consent-section">
-            <label class="consent-label">
-              <input type="checkbox" class="consent-check" checked />
-              <span>I consent NeoBank to collect & process my data for availing FASTag (Prepaid Payment Instrument) and related services.</span>
-            </label>
-            <label class="consent-label">
-              <input type="checkbox" class="consent-check" />
-              <span>I hereby consent to processing of my data for sending me personalised offers on other products and services of NeoBank through Call, SMS, WhatsApp, Email or other channels.</span>
-            </label>
-          </div>
-
-          <button
-            class="btn-get-otp"
-            (click)="sendOtp()"
-            [disabled]="loading || !gmailId || !isValidGmail()"
-          >
-            <span class="btn-loader" *ngIf="loading"></span>
-            <span *ngIf="!loading">Get OTP</span>
-            <span *ngIf="loading">Sending...</span>
-            <svg *ngIf="!loading" viewBox="0 0 24 24" fill="none" width="18" height="18" stroke="currentColor" stroke-width="2">
-              <path d="M9 5l7 7-7 7"/>
-            </svg>
-          </button>
-
-          <div class="terms-links">
-            For full details check our <a href="javascript:void(0)">Terms & Conditions</a> and <a href="javascript:void(0)">Privacy Policy</a>
-          </div>
-        </div>
-
-        <!-- Step 2: Enter OTP -->
-        <div class="form-step" *ngIf="otpSent">
-          <div class="otp-sent-info">
-            <span class="sent-to-label">OTP sent to</span>
-            <span class="sent-to-email">{{ gmailId }}</span>
-            <button class="change-email-btn" (click)="resetForm()">Change</button>
           </div>
 
           <div class="input-group">
@@ -128,45 +88,95 @@
                 </svg>
               </span>
               <input
-                type="text"
-                id="otp"
-                [(ngModel)]="otp"
-                placeholder="Enter 6-digit OTP"
-                class="form-input otp-input"
-                maxlength="6"
-                pattern="[0-9]*"
-                (keydown.enter)="verifyOtp()"
-                autocomplete="one-time-code"
+                [type]="showPassword ? 'text' : 'password'"
+                id="password"
+                [(ngModel)]="password"
+                placeholder="Enter your password"
+                class="form-input"
+                (keydown.enter)="login()"
+                autocomplete="current-password"
               />
             </div>
           </div>
 
+          <div class="consent-section">
+            <label class="consent-label">
+              <input type="checkbox" class="consent-check" checked />
+              <span>I consent NeoBank to collect & process my data for availing FASTag (Prepaid Payment Instrument) and related services.</span>
+            </label>
+          </div>
+
           <button
             class="btn-get-otp"
-            (click)="verifyOtp()"
-            [disabled]="verifying || !otp || otp.length !== 6"
+            (click)="login()"
+            [disabled]="loading || !gmailId || !isValidGmail() || !password"
           >
-            <span class="btn-loader" *ngIf="verifying"></span>
-            <span *ngIf="!verifying">Verify & Login</span>
-            <span *ngIf="verifying">Verifying...</span>
-            <svg *ngIf="!verifying" viewBox="0 0 24 24" fill="none" width="18" height="18" stroke="currentColor" stroke-width="2">
-              <path d="M9 5l7 7-7 7"/>
-            </svg>
+            <span class="btn-loader" *ngIf="loading"></span>
+            <span *ngIf="!loading">Sign In</span>
+            <span *ngIf="loading">Signing in...</span>
           </button>
 
-          <div class="resend-section">
-            <span *ngIf="!canResend" class="resend-timer">
-              Resend OTP in {{ resendTimer }}s
-            </span>
-            <button
-              *ngIf="canResend"
-              class="resend-btn"
-              (click)="resendOtp()"
-              [disabled]="loading"
-            >
-              Resend OTP
-            </button>
+          <div class="terms-links">
+            First time here?
+            <a href="javascript:void(0)" (click)="goToSetPassword()">Set your password</a>
           </div>
+        </div>
+
+        <!-- Set Password -->
+        <div class="form-step" *ngIf="step === 'set-password'">
+          <div class="otp-sent-info">
+            <span class="sent-to-label">Gmail</span>
+            <span class="sent-to-email">{{ gmailId || 'Enter Gmail on login first' }}</span>
+            <button class="change-email-btn" (click)="backToLogin()">Back to Sign In</button>
+          </div>
+
+          <div class="input-group" *ngIf="!gmailId">
+            <div class="input-wrapper">
+              <input
+                type="email"
+                [(ngModel)]="gmailId"
+                placeholder="yourname&#64;gmail.com"
+                class="form-input"
+              />
+            </div>
+          </div>
+
+          <div class="input-group">
+            <div class="input-wrapper">
+              <input
+                [type]="showPassword ? 'text' : 'password'"
+                [(ngModel)]="newPassword"
+                placeholder="Create password (min 8 chars)"
+                class="form-input"
+                autocomplete="new-password"
+              />
+            </div>
+          </div>
+
+          <div class="input-group">
+            <div class="input-wrapper">
+              <input
+                [type]="showPassword ? 'text' : 'password'"
+                [(ngModel)]="confirmPassword"
+                placeholder="Confirm password"
+                class="form-input"
+                (keydown.enter)="setPassword()"
+                autocomplete="new-password"
+              />
+            </div>
+          </div>
+
+          <small class="input-hint">Password must have uppercase, lowercase, and a number.</small>
+
+          <button
+            class="btn-get-otp"
+            (click)="setPassword()"
+            [disabled]="loading || !gmailId || !isValidGmail() || !newPassword || !confirmPassword"
+          >
+            <span class="btn-loader" *ngIf="loading"></span>
+            <span *ngIf="!loading">Set Password & Sign In</span>
+            <span *ngIf="loading">Saving...</span>
+          </button>
         </div>
       </div>
 
@@ -181,7 +191,7 @@
                 <path d="M7 15h4M13 15h4M7 11h10"/>
               </svg>
             </div>
-            <span>Enter Gmail<br>& verify identity</span>
+            <span>Enter Gmail<br>& password</span>
           </div>
           <div class="step-item">
             <div class="step-icon">
@@ -191,7 +201,7 @@
                 <path d="M9 10l2 2 4-4"/>
               </svg>
             </div>
-            <span>Verify with OTP</span>
+            <span>Set password<br>(first time)</span>
           </div>
           <div class="step-item">
             <div class="step-icon">

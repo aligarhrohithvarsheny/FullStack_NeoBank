@@ -36,6 +36,7 @@ public class BankFormUploadMigrationRunner implements ApplicationRunner {
         try {
             ensureUploadFileContentColumn();
             ensureUploadHistoryTable();
+            ensureAdminAuditFileBase64Column();
             backfillFileContentFromDisk();
         } catch (Exception e) {
             System.err.println("Bank form upload migration warning: " + e.getMessage());
@@ -46,11 +47,16 @@ public class BankFormUploadMigrationRunner implements ApplicationRunner {
         if (!tableExists("bank_form_uploads")) {
             return;
         }
-        if (columnExists("bank_form_uploads", "file_content")) {
+        if (!columnExists("bank_form_uploads", "file_content")) {
+            jdbcTemplate.execute("ALTER TABLE bank_form_uploads ADD COLUMN file_content LONGBLOB NULL");
+            System.out.println("Added bank_form_uploads.file_content column for persistent upload storage");
             return;
         }
-        jdbcTemplate.execute("ALTER TABLE bank_form_uploads ADD COLUMN file_content LONGBLOB NULL");
-        System.out.println("Added bank_form_uploads.file_content column for persistent upload storage");
+        String dataType = getColumnDataType("bank_form_uploads", "file_content");
+        if (dataType != null && !"longblob".equalsIgnoreCase(dataType)) {
+            jdbcTemplate.execute("ALTER TABLE bank_form_uploads MODIFY COLUMN file_content LONGBLOB NULL");
+            System.out.println("Upgraded bank_form_uploads.file_content from " + dataType + " to LONGBLOB");
+        }
     }
 
     private void ensureUploadHistoryTable() {
@@ -79,6 +85,17 @@ public class BankFormUploadMigrationRunner implements ApplicationRunner {
         System.out.println("Created bank_form_upload_history table");
     }
 
+    private void ensureAdminAuditFileBase64Column() {
+        if (!tableExists("admin_audit_documents") || !columnExists("admin_audit_documents", "file_base64")) {
+            return;
+        }
+        String dataType = getColumnDataType("admin_audit_documents", "file_base64");
+        if (dataType != null && !"longtext".equalsIgnoreCase(dataType)) {
+            jdbcTemplate.execute("ALTER TABLE admin_audit_documents MODIFY COLUMN file_base64 LONGTEXT NULL");
+            System.out.println("Upgraded admin_audit_documents.file_base64 from " + dataType + " to LONGTEXT");
+        }
+    }
+
     private boolean tableExists(String tableName) {
         Integer count = jdbcTemplate.queryForObject(
                 """
@@ -105,6 +122,24 @@ public class BankFormUploadMigrationRunner implements ApplicationRunner {
                 tableName,
                 columnName);
         return count != null && count > 0;
+    }
+
+    private String getColumnDataType(String tableName, String columnName) {
+        try {
+            return jdbcTemplate.queryForObject(
+                    """
+                    SELECT DATA_TYPE
+                    FROM information_schema.columns
+                    WHERE table_schema = DATABASE()
+                      AND table_name = ?
+                      AND column_name = ?
+                    """,
+                    String.class,
+                    tableName,
+                    columnName);
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     /** Copy disk files into DB for uploads created before database-backed storage. */

@@ -78,8 +78,95 @@ public class FastagLoginController {
     }
 
     /**
+     * POST /api/fastag/login
+     * Login with Gmail + password (no OTP).
+     */
+    @PostMapping("/login")
+    public ResponseEntity<Map<String, Object>> login(@RequestBody Map<String, String> request) {
+        Map<String, Object> response = new HashMap<>();
+        String gmailId = request.get("gmailId");
+        String password = request.get("password");
+
+        if (gmailId == null || gmailId.trim().isEmpty()) {
+            response.put("success", false);
+            response.put("message", "Gmail ID is required.");
+            return ResponseEntity.badRequest().body(response);
+        }
+        if (!GMAIL_PATTERN.matcher(gmailId.trim()).matches()) {
+            response.put("success", false);
+            response.put("message", "Please enter a valid Gmail address (e.g., user@gmail.com).");
+            return ResponseEntity.badRequest().body(response);
+        }
+
+        try {
+            FastagLoginService.LoginResult result = fastagLoginService.login(gmailId, password);
+            return buildFastagAuthResponse(response, result);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "Login failed. Please try again.");
+            return ResponseEntity.internalServerError().body(response);
+        }
+    }
+
+    /**
+     * POST /api/fastag/set-password
+     * Set password for new or existing FASTag user, then log in.
+     */
+    @PostMapping("/set-password")
+    public ResponseEntity<Map<String, Object>> setPassword(@RequestBody Map<String, String> request) {
+        Map<String, Object> response = new HashMap<>();
+        String gmailId = request.get("gmailId");
+        String newPassword = request.get("newPassword");
+        String confirmPassword = request.get("confirmPassword");
+
+        if (gmailId == null || gmailId.trim().isEmpty()) {
+            response.put("success", false);
+            response.put("message", "Gmail ID is required.");
+            return ResponseEntity.badRequest().body(response);
+        }
+        if (!GMAIL_PATTERN.matcher(gmailId.trim()).matches()) {
+            response.put("success", false);
+            response.put("message", "Please enter a valid Gmail address.");
+            return ResponseEntity.badRequest().body(response);
+        }
+
+        try {
+            FastagLoginService.LoginResult result = fastagLoginService.setPassword(gmailId, newPassword, confirmPassword);
+            return buildFastagAuthResponse(response, result);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "Failed to set password: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(response);
+        }
+    }
+
+    private ResponseEntity<Map<String, Object>> buildFastagAuthResponse(
+            Map<String, Object> response,
+            FastagLoginService.LoginResult result) {
+        response.put("success", result.success);
+        response.put("message", result.message);
+        if (result.requiresPasswordSetup) {
+            response.put("requiresPasswordSetup", true);
+        }
+        if (result.accountNotFound) {
+            response.put("accountNotFound", true);
+        }
+        if (result.success && result.user != null) {
+            Map<String, Object> userData = new HashMap<>();
+            userData.put("id", result.user.getId());
+            userData.put("gmailId", result.user.getGmailId());
+            userData.put("isVerified", result.user.getIsVerified());
+            userData.put("sessionToken", result.sessionToken);
+            response.put("user", userData);
+            List<Fasttag> fasttags = fasttagService.findByEmail(result.user.getGmailId());
+            response.put("fasttags", fasttags);
+        }
+        return ResponseEntity.ok(response);
+    }
+
+    /**
      * POST /api/fastag/send-otp
-     * Send OTP to Gmail ID for FASTag login
+     * @deprecated Use /api/fastag/login instead
      */
     @PostMapping("/send-otp")
     public ResponseEntity<Map<String, Object>> sendOtp(@RequestBody Map<String, String> request) {
@@ -101,71 +188,23 @@ public class FastagLoginController {
             return ResponseEntity.badRequest().body(response);
         }
 
-        try {
-            fastagLoginService.sendOtp(gmailId);
-            response.put("success", true);
-            response.put("message", "OTP sent successfully to " + gmailId);
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            response.put("success", false);
-            response.put("message", "Failed to send OTP. Please try again.");
-            return ResponseEntity.internalServerError().body(response);
-        }
+        response.put("success", false);
+        response.put("message", "OTP login is disabled. Please sign in with your Gmail and password.");
+        response.put("requiresPasswordLogin", true);
+        return ResponseEntity.ok(response);
     }
 
     /**
      * POST /api/fastag/verify-otp
-     * Verify OTP and login/register FASTag user
+     * @deprecated Use /api/fastag/login instead
      */
     @PostMapping("/verify-otp")
     public ResponseEntity<Map<String, Object>> verifyOtp(@RequestBody Map<String, String> request) {
         Map<String, Object> response = new HashMap<>();
-
-        String gmailId = request.get("gmailId");
-        String otp = request.get("otp");
-
-        if (gmailId == null || gmailId.trim().isEmpty()) {
-            response.put("success", false);
-            response.put("message", "Gmail ID is required.");
-            return ResponseEntity.badRequest().body(response);
-        }
-
-        if (otp == null || otp.trim().isEmpty()) {
-            response.put("success", false);
-            response.put("message", "OTP is required.");
-            return ResponseEntity.badRequest().body(response);
-        }
-
-        if (otp.trim().length() != 6) {
-            response.put("success", false);
-            response.put("message", "OTP must be 6 digits.");
-            return ResponseEntity.badRequest().body(response);
-        }
-
-        try {
-            FastagLoginService.VerifyResult result = fastagLoginService.verifyOtp(gmailId, otp);
-            response.put("success", result.success);
-            response.put("message", result.message);
-
-            if (result.success && result.user != null) {
-                Map<String, Object> userData = new HashMap<>();
-                userData.put("id", result.user.getId());
-                userData.put("gmailId", result.user.getGmailId());
-                userData.put("isVerified", result.user.getIsVerified());
-                userData.put("sessionToken", result.sessionToken);
-                response.put("user", userData);
-
-                // Fetch any existing FASTag details linked to this email
-                List<Fasttag> fasttags = fasttagService.findByEmail(gmailId.trim().toLowerCase());
-                response.put("fasttags", fasttags);
-            }
-
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            response.put("success", false);
-            response.put("message", "Verification failed. Please try again.");
-            return ResponseEntity.internalServerError().body(response);
-        }
+        response.put("success", false);
+        response.put("message", "OTP login is disabled. Please sign in with your Gmail and password.");
+        response.put("requiresPasswordLogin", true);
+        return ResponseEntity.ok(response);
     }
 
     /**

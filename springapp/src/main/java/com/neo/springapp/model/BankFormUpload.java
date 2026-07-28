@@ -44,7 +44,7 @@ public class BankFormUpload {
     @Lob
     @Basic(fetch = FetchType.LAZY)
     @JsonIgnore
-    @Column(name = "file_content")
+    @Column(name = "file_content", columnDefinition = "LONGBLOB")
     private byte[] fileContent;
 
     private String contentType;

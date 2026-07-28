@@ -16,6 +16,18 @@ public class FastagUser {
     @Column(name = "gmail_id", nullable = false, unique = true)
     private String gmailId;
 
+    @Column(length = 512)
+    private String password;
+
+    @Column(name = "password_set")
+    private Boolean passwordSet = false;
+
+    @Column(name = "failed_login_attempts")
+    private Integer failedLoginAttempts = 0;
+
+    @Column(name = "account_locked")
+    private Boolean accountLocked = false;
+
     private String otp;
 
     @Column(name = "otp_expiry")

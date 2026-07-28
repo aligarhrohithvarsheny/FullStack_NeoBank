@@ -15,19 +15,16 @@ import { environment } from '../../../../environment/environment';
 })
 export class FasttagLogin implements OnInit, OnDestroy {
   gmailId: string = '';
-  otp: string = '';
+  password: string = '';
+  newPassword: string = '';
+  confirmPassword: string = '';
 
-  // UI state
-  otpSent: boolean = false;
+  step: 'login' | 'set-password' = 'login';
+  showPassword: boolean = false;
+
   loading: boolean = false;
-  verifying: boolean = false;
   errorMessage: string = '';
   successMessage: string = '';
-
-  // Resend OTP timer
-  resendTimer: number = 0;
-  resendInterval: any;
-  canResend: boolean = false;
 
   isBrowser: boolean = false;
 
@@ -41,7 +38,6 @@ export class FasttagLogin implements OnInit, OnDestroy {
 
   ngOnInit() {
     if (this.isBrowser) {
-      // Check if already logged in
       const fastagUser = sessionStorage.getItem('fastagUser');
       if (fastagUser) {
         this.router.navigate(['/website/fasttag-dashboard']);
@@ -49,18 +45,14 @@ export class FasttagLogin implements OnInit, OnDestroy {
     }
   }
 
-  ngOnDestroy() {
-    if (this.resendInterval) {
-      clearInterval(this.resendInterval);
-    }
-  }
+  ngOnDestroy() {}
 
   isValidGmail(): boolean {
     const gmailRegex = /^[a-zA-Z0-9._%+-]+@gmail\.com$/i;
     return gmailRegex.test(this.gmailId.trim());
   }
 
-  sendOtp() {
+  login() {
     this.errorMessage = '';
     this.successMessage = '';
 
@@ -68,113 +60,100 @@ export class FasttagLogin implements OnInit, OnDestroy {
       this.errorMessage = 'Please enter your Gmail ID.';
       return;
     }
-
     if (!this.isValidGmail()) {
       this.errorMessage = 'Please enter a valid Gmail address (e.g., user@gmail.com).';
       return;
     }
+    if (!this.password) {
+      this.errorMessage = 'Please enter your password.';
+      return;
+    }
 
     this.loading = true;
-
-    this.http.post<any>(`${environment.apiBaseUrl}/api/fastag/send-otp`, {
-      gmailId: this.gmailId.trim()
-    }).subscribe({
-      next: (res) => {
-        this.loading = false;
-        if (res.success) {
-          this.otpSent = true;
-          this.successMessage = 'OTP sent successfully! Check your Gmail inbox.';
-          this.startResendTimer();
-        } else {
-          this.errorMessage = res.message || 'Failed to send OTP.';
-        }
-      },
-      error: (err) => {
-        this.loading = false;
-        this.errorMessage = err.error?.message || 'Failed to send OTP. Please try again.';
-      }
-    });
-  }
-
-  verifyOtp() {
-    this.errorMessage = '';
-    this.successMessage = '';
-
-    if (!this.otp.trim()) {
-      this.errorMessage = 'Please enter the OTP.';
-      return;
-    }
-
-    if (this.otp.trim().length !== 6) {
-      this.errorMessage = 'OTP must be 6 digits.';
-      return;
-    }
-
-    this.verifying = true;
-
-    this.http.post<any>(`${environment.apiBaseUrl}/api/fastag/verify-otp`, {
+    this.http.post<any>(`${environment.apiBaseUrl}/api/fastag/login`, {
       gmailId: this.gmailId.trim(),
-      otp: this.otp.trim()
+      password: this.password
     }).subscribe({
-      next: (res) => {
-        this.verifying = false;
-        if (res.success) {
-          this.successMessage = 'Login successful! Redirecting...';
-          // Store user session
-          if (this.isBrowser) {
-            sessionStorage.setItem('fastagUser', JSON.stringify(res.user));
-            if (res.fasttags) {
-              sessionStorage.setItem('fastagDetails', JSON.stringify(res.fasttags));
-            }
-          }
-          // Redirect to FASTag dashboard
-          setTimeout(() => {
-            this.router.navigate(['/website/fasttag-dashboard']);
-          }, 1000);
-        } else {
-          this.errorMessage = res.message || 'OTP verification failed.';
-        }
-      },
+      next: (res) => this.handleAuthResponse(res),
       error: (err) => {
-        this.verifying = false;
-        this.errorMessage = err.error?.message || 'Verification failed. Please try again.';
+        this.loading = false;
+        this.errorMessage = err.error?.message || 'Login failed. Please try again.';
       }
     });
   }
 
-  startResendTimer() {
-    this.canResend = false;
-    this.resendTimer = 30;
-
-    if (this.resendInterval) {
-      clearInterval(this.resendInterval);
-    }
-
-    this.resendInterval = setInterval(() => {
-      this.resendTimer--;
-      if (this.resendTimer <= 0) {
-        clearInterval(this.resendInterval);
-        this.canResend = true;
-      }
-    }, 1000);
-  }
-
-  resendOtp() {
-    if (!this.canResend) return;
-    this.otp = '';
-    this.sendOtp();
-  }
-
-  resetForm() {
-    this.otpSent = false;
-    this.otp = '';
+  setPassword() {
     this.errorMessage = '';
     this.successMessage = '';
-    this.canResend = false;
-    this.resendTimer = 0;
-    if (this.resendInterval) {
-      clearInterval(this.resendInterval);
+
+    if (!this.gmailId.trim() || !this.isValidGmail()) {
+      this.errorMessage = 'Please enter a valid Gmail address.';
+      return;
     }
+    if (!this.newPassword || !this.confirmPassword) {
+      this.errorMessage = 'Please enter and confirm your password.';
+      return;
+    }
+    if (this.newPassword !== this.confirmPassword) {
+      this.errorMessage = 'Passwords do not match.';
+      return;
+    }
+
+    this.loading = true;
+    this.http.post<any>(`${environment.apiBaseUrl}/api/fastag/set-password`, {
+      gmailId: this.gmailId.trim(),
+      newPassword: this.newPassword,
+      confirmPassword: this.confirmPassword
+    }).subscribe({
+      next: (res) => this.handleAuthResponse(res),
+      error: (err) => {
+        this.loading = false;
+        this.errorMessage = err.error?.message || 'Failed to set password. Please try again.';
+      }
+    });
+  }
+
+  private handleAuthResponse(res: any) {
+    this.loading = false;
+
+    if (res.success && res.user) {
+      this.successMessage = 'Login successful! Redirecting...';
+      if (this.isBrowser) {
+        sessionStorage.setItem('fastagUser', JSON.stringify(res.user));
+        if (res.fasttags) {
+          sessionStorage.setItem('fastagDetails', JSON.stringify(res.fasttags));
+        }
+      }
+      setTimeout(() => this.router.navigate(['/website/fasttag-dashboard']), 800);
+      return;
+    }
+
+    if (res.requiresPasswordSetup || res.accountNotFound) {
+      this.step = 'set-password';
+      this.successMessage = res.message || 'Please set your password to continue.';
+      this.errorMessage = '';
+      return;
+    }
+
+    this.errorMessage = res.message || 'Login failed.';
+  }
+
+  goToSetPassword() {
+    this.step = 'set-password';
+    this.errorMessage = '';
+    this.successMessage = '';
+  }
+
+  backToLogin() {
+    this.step = 'login';
+    this.newPassword = '';
+    this.confirmPassword = '';
+    this.errorMessage = '';
+    this.successMessage = '';
+  }
+
+  togglePasswordVisibility() {
+    this.showPassword = !this.showPassword;
   }
 
   goToLanding() {
