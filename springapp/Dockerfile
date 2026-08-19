@@ -1,12 +1,15 @@
 # ---- Build stage ----
-FROM eclipse-temurin:21-jdk-jammy AS build
+# Use official Maven image so Render does not download Maven 4.0.0-rc-5
+# (that Apache URL is gone and caused wget + mvnw exit code 1).
+FROM maven:3.9.9-eclipse-temurin-21 AS build
 
 WORKDIR /workspace
 
 COPY . .
 
-RUN chmod +x mvnw \
-    && ./mvnw clean package -DskipTests -Dspring-boot.repackage.excludeDevtools=true
+# Local jvm.config requests 1–4 GB heap; Render build VMs cannot use that.
+RUN printf '%s\n' '-Xmx512m' > .mvn/jvm.config \
+    && mvn -B clean package -DskipTests -Dspring-boot.repackage.excludeDevtools=true
 
 # ---- Runtime stage (JRE only — smaller image, less native memory) ----
 FROM eclipse-temurin:21-jre-jammy
