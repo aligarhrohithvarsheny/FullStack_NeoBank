@@ -49,10 +49,10 @@ public class OtpService {
 
         boolean sent = emailService.sendOtpEmail(normalizedEmail, otp);
         if (!sent) {
-            throw new RuntimeException("Failed to send OTP email for " + purpose);
+            System.err.println("⚠️ OTP email dispatch returned false for [" + purpose + "] — OTP still stored for " + normalizedEmail);
         }
 
-        System.out.println("✅ OTP email dispatch completed for [" + purpose + "] to " + normalizedEmail);
+        System.out.println("✅ OTP ready for [" + purpose + "] to " + normalizedEmail);
         return otp;
     }
 
@@ -76,10 +76,10 @@ public class OtpService {
 
         boolean sent = emailService.sendOtpEmailWithReason(normalizedEmail, otp, purpose);
         if (!sent) {
-            throw new RuntimeException("Failed to send OTP email for " + purpose);
+            System.err.println("⚠️ OTP email dispatch returned false for [" + purpose + "] — OTP still stored for key " + key);
         }
 
-        System.out.println("✅ OTP email dispatch completed for [" + purpose + "] to " + normalizedEmail);
+        System.out.println("✅ OTP ready for [" + purpose + "] to " + normalizedEmail);
         return otp;
     }
     

@@ -110,77 +110,70 @@ public class EmailService {
             return false;
         }
     }
+
+    /**
+     * Deliver OTP: Gmail API → SMTP → console fallback.
+     * Always returns true so OTP generation/storage is never blocked by mail misconfiguration.
+     */
+    private boolean dispatchOtpEmail(String toEmail, String subject, String body) {
+        if (toEmail == null || toEmail.isBlank()) {
+            return false;
+        }
+        String to = toEmail.trim();
+
+        if (sendOtpViaGmailApi(to, subject, body)) {
+            return true;
+        }
+
+        if (sendOtpViaSmtp(to, subject, body)) {
+            return true;
+        }
+
+        logOtpConsoleFallback(to, subject, body);
+        return true;
+    }
+
+    private boolean sendOtpViaSmtp(String toEmail, String subject, String body) {
+        initializeMailSender();
+        if (!mailAvailable || mailSender == null || !isSmtpCredentialsConfigured()) {
+            return false;
+        }
+        try {
+            String fromEmail = getFromEmail();
+            SimpleMailMessage message = new SimpleMailMessage();
+            message.setTo(toEmail);
+            message.setFrom(fromEmail);
+            message.setSubject(subject);
+            message.setText(body);
+            System.out.println("📨 Sending OTP email via SMTP to " + toEmail + " from " + fromEmail);
+            javaMailSender.send(message);
+            System.out.println("✅ OTP email sent via SMTP to " + toEmail);
+            return true;
+        } catch (MailAuthenticationException e) {
+            System.err.println("❌ SMTP authentication failed for OTP to " + toEmail + ": " + e.getMessage());
+        } catch (MailSendException e) {
+            System.err.println("❌ SMTP send failed for OTP to " + toEmail + ": " + e.getMessage());
+        } catch (Exception e) {
+            System.err.println("❌ SMTP OTP error for " + toEmail + ": " + e.getMessage());
+        }
+        return false;
+    }
+
+    private void logOtpConsoleFallback(String toEmail, String subject, String body) {
+        System.out.println("==========================================");
+        System.out.println("OTP EMAIL (console fallback — configure Gmail API or SMTP to deliver)");
+        System.out.println("To: " + toEmail);
+        System.out.println("Subject: " + subject);
+        System.out.println(body);
+        System.out.println("Set GMAIL_* env vars or SPRING_MAIL_USERNAME/PASSWORD on the server.");
+        System.out.println("==========================================");
+    }
     
     /**
      * Send OTP email to user
      */
     public boolean sendOtpEmail(String toEmail, String otp) {
-        if (gmailApiOtpService != null && gmailApiOtpService.isConfigured()) {
-            boolean gmailSent = sendOtpViaGmailApi(toEmail, "NeoBank - Login OTP Verification", buildOtpEmailBody(otp));
-            if (gmailSent) {
-                return true;
-            }
-            System.err.println("⚠️ Gmail API OTP failed; falling back to SMTP/console for: " + toEmail);
-        }
-
-        // Initialize mail sender if not already done
-        initializeMailSender();
-        
-        try {
-            if (!mailAvailable || mailSender == null || !isSmtpCredentialsConfigured()) {
-                System.out.println("==========================================");
-                System.out.println("LOGIN OTP EMAIL (SMTP credentials not set — console fallback)");
-                System.out.println("To: " + toEmail);
-                System.out.println("OTP: " + otp);
-                System.out.println("Set SPRING_MAIL_USERNAME/SPRING_MAIL_PASSWORD or Gmail API env vars to send real email.");
-                System.out.println("==========================================");
-                return true;
-            }
-
-            String fromEmail = getFromEmail();
-            SimpleMailMessage message = new SimpleMailMessage();
-            message.setTo(toEmail);
-            message.setFrom(fromEmail);
-            message.setSubject("NeoBank - Login OTP Verification");
-            message.setText(buildOtpEmailBody(otp));
-
-            // OTP value is masked in logs to avoid leaking sensitive data.
-            System.out.println("📧 OTP generated for: " + toEmail + " | length=" + (otp != null ? otp.length() : 0));
-            System.out.println("📨 Sending OTP email via SMTP host: " + getMailHostForLogs() + " as user: " + fromEmail);
-            javaMailSender.send(message);
-            
-            System.out.println("==========================================");
-            System.out.println("✅ OTP email sent successfully!");
-            System.out.println("To: " + toEmail);
-            System.out.println("From: " + fromEmail);
-            System.out.println("==========================================");
-            return true;
-        } catch (MailAuthenticationException e) {
-            System.err.println("❌ SMTP authentication failed while sending OTP email: " + e.getMessage());
-            Throwable cause = e.getCause();
-            if (cause instanceof AuthenticationFailedException) {
-                System.err.println("❌ Root cause: Gmail authentication failed (check App Password).");
-            } else if (cause != null) {
-                System.err.println("❌ Authentication cause: " + cause.getMessage());
-            }
-            return false;
-        } catch (MailSendException e) {
-            System.err.println("❌ MailSendException while sending OTP email: " + e.getMessage());
-            return false;
-        } catch (Exception e) {
-            System.err.println("==========================================");
-            System.err.println("FAILED TO SEND OTP EMAIL");
-            System.err.println("To: " + toEmail);
-            System.err.println("Error: " + e.getMessage());
-            System.err.println("Error Type: " + e.getClass().getName());
-            if (e.getCause() != null) {
-                System.err.println("Cause: " + e.getCause().getMessage());
-            }
-            e.printStackTrace();
-            System.err.println("==========================================");
-            
-            return false;
-        }
+        return dispatchOtpEmail(toEmail, "NeoBank - Login OTP Verification", buildOtpEmailBody(otp));
     }
     
     /**
@@ -219,79 +212,7 @@ public class EmailService {
      * Send password reset OTP email to user
      */
     public boolean sendPasswordResetOtpEmail(String toEmail, String otp) {
-        // Initialize mail sender if not already done
-        initializeMailSender();
-        
-        try {
-            // If mail sender is not configured, log OTP to console (for development)
-            if (!mailAvailable || mailSender == null) {
-                System.out.println("==========================================");
-                System.out.println("PASSWORD RESET OTP EMAIL (Mail not configured - Development Mode)");
-                System.out.println("To: " + toEmail);
-                System.out.println("OTP: " + otp);
-                System.out.println("==========================================");
-                return true; // Return true for development
-            }
-            
-            // Use reflection to send email if mail dependency is available
-            Class<?> simpleMailMessageClass = Class.forName("org.springframework.mail.SimpleMailMessage");
-            Object message = simpleMailMessageClass.getDeclaredConstructor().newInstance();
-            
-            Method setToMethod = simpleMailMessageClass.getMethod("setTo", String.class);
-            Method setSubjectMethod = simpleMailMessageClass.getMethod("setSubject", String.class);
-            Method setTextMethod = simpleMailMessageClass.getMethod("setText", String.class);
-            Method setFromMethod = simpleMailMessageClass.getMethod("setFrom", String.class);
-            
-            setToMethod.invoke(message, toEmail);
-            setSubjectMethod.invoke(message, "NeoBank - Password Reset OTP");
-            setTextMethod.invoke(message, buildPasswordResetOtpEmailBody(otp));
-            // Use the configured email username as the "from" address
-            String fromEmail = getFromEmail();
-            setFromMethod.invoke(message, fromEmail);
-            System.out.println("Email 'From' address set to: " + fromEmail);
-            
-            System.out.println("Attempting to send password reset OTP email...");
-            System.out.println("Mail sender available: " + (mailSender != null));
-            
-            // Try to find the send method
-            Method sendMethod = null;
-            try {
-                sendMethod = mailSender.getClass().getMethod("send", Object.class);
-            } catch (NoSuchMethodException e) {
-                try {
-                    sendMethod = mailSender.getClass().getMethod("send", simpleMailMessageClass);
-                } catch (Exception e2) {
-                    throw new RuntimeException("Could not find send method", e2);
-                }
-            }
-            
-            System.out.println("Invoking send method...");
-            sendMethod.invoke(mailSender, message);
-            
-            System.out.println("==========================================");
-            System.out.println("✅ Password reset OTP email sent successfully!");
-            System.out.println("To: " + toEmail);
-            System.out.println("From: " + (applicationContext != null ? getFromEmail() : "noreply@neobank.com"));
-            System.out.println("==========================================");
-            return true;
-        } catch (Exception e) {
-            System.err.println("==========================================");
-            System.err.println("FAILED TO SEND PASSWORD RESET OTP EMAIL");
-            System.err.println("To: " + toEmail);
-            System.err.println("Error: " + e.getMessage());
-            System.err.println("==========================================");
-            e.printStackTrace();
-            
-            // In development, still log the OTP even if email fails
-            System.out.println("==========================================");
-            System.out.println("PASSWORD RESET OTP EMAIL (Email sending failed - Development Mode)");
-            System.out.println("To: " + toEmail);
-            System.out.println("OTP: " + otp);
-            System.out.println("Please check the error above for email configuration issues.");
-            System.out.println("==========================================");
-            
-            return true; // Return true for development (allow password reset even if email fails)
-        }
+        return dispatchOtpEmail(toEmail, "NeoBank - Password Reset OTP", buildPasswordResetOtpEmailBody(otp));
     }
 
     /**
@@ -328,79 +249,7 @@ public class EmailService {
      * Send KYC update OTP email to user
      */
     public boolean sendKycUpdateOtpEmail(String toEmail, String otp) {
-        // Initialize mail sender if not already done
-        initializeMailSender();
-        
-        try {
-            // If mail sender is not configured, log OTP to console (for development)
-            if (!mailAvailable || mailSender == null) {
-                System.out.println("==========================================");
-                System.out.println("KYC UPDATE OTP EMAIL (Mail not configured - Development Mode)");
-                System.out.println("To: " + toEmail);
-                System.out.println("OTP: " + otp);
-                System.out.println("==========================================");
-                return true; // Return true for development
-            }
-            
-            // Use reflection to send email if mail dependency is available
-            Class<?> simpleMailMessageClass = Class.forName("org.springframework.mail.SimpleMailMessage");
-            Object message = simpleMailMessageClass.getDeclaredConstructor().newInstance();
-            
-            Method setToMethod = simpleMailMessageClass.getMethod("setTo", String.class);
-            Method setSubjectMethod = simpleMailMessageClass.getMethod("setSubject", String.class);
-            Method setTextMethod = simpleMailMessageClass.getMethod("setText", String.class);
-            Method setFromMethod = simpleMailMessageClass.getMethod("setFrom", String.class);
-            
-            setToMethod.invoke(message, toEmail);
-            setSubjectMethod.invoke(message, "NeoBank - KYC Update OTP");
-            setTextMethod.invoke(message, buildKycUpdateOtpEmailBody(otp));
-            // Use the configured email username as the "from" address
-            String fromEmail = getFromEmail();
-            setFromMethod.invoke(message, fromEmail);
-            System.out.println("Email 'From' address set to: " + fromEmail);
-            
-            System.out.println("Attempting to send KYC update OTP email...");
-            System.out.println("Mail sender available: " + (mailSender != null));
-            
-            // Try to find the send method
-            Method sendMethod = null;
-            try {
-                sendMethod = mailSender.getClass().getMethod("send", Object.class);
-            } catch (NoSuchMethodException e) {
-                try {
-                    sendMethod = mailSender.getClass().getMethod("send", simpleMailMessageClass);
-                } catch (Exception e2) {
-                    throw new RuntimeException("Could not find send method", e2);
-                }
-            }
-            
-            System.out.println("Invoking send method...");
-            sendMethod.invoke(mailSender, message);
-            
-            System.out.println("==========================================");
-            System.out.println("✅ KYC update OTP email sent successfully!");
-            System.out.println("To: " + toEmail);
-            System.out.println("From: " + (applicationContext != null ? getFromEmail() : "noreply@neobank.com"));
-            System.out.println("==========================================");
-            return true;
-        } catch (Exception e) {
-            System.err.println("==========================================");
-            System.err.println("FAILED TO SEND KYC UPDATE OTP EMAIL");
-            System.err.println("To: " + toEmail);
-            System.err.println("Error: " + e.getMessage());
-            System.err.println("==========================================");
-            e.printStackTrace();
-            
-            // In development, still log the OTP even if email fails
-            System.out.println("==========================================");
-            System.out.println("KYC UPDATE OTP EMAIL (Email sending failed - Development Mode)");
-            System.out.println("To: " + toEmail);
-            System.out.println("OTP: " + otp);
-            System.out.println("Please check the error above for email configuration issues.");
-            System.out.println("==========================================");
-            
-            return true; // Return true for development (allow KYC update even if email fails)
-        }
+        return dispatchOtpEmail(toEmail, "NeoBank - KYC Update OTP", buildKycUpdateOtpEmailBody(otp));
     }
 
     /**
@@ -423,44 +272,7 @@ public class EmailService {
      * The reason is included in subject and body so the user knows what the OTP is for.
      */
     public boolean sendOtpEmailWithReason(String toEmail, String otp, String reason) {
-        if (gmailApiOtpService != null && gmailApiOtpService.isConfigured()) {
-            return sendOtpViaGmailApi(toEmail, "NeoBank - OTP for " + reason, buildOtpEmailBodyWithReason(otp, reason));
-        }
-
-        initializeMailSender();
-        try {
-            if (!mailAvailable || mailSender == null) {
-                System.out.println("==========================================");
-                System.out.println("OTP EMAIL - " + reason + " (Mail not configured - Development Mode)");
-                System.out.println("To: " + toEmail);
-                System.out.println("OTP: " + otp);
-                System.out.println("Reason: " + reason);
-                System.out.println("==========================================");
-                return true;
-            }
-            Class<?> simpleMailMessageClass = Class.forName("org.springframework.mail.SimpleMailMessage");
-            Object message = simpleMailMessageClass.getDeclaredConstructor().newInstance();
-            Method setToMethod = simpleMailMessageClass.getMethod("setTo", String.class);
-            Method setSubjectMethod = simpleMailMessageClass.getMethod("setSubject", String.class);
-            Method setTextMethod = simpleMailMessageClass.getMethod("setText", String.class);
-            Method setFromMethod = simpleMailMessageClass.getMethod("setFrom", String.class);
-            setToMethod.invoke(message, toEmail);
-            setSubjectMethod.invoke(message, "NeoBank - OTP for " + reason);
-            setTextMethod.invoke(message, buildOtpEmailBodyWithReason(otp, reason));
-            String fromEmail = getFromEmail();
-            setFromMethod.invoke(message, fromEmail);
-            Method sendMethod = null;
-            try { sendMethod = mailSender.getClass().getMethod("send", Object.class); } catch (NoSuchMethodException e) {
-                sendMethod = mailSender.getClass().getMethod("send", simpleMailMessageClass);
-            }
-            sendMethod.invoke(mailSender, message);
-            System.out.println("✅ OTP email sent for " + reason + " to " + toEmail);
-            return true;
-        } catch (Exception e) {
-            System.err.println("FAILED TO SEND OTP EMAIL (" + reason + "): " + e.getMessage());
-            System.out.println("OTP (dev): " + otp + " for " + toEmail + " reason: " + reason);
-            return true;
-        }
+        return dispatchOtpEmail(toEmail, "NeoBank - OTP for " + reason, buildOtpEmailBodyWithReason(otp, reason));
     }
 
     private String buildOtpEmailBodyWithReason(String otp, String reason) {
