@@ -2233,6 +2233,7 @@
             <th>Name</th>
             <th>Account #</th>
             <th>Email</th>
+            <th>Profile Password</th>
             <th>Balance</th>
           </tr>
         </thead>
@@ -2249,6 +2250,11 @@
             <td>{{ u.name }}</td>
             <td>{{ u.accountNumber }}</td>
             <td>{{ u.email }}</td>
+            <td>
+              <span class="status-badge" [ngClass]="u.passwordSet ? 'status-approved' : 'status-pending'">
+                {{ u.passwordSet ? 'Verified' : 'Not Set' }}
+              </span>
+            </td>
             <td>₹{{ u.balance | number:'1.2-2' }}</td>
           </tr>
         </tbody>

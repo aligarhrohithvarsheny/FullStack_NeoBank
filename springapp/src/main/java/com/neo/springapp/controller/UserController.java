@@ -98,6 +98,7 @@ public class UserController {
         userResponse.put("email", user.getEmail());
         userResponse.put("accountNumber", user.getAccountNumber());
         userResponse.put("status", user.getStatus());
+        userResponse.put("passwordSet", user.isPasswordSet());
         userResponse.put("accountLocked", user.isAccountLocked());
         userResponse.put("failedLoginAttempts", user.getFailedLoginAttempts());
         userResponse.put("joinDate", user.getJoinDate());

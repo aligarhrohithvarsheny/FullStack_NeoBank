@@ -22,6 +22,7 @@ export interface UserProfile {
   customerId?: string;
   balance: number;
   status: string;
+  passwordSet?: boolean;
   phoneNumber?: string;
   dateOfBirth?: string;
   address?: string;

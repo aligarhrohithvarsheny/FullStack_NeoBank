@@ -566,11 +566,9 @@ export class Profile implements OnInit, AfterViewInit {
         if (response.success) {
           this.currentUpdateRequestId = response.requestId;
           this.currentUpdateField = 'ADDRESS';
-          this.showOtpModal = true;
-          this.otpInput = '';
-          this.otpError = '';
-          this.startOtpTimer();
-          this.alertService.success('OTP Sent', 'OTP has been sent to your email. Please verify to submit the update request.');
+          this.alertService.success('Update Submitted', 'Your address update was submitted for admin approval.');
+          this.cancelEditingAddress();
+          this.loadUpdateHistory();
         } else {
           this.updateError = response.message || 'Failed to request update';
         }
@@ -620,11 +618,9 @@ export class Profile implements OnInit, AfterViewInit {
         if (response.success) {
           this.currentUpdateRequestId = response.requestId;
           this.currentUpdateField = 'PHONE';
-          this.showOtpModal = true;
-          this.otpInput = '';
-          this.otpError = '';
-          this.startOtpTimer();
-          this.alertService.success('OTP Sent', 'OTP has been sent to your email. Please verify to submit the update request.');
+          this.alertService.success('Update Submitted', 'Your phone update was submitted for admin approval.');
+          this.cancelEditingPhone();
+          this.loadUpdateHistory();
         } else {
           this.updateError = response.message || 'Failed to request update';
         }

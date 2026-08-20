@@ -1524,11 +1524,6 @@ button[type="submit"]:disabled:hover {
     letter-spacing: 8px;
   }
 }
-  font-family: 'Courier New', monospace;
-  font-weight: 700;
-  color: #3b82f6;
-  font-size: 1rem;
-}
 
 .status-badge {
   padding: 6px 12px;

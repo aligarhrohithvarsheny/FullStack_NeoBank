@@ -89,21 +89,10 @@ public class ProfileUpdateService {
                 return response;
             }
 
-            // Generate and send OTP
-            String otp = otpService.generateOtp();
             String userEmail = user.getEmail();
             if (userEmail == null || userEmail.trim().isEmpty()) {
                 response.put("success", false);
-                response.put("message", "User email not found. Cannot send OTP.");
-                return response;
-            }
-
-            otpService.storeOtp(userEmail, otp);
-            boolean emailSent = emailService.sendOtpEmail(userEmail, otp);
-
-            if (!emailSent) {
-                response.put("success", false);
-                response.put("message", "Failed to send OTP. Please try again.");
+                response.put("message", "User email not found.");
                 return response;
             }
 
@@ -116,15 +105,15 @@ public class ProfileUpdateService {
             request.setFieldToUpdate(field);
             request.setOldValue(oldValue);
             request.setNewValue(newValue);
-            request.setOtp(otp);
-            request.setOtpSentAt(LocalDateTime.now());
-            request.setOtpVerified(false);
-            request.setStatus("PENDING");
+            request.setOtp(null);
+            request.setOtpSentAt(null);
+            request.setOtpVerified(true);
+            request.setStatus("OTP_VERIFIED");
 
             ProfileUpdateRequest savedRequest = requestRepository.save(request);
 
             response.put("success", true);
-            response.put("message", "OTP has been sent to your email. Please verify to submit the update request.");
+            response.put("message", "Profile update request submitted for admin approval.");
             response.put("requestId", savedRequest.getId());
             
         } catch (Exception e) {

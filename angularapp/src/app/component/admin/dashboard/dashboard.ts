@@ -2017,6 +2017,7 @@ export class Dashboard implements OnInit, OnDestroy {
             accountNumber: user.accountNumber || 'No account',
             balance: user.account?.balance || 0,
             status: user.account?.status || 'ACTIVE',
+            passwordSet: user.passwordSet === true,
             phoneNumber: user.account?.phone || user.phoneNumber || '',
             dateOfBirth: user.account?.dob || user.dateOfBirth || '',
             address: user.account?.address || user.address || '',

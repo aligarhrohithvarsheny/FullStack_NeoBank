@@ -202,6 +202,12 @@ export class User implements OnInit, OnDestroy {
   }
 
   private navigateAfterUserLogin() {
+    const currentUser = JSON.parse(sessionStorage.getItem('currentUser') || 'null');
+    if (currentUser && currentUser.passwordSet !== true) {
+      sessionStorage.setItem('setupEmail', currentUser.email || this.loginUserId);
+      this.router.navigate(['/password-setup']);
+      return;
+    }
     const redirectTo = this.route.snapshot.queryParams['redirectTo'];
     if (redirectTo === 'insurance') {
       this.router.navigate(['/website/insurance']);
@@ -255,6 +261,7 @@ export class User implements OnInit, OnDestroy {
               email: userData.email,
               accountNumber: userData.accountNumber,
               status: userData.status,
+              passwordSet: userData.passwordSet === true,
               loginTime: new Date().toISOString()
             };
             
@@ -387,6 +394,7 @@ export class User implements OnInit, OnDestroy {
               email: userData.email,
               accountNumber: userData.accountNumber,
               status: userData.status,
+              passwordSet: userData.passwordSet === true,
               loginTime: new Date().toISOString()
             };
 
@@ -570,7 +578,7 @@ export class User implements OnInit, OnDestroy {
         this.isUnifiedLoggingIn = false;
         console.log('Authentication response:', authResponse);
         
-        if (authResponse.success && authResponse.requiresPasswordSetup) {
+        if (authResponse.requiresPasswordSetup) {
           // New password setup required for newly approved accounts
           this.successMessage = authResponse.message || 'Your account has been approved. Please set up your password to proceed.';
           this.errorMessage = '';
