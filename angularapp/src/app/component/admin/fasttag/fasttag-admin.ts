@@ -4,6 +4,8 @@ import { FormsModule } from '@angular/forms';
 import { FasttagService, FasttagApplication } from '../../../service/fasttag.service';
 import { AccountService } from '../../../service/account';
 import { AlertService } from '../../../service/alert.service';
+import { HttpClient } from '@angular/common/http';
+import { environment } from '../../../../environment/environment';
 
 @Component({
   selector: 'app-fasttag-admin',
@@ -27,11 +29,20 @@ export class FasttagAdmin implements OnInit {
   selectedAccountId: string | null = null;
   // detail view
   selectedDetailTag: FasttagApplication | null = null;
+  selectedEditTag: FasttagApplication | null = null;
+  editForm: any = {};
+  editHistory: any[] = [];
+  fastagUsers: any[] = [];
+  loginHistory: any[] = [];
+  showAccountsPanel = false;
+  showLoginHistoryPanel = false;
 
-  constructor(private fasttagService: FasttagService, private alertService: AlertService, private accountService: AccountService) {}
+  constructor(private fasttagService: FasttagService, private alertService: AlertService, private accountService: AccountService, private http: HttpClient) {}
 
   ngOnInit() {
     this.reload();
+    this.loadFastagAccounts();
+    this.loadLoginHistory();
   }
 
   getFilteredList() {
@@ -198,6 +209,47 @@ export class FasttagAdmin implements OnInit {
 
   viewDetails(item: FasttagApplication) {
     this.selectedDetailTag = this.selectedDetailTag?.id === item.id ? null : item;
+  }
+
+  openEdit(item: FasttagApplication) {
+    this.selectedEditTag = item;
+    this.editForm = { ...item };
+    this.fasttagService.getEditHistory(String(item.id)).subscribe({
+      next: (history) => this.editHistory = history || [],
+      error: () => this.editHistory = []
+    });
+  }
+
+  closeEdit() {
+    this.selectedEditTag = null;
+    this.editForm = {};
+    this.editHistory = [];
+  }
+
+  saveEdit() {
+    if (!this.selectedEditTag) return;
+    this.fasttagService.updateAdminDetails(String(this.selectedEditTag.id), this.editForm).subscribe({
+      next: (updated) => {
+        this.alertService.success('FASTag Updated', 'All FASTag details were saved.');
+        this.closeEdit();
+        this.reload();
+      },
+      error: (err) => this.alertService.error('Update Failed', err?.error?.message || 'Unable to save FASTag details')
+    });
+  }
+
+  loadFastagAccounts() {
+    this.http.get<any[]>(`${environment.apiBaseUrl}/api/fastag/admin/users`).subscribe({
+      next: (users) => this.fastagUsers = users || [],
+      error: () => this.fastagUsers = []
+    });
+  }
+
+  loadLoginHistory() {
+    this.http.get<any[]>(`${environment.apiBaseUrl}/api/fastag/admin/login-history`).subscribe({
+      next: (history) => this.loginHistory = history || [],
+      error: () => this.loginHistory = []
+    });
   }
 
   getRcImageUrl(filename: string): string {

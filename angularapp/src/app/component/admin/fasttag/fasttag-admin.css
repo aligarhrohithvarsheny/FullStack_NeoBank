@@ -113,3 +113,17 @@
   padding: 10px 24px;
   font-size: 14px;
 }
+
+.ft-edit-panel,.ft-account-panel{margin:18px 0;padding:18px;background:#fff;border:1px solid #e2e8f0;border-radius:8px}
+.ft-panel-heading,.ft-edit-actions{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px}
+.ft-edit-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.ft-edit-grid label{display:flex;flex-direction:column;gap:5px;color:#475569;font-size:13px;font-weight:600}
+.ft-edit-grid input,.ft-edit-grid select,.ft-edit-grid textarea{width:100%;box-sizing:border-box;padding:8px;border:1px solid #cbd5e1;border-radius:5px;font:inherit;font-weight:400}
+.ft-edit-grid textarea{min-height:58px;resize:vertical}
+.ft-edit-grid .checkbox-label{flex-direction:row;align-items:center;margin-top:24px}
+.ft-edit-grid .checkbox-label input{width:auto}
+.ft-history{margin-top:18px;border-top:1px solid #e2e8f0;padding-top:12px}
+.ft-history-row{padding:8px 0;border-bottom:1px solid #f1f5f9;font-size:13px}
+.ft-history pre{white-space:pre-wrap;max-height:180px;overflow:auto;background:#f8fafc;padding:8px;font-size:11px}
+.ft-admin-panels{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:18px}
+@media (max-width:800px){.ft-admin-panels{grid-template-columns:1fr}.ft-edit-grid{grid-template-columns:1fr}}

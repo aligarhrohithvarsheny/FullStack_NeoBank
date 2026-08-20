@@ -4,6 +4,9 @@ import com.neo.springapp.model.Fasttag;
 import com.neo.springapp.model.FasttagTransaction;
 import com.neo.springapp.repository.FasttagRepository;
 import com.neo.springapp.repository.FasttagTransactionRepository;
+import com.neo.springapp.repository.FasttagEditHistoryRepository;
+import com.neo.springapp.model.FasttagEditHistory;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -28,6 +31,12 @@ public class FasttagService {
 
     @Autowired
     private FasttagStickerGenerator stickerGenerator;
+
+    @Autowired
+    private FasttagEditHistoryRepository editHistoryRepository;
+
+    @Autowired
+    private ObjectMapper objectMapper;
 
     public List<Fasttag> listAll() {
         return fasttagRepository.findAll();
@@ -221,6 +230,95 @@ public class FasttagService {
 
     public Fasttag getById(Long id) {
         return fasttagRepository.findById(id).orElse(null);
+    }
+
+    public Fasttag updateAdminDetails(Long id, Fasttag updates, String changedBy) {
+        Fasttag current = getById(id);
+        if (current == null) return null;
+
+        String before = snapshot(current);
+        current.setUserId(updates.getUserId());
+        current.setUserName(updates.getUserName());
+        current.setVehicleDetails(updates.getVehicleDetails());
+        current.setVehicleNumber(updates.getVehicleNumber());
+        current.setAadharNumber(updates.getAadharNumber());
+        current.setPanNumber(updates.getPanNumber());
+        current.setDob(updates.getDob());
+        current.setVehicleType(updates.getVehicleType());
+        current.setAmount(updates.getAmount());
+        current.setBank(updates.getBank());
+        current.setChassisNumber(updates.getChassisNumber());
+        current.setEngineNumber(updates.getEngineNumber());
+        current.setMake(updates.getMake());
+        current.setModel(updates.getModel());
+        current.setFuelType(updates.getFuelType());
+        current.setMobileNumber(updates.getMobileNumber());
+        current.setEmail(updates.getEmail());
+        current.setDispatchAddress(updates.getDispatchAddress());
+        current.setPinCode(updates.getPinCode());
+        current.setCity(updates.getCity());
+        current.setState(updates.getState());
+        current.setTagIssuanceFee(updates.getTagIssuanceFee());
+        current.setTagSecurityDeposit(updates.getTagSecurityDeposit());
+        current.setTagUploadAmount(updates.getTagUploadAmount());
+        current.setTagTotalAmount(updates.getTagTotalAmount());
+        current.setDebitAccountNumber(updates.getDebitAccountNumber());
+        current.setTermsAccepted(updates.getTermsAccepted());
+        current.setStatus(updates.getStatus());
+        current.setFasttagNumber(updates.getFasttagNumber());
+        current.setBarcodeNumber(updates.getBarcodeNumber());
+        current.setIssueDate(updates.getIssueDate());
+        current.setBalance(updates.getBalance());
+        current.setAssignedAccountId(updates.getAssignedAccountId());
+        current.setAssignedAt(updates.getAssignedAt());
+
+        Fasttag saved = fasttagRepository.save(current);
+        FasttagEditHistory history = new FasttagEditHistory();
+        history.setFasttagId(saved.getId());
+        history.setFasttagNumber(saved.getFasttagNumber());
+        history.setChangedBy(changedBy == null || changedBy.isBlank() ? "admin" : changedBy);
+        history.setBeforeValues(before);
+        history.setAfterValues(snapshot(saved));
+        editHistoryRepository.save(history);
+        return saved;
+    }
+
+    public List<FasttagEditHistory> editHistoryForTag(Long id) {
+        return editHistoryRepository.findByFasttagIdOrderByChangedAtDesc(id);
+    }
+
+    private String snapshot(Fasttag tag) {
+        try {
+            Map<String, Object> values = new HashMap<>();
+            values.put("userId", tag.getUserId());
+            values.put("userName", tag.getUserName());
+            values.put("vehicleDetails", tag.getVehicleDetails());
+            values.put("vehicleNumber", tag.getVehicleNumber());
+            values.put("aadharNumber", tag.getAadharNumber());
+            values.put("panNumber", tag.getPanNumber());
+            values.put("dob", tag.getDob());
+            values.put("vehicleType", tag.getVehicleType());
+            values.put("amount", tag.getAmount());
+            values.put("bank", tag.getBank());
+            values.put("chassisNumber", tag.getChassisNumber());
+            values.put("engineNumber", tag.getEngineNumber());
+            values.put("make", tag.getMake());
+            values.put("model", tag.getModel());
+            values.put("fuelType", tag.getFuelType());
+            values.put("mobileNumber", tag.getMobileNumber());
+            values.put("email", tag.getEmail());
+            values.put("dispatchAddress", tag.getDispatchAddress());
+            values.put("pinCode", tag.getPinCode());
+            values.put("city", tag.getCity());
+            values.put("state", tag.getState());
+            values.put("status", tag.getStatus());
+            values.put("fasttagNumber", tag.getFasttagNumber());
+            values.put("barcodeNumber", tag.getBarcodeNumber());
+            values.put("balance", tag.getBalance());
+            return objectMapper.writeValueAsString(values);
+        } catch (Exception e) {
+            return "{}";
+        }
     }
 
     public Fasttag ensureStickerForApprovedTag(Fasttag tag) {

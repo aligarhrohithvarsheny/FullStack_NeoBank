@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.Map;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -21,29 +22,40 @@ public class FastagLoginService {
     @Autowired
     private PasswordService passwordService;
 
+    @Autowired
+    private FastagLoginHistoryService loginHistoryService;
+
     /**
      * Login with Gmail + password (no OTP).
      */
     public LoginResult login(String gmailId, String password) {
+        return login(gmailId, password, "Unknown", "Unknown");
+    }
+
+    public LoginResult login(String gmailId, String password, String ipAddress, String deviceInfo) {
         String normalizedEmail = normalizeGmail(gmailId);
 
         Optional<FastagUser> optUser = fastagUserRepository.findByGmailId(normalizedEmail);
         if (optUser.isEmpty()) {
+            loginHistoryService.record(normalizedEmail, "FAILED", "PASSWORD", "ACCOUNT_NOT_FOUND", ipAddress, deviceInfo);
             return LoginResult.notFound("No FASTag account found for this Gmail. Please set your password to register.");
         }
 
         FastagUser user = optUser.get();
 
         if (Boolean.TRUE.equals(user.getAccountLocked())) {
+            loginHistoryService.record(normalizedEmail, "FAILED", "PASSWORD", "ACCOUNT_LOCKED", ipAddress, deviceInfo);
             return LoginResult.failed("Account is locked due to multiple failed login attempts. Please contact support.");
         }
 
         if (user.getPassword() == null || !Boolean.TRUE.equals(user.getPasswordSet())) {
+            loginHistoryService.record(normalizedEmail, "FAILED", "PASSWORD", "PASSWORD_NOT_SET", ipAddress, deviceInfo);
             return LoginResult.requiresPasswordSetup(
                     "Password not set for this Gmail. Please set your password to continue.");
         }
 
         if (password == null || password.isBlank()) {
+            loginHistoryService.record(normalizedEmail, "FAILED", "PASSWORD", "PASSWORD_REQUIRED", ipAddress, deviceInfo);
             return LoginResult.failed("Password is required.");
         }
 
@@ -52,14 +64,18 @@ public class FastagLoginService {
             if (user.getFailedLoginAttempts() >= MAX_LOGIN_ATTEMPTS) {
                 user.setAccountLocked(true);
                 fastagUserRepository.save(user);
+                loginHistoryService.record(normalizedEmail, "FAILED", "PASSWORD", "ACCOUNT_LOCKED", ipAddress, deviceInfo);
                 return LoginResult.failed("Account locked after 3 failed attempts.");
             }
             fastagUserRepository.save(user);
             int remaining = MAX_LOGIN_ATTEMPTS - user.getFailedLoginAttempts();
+            loginHistoryService.record(normalizedEmail, "FAILED", "PASSWORD", "INVALID_PASSWORD", ipAddress, deviceInfo);
             return LoginResult.failed("Invalid password. " + remaining + " attempt(s) remaining.");
         }
 
-        return completeLogin(user);
+        LoginResult result = completeLogin(user);
+        loginHistoryService.record(normalizedEmail, "SUCCESS", "PASSWORD", null, ipAddress, deviceInfo);
+        return result;
     }
 
     /**
@@ -100,6 +116,7 @@ public class FastagLoginService {
         user.setOtpAttempts(0);
 
         fastagUserRepository.save(user);
+        loginHistoryService.record(normalizedEmail, "SUCCESS", "PASSWORD_SETUP", null, "Unknown", "Unknown");
         return completeLogin(user);
     }
 
@@ -130,6 +147,10 @@ public class FastagLoginService {
 
     public Optional<FastagUser> getUserByGmail(String gmailId) {
         return fastagUserRepository.findByGmailId(normalizeGmail(gmailId));
+    }
+
+    public List<FastagUser> getAllUsers() {
+        return fastagUserRepository.findAll();
     }
 
     private LoginResult completeLogin(FastagUser user) {

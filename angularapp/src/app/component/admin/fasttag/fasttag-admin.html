@@ -71,6 +71,7 @@
           <td>{{t.createdAt | date:'short'}}</td>
           <td class="actions">
             <button (click)="viewDetails(t)" class="document-btn">{{ selectedDetailTag?.id === t.id ? 'Hide Details' : 'View Details' }}</button>
+            <button (click)="openEdit(t)" class="document-btn">Edit All Details</button>
             <button *ngIf="t.status==='Applied'" (click)="approve(t)" class="approve-btn">Approve</button>
             <button (click)="selectForRecharge(t)" class="document-btn">Recharge</button>
             <button *ngIf="t.status==='Approved'" (click)="openAssignAccount(t)" class="document-btn">Assign Account</button>
@@ -243,6 +244,75 @@
         </ng-container>
       </tbody>
     </table>
+  </div>
+
+  <div *ngIf="selectedEditTag" class="ft-edit-panel">
+    <div class="ft-panel-heading">
+      <h3>Edit FASTag Details #{{ selectedEditTag.id }}</h3>
+      <button class="reject-btn" (click)="closeEdit()">Close</button>
+    </div>
+    <div class="ft-edit-grid">
+      <label>User ID<input [(ngModel)]="editForm.userId"></label>
+      <label>User Name<input [(ngModel)]="editForm.userName"></label>
+      <label>Email<input type="email" [(ngModel)]="editForm.email"></label>
+      <label>Mobile Number<input [(ngModel)]="editForm.mobileNumber"></label>
+      <label>Vehicle Number<input [(ngModel)]="editForm.vehicleNumber"></label>
+      <label>Vehicle Details<input [(ngModel)]="editForm.vehicleDetails"></label>
+      <label>Vehicle Type<input [(ngModel)]="editForm.vehicleType"></label>
+      <label>Make<input [(ngModel)]="editForm.make"></label>
+      <label>Model<input [(ngModel)]="editForm.model"></label>
+      <label>Fuel Type<input [(ngModel)]="editForm.fuelType"></label>
+      <label>Chassis Number<input [(ngModel)]="editForm.chassisNumber"></label>
+      <label>Engine Number<input [(ngModel)]="editForm.engineNumber"></label>
+      <label>Aadhar Number<input [(ngModel)]="editForm.aadharNumber"></label>
+      <label>PAN Number<input [(ngModel)]="editForm.panNumber"></label>
+      <label>Date of Birth<input [(ngModel)]="editForm.dob"></label>
+      <label>Bank<input [(ngModel)]="editForm.bank"></label>
+      <label>Debit Account<input [(ngModel)]="editForm.debitAccountNumber"></label>
+      <label>Dispatch Address<textarea [(ngModel)]="editForm.dispatchAddress"></textarea></label>
+      <label>PIN Code<input [(ngModel)]="editForm.pinCode"></label>
+      <label>City<input [(ngModel)]="editForm.city"></label>
+      <label>State<input [(ngModel)]="editForm.state"></label>
+      <label>Status<select [(ngModel)]="editForm.status"><option>Applied</option><option>Approved</option><option>Closed</option><option>Rejected</option></select></label>
+      <label>FASTag Number<input [(ngModel)]="editForm.fasttagNumber"></label>
+      <label>Barcode Number<input [(ngModel)]="editForm.barcodeNumber"></label>
+      <label>Balance<input type="number" [(ngModel)]="editForm.balance"></label>
+      <label>Amount<input type="number" [(ngModel)]="editForm.amount"></label>
+      <label>Issuance Fee<input type="number" [(ngModel)]="editForm.tagIssuanceFee"></label>
+      <label>Security Deposit<input type="number" [(ngModel)]="editForm.tagSecurityDeposit"></label>
+      <label>Upload Amount<input type="number" [(ngModel)]="editForm.tagUploadAmount"></label>
+      <label>Total Amount<input type="number" [(ngModel)]="editForm.tagTotalAmount"></label>
+      <label>Assigned Account ID<input [(ngModel)]="editForm.assignedAccountId"></label>
+      <label class="checkbox-label"><input type="checkbox" [(ngModel)]="editForm.termsAccepted"> Terms Accepted</label>
+    </div>
+    <div class="ft-edit-actions"><button class="approve-btn" (click)="saveEdit()">Save Details</button><button class="reject-btn" (click)="closeEdit()">Cancel</button></div>
+    <div class="ft-history" *ngIf="editHistory.length">
+      <h4>Saved Edit History</h4>
+      <div *ngFor="let entry of editHistory" class="ft-history-row">
+        <strong>{{ entry.changedAt | date:'short' }}</strong> by {{ entry.changedBy || 'admin' }}
+        <details><summary>Before / after snapshot</summary><pre>{{ entry.beforeValues }}
+{{ entry.afterValues }}</pre></details>
+      </div>
+    </div>
+  </div>
+
+  <div class="ft-admin-panels">
+    <section class="ft-account-panel">
+      <button class="document-btn" (click)="showAccountsPanel = !showAccountsPanel">{{ showAccountsPanel ? 'Hide' : 'Show' }} FASTag Login Accounts</button>
+      <div *ngIf="showAccountsPanel" class="kyc-table">
+        <table><thead><tr><th>Gmail</th><th>Password Set</th><th>Locked</th><th>Created</th><th>Last Login</th></tr></thead>
+          <tbody><tr *ngFor="let user of fastagUsers"><td>{{ user.gmailId }}</td><td>{{ user.passwordSet ? 'Yes' : 'No' }}</td><td>{{ user.accountLocked ? 'Yes' : 'No' }}</td><td>{{ user.createdAt | date:'short' }}</td><td>{{ user.lastLoginAt | date:'short' }}</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+    <section class="ft-account-panel">
+      <button class="document-btn" (click)="showLoginHistoryPanel = !showLoginHistoryPanel">{{ showLoginHistoryPanel ? 'Hide' : 'Show' }} FASTag Login History</button>
+      <div *ngIf="showLoginHistoryPanel" class="kyc-table">
+        <table><thead><tr><th>Gmail</th><th>Time</th><th>Status</th><th>Method</th><th>Reason</th><th>IP</th></tr></thead>
+          <tbody><tr *ngFor="let entry of loginHistory"><td>{{ entry.gmailId }}</td><td>{{ entry.loginTime | date:'short' }}</td><td>{{ entry.status }}</td><td>{{ entry.loginMethod }}</td><td>{{ entry.failureReason || '-' }}</td><td>{{ entry.ipAddress }}</td></tr></tbody>
+        </table>
+      </div>
+    </section>
   </div>
 
     <div *ngIf="assigningTagId" class="assign-panel">

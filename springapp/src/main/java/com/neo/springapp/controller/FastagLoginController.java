@@ -9,6 +9,7 @@ import com.neo.springapp.service.FasttagService;
 import com.neo.springapp.service.AccountService;
 import com.neo.springapp.service.OtpService;
 import com.neo.springapp.service.EmailService;
+import com.neo.springapp.service.FastagLoginHistoryService;
 import com.neo.springapp.repository.FastagLinkedAccountRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.InputStreamResource;
@@ -49,6 +50,9 @@ public class FastagLoginController {
 
     @Autowired
     private FastagLinkedAccountRepository fastagLinkedAccountRepository;
+
+    @Autowired
+    private FastagLoginHistoryService fastagLoginHistoryService;
 
     /**
      * POST /api/fastag/test-email
@@ -99,13 +103,44 @@ public class FastagLoginController {
         }
 
         try {
-            FastagLoginService.LoginResult result = fastagLoginService.login(gmailId, password);
+            String ipAddress = request.get("ipAddress");
+            String deviceInfo = request.get("deviceInfo");
+            FastagLoginService.LoginResult result = fastagLoginService.login(gmailId, password, ipAddress, deviceInfo);
             return buildFastagAuthResponse(response, result);
         } catch (Exception e) {
             response.put("success", false);
             response.put("message", "Login failed. Please try again.");
             return ResponseEntity.internalServerError().body(response);
         }
+    }
+
+    @GetMapping("/account-status/{gmailId}")
+    public ResponseEntity<Map<String, Object>> accountStatus(@PathVariable String gmailId) {
+        if (!GMAIL_PATTERN.matcher(gmailId.trim()).matches()) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Please enter a valid Gmail address."));
+        }
+        return ResponseEntity.ok(fastagLoginService.accountStatus(gmailId));
+    }
+
+    @GetMapping("/admin/users")
+    public ResponseEntity<List<Map<String, Object>>> adminUsers() {
+        List<Map<String, Object>> users = fastagLoginService.getAllUsers().stream().map(user -> {
+            Map<String, Object> item = new HashMap<>();
+            item.put("id", user.getId());
+            item.put("gmailId", user.getGmailId());
+            item.put("passwordSet", Boolean.TRUE.equals(user.getPasswordSet()));
+            item.put("accountLocked", Boolean.TRUE.equals(user.getAccountLocked()));
+            item.put("failedLoginAttempts", user.getFailedLoginAttempts());
+            item.put("createdAt", user.getCreatedAt());
+            item.put("lastLoginAt", user.getLastLoginAt());
+            return item;
+        }).toList();
+        return ResponseEntity.ok(users);
+    }
+
+    @GetMapping("/admin/login-history")
+    public ResponseEntity<?> adminLoginHistory() {
+        return ResponseEntity.ok(fastagLoginHistoryService.getAll());
     }
 
     /**

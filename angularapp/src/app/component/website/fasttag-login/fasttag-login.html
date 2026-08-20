@@ -30,7 +30,7 @@
     <!-- Right Panel - Form -->
     <div class="login-right">
       <div class="form-card">
-        <h2 class="form-title">{{ step === 'login' ? "Let's Get Started" : 'Set Your Password' }}</h2>
+        <h2 class="form-title">{{ step === 'login' ? "Let's Get Started" : (accountExists === true ? 'Create Your Password' : 'Create FASTag Account') }}</h2>
 
         <!-- Info Banner -->
         <div class="info-banner" *ngIf="step === 'login'">
@@ -71,6 +71,7 @@
                   class="form-input"
                   [class.invalid]="gmailId && !isValidGmail()"
                   (keydown.enter)="login()"
+                  (blur)="checkAccountStatus()"
                   autocomplete="email"
                 />
               </div>
@@ -117,8 +118,8 @@
           </button>
 
           <div class="terms-links">
-            First time here?
-            <a href="javascript:void(0)" (click)="goToSetPassword()">Set your password</a>
+            <span *ngIf="accountExists !== false">First time here?</span>
+            <a href="javascript:void(0)" (click)="goToSetPassword()">{{ accountExists === true ? 'Create or reset password' : 'Create account and password' }}</a>
           </div>
         </div>
 

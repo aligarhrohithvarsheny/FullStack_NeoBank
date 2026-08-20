@@ -91,6 +91,25 @@ public class FasttagController {
         return ResponseEntity.ok(f);
     }
 
+    @PutMapping("/{id}")
+    public ResponseEntity<?> updateAdminDetails(@PathVariable Long id,
+                                                 @RequestBody Fasttag updates,
+                                                 @RequestParam(value = "changedBy", required = false) String changedBy) {
+        try {
+            Fasttag updated = fasttagService.updateAdminDetails(id, updates, changedBy);
+            if (updated == null) return ResponseEntity.notFound().build();
+            return ResponseEntity.ok(updated);
+        } catch (RuntimeException ex) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", ex.getMessage()));
+        }
+    }
+
+    @GetMapping("/{id}/edit-history")
+    public ResponseEntity<?> editHistory(@PathVariable Long id) {
+        if (fasttagService.getById(id) == null) return ResponseEntity.notFound().build();
+        return ResponseEntity.ok(fasttagService.editHistoryForTag(id));
+    }
+
     @PostMapping
     public ResponseEntity<?> apply(@RequestBody Fasttag app) {
         try {

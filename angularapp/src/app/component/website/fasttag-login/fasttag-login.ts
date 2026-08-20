@@ -21,6 +21,8 @@ export class FasttagLogin implements OnInit, OnDestroy {
 
   step: 'login' | 'set-password' = 'login';
   showPassword: boolean = false;
+  accountExists: boolean | null = null;
+  checkingAccount: boolean = false;
 
   loading: boolean = false;
   errorMessage: string = '';
@@ -50,6 +52,24 @@ export class FasttagLogin implements OnInit, OnDestroy {
   isValidGmail(): boolean {
     const gmailRegex = /^[a-zA-Z0-9._%+-]+@gmail\.com$/i;
     return gmailRegex.test(this.gmailId.trim());
+  }
+
+  checkAccountStatus() {
+    if (!this.isValidGmail()) {
+      this.accountExists = null;
+      return;
+    }
+    this.checkingAccount = true;
+    this.http.get<any>(`${environment.apiBaseUrl}/api/fastag/account-status/${encodeURIComponent(this.gmailId.trim())}`).subscribe({
+      next: (res) => {
+        this.checkingAccount = false;
+        this.accountExists = res.exists === true;
+      },
+      error: () => {
+        this.checkingAccount = false;
+        this.accountExists = null;
+      }
+    });
   }
 
   login() {
@@ -140,6 +160,7 @@ export class FasttagLogin implements OnInit, OnDestroy {
 
   goToSetPassword() {
     this.step = 'set-password';
+    this.checkAccountStatus();
     this.errorMessage = '';
     this.successMessage = '';
   }

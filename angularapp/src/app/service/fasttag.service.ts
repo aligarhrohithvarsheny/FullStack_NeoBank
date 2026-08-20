@@ -88,6 +88,16 @@ export class FasttagService {
     return this.http.get<FasttagApplication>(`${environment.apiBaseUrl}/api/fasttags/${id}`);
   }
 
+  updateAdminDetails(id: string, details: Partial<FasttagApplication>, changedBy = 'admin'): Observable<FasttagApplication> {
+    return this.http.put<FasttagApplication>(`${environment.apiBaseUrl}/api/fasttags/${id}`, details, {
+      params: { changedBy }
+    });
+  }
+
+  getEditHistory(id: string): Observable<any[]> {
+    return this.http.get<any[]>(`${environment.apiBaseUrl}/api/fasttags/${id}/edit-history`);
+  }
+
   // Admin recharge specifying initiator (ADMIN) and initiator id
   rechargeByTagAsAdmin(fasttagNumber: string, amount: number, adminId: string): Observable<FasttagApplication> {
     return this.http.post<FasttagApplication>(`${environment.apiBaseUrl}/api/fasttags/recharge`, { fasttagNumber, amount, initiatedBy: 'ADMIN', initiatedById: adminId });
