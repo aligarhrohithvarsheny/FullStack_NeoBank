@@ -65,6 +65,9 @@ public class LoanController {
     @Autowired(required = false)
     private com.neo.springapp.service.BankChargesService bankChargesService;
 
+    @Autowired(required = false)
+    private com.neo.springapp.service.EducationLoanApplicationService educationLoanApplicationService;
+
     public LoanController(LoanService loanService) {
         this.loanService = loanService;
     }
@@ -78,6 +81,14 @@ public class LoanController {
                 bankChargesService.applyCibilChargeAtLoanApply(saved.getAccountNumber(), saved.getUserName());
             } catch (Exception e) {
                 System.err.println("CIBIL charge could not be applied: " + e.getMessage());
+            }
+        }
+        if (saved != null && educationLoanApplicationService != null
+                && saved.getType() != null && saved.getType().toLowerCase().contains("education")) {
+            try {
+                educationLoanApplicationService.createFromLoan(saved, null);
+            } catch (Exception e) {
+                System.err.println("Education loan application record could not be created: " + e.getMessage());
             }
         }
         return saved;

@@ -1,7 +1,9 @@
 package com.neo.springapp.service;
 
 import com.neo.springapp.model.EducationLoanApplication;
+import com.neo.springapp.model.Loan;
 import com.neo.springapp.repository.EducationLoanApplicationRepository;
+import com.neo.springapp.repository.LoanRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,6 +24,9 @@ public class EducationLoanApplicationService {
     @Autowired
     private EducationLoanApplicationRepository applicationRepository;
 
+    @Autowired
+    private LoanRepository loanRepository;
+
     private static final String UPLOAD_DIR = "uploads/education-loan-documents/";
 
     /**
@@ -29,25 +34,85 @@ public class EducationLoanApplicationService {
      */
     @Transactional
     public EducationLoanApplication createApplication(EducationLoanApplication application) {
-        // Validate age
-        if (!application.isValidAge()) {
-            throw new RuntimeException("Child age must be between 18 and 26 years");
-        }
-        
-        // Set calculated age
         application.setChildAge(application.calculateAge());
-        application.setApplicationDate(LocalDateTime.now());
+        if (application.getChildDateOfBirth() != null && !application.isValidAge()) {
+            String note = "Child age is outside 18-26 (age=" + application.getChildAge() + "). Saved for admin review.";
+            application.setAdminNotes(application.getAdminNotes() == null ? note : application.getAdminNotes() + " | " + note);
+        }
+        if (application.getApplicationDate() == null) {
+            application.setApplicationDate(LocalDateTime.now());
+        }
         application.setLastUpdatedDate(LocalDateTime.now());
-        application.setApplicationStatus("Pending");
-        
+        if (application.getApplicationStatus() == null || application.getApplicationStatus().isBlank()) {
+            application.setApplicationStatus("Pending");
+        }
+        if (application.getLoanId() != null) {
+            return applicationRepository.findByLoanId(application.getLoanId())
+                    .map(existing -> updateApplication(existing.getId(), application))
+                    .orElseGet(() -> applicationRepository.save(application));
+        }
         return applicationRepository.save(application);
     }
 
     /**
-     * Get all applications
+     * Create a linked education-loan application from a saved Loan (covers historical applies).
+     */
+    @Transactional
+    public EducationLoanApplication createFromLoan(Loan loan, EducationLoanApplication details) {
+        if (loan == null || loan.getId() == null) {
+            throw new IllegalArgumentException("Saved loan is required");
+        }
+        return applicationRepository.findByLoanId(loan.getId()).orElseGet(() -> {
+            EducationLoanApplication app = details != null ? details : new EducationLoanApplication();
+            app.setLoanId(loan.getId());
+            app.setLoanAccountNumber(loan.getLoanAccountNumber());
+            app.setRequestedLoanAmount(loan.getAmount());
+            if (app.getApplicantAccountNumber() == null) {
+                app.setApplicantAccountNumber(loan.getAccountNumber());
+            }
+            if (app.getApplicantName() == null) {
+                app.setApplicantName(loan.getUserName());
+            }
+            if (app.getApplicantEmail() == null) {
+                app.setApplicantEmail(loan.getUserEmail());
+            }
+            if (app.getChildAccountNumber() == null) {
+                app.setChildAccountNumber(loan.getChildAccountNumber());
+            }
+            if (app.getChildName() == null || app.getChildName().isBlank()) {
+                app.setChildName(loan.getUserName() != null ? loan.getUserName() : "Education loan applicant");
+            }
+            return createApplication(app);
+        });
+    }
+
+    /**
+     * Get all applications, including education loans that only exist in the loans table.
      */
     public List<EducationLoanApplication> getAllApplications() {
-        return applicationRepository.findAll();
+        List<EducationLoanApplication> apps = new java.util.ArrayList<>(applicationRepository.findAll());
+        try {
+            List<Loan> educationLoans = loanRepository.findAll().stream()
+                    .filter(l -> l.getType() != null && l.getType().toLowerCase().contains("education"))
+                    .toList();
+            for (Loan loan : educationLoans) {
+                boolean exists = apps.stream().anyMatch(a ->
+                        (a.getLoanId() != null && a.getLoanId().equals(loan.getId()))
+                                || (a.getLoanAccountNumber() != null
+                                && a.getLoanAccountNumber().equals(loan.getLoanAccountNumber())));
+                if (!exists) {
+                    apps.add(createFromLoan(loan, null));
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Education loan backfill skipped: " + e.getMessage());
+        }
+        apps.sort((a, b) -> {
+            if (a.getApplicationDate() == null) return 1;
+            if (b.getApplicationDate() == null) return -1;
+            return b.getApplicationDate().compareTo(a.getApplicationDate());
+        });
+        return apps;
     }
 
     /**

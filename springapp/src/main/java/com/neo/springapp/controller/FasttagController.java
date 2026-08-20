@@ -161,24 +161,16 @@ public class FasttagController {
         Fasttag f = fasttagService.getById(id);
         if (f == null) return ResponseEntity.notFound().build();
         if (!"Approved".equalsIgnoreCase(f.getStatus())) return ResponseEntity.badRequest().body("Sticker is available only for approved FASTag.");
-        f = fasttagService.ensureStickerForApprovedTag(f);
-        String path = f.getStickerPath();
-        if (path == null || path.isEmpty()) return ResponseEntity.badRequest().body("Sticker not available");
         try {
-            File file = new File(path);
-            if (!file.exists()) return ResponseEntity.notFound().build();
-            InputStreamResource resource = new InputStreamResource(new FileInputStream(file));
+            byte[] bytes = fasttagService.getStickerBytes(f);
+            String filename = "FASTag-" + (f.getFasttagNumber() != null ? f.getFasttagNumber() : id) + ".png";
             HttpHeaders headers = new HttpHeaders();
-            headers.add(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + file.getName());
-            String contentType = Files.probeContentType(file.toPath());
-            if (contentType == null || contentType.isBlank()) {
-                contentType = "application/octet-stream";
-            }
+            headers.add(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + filename);
             return ResponseEntity.ok()
                     .headers(headers)
-                    .contentLength(file.length())
-                    .contentType(MediaType.parseMediaType(contentType))
-                    .body(resource);
+                    .contentLength(bytes.length)
+                    .contentType(MediaType.IMAGE_PNG)
+                    .body(bytes);
         } catch (Exception e) {
             return ResponseEntity.status(500).body("Failed to read sticker");
         }

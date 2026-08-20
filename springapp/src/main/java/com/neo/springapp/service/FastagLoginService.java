@@ -102,6 +102,31 @@ public class FastagLoginService {
         return completeLogin(user);
     }
 
+    public Map<String, Object> accountStatus(String gmailId) {
+        String normalizedEmail = normalizeGmail(gmailId);
+        Map<String, Object> status = new java.util.HashMap<>();
+        status.put("success", true);
+        status.put("gmailId", normalizedEmail);
+        Optional<FastagUser> optUser = fastagUserRepository.findByGmailId(normalizedEmail);
+        if (optUser.isEmpty()) {
+            status.put("exists", false);
+            status.put("passwordSet", false);
+            status.put("requiresPasswordSetup", true);
+            status.put("message", "No FASTag account yet. Create a password to continue.");
+            return status;
+        }
+        FastagUser user = optUser.get();
+        boolean passwordSet = user.getPassword() != null && Boolean.TRUE.equals(user.getPasswordSet());
+        status.put("exists", true);
+        status.put("passwordSet", passwordSet);
+        status.put("requiresPasswordSetup", !passwordSet);
+        status.put("accountLocked", Boolean.TRUE.equals(user.getAccountLocked()));
+        status.put("message", passwordSet
+                ? "Enter your password to sign in."
+                : "Password not set. Create a password to continue.");
+        return status;
+    }
+
     public Optional<FastagUser> getUserByGmail(String gmailId) {
         return fastagUserRepository.findByGmailId(normalizeGmail(gmailId));
     }

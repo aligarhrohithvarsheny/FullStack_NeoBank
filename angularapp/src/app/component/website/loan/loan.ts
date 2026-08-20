@@ -1272,9 +1272,16 @@ export class Loan implements OnInit {
     }
 
     // Submit to MySQL database
-    this.http.post(`${environment.apiBaseUrl}/api/loans`, backendLoan).subscribe({
+        // Submit to MySQL database — omit applicationDate so Jackson/LocalDateTime cannot reject the payload
+        delete (backendLoan as any).applicationDate;
+
+        this.http.post(`${environment.apiBaseUrl}/api/loans`, backendLoan).subscribe({
       next: (response: any) => {
         console.log('Loan request created successfully in MySQL:', response);
+
+        if (this.loanForm.type === 'Education Loan' && response?.id) {
+          this.saveEducationLoanApplication(response);
+        }
         
         // Add to local loans array
         this.loans.unshift(newLoan);
@@ -1297,6 +1304,25 @@ export class Loan implements OnInit {
         this.loans.unshift(newLoan);
         this.saveLoansToStorage();
       }
+    });
+  }
+
+  private saveEducationLoanApplication(savedLoan: any) {
+    const payload: any = {
+      ...this.educationLoanForm,
+      collegeApplicationFile: undefined,
+      loanId: savedLoan.id,
+      loanAccountNumber: savedLoan.loanAccountNumber,
+      requestedLoanAmount: this.loanForm.amount,
+      applicantAccountNumber: this.educationLoanForm.applicantAccountNumber || this.userAccountNumber,
+      applicantName: this.educationLoanForm.applicantName || this.userName,
+      applicantEmail: this.educationLoanForm.applicantEmail || this.userEmail,
+      childAccountNumber: this.childAccountVerified ? this.childAccountNumber : this.educationLoanForm.childAccountNumber,
+      applicationStatus: 'Pending'
+    };
+    this.http.post(`${environment.apiBaseUrl}/api/education-loan-applications/create`, payload).subscribe({
+      next: () => console.log('Education loan application details saved for admin'),
+      error: (err) => console.error('Education loan details save failed:', err)
     });
   }
 

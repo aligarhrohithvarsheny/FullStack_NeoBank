@@ -246,6 +246,23 @@ public class FasttagService {
         return fasttagRepository.save(tag);
     }
 
+    public byte[] getStickerBytes(Fasttag tag) throws Exception {
+        tag = ensureStickerForApprovedTag(tag);
+        if (tag.getStickerPath() != null && !tag.getStickerPath().isBlank()) {
+            java.io.File file = new java.io.File(tag.getStickerPath());
+            if (file.exists()) {
+                return java.nio.file.Files.readAllBytes(file.toPath());
+            }
+        }
+        return stickerGenerator.generateStickerPngBytes(
+                tag.getFasttagNumber(),
+                tag.getBarcodeNumber(),
+                tag.getUserName() == null ? "" : tag.getUserName(),
+                tag.getVehicleNumber() == null ? "" : tag.getVehicleNumber(),
+                tag.getBank() == null ? "NeoBank" : tag.getBank(),
+                tag.getIssueDate() == null ? LocalDateTime.now() : tag.getIssueDate());
+    }
+
     public Fasttag save(Fasttag fasttag) {
         return fasttagRepository.save(fasttag);
     }

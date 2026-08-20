@@ -639,28 +639,18 @@ public class FastagLoginController {
         if (!"Approved".equalsIgnoreCase(tag.getStatus())) {
             return ResponseEntity.badRequest().body(Map.of("success", false, "message", "FASTag sticker is available only for approved FASTag."));
         }
-        tag = fasttagService.ensureStickerForApprovedTag(tag);
-        if (tag.getStickerPath() == null || tag.getStickerPath().isBlank()) {
-            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Sticker not available for this FASTag."));
-        }
-
         try {
-            File file = new File(tag.getStickerPath());
-            if (!file.exists()) {
-                return ResponseEntity.notFound().build();
-            }
-            String contentType = Files.probeContentType(file.toPath());
-            if (contentType == null || contentType.isBlank()) {
-                contentType = "application/octet-stream";
-            }
+            byte[] bytes = fasttagService.getStickerBytes(tag);
+            String filename = "FASTag-" + (tag.getFasttagNumber() != null ? tag.getFasttagNumber() : id) + ".png";
             HttpHeaders headers = new HttpHeaders();
-            headers.add(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + file.getName());
+            headers.add(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + filename);
             return ResponseEntity.ok()
                     .headers(headers)
-                    .contentLength(file.length())
-                    .contentType(MediaType.parseMediaType(contentType))
-                    .body(new InputStreamResource(new FileInputStream(file)));
+                    .contentLength(bytes.length)
+                    .contentType(MediaType.IMAGE_PNG)
+                    .body(bytes);
         } catch (Exception ex) {
+            System.err.println("FASTag sticker download failed: " + ex.getMessage());
             return ResponseEntity.internalServerError().body(Map.of("success", false, "message", "Failed to download FASTag sticker."));
         }
     }
