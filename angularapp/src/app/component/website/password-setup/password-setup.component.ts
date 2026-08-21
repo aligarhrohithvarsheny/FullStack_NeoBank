@@ -53,7 +53,7 @@ export class PasswordSetupComponent implements OnInit {
     } else {
       // If no email in session, redirect back to login
       this.alertService.userError('Session Error', 'Please login first to proceed with password setup.');
-      this.router.navigate(['/user']);
+      this.router.navigate(['/website/user']);
     }
   }
 
@@ -141,15 +141,9 @@ export class PasswordSetupComponent implements OnInit {
         this.isSubmitting = false;
         
         if (response.success) {
-          this.alertService.userSuccess('Success', response.message || 'Password set successfully! You can now login.');
-          
-          // Clear any setup-related session data
+          this.alertService.userSuccess('Success', 'Password set successfully! Signing you in...');
           sessionStorage.removeItem('setupEmail');
-          
-          // Redirect to login page after 2 seconds
-          setTimeout(() => {
-            this.router.navigate(['/user']);
-          }, 2000);
+          this.loginAfterPasswordSetup();
         } else {
           this.alertService.userError('Error', response.message || 'Failed to set password. Please try again.');
         }
@@ -172,9 +166,40 @@ export class PasswordSetupComponent implements OnInit {
     });
   }
 
+  private loginAfterPasswordSetup() {
+    this.http.post(`${environment.apiBaseUrl}/api/users/authenticate`, {
+      email: this.email,
+      password: this.newPassword
+    }).subscribe({
+      next: (response: any) => {
+        if (response.success && response.user) {
+          const user = response.user;
+          sessionStorage.setItem('currentUser', JSON.stringify({
+            id: user.id,
+            name: user.account?.name || user.username,
+            email: user.email,
+            accountNumber: user.accountNumber,
+            status: user.status,
+            passwordSet: user.passwordSet === true,
+            loginTime: new Date().toISOString()
+          }));
+          this.router.navigate(['/website/userdashboard']);
+          return;
+        }
+
+        this.alertService.userError('Login Error', 'Password was set, but automatic login failed. Please sign in again.');
+        this.router.navigate(['/website/user']);
+      },
+      error: () => {
+        this.alertService.userError('Login Error', 'Password was set, but automatic login failed. Please sign in again.');
+        this.router.navigate(['/website/user']);
+      }
+    });
+  }
+
   backToLogin() {
     sessionStorage.removeItem('setupEmail');
-    this.router.navigate(['/user']);
+    this.router.navigate(['/website/user']);
   }
 
 }

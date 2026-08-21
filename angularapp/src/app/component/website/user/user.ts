@@ -202,12 +202,6 @@ export class User implements OnInit, OnDestroy {
   }
 
   private navigateAfterUserLogin() {
-    const currentUser = JSON.parse(sessionStorage.getItem('currentUser') || 'null');
-    if (currentUser && currentUser.passwordSet !== true) {
-      sessionStorage.setItem('setupEmail', currentUser.email || this.loginUserId);
-      this.router.navigate(['/password-setup']);
-      return;
-    }
     const redirectTo = this.route.snapshot.queryParams['redirectTo'];
     if (redirectTo === 'insurance') {
       this.router.navigate(['/website/insurance']);
@@ -608,6 +602,7 @@ export class User implements OnInit, OnDestroy {
               email: userData.email,
               accountNumber: userData.accountNumber,
               status: userData.status,
+              passwordSet: userData.passwordSet === true,
               loginTime: new Date().toISOString()
             };
             
