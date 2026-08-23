@@ -13,15 +13,13 @@ import { PaymentGatewayService } from '../../../service/payment-gateway.service'
   encapsulation: ViewEncapsulation.None
 })
 export class PgLogin implements OnInit, OnDestroy {
-  email = '';
-  otp = '';
+  merchantId = '';
+  phoneNumber = '';
 
-  otpSent = false;
   loading = false;
   verifying = false;
   errorMessage = '';
   successMessage = '';
-  maskedEmail = '';
   businessName = '';
 
   resendTimer = 0;
@@ -63,79 +61,35 @@ export class PgLogin implements OnInit, OnDestroy {
     if (this.resendInterval) clearInterval(this.resendInterval);
   }
 
-  isValidEmail(): boolean {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(this.email.trim());
-  }
-
-  sendOtp() {
+  login() {
     this.errorMessage = '';
     this.successMessage = '';
 
-    if (!this.email.trim()) {
-      this.errorMessage = 'Please enter your registered business email.';
-      return;
-    }
-    if (!this.isValidEmail()) {
-      this.errorMessage = 'Please enter a valid email address.';
+    if (!this.merchantId.trim() || !/^\d{10}$/.test(this.phoneNumber.trim())) {
+      this.errorMessage = 'Enter a valid merchant ID and 10-digit phone number.';
       return;
     }
 
     this.loading = true;
-    this.pgService.sendLoginOtp(this.email.trim()).subscribe({
+    this.pgService.loginByCredentials(this.merchantId.trim(), this.phoneNumber.trim()).subscribe({
       next: (res) => {
         this.loading = false;
         if (res.success) {
-          this.otpSent = true;
-          this.maskedEmail = res.maskedEmail || '';
           this.businessName = res.businessName || '';
-          this.successMessage = 'OTP sent to ' + this.maskedEmail;
-          this.startResendTimer();
+          this.successMessage = 'Login successful! Redirecting...';
+          if (this.isBrowser) sessionStorage.setItem('pgMerchant', JSON.stringify(res.merchant));
+          setTimeout(() => this.router.navigate(['/website/pg-dashboard']), 500);
         } else {
           this.errorMessage = res.message || 'Failed to send OTP.';
         }
       },
       error: (err) => {
         this.loading = false;
-        this.errorMessage = err.error?.message || 'Failed to send OTP. Please try again.';
+        this.errorMessage = err.error?.message || 'Login failed. Please try again.';
       }
     });
   }
 
-  verifyOtp() {
-    this.errorMessage = '';
-    this.successMessage = '';
-
-    if (!this.otp.trim()) {
-      this.errorMessage = 'Please enter OTP.';
-      return;
-    }
-    if (this.otp.trim().length !== 6) {
-      this.errorMessage = 'OTP must be 6 digits.';
-      return;
-    }
-
-    this.verifying = true;
-    this.pgService.verifyLoginOtp(this.email.trim(), this.otp.trim()).subscribe({
-      next: (res) => {
-        this.verifying = false;
-        if (res.success) {
-          this.successMessage = 'Login successful! Redirecting...';
-          if (this.isBrowser) {
-            sessionStorage.setItem('pgMerchant', JSON.stringify(res.merchant));
-          }
-          setTimeout(() => {
-            this.router.navigate(['/website/pg-dashboard']);
-          }, 1000);
-        } else {
-          this.errorMessage = res.message || 'OTP verification failed.';
-        }
-      },
-      error: (err) => {
-        this.verifying = false;
-        this.errorMessage = err.error?.message || 'Verification failed. Please try again.';
-      }
-    });
-  }
 
   startResendTimer() {
     this.canResend = false;
@@ -150,17 +104,9 @@ export class PgLogin implements OnInit, OnDestroy {
     }, 1000);
   }
 
-  resendOtp() {
-    if (!this.canResend) return;
-    this.otp = '';
-    this.sendOtp();
-  }
-
   resetForm() {
-    this.otpSent = false;
-    this.otp = '';
-    this.email = '';
-    this.maskedEmail = '';
+    this.merchantId = '';
+    this.phoneNumber = '';
     this.businessName = '';
     this.errorMessage = '';
     this.successMessage = '';
@@ -181,8 +127,7 @@ export class PgLogin implements OnInit, OnDestroy {
         this.registerLoading = false;
         if (res.success) {
           this.showRegisterMerchant = false;
-          this.email = this.registerForm.businessEmail;
-          this.successMessage = 'Merchant registered successfully! You can now login with your business email.';
+          this.successMessage = 'Merchant registered successfully! You can now login with your merchant ID and phone number.';
           this.registerForm = {
             businessName: '', businessEmail: '', businessPhone: '',
             businessType: 'ONLINE', webhookUrl: '', callbackUrl: '',

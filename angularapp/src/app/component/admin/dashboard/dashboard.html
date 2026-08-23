@@ -3955,6 +3955,26 @@
             <label>Transaction ID:</label>
             <span>{{ selectedSupportTicket.transactionId }}</span>
           </div>
+          <div class="detail-item" *ngIf="selectedSupportTicket.transactionAccountNumber">
+            <label>Verified Transaction Account:</label>
+            <span>{{ selectedSupportTicket.transactionAccountNumber }}</span>
+          </div>
+          <div class="detail-item" *ngIf="selectedSupportTicket.transactionAmount !== null && selectedSupportTicket.transactionAmount !== undefined">
+            <label>Transaction Amount:</label>
+            <span>₹{{ selectedSupportTicket.transactionAmount | number:'1.2-2' }}</span>
+          </div>
+          <div class="detail-item" *ngIf="selectedSupportTicket.transactionType">
+            <label>Transaction Type / Status:</label>
+            <span>{{ selectedSupportTicket.transactionType }} / {{ selectedSupportTicket.transactionStatus }}</span>
+          </div>
+          <div class="detail-item" *ngIf="selectedSupportTicket.transactionDate">
+            <label>Transaction Date:</label>
+            <span>{{ selectedSupportTicket.transactionDate | date:'dd/MM/yyyy HH:mm' }}</span>
+          </div>
+          <div class="detail-item" *ngIf="selectedSupportTicket.transactionDescription">
+            <label>Transaction Description:</label>
+            <span>{{ selectedSupportTicket.transactionDescription }}</span>
+          </div>
           <div class="detail-item">
             <label>Created:</label>
             <span>{{ selectedSupportTicket.createdAt | date:'dd/MM/yyyy HH:mm' }}</span>
@@ -4833,6 +4853,32 @@
           style="padding:4px 14px;border-radius:20px;font-size:11px;font-weight:700;">
           {{pgSelectedMerchant.loginEnabled ? 'LOGIN ENABLED' : 'LOGIN DISABLED'}}
         </span>
+      </div>
+
+      <div *ngIf="!pgEditingMerchant" style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:14px;">
+        <button (click)="startPgMerchantEdit()" style="padding:9px 14px;background:#6366F1;color:#fff;border:none;border-radius:8px;font-weight:600;cursor:pointer;"><i class="fa fa-edit"></i> Edit Merchant Details</button>
+        <button (click)="downloadPgMerchantChanges()" style="padding:9px 14px;background:#0F766E;color:#fff;border:none;border-radius:8px;font-weight:600;cursor:pointer;"><i class="fa fa-download"></i> Download Changes</button>
+      </div>
+      <div *ngIf="pgEditingMerchant" style="background:#fff;border:1px solid #E2E8F0;border-radius:12px;padding:16px;margin-bottom:16px;">
+        <h3 style="margin:0 0 12px;color:#1E293B;">Edit Payment Gateway Details</h3>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;">
+          <label>Business Name<input [(ngModel)]="pgMerchantEditForm.businessName" /></label>
+          <label>Business Email<input [(ngModel)]="pgMerchantEditForm.businessEmail" /></label>
+          <label>Business Phone<input [(ngModel)]="pgMerchantEditForm.businessPhone" /></label>
+          <label>Business Type<input [(ngModel)]="pgMerchantEditForm.businessType" /></label>
+          <label>Webhook URL<input [(ngModel)]="pgMerchantEditForm.webhookUrl" /></label>
+          <label>Callback URL<input [(ngModel)]="pgMerchantEditForm.callbackUrl" /></label>
+          <label>Account Number<input [(ngModel)]="pgMerchantEditForm.accountNumber" /></label>
+          <label>Settlement Account<input [(ngModel)]="pgMerchantEditForm.settlementAccount" /></label>
+          <label>Linked Account<input [(ngModel)]="pgMerchantEditForm.linkedAccountNumber" /></label>
+          <label>Linked Holder<input [(ngModel)]="pgMerchantEditForm.linkedAccountHolderName" /></label>
+          <label>Daily Limit<input type="number" [(ngModel)]="pgMerchantEditForm.dailyLimit" /></label>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:14px;"><button (click)="savePgMerchantEdit()" style="padding:9px 16px;background:#16A34A;color:#fff;border:0;border-radius:8px;cursor:pointer;"><i class="fa fa-save"></i> Save Changes</button><button (click)="cancelPgMerchantEdit()" style="padding:9px 16px;border:0;border-radius:8px;cursor:pointer;">Cancel</button></div>
+      </div>
+      <div *ngIf="pgMerchantChangeLogs.length > 0" style="background:#fff;border:1px solid #E2E8F0;border-radius:12px;padding:14px;margin-bottom:16px;">
+        <h3 style="margin:0 0 10px;color:#1E293B;"><i class="fa fa-history"></i> Saved Changes</h3>
+        <div *ngFor="let log of pgMerchantChangeLogs" style="padding:8px 0;border-bottom:1px solid #F1F5F9;font-size:12px;color:#475569;"><strong>{{log.changedAt | date:'dd/MM/yyyy HH:mm'}}</strong> by {{log.changedBy}}: {{log.changedFields}}</div>
       </div>
 
       <!-- Detail Tabs -->

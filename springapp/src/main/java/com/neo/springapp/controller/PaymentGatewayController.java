@@ -4,6 +4,8 @@ import com.neo.springapp.model.*;
 import com.neo.springapp.service.PaymentGatewayService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -260,6 +262,12 @@ public class PaymentGatewayController {
         return ResponseEntity.badRequest().body(result);
     }
 
+    @PostMapping("/login/credentials")
+    public ResponseEntity<Map<String, Object>> loginByCredentials(@RequestBody Map<String, String> request) {
+        Map<String, Object> result = paymentGatewayService.loginByCredentials(request.get("merchantId"), request.get("phoneNumber"));
+        return Boolean.TRUE.equals(result.get("success")) ? ResponseEntity.ok(result) : ResponseEntity.badRequest().body(result);
+    }
+
     // ==================== UPI QR PAYMENT SESSION ====================
 
     @PostMapping("/payment-session/create")
@@ -350,6 +358,35 @@ public class PaymentGatewayController {
             return ResponseEntity.badRequest().body(error);
         }
     }
+
+    @PutMapping("/admin/merchant/{merchantId}")
+    public ResponseEntity<?> updateMerchant(@PathVariable String merchantId, @RequestBody Map<String, Object> request) {
+        try {
+            String adminName = String.valueOf(request.getOrDefault("changedBy", "Admin"));
+            return ResponseEntity.ok(paymentGatewayService.adminUpdateMerchant(merchantId, request, adminName));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", e.getMessage()));
+        }
+    }
+
+    @GetMapping("/admin/merchant/{merchantId}/changes")
+    public ResponseEntity<?> getMerchantChanges(@PathVariable String merchantId) {
+        return ResponseEntity.ok(paymentGatewayService.getMerchantChangeLogs(merchantId));
+    }
+
+    @GetMapping("/admin/merchant/{merchantId}/changes/download")
+    public ResponseEntity<byte[]> downloadMerchantChanges(@PathVariable String merchantId) {
+        StringBuilder csv = new StringBuilder("Change ID,Merchant ID,Merchant Name,Changed By,Changed At,Changed Fields,Previous Details,Updated Details\n");
+        for (PgMerchantChangeLog log : paymentGatewayService.getMerchantChangeLogs(merchantId)) {
+            csv.append(csv(log.getId())).append(',').append(csv(log.getMerchantId())).append(',').append(csv(log.getMerchantName())).append(',')
+                    .append(csv(log.getChangedBy())).append(',').append(csv(log.getChangedAt())).append(',').append(csv(log.getChangedFields())).append(',')
+                    .append(csv(log.getPreviousDetails())).append(',').append(csv(log.getUpdatedDetails())).append('\n');
+        }
+        return ResponseEntity.ok().header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"merchant-" + merchantId + "-changes.csv\"")
+                .contentType(MediaType.parseMediaType("text/csv")).body(csv.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+    }
+
+    private String csv(Object value) { return "\"" + String.valueOf(value == null ? "" : value).replace("\"", "\"\"") + "\""; }
 
     // ==================== SETTLEMENT & CREDIT ====================
 

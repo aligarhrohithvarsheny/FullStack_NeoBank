@@ -2,6 +2,8 @@ package com.neo.springapp.service;
 
 import com.neo.springapp.model.SupportTicket;
 import com.neo.springapp.repository.SupportTicketRepository;
+import com.neo.springapp.model.Transaction;
+import com.neo.springapp.repository.TransactionRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -16,11 +18,39 @@ public class SupportTicketService {
     @Autowired
     private SupportTicketRepository supportTicketRepository;
 
+    @Autowired
+    private TransactionRepository transactionRepository;
+
     public SupportTicket createTicket(SupportTicket ticket) {
+        if (ticket.getTransactionId() != null && !ticket.getTransactionId().isBlank()) {
+            Transaction transaction = transactionRepository.findByTransactionId(ticket.getTransactionId().trim())
+                    .orElseThrow(() -> new IllegalArgumentException("Transaction ID was not found for this account"));
+            if (!ticket.getAccountNumber().equals(transaction.getAccountNumber())) {
+                throw new IllegalArgumentException("You can only raise a ticket for your own transaction");
+            }
+            copyTransactionDetails(ticket, transaction);
+            ticket.setTransactionId(transaction.getTransactionId());
+        }
         ticket.setTicketId("TKT-" + System.currentTimeMillis());
         ticket.setStatus("OPEN");
         ticket.setCreatedAt(LocalDateTime.now());
         return supportTicketRepository.save(ticket);
+    }
+
+    public Transaction getOwnTransaction(String accountNumber, String transactionId) {
+        if (accountNumber == null || transactionId == null || transactionId.isBlank()) return null;
+        return transactionRepository.findByTransactionId(transactionId.trim())
+                .filter(transaction -> accountNumber.equals(transaction.getAccountNumber()))
+                .orElse(null);
+    }
+
+    private void copyTransactionDetails(SupportTicket ticket, Transaction transaction) {
+        ticket.setTransactionAccountNumber(transaction.getAccountNumber());
+        ticket.setTransactionAmount(transaction.getAmount());
+        ticket.setTransactionType(transaction.getType());
+        ticket.setTransactionStatus(transaction.getStatus());
+        ticket.setTransactionDate(transaction.getDate() == null ? null : transaction.getDate().toString());
+        ticket.setTransactionDescription(transaction.getDescription());
     }
 
     public List<SupportTicket> getTicketsByAccountNumber(String accountNumber) {

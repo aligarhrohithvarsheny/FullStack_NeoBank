@@ -2,6 +2,7 @@ package com.neo.springapp.controller;
 
 import com.neo.springapp.model.SupportTicket;
 import com.neo.springapp.service.SupportTicketService;
+import com.neo.springapp.model.Transaction;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -33,6 +34,20 @@ public class SupportTicketController {
             response.put("message", "Error creating support ticket: " + e.getMessage());
             return ResponseEntity.badRequest().body(response);
         }
+    }
+
+    @GetMapping("/verify-transaction")
+    public ResponseEntity<Map<String, Object>> verifyTransaction(
+            @RequestParam String accountNumber, @RequestParam String transactionId) {
+        Transaction transaction = supportTicketService.getOwnTransaction(accountNumber, transactionId);
+        if (transaction == null) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "success", false, "message", "Transaction ID was not found in your account history"));
+        }
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", true);
+        response.put("transaction", transaction);
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/account/{accountNumber}")

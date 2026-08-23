@@ -33,6 +33,7 @@ public class PaymentGatewayService {
     private final TransactionService transactionService;
     private final PgPaymentLinkRepository paymentLinkRepository;
     private final UserRepository userRepository;
+    private final PgMerchantChangeLogRepository changeLogRepository;
 
     private static final BigDecimal PLATFORM_FEE_RATE = new BigDecimal("0.02"); // 2%
     private static final BigDecimal GST_RATE = new BigDecimal("0.18"); // 18% on fee
@@ -52,7 +53,8 @@ public class PaymentGatewayService {
             SalaryAccountRepository salaryAccountRepository,
             TransactionService transactionService,
             PgPaymentLinkRepository paymentLinkRepository,
-            UserRepository userRepository) {
+            UserRepository userRepository,
+            PgMerchantChangeLogRepository changeLogRepository) {
         this.merchantRepository = merchantRepository;
         this.orderRepository = orderRepository;
         this.transactionRepository = transactionRepository;
@@ -67,6 +69,7 @@ public class PaymentGatewayService {
         this.transactionService = transactionService;
         this.paymentLinkRepository = paymentLinkRepository;
         this.userRepository = userRepository;
+        this.changeLogRepository = changeLogRepository;
     }
 
     // ==================== MERCHANT OPERATIONS ====================
@@ -760,6 +763,80 @@ public class PaymentGatewayService {
         result.put("merchant", merchantData);
         result.put("message", "Login successful");
         return result;
+    }
+
+    public Map<String, Object> loginByCredentials(String merchantId, String phoneNumber) {
+        PgMerchant merchant = merchantRepository.findByMerchantId(merchantId == null ? "" : merchantId.trim()).orElse(null);
+        Map<String, Object> result = new HashMap<>();
+        if (merchant == null || phoneNumber == null || !phoneNumber.trim().equals(merchant.getBusinessPhone())) {
+            result.put("success", false); result.put("message", "Merchant ID or phone number is incorrect"); return result;
+        }
+        if (!Boolean.TRUE.equals(merchant.getLoginEnabled()) || !Boolean.TRUE.equals(merchant.getIsActive())) {
+            result.put("success", false); result.put("message", "Merchant login is disabled"); return result;
+        }
+        Map<String, Object> data = new HashMap<>();
+        data.put("merchantId", merchant.getMerchantId()); data.put("businessName", merchant.getBusinessName());
+        data.put("businessEmail", merchant.getBusinessEmail()); data.put("businessPhone", merchant.getBusinessPhone());
+        data.put("apiKey", merchant.getApiKey()); data.put("linkedAccountNumber", merchant.getLinkedAccountNumber());
+        data.put("totalVolume", merchant.getTotalVolume());
+        result.put("success", true); result.put("merchant", data); result.put("message", "Login successful");
+        return result;
+    }
+
+    @Transactional
+    public Map<String, Object> adminUpdateMerchant(String merchantId, Map<String, Object> updates, String changedBy) {
+        PgMerchant merchant = merchantRepository.findByMerchantId(merchantId)
+                .orElseThrow(() -> new IllegalArgumentException("Merchant not found"));
+        Map<String, Object> before = merchantDetails(merchant);
+        Map<String, Object> changed = new LinkedHashMap<>();
+        updateString(updates, "businessName", merchant.getBusinessName(), merchant::setBusinessName, changed);
+        updateString(updates, "businessEmail", merchant.getBusinessEmail(), merchant::setBusinessEmail, changed);
+        updateString(updates, "businessPhone", merchant.getBusinessPhone(), merchant::setBusinessPhone, changed);
+        updateString(updates, "businessType", merchant.getBusinessType(), merchant::setBusinessType, changed);
+        updateString(updates, "webhookUrl", merchant.getWebhookUrl(), merchant::setWebhookUrl, changed);
+        updateString(updates, "callbackUrl", merchant.getCallbackUrl(), merchant::setCallbackUrl, changed);
+        updateString(updates, "accountNumber", merchant.getAccountNumber(), merchant::setAccountNumber, changed);
+        updateString(updates, "settlementAccount", merchant.getSettlementAccount(), merchant::setSettlementAccount, changed);
+        updateString(updates, "linkedAccountNumber", merchant.getLinkedAccountNumber(), merchant::setLinkedAccountNumber, changed);
+        updateString(updates, "linkedAccountHolderName", merchant.getLinkedAccountHolderName(), merchant::setLinkedAccountHolderName, changed);
+        if (updates.containsKey("dailyLimit")) {
+            BigDecimal value = new BigDecimal(String.valueOf(updates.get("dailyLimit")));
+            if (value.signum() < 0) throw new IllegalArgumentException("Daily limit cannot be negative");
+            if (!value.equals(merchant.getDailyLimit())) changed.put("dailyLimit", value.toString());
+            merchant.setDailyLimit(value);
+        }
+        PgMerchant saved = merchantRepository.save(merchant);
+        if (!changed.isEmpty()) {
+            PgMerchantChangeLog log = new PgMerchantChangeLog();
+            log.setMerchantId(saved.getMerchantId()); log.setMerchantName(saved.getBusinessName());
+            log.setChangedBy(changedBy == null ? "Admin" : changedBy);
+            log.setChangedFields(String.join(", ", changed.keySet()));
+            log.setPreviousDetails(before.toString()); log.setUpdatedDetails(merchantDetails(saved).toString());
+            changeLogRepository.save(log);
+        }
+        return Map.of("success", true, "merchant", saved, "changedFields", changed.keySet());
+    }
+
+    public List<PgMerchantChangeLog> getMerchantChangeLogs(String merchantId) {
+        return changeLogRepository.findByMerchantIdOrderByChangedAtDesc(merchantId);
+    }
+
+    private void updateString(Map<String, Object> updates, String key, String oldValue, java.util.function.Consumer<String> setter, Map<String, Object> changed) {
+        if (!updates.containsKey(key)) return;
+        String value = updates.get(key) == null ? null : String.valueOf(updates.get(key)).trim();
+        if (!Objects.equals(oldValue, value)) changed.put(key, value); setter.accept(value);
+    }
+
+    private Map<String, Object> merchantDetails(PgMerchant m) {
+        Map<String, Object> details = new LinkedHashMap<>();
+        details.put("merchantId", m.getMerchantId()); details.put("businessName", m.getBusinessName());
+        details.put("businessEmail", m.getBusinessEmail()); details.put("businessPhone", m.getBusinessPhone());
+        details.put("businessType", m.getBusinessType()); details.put("webhookUrl", m.getWebhookUrl());
+        details.put("callbackUrl", m.getCallbackUrl()); details.put("accountNumber", m.getAccountNumber());
+        details.put("settlementAccount", m.getSettlementAccount()); details.put("linkedAccountNumber", m.getLinkedAccountNumber());
+        details.put("linkedAccountHolderName", m.getLinkedAccountHolderName()); details.put("dailyLimit", m.getDailyLimit());
+        details.put("loginEnabled", m.getLoginEnabled()); details.put("isActive", m.getIsActive());
+        return details;
     }
 
     private String maskEmail(String email) {

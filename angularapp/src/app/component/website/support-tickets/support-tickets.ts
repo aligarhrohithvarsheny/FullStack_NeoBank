@@ -41,6 +41,9 @@ export class SupportTickets implements OnInit, OnDestroy {
 
   priorities = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
   isSubmitting: boolean = false;
+  isVerifyingTransaction: boolean = false;
+  verifiedTransaction: any = null;
+  transactionVerificationError = '';
 
   constructor(
     private supportTicketService: SupportTicketService,
@@ -114,6 +117,14 @@ export class SupportTickets implements OnInit, OnDestroy {
       this.alertService.error('Validation Error', 'Please fill subject and description');
       return;
     }
+    if (this.ticketForm.transactionId.trim() && !this.verifiedTransaction) {
+      this.alertService.error('Transaction Verification Required', 'Verify the transaction ID before submitting the ticket');
+      return;
+    }
+    if (this.ticketForm.category === 'TRANSACTION_FAILED' && !this.ticketForm.transactionId.trim()) {
+      this.alertService.error('Transaction ID Required', 'Enter the transaction ID related to this issue');
+      return;
+    }
     this.isSubmitting = true;
     const payload = {
       ...this.ticketForm,
@@ -138,12 +149,36 @@ export class SupportTickets implements OnInit, OnDestroy {
     });
   }
 
+  verifyTransaction() {
+    const transactionId = this.ticketForm.transactionId.trim();
+    if (!transactionId) {
+      this.transactionVerificationError = 'Enter a transaction ID first';
+      return;
+    }
+    this.isVerifyingTransaction = true;
+    this.verifiedTransaction = null;
+    this.transactionVerificationError = '';
+    this.supportTicketService.verifyTransaction(this.accountNumber, transactionId).subscribe({
+      next: (res: any) => {
+        this.isVerifyingTransaction = false;
+        if (res.success) this.verifiedTransaction = res.transaction;
+        else this.transactionVerificationError = res.message || 'Transaction was not found in your account';
+      },
+      error: (err: any) => {
+        this.isVerifyingTransaction = false;
+        this.transactionVerificationError = err.error?.message || 'Transaction was not found in your account';
+      }
+    });
+  }
+
   viewTicket(ticket: any) {
     this.selectedTicket = this.selectedTicket?.id === ticket.id ? null : ticket;
   }
 
   resetForm() {
     this.ticketForm = { category: 'TRANSACTION_FAILED', subject: '', description: '', priority: 'MEDIUM', transactionId: '' };
+    this.verifiedTransaction = null;
+    this.transactionVerificationError = '';
   }
 
   getStatusColor(status: string): string {

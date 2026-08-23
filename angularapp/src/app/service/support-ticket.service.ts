@@ -13,6 +13,10 @@ export class SupportTicketService {
     return this.http.post<any>(this.apiUrl, ticket);
   }
 
+  verifyTransaction(accountNumber: string, transactionId: string): Observable<any> {
+    return this.http.get<any>(`${this.apiUrl}/verify-transaction?accountNumber=${encodeURIComponent(accountNumber)}&transactionId=${encodeURIComponent(transactionId)}`);
+  }
+
   getByAccountNumber(accountNumber: string): Observable<any> {
     return this.http.get<any>(`${this.apiUrl}/account/${accountNumber}`);
   }

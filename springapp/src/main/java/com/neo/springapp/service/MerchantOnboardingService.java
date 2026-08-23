@@ -397,6 +397,31 @@ public class MerchantOnboardingService {
         return result;
     }
 
+    public Map<String, Object> loginMerchantByCredentials(String merchantId, String phoneNumber) {
+        Map<String, Object> result = new HashMap<>();
+        Optional<Merchant> merchantOpt = StringUtils.hasText(merchantId)
+                ? merchantRepository.findByMerchantId(merchantId.trim()) : Optional.empty();
+        if (merchantOpt.isEmpty() || !StringUtils.hasText(phoneNumber)
+                || !phoneNumber.trim().equals(merchantOpt.get().getMobile())) {
+            result.put("success", false);
+            result.put("error", "Merchant ID or phone number is incorrect");
+            return result;
+        }
+        Merchant merchant = merchantOpt.get();
+        if (!"APPROVED".equalsIgnoreCase(merchant.getStatus()) && !"ACTIVE".equalsIgnoreCase(merchant.getStatus())) {
+            result.put("success", false);
+            result.put("error", "Merchant account is not active");
+            return result;
+        }
+        result.put("success", true);
+        result.put("merchant", merchant);
+        result.put("devices", deviceRepository.findByMerchantId(merchant.getMerchantId()));
+        Map<String, Object> dashboard = getMerchantPortalDetails(merchant.getMerchantId());
+        result.put("dashboard", dashboard.get("dashboard"));
+        result.put("message", "Login successful");
+        return result;
+    }
+
     public Map<String, Object> getMerchantPortalDetails(String merchantId) {
         Map<String, Object> result = new HashMap<>();
         Optional<Merchant> merchantOpt = merchantRepository.findByMerchantId(merchantId);

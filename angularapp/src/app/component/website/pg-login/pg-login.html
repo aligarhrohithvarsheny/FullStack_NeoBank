@@ -31,45 +31,22 @@
       <i class="fa fa-check-circle"></i> {{ successMessage }}
     </div>
 
-    <!-- Step 1: Email -->
-    <div class="pg-login-form" *ngIf="!otpSent">
-      <label class="pg-label">Business Email</label>
+    <div class="pg-login-form">
+      <label class="pg-label">Merchant ID</label>
       <div class="pg-input-group">
-        <i class="fa fa-envelope"></i>
-        <input type="email" [(ngModel)]="email" placeholder="your-business@example.com"
-               class="pg-input" [class.invalid]="email && !isValidEmail()"
-               (keydown.enter)="sendOtp()" />
+        <i class="fa fa-store"></i>
+        <input type="text" [(ngModel)]="merchantId" placeholder="Enter merchant ID" class="pg-input" (keydown.enter)="login()" />
       </div>
-      <p class="pg-hint">Enter the email registered with your payment gateway account</p>
-      <button class="pg-btn pg-btn-primary" (click)="sendOtp()" [disabled]="loading || !email.trim()">
-        <span *ngIf="!loading">Send OTP</span>
+      <label class="pg-label">Registered Phone Number</label>
+      <div class="pg-input-group">
+        <i class="fa fa-phone"></i>
+        <input type="tel" [(ngModel)]="phoneNumber" maxlength="10" placeholder="10-digit phone number" class="pg-input" (keydown.enter)="login()" />
+      </div>
+      <p class="pg-hint">Enter the phone number registered with your payment gateway account</p>
+      <button class="pg-btn pg-btn-primary" (click)="login()" [disabled]="loading || !merchantId.trim() || !phoneNumber.trim()">
+        <span *ngIf="!loading">Login</span>
         <span *ngIf="loading" class="pg-spinner"></span>
       </button>
-    </div>
-
-    <!-- Step 2: OTP -->
-    <div class="pg-login-form" *ngIf="otpSent">
-      <div class="pg-merchant-info" *ngIf="businessName">
-        <i class="fa fa-building"></i>
-        <span>{{ businessName }}</span>
-      </div>
-      <label class="pg-label">Enter 6-digit OTP</label>
-      <div class="pg-input-group">
-        <i class="fa fa-lock"></i>
-        <input type="text" [(ngModel)]="otp" placeholder="000000" maxlength="6"
-               class="pg-input pg-otp-input" (keydown.enter)="verifyOtp()" />
-      </div>
-      <p class="pg-hint">OTP sent to {{ maskedEmail }}</p>
-      <button class="pg-btn pg-btn-primary" (click)="verifyOtp()" [disabled]="verifying || otp.length < 6">
-        <span *ngIf="!verifying">Verify & Login</span>
-        <span *ngIf="verifying" class="pg-spinner"></span>
-      </button>
-      <div class="pg-resend-row">
-        <button class="pg-btn-link" (click)="resendOtp()" [disabled]="!canResend">
-          {{ canResend ? 'Resend OTP' : 'Resend in ' + resendTimer + 's' }}
-        </button>
-        <button class="pg-btn-link" (click)="resetForm()">Change Email</button>
-      </div>
     </div>
 
     <!-- New Merchant Registration -->

@@ -84,6 +84,12 @@ public class MerchantOnboardingController {
         return ResponseEntity.badRequest().body(result);
     }
 
+    @PostMapping("/merchant/login/credentials")
+    public ResponseEntity<Map<String, Object>> loginMerchantByCredentials(@RequestBody Map<String, String> body) {
+        Map<String, Object> result = service.loginMerchantByCredentials(body.get("merchantId"), body.get("phoneNumber"));
+        return Boolean.TRUE.equals(result.get("success")) ? ResponseEntity.ok(result) : ResponseEntity.badRequest().body(result);
+    }
+
     @GetMapping("/merchant/{merchantId}/dashboard")
     public ResponseEntity<Map<String, Object>> getMerchantDashboard(@PathVariable String merchantId) {
         Map<String, Object> result = service.getMerchantPortalDetails(merchantId);

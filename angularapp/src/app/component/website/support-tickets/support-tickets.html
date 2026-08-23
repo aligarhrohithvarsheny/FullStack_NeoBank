@@ -30,9 +30,24 @@
         <label>Description *</label>
         <textarea [(ngModel)]="ticketForm.description" rows="4" placeholder="Describe the issue in detail..."></textarea>
       </div>
-      <div class="form-group" *ngIf="ticketForm.category === 'TRANSACTION_FAILED'">
-        <label>Transaction ID (if applicable)</label>
-        <input type="text" [(ngModel)]="ticketForm.transactionId" placeholder="e.g. TXN-123456" />
+      <div class="form-group full-width">
+        <label>Transaction ID</label>
+        <div class="transaction-verify-row">
+          <input type="text" [(ngModel)]="ticketForm.transactionId" (input)="verifiedTransaction = null; transactionVerificationError = ''" placeholder="Enter only a transaction from your account" />
+          <button class="btn-secondary" type="button" (click)="verifyTransaction()" [disabled]="isVerifyingTransaction || !ticketForm.transactionId.trim()">
+            {{ isVerifyingTransaction ? 'Checking...' : 'Verify Transaction' }}
+          </button>
+        </div>
+        <p class="error-message" *ngIf="transactionVerificationError">{{ transactionVerificationError }}</p>
+        <div class="verified-transaction" *ngIf="verifiedTransaction">
+          <strong>Verified transaction</strong>
+          <span>Account: {{ verifiedTransaction.accountNumber }}</span>
+          <span>Amount: ₹{{ verifiedTransaction.amount | number:'1.2-2' }}</span>
+          <span>Type: {{ verifiedTransaction.type }}</span>
+          <span>Status: {{ verifiedTransaction.status }}</span>
+          <span>Date: {{ verifiedTransaction.date | date:'dd/MM/yyyy HH:mm' }}</span>
+          <span>{{ verifiedTransaction.description || verifiedTransaction.merchant }}</span>
+        </div>
       </div>
     </div>
     <div class="form-actions">

@@ -127,6 +127,10 @@ export class MerchantOnboardingService {
     return this.http.post<any>(`${this.apiUrl}/merchant/login/verify-otp`, { email, otp });
   }
 
+  loginMerchantByCredentials(merchantId: string, phoneNumber: string): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/merchant/login/credentials`, { merchantId, phoneNumber });
+  }
+
   getMerchantDashboard(merchantId: string): Observable<any> {
     return this.http.get<any>(`${this.apiUrl}/merchant/${merchantId}/dashboard`);
   }

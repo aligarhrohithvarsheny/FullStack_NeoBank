@@ -121,6 +121,9 @@ export class Dashboard implements OnInit, OnDestroy {
   pgMerchantRefunds: any[] = [];
   pgMerchantAnalytics: any = null;
   pgMerchantDetailsLoading = false;
+  pgEditingMerchant = false;
+  pgMerchantEditForm: any = {};
+  pgMerchantChangeLogs: any[] = [];
 
   // Daily Activity Report
   showDailyActivityReport: boolean = false;
@@ -669,6 +672,8 @@ export class Dashboard implements OnInit, OnDestroy {
     this.pgMerchantRefunds = [];
     this.pgMerchantAnalytics = null;
     this.pgMerchantDetailsLoading = true;
+    this.pgMerchantEditForm = { ...merchant };
+    this.pgMerchantChangeLogs = [];
     forkJoin({
       orders: this.pgService.getOrdersByMerchant(merchant.merchantId).pipe(catchError(() => of([]))),
       transactions: this.pgService.getTransactionsByMerchant(merchant.merchantId).pipe(catchError(() => of([]))),
@@ -683,6 +688,10 @@ export class Dashboard implements OnInit, OnDestroy {
         this.pgMerchantDetailsLoading = false;
       },
       error: () => { this.pgMerchantDetailsLoading = false; }
+    });
+    this.pgService.getMerchantChanges(merchant.merchantId).subscribe({
+      next: logs => this.pgMerchantChangeLogs = logs || [],
+      error: () => this.pgMerchantChangeLogs = []
     });
   }
 
@@ -1260,6 +1269,31 @@ export class Dashboard implements OnInit, OnDestroy {
         // Load pending profile updates for badge count
         this.loadPendingProfileUpdatesForBadge();
       }
+    });
+  }
+
+  startPgMerchantEdit() { this.pgMerchantEditForm = { ...this.pgSelectedMerchant }; this.pgEditingMerchant = true; }
+  cancelPgMerchantEdit() { this.pgEditingMerchant = false; }
+  savePgMerchantEdit() {
+    if (!this.pgSelectedMerchant) return;
+    const adminData = sessionStorage.getItem('admin');
+    const changedBy = adminData ? JSON.parse(adminData).name || 'Admin' : 'Admin';
+    this.pgService.updateMerchant(this.pgSelectedMerchant.merchantId, { ...this.pgMerchantEditForm, changedBy }).subscribe({
+      next: (res: any) => {
+        this.pgSelectedMerchant = res.merchant;
+        this.pgEditingMerchant = false;
+        this.pgMerchantChangeLogs = [];
+        this.pgService.getMerchantChanges(this.pgSelectedMerchant.merchantId).subscribe({ next: logs => this.pgMerchantChangeLogs = logs || [] });
+        this.loadPgApprovedMerchants();
+      },
+      error: (err: any) => this.alertService.error('Update Failed', err.error?.message || 'Unable to update merchant details')
+    });
+  }
+  downloadPgMerchantChanges() {
+    if (!this.pgSelectedMerchant) return;
+    this.pgService.downloadMerchantChanges(this.pgSelectedMerchant.merchantId).subscribe(blob => {
+      const url = URL.createObjectURL(blob); const link = document.createElement('a');
+      link.href = url; link.download = `merchant-${this.pgSelectedMerchant.merchantId}-changes.csv`; link.click(); URL.revokeObjectURL(url);
     });
   }
 

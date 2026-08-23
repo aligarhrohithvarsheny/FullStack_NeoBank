@@ -86,6 +86,22 @@ export class PaymentGatewayService {
     return this.http.post(`${this.apiUrl}/login/verify-otp`, { email, otp });
   }
 
+  loginByCredentials(merchantId: string, phoneNumber: string): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/login/credentials`, { merchantId, phoneNumber });
+  }
+
+  updateMerchant(merchantId: string, updates: any): Observable<any> {
+    return this.http.put<any>(`${this.apiUrl}/admin/merchant/${encodeURIComponent(merchantId)}`, updates);
+  }
+
+  getMerchantChanges(merchantId: string): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiUrl}/admin/merchant/${encodeURIComponent(merchantId)}/changes`);
+  }
+
+  downloadMerchantChanges(merchantId: string): Observable<Blob> {
+    return this.http.get(`${this.apiUrl}/admin/merchant/${encodeURIComponent(merchantId)}/changes/download`, { responseType: 'blob' });
+  }
+
   // UPI QR Payment Session
   createPaymentSession(data: any): Observable<any> {
     return this.http.post(`${this.apiUrl}/payment-session/create`, data);

@@ -27,7 +27,7 @@
           </svg>
         </div>
         <h2 class="card-title">Merchant Soundbox Login</h2>
-        <p class="card-subtitle">Login with your Current Account number &amp; registered email OTP</p>
+        <p class="card-subtitle">Login with your merchant ID and registered phone number</p>
       </div>
 
       <!-- Success message -->
@@ -42,10 +42,9 @@
         {{ errorMessage }}
       </div>
 
-      <!-- Step 1: Enter Account Number -->
-      <div class="form-step" *ngIf="!otpSent">
+      <div class="form-step">
         <div class="input-group">
-          <label for="email">Registered Email Address</label>
+          <label for="merchantId">Merchant ID</label>
           <div class="input-wrapper">
             <span class="input-icon">
               <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18">
@@ -55,27 +54,19 @@
             </span>
             <input
               type="text"
-              id="email"
-              [(ngModel)]="email"
-              placeholder="Enter merchant onboarding email"
+              id="merchantId"
+              [(ngModel)]="merchantId"
+              placeholder="Enter merchant ID"
               class="form-input"
-              [class.invalid]="email && !isValidEmail()"
-              (keydown.enter)="sendOtp()"
+              (keydown.enter)="login()"
               autocomplete="off"
             />
           </div>
-          <small class="input-hint" *ngIf="email && !isValidEmail()">
-            Please enter valid email address
-          </small>
         </div>
-
-        <button
-          class="btn-primary"
-          (click)="sendOtp()"
-          [disabled]="loading || !email || !isValidEmail()"
-        >
+        <div class="input-group"><label for="phoneNumber">Registered Phone Number</label><input id="phoneNumber" type="tel" [(ngModel)]="phoneNumber" maxlength="10" placeholder="10-digit phone number" class="form-input" (keydown.enter)="login()" /></div>
+        <button class="btn-primary" (click)="login()" [disabled]="loading || !merchantId || !phoneNumber">
           <span class="btn-loader" *ngIf="loading"></span>
-          <span *ngIf="!loading">Send OTP</span>
+          <span *ngIf="!loading">Login</span>
           <span *ngIf="loading">Verifying account...</span>
         </button>
 
@@ -83,66 +74,7 @@
           <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14">
             <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
           </svg>
-          <span>OTP will be sent to your merchant onboarding email</span>
-        </div>
-      </div>
-
-      <!-- Step 2: Enter OTP -->
-      <div class="form-step" *ngIf="otpSent">
-        <div class="otp-sent-info">
-          <div class="sent-business" *ngIf="businessName">
-            <span class="business-label">Business:</span>
-            <span class="business-name">{{ businessName }}</span>
-          </div>
-          <span class="sent-to-label">OTP sent to</span>
-          <span class="sent-to-email">{{ maskedEmail }}</span>
-          <button class="change-btn" (click)="resetForm()">Change Email</button>
-        </div>
-
-        <div class="input-group">
-          <label for="otp">Enter OTP</label>
-          <div class="input-wrapper">
-            <span class="input-icon">
-              <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18">
-                <path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"/>
-              </svg>
-            </span>
-            <input
-              type="text"
-              id="otp"
-              [(ngModel)]="otp"
-              placeholder="Enter 6-digit OTP"
-              class="form-input otp-input"
-              maxlength="6"
-              pattern="[0-9]*"
-              (keydown.enter)="verifyOtp()"
-              autocomplete="one-time-code"
-            />
-          </div>
-        </div>
-
-        <button
-          class="btn-primary"
-          (click)="verifyOtp()"
-          [disabled]="verifying || !otp || otp.length !== 6"
-        >
-          <span class="btn-loader" *ngIf="verifying"></span>
-          <span *ngIf="!verifying">Verify & Login</span>
-          <span *ngIf="verifying">Verifying...</span>
-        </button>
-
-        <div class="resend-section">
-          <span *ngIf="!canResend" class="resend-timer">
-            Resend OTP in {{ resendTimer }}s
-          </span>
-          <button
-            *ngIf="canResend"
-            class="resend-btn"
-            (click)="resendOtp()"
-            [disabled]="loading"
-          >
-            Resend OTP
-          </button>
+          <span>Merchant ID and phone number are checked against your registered account</span>
         </div>
       </div>
 

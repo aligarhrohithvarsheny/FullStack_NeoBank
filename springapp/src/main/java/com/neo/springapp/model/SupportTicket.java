@@ -45,6 +45,13 @@ public class SupportTicket {
     private String assignedTo;
 
     private String transactionId; // If related to a transaction
+    private String transactionAccountNumber;
+    private Double transactionAmount;
+    private String transactionType;
+    private String transactionStatus;
+    private String transactionDate;
+    @Column(length = 2000)
+    private String transactionDescription;
 
     private LocalDateTime resolvedAt;
     private LocalDateTime closedAt;

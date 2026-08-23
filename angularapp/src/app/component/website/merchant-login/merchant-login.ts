@@ -13,16 +13,14 @@ import { MerchantOnboardingService } from '../../../service/merchant-onboarding.
   encapsulation: ViewEncapsulation.None
 })
 export class MerchantLogin implements OnInit, OnDestroy {
-  email: string = '';
-  otp: string = '';
+  merchantId: string = '';
+  phoneNumber: string = '';
 
   // UI state
-  otpSent: boolean = false;
   loading: boolean = false;
   verifying: boolean = false;
   errorMessage: string = '';
   successMessage: string = '';
-  maskedEmail: string = '';
   businessName: string = '';
 
   // Resend OTP timer
@@ -55,87 +53,40 @@ export class MerchantLogin implements OnInit, OnDestroy {
     }
   }
 
-  isValidEmail(): boolean {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(this.email.trim());
-  }
-
-  sendOtp() {
+  login() {
     this.errorMessage = '';
     this.successMessage = '';
 
-    if (!this.email.trim()) {
-      this.errorMessage = 'Please enter your registered email.';
-      return;
-    }
-
-    if (!this.isValidEmail()) {
-      this.errorMessage = 'Please enter a valid email address.';
+    if (!this.merchantId.trim() || !/^\d{10}$/.test(this.phoneNumber.trim())) {
+      this.errorMessage = 'Enter a valid merchant ID and 10-digit phone number.';
       return;
     }
 
     this.loading = true;
 
-    this.merchantService.sendMerchantLoginOtp(this.email.trim()).subscribe({
+    this.merchantService.loginMerchantByCredentials(this.merchantId.trim(), this.phoneNumber.trim()).subscribe({
       next: (res) => {
         this.loading = false;
         if (res.success) {
-          this.otpSent = true;
-          this.maskedEmail = res.maskedEmail || '';
           this.businessName = res.businessName || '';
-          this.successMessage = 'OTP sent successfully to ' + this.maskedEmail + '.';
-          this.startResendTimer();
+          this.successMessage = 'Login successful! Redirecting...';
+          if (this.isBrowser) {
+            sessionStorage.setItem('merchantSoundbox', JSON.stringify(res.merchant));
+            const firstDevice = Array.isArray(res.devices) && res.devices.length > 0 ? res.devices[0] : null;
+            if (firstDevice) sessionStorage.setItem('merchantDevice', JSON.stringify(firstDevice));
+          }
+          setTimeout(() => this.router.navigate(['/website/soundbox-payment']), 500);
         } else {
           this.errorMessage = res.message || 'Failed to send OTP.';
         }
       },
       error: (err) => {
         this.loading = false;
-        this.errorMessage = err.error?.message || 'Failed to send OTP. Please try again.';
+        this.errorMessage = err.error?.error || err.error?.message || 'Login failed. Please try again.';
       }
     });
   }
 
-  verifyOtp() {
-    this.errorMessage = '';
-    this.successMessage = '';
-
-    if (!this.otp.trim()) {
-      this.errorMessage = 'Please enter OTP.';
-      return;
-    }
-
-    if (this.otp.trim().length !== 6) {
-      this.errorMessage = 'OTP must be 6 digits.';
-      return;
-    }
-
-    this.verifying = true;
-
-    this.merchantService.verifyMerchantLoginOtp(this.email.trim(), this.otp.trim()).subscribe({
-      next: (res) => {
-        this.verifying = false;
-        if (res.success) {
-          this.successMessage = 'Login successful! Redirecting...';
-          if (this.isBrowser) {
-            sessionStorage.setItem('merchantSoundbox', JSON.stringify(res.merchant));
-            const firstDevice = Array.isArray(res.devices) && res.devices.length > 0 ? res.devices[0] : null;
-            if (firstDevice) {
-              sessionStorage.setItem('merchantDevice', JSON.stringify(firstDevice));
-            }
-          }
-          setTimeout(() => {
-            this.router.navigate(['/website/soundbox-payment']);
-          }, 1000);
-        } else {
-          this.errorMessage = res.message || 'OTP verification failed.';
-        }
-      },
-      error: (err) => {
-        this.verifying = false;
-      this.errorMessage = err.error?.error || err.error?.message || 'Verification failed. Please try again.';
-      }
-    });
-  }
 
   startResendTimer() {
     this.canResend = false;
@@ -154,17 +105,9 @@ export class MerchantLogin implements OnInit, OnDestroy {
     }, 1000);
   }
 
-  resendOtp() {
-    if (!this.canResend) return;
-    this.otp = '';
-    this.sendOtp();
-  }
-
   resetForm() {
-    this.otpSent = false;
-    this.otp = '';
-    this.email = '';
-    this.maskedEmail = '';
+    this.merchantId = '';
+    this.phoneNumber = '';
     this.businessName = '';
     this.errorMessage = '';
     this.successMessage = '';
