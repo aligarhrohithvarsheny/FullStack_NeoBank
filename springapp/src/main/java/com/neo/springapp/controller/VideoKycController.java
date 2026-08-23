@@ -633,6 +633,16 @@ public class VideoKycController {
         }
     }
 
+    @PostMapping("/reschedule-slot/{sessionId}")
+    public ResponseEntity<?> rescheduleBooking(@PathVariable Long sessionId, @RequestBody Map<String, Object> payload) {
+        try {
+            Long slotId = Long.valueOf(payload.get("slotId").toString());
+            return ResponseEntity.ok(videoKycService.rescheduleBooking(sessionId, slotId));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", e.getMessage()));
+        }
+    }
+
     @PutMapping("/admin/slots/{slotId}/reschedule")
     public ResponseEntity<?> rescheduleSlot(@PathVariable Long slotId, @RequestBody Map<String, Object> payload) {
         try {

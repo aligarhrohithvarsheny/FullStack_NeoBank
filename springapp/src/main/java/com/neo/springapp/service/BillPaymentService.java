@@ -286,27 +286,10 @@ public class BillPaymentService {
                 cardEmail = debitCard.getUserEmail();
             }
             
-            // Generate and send OTP (valid for 2 minutes)
-            String otp = otpService.generateOtp();
-            otpService.storeOtp(cardEmail, otp);
-            
-            // Send OTP email
-            boolean emailSent = emailService.sendOtpEmail(cardEmail, otp);
-            
-            if (!emailSent) {
-                response.put("success", false);
-                response.put("message", "Failed to send OTP. Please try again.");
-                return response;
-            }
-            
-            // Mask email (show last 9 characters)
-            String maskedEmail = maskEmail(cardEmail);
-            
             response.put("success", true);
             response.put("cardType", cardType);
             response.put("cardLastFour", cardLastFour);
-            response.put("maskedEmail", maskedEmail);
-            response.put("message", "OTP has been sent to your registered email");
+            response.put("message", "Card details verified successfully");
             
             return response;
             
@@ -318,32 +301,9 @@ public class BillPaymentService {
         }
     }
 
-    /**
-     * Verify OTP and process bill payment
-     */
+    /** Process a bill payment after card details have been validated. */
     @Transactional
     public BillPayment verifyOtpAndProcessPayment(BillPaymentRequest request, String otp, String cardType) {
-        // Verify OTP
-        String cardEmail = null;
-        if ("CREDIT".equals(cardType)) {
-            Optional<CreditCard> cardOpt = creditCardRepository.findById(request.getCreditCardId());
-            if (cardOpt.isEmpty()) {
-                throw new RuntimeException("Credit card not found");
-            }
-            cardEmail = cardOpt.get().getUserEmail();
-        } else {
-            // For debit card, get email from user account
-            Optional<com.neo.springapp.model.User> userOpt = userService.getUserByAccountNumber(request.getAccountNumber());
-            if (userOpt.isEmpty()) {
-                throw new RuntimeException("User not found for this account");
-            }
-            cardEmail = userOpt.get().getEmail();
-        }
-        
-        if (!otpService.verifyOtp(cardEmail, otp)) {
-            throw new RuntimeException("Invalid or expired OTP. Please try again.");
-        }
-        
         // Process payment based on card type
         if ("CREDIT".equals(cardType)) {
             return processCreditCardPayment(request);

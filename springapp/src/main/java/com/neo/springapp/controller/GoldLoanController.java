@@ -56,13 +56,7 @@ public class GoldLoanController {
     @Autowired
     private SalaryNormalTransactionRepository salaryNormalTransactionRepository;
 
-    // Send OTP to registered email for gold loan apply (reason in email)
-    @PostMapping("/request-otp")
-    public ResponseEntity<Map<String, Object>> requestApplyOtp(@RequestParam String accountNumber) {
-        return ResponseEntity.ok(goldLoanService.requestApplyOtp(accountNumber));
-    }
-
-    // Apply for gold loan. Pass otp in body or as request param to verify before applying.
+    // Apply for gold loan.
     @PostMapping
     public ResponseEntity<Map<String, Object>> applyGoldLoan(
             @RequestBody GoldLoan goldLoan,

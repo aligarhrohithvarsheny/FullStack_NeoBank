@@ -227,42 +227,13 @@
         </div>
       </div>
 
-      <!-- OTP panel for Gold Loan Application -->
-      <div class="otp-panel" *ngIf="acceptTerms && calculatedLoan?.success">
-        <p class="otp-reason">OTP will be sent to your registered email for verification (reason: Gold Loan Application).</p>
-        <div *ngIf="!goldLoanOtpSent">
-          <button type="button" class="btn-send-otp" (click)="sendGoldLoanOtp()" [disabled]="isSendingGoldLoanOtp">
-            <span *ngIf="!isSendingGoldLoanOtp">Send OTP to Email</span>
-            <span *ngIf="isSendingGoldLoanOtp">Sending...</span>
-          </button>
-        </div>
-        <div *ngIf="goldLoanOtpSent" class="otp-verify-panel">
-          <p class="otp-info">Enter the 6-digit OTP received on your registered email.</p>
-          <input
-            type="text"
-            inputmode="numeric"
-            maxlength="6"
-            pattern="[0-9]*"
-            [(ngModel)]="goldLoanOtpInput"
-            name="goldLoanOtpInput"
-            class="otp-input"
-            placeholder="000000"
-          />
-          <div class="otp-timer" [ngClass]="{'otp-timer-expired': goldLoanOtpTimer <= 0}">
-            <span *ngIf="goldLoanOtpTimer > 0">Valid for {{ formatGoldLoanOtpTimer() }}</span>
-            <span *ngIf="goldLoanOtpTimer <= 0" class="expired-text">OTP expired. Send a new OTP.</span>
-          </div>
-          <p *ngIf="goldLoanOtpError" class="otp-error">{{ goldLoanOtpError }}</p>
-        </div>
-      </div>
-
       <div class="form-actions">
           <button
           type="submit"
           class="submit-btn"
-          [disabled]="loading || !calculatedLoan || !acceptTerms || !goldLoanOtpSent || goldLoanOtpInput.length !== 6 || goldLoanOtpTimer <= 0"
+          [disabled]="loading || !calculatedLoan || !acceptTerms"
         >
-          <span *ngIf="!loading">🔐 Verify OTP &amp; Submit Application</span>
+          <span *ngIf="!loading">Submit Application</span>
           <span *ngIf="loading">⏳ Submitting...</span>
         </button>
         <button

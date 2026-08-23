@@ -86,6 +86,7 @@ export class Createaccount implements OnInit, OnDestroy {
   selectedSlot: any = null;
   bookingSlot = false;
   slotBookingError = '';
+  changingSlot = false;
   canJoinNow = false;
   countdownDisplay = '';
   countdownParts = { hours: '00', minutes: '00', seconds: '00' };
@@ -1420,16 +1421,31 @@ export class Createaccount implements OnInit, OnDestroy {
     this.slotBookingError = '';
   }
 
+  startChangeSlot() {
+    this.changingSlot = true;
+    this.selectedSlot = null;
+    this.loadAvailableSlots();
+  }
+
+  cancelChangeSlot() {
+    this.changingSlot = false;
+    this.selectedSlot = null;
+  }
+
   confirmSlotBooking() {
     if (!this.selectedSlot || !this.kycSessionData?.id) return;
     this.bookingSlot = true;
     this.slotBookingError = '';
 
-    this.videoKycService.bookSlot(this.kycSessionData.id, this.selectedSlot.id).subscribe({
+    const bookingRequest = this.changingSlot
+      ? this.videoKycService.rescheduleBooking(this.kycSessionData.id, this.selectedSlot.id)
+      : this.videoKycService.bookSlot(this.kycSessionData.id, this.selectedSlot.id);
+    bookingRequest.subscribe({
       next: (response: any) => {
         this.bookingSlot = false;
         this.kycSessionData = { ...this.kycSessionData, ...response, id: this.kycSessionData.id };
-        this.successMessage = 'Slot booked successfully!';
+        this.changingSlot = false;
+        this.successMessage = 'Video KYC slot updated successfully!';
         this.startCountdown();
         setTimeout(() => this.successMessage = '', 3000);
       },

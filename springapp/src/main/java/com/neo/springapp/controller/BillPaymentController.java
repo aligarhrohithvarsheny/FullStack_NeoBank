@@ -79,10 +79,10 @@ public class BillPaymentController {
             String otp = (String) request.get("otp");
             String cardType = (String) request.get("cardType");
             
-            if (otp == null || cardType == null) {
+            if (cardType == null) {
                 Map<String, Object> response = new HashMap<>();
                 response.put("success", false);
-                response.put("message", "OTP and card type are required");
+                response.put("message", "Card type is required");
                 return ResponseEntity.badRequest().body(response);
             }
             

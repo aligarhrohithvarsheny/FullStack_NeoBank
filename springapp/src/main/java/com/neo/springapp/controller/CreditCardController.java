@@ -4,6 +4,8 @@ import com.neo.springapp.model.*;
 import com.neo.springapp.service.CreditCardService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -112,6 +114,21 @@ public class CreditCardController {
     @GetMapping("/{id}/transactions")
     public ResponseEntity<List<CreditCardTransaction>> getTransactions(@PathVariable Long id) {
         return ResponseEntity.ok(creditCardService.getTransactionsByCardId(id));
+    }
+
+    @GetMapping("/transactions/{transactionId}/cheque-image")
+    public ResponseEntity<byte[]> downloadChequeImage(@PathVariable Long transactionId) {
+        CreditCardTransaction transaction = creditCardService.getChequeImageTransaction(transactionId);
+        if (transaction == null) return ResponseEntity.notFound().build();
+        MediaType mediaType = MediaType.APPLICATION_OCTET_STREAM;
+        try {
+            if (transaction.getChequeImageType() != null) mediaType = MediaType.parseMediaType(transaction.getChequeImageType());
+        } catch (Exception ignored) { }
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\""
+                        + (transaction.getChequeImageName() == null ? "cheque-image" : transaction.getChequeImageName()) + "\"")
+                .contentType(mediaType)
+                .body(transaction.getChequeImage());
     }
 
     @GetMapping("/account/{accountNumber}/transactions")

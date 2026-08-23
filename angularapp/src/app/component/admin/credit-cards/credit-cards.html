@@ -243,6 +243,8 @@
                   <th>Payment Method</th>
                   <th>Cheque Number</th>
                   <th>Debited Account</th>
+                  <th>Cheque Image</th>
+                  <th>Processed By</th>
                   <th>Amount</th>
                   <th>Balance After</th>
                   <th>Status</th>
@@ -256,6 +258,13 @@
                   <td>{{ transaction.paymentMethod || '-' }}</td>
                   <td>{{ transaction.chequeNumber || '-' }}</td>
                   <td>{{ transaction.debitAccountNumber || '-' }}</td>
+                  <td>
+                    <button class="btn-download" *ngIf="transaction.chequeImage" (click)="downloadChequeImage(transaction)">
+                      <i class="fa fa-download"></i> Download
+                    </button>
+                    <span *ngIf="!transaction.chequeImage">-</span>
+                  </td>
+                  <td>{{ transaction.processedBy || '-' }}</td>
                   <td>₹{{ transaction.amount | number:'1.2-2' }}</td>
                   <td>₹{{ transaction.balanceAfter | number:'1.2-2' }}</td>
                   <td><span class="status-badge" [ngClass]="transaction.status?.toLowerCase()">{{ transaction.status }}</span></td>
@@ -324,7 +333,7 @@
           </div>
           <div class="form-group">
             <label>Payment Method:</label>
-            <select [(ngModel)]="billPaymentForm.paymentMethod">
+            <select [(ngModel)]="billPaymentForm.paymentMethod" (change)="loadPaymentAccountDetails()">
               <option value="ACCOUNT">Debit User Account</option>
               <option value="CASH">Cash</option>
               <option value="CHEQUE">Cheque</option>
@@ -332,11 +341,20 @@
           </div>
           <div class="form-group" *ngIf="billPaymentForm.paymentMethod !== 'CASH'">
             <label>User Account Number:</label>
-            <input type="text" [(ngModel)]="billPaymentForm.debitAccountNumber" placeholder="Account to debit" />
+            <input type="text" [(ngModel)]="billPaymentForm.debitAccountNumber" (blur)="loadPaymentAccountDetails()" placeholder="Any account to debit" />
+            <div class="info-box" *ngIf="paymentAccountDetails">
+              <strong>{{ paymentAccountDetails.name }}</strong>
+              <span>Account: {{ paymentAccountDetails.accountNumber }}</span>
+              <span>Type: {{ paymentAccountDetails.accountType }}</span>
+              <span>Balance: ₹{{ paymentAccountDetails.balance | number:'1.2-2' }}</span>
+            </div>
           </div>
           <div class="form-group" *ngIf="billPaymentForm.paymentMethod === 'CHEQUE'">
             <label>Cheque Payment Number:</label>
             <input type="text" [(ngModel)]="billPaymentForm.chequeNumber" placeholder="Enter cheque number" />
+            <label>Cheque Image:</label>
+            <input type="file" accept="image/jpeg,image/png,application/pdf" (change)="onChequeImageSelected($event)" />
+            <small *ngIf="chequeImagePreviewName">Selected: {{ chequeImagePreviewName }}</small>
           </div>
           <div class="modal-actions">
             <button class="btn-success" (click)="payBillAsAdmin()" [disabled]="isPayingBill">

@@ -716,7 +716,18 @@ public class VideoKycService {
         VideoKycSlot slot = slotRepository.findById(slotId)
                 .orElseThrow(() -> new RuntimeException("Slot not found"));
         slot.setIsActive(false);
-        return slotRepository.save(slot);
+        VideoKycSlot saved = slotRepository.save(slot);
+        for (VideoKycSession session : sessionRepository.findByBookedSlotId(slotId)) {
+            session.setBookedSlotId(null);
+            session.setSlotDate(null);
+            session.setSlotTime(null);
+            session.setSlotEndTime(null);
+            session.setKycStatus("Documents Uploaded");
+            sessionRepository.save(session);
+            createAuditLog(session.getId(), null, null, "SLOT_CANCELLED_BY_ADMIN",
+                "Admin cancelled the scheduled Video KYC slot");
+        }
+        return saved;
     }
 
     @Transactional
@@ -726,7 +737,16 @@ public class VideoKycService {
         slot.setSlotDate(newDate);
         slot.setSlotTime(newTime);
         slot.setSlotEndTime(newEndTime);
-        return slotRepository.save(slot);
+        VideoKycSlot saved = slotRepository.save(slot);
+        for (VideoKycSession session : sessionRepository.findByBookedSlotId(slotId)) {
+            session.setSlotDate(newDate);
+            session.setSlotTime(newTime);
+            session.setSlotEndTime(newEndTime);
+            sessionRepository.save(session);
+            createAuditLog(session.getId(), null, null, "SLOT_UPDATED_BY_ADMIN",
+                "Admin updated the scheduled Video KYC slot");
+        }
+        return saved;
     }
 
     // ======================== Slot Booking (User) ========================
@@ -795,6 +815,39 @@ public class VideoKycService {
 
         createAuditLog(sessionId, null, null, "SLOT_CANCELLED", "Slot booking cancelled");
 
+        return saved;
+    }
+
+    @Transactional
+    public VideoKycSession rescheduleBooking(Long sessionId, Long newSlotId) {
+        VideoKycSession session = sessionRepository.findById(sessionId)
+                .orElseThrow(() -> new RuntimeException("Session not found"));
+        if (session.getBookedSlotId() == null) {
+            return bookSlot(sessionId, newSlotId);
+        }
+        if (session.getBookedSlotId().equals(newSlotId)) {
+            throw new RuntimeException("Please select a different slot");
+        }
+        VideoKycSlot newSlot = slotRepository.findById(newSlotId)
+                .orElseThrow(() -> new RuntimeException("Slot not found"));
+        if (!Boolean.TRUE.equals(newSlot.getIsActive()) || newSlot.getCurrentBookings() >= newSlot.getMaxBookings()) {
+            throw new RuntimeException("This slot is no longer available");
+        }
+        VideoKycSlot oldSlot = slotRepository.findById(session.getBookedSlotId()).orElse(null);
+        if (oldSlot != null && oldSlot.getCurrentBookings() > 0) {
+            oldSlot.setCurrentBookings(oldSlot.getCurrentBookings() - 1);
+            slotRepository.save(oldSlot);
+        }
+        newSlot.setCurrentBookings(newSlot.getCurrentBookings() + 1);
+        slotRepository.save(newSlot);
+        session.setBookedSlotId(newSlot.getId());
+        session.setSlotDate(newSlot.getSlotDate());
+        session.setSlotTime(newSlot.getSlotTime());
+        session.setSlotEndTime(newSlot.getSlotEndTime());
+        session.setKycStatus("Scheduled");
+        VideoKycSession saved = sessionRepository.save(session);
+        createAuditLog(sessionId, null, null, "SLOT_RESCHEDULED",
+                "Slot changed to " + newSlot.getSlotDate() + " " + newSlot.getSlotTime());
         return saved;
     }
 

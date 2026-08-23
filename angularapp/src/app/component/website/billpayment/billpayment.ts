@@ -259,23 +259,12 @@ export class BillPayment implements OnInit {
       accountNumber: this.userAccountNumber
     };
 
-    // Verify card and send OTP
+    // Verify card details and process the payment directly.
     this.http.post(`${environment.apiBaseUrl}/api/bill-payments/verify-card`, request).subscribe({
       next: (response: any) => {
         this.isProcessing = false;
         if (response.success) {
-          this.otpData = {
-            cardType: response.cardType,
-            cardLastFour: response.cardLastFour,
-            maskedEmail: response.maskedEmail,
-            cardNumber: cleanCardNumber,
-            cvv: this.cardForm.cvv,
-            expiryDate: this.cardForm.expiryDate,
-            cardholderName: this.cardForm.cardholderName
-          };
-          this.showOtpPage = true;
-          this.startOtpTimer();
-          this.alertService.success('OTP Sent', 'OTP has been sent to your registered email');
+          this.payVerifiedCard(response.cardType, cleanCardNumber);
         } else {
           this.alertService.error('Verification Failed', response.message || 'Failed to verify card details');
         }
@@ -285,6 +274,42 @@ export class BillPayment implements OnInit {
         const errorMessage = err.error?.message || 'Failed to verify card. Please try again.';
         this.alertService.error('Verification Error', errorMessage);
         this.isProcessing = false;
+      }
+    });
+  }
+
+  private payVerifiedCard(cardType: string, cleanCardNumber: string) {
+    const paymentRequest = {
+      accountNumber: this.userAccountNumber,
+      userName: this.userName,
+      userEmail: this.userEmail,
+      billType: this.billForm.billType,
+      networkProvider: this.billForm.networkProvider,
+      customerNumber: this.billForm.customerNumber,
+      amount: this.billForm.amount,
+      creditCardId: this.cardForm.creditCardId,
+      cardNumber: cleanCardNumber,
+      cvv: this.cardForm.cvv,
+      expiryDate: this.cardForm.expiryDate,
+      cardType
+    };
+
+    this.isVerifyingOtp = true;
+    this.http.post(`${environment.apiBaseUrl}/api/bill-payments/verify-otp-and-pay`, paymentRequest).subscribe({
+      next: (response: any) => {
+        this.isVerifyingOtp = false;
+        if (response.success) {
+          this.alertService.success('Success', 'Bill payment processed successfully!');
+          this.resetForm();
+          this.loadPaymentHistory();
+          this.loadCreditCards();
+        } else {
+          this.alertService.error('Error', response.message || 'Payment failed');
+        }
+      },
+      error: (err: any) => {
+        this.isVerifyingOtp = false;
+        this.alertService.error('Payment Error', err.error?.message || 'Failed to process payment. Please try again.');
       }
     });
   }

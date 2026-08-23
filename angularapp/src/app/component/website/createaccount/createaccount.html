@@ -853,14 +853,17 @@
           <button type="button" class="btn-secondary" (click)="cancelSlotBooking()">
             <i class="fa fa-times"></i> Cancel Booking
           </button>
+          <button type="button" class="btn-primary" (click)="startChangeSlot()" *ngIf="!changingSlot">
+            <i class="fa fa-calendar-alt"></i> Change Slot
+          </button>
         </div>
       </div>
 
       <!-- Select Slot -->
-      <div *ngIf="!kycSessionData?.bookedSlotId">
+      <div *ngIf="!kycSessionData?.bookedSlotId || changingSlot">
         <div class="slot-info-card">
           <i class="fa fa-calendar-alt fa-3x"></i>
-          <h3>Book a Video KYC Slot</h3>
+          <h3>{{ changingSlot ? 'Change Your Video KYC Slot' : 'Book a Video KYC Slot' }}</h3>
           <p>Select a convenient date and time for your Video KYC session. You will only be able to join at the scheduled time.</p>
         </div>
 
@@ -916,8 +919,9 @@
           <button type="button" class="btn-primary" (click)="confirmSlotBooking()" 
                   [disabled]="!selectedSlot || bookingSlot">
             <i class="fa" [ngClass]="bookingSlot ? 'fa-spinner fa-spin' : 'fa-calendar-check'"></i>
-            {{ bookingSlot ? 'Booking...' : 'Confirm Booking' }}
+            {{ bookingSlot ? 'Updating...' : (changingSlot ? 'Update Slot' : 'Confirm Booking') }}
           </button>
+          <button type="button" class="btn-secondary" (click)="cancelChangeSlot()" *ngIf="changingSlot">Cancel Change</button>
         </div>
       </div>
     </div>

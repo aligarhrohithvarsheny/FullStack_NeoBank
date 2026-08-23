@@ -55,6 +55,9 @@ export class CreditCards implements OnInit {
     chequeNumber: ''
   };
   isPayingBill: boolean = false;
+  chequeImageFile: File | null = null;
+  chequeImagePreviewName = '';
+  paymentAccountDetails: any = null;
 
   constructor(
     private router: Router,
@@ -349,6 +352,46 @@ export class CreditCards implements OnInit {
       chequeNumber: ''
     };
     this.showBillPaymentModal = true;
+    this.loadPaymentAccountDetails();
+  }
+
+  onChequeImageSelected(event: any) {
+    const file = event.target.files?.[0] as File | undefined;
+    if (!file) return;
+    if (!['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'].includes(file.type)) {
+      this.alertService.error('Invalid File', 'Upload a JPG, PNG, or PDF cheque image');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      this.alertService.error('Invalid File', 'Cheque image must be smaller than 5MB');
+      return;
+    }
+    this.chequeImageFile = file;
+    this.chequeImagePreviewName = file.name;
+  }
+
+  loadPaymentAccountDetails() {
+    const accountNumber = this.billPaymentForm.debitAccountNumber.trim();
+    this.paymentAccountDetails = null;
+    if (!accountNumber || this.billPaymentForm.paymentMethod === 'CASH') return;
+    this.http.get(`${environment.apiBaseUrl}/api/accounts/number/${encodeURIComponent(accountNumber)}`).subscribe({
+      next: (account: any) => this.paymentAccountDetails = account,
+      error: () => this.paymentAccountDetails = null
+    });
+  }
+
+  downloadChequeImage(transaction: any) {
+    this.http.get(`${environment.apiBaseUrl}/api/credit-cards/transactions/${transaction.id}/cheque-image`, { responseType: 'blob' }).subscribe({
+      next: (blob: Blob) => {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = transaction.chequeImageName || `cheque-${transaction.chequeNumber || transaction.id}`;
+        link.click();
+        URL.revokeObjectURL(url);
+      },
+      error: () => this.alertService.error('Download Failed', 'Cheque image is not available')
+    });
   }
 
   payBillAsAdmin() {
@@ -366,17 +409,17 @@ export class CreditCards implements OnInit {
     this.isPayingBill = true;
     const adminData = isPlatformBrowser(this.platformId) ? sessionStorage.getItem('adminData') : null;
     const admin = adminData ? JSON.parse(adminData) : {};
-    this.http.post(`${environment.apiBaseUrl}/api/credit-cards/bills/${bill.id}/admin-pay`, {
-      amount: form.amount,
-      paymentMethod: form.paymentMethod,
-      debitAccountNumber: form.debitAccountNumber,
-      chequeNumber: form.chequeNumber || null,
-      adminName: admin.name || admin.username || this.adminName
+    const submitPayment = (chequeImageBase64: string | null) => this.http.post(`${environment.apiBaseUrl}/api/credit-cards/bills/${bill.id}/admin-pay`, {
+      amount: form.amount, paymentMethod: form.paymentMethod, debitAccountNumber: form.debitAccountNumber,
+      chequeNumber: form.chequeNumber || null, chequeImageBase64, chequeImageName: this.chequeImageFile?.name || null,
+      chequeImageType: this.chequeImageFile?.type || null, adminName: admin.name || admin.username || this.adminName
     }).subscribe({
       next: (response: any) => {
         this.alertService.success('Payment Successful', `Bill paid by ${form.paymentMethod}. Account balance and history updated.`);
         this.showBillPaymentModal = false;
         this.isPayingBill = false;
+        this.chequeImageFile = null;
+        this.chequeImagePreviewName = '';
         if (this.selectedCreditCard) {
           this.selectedCreditCard = response.card;
           this.loadCreditCardDetails(this.selectedCreditCard.id);
@@ -388,6 +431,19 @@ export class CreditCards implements OnInit {
         this.alertService.error('Payment Failed', err.error?.message || 'Unable to process bill payment');
       }
     });
+    if (!this.chequeImageFile) {
+      if (form.paymentMethod === 'CHEQUE') {
+        this.isPayingBill = false;
+        this.alertService.error('Cheque Image Required', 'Upload the cheque image before confirming payment');
+        return;
+      }
+      submitPayment(null);
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => submitPayment(reader.result as string);
+    reader.onerror = () => { this.isPayingBill = false; this.alertService.error('File Error', 'Unable to read cheque image'); };
+    reader.readAsDataURL(this.chequeImageFile);
   }
 
   closeCreditCard(cardId: string | number) {

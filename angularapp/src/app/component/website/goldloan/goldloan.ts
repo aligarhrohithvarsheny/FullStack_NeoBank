@@ -2,7 +2,7 @@ import { Component, OnInit, OnDestroy, Inject, PLATFORM_ID } from '@angular/core
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../../environment/environment';
 import { AlertService } from '../../../service/alert.service';
 import { timeout, catchError } from 'rxjs/operators';
@@ -258,22 +258,7 @@ export class Goldloan implements OnInit, OnDestroy {
       return;
     }
 
-    if (!this.goldLoanOtpSent) {
-      this.alertService.error('OTP Required', 'Please send OTP to your email first.');
-      return;
-    }
-    const otp = (this.goldLoanOtpInput || '').trim();
-    if (!/^\d{6}$/.test(otp)) {
-      this.goldLoanOtpError = 'Enter a valid 6-digit OTP';
-      return;
-    }
-    if (this.goldLoanOtpTimer <= 0) {
-      this.goldLoanOtpError = 'OTP expired. Please send a new OTP.';
-      return;
-    }
-
     this.loading = true;
-    this.goldLoanOtpError = '';
 
     const goldLoanData: GoldLoan = {
       goldGrams: this.goldGrams,
@@ -301,9 +286,7 @@ export class Goldloan implements OnInit, OnDestroy {
         console.log(`Retrying gold loan submission (attempt ${retryCount + 1}/${maxRetries + 1})...`);
       }
       
-      this.http.post(`${environment.apiBaseUrl}/api/gold-loans`, goldLoanData, {
-        params: new HttpParams().set('otp', otp)
-      })
+      this.http.post(`${environment.apiBaseUrl}/api/gold-loans`, goldLoanData)
         .pipe(
           timeout(15000), // 15 second timeout for submission
           catchError(err => {
@@ -355,9 +338,6 @@ export class Goldloan implements OnInit, OnDestroy {
               this.alertService.success('Application Submitted', 
                 `Gold loan application submitted successfully! Loan Amount: ₹${this.calculatedLoan.loanAmount.toFixed(2)}`);
               this.resetForm();
-              this.stopGoldLoanOtpTimer();
-              this.goldLoanOtpSent = false;
-              this.goldLoanOtpInput = '';
               this.loadGoldLoans();
             } else if (response) {
               this.alertService.error('Application Failed', response.message || 'Failed to submit gold loan application');

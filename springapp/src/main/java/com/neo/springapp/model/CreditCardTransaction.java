@@ -26,6 +26,11 @@ public class CreditCardTransaction {
     private String chequeNumber;
     private String debitAccountNumber;
     private String processedBy;
+    @Lob
+    @Column(columnDefinition = "LONGBLOB")
+    private byte[] chequeImage;
+    private String chequeImageName;
+    private String chequeImageType;
     private Double amount;
     private String merchant;
     private String description;

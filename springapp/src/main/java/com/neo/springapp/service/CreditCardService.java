@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Base64;
 
 @Service
 @SuppressWarnings("null")
@@ -290,6 +291,14 @@ public class CreditCardService {
         cardTransaction.setTransactionType("Payment");
         cardTransaction.setPaymentMethod(paymentMethod);
         cardTransaction.setChequeNumber(request.getChequeNumber());
+        if (request.getChequeImageBase64() != null && !request.getChequeImageBase64().isBlank()) {
+            String imageData = request.getChequeImageBase64();
+            int comma = imageData.indexOf(',');
+            if (comma >= 0) imageData = imageData.substring(comma + 1);
+            cardTransaction.setChequeImage(Base64.getDecoder().decode(imageData));
+            cardTransaction.setChequeImageName(request.getChequeImageName());
+            cardTransaction.setChequeImageType(request.getChequeImageType());
+        }
         cardTransaction.setDebitAccountNumber(debitAccountNumber);
         cardTransaction.setProcessedBy(request.getAdminName());
         cardTransaction.setAmount(amount);
@@ -319,6 +328,12 @@ public class CreditCardService {
         result.put("accountBalanceAfter", accountBalanceAfter);
         result.put("debitAccountNumber", debitAccountNumber);
         return result;
+    }
+
+    public CreditCardTransaction getChequeImageTransaction(Long transactionId) {
+        return transactionRepository.findById(transactionId)
+                .filter(transaction -> transaction.getChequeImage() != null)
+                .orElse(null);
     }
 
     // Get statement

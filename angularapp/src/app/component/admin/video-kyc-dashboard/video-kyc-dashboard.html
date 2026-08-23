@@ -414,9 +414,18 @@
           <tbody>
             <tr *ngFor="let slot of allSlots">
               <td class="mono">{{ slot.id }}</td>
-              <td>{{ slot.slotDate }}</td>
-              <td>{{ slot.slotTime }}</td>
-              <td>{{ slot.slotEndTime }}</td>
+              <td>
+                <input *ngIf="editingSlotId === slot.id" type="date" [(ngModel)]="editSlotDate" />
+                <span *ngIf="editingSlotId !== slot.id">{{ slot.slotDate }}</span>
+              </td>
+              <td>
+                <input *ngIf="editingSlotId === slot.id" type="time" [(ngModel)]="editSlotTime" />
+                <span *ngIf="editingSlotId !== slot.id">{{ slot.slotTime }}</span>
+              </td>
+              <td>
+                <input *ngIf="editingSlotId === slot.id" type="time" [(ngModel)]="editSlotEndTime" />
+                <span *ngIf="editingSlotId !== slot.id">{{ slot.slotEndTime }}</span>
+              </td>
               <td>
                 <span class="booking-count" [class.full]="slot.currentBookings >= slot.maxBookings">
                   {{ slot.currentBookings }}/{{ slot.maxBookings }}
@@ -428,8 +437,17 @@
                 </span>
               </td>
               <td>
+                <button class="action-btn" (click)="startEditSlot(slot)" *ngIf="slot.isActive && editingSlotId !== slot.id" [disabled]="slotLoading">
+                  <i class="fa fa-edit"></i> Edit
+                </button>
+                <button class="action-btn approve small-btn" (click)="saveEditSlot()" *ngIf="editingSlotId === slot.id" [disabled]="slotLoading">
+                  <i class="fa fa-save"></i> Save
+                </button>
+                <button class="action-btn small-btn" (click)="cancelEditSlot()" *ngIf="editingSlotId === slot.id">
+                  Cancel
+                </button>
                 <button class="action-btn reject small-btn" (click)="cancelSlot(slot.id)" 
-                        *ngIf="slot.isActive" [disabled]="slotLoading">
+                        *ngIf="slot.isActive && editingSlotId !== slot.id" [disabled]="slotLoading">
                   <i class="fa fa-ban"></i> Cancel
                 </button>
               </td>

@@ -146,6 +146,10 @@ export class VideoKycService {
     return this.http.post(`${this.apiUrl}/cancel-booking/${sessionId}`, {});
   }
 
+  rescheduleBooking(sessionId: number, slotId: number): Observable<any> {
+    return this.http.post(`${this.apiUrl}/reschedule-slot/${sessionId}`, { slotId });
+  }
+
   canJoinVideoKyc(sessionId: number): Observable<any> {
     return this.http.get(`${this.apiUrl}/can-join/${sessionId}`);
   }

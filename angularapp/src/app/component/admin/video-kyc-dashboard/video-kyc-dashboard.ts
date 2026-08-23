@@ -61,6 +61,10 @@ export class VideoKycDashboard implements OnInit, OnDestroy {
   slotLoading = false;
   slotError = '';
   slotSuccess = '';
+  editingSlotId: number | null = null;
+  editSlotDate = '';
+  editSlotTime = '';
+  editSlotEndTime = '';
 
   // Verification Lookup
   verificationNumber = '';
@@ -473,6 +477,7 @@ export class VideoKycDashboard implements OnInit, OnDestroy {
   }
 
   cancelSlot(slotId: number) {
+    if (!confirm('Cancel this slot? Existing users will need to select another slot.')) return;
     this.videoKycService.cancelSlot(slotId).subscribe({
       next: () => {
         this.slotSuccess = 'Slot cancelled.';
@@ -481,6 +486,34 @@ export class VideoKycDashboard implements OnInit, OnDestroy {
       },
       error: (err: any) => {
         this.slotError = err.error?.message || 'Failed to cancel slot.';
+      }
+    });
+  }
+
+  startEditSlot(slot: any) {
+    this.editingSlotId = slot.id;
+    this.editSlotDate = slot.slotDate;
+    this.editSlotTime = slot.slotTime;
+    this.editSlotEndTime = slot.slotEndTime;
+  }
+
+  cancelEditSlot() {
+    this.editingSlotId = null;
+  }
+
+  saveEditSlot() {
+    if (!this.editingSlotId || !this.editSlotDate || !this.editSlotTime || !this.editSlotEndTime) return;
+    this.slotLoading = true;
+    this.videoKycService.rescheduleSlot(this.editingSlotId, this.editSlotDate, this.editSlotTime, this.editSlotEndTime).subscribe({
+      next: () => {
+        this.slotLoading = false;
+        this.editingSlotId = null;
+        this.slotSuccess = 'Slot updated successfully.';
+        this.loadSlots();
+      },
+      error: (err: any) => {
+        this.slotLoading = false;
+        this.slotError = err.error?.message || 'Failed to update slot.';
       }
     });
   }
