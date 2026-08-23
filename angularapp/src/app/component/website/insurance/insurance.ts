@@ -80,6 +80,7 @@ export class Insurance implements OnInit {
   // Session
   userAccountNumber: string = '';
   userId: number | null = null;
+  applyMode = false;
 
   get visiblePolicies(): any[] {
     return (this.availablePolicies || []).filter(p => !p.unavailable);
@@ -126,6 +127,7 @@ export class Insurance implements OnInit {
 
     // If opened via policy lookup (website/insurance?policy=POL123), auto-select that policy.
     this.route.queryParams.subscribe(params => {
+      this.applyMode = params['apply'] === 'true';
       const policyNumber = params['policy'];
       if (policyNumber) {
         // lookup policy by number and set selectedPolicyId when found

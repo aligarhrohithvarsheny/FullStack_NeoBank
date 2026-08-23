@@ -22,6 +22,10 @@ public class CreditCardTransaction {
     private String userName;
     
     private String transactionType; // Purchase, Payment, Refund, Interest, Fee
+    private String paymentMethod; // CASH, ACCOUNT, CHEQUE
+    private String chequeNumber;
+    private String debitAccountNumber;
+    private String processedBy;
     private Double amount;
     private String merchant;
     private String description;

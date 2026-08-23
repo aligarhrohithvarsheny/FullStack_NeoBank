@@ -211,6 +211,7 @@
                   <th>Minimum Due</th>
                   <th>Paid Amount</th>
                   <th>Status</th>
+                  <th>Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -221,6 +222,11 @@
                   <td>₹{{ bill.minimumDue | number:'1.2-2' }}</td>
                   <td>₹{{ bill.paidAmount | number:'1.2-2' }}</td>
                   <td><span class="status-badge" [ngClass]="bill.status?.toLowerCase()">{{ bill.status }}</span></td>
+                  <td>
+                    <button class="btn-success" (click)="openBillPayment(bill)" [disabled]="bill.status?.toLowerCase() === 'paid'">
+                      <i class="fa fa-money-bill-wave"></i> Pay Bill
+                    </button>
+                  </td>
                 </tr>
               </tbody>
             </table>
@@ -234,6 +240,9 @@
                   <th>Date</th>
                   <th>Type</th>
                   <th>Merchant</th>
+                  <th>Payment Method</th>
+                  <th>Cheque Number</th>
+                  <th>Debited Account</th>
                   <th>Amount</th>
                   <th>Balance After</th>
                   <th>Status</th>
@@ -244,6 +253,9 @@
                   <td>{{ transaction.transactionDate | date:'dd/MM/yyyy HH:mm' }}</td>
                   <td>{{ transaction.transactionType }}</td>
                   <td>{{ transaction.merchant || '-' }}</td>
+                  <td>{{ transaction.paymentMethod || '-' }}</td>
+                  <td>{{ transaction.chequeNumber || '-' }}</td>
+                  <td>{{ transaction.debitAccountNumber || '-' }}</td>
                   <td>₹{{ transaction.amount | number:'1.2-2' }}</td>
                   <td>₹{{ transaction.balanceAfter | number:'1.2-2' }}</td>
                   <td><span class="status-badge" [ngClass]="transaction.status?.toLowerCase()">{{ transaction.status }}</span></td>
@@ -287,6 +299,50 @@
               <i class="fa fa-exclamation-triangle"></i>
               <span>{{ getCloseCardStatus(selectedCreditCard).message }}</span>
             </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Admin Bill Payment Modal -->
+    <div class="modal-overlay" *ngIf="showBillPaymentModal" (click)="showBillPaymentModal = false">
+      <div class="modal-content" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h3><i class="fa fa-money-bill-wave"></i> Pay Credit Card Bill</h3>
+          <button class="close-btn" (click)="showBillPaymentModal = false">&times;</button>
+        </div>
+        <div class="modal-body" *ngIf="selectedBillForPayment">
+          <div class="info-grid">
+            <div class="info-item"><label>Card Holder:</label><span>{{ selectedCreditCard?.userName }}</span></div>
+            <div class="info-item"><label>Card Number:</label><span>{{ selectedCreditCard?.maskedCardNumber || selectedCreditCard?.cardNumber }}</span></div>
+            <div class="info-item"><label>Bill Number:</label><span>#{{ selectedBillForPayment.id }}</span></div>
+            <div class="info-item"><label>Outstanding:</label><span class="amount">₹{{ ((selectedBillForPayment.totalAmount || 0) + (selectedBillForPayment.fine || 0) + (selectedBillForPayment.penalty || 0) - (selectedBillForPayment.paidAmount || 0)) | number:'1.2-2' }}</span></div>
+          </div>
+          <div class="form-group">
+            <label>Payment Amount:</label>
+            <input type="number" [(ngModel)]="billPaymentForm.amount" min="0.01" step="0.01" />
+          </div>
+          <div class="form-group">
+            <label>Payment Method:</label>
+            <select [(ngModel)]="billPaymentForm.paymentMethod">
+              <option value="ACCOUNT">Debit User Account</option>
+              <option value="CASH">Cash</option>
+              <option value="CHEQUE">Cheque</option>
+            </select>
+          </div>
+          <div class="form-group" *ngIf="billPaymentForm.paymentMethod !== 'CASH'">
+            <label>User Account Number:</label>
+            <input type="text" [(ngModel)]="billPaymentForm.debitAccountNumber" placeholder="Account to debit" />
+          </div>
+          <div class="form-group" *ngIf="billPaymentForm.paymentMethod === 'CHEQUE'">
+            <label>Cheque Payment Number:</label>
+            <input type="text" [(ngModel)]="billPaymentForm.chequeNumber" placeholder="Enter cheque number" />
+          </div>
+          <div class="modal-actions">
+            <button class="btn-success" (click)="payBillAsAdmin()" [disabled]="isPayingBill">
+              <i class="fa fa-check"></i> {{ isPayingBill ? 'Processing...' : 'Confirm Payment' }}
+            </button>
+            <button class="btn-secondary" (click)="showBillPaymentModal = false" [disabled]="isPayingBill">Cancel</button>
           </div>
         </div>
       </div>

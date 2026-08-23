@@ -13,6 +13,10 @@
     <button [class.active]="activeTab === 'payments'" (click)="setTab('payments')">Premium Payments</button>
   </div>
 
+  <div class="application-notice" *ngIf="applyMode">
+    Your account does not have an Aadhaar number yet. You can apply for an insurance policy using your logged-in account details.
+  </div>
+
   <!-- Available Policies -->
   <section *ngIf="activeTab === 'policies'" class="tab-content">
     <h2>Available Insurance Policies</h2>

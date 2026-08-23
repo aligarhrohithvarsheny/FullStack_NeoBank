@@ -51,8 +51,12 @@ export class SalaryAccountService {
   }
 
   // Update
-  updateAccount(id: number, updates: Partial<SalaryAccount>): Observable<any> {
-    return this.http.put<any>(`${this.apiUrl}/update/${id}`, updates);
+  updateAccount(id: number, updates: Partial<SalaryAccount>, editedBy = 'Manager'): Observable<any> {
+    return this.http.put<any>(`${this.apiUrl}/update/${id}`, updates, { params: { editedBy } });
+  }
+
+  getEditHistory(accountId: number): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiUrl}/${accountId}/edit-history`);
   }
 
   freezeAccount(id: number): Observable<any> {

@@ -7,6 +7,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 
 @Service
@@ -16,14 +18,23 @@ public class CreditCardService {
     private final CreditCardRepository creditCardRepository;
     private final CreditCardTransactionRepository transactionRepository;
     private final CreditCardBillRepository billRepository;
+    private final AccountService accountService;
+    private final TransactionService transactionService;
+    private final GlobalTransactionIdGenerator transactionIdGenerator;
 
     public CreditCardService(
             CreditCardRepository creditCardRepository,
             CreditCardTransactionRepository transactionRepository,
-            CreditCardBillRepository billRepository) {
+            CreditCardBillRepository billRepository,
+            AccountService accountService,
+            TransactionService transactionService,
+            GlobalTransactionIdGenerator transactionIdGenerator) {
         this.creditCardRepository = creditCardRepository;
         this.transactionRepository = transactionRepository;
         this.billRepository = billRepository;
+        this.accountService = accountService;
+        this.transactionService = transactionService;
+        this.transactionIdGenerator = transactionIdGenerator;
     }
 
     // Get all credit cards (for admin)
@@ -209,6 +220,105 @@ public class CreditCardService {
         }
         
         return billRepository.save(bill);
+    }
+
+    @Transactional
+    public Map<String, Object> payBillAsAdmin(Long billId, AdminCreditCardPaymentRequest request) {
+        if (request == null || request.getAmount() == null || request.getAmount() <= 0) {
+            throw new IllegalArgumentException("Payment amount must be greater than zero");
+        }
+
+        String paymentMethod = request.getPaymentMethod() == null
+                ? "" : request.getPaymentMethod().trim().toUpperCase();
+        if (!List.of("CASH", "ACCOUNT", "CHEQUE").contains(paymentMethod)) {
+            throw new IllegalArgumentException("Payment method must be CASH, ACCOUNT, or CHEQUE");
+        }
+        if ("CHEQUE".equals(paymentMethod)
+                && (request.getChequeNumber() == null || request.getChequeNumber().isBlank())) {
+            throw new IllegalArgumentException("Cheque payment number is required");
+        }
+
+        CreditCardBill bill = billRepository.findById(billId)
+                .orElseThrow(() -> new IllegalArgumentException("Credit card bill not found"));
+        CreditCard card = creditCardRepository.findById(bill.getCreditCardId())
+                .orElseThrow(() -> new IllegalArgumentException("Credit card not found"));
+
+        double paidAmount = bill.getPaidAmount() == null ? 0.0 : bill.getPaidAmount();
+        double billDue = (bill.getTotalAmount() == null ? 0.0 : bill.getTotalAmount())
+                + (bill.getFine() == null ? 0.0 : bill.getFine())
+                + (bill.getPenalty() == null ? 0.0 : bill.getPenalty()) - paidAmount;
+        double amount = request.getAmount();
+        if (amount > billDue + 0.01) {
+            throw new IllegalArgumentException("Payment cannot exceed the outstanding bill amount of ₹"
+                    + String.format("%.2f", Math.max(0, billDue)));
+        }
+
+        String debitAccountNumber = request.getDebitAccountNumber();
+        Double accountBalanceAfter = null;
+        if ("ACCOUNT".equals(paymentMethod) || "CHEQUE".equals(paymentMethod)) {
+            if (debitAccountNumber == null || debitAccountNumber.isBlank()) {
+                debitAccountNumber = card.getAccountNumber();
+            }
+            accountBalanceAfter = accountService.debitBalance(debitAccountNumber, amount);
+            if (accountBalanceAfter == null) {
+                throw new IllegalArgumentException("Account not found or insufficient balance");
+            }
+        }
+
+        double cardBalanceAfter = Math.max(0.0, (card.getCurrentBalance() == null ? 0.0 : card.getCurrentBalance()) - amount);
+        card.setCurrentBalance(cardBalanceAfter);
+        card.setLastPaidDate(LocalDateTime.now());
+        card.setOverdueAmount(0.0);
+        card.setFine(0.0);
+        card.setPenalty(0.0);
+        card.calculateAvailableLimit();
+        card.calculateUsageLimit();
+        creditCardRepository.save(card);
+
+        bill.setPaidAmount(paidAmount + amount);
+        bill.setPaidDate(LocalDateTime.now());
+        bill.setStatus(bill.getPaidAmount() >= bill.getTotalAmount() ? "Paid" : "Partial");
+        billRepository.save(bill);
+
+        Long globalSequence = transactionIdGenerator.getNextTransactionId();
+        CreditCardTransaction cardTransaction = new CreditCardTransaction();
+        cardTransaction.setGlobalTransactionSequence(globalSequence);
+        cardTransaction.setCreditCardId(card.getId());
+        cardTransaction.setCardNumber(card.getCardNumber());
+        cardTransaction.setAccountNumber(card.getAccountNumber());
+        cardTransaction.setUserName(card.getUserName());
+        cardTransaction.setTransactionType("Payment");
+        cardTransaction.setPaymentMethod(paymentMethod);
+        cardTransaction.setChequeNumber(request.getChequeNumber());
+        cardTransaction.setDebitAccountNumber(debitAccountNumber);
+        cardTransaction.setProcessedBy(request.getAdminName());
+        cardTransaction.setAmount(amount);
+        cardTransaction.setDescription("Admin bill payment via " + paymentMethod
+                + (request.getChequeNumber() == null ? "" : " - Cheque: " + request.getChequeNumber()));
+        cardTransaction.setBalanceAfter(cardBalanceAfter);
+        transactionRepository.save(cardTransaction);
+
+        if (accountBalanceAfter != null) {
+            Transaction accountTransaction = new Transaction();
+            accountTransaction.setGlobalTransactionSequence(globalSequence);
+            accountTransaction.setAccountNumber(debitAccountNumber);
+            accountTransaction.setUserName(card.getUserName());
+            accountTransaction.setAmount(amount);
+            accountTransaction.setType("Debit");
+            accountTransaction.setMerchant("Credit Card Bill");
+            accountTransaction.setDescription(cardTransaction.getDescription());
+            accountTransaction.setBalance(accountBalanceAfter);
+            accountTransaction.setStatus("Completed");
+            transactionService.saveTransaction(accountTransaction);
+        }
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("bill", bill);
+        result.put("card", card);
+        result.put("payment", cardTransaction);
+        result.put("accountBalanceAfter", accountBalanceAfter);
+        result.put("debitAccountNumber", debitAccountNumber);
+        return result;
     }
 
     // Get statement

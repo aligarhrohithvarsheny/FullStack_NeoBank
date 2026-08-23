@@ -7,6 +7,7 @@ import com.neo.springapp.model.SalaryLoginActivity;
 import com.neo.springapp.model.SalaryUpiTransaction;
 import com.neo.springapp.model.SalaryAdvanceRequest;
 import com.neo.springapp.model.SalaryFraudAlert;
+import com.neo.springapp.model.SalaryAccountEditHistory;
 import com.neo.springapp.service.SalaryAccountService;
 import com.neo.springapp.service.SessionHistoryService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -91,9 +92,10 @@ public class SalaryAccountController {
     // ─── Update ──────────────────────────────────────────────
 
     @PutMapping("/update/{id}")
-    public ResponseEntity<Map<String, Object>> updateAccount(@PathVariable Long id, @RequestBody SalaryAccount updates) {
+    public ResponseEntity<Map<String, Object>> updateAccount(@PathVariable Long id, @RequestBody SalaryAccount updates,
+            @RequestParam(value = "editedBy", defaultValue = "Manager") String editedBy) {
         Map<String, Object> response = new HashMap<>();
-        SalaryAccount updated = salaryAccountService.updateAccount(id, updates);
+        SalaryAccount updated = salaryAccountService.updateAccount(id, updates, editedBy);
         if (updated != null) {
             response.put("success", true);
             response.put("message", "Salary account updated successfully");
@@ -103,6 +105,11 @@ public class SalaryAccountController {
         response.put("success", false);
         response.put("message", "Salary account not found");
         return ResponseEntity.badRequest().body(response);
+    }
+
+    @GetMapping("/{id}/edit-history")
+    public ResponseEntity<List<SalaryAccountEditHistory>> getEditHistory(@PathVariable Long id) {
+        return ResponseEntity.ok(salaryAccountService.getEditHistory(id));
     }
 
     @PutMapping("/freeze/{id}")

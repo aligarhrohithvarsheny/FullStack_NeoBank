@@ -7,6 +7,7 @@ import com.neo.springapp.model.SalaryLoginActivity;
 import com.neo.springapp.model.SalaryUpiTransaction;
 import com.neo.springapp.model.SalaryAdvanceRequest;
 import com.neo.springapp.model.SalaryFraudAlert;
+import com.neo.springapp.model.SalaryAccountEditHistory;
 import com.neo.springapp.model.Account;
 import com.neo.springapp.model.CurrentAccount;
 import com.neo.springapp.repository.AccountRepository;
@@ -21,10 +22,13 @@ import com.neo.springapp.repository.SalaryAdvanceRequestRepository;
 import com.neo.springapp.repository.ChequeRequestRepository;
 import com.neo.springapp.repository.SalaryFraudAlertRepository;
 import com.neo.springapp.repository.SalaryCardLimitHistoryRepository;
+import com.neo.springapp.repository.SalaryAccountEditHistoryRepository;
 import com.neo.springapp.model.SalaryCardLimitHistory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.time.LocalDateTime;
 import java.util.*;
@@ -68,6 +72,12 @@ public class SalaryAccountService {
 
     @Autowired
     private SalaryCardLimitHistoryRepository salaryCardLimitHistoryRepository;
+
+    @Autowired
+    private SalaryAccountEditHistoryRepository salaryAccountEditHistoryRepository;
+
+    @Autowired
+    private ObjectMapper objectMapper;
 
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder(10);
 
@@ -118,30 +128,72 @@ public class SalaryAccountService {
         return salaryAccountRepository.search(query);
     }
 
-    public SalaryAccount updateAccount(Long id, SalaryAccount updates) {
+    public SalaryAccount updateAccount(Long id, SalaryAccount updates, String editedBy) {
         Optional<SalaryAccount> opt = salaryAccountRepository.findById(id);
         if (opt.isEmpty()) return null;
         SalaryAccount existing = opt.get();
+        Map<String, Map<String, Object>> changes = new LinkedHashMap<>();
 
-        if (updates.getEmployeeName() != null) existing.setEmployeeName(updates.getEmployeeName());
-        if (updates.getDob() != null) existing.setDob(updates.getDob());
-        if (updates.getMobileNumber() != null) existing.setMobileNumber(updates.getMobileNumber());
-        if (updates.getEmail() != null) existing.setEmail(updates.getEmail());
-        if (updates.getAadharNumber() != null) existing.setAadharNumber(updates.getAadharNumber());
-        if (updates.getPanNumber() != null) existing.setPanNumber(updates.getPanNumber());
-        if (updates.getCompanyName() != null) existing.setCompanyName(updates.getCompanyName());
-        if (updates.getCompanyId() != null) existing.setCompanyId(updates.getCompanyId());
-        if (updates.getEmployerAddress() != null) existing.setEmployerAddress(updates.getEmployerAddress());
-        if (updates.getHrContactNumber() != null) existing.setHrContactNumber(updates.getHrContactNumber());
-        if (updates.getMonthlySalary() != null) existing.setMonthlySalary(updates.getMonthlySalary());
-        if (updates.getSalaryCreditDate() != null) existing.setSalaryCreditDate(updates.getSalaryCreditDate());
-        if (updates.getDesignation() != null) existing.setDesignation(updates.getDesignation());
-        if (updates.getBranchName() != null) existing.setBranchName(updates.getBranchName());
-        if (updates.getIfscCode() != null) existing.setIfscCode(updates.getIfscCode());
-        if (updates.getStatus() != null) existing.setStatus(updates.getStatus());
+        recordChange(changes, "employeeName", existing.getEmployeeName(), updates.getEmployeeName(), updates.getEmployeeName() != null, existing::setEmployeeName);
+        recordChange(changes, "dob", existing.getDob(), updates.getDob(), updates.getDob() != null, existing::setDob);
+        recordChange(changes, "mobileNumber", existing.getMobileNumber(), updates.getMobileNumber(), updates.getMobileNumber() != null, existing::setMobileNumber);
+        recordChange(changes, "email", existing.getEmail(), updates.getEmail(), updates.getEmail() != null, existing::setEmail);
+        recordChange(changes, "aadharNumber", existing.getAadharNumber(), updates.getAadharNumber(), updates.getAadharNumber() != null, existing::setAadharNumber);
+        recordChange(changes, "panNumber", existing.getPanNumber(), updates.getPanNumber(), updates.getPanNumber() != null, existing::setPanNumber);
+        recordChange(changes, "companyName", existing.getCompanyName(), updates.getCompanyName(), updates.getCompanyName() != null, existing::setCompanyName);
+        recordChange(changes, "companyId", existing.getCompanyId(), updates.getCompanyId(), updates.getCompanyId() != null, existing::setCompanyId);
+        recordChange(changes, "employerAddress", existing.getEmployerAddress(), updates.getEmployerAddress(), updates.getEmployerAddress() != null, existing::setEmployerAddress);
+        recordChange(changes, "hrContactNumber", existing.getHrContactNumber(), updates.getHrContactNumber(), updates.getHrContactNumber() != null, existing::setHrContactNumber);
+        recordChange(changes, "monthlySalary", existing.getMonthlySalary(), updates.getMonthlySalary(), updates.getMonthlySalary() != null, existing::setMonthlySalary);
+        recordChange(changes, "salaryCreditDate", existing.getSalaryCreditDate(), updates.getSalaryCreditDate(), updates.getSalaryCreditDate() != null, existing::setSalaryCreditDate);
+        recordChange(changes, "designation", existing.getDesignation(), updates.getDesignation(), updates.getDesignation() != null, existing::setDesignation);
+        recordChange(changes, "branchName", existing.getBranchName(), updates.getBranchName(), updates.getBranchName() != null, existing::setBranchName);
+        recordChange(changes, "ifscCode", existing.getIfscCode(), updates.getIfscCode(), updates.getIfscCode() != null, existing::setIfscCode);
+        recordChange(changes, "address", existing.getAddress(), updates.getAddress(), updates.getAddress() != null, existing::setAddress);
+        recordChange(changes, "netBankingEnabled", existing.getNetBankingEnabled(), updates.getNetBankingEnabled(), updates.getNetBankingEnabled() != null, existing::setNetBankingEnabled);
+        recordChange(changes, "upiEnabled", existing.getUpiEnabled(), updates.getUpiEnabled(), updates.getUpiEnabled() != null, existing::setUpiEnabled);
+        recordChange(changes, "autoSavingsEnabled", existing.getAutoSavingsEnabled(), updates.getAutoSavingsEnabled(), updates.getAutoSavingsEnabled() != null, existing::setAutoSavingsEnabled);
+        recordChange(changes, "autoSavingsPercentage", existing.getAutoSavingsPercentage(), updates.getAutoSavingsPercentage(), updates.getAutoSavingsPercentage() != null, existing::setAutoSavingsPercentage);
+        recordChange(changes, "debitCardStatus", existing.getDebitCardStatus(), updates.getDebitCardStatus(), updates.getDebitCardStatus() != null, existing::setDebitCardStatus);
+        recordChange(changes, "dailyLimit", existing.getDailyLimit(), updates.getDailyLimit(), updates.getDailyLimit() != null, existing::setDailyLimit);
+        recordChange(changes, "internationalEnabled", existing.getInternationalEnabled(), updates.getInternationalEnabled(), updates.getInternationalEnabled() != null, existing::setInternationalEnabled);
+        recordChange(changes, "onlineEnabled", existing.getOnlineEnabled(), updates.getOnlineEnabled(), updates.getOnlineEnabled() != null, existing::setOnlineEnabled);
+        recordChange(changes, "contactlessEnabled", existing.getContactlessEnabled(), updates.getContactlessEnabled(), updates.getContactlessEnabled() != null, existing::setContactlessEnabled);
+        recordChange(changes, "accountLocked", existing.getAccountLocked(), updates.getAccountLocked(), updates.getAccountLocked() != null, existing::setAccountLocked);
+        recordChange(changes, "lockReason", existing.getLockReason(), updates.getLockReason(), updates.getLockReason() != null, existing::setLockReason);
 
         existing.setUpdatedAt(LocalDateTime.now());
-        return salaryAccountRepository.save(existing);
+        SalaryAccount saved = salaryAccountRepository.save(existing);
+        if (!changes.isEmpty()) {
+            SalaryAccountEditHistory history = new SalaryAccountEditHistory();
+            history.setSalaryAccountId(saved.getId());
+            history.setAccountNumber(saved.getAccountNumber());
+            history.setEditedBy(editedBy == null || editedBy.isBlank() ? "Manager" : editedBy);
+            history.setChangesDescription(String.join(", ", changes.keySet()));
+            try {
+                history.setFieldChanges(objectMapper.writeValueAsString(changes));
+            } catch (JsonProcessingException e) {
+                throw new IllegalStateException("Unable to record salary account edit history", e);
+            }
+            salaryAccountEditHistoryRepository.save(history);
+        }
+        return saved;
+    }
+
+    public List<SalaryAccountEditHistory> getEditHistory(Long accountId) {
+        return salaryAccountEditHistoryRepository.findBySalaryAccountIdOrderByEditedAtDesc(accountId);
+    }
+
+    private <T> void recordChange(Map<String, Map<String, Object>> changes, String field, T oldValue, T newValue,
+            boolean supplied, java.util.function.Consumer<T> setter) {
+        if (!supplied) return;
+        setter.accept(newValue);
+        if (!Objects.equals(oldValue, newValue)) {
+            Map<String, Object> values = new LinkedHashMap<>();
+            values.put("old", oldValue);
+            values.put("new", newValue);
+            changes.put(field, values);
+        }
     }
 
     public SalaryAccount freezeAccount(Long id) {

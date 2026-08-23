@@ -150,6 +150,17 @@ public class CreditCardController {
         return bill != null ? ResponseEntity.ok(bill) : ResponseEntity.notFound().build();
     }
 
+    // Admin: pay a bill by cash, user account debit, or cheque
+    @PostMapping("/bills/{billId}/admin-pay")
+    public ResponseEntity<?> adminPayBill(@PathVariable Long billId,
+                                          @RequestBody AdminCreditCardPaymentRequest request) {
+        try {
+            return ResponseEntity.ok(creditCardService.payBillAsAdmin(billId, request));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
+    }
+
     // Get statement
     @GetMapping("/{id}/statement")
     public ResponseEntity<List<CreditCardTransaction>> getStatement(

@@ -20,7 +20,8 @@ RUN groupadd -r appuser && useradd -r -g appuser appuser
 
 COPY --from=build /workspace/target/*.jar app.jar
 
-RUN chown appuser:appuser app.jar
+RUN mkdir -p /app/uploads \
+    && chown -R appuser:appuser /app/app.jar /app/uploads
 
 USER appuser
 

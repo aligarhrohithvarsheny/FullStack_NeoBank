@@ -46,6 +46,16 @@ export class CreditCards implements OnInit {
   closeCardDocumentName: string = '';
   isUploadingDocument: boolean = false;
 
+  showBillPaymentModal: boolean = false;
+  selectedBillForPayment: any = null;
+  billPaymentForm = {
+    amount: 0,
+    paymentMethod: 'ACCOUNT',
+    debitAccountNumber: '',
+    chequeNumber: ''
+  };
+  isPayingBill: boolean = false;
+
   constructor(
     private router: Router,
     @Inject(PLATFORM_ID) private platformId: Object,
@@ -325,6 +335,57 @@ export class CreditCards implements OnInit {
         console.error('Error getting statement:', err);
         const errorMessage = err.error?.message || err.message || 'Failed to get statement';
         this.alertService.error('Error', errorMessage);
+      }
+    });
+  }
+
+  openBillPayment(bill: any) {
+    this.selectedBillForPayment = bill;
+    const outstanding = Math.max(0, (bill.totalAmount || 0) + (bill.fine || 0) + (bill.penalty || 0) - (bill.paidAmount || 0));
+    this.billPaymentForm = {
+      amount: outstanding,
+      paymentMethod: 'ACCOUNT',
+      debitAccountNumber: this.selectedCreditCard?.accountNumber || '',
+      chequeNumber: ''
+    };
+    this.showBillPaymentModal = true;
+  }
+
+  payBillAsAdmin() {
+    const bill = this.selectedBillForPayment;
+    const form = this.billPaymentForm;
+    if (!bill || !form.amount || form.amount <= 0) {
+      this.alertService.error('Validation Error', 'Enter a valid payment amount');
+      return;
+    }
+    if (form.paymentMethod === 'CHEQUE' && !form.chequeNumber.trim()) {
+      this.alertService.error('Validation Error', 'Cheque payment number is required');
+      return;
+    }
+
+    this.isPayingBill = true;
+    const adminData = isPlatformBrowser(this.platformId) ? sessionStorage.getItem('adminData') : null;
+    const admin = adminData ? JSON.parse(adminData) : {};
+    this.http.post(`${environment.apiBaseUrl}/api/credit-cards/bills/${bill.id}/admin-pay`, {
+      amount: form.amount,
+      paymentMethod: form.paymentMethod,
+      debitAccountNumber: form.debitAccountNumber,
+      chequeNumber: form.chequeNumber || null,
+      adminName: admin.name || admin.username || this.adminName
+    }).subscribe({
+      next: (response: any) => {
+        this.alertService.success('Payment Successful', `Bill paid by ${form.paymentMethod}. Account balance and history updated.`);
+        this.showBillPaymentModal = false;
+        this.isPayingBill = false;
+        if (this.selectedCreditCard) {
+          this.selectedCreditCard = response.card;
+          this.loadCreditCardDetails(this.selectedCreditCard.id);
+        }
+        this.loadCreditCards();
+      },
+      error: (err: any) => {
+        this.isPayingBill = false;
+        this.alertService.error('Payment Failed', err.error?.message || 'Unable to process bill payment');
       }
     });
   }
