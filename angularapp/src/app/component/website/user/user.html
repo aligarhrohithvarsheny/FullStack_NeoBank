@@ -58,6 +58,11 @@
         >
           {{ isUnifiedLoggingIn ? 'Signing in...' : 'Sign in' }}
         </button>
+        <div class="jpm-qr-login-actions">
+          <button type="button" class="jpm-link-small" (click)="generateQrCode()">Show QR Login Code</button>
+          <label class="jpm-link-small">Scan Login QR<input type="file" accept="image/*" (change)="scanLoginQr($event)" hidden /></label>
+          <p class="jpm-error" *ngIf="qrScanError">{{ qrScanError }}</p>
+        </div>
 
         <!-- Error/Success Messages -->
         <div class="jpm-message-section" *ngIf="errorMessage || successMessage">
@@ -356,6 +361,11 @@
       <!-- ═══════════ QR Login Mode ═══════════ -->
       <div *ngIf="isQrLoginMode" class="jpm-qr-mode-banner">
         <p>QR Code Login Mode — Enter your credentials to complete login</p>
+      </div>
+      <div *ngIf="showQrCode" class="jpm-qr-login-panel">
+        <img [src]="qrCodeImage" alt="NeoBank QR login code" />
+        <p>Status: {{ qrStatus }}</p>
+        <button type="button" (click)="closeQrCode()">Close QR</button>
       </div>
 
     </div>

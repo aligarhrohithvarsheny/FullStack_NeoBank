@@ -330,6 +330,27 @@ export class VideoKycDashboard implements OnInit, OnDestroy {
     });
   }
 
+  startReVideoKyc(session: any, event?: Event) {
+    event?.stopPropagation();
+    const adminId = this.getAdminId();
+    const adminName = this.getAdminName();
+    this.actionLoading = true;
+    this.videoKycService.forceReVerify(session.id, Number(adminId), adminName).subscribe({
+      next: (response: any) => {
+        this.actionLoading = false;
+        this.successMsg = 'Customer moved to re-video KYC.';
+        this.selectSession(response);
+        this.activeTab = 'queue';
+        this.loadQueue();
+        this.loadStats();
+      },
+      error: (err: any) => {
+        this.actionLoading = false;
+        this.error = err.error?.message || err.error?.error || 'Failed to start re-video KYC.';
+      }
+    });
+  }
+
   // Document viewer
   viewDocument(type: 'aadhar' | 'pan' | 'face' | 'id') {
     if (!this.selectedSession) return;

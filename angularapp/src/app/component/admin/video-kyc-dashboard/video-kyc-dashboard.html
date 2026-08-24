@@ -304,6 +304,9 @@
             <td>{{ session.slotDate ? session.slotDate + ' ' + session.slotTime : '—' }}</td>
             <td>{{ session.createdAt | date:'short' }}</td>
             <td>
+              <button class="view-btn" (click)="startReVideoKyc(session, $event)" [disabled]="actionLoading">
+                <i class="fa fa-video"></i> Re-video KYC
+              </button>
               <button class="view-btn" (click)="selectSession(session); switchTab('queue'); $event.stopPropagation()">
                 <i class="fa fa-eye"></i> View
               </button>

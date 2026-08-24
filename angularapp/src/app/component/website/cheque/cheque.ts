@@ -8,8 +8,6 @@ import { ChequeService } from '../../../service/cheque';
 import { Cheque as ChequeModel, CreateChequeRequest, CancelChequeRequest, RequestChequeDraw } from '../../../model/cheque/cheque-module';
 import { environment } from '../../../../environment/environment';
 
-const OTP_VALID_SECONDS = 120;
-
 @Component({
   selector: 'app-cheque',
   standalone: true,
@@ -61,14 +59,8 @@ export class ChequeComponent implements OnInit, OnDestroy {
   // Request cheque draw
   requesting: boolean = false;
 
-  // Draw request modal + OTP
+  // Draw request modal
   selectedChequeForDraw: ChequeModel | null = null;
-  chequeDrawOtpSent: boolean = false;
-  chequeDrawOtpInput: string = '';
-  chequeDrawOtpError: string = '';
-  chequeDrawOtpTimer: number = 0;
-  chequeDrawOtpTimerRef: any = null;
-  isSendingChequeDrawOtp: boolean = false;
 
   constructor(
     private router: Router,
@@ -87,91 +79,27 @@ export class ChequeComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy() {
-    this.stopChequeDrawOtpTimer();
   }
 
   openDrawModal(cheque: ChequeModel) {
     if (!this.canRequestCheque(cheque)) return;
     this.selectedChequeForDraw = cheque;
-    this.chequeDrawOtpSent = false;
-    this.chequeDrawOtpInput = '';
-    this.chequeDrawOtpError = '';
-    this.chequeDrawOtpTimer = 0;
-    this.stopChequeDrawOtpTimer();
   }
 
   closeDrawModal() {
     this.selectedChequeForDraw = null;
-    this.chequeDrawOtpSent = false;
-    this.chequeDrawOtpInput = '';
-    this.chequeDrawOtpError = '';
-    this.stopChequeDrawOtpTimer();
   }
 
-  sendChequeDrawOtp() {
-    if (!this.selectedChequeForDraw?.id) return;
-    this.chequeDrawOtpError = '';
-    this.isSendingChequeDrawOtp = true;
-    this.chequeService.requestChequeDrawOtp(this.selectedChequeForDraw.id).subscribe({
-      next: (res: any) => {
-        this.isSendingChequeDrawOtp = false;
-        if (res?.success !== false) {
-          this.chequeDrawOtpSent = true;
-          this.startChequeDrawOtpTimer();
-          this.alertService.success('OTP Sent', 'OTP sent to your registered email (reason: Cheque Withdrawal / Draw Request). Valid for 2 minutes.');
-        } else {
-          this.chequeDrawOtpError = res?.message || 'Failed to send OTP';
-        }
-      },
-      error: (err: any) => {
-        this.isSendingChequeDrawOtp = false;
-        this.chequeDrawOtpError = err.error?.error || err.error?.message || 'Failed to send OTP. Please try again.';
-      }
-    });
-  }
-
-  startChequeDrawOtpTimer() {
-    this.stopChequeDrawOtpTimer();
-    this.chequeDrawOtpTimer = OTP_VALID_SECONDS;
-    this.chequeDrawOtpTimerRef = setInterval(() => {
-      this.chequeDrawOtpTimer--;
-      if (this.chequeDrawOtpTimer <= 0) this.stopChequeDrawOtpTimer();
-    }, 1000);
-  }
-
-  stopChequeDrawOtpTimer() {
-    if (this.chequeDrawOtpTimerRef) {
-      clearInterval(this.chequeDrawOtpTimerRef);
-      this.chequeDrawOtpTimerRef = null;
-    }
-  }
-
-  formatChequeDrawOtpTimer(): string {
-    if (this.chequeDrawOtpTimer <= 0) return '0:00';
-    const m = Math.floor(this.chequeDrawOtpTimer / 60);
-    const s = this.chequeDrawOtpTimer % 60;
-    return `${m}:${s.toString().padStart(2, '0')}`;
-  }
-
-  requestChequeDrawWithOtp() {
+  requestChequeDrawDirect() {
     const c = this.selectedChequeForDraw;
-    if (!c?.id || !this.chequeDrawOtpSent) {
-      this.alertService.error('OTP Required', 'Please send OTP first.');
-      return;
-    }
-    const otp = (this.chequeDrawOtpInput || '').trim();
-    if (!/^\d{6}$/.test(otp)) {
-      this.chequeDrawOtpError = 'Enter a valid 6-digit OTP';
-      return;
-    }
-    if (this.chequeDrawOtpTimer <= 0) {
-      this.chequeDrawOtpError = 'OTP expired. Please send a new OTP.';
+    if (!c?.id) {
+      this.alertService.error('Request Error', 'Please select a valid cheque');
       return;
     }
     this.requesting = true;
-    this.chequeDrawOtpError = '';
-    const request: RequestChequeDraw = { requestedBy: this.userName, otp };
-    this.chequeService.requestChequeDraw(c.id, request).subscribe({
+    const request: RequestChequeDraw = { requestedBy: this.userName };
+    const chequeId = c.id;
+    this.chequeService.requestChequeDraw(chequeId, request).subscribe({
       next: (response: any) => {
         this.alertService.success('Request Submitted', response.message || 'Cheque draw request submitted successfully. Waiting for admin approval.');
         this.requesting = false;
@@ -182,7 +110,7 @@ export class ChequeComponent implements OnInit, OnDestroy {
       },
       error: (err: any) => {
         this.requesting = false;
-        this.chequeDrawOtpError = err.error?.error || err.error?.message || 'Failed to submit. Invalid or expired OTP.';
+        this.alertService.error('Request Failed', err.error?.error || err.error?.message || 'Failed to submit cheque draw request.');
       }
     });
   }

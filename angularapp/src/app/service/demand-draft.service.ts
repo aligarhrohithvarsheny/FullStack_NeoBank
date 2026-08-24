@@ -14,4 +14,5 @@ export class DemandDraftService {
   approve(id: number, adminName: string) { return this.http.post<any>(`${this.api}/admin/${id}/approve`, { adminName }); }
   reject(id: number, adminName: string, reason: string) { return this.http.post<any>(`${this.api}/admin/${id}/reject`, { adminName, reason }); }
   download(id: number) { return this.http.get(`${this.api}/${id}/download`, { responseType: 'blob' }); }
+  getAccountSignature(accountNumber: string) { return this.http.get<any>(`${environment.apiBaseUrl}/api/admin/signature-management/lookup/${encodeURIComponent(accountNumber)}`); }
 }

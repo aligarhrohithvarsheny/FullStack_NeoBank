@@ -240,52 +240,27 @@
   </div>
 </div>
 
-<!-- Request Draw (with OTP) Modal -->
+<!-- Direct Request Draw Modal -->
 <div *ngIf="selectedChequeForDraw" class="modal-overlay" (click)="closeDrawModal()">
   <div class="modal-content draw-modal" (click)="$event.stopPropagation()">
     <div class="modal-header">
-      <h3>Request Cheque Draw – OTP Verification</h3>
+      <h3>Request Cheque Draw</h3>
       <button type="button" (click)="closeDrawModal()" class="close-btn">×</button>
     </div>
     <div class="modal-body">
       <p *ngIf="selectedChequeForDraw" class="draw-summary">
         Cheque #{{ selectedChequeForDraw.chequeNumber }} – Amount: ₹{{ selectedChequeForDraw.amount || 0 | number:'1.2-2' }}
       </p>
-      <div class="otp-panel">
-        <p class="otp-reason">OTP will be sent to your registered email (reason: Cheque Withdrawal / Draw Request).</p>
-        <div *ngIf="!chequeDrawOtpSent">
-          <button type="button" class="btn-send-otp" (click)="sendChequeDrawOtp()" [disabled]="isSendingChequeDrawOtp">
-            <span *ngIf="!isSendingChequeDrawOtp">Send OTP to Email</span>
-            <span *ngIf="isSendingChequeDrawOtp">Sending...</span>
-          </button>
-        </div>
-        <div *ngIf="chequeDrawOtpSent" class="otp-verify-panel">
-          <p class="otp-info">Enter the 6-digit OTP received on your registered email.</p>
-          <input
-            type="text"
-            inputmode="numeric"
-            maxlength="6"
-            [(ngModel)]="chequeDrawOtpInput"
-            name="chequeDrawOtpInput"
-            class="otp-input"
-            placeholder="000000"
-          />
-          <div class="otp-timer" [ngClass]="{'otp-timer-expired': chequeDrawOtpTimer <= 0}">
-            <span *ngIf="chequeDrawOtpTimer > 0">Valid for {{ formatChequeDrawOtpTimer() }}</span>
-            <span *ngIf="chequeDrawOtpTimer <= 0" class="expired-text">OTP expired. Send a new OTP.</span>
-          </div>
-          <p *ngIf="chequeDrawOtpError" class="otp-error">{{ chequeDrawOtpError }}</p>
-        </div>
-      </div>
+      <p class="draw-direct-note">Your cheque details and account balance have been verified. Submit the draw request directly for admin approval.</p>
     </div>
     <div class="modal-footer">
       <button type="button" (click)="closeDrawModal()" class="btn-cancel" [disabled]="requesting">Cancel</button>
       <button
         type="button"
-        (click)="requestChequeDrawWithOtp()"
+        (click)="requestChequeDrawDirect()"
         class="btn-confirm request-draw-confirm"
-        [disabled]="requesting || !chequeDrawOtpSent || chequeDrawOtpInput.length !== 6 || chequeDrawOtpTimer <= 0">
-        <span *ngIf="!requesting">Verify OTP &amp; Request Draw</span>
+        [disabled]="requesting">
+        <span *ngIf="!requesting">Request Draw</span>
         <span *ngIf="requesting">Submitting...</span>
       </button>
     </div>

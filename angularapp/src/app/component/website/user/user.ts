@@ -41,6 +41,7 @@ export class User implements OnInit, OnDestroy {
   qrStatus: string = 'PENDING';
   qrStatusInterval: any;
   isQrLoginMode: boolean = false; // True when user came from QR scan
+  qrScanError = '';
 
   // For create account
   signupName: string = '';
@@ -1603,6 +1604,33 @@ export class User implements OnInit, OnDestroy {
         this.showQrCode = false;
       }
     });
+  }
+
+  scanLoginQr(event: Event) {
+    const file = (event.target as HTMLInputElement).files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const image = new Image();
+      image.onload = () => {
+        const canvas = document.createElement('canvas'); canvas.width = image.width; canvas.height = image.height;
+        const context = canvas.getContext('2d'); if (!context) return;
+        context.drawImage(image, 0, 0);
+        import('jsqr').then(({ default: jsQR }) => {
+          const result = jsQR(context.getImageData(0, 0, canvas.width, canvas.height).data, canvas.width, canvas.height);
+          if (!result?.data) { this.qrScanError = 'No valid NeoBank login QR code found.'; return; }
+          try {
+            const url = new URL(result.data, window.location.origin);
+            const token = url.searchParams.get('qrToken');
+            if (!token) throw new Error('missing token');
+            this.qrToken = token; this.isQrLoginMode = true; this.qrScanError = '';
+            this.alertService.userSuccess('QR Code Scanned', 'Enter your account credentials to complete login.');
+          } catch { this.qrScanError = 'This QR code is not a valid NeoBank login code.'; }
+        });
+      };
+      image.src = reader.result as string;
+    };
+    reader.readAsDataURL(file);
   }
   
   startQrStatusPolling() {

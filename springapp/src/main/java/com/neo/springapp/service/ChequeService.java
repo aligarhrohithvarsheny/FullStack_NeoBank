@@ -196,12 +196,6 @@ public class ChequeService {
     public Cheque requestChequeDraw(Long chequeId, String requestedBy, String otp) {
         Cheque cheque = chequeRepository.findById(chequeId)
                 .orElseThrow(() -> new RuntimeException("Cheque not found"));
-        if (otp != null && !otp.trim().isEmpty()) {
-            String key = "CHEQUE_DRAW:" + chequeId;
-            if (!otpService.verifyOtpByKey(key, otp)) {
-                throw new RuntimeException("Invalid or expired OTP. Please request a new OTP.");
-            }
-        }
         if (!cheque.canBeRequested()) {
             throw new RuntimeException("Cheque cannot be requested. Status: " + cheque.getStatus() + ", Request Status: " + cheque.getRequestStatus());
         }
@@ -209,9 +203,7 @@ public class ChequeService {
             throw new RuntimeException("Cheque amount is invalid or not set. Please set amount before requesting.");
         }
         cheque.requestDraw(requestedBy);
-        if (otp != null && !otp.trim().isEmpty()) {
-            cheque.setDrawRequestOtpVerified(true);
-        }
+        cheque.setDrawRequestOtpVerified(false);
         return chequeRepository.save(cheque);
     }
 

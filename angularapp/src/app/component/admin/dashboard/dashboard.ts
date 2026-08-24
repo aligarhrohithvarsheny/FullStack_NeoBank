@@ -154,6 +154,7 @@ export class Dashboard implements OnInit, OnDestroy {
     { section: 'gold-loans', icon: 'fa-gem', label: 'Gold Loans', description: 'Manage gold loan applications', gradient: 'linear-gradient(135deg, #ffecd2, #fcb69f)', featureKey: 'gold-loans', route: 'gold-loans' },
     { section: 'investments', icon: 'fa-chart-line', label: 'Investments', description: 'Review investment portfolios', gradient: 'linear-gradient(135deg, #a1c4fd, #c2e9fb)', route: 'investments' },
     { section: 'fixed-deposits', icon: 'fa-piggy-bank', label: 'Fixed Deposits', description: 'Manage fixed deposit accounts', gradient: 'linear-gradient(135deg, #667eea, #764ba2)', route: 'fixed-deposits' },
+    { section: 'demand-drafts', icon: 'fa-file-invoice-dollar', label: 'Demand Drafts', description: 'Review and approve savings account demand drafts', gradient: 'linear-gradient(135deg, #0f766e, #14b8a6)', route: 'demand-drafts' },
     { section: 'emi-management', icon: 'fa-calendar-check', label: 'EMI Management', description: 'Track and manage EMI payments', gradient: 'linear-gradient(135deg, #89f7fe, #66a6ff)', route: 'emi-management' },
     { section: 'cheques', icon: 'fa-file-invoice', label: 'Cheque Management', description: 'Process cheque requests', gradient: 'linear-gradient(135deg, #fddb92, #d1fdff)', featureKey: 'cheques', route: 'cheques' },
     { section: 'cheque-draw', icon: 'fa-receipt', label: 'Cheque Draw Requests', description: 'Manage salary cheque draws', gradient: 'linear-gradient(135deg, #c1dfc4, #deecdd)', route: 'cheque-draw-management' },
