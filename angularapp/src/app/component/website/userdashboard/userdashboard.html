@@ -537,6 +537,11 @@
           <span>Fixed Deposit</span>
         </div>
       </div>
+      <div class="cb-service-card" (click)="selectFeature('demand-draft')">
+        <i class="fa fa-file-invoice-dollar"></i>
+        <span>Demand Draft</span>
+        <small>Create savings DD</small>
+      </div>
     </div>
 
     <!-- ─── FEATURE CONTENT (all existing feature views) ─── -->
@@ -782,6 +787,7 @@
       <div *ngIf="selectedFeature === 'cheque'" class="ud-embedded"><app-cheque></app-cheque></div>
       <div *ngIf="selectedFeature === 'kycupdate'" class="ud-embedded"><app-kycupdate></app-kycupdate></div>
       <div *ngIf="selectedFeature === 'goldloan'" class="ud-embedded"><app-goldloan></app-goldloan></div>
+      <div *ngIf="selectedFeature === 'demand-draft'" class="ud-embedded"><app-demand-draft></app-demand-draft></div>
       <div *ngIf="selectedFeature === 'subsidy-claim'" class="ud-embedded"><app-subsidy-claim></app-subsidy-claim></div>
       <div *ngIf="selectedFeature === 'bill-payment'" class="ud-embedded"><app-billpayment></app-billpayment></div>
       <div *ngIf="selectedFeature === 'scheduled-payments'" class="ud-embedded"><app-scheduled-payments></app-scheduled-payments></div>

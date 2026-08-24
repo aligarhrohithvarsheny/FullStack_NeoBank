@@ -65,6 +65,9 @@
           <button *ngIf="fd.status === 'ACTIVE' && isFDMatured(fd)" 
                   (click)="processFDMaturity(fd)" class="btn-process">Process Maturity</button>
           <button (click)="viewFDDetails(fd)" class="btn-view">View</button>
+          <button *ngIf="fd.status === 'PENDING' || fd.status === 'ACTIVE'" (click)="editFD(fd)" class="btn-view">Edit</button>
+          <button *ngIf="fd.status === 'ACTIVE'" (click)="topUpFD(fd)" class="btn-process">Increase</button>
+          <button *ngIf="fd.status === 'ACTIVE'" (click)="closeFD(fd)" class="btn-reject">Close</button>
         </td>
       </tr>
     </tbody>

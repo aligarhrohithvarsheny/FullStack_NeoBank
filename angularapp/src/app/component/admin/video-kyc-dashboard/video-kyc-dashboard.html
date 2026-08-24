@@ -159,6 +159,16 @@
               <label>Slot Time</label>
               <span>{{ selectedSession.slotTime }} - {{ selectedSession.slotEndTime }}</span>
             </div>
+            <div class="detail-item" *ngIf="selectedSession.bookedSlotId">
+              <label>Change Customer Slot</label>
+              <select [(ngModel)]="queueSlotId" (click)="loadSlots()">
+                <option *ngFor="let slot of allSlots" [ngValue]="slot.id" [disabled]="slot.id !== selectedSession.bookedSlotId && slot.currentBookings >= slot.maxBookings">
+                  {{ slot.slotDate }} {{ slot.slotTime }} - {{ slot.slotEndTime }} ({{ slot.currentBookings }}/{{ slot.maxBookings }})
+                </option>
+              </select>
+              <button class="action-btn approve small-btn" (click)="changeCustomerSlot()" [disabled]="!queueSlotId || queueSlotId === selectedSession.bookedSlotId">Update Slot</button>
+              <button class="action-btn reject small-btn" (click)="cancelCustomerSlot()">Cancel Slot</button>
+            </div>
           </div>
         </div>
 

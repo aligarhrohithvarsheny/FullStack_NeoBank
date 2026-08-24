@@ -280,6 +280,18 @@ public class InvestmentService {
             if (investmentDetails.getCurrentValue() != null) {
                 investment.setCurrentValue(investmentDetails.getCurrentValue());
             }
+            if (investmentDetails.getInvestmentAmount() != null) investment.setInvestmentAmount(investmentDetails.getInvestmentAmount());
+            if (investmentDetails.getInvestmentType() != null) investment.setInvestmentType(investmentDetails.getInvestmentType());
+            if (investmentDetails.getFundName() != null) investment.setFundName(investmentDetails.getFundName());
+            if (investmentDetails.getFundCategory() != null) investment.setFundCategory(investmentDetails.getFundCategory());
+            if (investmentDetails.getFundScheme() != null) investment.setFundScheme(investmentDetails.getFundScheme());
+            if (investmentDetails.getInvestmentDate() != null) investment.setInvestmentDate(investmentDetails.getInvestmentDate());
+            if (investmentDetails.getMaturityDate() != null) investment.setMaturityDate(investmentDetails.getMaturityDate());
+            if (investment.getInvestmentAmount() != null) {
+                investment.setUnits(investment.getInvestmentAmount() / 100.0);
+                if (investment.getCurrentValue() == null) investment.setCurrentValue(investment.getInvestmentAmount());
+                investment.setProfitLoss(investment.getCurrentValue() - investment.getInvestmentAmount());
+            }
             if (investmentDetails.getReturns() != null) {
                 investment.setReturns(investmentDetails.getReturns());
             }
@@ -305,6 +317,29 @@ public class InvestmentService {
         }
         
         return response;
+    }
+
+    @Transactional
+    public Map<String, Object> adminIncreaseAmount(Long id, Double amount) {
+        if (amount == null || amount <= 0) throw new IllegalArgumentException("Increase amount must be greater than zero");
+        Investment investment = investmentRepository.findById(id).orElseThrow(() -> new IllegalArgumentException("Investment not found"));
+        Double balance = accountService.getBalanceByAccountNumber(investment.getAccountNumber());
+        if (balance == null || balance < amount) throw new IllegalArgumentException("Insufficient account balance");
+        accountService.debitBalance(investment.getAccountNumber(), amount);
+        investment.setInvestmentAmount(investment.getInvestmentAmount() + amount);
+        investment.setCurrentValue((investment.getCurrentValue() == null ? 0 : investment.getCurrentValue()) + amount);
+        investment.setUnits(investment.getInvestmentAmount() / 100.0);
+        return Map.of("success", true, "investment", investmentRepository.save(investment));
+    }
+
+    @Transactional
+    public Map<String, Object> adminClose(Long id, String closedBy) {
+        Investment investment = investmentRepository.findById(id).orElseThrow(() -> new IllegalArgumentException("Investment not found"));
+        if (!"APPROVED".equals(investment.getStatus()) && !"ACTIVE".equals(investment.getStatus())) throw new IllegalArgumentException("Only active investments can be closed");
+        Double amount = investment.getCurrentValue() == null ? investment.getInvestmentAmount() : investment.getCurrentValue();
+        Double balance = accountService.creditBalance(investment.getAccountNumber(), amount);
+        investment.setStatus("CLOSED"); investment.setRemarks((investment.getRemarks() == null ? "" : investment.getRemarks() + " | ") + "Closed by " + closedBy);
+        return Map.of("success", true, "investment", investmentRepository.save(investment), "newBalance", balance);
     }
 
     /**

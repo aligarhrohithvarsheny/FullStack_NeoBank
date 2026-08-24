@@ -57,6 +57,9 @@
         <td>
           <button *ngIf="inv.status === 'PENDING'" (click)="approveInvestment(inv)" class="btn-approve">Approve</button>
           <button *ngIf="inv.status === 'PENDING'" (click)="rejectInvestment(inv)" class="btn-reject">Reject</button>
+          <button *ngIf="inv.status === 'PENDING' || inv.status === 'APPROVED'" (click)="editInvestment(inv)" class="btn-view">Edit</button>
+          <button *ngIf="inv.status === 'APPROVED'" (click)="increaseInvestment(inv)" class="btn-process">Increase</button>
+          <button *ngIf="inv.status === 'APPROVED'" (click)="closeInvestment(inv)" class="btn-reject">Close</button>
         </td>
       </tr>
     </tbody>

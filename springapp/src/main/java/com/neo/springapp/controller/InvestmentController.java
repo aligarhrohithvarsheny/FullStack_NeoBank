@@ -89,6 +89,11 @@ public class InvestmentController {
         return ResponseEntity.ok(response);
     }
 
+    @PostMapping("/{id}/admin/increase")
+    public ResponseEntity<Map<String,Object>> adminIncrease(@PathVariable Long id, @RequestParam Double amount) { return ResponseEntity.ok(investmentService.adminIncreaseAmount(id, amount)); }
+    @PostMapping("/{id}/admin/close")
+    public ResponseEntity<Map<String,Object>> adminClose(@PathVariable Long id, @RequestParam String closedBy) { return ResponseEntity.ok(investmentService.adminClose(id, closedBy)); }
+
     // ========== FORECLOSURE ENDPOINTS ==========
 
     // Calculate foreclosure details

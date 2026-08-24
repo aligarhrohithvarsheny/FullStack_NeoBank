@@ -142,6 +142,10 @@ export class Investments implements OnInit {
     });
   }
 
+  editInvestment(inv: any) { const amount = prompt('Investment amount:', inv.investmentAmount); const value = prompt('Current value:', inv.currentValue); if (!amount) return; this.http.put(`${environment.apiBaseUrl}/api/investments/${inv.id}`, { investmentAmount: Number(amount), currentValue: value ? Number(value) : inv.currentValue, fundName: inv.fundName, fundCategory: inv.fundCategory, fundScheme: inv.fundScheme, investmentType: inv.investmentType, remarks: inv.remarks }).subscribe({ next: () => this.loadInvestments(), error: (e: any) => this.alertService.error('Error', e.error?.message || 'Unable to update investment') }); }
+  increaseInvestment(inv: any) { const amount = prompt('Increase investment by:'); if (!amount || Number(amount) <= 0) return; this.http.post(`${environment.apiBaseUrl}/api/investments/${inv.id}/admin/increase?amount=${Number(amount)}`, {}).subscribe({ next: () => this.loadInvestments(), error: (e: any) => this.alertService.error('Error', e.error?.message || 'Unable to increase investment') }); }
+  closeInvestment(inv: any) { if (!confirm('Close investment and credit its current value to the account?')) return; this.http.post(`${environment.apiBaseUrl}/api/investments/${inv.id}/admin/close?closedBy=${encodeURIComponent(this.adminName)}`, {}).subscribe({ next: () => this.loadInvestments(), error: (e: any) => this.alertService.error('Error', e.error?.message || 'Unable to close investment') }); }
+
   // Foreclosure Methods
   loadForeclosures() {
     this.isLoadingForeclosures = true;

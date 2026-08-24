@@ -434,12 +434,23 @@ public class FixedDepositService {
             FixedDeposit fixedDeposit = fixedDepositRepository.findById(fdId)
                 .orElseThrow(() -> new RuntimeException("Fixed Deposit not found"));
 
-            // Update allowed fields
+            if (fdDetails.getPrincipalAmount() != null) fixedDeposit.setPrincipalAmount(fdDetails.getPrincipalAmount());
+            if (fdDetails.getTenure() != null) fixedDeposit.setTenure(fdDetails.getTenure());
+            if (fdDetails.getInterestPayout() != null) fixedDeposit.setInterestPayout(fdDetails.getInterestPayout());
+            if (fdDetails.getMaturityDate() != null) fixedDeposit.setMaturityDate(fdDetails.getMaturityDate());
             if (fdDetails.getRemarks() != null) {
                 fixedDeposit.setRemarks(fdDetails.getRemarks());
             }
             if (fdDetails.getStatus() != null) {
                 fixedDeposit.setStatus(fdDetails.getStatus());
+            }
+            if (fixedDeposit.getTenure() != null) {
+                int years = (int) Math.ceil(fixedDeposit.getTenure() / 12.0);
+                fixedDeposit.setYears(years);
+                fixedDeposit.setInterestRate(calculateInterestRateByYears(years));
+                fixedDeposit.setMaturityDate(fixedDeposit.getStartDate().plusMonths(fixedDeposit.getTenure()));
+                fixedDeposit.setMaturityAmount(calculateMaturityAmount(fixedDeposit.getPrincipalAmount(), fixedDeposit.getInterestRate(), fixedDeposit.getTenure()));
+                fixedDeposit.setInterestAmount(calculateInterestAmount(fixedDeposit.getPrincipalAmount(), fixedDeposit.getInterestRate(), fixedDeposit.getTenure()));
             }
 
             FixedDeposit savedFD = fixedDepositRepository.save(fixedDeposit);
@@ -454,6 +465,29 @@ public class FixedDepositService {
         }
         
         return response;
+    }
+
+    @Transactional
+    public Map<String, Object> adminTopUp(Long fdId, Double amount, String admin) {
+        if (amount == null || amount <= 0) throw new IllegalArgumentException("Top-up amount must be greater than zero");
+        FixedDeposit fd = fixedDepositRepository.findById(fdId).orElseThrow(() -> new IllegalArgumentException("Fixed Deposit not found"));
+        Double balance = accountService.getBalanceByAccountNumber(fd.getAccountNumber());
+        if (balance == null || balance < amount) throw new IllegalArgumentException("Insufficient account balance");
+        accountService.debitBalance(fd.getAccountNumber(), amount);
+        fd.setPrincipalAmount(fd.getPrincipalAmount() + amount);
+        fd.setMaturityAmount(calculateMaturityAmount(fd.getPrincipalAmount(), fd.getInterestRate(), fd.getTenure()));
+        fd.setInterestAmount(calculateInterestAmount(fd.getPrincipalAmount(), fd.getInterestRate(), fd.getTenure()));
+        return Map.of("success", true, "fixedDeposit", fixedDepositRepository.save(fd), "message", "FD amount increased by admin");
+    }
+
+    @Transactional
+    public Map<String, Object> adminClose(Long fdId, String closedBy) {
+        FixedDeposit fd = fixedDepositRepository.findById(fdId).orElseThrow(() -> new IllegalArgumentException("Fixed Deposit not found"));
+        if (!"ACTIVE".equals(fd.getStatus())) throw new IllegalArgumentException("Only active FDs can be closed");
+        Double amount = fd.getMaturityAmount() != null ? fd.getMaturityAmount() : fd.getPrincipalAmount();
+        Double balance = accountService.creditBalance(fd.getAccountNumber(), amount);
+        fd.setStatus("CLOSED"); fd.setClosureDate(LocalDate.now()); fd.setClosedBy(closedBy); fd.setPrematureClosureAmount(amount);
+        return Map.of("success", true, "fixedDeposit", fixedDepositRepository.save(fd), "newBalance", balance);
     }
 
     /**

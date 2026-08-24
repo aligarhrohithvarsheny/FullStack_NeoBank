@@ -24,7 +24,9 @@ import { Kycupdate } from './component/website/kycupdate/kycupdate';
 import { Profile } from './component/website/profile/profile';
 import { ChequeComponent } from './component/website/cheque/cheque';
 import { Goldloan } from './component/website/goldloan/goldloan';
+import { DemandDraftComponent } from './component/website/demand-draft/demand-draft';
 import { AdminGoldLoans } from './component/admin/goldloans/goldloans';
+import { AdminDemandDrafts } from './component/admin/demand-drafts/demand-drafts';
 import { UserControl } from './component/admin/usercontrol/usercontrol';
 import { Chat } from './component/website/chat/chat';
 import { AdminChat } from './component/admin/chat/chat';
@@ -85,6 +87,7 @@ export const routes: Routes = [
   { path: 'admin/cheque-draw-management', component: ChequeManagementComponent, canActivate: [adminAuthGuard] },
   { path: 'admin/business-cheque-management', component: BusinessChequeManagementComponent, canActivate: [adminAuthGuard] },
   { path: 'admin/gold-loans', component: AdminGoldLoans, canActivate: [adminAuthGuard] },
+  { path: 'admin/demand-drafts', component: AdminDemandDrafts, canActivate: [adminAuthGuard] },
   { path: 'admin/user-control', component: UserControl, canActivate: [adminAuthGuard] },
   { path: 'admin/chat', component: AdminChat, canActivate: [adminAuthGuard] },
   { path: 'admin/subsidy-claims', component: SubsidyClaims, canActivate: [adminAuthGuard] },
@@ -122,6 +125,7 @@ export const routes: Routes = [
       { path: 'cheque', component: ChequeComponent, canActivate: [userAuthGuard] },
       { path: 'fasttag', component: FasttagUser, canActivate: [userAuthGuard] },
       { path: 'goldloan', component: Goldloan, canActivate: [userAuthGuard] },
+      { path: 'demand-draft', component: DemandDraftComponent, canActivate: [userAuthGuard] },
       { path: 'chat', component: Chat, canActivate: [userAuthGuard] },
       { path: 'subsidy-claim', component: SubsidyClaim, canActivate: [userAuthGuard] },
       { path: 'logout', component: Logout },

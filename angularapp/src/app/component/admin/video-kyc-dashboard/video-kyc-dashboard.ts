@@ -61,6 +61,7 @@ export class VideoKycDashboard implements OnInit, OnDestroy {
   slotLoading = false;
   slotError = '';
   slotSuccess = '';
+  queueSlotId: number | null = null;
   editingSlotId: number | null = null;
   editSlotDate = '';
   editSlotTime = '';
@@ -181,6 +182,17 @@ export class VideoKycDashboard implements OnInit, OnDestroy {
     this.error = '';
     this.successMsg = '';
     this.loadAuditLogs(session.id);
+    this.queueSlotId = session.bookedSlotId || null;
+  }
+
+  cancelCustomerSlot() {
+    if (!this.selectedSession?.id || !confirm('Cancel this customer slot?')) return;
+    this.videoKycService.cancelBooking(this.selectedSession.id).subscribe({ next: (response: any) => { this.selectedSession = { ...this.selectedSession, ...response, bookedSlotId: null, slotDate: null, slotTime: null, slotEndTime: null }; this.queueSlotId = null; this.loadQueue(); }, error: (err: any) => this.error = err.error?.message || 'Failed to cancel customer slot.' });
+  }
+
+  changeCustomerSlot() {
+    if (!this.selectedSession?.id || !this.queueSlotId) return;
+    this.videoKycService.rescheduleBooking(this.selectedSession.id, this.queueSlotId).subscribe({ next: (response: any) => { this.selectedSession = response; this.loadQueue(); this.successMsg = 'Customer slot updated.'; }, error: (err: any) => this.error = err.error?.message || 'Failed to change customer slot.' });
   }
 
   loadAuditLogs(sessionId: number) {

@@ -18,6 +18,7 @@ import { Loan } from '../loan/loan';
 import { ChequeComponent } from '../cheque/cheque';
 import { Kycupdate } from '../kycupdate/kycupdate';
 import { Goldloan } from '../goldloan/goldloan';
+import { DemandDraftComponent } from '../demand-draft/demand-draft';
 import { SubsidyClaim } from '../subsidy-claim/subsidy-claim';
 import { BillPayment } from '../billpayment/billpayment';
 import { ScheduledPayments } from '../scheduled-payments/scheduled-payments';
@@ -49,6 +50,7 @@ import { of } from 'rxjs';
     ChequeComponent,
     Kycupdate,
     Goldloan,
+    DemandDraftComponent,
     SubsidyClaim,
     BillPayment,
     ScheduledPayments,

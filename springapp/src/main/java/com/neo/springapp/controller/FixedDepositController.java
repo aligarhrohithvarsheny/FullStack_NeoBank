@@ -112,6 +112,11 @@ public class FixedDepositController {
         return ResponseEntity.ok(response);
     }
 
+    @PostMapping("/{id}/admin/top-up")
+    public ResponseEntity<Map<String,Object>> adminTopUp(@PathVariable Long id, @RequestParam Double amount, @RequestParam String admin) { return ResponseEntity.ok(fixedDepositService.adminTopUp(id, amount, admin)); }
+    @PostMapping("/{id}/admin/close")
+    public ResponseEntity<Map<String,Object>> adminClose(@PathVariable Long id, @RequestParam String closedBy) { return ResponseEntity.ok(fixedDepositService.adminClose(id, closedBy)); }
+
     // Get FD history (all FDs for an account or all FDs)
     @GetMapping("/history")
     public ResponseEntity<List<FixedDeposit>> getFDHistory(

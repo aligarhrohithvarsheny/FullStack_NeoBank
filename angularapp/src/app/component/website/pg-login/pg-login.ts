@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, Inject, PLATFORM_ID, ViewEncapsulation } from '@angular/core';
+import { Component, OnInit, Inject, PLATFORM_ID, ViewEncapsulation } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { Router } from '@angular/router';
@@ -12,7 +12,7 @@ import { PaymentGatewayService } from '../../../service/payment-gateway.service'
   styleUrls: ['./pg-login.css'],
   encapsulation: ViewEncapsulation.None
 })
-export class PgLogin implements OnInit, OnDestroy {
+export class PgLogin implements OnInit {
   merchantId = '';
   phoneNumber = '';
 
@@ -21,10 +21,6 @@ export class PgLogin implements OnInit, OnDestroy {
   errorMessage = '';
   successMessage = '';
   businessName = '';
-
-  resendTimer = 0;
-  resendInterval: any;
-  canResend = false;
 
   isBrowser = false;
 
@@ -57,10 +53,6 @@ export class PgLogin implements OnInit, OnDestroy {
     }
   }
 
-  ngOnDestroy() {
-    if (this.resendInterval) clearInterval(this.resendInterval);
-  }
-
   login() {
     this.errorMessage = '';
     this.successMessage = '';
@@ -80,7 +72,7 @@ export class PgLogin implements OnInit, OnDestroy {
           if (this.isBrowser) sessionStorage.setItem('pgMerchant', JSON.stringify(res.merchant));
           setTimeout(() => this.router.navigate(['/website/pg-dashboard']), 500);
         } else {
-          this.errorMessage = res.message || 'Failed to send OTP.';
+          this.errorMessage = res.message || 'Login failed.';
         }
       },
       error: (err) => {
@@ -91,28 +83,12 @@ export class PgLogin implements OnInit, OnDestroy {
   }
 
 
-  startResendTimer() {
-    this.canResend = false;
-    this.resendTimer = 30;
-    if (this.resendInterval) clearInterval(this.resendInterval);
-    this.resendInterval = setInterval(() => {
-      this.resendTimer--;
-      if (this.resendTimer <= 0) {
-        clearInterval(this.resendInterval);
-        this.canResend = true;
-      }
-    }, 1000);
-  }
-
   resetForm() {
     this.merchantId = '';
     this.phoneNumber = '';
     this.businessName = '';
     this.errorMessage = '';
     this.successMessage = '';
-    this.canResend = false;
-    this.resendTimer = 0;
-    if (this.resendInterval) clearInterval(this.resendInterval);
   }
 
   goToLanding() {

@@ -160,6 +160,14 @@ export class FixedDeposits implements OnInit {
     });
   }
 
+  editFD(fd: any) {
+    const principal = prompt('Principal amount:', fd.principalAmount); const tenure = prompt('Tenure in months:', fd.tenure);
+    if (!principal || !tenure) return;
+    this.http.put(`${environment.apiBaseUrl}/api/fixed-deposits/${fd.id}`, { principalAmount: Number(principal), tenure: Number(tenure), interestPayout: fd.interestPayout, remarks: fd.remarks }).subscribe({ next: () => { this.alertService.success('Updated', 'FD details and interest recalculated'); this.loadFixedDeposits(); }, error: (e: any) => this.alertService.error('Error', e.error?.message || 'Unable to update FD') });
+  }
+  topUpFD(fd: any) { const amount = prompt('Increase FD amount by:'); if (!amount || Number(amount) <= 0) return; this.http.post(`${environment.apiBaseUrl}/api/fixed-deposits/${fd.id}/admin/top-up?amount=${Number(amount)}&admin=${encodeURIComponent(this.adminName)}`, {}).subscribe({ next: () => this.loadFixedDeposits(), error: (e: any) => this.alertService.error('Error', e.error?.message || 'Unable to increase FD') }); }
+  closeFD(fd: any) { if (!confirm('Close this fixed deposit and credit its value to the account?')) return; this.http.post(`${environment.apiBaseUrl}/api/fixed-deposits/${fd.id}/admin/close?closedBy=${encodeURIComponent(this.adminName)}`, {}).subscribe({ next: () => this.loadFixedDeposits(), error: (e: any) => this.alertService.error('Error', e.error?.message || 'Unable to close FD') }); }
+
   isFDMatured(fd: any): boolean {
     if (!fd || !fd.maturityDate || fd.isMatured) return false;
     const maturityDate = new Date(fd.maturityDate);
