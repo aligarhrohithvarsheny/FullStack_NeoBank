@@ -45,6 +45,9 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
           </button>
         </div>
+        <button class="ud-header-qr-btn" type="button" (click)="startQrScanner()" title="Scan QR code to log in or pay">
+          <i class="fa fa-qrcode"></i><span>Scan QR</span>
+        </button>
       </div>
 
       <!-- Right: Welcome + Actions -->
@@ -65,6 +68,15 @@
       </div>
     </div>
   </nav>
+
+  <div class="ud-qr-scanner-modal" *ngIf="showQrScanner" (click)="stopQrScanner()">
+    <div class="ud-qr-scanner-panel" (click)="$event.stopPropagation()">
+      <div class="ud-qr-scanner-header"><h3><i class="fa fa-qrcode"></i> Scan QR Code</h3><button type="button" (click)="stopQrScanner()" title="Close scanner">&times;</button></div>
+      <p>Scan a NeoBank web login QR or UPI payment QR.</p>
+      <div id="qr-reader"></div>
+      <button type="button" class="ud-qr-cancel" (click)="stopQrScanner()">Close Scanner</button>
+    </div>
+  </div>
 
   <!-- ═══ SERVICES ICON STRIP (Canara Bank Style) ═══ -->
   <div class="cb-icon-strip">

@@ -184,6 +184,18 @@
   padding: 0 28px;
   height: 60px;
 }
+.cb-search-block { display:flex; align-items:center; gap:8px; }
+.ud-header-qr-btn { height:38px; padding:0 12px; border:1px solid #d8ddea; border-radius:8px; background:#fff; color:#0d9488; cursor:pointer; font-weight:600; white-space:nowrap; }
+.ud-header-qr-btn i { margin-right:6px; }
+.ud-qr-scanner-modal { position:fixed; inset:0; z-index:1000; display:flex; align-items:center; justify-content:center; padding:16px; background:rgba(15,23,42,.68); }
+.ud-qr-scanner-panel { width:min(420px,100%); padding:20px; border-radius:14px; background:#fff; box-shadow:0 20px 60px rgba(0,0,0,.25); }
+.ud-qr-scanner-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; color:#0f172a; }
+.ud-qr-scanner-header h3 { margin:0; }
+.ud-qr-scanner-header button { border:0; background:transparent; font-size:24px; cursor:pointer; color:#64748b; }
+.ud-qr-scanner-panel p { color:#64748b; font-size:13px; margin:8px 0 14px; }
+.ud-qr-scanner-panel #qr-reader { width:100%; min-height:260px; overflow:hidden; border-radius:10px; }
+.ud-qr-cancel { width:100%; margin-top:14px; padding:10px; border:0; border-radius:8px; background:#0d9488; color:#fff; cursor:pointer; font-weight:600; }
+@media (max-width:700px) { .cb-search-block { flex:1; min-width:0; } .cb-search-wrap { flex:1; min-width:0; } .ud-header-qr-btn { width:40px; padding:0; } .ud-header-qr-btn span { display:none; } }
 
 /* Left – hamburger */
 .cb-topnav-left { display: flex; align-items: center; gap: 14px; }

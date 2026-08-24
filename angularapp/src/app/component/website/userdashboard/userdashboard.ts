@@ -897,6 +897,19 @@ export class Userdashboard implements OnInit, OnDestroy {
 
   onQrCodeScanned(decodedText: string) {
     console.log('QR Code scanned:', decodedText);
+
+    // A web-login QR contains the token generated on the public login page.
+    try {
+      const loginUrl = new URL(decodedText, window.location.origin);
+      const qrToken = loginUrl.searchParams.get('qrToken');
+      if (qrToken) {
+        this.stopQrScanner();
+        this.router.navigate(['/website/user'], { queryParams: { qrToken } });
+        return;
+      }
+    } catch {
+      // Continue with the existing UPI QR parser below.
+    }
     
     // Check if it's a UPI payment QR code
     if (decodedText.startsWith('upi://pay')) {
