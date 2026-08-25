@@ -24,4 +24,10 @@ public class FamilyBankingAuditLog {
     private String details;
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
+
+    @PreUpdate
+    @PreRemove
+    private void preventMutation() {
+        throw new IllegalStateException("Family Banking audit records are immutable");
+    }
 }

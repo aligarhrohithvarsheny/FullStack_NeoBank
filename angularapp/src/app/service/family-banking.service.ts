@@ -18,6 +18,18 @@ export interface JointAccountProfile {
   createdAt: string;
 }
 
+export interface FamilyTransaction {
+  id?: number;
+  accountNumber?: string;
+  description?: string;
+  amount?: number;
+  type?: string;
+  date?: string;
+  transactionDate?: string;
+  balanceAfter?: number;
+  [key: string]: unknown;
+}
+
 @Injectable({ providedIn: 'root' })
 export class FamilyBankingService {
   private readonly api = `${environment.apiBaseUrl}/api/family`;
@@ -32,6 +44,8 @@ export class FamilyBankingService {
   applyMinor(data: { guardianUserId: number; minorName: string; dateOfBirth: string; monthlyLimit: number; dailyLimit: number }): Observable<MinorApplication> { return this.http.post<MinorApplication>(`${this.api}/minor-applications`, data); }
   guardianLinks(guardianUserId: number): Observable<any[]> { return this.http.get<any[]>(`${this.api}/guardian-links`, { params: { guardianUserId } }); }
   jointAccounts(userId: number): Observable<JointAccountProfile[]> { return this.http.get<JointAccountProfile[]>(`${this.api}/joint-accounts?userId=${userId}`); }
+  history(userId: number, accountNumber: string): Observable<FamilyTransaction[]> { return this.http.get<FamilyTransaction[]>(`${this.api}/joint-accounts/${encodeURIComponent(accountNumber)}/history`, { params: { userId } }); }
+  updateSettings(userId: number, accountNumber: string, operatingMode: string): Observable<JointAccountProfile> { return this.http.patch<JointAccountProfile>(`${this.api}/joint-accounts/${encodeURIComponent(accountNumber)}/settings`, { userId, operatingMode }); }
   notifications(userId: number): Observable<FamilyNotification[]> { return this.http.get<FamilyNotification[]>(`${this.api}/notifications`, { params: { userId } }); }
   markNotificationRead(userId: number, id: number): Observable<FamilyNotification> { return this.http.post<FamilyNotification>(`${this.api}/notifications/${id}/read`, { userId, approve: true }); }
 }
