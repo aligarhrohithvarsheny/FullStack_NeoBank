@@ -206,7 +206,7 @@ public class FamilyBankingService {
         }
         MinorAccountApplication saved = minorRepository.save(app);
         notify(app.getGuardianUserId(), "MINOR_APPLICATION_DECISION", "Minor application " + (approve ? "approved" : "declined"), "The Family Banking minor application was " + (approve ? "approved." : "declined."));
-        audit(guardian.getId(), "MINOR_APPLICATION_REVIEWED", "MINOR_APPLICATION", applicationId, approve ? "approved" : "declined");
+        audit(app.getGuardianUserId(), "MINOR_APPLICATION_REVIEWED", "MINOR_APPLICATION", applicationId, "reviewed by " + adminEmail + ": " + (approve ? "approved" : "declined"));
         return saved;
     }
 
