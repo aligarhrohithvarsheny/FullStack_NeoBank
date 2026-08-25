@@ -103,6 +103,10 @@ export const serverRoutes: ServerRoute[] = [
     renderMode: RenderMode.Client
   },
   {
+    path: 'admin/family-banking',
+    renderMode: RenderMode.Client
+  },
+  {
     path: 'admin/cheque-draw-management',
     renderMode: RenderMode.Client
   },
@@ -180,6 +184,10 @@ export const serverRoutes: ServerRoute[] = [
   },
   {
     path: 'website/agent-dashboard',
+    renderMode: RenderMode.Client
+  },
+  {
+    path: 'website/family-banking',
     renderMode: RenderMode.Client
   },
   {

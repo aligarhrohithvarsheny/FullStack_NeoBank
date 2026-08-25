@@ -28,6 +28,7 @@ import { VirtualCardComponent } from '../virtual-card/virtual-card';
 import { BeneficiaryManagementComponent } from '../beneficiary-management/beneficiary-management';
 import { AtmSimulatorComponent } from '../atm-simulator/atm-simulator';
 import { FasttagUser } from '../fasttag/fasttag-user';
+import { FamilyBankingComponent } from '../family-banking/family-banking';
 import { timeout, catchError } from 'rxjs/operators';
 import { of } from 'rxjs';
 // import { UserService } from '../../service/user';
@@ -59,7 +60,8 @@ import { of } from 'rxjs';
     VirtualCardComponent,
     BeneficiaryManagementComponent,
     AtmSimulatorComponent,
-    FasttagUser
+    FasttagUser,
+    FamilyBankingComponent
   ],
   templateUrl: './userdashboard.html',
   styleUrls: ['./userdashboard.css']

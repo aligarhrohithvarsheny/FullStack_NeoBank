@@ -147,6 +147,10 @@
         </div>
         <span>FX 4 U</span>
       </div>
+      <div class="cb-strip-item" [class.active]="selectedFeature === 'family-banking'" (click)="selectFeature('family-banking')">
+        <div class="cb-strip-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M3 20v-1a6 6 0 0 1 12 0v1M15 15a5 5 0 0 1 6 4v1"/></svg></div>
+        <span>Family<br>Banking</span>
+      </div>
       <div class="cb-strip-item" [class.active]="selectedFeature === 'fasttag'" (click)="selectFeature('fasttag')">
         <div class="cb-strip-icon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 12h2"/><path d="M12 10v4"/><path d="M16 12h2"/><circle cx="12" cy="12" r="1"/></svg>
@@ -811,6 +815,7 @@
       <div *ngIf="selectedFeature === 'beneficiary-management'" class="ud-embedded"><app-beneficiary-management></app-beneficiary-management></div>
       <div *ngIf="selectedFeature === 'atm-simulator'" class="ud-embedded"><app-atm-simulator></app-atm-simulator></div>
       <div *ngIf="selectedFeature === 'fasttag'" class="ud-embedded"><app-fasttag-user></app-fasttag-user></div>
+      <div *ngIf="selectedFeature === 'family-banking'" class="ud-embedded"><app-family-banking></app-family-banking></div>
 
       <!-- ─── UPI PAY SECTION ─── -->
       <div *ngIf="selectedFeature === 'upi-pay'" class="ud-feature-card upi-section">

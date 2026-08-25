@@ -69,6 +69,8 @@ import { PaymentGateway } from './component/website/payment-gateway/payment-gate
 import { PgLogin } from './component/website/pg-login/pg-login';
 import { PgDashboard } from './component/website/pg-dashboard/pg-dashboard';
 import { PasswordSetupComponent } from './component/website/password-setup/password-setup.component';
+import { FamilyBankingComponent } from './component/website/family-banking/family-banking';
+import { FamilyBankingAdminComponent } from './component/admin/family-banking/family-banking-admin';
 
 
 
@@ -105,6 +107,7 @@ export const routes: Routes = [
   { path: 'admin/merchant-onboarding', component: AdminMerchantOnboarding, canActivate: [adminAuthGuard] },
   { path: 'admin/agent-management', component: AgentManagement, canActivate: [adminAuthGuard] },
   { path: 'admin/admin-open-account', component: AdminOpenAccount, canActivate: [adminOrManagerAuthGuard] },
+  { path: 'admin/family-banking', component: FamilyBankingAdminComponent, canActivate: [adminAuthGuard] },
 
   // ------------------ WEBSITE ------------------
   {
@@ -143,6 +146,7 @@ export const routes: Routes = [
       { path: 'payment-gateway', component: PaymentGateway },
       { path: 'pg-login', component: PgLogin },
       { path: 'pg-dashboard', component: PgDashboard, canActivate: [pgMerchantAuthGuard] },
+      { path: 'family-banking', component: FamilyBankingComponent, canActivate: [userAuthGuard] },
     ],
   },
 
