@@ -39,7 +39,8 @@
 
   <!-- Filters -->
   <div class="filters">
-    <input type="text" [(ngModel)]="searchTerm" placeholder="Search by merchant" name="search">
+    <input type="text" [(ngModel)]="searchTerm" placeholder="Search ID, merchant, UPI ID" name="search">
+    <input type="number" [(ngModel)]="amountSearch" placeholder="Exact amount" name="amountSearch" min="0" step="0.01">
     <input type="date" [(ngModel)]="fromDate" name="from">
     <input type="date" [(ngModel)]="toDate" name="to">
     <button type="button" (click)="downloadStatement()" class="download-csv-btn" [disabled]="loading || transactions.length === 0">

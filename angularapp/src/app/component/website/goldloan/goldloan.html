@@ -325,6 +325,13 @@
               <span class="detail-value">{{ loan.storageLocation }}</span>
             </div>
           </div>
+          <div class="gold-images" *ngIf="loan.goldImageOnePath || loan.goldImageTwoPath">
+            <h4>Jewellery Details Images</h4>
+            <div class="gold-image-grid">
+              <img *ngIf="loan.goldImageOnePath" [src]="environment.apiBaseUrl + '/api/gold-loans/' + loan.id + '/jewellery-image/one'" alt="Gold jewellery image 1">
+              <img *ngIf="loan.goldImageTwoPath" [src]="environment.apiBaseUrl + '/api/gold-loans/' + loan.id + '/jewellery-image/two'" alt="Gold jewellery image 2">
+            </div>
+          </div>
         </div>
 
         <!-- Terms Acceptance Section -->

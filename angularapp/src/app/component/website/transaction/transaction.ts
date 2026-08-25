@@ -9,6 +9,8 @@ import { AlertService } from '../../../service/alert.service';
 
 interface TransactionRecord {
   id: string;
+  transactionId?: string;
+  upiId?: string;
   merchant: string;
   amount: number;
   type: 'Debit' | 'Credit' | 'Loan Credit';
@@ -38,6 +40,7 @@ export class Transaction implements OnInit {
   
   // Search and filter fields
   searchTerm: string = '';
+  amountSearch: string = '';
   fromDate: string = '';
   toDate: string = '';
 
@@ -112,6 +115,8 @@ export class Transaction implements OnInit {
           
           this.transactions = transactions.map((txn: any) => ({
             id: txn.id,
+            transactionId: txn.transactionId || txn.txnId || txn.id,
+            upiId: txn.upiId || txn.senderUpiId || txn.receiverUpiId,
             merchant: txn.merchant || txn.description,
             amount: txn.amount,
             type: txn.type,
@@ -213,7 +218,13 @@ export class Transaction implements OnInit {
       const txDate = new Date(tx.date);
       const now = new Date();
       const thirtyDaysAgo = new Date(now.getTime() - (30 * 24 * 60 * 60 * 1000));
-      return txDate >= thirtyDaysAgo;
+      const query = this.searchTerm.trim().toLowerCase();
+      const matchesText = !query || [tx.id, tx.transactionId, tx.merchant, tx.upiId, tx.description]
+        .filter(Boolean).some(value => String(value).toLowerCase().includes(query));
+      const matchesAmount = !this.amountSearch || tx.amount === Number(this.amountSearch);
+      const matchesFrom = !this.fromDate || txDate >= new Date(`${this.fromDate}T00:00:00`);
+      const matchesTo = !this.toDate || txDate <= new Date(`${this.toDate}T23:59:59`);
+      return txDate >= thirtyDaysAgo && matchesText && matchesAmount && matchesFrom && matchesTo;
     });
   }
 

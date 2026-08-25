@@ -32,6 +32,9 @@
           </div>
         </div>
         <span class="admin-name"><i class="fa fa-user-shield"></i> {{ adminName }}</span>
+        <button class="header-forms-tab" (click)="navigateTo('profile')" title="Open Admin Profile">
+          <i class="fa fa-user-cog"></i> Profile
+        </button>
         <button class="logout-btn-header" (click)="logout()" title="Logout">
           <i class="fa fa-sign-out-alt"></i> Logout
         </button>
@@ -1045,6 +1048,8 @@
       <div class="section-header">
         <h4><i class="fa fa-inbox"></i> Deposit Requests</h4>
         <div class="section-header-actions">
+          <input type="text" [(ngModel)]="depositSlipLookupId" placeholder="Enter slip ID" (keyup.enter)="lookupDepositSlip()" style="padding:8px 10px;border:1px solid #ced4da;border-radius:4px;" />
+          <button class="refresh-btn" (click)="lookupDepositSlip()" [disabled]="isLookingUpDepositSlip"><i class="fa fa-search"></i> Find Slip</button>
           <button class="refresh-btn" (click)="loadDepositRequests()"><i class="fa fa-sync-alt"></i> Refresh</button>
           <button class="close-btn" (click)="setActiveSection('home')">
             <i class="fa fa-times"></i>
@@ -1061,6 +1066,7 @@
             <div>
               <h4>₹{{ req.amount | number:'1.2-2' }} • {{ req.method }}</h4>
               <p class="muted">From: {{ req.userName }} ({{ req.accountNumber }})</p>
+              <p class="muted"><strong>Slip ID: {{ req.requestId }}</strong></p>
               <p class="muted">Ref: {{ req.referenceNumber || 'N/A' }}</p>
             </div>
             <span class="status-badge">{{ req.status }}</span>

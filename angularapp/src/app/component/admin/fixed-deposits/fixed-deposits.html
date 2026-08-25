@@ -20,6 +20,29 @@
     <input type="text" [(ngModel)]="fdSearchQuery" placeholder="Search by FD account, user..." />
   </div>
 
+  <section class="plan-management" style="margin:20px 0;padding:18px;background:#f8fafc;border:1px solid #dbe3ef;border-radius:8px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
+      <h2 style="margin:0;font-size:18px;">Term Deposit Plans</h2>
+      <button class="btn-process" (click)="showPlanForm = !showPlanForm">{{ showPlanForm ? 'Close' : 'Create Plan' }}</button>
+    </div>
+    <div *ngIf="showPlanForm" class="filters-bar" style="margin-top:15px;display:grid;grid-template-columns:repeat(4,1fr);gap:10px;">
+      <input [(ngModel)]="planForm.schemeName" placeholder="Scheme name" />
+      <input type="number" [(ngModel)]="planForm.days" placeholder="Days" min="1" />
+      <input type="number" [(ngModel)]="planForm.years" placeholder="Years" min="1" />
+      <input type="number" [(ngModel)]="planForm.interestRate" placeholder="Interest %" min="0" step="0.01" />
+      <input type="number" [(ngModel)]="planForm.minimumAmount" placeholder="Minimum amount" min="0" />
+      <input type="number" [(ngModel)]="planForm.maximumAmount" placeholder="Maximum amount" min="0" />
+      <input [(ngModel)]="planForm.payoutDate" placeholder="Payout date/scheme" />
+      <input type="number" [(ngModel)]="planForm.interestAmount" placeholder="Interest amount (optional)" min="0" />
+      <button class="btn-approve" (click)="saveTermPlan()" [disabled]="savingPlan">Save Plan</button>
+    </div>
+    <div *ngIf="termPlans.length" style="overflow:auto;margin-top:14px;">
+      <table class="data-table"><thead><tr><th>Scheme</th><th>Days</th><th>Years</th><th>Interest</th><th>Amount Range</th><th>Payout</th><th>Status</th><th></th></tr></thead>
+        <tbody><tr *ngFor="let plan of termPlans"><td>{{ plan.schemeName }}</td><td>{{ plan.days }}</td><td>{{ plan.years }}</td><td>{{ plan.interestRate }}%</td><td>₹{{ plan.minimumAmount }} - ₹{{ plan.maximumAmount }}</td><td>{{ plan.payoutDate }}</td><td>{{ plan.active ? 'Active' : 'Inactive' }}</td><td><button *ngIf="plan.active" class="btn-reject" (click)="deactivateTermPlan(plan)">Deactivate</button></td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
   <div *ngIf="isLoadingFDs" class="loading-state">
     <p>Loading fixed deposits...</p>
   </div>

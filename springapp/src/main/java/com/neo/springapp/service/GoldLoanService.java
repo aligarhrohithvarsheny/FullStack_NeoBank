@@ -152,6 +152,10 @@ public class GoldLoanService {
         return goldLoanRepository.findById(id).orElse(null);
     }
 
+    public GoldLoan save(GoldLoan goldLoan) {
+        return goldLoanRepository.save(goldLoan);
+    }
+
     // Get gold loans by status
     public List<GoldLoan> getGoldLoansByStatus(String status) {
         return goldLoanRepository.findByStatus(status);

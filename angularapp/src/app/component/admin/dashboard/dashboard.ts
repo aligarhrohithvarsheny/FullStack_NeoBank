@@ -71,6 +71,8 @@ export class Dashboard implements OnInit, OnDestroy {
   // Deposit Requests
   depositRequests: DepositRequest[] = [];
   isLoadingDepositRequests: boolean = false;
+  depositSlipLookupId: string = '';
+  isLookingUpDepositSlip: boolean = false;
 
   // Receipt fields
   showReceipt: boolean = false;
@@ -2174,6 +2176,16 @@ export class Dashboard implements OnInit, OnDestroy {
         console.error('Error loading deposit requests:', err);
         this.isLoadingDepositRequests = false;
       }
+    });
+  }
+
+  lookupDepositSlip() {
+    const slipId = this.depositSlipLookupId.trim();
+    if (!slipId) return;
+    this.isLookingUpDepositSlip = true;
+    this.http.get(`${environment.apiBaseUrl}/api/deposit-requests/request-id/${encodeURIComponent(slipId)}`).subscribe({
+      next: (request: any) => { this.depositRequests = request?.status === 'PENDING' ? [request] : [request]; this.isLookingUpDepositSlip = false; },
+      error: () => { this.depositRequests = []; this.isLookingUpDepositSlip = false; this.alertService.error('Not Found', 'No deposit request found for that slip ID'); }
     });
   }
 

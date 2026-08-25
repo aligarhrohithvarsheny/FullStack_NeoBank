@@ -75,6 +75,8 @@ export class AdminGoldLoans implements OnInit {
     verificationNotes: '',
     storageLocation: ''
   };
+  jewelleryImageOne: File | null = null;
+  jewelleryImageTwo: File | null = null;
   
   // Calculated values for display
   calculatedVerifiedValue: number = 0;
@@ -256,10 +258,15 @@ export class AdminGoldLoans implements OnInit {
     ).subscribe({
       next: (response: any) => {
         if (response.success) {
-          this.alertService.success(
-            status === 'Approved' ? 'Loan Approved' : 'Loan Rejected',
-            response.message || `Gold loan ${status.toLowerCase()} successfully`
-          );
+          if (status === 'Approved' && (this.jewelleryImageOne || this.jewelleryImageTwo)) {
+            const formData = new FormData();
+            if (this.jewelleryImageOne) formData.append('imageOne', this.jewelleryImageOne);
+            if (this.jewelleryImageTwo) formData.append('imageTwo', this.jewelleryImageTwo);
+            this.http.post(`${environment.apiBaseUrl}/api/gold-loans/${loan.id}/jewellery-images`, formData).subscribe({
+              error: () => this.alertService.error('Image Upload', 'Loan approved, but jewellery images could not be saved.')
+            });
+          }
+          this.alertService.success(status === 'Approved' ? 'Loan Approved' : 'Loan Rejected', response.message || `Gold loan ${status.toLowerCase()} successfully`);
           this.approving = false;
           this.selectedLoan = null;
           this.showGoldDetailsModal = false;
@@ -296,6 +303,15 @@ export class AdminGoldLoans implements OnInit {
     this.processApproval(this.selectedLoan, 'Approved', this.goldDetailsForm);
   }
 
+  onJewelleryImageSelected(event: Event, slot: 'one' | 'two') {
+    const file = (event.target as HTMLInputElement).files?.[0] || null;
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { this.alertService.error('Validation Error', 'Please select an image file'); return; }
+    if (file.size > 5 * 1024 * 1024) { this.alertService.error('Validation Error', 'Each image must be smaller than 5 MB'); return; }
+    if (slot === 'one') this.jewelleryImageOne = file;
+    else this.jewelleryImageTwo = file;
+  }
+
   cancelGoldDetails() {
     this.showGoldDetailsModal = false;
     this.resetGoldDetailsForm();
@@ -311,6 +327,8 @@ export class AdminGoldLoans implements OnInit {
       verificationNotes: '',
       storageLocation: ''
     };
+    this.jewelleryImageOne = null;
+    this.jewelleryImageTwo = null;
   }
 
   formatDate(dateString: string | undefined): string {

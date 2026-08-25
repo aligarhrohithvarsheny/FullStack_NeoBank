@@ -595,6 +595,7 @@
         <div class="ud-feature-header"><h2>Deposit Request</h2><button (click)="loadDepositRequests()" class="ud-chip-btn">Refresh</button></div>
         <div class="ud-form-wrap">
           <div class="ud-form-grid">
+            <div class="ud-form-group"><label>Cash Deposit Slip ID</label><input type="text" [(ngModel)]="depositForm.requestId" class="ud-input" placeholder="Enter your slip ID (optional; generated if blank)"/></div>
             <div class="ud-form-group"><label>Amount (&#8377;) <span class="required">*</span></label><input type="number" [(ngModel)]="depositForm.amount" class="ud-input" min="1" placeholder="Enter amount"/></div>
             <div class="ud-form-group"><label>Method</label><select [(ngModel)]="depositForm.method" class="ud-input"><option value="Cash">Cash</option><option value="Cheque">Cheque</option><option value="UPI">UPI</option><option value="Online Transfer">Online Transfer</option></select></div>
             <div class="ud-form-group"><label>Reference Number</label><input type="text" [(ngModel)]="depositForm.referenceNumber" class="ud-input" placeholder="Slip/UTR/Reference"/></div>
@@ -609,7 +610,7 @@
         <div *ngIf="!isLoadingDepositRequests && depositRequests.length === 0" class="ud-empty">No deposit requests found.</div>
         <div *ngIf="!isLoadingDepositRequests && depositRequests.length > 0" class="ud-deposit-list">
           <div *ngFor="let req of depositRequests" class="ud-deposit-card">
-            <div class="ud-deposit-head"><div><strong>&#8377;{{ req.amount | number:'1.2-2' }} &bull; {{ req.method }}</strong><br><small>Request ID: {{ req.requestId }}</small></div><span class="ud-status-badge" [ngClass]="req.status?.toLowerCase()">{{ req.status }}</span></div>
+            <div class="ud-deposit-head"><div><strong>&#8377;{{ req.amount | number:'1.2-2' }} &bull; {{ req.method }}</strong><br><small>Cash Deposit Slip ID: {{ req.requestId }}</small></div><span class="ud-status-badge" [ngClass]="req.status?.toLowerCase()">{{ req.status }}</span></div>
             <div class="ud-deposit-body"><p><strong>Note:</strong> {{ req.note || 'N/A' }}</p><p><strong>Reference:</strong> {{ req.referenceNumber || 'N/A' }}</p><p><strong>Created:</strong> {{ req.createdAt | date:'dd/MM/yyyy, h:mm a' }}</p><p *ngIf="req.processedAt"><strong>Processed:</strong> {{ req.processedAt | date:'dd/MM/yyyy, h:mm a' }}</p><p *ngIf="req.rejectionReason" class="ud-text-danger">Reason: {{ req.rejectionReason }}</p></div>
           </div>
         </div>
@@ -650,6 +651,7 @@
             <div class="ud-invest-foot" *ngIf="fd.status === 'MATURED' || fd.status === 'PREMATURE_CLOSED'"><button (click)="downloadFDReceipt(fd)" class="ud-btn-receipt ud-btn-sm" title="Download FD Receipt"><i class="fa fa-download"></i> Download Receipt</button></div>
           </div>
         </div>
+        <div *ngIf="showFDForm && termDepositPlans.length > 0" class="ud-form-group" style="margin:16px 0;padding:14px;background:#f8f9ff;border:1px solid #dbe3ef;border-radius:8px;"><label>Admin Term Deposit Plan *</label><select [(ngModel)]="fdForm.planId" class="ud-input"><option [ngValue]="null">Select a plan</option><option *ngFor="let plan of termDepositPlans" [ngValue]="plan.id">{{ plan.schemeName }} | {{ plan.days }} days | {{ plan.interestRate }}% | {{ plan.payoutDate }}</option></select></div>
         <!-- FD Form Modal -->
         <div *ngIf="showFDForm" class="ud-modal-overlay" (click)="closeFDForm()"><div class="ud-modal" (click)="$event.stopPropagation()"><div class="ud-modal-head"><h3>Open New Fixed Deposit</h3><button (click)="closeFDForm()" class="ud-close-btn">&times;</button></div><div class="ud-modal-body"><div class="ud-form-grid"><div class="ud-form-group"><label>Principal (&#8377;) *</label><input type="number" [(ngModel)]="fdForm.principalAmount" class="ud-input" min="1000"/></div><div class="ud-form-group"><label>Interest Rate (%)</label><input type="number" [(ngModel)]="fdForm.interestRate" class="ud-input" min="3" max="10" step="0.1"/></div><div class="ud-form-group"><label>Tenure (Months)</label><input type="number" [(ngModel)]="fdForm.tenure" class="ud-input" min="6" max="120"/></div><div class="ud-form-group"><label>Interest Payout</label><select [(ngModel)]="fdForm.interestPayout" class="ud-input"><option value="At Maturity">At Maturity</option><option value="Monthly">Monthly</option><option value="Quarterly">Quarterly</option></select></div></div></div><div class="ud-modal-foot"><button (click)="closeFDForm()" class="ud-btn-outline">Cancel</button><button (click)="submitFD()" [disabled]="isSubmittingFD" class="ud-btn-primary">{{ isSubmittingFD ? 'Submitting...' : 'Submit' }}</button></div></div></div>
         <!-- Foreclosure Modal -->

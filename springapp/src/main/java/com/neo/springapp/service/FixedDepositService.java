@@ -4,6 +4,8 @@ import com.neo.springapp.model.FixedDeposit;
 import com.neo.springapp.model.Account;
 import com.neo.springapp.model.Transaction;
 import com.neo.springapp.repository.FixedDepositRepository;
+import com.neo.springapp.repository.TermDepositPlanRepository;
+import com.neo.springapp.model.TermDepositPlan;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,6 +35,9 @@ public class FixedDepositService {
 
     @Autowired
     private UserService userService;
+
+    @Autowired
+    private TermDepositPlanRepository termDepositPlanRepository;
 
     private static final String OTP_REASON_FD_FORECLOSURE = "FD (Fixed Deposit) Withdrawal / Foreclosure";
 
@@ -104,6 +109,21 @@ public class FixedDepositService {
                 response.put("success", false);
                 response.put("message", "Account not found");
                 return response;
+            }
+
+            if (fixedDeposit.getPlanId() != null) {
+                TermDepositPlan plan = termDepositPlanRepository.findById(fixedDeposit.getPlanId())
+                        .filter(p -> Boolean.TRUE.equals(p.getActive()))
+                        .orElseThrow(() -> new IllegalArgumentException("Selected term-deposit plan is not available"));
+                if (fixedDeposit.getPrincipalAmount() == null || fixedDeposit.getPrincipalAmount() < (plan.getMinimumAmount() == null ? 0 : plan.getMinimumAmount())
+                        || (plan.getMaximumAmount() != null && fixedDeposit.getPrincipalAmount() > plan.getMaximumAmount())) {
+                    throw new IllegalArgumentException("Amount is outside the selected plan limits");
+                }
+                fixedDeposit.setSchemeName(plan.getSchemeName());
+                fixedDeposit.setTenure(plan.getDays() != null ? Math.max(1, (int) Math.ceil(plan.getDays() / 30.0)) : fixedDeposit.getTenure());
+                fixedDeposit.setYears(plan.getYears());
+                fixedDeposit.setInterestRate(plan.getInterestRate());
+                fixedDeposit.setInterestPayout(plan.getPayoutDate());
             }
 
             // Set user details

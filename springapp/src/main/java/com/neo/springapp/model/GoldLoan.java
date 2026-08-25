@@ -77,6 +77,10 @@ public class GoldLoan {
     private String verificationNotes; // Notes from admin during verification
     
     private String storageLocation; // Where gold is stored
+
+    // Admin-uploaded jewellery evidence images shown to the customer after approval
+    private String goldImageOnePath;
+    private String goldImageTwoPath;
     
     // Terms and conditions acceptance
     private Boolean termsAccepted = false; // Whether user has accepted terms after admin approval

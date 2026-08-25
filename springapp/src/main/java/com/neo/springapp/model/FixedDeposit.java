@@ -21,6 +21,8 @@ public class FixedDeposit {
     
     // FD details
     private String fdAccountNumber; // Unique FD account number
+    private Long planId;
+    private String schemeName;
     private Double principalAmount; // FD principal amount
     private Double interestRate; // Annual interest rate
     private Integer tenure; // Tenure in months

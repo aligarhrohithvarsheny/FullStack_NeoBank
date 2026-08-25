@@ -21,6 +21,10 @@ export class FixedDeposits implements OnInit {
   fdStatusFilter: string = 'PENDING';
   fdSearchQuery: string = '';
   adminName: string = 'Admin';
+  termPlans: any[] = [];
+  showPlanForm = false;
+  planForm: any = { schemeName: '', days: 30, years: 1, minimumAmount: 1000, maximumAmount: 10000000, interestRate: 7, payoutDate: 'At Maturity', interestAmount: 0 };
+  savingPlan = false;
   
   // Approval modal properties
   showApprovalModal: boolean = false;
@@ -47,7 +51,26 @@ export class FixedDeposits implements OnInit {
         }
       }
       this.loadFixedDeposits();
+      this.loadTermPlans();
     }
+  }
+
+  loadTermPlans() {
+    this.http.get<any[]>(`${environment.apiBaseUrl}/api/term-deposit-plans/all`).subscribe({ next: plans => this.termPlans = plans || [], error: () => this.termPlans = [] });
+  }
+
+  saveTermPlan() {
+    if (!this.planForm.schemeName || !this.planForm.days || this.planForm.interestRate < 0) return;
+    this.savingPlan = true;
+    this.planForm.createdBy = this.adminName;
+    this.http.post(`${environment.apiBaseUrl}/api/term-deposit-plans`, this.planForm).subscribe({
+      next: () => { this.savingPlan = false; this.showPlanForm = false; this.planForm = { schemeName: '', days: 30, years: 1, minimumAmount: 1000, maximumAmount: 10000000, interestRate: 7, payoutDate: 'At Maturity', interestAmount: 0 }; this.loadTermPlans(); },
+      error: () => { this.savingPlan = false; this.alertService.error('Plan Failed', 'Unable to create term-deposit plan'); }
+    });
+  }
+
+  deactivateTermPlan(plan: any) {
+    this.http.delete(`${environment.apiBaseUrl}/api/term-deposit-plans/${plan.id}`).subscribe({ next: () => this.loadTermPlans(), error: () => this.alertService.error('Plan Failed', 'Unable to deactivate plan') });
   }
 
   loadFixedDeposits() {

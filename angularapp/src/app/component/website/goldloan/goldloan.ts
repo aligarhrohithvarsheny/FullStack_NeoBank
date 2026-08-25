@@ -26,6 +26,8 @@ interface GoldLoan {
   approvalDate?: string;
   goldItems?: string;
   goldDescription?: string;
+  goldImageOnePath?: string;
+  goldImageTwoPath?: string;
   goldPurity?: string;
   verifiedGoldGrams?: number;
   verifiedGoldValue?: number;
@@ -55,6 +57,7 @@ const OTP_VALID_SECONDS = 120;
 })
 
 export class Goldloan implements OnInit, OnDestroy {
+  readonly environment = environment;
   goldGrams: number = 0;
   currentGoldRate: GoldRate | null = null;
   calculatedLoan: any = null;

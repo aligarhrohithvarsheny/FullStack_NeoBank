@@ -43,7 +43,13 @@ public class DepositRequestService {
         // Prefill user friendly fields
         request.setUserName(account.getName());
         request.setStatus("PENDING");
-        request.setRequestId(request.getRequestId() != null ? request.getRequestId() : "DEP" + System.currentTimeMillis());
+        String requestedSlipId = request.getRequestId() == null ? null : request.getRequestId().trim();
+        if (requestedSlipId != null && !requestedSlipId.isEmpty()
+            && depositRequestRepository.findByRequestId(requestedSlipId).isPresent()) {
+            throw new IllegalArgumentException("Cash deposit slip ID is already in use");
+        }
+        request.setRequestId(requestedSlipId == null || requestedSlipId.isEmpty()
+            ? "DEP" + System.currentTimeMillis() : requestedSlipId);
         request.setCreatedAt(LocalDateTime.now());
         request.setUpdatedAt(LocalDateTime.now());
         return depositRequestRepository.save(request);
@@ -62,6 +68,10 @@ public class DepositRequestService {
 
     public Optional<DepositRequest> getById(Long id) {
         return depositRequestRepository.findById(id);
+    }
+
+    public Optional<DepositRequest> getByRequestId(String requestId) {
+        return depositRequestRepository.findByRequestId(requestId);
     }
 
     public DepositRequest approveRequest(Long id, String processedBy) {

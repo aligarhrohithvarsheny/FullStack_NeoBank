@@ -17,12 +17,21 @@ import com.neo.springapp.service.EmailService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 
 @RestController
 @RequestMapping("/api/gold-loans")
@@ -106,6 +115,47 @@ public class GoldLoanController {
             return ResponseEntity.ok(loan);
         }
         return ResponseEntity.notFound().build();
+    }
+
+    @PostMapping(value = "/{id}/jewellery-images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> uploadJewelleryImages(@PathVariable Long id,
+            @RequestParam(value = "imageOne", required = false) MultipartFile imageOne,
+            @RequestParam(value = "imageTwo", required = false) MultipartFile imageTwo) {
+        GoldLoan loan = goldLoanService.getGoldLoanById(id);
+        if (loan == null) return ResponseEntity.notFound().build();
+        try {
+            Path directory = Paths.get("uploads/gold-loans");
+            Files.createDirectories(directory);
+            if (imageOne != null && !imageOne.isEmpty()) loan.setGoldImageOnePath(saveJewelleryImage(directory, id, "one", imageOne));
+            if (imageTwo != null && !imageTwo.isEmpty()) loan.setGoldImageTwoPath(saveJewelleryImage(directory, id, "two", imageTwo));
+            return ResponseEntity.ok(goldLoanService.save(loan));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("success", false, "message", "Failed to save jewellery images: " + e.getMessage()));
+        }
+    }
+
+    @GetMapping("/{id}/jewellery-image/{slot}")
+    public ResponseEntity<?> viewJewelleryImage(@PathVariable Long id, @PathVariable String slot) {
+        GoldLoan loan = goldLoanService.getGoldLoanById(id);
+        if (loan == null) return ResponseEntity.notFound().build();
+        String storedPath = "one".equalsIgnoreCase(slot) ? loan.getGoldImageOnePath() : loan.getGoldImageTwoPath();
+        if (storedPath == null || storedPath.isBlank()) return ResponseEntity.notFound().build();
+        try {
+            Path path = Paths.get(storedPath).normalize();
+            Resource resource = new UrlResource(path.toUri());
+            if (!resource.exists()) return ResponseEntity.notFound().build();
+            String contentType = Files.probeContentType(path);
+            return ResponseEntity.ok().contentType(MediaType.parseMediaType(contentType == null ? "application/octet-stream" : contentType))
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + path.getFileName() + "\"").body(resource);
+        } catch (Exception e) { return ResponseEntity.internalServerError().build(); }
+    }
+
+    private String saveJewelleryImage(Path directory, Long id, String slot, MultipartFile file) throws java.io.IOException {
+        String original = file.getOriginalFilename() == null ? "image.jpg" : file.getOriginalFilename();
+        String extension = original.contains(".") ? original.substring(original.lastIndexOf('.')) : ".jpg";
+        Path target = directory.resolve("gold_loan_" + id + "_" + slot + "_" + System.currentTimeMillis() + extension).normalize();
+        Files.copy(file.getInputStream(), target, StandardCopyOption.REPLACE_EXISTING);
+        return target.toString();
     }
 
     // Get gold loans by status

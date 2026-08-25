@@ -126,9 +126,11 @@ export class Userdashboard implements OnInit, OnDestroy {
   
   // Fixed Deposits properties
   fixedDeposits: any[] = [];
+  termDepositPlans: any[] = [];
   isLoadingFDs: boolean = false;
   showFDForm: boolean = false;
   fdForm = {
+    planId: null as number | null,
     principalAmount: 0,
     interestRate: 7.5,
     tenure: 12,
@@ -190,6 +192,7 @@ export class Userdashboard implements OnInit, OnDestroy {
 
   // Deposit Request properties
   depositForm = {
+    requestId: '',
     amount: 0,
     method: 'Cash',
     referenceNumber: '',
@@ -1746,6 +1749,7 @@ export class Userdashboard implements OnInit, OnDestroy {
     if (!this.userAccountNumber) return;
     
     this.isLoadingFDs = true;
+    this.http.get<any[]>(`${environment.apiBaseUrl}/api/term-deposit-plans`).subscribe({ next: plans => this.termDepositPlans = plans || [], error: () => this.termDepositPlans = [] });
     this.http.get(`${environment.apiBaseUrl}/api/fixed-deposits/account/${this.userAccountNumber}`).subscribe({
       next: (fds: any) => {
         this.fixedDeposits = fds || [];
@@ -1763,6 +1767,7 @@ export class Userdashboard implements OnInit, OnDestroy {
     this.showFDForm = true;
     this.fdForm = {
       principalAmount: 0,
+      planId: null,
       interestRate: 7.5,
       tenure: 12,
       interestPayout: 'At Maturity'
@@ -1783,6 +1788,12 @@ export class Userdashboard implements OnInit, OnDestroy {
       this.alertService.error('Validation Error', 'Principal amount must be greater than 0');
       return;
     }
+
+    const selectedPlan = this.termDepositPlans.find(plan => plan.id === Number(this.fdForm.planId));
+    if (this.termDepositPlans.length > 0 && !selectedPlan) {
+      this.alertService.error('Validation Error', 'Please select a term-deposit plan');
+      return;
+    }
     
     if (this.fdForm.tenure < 6) {
       this.alertService.error('Validation Error', 'Minimum tenure is 6 months');
@@ -1792,10 +1803,12 @@ export class Userdashboard implements OnInit, OnDestroy {
     this.isSubmittingFD = true;
     const fdData = {
       accountNumber: this.userAccountNumber,
+      planId: selectedPlan?.id,
       principalAmount: this.fdForm.principalAmount,
-      interestRate: this.fdForm.interestRate,
-      tenure: this.fdForm.tenure,
-      interestPayout: this.fdForm.interestPayout
+      interestRate: selectedPlan?.interestRate || this.fdForm.interestRate,
+      tenure: selectedPlan?.days ? Math.max(1, Math.ceil(selectedPlan.days / 30)) : this.fdForm.tenure,
+      interestPayout: selectedPlan?.payoutDate || this.fdForm.interestPayout,
+      schemeName: selectedPlan?.schemeName
     };
     
     this.http.post(`${environment.apiBaseUrl}/api/fixed-deposits`, fdData).subscribe({
@@ -2562,6 +2575,7 @@ export class Userdashboard implements OnInit, OnDestroy {
     const payload = {
       accountNumber: this.userAccountNumber,
       userName: this.username,
+      requestId: this.depositForm.requestId.trim() || undefined,
       amount: this.depositForm.amount,
       method: this.depositForm.method,
       referenceNumber: this.depositForm.referenceNumber,
@@ -2602,6 +2616,7 @@ export class Userdashboard implements OnInit, OnDestroy {
 
   resetDepositForm() {
     this.depositForm = {
+      requestId: '',
       amount: 0,
       method: 'Cash',
       referenceNumber: '',

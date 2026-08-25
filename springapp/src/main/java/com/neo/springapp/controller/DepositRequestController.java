@@ -51,6 +51,13 @@ public class DepositRequestController {
         return depositRequestService.getByAccount(accountNumber);
     }
 
+    @GetMapping("/request-id/{requestId}")
+    public ResponseEntity<?> getByRequestId(@PathVariable String requestId) {
+        return depositRequestService.getByRequestId(requestId.trim())
+                .<ResponseEntity<?>>map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
     @PutMapping("/{id}/approve")
     public ResponseEntity<?> approveRequest(@PathVariable Long id,
                                             @RequestParam(required = false, defaultValue = "Admin") String processedBy) {
