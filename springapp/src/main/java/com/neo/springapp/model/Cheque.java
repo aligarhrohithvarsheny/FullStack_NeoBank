@@ -23,7 +23,9 @@ public class Cheque {
     private String accountType; // Savings/Current
     
     private Double amount; // Amount to be withdrawn when cheque is drawn
-    private String status = "ACTIVE"; // ACTIVE, DRAWN, BOUNCED, CANCELLED
+    private String status = "ACTIVE"; // ACTIVE, USED, DRAWN, BOUNCED, CANCELLED
+    private String usedFor; // What consumed this cheque, e.g. "DEMAND_DRAFT"
+    private String usedReference; // Reference number of the consumer, e.g. DD chequeNumber/id
     
     // Request fields
     private String requestStatus = "NONE"; // NONE, PENDING, APPROVED, REJECTED
@@ -94,6 +96,21 @@ public class Cheque {
     // Check if cheque can be requested
     public boolean canBeRequested() {
         return "ACTIVE".equals(this.status) && ("NONE".equals(this.requestStatus) || "REJECTED".equals(this.requestStatus));
+    }
+
+    // Check if cheque is still available for allocation (not used/drawn/bounced/cancelled)
+    public boolean isAvailable() {
+        return "ACTIVE".equals(this.status);
+    }
+
+    // Mark cheque as used (e.g. consumed to create a Demand Draft)
+    public void markUsed(String usedFor, String usedReference) {
+        if (isAvailable()) {
+            this.status = "USED";
+            this.usedDate = LocalDateTime.now();
+            this.usedFor = usedFor;
+            this.usedReference = usedReference;
+        }
     }
 
     // Request cheque drawing

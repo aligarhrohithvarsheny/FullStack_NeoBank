@@ -276,12 +276,14 @@ public class ChequeController {
         try {
             Long activeCount = chequeService.countActiveCheques(accountNumber);
             Long cancelledCount = chequeService.countCancelledCheques(accountNumber);
-            Long totalCount = activeCount + cancelledCount;
+            Long usedCount = chequeService.countUsedCheques(accountNumber);
+            Long totalCount = activeCount + cancelledCount + usedCount;
             
             Map<String, Object> statistics = new HashMap<>();
             statistics.put("totalCheques", totalCount);
             statistics.put("activeCheques", activeCount);
             statistics.put("cancelledCheques", cancelledCount);
+            statistics.put("usedCheques", usedCount);
             
             return ResponseEntity.ok(statistics);
         } catch (Exception e) {

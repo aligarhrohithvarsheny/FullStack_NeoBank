@@ -9,9 +9,11 @@ export interface Cheque {
   micrCode?: string;
   accountType?: string;
   amount?: number; // Amount to be withdrawn when cheque is drawn
-  status: 'ACTIVE' | 'DRAWN' | 'BOUNCED' | 'CANCELLED';
+  status: 'ACTIVE' | 'USED' | 'DRAWN' | 'BOUNCED' | 'CANCELLED';
   createdAt?: string; // ISO string format
   usedDate?: string; // ISO string format
+  usedFor?: string; // What consumed this cheque, e.g. "DEMAND_DRAFT"
+  usedReference?: string; // Reference of the consumer (e.g. DD id)
   drawnDate?: string; // ISO string format
   bouncedDate?: string; // ISO string format
   cancelledDate?: string; // ISO string format

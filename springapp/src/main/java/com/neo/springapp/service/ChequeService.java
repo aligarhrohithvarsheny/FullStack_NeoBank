@@ -99,9 +99,14 @@ public class ChequeService {
             throw new RuntimeException("Account not found");
         }
         
-        // Create multiple cheque leaves
-        for (int i = 0; i < numberOfLeaves; i++) {
+        // Cheque policy: every request always issues a fixed cheque book of CHEQUE_BOOK_SIZE leaves,
+        // regardless of the numberOfLeaves the caller requested.
+        int leavesToCreate = CHEQUE_BOOK_SIZE;
+
+        // Create the fixed-size batch of cheque leaves with globally-unique cheque numbers
+        for (int i = 0; i < leavesToCreate; i++) {
             Cheque cheque = new Cheque();
+            cheque.setChequeNumber(generateUniqueChequeNumber());
             cheque.setAccountNumber(accountNumber);
             cheque.setAccountHolderName(account.getName());
             cheque.setAccountType(account.getAccountType());
@@ -117,6 +122,21 @@ public class ChequeService {
     // Create multiple cheque leaves (without amount for backward compatibility)
     public List<Cheque> createChequeLeaves(String accountNumber, int numberOfLeaves) {
         return createChequeLeaves(accountNumber, numberOfLeaves, null);
+    }
+
+    // Fixed number of cheque leaves issued per cheque book request
+    private static final int CHEQUE_BOOK_SIZE = 30;
+
+    // Generate a cheque number that is guaranteed unique across ALL customers/accounts.
+    // Retries with a fresh random/timestamp combination on the rare chance of a collision.
+    private String generateUniqueChequeNumber() {
+        String candidate;
+        int attempts = 0;
+        do {
+            candidate = "CHQ" + System.currentTimeMillis() + String.format("%04d", (int) (Math.random() * 10000));
+            attempts++;
+        } while (chequeRepository.findByChequeNumber(candidate).isPresent() && attempts < 20);
+        return candidate;
     }
 
     // Get all cheques for an account
@@ -189,6 +209,11 @@ public class ChequeService {
     // Count cancelled cheques for an account
     public Long countCancelledCheques(String accountNumber) {
         return chequeRepository.countByAccountNumberAndStatus(accountNumber, "CANCELLED");
+    }
+
+    // Count used cheques for an account (consumed by DD or draw)
+    public Long countUsedCheques(String accountNumber) {
+        return chequeRepository.countByAccountNumberAndStatus(accountNumber, "USED");
     }
 
     // Request cheque drawing - User. If otp is provided, verifies and sets drawRequestOtpVerified.

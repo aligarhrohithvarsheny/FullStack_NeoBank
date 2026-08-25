@@ -54,7 +54,11 @@ public class QrCodeService {
      */
     public String generateQrCodeImage(String token, String loginUrl) {
         try {
-            String qrContent = loginUrl + "?qrToken=" + token;
+            // loginUrl already contains the "?qrToken=<token>" query parameter (set by the caller),
+            // so it must be used as-is. Appending it again produced a malformed URL like
+            // ".../website/user?qrToken=X?qrToken=X" which corrupted the token read by the
+            // mobile browser and caused the QR login/approve flow to fail.
+            String qrContent = loginUrl;
             
             Map<EncodeHintType, Object> hints = new HashMap<>();
             hints.put(EncodeHintType.ERROR_CORRECTION, ErrorCorrectionLevel.H);

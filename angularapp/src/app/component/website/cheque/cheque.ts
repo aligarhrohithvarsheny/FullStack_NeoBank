@@ -22,8 +22,9 @@ export class ChequeComponent implements OnInit, OnDestroy {
   userName: string = '';
   currentBalance: number = 0;
 
-  // Cheque leaves creation
-  numberOfLeaves: number = 1;
+  // Cheque leaves creation - a cheque book is always issued as a fixed batch of leaves
+  readonly CHEQUE_BOOK_SIZE = 30;
+  numberOfLeaves: number = 30;
   chequeAmount: number = 0; // Amount for each cheque
   creatingCheques: boolean = false;
   createError: string = '';
@@ -32,6 +33,7 @@ export class ChequeComponent implements OnInit, OnDestroy {
   cheques: ChequeModel[] = [];
   activeCheques: ChequeModel[] = [];
   cancelledCheques: ChequeModel[] = [];
+  usedCheques: ChequeModel[] = [];
   loading: boolean = false;
   error: string = '';
 
@@ -39,6 +41,7 @@ export class ChequeComponent implements OnInit, OnDestroy {
   statistics: any = {
     totalCheques: 0,
     activeCheques: 0,
+    usedCheques: 0,
     cancelledCheques: 0
   };
 
@@ -49,7 +52,7 @@ export class ChequeComponent implements OnInit, OnDestroy {
   totalElements: number = 0;
 
   // Filter
-  filterStatus: string = 'ALL'; // ALL, ACTIVE, CANCELLED
+  filterStatus: string = 'ALL'; // ALL, ACTIVE, USED, CANCELLED
 
   // Cancel cheque
   selectedCheque: ChequeModel | null = null;
@@ -156,6 +159,7 @@ export class ChequeComponent implements OnInit, OnDestroy {
         // Filter cheques by status
         this.activeCheques = this.cheques.filter(c => c.status === 'ACTIVE');
         this.cancelledCheques = this.cheques.filter(c => c.status === 'CANCELLED');
+        this.usedCheques = this.cheques.filter(c => c.status === 'USED');
 
         this.loading = false;
       },
@@ -186,25 +190,20 @@ export class ChequeComponent implements OnInit, OnDestroy {
       return;
     }
 
-    if (this.numberOfLeaves <= 0 || this.numberOfLeaves > 100) {
-      this.alertService.error('Validation Error', 'Number of leaves must be between 1 and 100');
-      return;
-    }
-
     this.creatingCheques = true;
     this.createError = '';
 
     const request: CreateChequeRequest = {
       accountNumber: this.userAccountNumber,
-      numberOfLeaves: this.numberOfLeaves,
+      numberOfLeaves: this.CHEQUE_BOOK_SIZE,
       amount: this.chequeAmount > 0 ? this.chequeAmount : undefined
     };
 
     this.chequeService.createChequeLeaves(request).subscribe({
       next: (response: any) => {
-        this.alertService.success('Cheque Leaves Created', `Successfully created ${response.count || this.numberOfLeaves} cheque leaves`);
+        this.alertService.success('Cheque Book Created', `Successfully created a cheque book of ${response.count || this.CHEQUE_BOOK_SIZE} cheque leaves`);
         this.creatingCheques = false;
-        this.numberOfLeaves = 1;
+        this.numberOfLeaves = this.CHEQUE_BOOK_SIZE;
         this.chequeAmount = 0;
         this.loadCheques();
         this.loadStatistics();
@@ -311,6 +310,8 @@ export class ChequeComponent implements OnInit, OnDestroy {
       return this.cheques;
     } else if (this.filterStatus === 'ACTIVE') {
       return this.activeCheques;
+    } else if (this.filterStatus === 'USED') {
+      return this.usedCheques;
     } else {
       return this.cancelledCheques;
     }
@@ -403,6 +404,8 @@ export class ChequeComponent implements OnInit, OnDestroy {
     switch (status) {
       case 'ACTIVE':
         return 'status-active';
+      case 'USED':
+        return 'status-used';
       case 'DRAWN':
         return 'status-drawn';
       case 'BOUNCED':

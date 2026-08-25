@@ -16,6 +16,10 @@
       <h3>Active Cheques</h3>
       <p class="stat-value">{{ statistics.activeCheques || 0 }}</p>
     </div>
+    <div class="stat-card used">
+      <h3>Used Cheques</h3>
+      <p class="stat-value">{{ statistics.usedCheques || 0 }}</p>
+    </div>
     <div class="stat-card cancelled">
       <h3>Cancelled Cheques</h3>
       <p class="stat-value">{{ statistics.cancelledCheques || 0 }}</p>
@@ -24,20 +28,12 @@
 
   <!-- Create Cheque Leaves Section -->
   <div class="create-cheque-section">
-    <h3>Create Cheque Leaves</h3>
+    <h3>Create Cheque Book</h3>
     <div class="create-form">
       <div class="form-group">
-        <label for="numberOfLeaves">Number of Leaves</label>
-        <input 
-          id="numberOfLeaves"
-          type="number" 
-          [(ngModel)]="numberOfLeaves" 
-          name="numberOfLeaves"
-          min="1"
-          max="100"
-          placeholder="Enter number of cheque leaves"
-          [disabled]="creatingCheques">
-        <small>Maximum 100 leaves at a time</small>
+        <label>Number of Leaves</label>
+        <input type="text" value="30" disabled readonly>
+        <small>Every cheque book always contains {{ CHEQUE_BOOK_SIZE }} cheque leaves, each with a unique number</small>
       </div>
       <div class="form-group">
         <label for="chequeAmount">Amount per Cheque (₹)</label>
@@ -55,9 +51,9 @@
       <button 
         type="button" 
         (click)="createChequeLeaves()"
-        [disabled]="creatingCheques || numberOfLeaves <= 0 || numberOfLeaves > 100"
+        [disabled]="creatingCheques"
         class="create-btn">
-        <span *ngIf="!creatingCheques">Create Cheque Leaves</span>
+        <span *ngIf="!creatingCheques">Create Cheque Book ({{ CHEQUE_BOOK_SIZE }} leaves)</span>
         <span *ngIf="creatingCheques">Creating...</span>
       </button>
     </div>
@@ -83,6 +79,13 @@
         [class.active]="filterStatus === 'ACTIVE'"
         class="filter-btn">
         Active ({{ activeCheques.length }})
+      </button>
+      <button 
+        type="button" 
+        (click)="filterCheques('USED')"
+        [class.active]="filterStatus === 'USED'"
+        class="filter-btn">
+        Used ({{ usedCheques.length }})
       </button>
       <button 
         type="button" 
@@ -193,6 +196,14 @@
         <div *ngIf="cheque.cancellationReason" class="detail-item">
           <span class="detail-label">Cancellation Reason:</span>
           <span class="detail-value">{{ cheque.cancellationReason }}</span>
+        </div>
+        <div *ngIf="cheque.status === 'USED'" class="detail-item">
+          <span class="detail-label">Used Date:</span>
+          <span class="detail-value">{{ formatDate(cheque.usedDate) }}</span>
+        </div>
+        <div *ngIf="cheque.status === 'USED' && cheque.usedFor" class="detail-item">
+          <span class="detail-label">Used For:</span>
+          <span class="detail-value">{{ cheque.usedFor }}</span>
         </div>
         <div *ngIf="cheque.bounceReason" class="detail-item">
           <span class="detail-label">Bounce Reason:</span>

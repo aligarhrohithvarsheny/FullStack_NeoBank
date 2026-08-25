@@ -36,6 +36,10 @@ public interface ChequeRepository extends JpaRepository<Cheque, Long> {
     // Find cancelled cheques for an account
     @Query("SELECT c FROM Cheque c WHERE c.accountNumber = :accountNumber AND c.status = 'CANCELLED'")
     List<Cheque> findCancelledChequesByAccountNumber(@Param("accountNumber") String accountNumber);
+
+    // Find used cheques for an account (consumed by DD or draw)
+    @Query("SELECT c FROM Cheque c WHERE c.accountNumber = :accountNumber AND c.status = 'USED'")
+    List<Cheque> findUsedChequesByAccountNumber(@Param("accountNumber") String accountNumber);
     
     // Count cheques by status
     Long countByAccountNumberAndStatus(String accountNumber, String status);
