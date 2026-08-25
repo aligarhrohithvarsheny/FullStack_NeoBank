@@ -205,6 +205,13 @@ export class Userdashboard implements OnInit, OnDestroy {
   isLoadingDepositRequests: boolean = false;
   depositMessage: string = '';
   depositError: string = '';
+
+  onDepositMethodChange(): void {
+    if (this.depositForm.method !== 'Cheque') {
+      this.depositForm.referenceNumber = '';
+    }
+    this.depositError = '';
+  }
   
   // Credit Card properties
   creditCards: any[] = [];

@@ -6,10 +6,12 @@ import com.neo.springapp.model.Transaction;
 import com.neo.springapp.repository.DepositRequestRepository;
 import com.neo.springapp.service.ChequeService;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.Map;
 
 @Service
 @SuppressWarnings("null")
@@ -30,6 +32,7 @@ public class DepositRequestService {
         this.chequeService = chequeService;
     }
 
+    @Transactional
     public DepositRequest createRequest(DepositRequest request) {
         if (request.getAmount() == null || request.getAmount() <= 0) {
             throw new IllegalArgumentException("Amount must be greater than 0");
@@ -46,6 +49,20 @@ public class DepositRequestService {
 
         // Prefill user friendly fields
         request.setUserName(account.getName());
+        if ("CHEQUE".equalsIgnoreCase(request.getMethod())) {
+            if (request.getReferenceNumber() == null || request.getReferenceNumber().isBlank()) {
+                throw new IllegalArgumentException("Cheque number is required for cheque deposits");
+            }
+            Map<String, Object> cheque = chequeService.verifyForDeposit(request.getReferenceNumber(), request.getAccountNumber());
+            if (!Boolean.TRUE.equals(cheque.get("valid"))) {
+                throw new IllegalArgumentException(String.valueOf(cheque.get("message")));
+            }
+            request.setChequeValid(true);
+            request.setChequeAccountNumber(String.valueOf(cheque.get("accountNumber")));
+            request.setChequeAccountHolderName(String.valueOf(cheque.get("accountHolderName")));
+            request.setChequeStatus(String.valueOf(cheque.get("status")));
+            request.setChequeAvailableBalance((Double) cheque.get("availableBalance"));
+        }
         request.setStatus("PENDING");
         String requestedSlipId = request.getRequestId() == null ? null : request.getRequestId().trim();
         if (requestedSlipId != null && !requestedSlipId.isEmpty()
@@ -60,14 +77,17 @@ public class DepositRequestService {
     }
 
     public List<DepositRequest> getAll(String status) {
-        if (status != null && !status.trim().isEmpty()) {
-            return depositRequestRepository.findByStatusOrderByCreatedAtDesc(status.toUpperCase());
-        }
-        return depositRequestRepository.findAllByOrderByCreatedAtDesc();
+        List<DepositRequest> requests = status != null && !status.trim().isEmpty()
+                ? depositRequestRepository.findByStatusOrderByCreatedAtDesc(status.toUpperCase())
+                : depositRequestRepository.findAllByOrderByCreatedAtDesc();
+        requests.forEach(this::enrichChequeDetails);
+        return requests;
     }
 
     public List<DepositRequest> getByAccount(String accountNumber) {
-        return depositRequestRepository.findByAccountNumberOrderByCreatedAtDesc(accountNumber);
+        List<DepositRequest> requests = depositRequestRepository.findByAccountNumberOrderByCreatedAtDesc(accountNumber);
+        requests.forEach(this::enrichChequeDetails);
+        return requests;
     }
 
     public Optional<DepositRequest> getById(Long id) {
@@ -75,9 +95,26 @@ public class DepositRequestService {
     }
 
     public Optional<DepositRequest> getByRequestId(String requestId) {
-        return depositRequestRepository.findByRequestId(requestId);
+        return depositRequestRepository.findByRequestId(requestId).map(this::enrichChequeDetails);
     }
 
+    private DepositRequest enrichChequeDetails(DepositRequest request) {
+        if (!"CHEQUE".equalsIgnoreCase(request.getMethod()) || request.getReferenceNumber() == null) return request;
+        try {
+            Map<String, Object> cheque = chequeService.verifyForDeposit(request.getReferenceNumber());
+            request.setChequeValid(Boolean.TRUE.equals(cheque.get("valid")) || "APPROVED".equalsIgnoreCase(request.getStatus()));
+            request.setChequeAccountNumber(String.valueOf(cheque.get("accountNumber")));
+            request.setChequeAccountHolderName(String.valueOf(cheque.get("accountHolderName")));
+            request.setChequeStatus(String.valueOf(cheque.get("status")));
+            request.setChequeAvailableBalance((Double) cheque.get("availableBalance"));
+        } catch (Exception ignored) {
+            request.setChequeValid(false);
+            request.setChequeStatus("NOT_FOUND");
+        }
+        return request;
+    }
+
+    @Transactional
     public DepositRequest approveRequest(Long id, String processedBy) {
         DepositRequest request = depositRequestRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Deposit request not found"));

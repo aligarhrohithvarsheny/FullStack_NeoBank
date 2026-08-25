@@ -1088,6 +1088,12 @@
           <div class="card-body">
             <p><strong>Note:</strong> {{ req.note || 'N/A' }}</p>
             <p><strong>Created:</strong> {{ req.createdAt | date:'dd/MM/yyyy, h:mm a' }}</p>
+            <div *ngIf="req.method === 'Cheque'" style="margin-top:10px;padding:10px;background:#f8f9fa;border-left:3px solid #0d6efd;">
+              <p><strong>Cheque verification:</strong> <span [style.color]="req.chequeValid ? '#198754' : '#dc3545'">{{ req.chequeValid ? 'Valid / owned by deposit account' : 'Used or unavailable' }}</span></p>
+              <p><strong>Cheque account:</strong> {{ req.chequeAccountNumber || 'N/A' }} · {{ req.chequeAccountHolderName || 'N/A' }}</p>
+              <p><strong>Cheque status:</strong> {{ req.chequeStatus || 'N/A' }}</p>
+              <p><strong>Account balance:</strong> ₹{{ req.chequeAvailableBalance || 0 | number:'1.2-2' }}</p>
+            </div>
           </div>
           <div class="card-footer">
             <button class="btn-deposit" (click)="approveDepositRequest(req)">

@@ -29,6 +29,16 @@ public class DepositRequest {
     private String rejectionReason;
     private Double resultingBalance;
     private String transactionId;
+    @Transient
+    private Boolean chequeValid;
+    @Transient
+    private String chequeAccountNumber;
+    @Transient
+    private String chequeAccountHolderName;
+    @Transient
+    private String chequeStatus;
+    @Transient
+    private Double chequeAvailableBalance;
 
     @PrePersist
     public void prePersist() {

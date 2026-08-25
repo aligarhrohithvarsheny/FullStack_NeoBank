@@ -188,6 +188,18 @@ public class ChequeService {
         return result;
     }
 
+    public Map<String, Object> verifyForDeposit(String chequeNumber, String receivingAccountNumber) {
+        Map<String, Object> result = verifyForDeposit(chequeNumber);
+        boolean ownerMatches = receivingAccountNumber != null
+                && receivingAccountNumber.trim().equals(result.get("accountNumber"));
+        result.put("valid", Boolean.TRUE.equals(result.get("valid")) && ownerMatches);
+        result.put("ownerMatches", ownerMatches);
+        result.put("message", ownerMatches
+                ? result.get("message")
+                : "This cheque belongs to another account and cannot be deposited here");
+        return result;
+    }
+
     @Transactional
     public Cheque markDeposited(String chequeNumber, String depositReference) {
         Cheque cheque = chequeRepository.findByChequeNumber(chequeNumber == null ? "" : chequeNumber.trim())
