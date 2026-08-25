@@ -67,6 +67,7 @@ export class FasttagDashboard implements OnInit {
   linkedAccounts: any[] = [];
   showLinkAccountModal: boolean = false;
   linkAccountNumber: string = '';
+  linkCustomerId: string = '';
   linkOtpSent: boolean = false;
   linkOtp: string = '';
   linkLoading: boolean = false;
@@ -412,6 +413,7 @@ export class FasttagDashboard implements OnInit {
     this.linkAccountNumber = '';
     this.linkOtpSent = false;
     this.linkOtp = '';
+    this.linkCustomerId = '';
     this.linkMessage = '';
     this.linkSuccess = false;
     this.linkAccountDetails = null;
@@ -422,6 +424,7 @@ export class FasttagDashboard implements OnInit {
     this.linkAccountNumber = '';
     this.linkOtpSent = false;
     this.linkOtp = '';
+    this.linkCustomerId = '';
     this.linkMessage = '';
     this.linkAccountDetails = null;
   }
@@ -429,6 +432,7 @@ export class FasttagDashboard implements OnInit {
   sendLinkOtp() {
     const accountNumber = this.linkAccountNumber.trim();
     const gmailId = this.user?.gmailId?.trim();
+    const customerId = this.linkCustomerId.trim();
 
     console.log('[FASTag] sendLinkOtp clicked', {
       hasAccountNumber: !!accountNumber,
@@ -441,8 +445,8 @@ export class FasttagDashboard implements OnInit {
       this.linkSuccess = false;
       return;
     }
-    if (!gmailId) {
-      this.linkMessage = 'Session expired. Please login again and retry.';
+    if (!customerId) {
+      this.linkMessage = 'Please enter your customer ID.';
       this.linkSuccess = false;
       this.linkLoading = false;
       return;
@@ -453,18 +457,19 @@ export class FasttagDashboard implements OnInit {
 
     this.http.post<any>(`${environment.apiBaseUrl}/api/fastag/link-account`, {
       gmailId,
+      customerId,
       accountNumber
     }).subscribe({
       next: (res) => {
         console.log('[FASTag] sendLinkOtp response', res);
         this.linkLoading = false;
         if (res.success) {
-          this.linkOtpSent = true;
+          this.linkOtpSent = false;
           this.linkAccountDetails = {
             accountHolderName: res.accountHolderName,
             maskedBalance: res.maskedBalance
           };
-          this.linkMessage = res.message;
+          this.linkMessage = res.message || 'Bank account linked successfully.';
           this.linkSuccess = true;
         } else {
           this.linkMessage = res.message;

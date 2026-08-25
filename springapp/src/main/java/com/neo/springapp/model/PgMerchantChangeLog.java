@@ -15,11 +15,11 @@ public class PgMerchantChangeLog {
     private String merchantName;
     private String changedBy;
     private LocalDateTime changedAt;
-    @Column(length = 10000)
+    @Column(columnDefinition = "TEXT")
     private String changedFields;
-    @Column(length = 20000)
+    @Column(columnDefinition = "TEXT")
     private String previousDetails;
-    @Column(length = 20000)
+    @Column(columnDefinition = "TEXT")
     private String updatedDetails;
 
     @PrePersist

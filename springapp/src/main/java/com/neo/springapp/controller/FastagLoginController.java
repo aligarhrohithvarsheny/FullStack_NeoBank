@@ -490,18 +490,19 @@ public class FastagLoginController {
 
     /**
      * POST /api/fastag/link-account
-     * Verify account number exists and send OTP to user's email to confirm linking
+     * Verify customer ID and account number, then link without email OTP.
      */
     @PostMapping("/link-account")
     public ResponseEntity<Map<String, Object>> linkAccount(@RequestBody Map<String, String> request) {
         Map<String, Object> response = new HashMap<>();
 
         String gmailId = request.get("gmailId");
+        String customerId = request.get("customerId");
         String accountNumber = request.get("accountNumber");
 
-        if (gmailId == null || gmailId.trim().isEmpty()) {
+        if (customerId == null || customerId.trim().isEmpty()) {
             response.put("success", false);
-            response.put("message", "Gmail ID is required.");
+            response.put("message", "Customer ID is required.");
             return ResponseEntity.badRequest().body(response);
         }
         if (accountNumber == null || accountNumber.trim().isEmpty()) {
@@ -510,7 +511,10 @@ public class FastagLoginController {
             return ResponseEntity.badRequest().body(response);
         }
 
-        gmailId = gmailId.trim().toLowerCase();
+        gmailId = gmailId == null || gmailId.trim().isEmpty()
+            ? "CUSTOMER:" + customerId.trim().toUpperCase()
+            : gmailId.trim().toLowerCase();
+        customerId = customerId.trim();
         accountNumber = accountNumber.trim();
 
         try {
@@ -529,6 +533,12 @@ public class FastagLoginController {
                 return ResponseEntity.badRequest().body(response);
             }
 
+            if (account.getCustomerId() == null || !customerId.equalsIgnoreCase(account.getCustomerId())) {
+                response.put("success", false);
+                response.put("message", "Customer ID does not match this account.");
+                return ResponseEntity.badRequest().body(response);
+            }
+
             // Check if already linked
             var existingLink = fastagLinkedAccountRepository.findByGmailIdAndAccountNumberAndStatus(gmailId, accountNumber, "ACTIVE");
             if (existingLink.isPresent()) {
@@ -537,22 +547,24 @@ public class FastagLoginController {
                 return ResponseEntity.badRequest().body(response);
             }
 
-            // Generate OTP and send to user's gmail
-            String otp = otpService.generateOtp();
-            otpService.storeOtp("FASTAG_LINK_" + gmailId, otp);
-
-            // Send OTP email
-            boolean sent = emailService.sendOtpEmail(gmailId, otp);
-            if (!sent) {
-                System.out.println("⚠️ Link account OTP email send reported failure. Check console for OTP.");
-            }
-
-            // Return account holder name (masked) for verification
+            // Customer ID + account number are verified above; link immediately without email OTP.
             String holderName = account.getName() != null ? account.getName() : "Account Holder";
+            var linkedAccount = existingLink.isPresent()
+                    ? existingLink.get()
+                    : new com.neo.springapp.model.FastagLinkedAccount();
+            linkedAccount.setGmailId(gmailId);
+            linkedAccount.setAccountNumber(accountNumber);
+            linkedAccount.setVerified(true);
+            linkedAccount.setStatus("ACTIVE");
+            linkedAccount.setLinkedAt(java.time.LocalDateTime.now());
+            linkedAccount.setAccountHolderName(holderName);
+            fastagLinkedAccountRepository.save(linkedAccount);
             response.put("success", true);
-            response.put("message", "OTP sent to " + gmailId + ". Please verify to link your account.");
+            response.put("message", "Account linked successfully.");
             response.put("accountHolderName", holderName);
             response.put("maskedBalance", "₹" + String.format("%,.2f", account.getBalance()));
+            response.put("customerId", account.getCustomerId());
+            response.put("linkedAccount", linkedAccount);
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             response.put("success", false);

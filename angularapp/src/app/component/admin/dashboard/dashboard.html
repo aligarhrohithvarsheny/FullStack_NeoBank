@@ -86,6 +86,8 @@
           <span class="badge users" *ngIf="universalSearchResults.userCount > 0">{{ universalSearchResults.userCount }} User(s)</span>
           <span class="badge loans" *ngIf="universalSearchResults.loanCount > 0">{{ universalSearchResults.loanCount }} Loan(s)</span>
           <span class="badge cheques" *ngIf="universalSearchResults.chequeCount > 0">{{ universalSearchResults.chequeCount }} Cheque(s)</span>
+          <span class="badge demand-drafts" *ngIf="universalSearchResults.demandDraftCount > 0">{{ universalSearchResults.demandDraftCount }} DD(s)</span>
+          <span class="badge upi-accounts" *ngIf="universalSearchResults.upiAccountCount > 0">{{ universalSearchResults.upiAccountCount }} UPI</span>
           <span class="badge transactions" *ngIf="universalSearchResults.transactionCount > 0">{{ universalSearchResults.transactionCount }} Transaction(s)</span>
           <span class="badge cards" *ngIf="universalSearchResults.cardCount > 0">{{ universalSearchResults.cardCount }} Card(s)</span>
           <span class="badge credit-cards" *ngIf="universalSearchResults.creditCardCount > 0">{{ universalSearchResults.creditCardCount }} Credit Card(s)</span>
@@ -262,6 +264,40 @@
                 <label>Status:</label>
                 <span class="value status" [ngClass]="'status-' + cheque.status.toLowerCase()">{{ cheque.status }}</span>
               </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Demand Draft Results -->
+      <div class="results-group" *ngIf="universalSearchResults.demandDrafts && universalSearchResults.demandDrafts.length > 0">
+        <h5 class="group-header"><i class="fa fa-file-invoice-dollar"></i> Demand Drafts ({{ universalSearchResults.demandDrafts.length }})</h5>
+        <div class="results-grid">
+          <div *ngFor="let dd of universalSearchResults.demandDrafts" class="result-card demand-draft-card">
+            <div class="card-header"><span class="card-type">Demand Draft</span><span class="match-type">{{ dd.matchType }}</span></div>
+            <div class="card-body">
+              <div class="card-field"><label>DD No:</label><span class="value highlight">{{ dd.ddNumber || '-' }}</span></div>
+              <div class="card-field"><label>Cheque Ref:</label><span class="value">{{ dd.chequeNumber || '-' }}</span></div>
+              <div class="card-field"><label>Account:</label><span class="value">{{ dd.accountNumber }}</span></div>
+              <div class="card-field"><label>Payee:</label><span class="value">{{ dd.payeeName || '-' }}</span></div>
+              <div class="card-field"><label>Amount:</label><span class="value amount">₹{{ dd.amount | number:'1.2-2' }}</span></div>
+              <div class="card-field"><label>Status:</label><span class="value status">{{ dd.status }}</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- UPI Account Results -->
+      <div class="results-group" *ngIf="universalSearchResults.upiAccounts && universalSearchResults.upiAccounts.length > 0">
+        <h5 class="group-header"><i class="fa fa-mobile-alt"></i> UPI Accounts ({{ universalSearchResults.upiAccounts.length }})</h5>
+        <div class="results-grid">
+          <div *ngFor="let upi of universalSearchResults.upiAccounts" class="result-card upi-card">
+            <div class="card-header"><span class="card-type">UPI Account</span><span class="match-type">{{ upi.matchType }}</span></div>
+            <div class="card-body">
+              <div class="card-field"><label>UPI ID:</label><span class="value highlight">{{ upi.upiId }}</span></div>
+              <div class="card-field"><label>User:</label><span class="value">{{ upi.userName }}</span></div>
+              <div class="card-field"><label>Account:</label><span class="value">{{ upi.accountNumber || '-' }}</span></div>
+              <div class="card-field"><label>Status:</label><span class="value status">{{ upi.upiEnabled ? 'Enabled' : 'Disabled' }}</span></div>
             </div>
           </div>
         </div>

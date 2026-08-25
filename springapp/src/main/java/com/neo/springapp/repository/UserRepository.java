@@ -77,5 +77,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     // UPI queries
     Optional<User> findByUpiId(String upiId);
+    List<User> findByUpiIdContainingIgnoreCase(String upiId);
     List<User> findByUpiEnabled(Boolean upiEnabled);
 }

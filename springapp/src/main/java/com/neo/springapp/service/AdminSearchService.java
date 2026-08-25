@@ -94,6 +94,9 @@ public class AdminSearchService {
     @Autowired(required = false)
     private ChequeRequestRepository chequeRequestRepository;
 
+    @Autowired(required = false)
+    private DemandDraftRepository demandDraftRepository;
+
     /**
      * Comprehensive search across ALL entities - A to Z
      */
@@ -129,6 +132,14 @@ public class AdminSearchService {
         List<Map<String, Object>> cheques = searchCheques(term);
         results.put("cheques", cheques);
         results.put("chequeCount", cheques.size());
+
+        List<Map<String, Object>> demandDrafts = searchDemandDrafts(term);
+        results.put("demandDrafts", demandDrafts);
+        results.put("demandDraftCount", demandDrafts.size());
+
+        List<Map<String, Object>> upiAccounts = searchUpiAccounts(term);
+        results.put("upiAccounts", upiAccounts);
+        results.put("upiAccountCount", upiAccounts.size());
 
         // Search Transactions
         List<Map<String, Object>> transactions = searchTransactions(term);
@@ -242,7 +253,7 @@ public class AdminSearchService {
 
         // Total results
         int totalCount = accounts.size() + users.size() + loans.size() + 
-                        cheques.size() + transactions.size() + cards.size() +
+                        cheques.size() + demandDrafts.size() + upiAccounts.size() + transactions.size() + cards.size() +
                         creditCards.size() + fixedDeposits.size() + investments.size() +
                         emis.size() + insurance.size() + fastags.size() +
                         salaryAccounts.size() + currentAccounts.size() + soundboxes.size() +
@@ -541,6 +552,73 @@ public class AdminSearchService {
         result.put("drawnDate", cheque.getDrawnDate());
         result.put("matchType", matchType);
         return result;
+    }
+
+    private List<Map<String, Object>> searchDemandDrafts(String term) {
+        List<Map<String, Object>> results = new ArrayList<>();
+        if (demandDraftRepository == null) return results;
+        try {
+            demandDraftRepository.findAll().stream()
+                    .filter(d -> containsIgnoreCase(d.getDdNumber(), term)
+                            || containsIgnoreCase(d.getChequeNumber(), term)
+                            || containsIgnoreCase(d.getAccountNumber(), term)
+                            || (d.getId() != null && String.valueOf(d.getId()).equals(term)))
+                    .limit(50)
+                    .forEach(d -> results.add(createDemandDraftResult(d, matchTypeForDraft(d, term))));
+        } catch (Exception e) { /* keep other universal search groups available */ }
+        return results;
+    }
+
+    private String matchTypeForDraft(DemandDraft draft, String term) {
+        if (draft.getDdNumber() != null && draft.getDdNumber().equalsIgnoreCase(term)) return "DD Number";
+        if (draft.getChequeNumber() != null && draft.getChequeNumber().equalsIgnoreCase(term)) return "Cheque Reference";
+        if (draft.getId() != null && String.valueOf(draft.getId()).equals(term)) return "DD Database ID";
+        return "Demand Draft Details";
+    }
+
+    private Map<String, Object> createDemandDraftResult(DemandDraft draft, String matchType) {
+        Map<String, Object> result = new HashMap<>();
+        result.put("type", "DemandDraft");
+        result.put("id", draft.getId());
+        result.put("ddNumber", draft.getDdNumber());
+        result.put("chequeNumber", draft.getChequeNumber());
+        result.put("accountNumber", draft.getAccountNumber());
+        result.put("userName", draft.getUserName());
+        result.put("payeeName", draft.getPayeeName());
+        result.put("amount", draft.getAmount());
+        result.put("status", draft.getStatus());
+        result.put("createdAt", draft.getCreatedAt());
+        result.put("matchType", matchType);
+        return result;
+    }
+
+    private List<Map<String, Object>> searchUpiAccounts(String term) {
+        List<Map<String, Object>> results = new ArrayList<>();
+        try {
+            userRepository.findByUpiId(term).ifPresent(u -> results.add(createUpiResult(u, "UPI ID")));
+            for (User u : userRepository.findByUpiIdContainingIgnoreCase(term)) {
+                if (results.stream().noneMatch(r -> Objects.equals(r.get("userId"), u.getId()))) {
+                    results.add(createUpiResult(u, "UPI ID (Partial)"));
+                }
+            }
+        } catch (Exception e) { /* UPI is optional for older schemas */ }
+        return results;
+    }
+
+    private Map<String, Object> createUpiResult(User user, String matchType) {
+        Map<String, Object> result = new HashMap<>();
+        result.put("type", "UPI");
+        result.put("userId", user.getId());
+        result.put("upiId", user.getUpiId());
+        result.put("userName", user.getUsername());
+        result.put("accountNumber", user.getAccountNumber());
+        result.put("upiEnabled", user.getUpiEnabled());
+        result.put("matchType", matchType);
+        return result;
+    }
+
+    private boolean containsIgnoreCase(String value, String term) {
+        return value != null && value.toLowerCase(Locale.ROOT).contains(term.toLowerCase(Locale.ROOT));
     }
 
     /**

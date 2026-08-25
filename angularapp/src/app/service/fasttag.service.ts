@@ -134,7 +134,10 @@ export class FasttagService {
 
   // Get RC image URL
   getRcImageUrl(filename: string): string {
-    return `${environment.apiBaseUrl}/api/fasttags/rc-image/${filename}`;
+    // The backend stores a filesystem path (which may contain either slash style),
+    // while the image endpoint accepts only the saved filename.
+    const basename = (filename || '').split(/[\\/]/).pop() || '';
+    return `${environment.apiBaseUrl}/api/fasttags/rc-image/${encodeURIComponent(basename)}`;
   }
 
   // Get sticker download URL
