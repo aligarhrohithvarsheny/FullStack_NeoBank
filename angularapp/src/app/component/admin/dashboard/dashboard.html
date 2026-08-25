@@ -1050,10 +1050,24 @@
         <div class="section-header-actions">
           <input type="text" [(ngModel)]="depositSlipLookupId" placeholder="Enter slip ID" (keyup.enter)="lookupDepositSlip()" style="padding:8px 10px;border:1px solid #ced4da;border-radius:4px;" />
           <button class="refresh-btn" (click)="lookupDepositSlip()" [disabled]="isLookingUpDepositSlip"><i class="fa fa-search"></i> Find Slip</button>
+          <input type="text" [(ngModel)]="chequeDepositNumber" placeholder="Cheque number" (keyup.enter)="verifyChequeForDeposit()" style="padding:8px 10px;border:1px solid #ced4da;border-radius:4px;" />
+          <button class="refresh-btn" (click)="verifyChequeForDeposit()" [disabled]="isVerifyingChequeDeposit"><i class="fa fa-check-circle"></i> Verify Cheque</button>
           <button class="refresh-btn" (click)="loadDepositRequests()"><i class="fa fa-sync-alt"></i> Refresh</button>
           <button class="close-btn" (click)="setActiveSection('home')">
             <i class="fa fa-times"></i>
           </button>
+        </div>
+      </div>
+      <div *ngIf="chequeDepositDetails" class="deposit-card" style="margin:12px 0;border-left:4px solid #0d6efd;">
+        <strong>Cheque Verification</strong>
+        <span [style.color]="chequeDepositDetails.valid ? '#198754' : '#dc3545'">{{ chequeDepositDetails.message }}</span>
+        <div style="display:flex;gap:18px;flex-wrap:wrap;margin-top:8px;font-size:13px;">
+          <span>Cheque: {{ chequeDepositDetails.chequeNumber || chequeDepositNumber }}</span>
+          <span>Owner: {{ chequeDepositDetails.accountHolderName || 'N/A' }}</span>
+          <span>Account: {{ chequeDepositDetails.accountNumber || 'N/A' }}</span>
+          <span>Amount: ₹{{ chequeDepositDetails.amount || 0 | number:'1.2-2' }}</span>
+          <span>Available balance: ₹{{ chequeDepositDetails.availableBalance || 0 | number:'1.2-2' }}</span>
+          <span>Status: {{ chequeDepositDetails.status || 'NOT FOUND' }}</span>
         </div>
       </div>
       <div *ngIf="isLoadingDepositRequests" class="loading-state">Loading deposit requests...</div>

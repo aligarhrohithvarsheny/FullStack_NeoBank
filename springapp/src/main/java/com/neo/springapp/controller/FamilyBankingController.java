@@ -46,6 +46,8 @@ public class FamilyBankingController {
     public List<MinorAccountApplication> applications(@RequestParam Long guardianUserId) { return service.guardianApplications(guardianUserId); }
     @GetMapping("/guardian-links")
     public List<GuardianLink> links(@RequestParam Long guardianUserId) { return service.guardianLinks(guardianUserId); }
+    @GetMapping("/account-lookup/{accountNumber}")
+    public Map<String, Object> accountLookup(@PathVariable String accountNumber, @RequestParam Long userId) { return service.lookupAccount(userId, accountNumber); }
     @GetMapping("/notifications")
     public List<FamilyBankingNotification> notifications(@RequestParam Long userId) { return service.notifications(userId); }
     @PostMapping("/notifications/{id}/read")
@@ -59,8 +61,8 @@ public class FamilyBankingController {
         return ResponseEntity.ok(service.reviewMinor(id, adminEmail, request.approve(), request.reason()));
     }
     @GetMapping("/admin/minor-applications")
-    public List<MinorAccountApplication> pendingApplications(@RequestHeader("X-Admin-Email") String adminEmail) {
-        if (adminEmail == null || adminEmail.isBlank()) throw new SecurityException("Admin identity is required");
+    public List<MinorAccountApplication> pendingApplications(@RequestHeader(value = "X-Admin-Email", required = false) String adminEmail) {
+        if (adminEmail == null || adminEmail.isBlank()) throw new SecurityException("Admin identity is required. Please sign in again.");
         return service.pendingMinorApplications();
     }
 

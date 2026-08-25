@@ -8,6 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 @Service
@@ -215,6 +216,18 @@ public class FamilyBankingService {
     }
 
     public List<GuardianLink> guardianLinks(Long guardianId) { requireUser(guardianId); return guardianRepository.findByGuardianUserIdAndStatus(guardianId, "ACTIVE"); }
+
+    public Map<String, Object> lookupAccount(Long userId, String accountNumber) {
+        requireUser(userId);
+        Account account = accountService.getAccountByNumber(accountNumber == null ? "" : accountNumber.trim());
+        if (account == null) throw new IllegalArgumentException("Account number not found");
+        Map<String, Object> result = new java.util.LinkedHashMap<>();
+        result.put("accountNumber", account.getAccountNumber()); result.put("name", account.getName());
+        boolean minor = account.isChildAccount() || "MINOR_SAVINGS".equalsIgnoreCase(account.getAccountType());
+        result.put("accountType", minor ? "MINOR_SAVINGS" : account.getAccountType()); result.put("isMinor", minor);
+        result.put("status", account.getStatus()); result.put("balance", account.getBalance());
+        return result;
+    }
 
     public List<FamilyBankingNotification> notifications(Long userId) { requireUser(userId); return notificationRepository.findByRecipientUserIdOrderByCreatedAtDesc(userId); }
 

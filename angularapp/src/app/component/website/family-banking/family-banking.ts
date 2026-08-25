@@ -14,6 +14,7 @@ export class FamilyBankingComponent implements OnInit {
   jointAccounts: JointAccountProfile[] = [];
   history: FamilyTransaction[] = []; selectedAccount: JointAccountProfile | null = null; operatingMode = 'JOINTLY';
   activeSection = 'overview'; message = ''; error = ''; busy = false; loading = false; loaded = false;
+  lookupAccountNumber = ''; lookupResult: any = null; lookupBusy = false;
   constructor(private family: FamilyBankingService) {}
   ngOnInit(): void {
     const raw = sessionStorage.getItem('currentUser'); const user = raw ? JSON.parse(raw) : null;
@@ -37,7 +38,17 @@ export class FamilyBankingComponent implements OnInit {
   requestTransfer(): void { this.run(this.family.requestTransfer(this.userId, this.transferAccountNumber, this.destinationAccount, this.amount, this.note), 'Transfer sent for joint approval'); }
   decide(transfer: JointTransfer, approve: boolean): void { this.run(this.family.decideTransfer(this.userId, transfer.id, approve), approve ? 'Transfer approved' : 'Transfer declined'); }
   applyMinor(): void { this.run(this.family.applyMinor({ guardianUserId: this.userId, minorName: this.minorName, dateOfBirth: this.dateOfBirth, monthlyLimit: this.monthlyLimit, dailyLimit: this.dailyLimit }), 'Minor account application submitted'); }
-  readNotification(notification: FamilyNotification): void { this.run(this.family.markNotificationRead(this.userId, notification.id), 'Notification marked as read'); }
+  lookupFamilyAccount(): void { if (!this.lookupAccountNumber.trim()) return; this.lookupBusy = true; this.lookupResult = null; this.family.lookupAccount(this.userId, this.lookupAccountNumber.trim()).subscribe({ next: result => { this.lookupResult = result; this.lookupBusy = false; }, error: e => { this.lookupBusy = false; this.error = e?.error?.message || 'Account could not be verified'; } }); }
+  readNotification(notification: FamilyNotification): void {
+    this.busy = true; this.error = '';
+    this.family.markNotificationRead(this.userId, notification.id).subscribe({
+      next: updated => {
+        this.busy = false; this.message = 'Notification marked as read';
+        this.notifications = this.notifications.map(item => item.id === updated.id ? updated : item);
+      },
+      error: e => { this.busy = false; this.error = e?.error?.message || e?.error?.error || 'Unable to mark notification as read'; }
+    });
+  }
   mask(value: string | undefined): string { return value ? `${value.slice(0, 4)} •••• ${value.slice(-4)}` : 'Not available'; }
   maskId(value: unknown): string { return this.mask(value === undefined || value === null ? undefined : String(value)); }
   get unreadCount(): number { return this.notifications.filter(notification => !notification.readAt).length; }

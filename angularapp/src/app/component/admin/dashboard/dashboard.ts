@@ -73,6 +73,9 @@ export class Dashboard implements OnInit, OnDestroy {
   isLoadingDepositRequests: boolean = false;
   depositSlipLookupId: string = '';
   isLookingUpDepositSlip: boolean = false;
+  chequeDepositNumber: string = '';
+  chequeDepositDetails: any = null;
+  isVerifyingChequeDeposit: boolean = false;
 
   // Receipt fields
   showReceipt: boolean = false;
@@ -2188,6 +2191,17 @@ export class Dashboard implements OnInit, OnDestroy {
     this.http.get(`${environment.apiBaseUrl}/api/deposit-requests/request-id/${encodeURIComponent(slipId)}`).subscribe({
       next: (request: any) => { this.depositRequests = request?.status === 'PENDING' ? [request] : [request]; this.isLookingUpDepositSlip = false; },
       error: () => { this.depositRequests = []; this.isLookingUpDepositSlip = false; this.alertService.error('Not Found', 'No deposit request found for that slip ID'); }
+    });
+  }
+
+  verifyChequeForDeposit() {
+    const chequeNumber = this.chequeDepositNumber.trim();
+    if (!chequeNumber) return;
+    this.isVerifyingChequeDeposit = true;
+    this.chequeDepositDetails = null;
+    this.http.get(`${environment.apiBaseUrl}/api/cheques/admin/deposit-verify?chequeNumber=${encodeURIComponent(chequeNumber)}`).subscribe({
+      next: details => { this.chequeDepositDetails = details; this.isVerifyingChequeDeposit = false; },
+      error: err => { this.isVerifyingChequeDeposit = false; this.chequeDepositDetails = err.error || { valid: false, message: 'Cheque number not found' }; }
     });
   }
 

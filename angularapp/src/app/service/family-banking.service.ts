@@ -43,6 +43,7 @@ export class FamilyBankingService {
   applications(guardianUserId: number): Observable<MinorApplication[]> { return this.http.get<MinorApplication[]>(`${this.api}/minor-applications`, { params: { guardianUserId } }); }
   applyMinor(data: { guardianUserId: number; minorName: string; dateOfBirth: string; monthlyLimit: number; dailyLimit: number }): Observable<MinorApplication> { return this.http.post<MinorApplication>(`${this.api}/minor-applications`, data); }
   guardianLinks(guardianUserId: number): Observable<any[]> { return this.http.get<any[]>(`${this.api}/guardian-links`, { params: { guardianUserId } }); }
+  lookupAccount(userId: number, accountNumber: string): Observable<any> { return this.http.get<any>(`${this.api}/account-lookup/${encodeURIComponent(accountNumber)}`, { params: { userId } }); }
   jointAccounts(userId: number): Observable<JointAccountProfile[]> { return this.http.get<JointAccountProfile[]>(`${this.api}/joint-accounts?userId=${userId}`); }
   history(userId: number, accountNumber: string): Observable<FamilyTransaction[]> { return this.http.get<FamilyTransaction[]>(`${this.api}/joint-accounts/${encodeURIComponent(accountNumber)}/history`, { params: { userId } }); }
   updateSettings(userId: number, accountNumber: string, operatingMode: string): Observable<JointAccountProfile> { return this.http.patch<JointAccountProfile>(`${this.api}/joint-accounts/${encodeURIComponent(accountNumber)}/settings`, { userId, operatingMode }); }

@@ -170,6 +170,33 @@ public class ChequeService {
         return chequeRepository.findByChequeNumber(chequeNumber);
     }
 
+    public Map<String, Object> verifyForDeposit(String chequeNumber) {
+        Cheque cheque = chequeRepository.findByChequeNumber(chequeNumber == null ? "" : chequeNumber.trim())
+                .orElseThrow(() -> new IllegalArgumentException("Cheque number not found"));
+        Map<String, Object> result = new java.util.LinkedHashMap<>();
+        result.put("valid", cheque.isAvailable());
+        result.put("chequeId", cheque.getId());
+        result.put("chequeNumber", cheque.getChequeNumber());
+        result.put("accountNumber", cheque.getAccountNumber());
+        result.put("accountHolderName", cheque.getAccountHolderName());
+        result.put("accountType", cheque.getAccountType());
+        result.put("amount", cheque.getAmount());
+        result.put("status", cheque.getStatus());
+        Account account = accountRepository.findByAccountNumber(cheque.getAccountNumber());
+        result.put("availableBalance", account == null || account.getBalance() == null ? 0.0 : account.getBalance());
+        result.put("message", cheque.isAvailable() ? "Cheque is valid and unused" : "Cheque is already used or unavailable");
+        return result;
+    }
+
+    @Transactional
+    public Cheque markDeposited(String chequeNumber, String depositReference) {
+        Cheque cheque = chequeRepository.findByChequeNumber(chequeNumber == null ? "" : chequeNumber.trim())
+                .orElseThrow(() -> new IllegalArgumentException("Cheque number not found"));
+        if (!cheque.isAvailable()) throw new IllegalArgumentException("Cheque is already used or unavailable");
+        cheque.markUsed("CASH_DEPOSIT", depositReference);
+        return chequeRepository.save(cheque);
+    }
+
     // Cancel cheque
     public Cheque cancelCheque(Long id, String cancelledBy, String reason) {
         Cheque cheque = chequeRepository.findById(id)

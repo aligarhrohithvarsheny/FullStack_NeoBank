@@ -4,6 +4,7 @@ import com.neo.springapp.model.Account;
 import com.neo.springapp.model.DepositRequest;
 import com.neo.springapp.model.Transaction;
 import com.neo.springapp.repository.DepositRequestRepository;
+import com.neo.springapp.service.ChequeService;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -17,13 +18,16 @@ public class DepositRequestService {
     private final DepositRequestRepository depositRequestRepository;
     private final AccountService accountService;
     private final TransactionService transactionService;
+    private final ChequeService chequeService;
 
     public DepositRequestService(DepositRequestRepository depositRequestRepository,
                                  AccountService accountService,
-                                 TransactionService transactionService) {
+                                 TransactionService transactionService,
+                                 ChequeService chequeService) {
         this.depositRequestRepository = depositRequestRepository;
         this.accountService = accountService;
         this.transactionService = transactionService;
+        this.chequeService = chequeService;
     }
 
     public DepositRequest createRequest(DepositRequest request) {
@@ -80,6 +84,12 @@ public class DepositRequestService {
 
         if (!"PENDING".equalsIgnoreCase(request.getStatus())) {
             throw new IllegalStateException("Only pending requests can be approved");
+        }
+
+        if ("CHEQUE".equalsIgnoreCase(request.getMethod())) {
+            if (request.getReferenceNumber() == null || request.getReferenceNumber().isBlank())
+                throw new IllegalArgumentException("Cheque number is required for cheque deposits");
+            chequeService.markDeposited(request.getReferenceNumber(), request.getRequestId());
         }
 
         Account account = accountService.getAccountByNumber(request.getAccountNumber());

@@ -364,6 +364,12 @@ public class ChequeController {
         }
     }
 
+    @GetMapping("/admin/deposit-verify")
+    public ResponseEntity<?> verifyChequeForDeposit(@RequestParam String chequeNumber) {
+        try { return ResponseEntity.ok(chequeService.verifyForDeposit(chequeNumber)); }
+        catch (IllegalArgumentException e) { return ResponseEntity.badRequest().body(Map.of("valid", false, "message", e.getMessage())); }
+    }
+
     // Get all drawn cheques - Admin only
     @GetMapping("/admin/drawn")
     public ResponseEntity<Page<Cheque>> getDrawnCheques(
