@@ -22,6 +22,8 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
     // JPQL Query to find transactions by account number with pagination
     @Query("SELECT t FROM Transaction t WHERE t.accountNumber = :accountNumber ORDER BY t.date DESC")
     Page<Transaction> findByAccountNumberOrderByDateDesc(@Param("accountNumber") String accountNumber, Pageable pageable);
+
+       List<Transaction> findByAccountNumberOrderByDateDesc(String accountNumber);
     
     // JPQL Query to find transactions by user name with pagination
     @Query("SELECT t FROM Transaction t WHERE t.userName = :userName ORDER BY t.date DESC")

@@ -20,6 +20,9 @@ public class FamilyBankingService {
     private final AccountService accountService;
     private final JointAccountProfileRepository jointProfileRepository;
     private final TransactionService transactionService;
+    private final FamilyBankingNotificationRepository notificationRepository;
+    private final FamilyBankingAuditLogRepository auditRepository;
+    private final TransactionRepository transactionRepository;
 
     public FamilyBankingService(JointAccountInvitationRepository invitationRepository,
                                 JointTransferApprovalRepository transferRepository,
@@ -28,7 +31,10 @@ public class FamilyBankingService {
                                 UserRepository userRepository,
                                 AccountService accountService,
                                 JointAccountProfileRepository jointProfileRepository,
-                                TransactionService transactionService) {
+                                TransactionService transactionService,
+                                FamilyBankingNotificationRepository notificationRepository,
+                                FamilyBankingAuditLogRepository auditRepository,
+                                TransactionRepository transactionRepository) {
         this.invitationRepository = invitationRepository;
         this.transferRepository = transferRepository;
         this.minorRepository = minorRepository;
@@ -37,6 +43,9 @@ public class FamilyBankingService {
         this.accountService = accountService;
         this.jointProfileRepository = jointProfileRepository;
         this.transactionService = transactionService;
+        this.notificationRepository = notificationRepository;
+        this.auditRepository = auditRepository;
+        this.transactionRepository = transactionRepository;
     }
 
     @Transactional
@@ -59,7 +68,10 @@ public class FamilyBankingService {
         invitation.setInviterUserId(inviterId);
         invitation.setInviteeUserId(invitee.getId());
         invitation.setOperatingMode("JOINTLY");
-        return invitationRepository.save(invitation);
+        JointAccountInvitation saved = invitationRepository.save(invitation);
+        notify(invitee.getId(), "JOINT_INVITATION", "Joint account invitation", "You have been invited to join account " + accountNumber + ".");
+        audit(inviterId, "JOINT_INVITATION_CREATED", "INVITATION", saved.getId(), accountNumber);
+        return saved;
     }
 
     @Transactional
@@ -91,7 +103,10 @@ public class FamilyBankingService {
             profile.setOperatingMode("JOINTLY");
             jointProfileRepository.save(profile);
         }
-        return invitationRepository.save(invitation);
+        JointAccountInvitation saved = invitationRepository.save(invitation);
+        notify(invitation.getInviterUserId(), "JOINT_INVITATION_DECISION", "Joint invitation " + (accept ? "accepted" : "declined"), "Your joint account invitation was " + (accept ? "accepted." : "declined."));
+        audit(userId, "JOINT_INVITATION_DECIDED", "INVITATION", invitationId, accept ? "accepted" : "declined");
+        return saved;
     }
 
     public List<JointAccountInvitation> invitations(Long userId) {
@@ -118,7 +133,10 @@ public class FamilyBankingService {
         JointTransferApproval approval = new JointTransferApproval();
         approval.setAccountNumber(accountNumber); approval.setFromUserId(userId); approval.setApproverUserId(approver);
         approval.setToAccountNumber(toAccountNumber); approval.setAmount(amount); approval.setNote(note);
-        return transferRepository.save(approval);
+        JointTransferApproval saved = transferRepository.save(approval);
+        notify(approver, "TRANSFER_APPROVAL", "Joint transfer needs approval", "A transfer of " + amount + " from " + accountNumber + " is waiting for your decision.");
+        audit(userId, "JOINT_TRANSFER_REQUESTED", "TRANSFER", saved.getId(), accountNumber);
+        return saved;
     }
 
     public List<JointTransferApproval> pendingTransfers(Long userId) {
@@ -143,7 +161,10 @@ public class FamilyBankingService {
             transfer.setTransactionReference("FAM-" + transfer.getId() + "-" + System.currentTimeMillis());
         } else transfer.setStatus("DECLINED");
         transfer.setDecidedAt(LocalDateTime.now());
-        return transferRepository.save(transfer);
+        JointTransferApproval saved = transferRepository.save(transfer);
+        notify(transfer.getFromUserId(), "TRANSFER_DECISION", "Joint transfer " + (approve ? "approved" : "declined"), "Your joint transfer request was " + (approve ? "approved." : "declined."));
+        audit(userId, "JOINT_TRANSFER_DECIDED", "TRANSFER", transferId, approve ? "approved" : "declined");
+        return saved;
     }
 
     @Transactional
@@ -155,7 +176,9 @@ public class FamilyBankingService {
         MinorAccountApplication app = new MinorAccountApplication();
         app.setGuardianUserId(guardianId); app.setMinorName(minorName); app.setDateOfBirth(dateOfBirth);
         app.setMonthlyLimit(monthlyLimit); app.setDailyLimit(dailyLimit);
-        return minorRepository.save(app);
+        MinorAccountApplication saved = minorRepository.save(app);
+        audit(guardianId, "MINOR_APPLICATION_CREATED", "MINOR_APPLICATION", saved.getId(), minorName);
+        return saved;
     }
 
     public List<MinorAccountApplication> guardianApplications(Long guardianId) {
@@ -181,7 +204,10 @@ public class FamilyBankingService {
             User child = new User(); child.setUsername(app.getMinorName()); child.setEmail("minor." + app.getId() + "@neobank.local"); child.setStatus("APPROVED"); child.setAccount(savedAccount); child.setParentUser(guardian); userRepository.save(child);
             GuardianLink link = new GuardianLink(); link.setGuardianUserId(app.getGuardianUserId()); link.setChildUserId(child.getId()); link.setStatus("ACTIVE"); guardianRepository.save(link);
         }
-        return minorRepository.save(app);
+        MinorAccountApplication saved = minorRepository.save(app);
+        notify(app.getGuardianUserId(), "MINOR_APPLICATION_DECISION", "Minor application " + (approve ? "approved" : "declined"), "The Family Banking minor application was " + (approve ? "approved." : "declined."));
+        audit(guardian.getId(), "MINOR_APPLICATION_REVIEWED", "MINOR_APPLICATION", applicationId, approve ? "approved" : "declined");
+        return saved;
     }
 
     public List<MinorAccountApplication> pendingMinorApplications() {
@@ -190,10 +216,39 @@ public class FamilyBankingService {
 
     public List<GuardianLink> guardianLinks(Long guardianId) { requireUser(guardianId); return guardianRepository.findByGuardianUserIdAndStatus(guardianId, "ACTIVE"); }
 
+    public List<FamilyBankingNotification> notifications(Long userId) { requireUser(userId); return notificationRepository.findByRecipientUserIdOrderByCreatedAtDesc(userId); }
+
+    @Transactional
+    public FamilyBankingNotification markNotificationRead(Long userId, Long notificationId) {
+        requireUser(userId);
+        FamilyBankingNotification notification = notificationRepository.findById(notificationId).orElseThrow(() -> new IllegalArgumentException("Notification not found"));
+        requireOwner(userId, notification.getRecipientUserId());
+        notification.setReadAt(LocalDateTime.now());
+        return notificationRepository.save(notification);
+    }
+
+    public List<Transaction> jointHistory(Long userId, String accountNumber) {
+        requireJointOwner(userId, accountNumber);
+        return transactionRepository.findByAccountNumberOrderByDateDesc(accountNumber);
+    }
+
+    @Transactional
+    public JointAccountProfile updateJointSettings(Long userId, String accountNumber, String operatingMode) {
+        requireJointOwner(userId, accountNumber);
+        if (!List.of("JOINTLY", "EITHER_OR_SURVIVOR").contains(operatingMode)) throw new IllegalArgumentException("Unsupported operating mode");
+        JointAccountProfile profile = jointProfileRepository.findByJointAccountNumber(accountNumber).orElseThrow();
+        profile.setOperatingMode(operatingMode);
+        audit(userId, "JOINT_SETTINGS_UPDATED", "JOINT_ACCOUNT", profile.getId(), operatingMode);
+        return jointProfileRepository.save(profile);
+    }
+
     private boolean isJointOwner(Long userId, String accountNumber) {
         return invitationRepository.findByAccountNumberAndStatus(accountNumber, "ACCEPTED").stream()
                 .anyMatch(i -> Objects.equals(i.getInviterUserId(), userId) || Objects.equals(i.getInviteeUserId(), userId));
     }
+    private void requireJointOwner(Long userId, String accountNumber) { requireUser(userId); if (!isJointOwner(userId, accountNumber)) throw new SecurityException("User is not an approved joint owner"); }
+    private void notify(Long userId, String type, String title, String message) { FamilyBankingNotification n = new FamilyBankingNotification(); n.setRecipientUserId(userId); n.setType(type); n.setTitle(title); n.setMessage(message); notificationRepository.save(n); }
+    private void audit(Long userId, String action, String resourceType, Long resourceId, String details) { FamilyBankingAuditLog log = new FamilyBankingAuditLog(); log.setActorUserId(userId); log.setAction(action); log.setResourceType(resourceType); log.setResourceId(resourceId == null ? null : resourceId.toString()); log.setDetails(details); auditRepository.save(log); }
     private void requireUser(Long id) { if (id == null || !userRepository.existsById(id)) throw new SecurityException("Authenticated user is required"); }
     private void requireOwner(Long actual, Long expected) { requireUser(actual); if (!Objects.equals(actual, expected)) throw new SecurityException("Not authorized for this resource"); }
     private void validateAmount(Double amount) { if (amount == null || amount <= 0 || amount > 1_000_000) throw new IllegalArgumentException("Invalid amount"); }

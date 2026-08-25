@@ -46,6 +46,14 @@ public class FamilyBankingController {
     public List<MinorAccountApplication> applications(@RequestParam Long guardianUserId) { return service.guardianApplications(guardianUserId); }
     @GetMapping("/guardian-links")
     public List<GuardianLink> links(@RequestParam Long guardianUserId) { return service.guardianLinks(guardianUserId); }
+    @GetMapping("/notifications")
+    public List<FamilyBankingNotification> notifications(@RequestParam Long userId) { return service.notifications(userId); }
+    @PostMapping("/notifications/{id}/read")
+    public FamilyBankingNotification markNotificationRead(@PathVariable Long id, @RequestBody DecisionRequest request) { return service.markNotificationRead(request.userId(), id); }
+    @GetMapping("/joint-accounts/{accountNumber}/history")
+    public List<Transaction> history(@PathVariable String accountNumber, @RequestParam Long userId) { return service.jointHistory(userId, accountNumber); }
+    @PatchMapping("/joint-accounts/{accountNumber}/settings")
+    public JointAccountProfile settings(@PathVariable String accountNumber, @RequestBody SettingsRequest request) { return service.updateJointSettings(request.userId(), accountNumber, request.operatingMode()); }
     @PostMapping("/admin/minor-applications/{id}/review")
     public ResponseEntity<MinorAccountApplication> review(@PathVariable Long id, @RequestHeader("X-Admin-Email") String adminEmail, @RequestBody DecisionRequest request) {
         return ResponseEntity.ok(service.reviewMinor(id, adminEmail, request.approve(), request.reason()));
@@ -60,4 +68,5 @@ public class FamilyBankingController {
     public record DecisionRequest(Long userId, boolean approve, String reason) {}
     public record TransferRequest(Long userId, String accountNumber, String toAccountNumber, Double amount, String note) {}
     public record MinorRequest(Long guardianUserId, String minorName, LocalDate dateOfBirth, Double monthlyLimit, Double dailyLimit) {}
+    public record SettingsRequest(Long userId, String operatingMode) {}
 }

@@ -44,6 +44,18 @@ public class FamilyBankingMigrationRunner implements ApplicationRunner {
                 status VARCHAR(20) NOT NULL, created_at DATETIME(6) NOT NULL,
                 UNIQUE KEY uk_guardian_child (guardian_user_id, child_user_id)
                 """);
+            create("family_banking_notifications", """
+                id BIGINT AUTO_INCREMENT PRIMARY KEY, recipient_user_id BIGINT NOT NULL,
+                type VARCHAR(40) NOT NULL, title VARCHAR(120) NOT NULL, message VARCHAR(1000) NOT NULL,
+                created_at DATETIME(6) NOT NULL, read_at DATETIME(6) NULL,
+                INDEX idx_family_notification_recipient (recipient_user_id, read_at)
+                """);
+            create("family_banking_audit_logs", """
+                id BIGINT AUTO_INCREMENT PRIMARY KEY, actor_user_id BIGINT NOT NULL,
+                action VARCHAR(80) NOT NULL, resource_type VARCHAR(80), resource_id VARCHAR(80),
+                details VARCHAR(1000), created_at DATETIME(6) NOT NULL,
+                INDEX idx_family_audit_actor (actor_user_id, created_at)
+                """);
         } catch (Exception ex) {
             System.err.println("Family Banking migration warning: " + ex.getMessage());
         }
