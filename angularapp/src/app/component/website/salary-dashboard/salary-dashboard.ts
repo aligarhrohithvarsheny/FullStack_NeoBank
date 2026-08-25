@@ -173,6 +173,14 @@ export class SalaryDashboard implements OnInit, OnDestroy {
   isLoadingCardTransactions = false;
   cardLimitHistory: any[] = [];
 
+  // Credit card application and salary-based prediction
+  creditCardPrediction: any = null;
+  creditCardPan = '';
+  creditCardIncome: number | null = null;
+  isPredictingCredit = false;
+  isApplyingCredit = false;
+  creditCardApplicationSent = false;
+
   // ─── AI Fraud Detection ───────────────────────────────────
   fraudSummary: any = {};
   fraudAlerts: SalaryFraudAlert[] = [];
@@ -304,6 +312,39 @@ export class SalaryDashboard implements OnInit, OnDestroy {
     else if (section === 'fraud-detection') { this.loadFraudSummary(); }
     else if (section === 'gold-loan') { this.loadCurrentGoldRate(); this.loadMyGoldLoans(); }
     else if (section === 'employee-profile') { this.initProfileForm(); }
+  }
+
+  generatePassbook(): void {
+    if (!this.account?.accountNumber) return;
+    this.http.get(`${environment.apiBaseUrl}/api/passbook/generate/${this.account.accountNumber}?accountType=salary`, { responseType: 'blob' }).subscribe({
+      next: (blob) => {
+        if (blob.type.includes('application/json')) { this.alertService.userError('Passbook', 'Unable to generate passbook'); return; }
+        const url = URL.createObjectURL(blob); const link = document.createElement('a');
+        link.href = url; link.download = `NeoBank_Salary_Passbook_${this.account?.accountNumber}.pdf`; link.click(); URL.revokeObjectURL(url);
+        this.alertService.userSuccess('Passbook Generated', 'Your salary passbook has been downloaded.');
+      },
+      error: () => this.alertService.userError('Passbook', 'Unable to generate passbook')
+    });
+  }
+
+  predictSalaryCreditCard(): void {
+    const pan = this.creditCardPan.trim().toUpperCase();
+    if (pan.length !== 10) { this.alertService.userError('Validation', 'Enter a valid 10-character PAN'); return; }
+    this.isPredictingCredit = true;
+    this.http.post(`${environment.apiBaseUrl}/api/credit-card-requests/preview?pan=${encodeURIComponent(pan)}&income=${this.creditCardIncome || this.account?.monthlySalary || 0}`, {}).subscribe({
+      next: (result) => { this.creditCardPrediction = result; this.isPredictingCredit = false; },
+      error: () => { this.isPredictingCredit = false; this.alertService.userError('Prediction', 'Unable to calculate credit prediction'); }
+    });
+  }
+
+  applyForSalaryCreditCard(): void {
+    if (!this.account?.accountNumber || !this.creditCardPrediction) return;
+    this.isApplyingCredit = true;
+    const payload = { accountNumber: this.account.accountNumber, userName: this.account.employeeName, userEmail: this.account.email || '', pan: this.creditCardPan.trim().toUpperCase() };
+    this.http.post(`${environment.apiBaseUrl}/api/credit-card-requests/create?income=${this.creditCardIncome || this.account.monthlySalary || 0}`, payload).subscribe({
+      next: () => { this.isApplyingCredit = false; this.creditCardApplicationSent = true; this.alertService.userSuccess('Application Submitted', 'Your credit-card application is now visible to admin for review.'); },
+      error: () => { this.isApplyingCredit = false; this.alertService.userError('Application Failed', 'Unable to submit credit-card application'); }
+    });
   }
 
   // ─── Salary Transactions ──────────────────────────────────

@@ -328,6 +328,8 @@ export class ManagerDashboard implements OnInit, OnDestroy {
   isLoadingSalaryTxns: boolean = false;
   selectedSalaryAccount: SalaryAccount | null = null;
   editingSalaryAccount: SalaryAccount | null = null;
+  salaryEditHistory: any[] = [];
+  isLoadingSalaryEditHistory: boolean = false;
   salaryTransactions: SalaryTransaction[] = [];
   newSalaryAccount: SalaryAccount = this.getEmptySalaryAccount();
 
@@ -3186,10 +3188,16 @@ export class ManagerDashboard implements OnInit, OnDestroy {
   viewSalaryAccountDetails(acc: SalaryAccount): void {
     this.selectedSalaryAccount = { ...acc };
     this.salaryTransactions = [];
+    this.salaryEditHistory = [];
     this.isLoadingSalaryTxns = true;
     this.salaryAccountService.getTransactions(acc.id!).subscribe({
       next: (txns) => { this.salaryTransactions = txns || []; this.isLoadingSalaryTxns = false; },
       error: () => { this.isLoadingSalaryTxns = false; }
+    });
+    this.isLoadingSalaryEditHistory = true;
+    this.salaryAccountService.getEditHistory(acc.id!).subscribe({
+      next: (history) => { this.salaryEditHistory = history || []; this.isLoadingSalaryEditHistory = false; },
+      error: () => { this.isLoadingSalaryEditHistory = false; }
     });
   }
 
@@ -3200,7 +3208,7 @@ export class ManagerDashboard implements OnInit, OnDestroy {
   saveSalaryAccountEdit(): void {
     if (!this.editingSalaryAccount || !this.editingSalaryAccount.id) return;
     this.isSavingSalaryAccount = true;
-    this.salaryAccountService.updateAccount(this.editingSalaryAccount.id, this.editingSalaryAccount).subscribe({
+    this.salaryAccountService.updateAccount(this.editingSalaryAccount.id, this.editingSalaryAccount, this.managerName).subscribe({
       next: () => {
         this.alertService.success('Updated', 'Salary account updated successfully');
         this.editingSalaryAccount = null;
@@ -3211,6 +3219,27 @@ export class ManagerDashboard implements OnInit, OnDestroy {
         this.alertService.error('Update Failed', err?.error?.message || 'Unable to update');
         this.isSavingSalaryAccount = false;
       }
+    });
+  }
+
+  generateSalaryPassbook(acc: SalaryAccount): void {
+    if (!acc.accountNumber) return;
+    const url = `${environment.apiBaseUrl}/api/passbook/generate/${acc.accountNumber}?accountType=salary`;
+    this.http.get(url, { responseType: 'blob' }).subscribe({
+      next: (blob) => {
+        if (blob.type.includes('application/json')) {
+          this.alertService.error('Passbook Failed', 'Unable to generate salary passbook');
+          return;
+        }
+        const downloadUrl = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = downloadUrl;
+        link.download = `Passbook_${acc.accountNumber}.pdf`;
+        link.click();
+        URL.revokeObjectURL(downloadUrl);
+        this.alertService.success('Passbook Generated', `Passbook generated for ${acc.employeeName}`);
+      },
+      error: () => this.alertService.error('Passbook Failed', 'Unable to generate salary passbook')
     });
   }
 

@@ -492,11 +492,11 @@ export class AdminCheques implements OnInit {
     this.signatureDocUrl = null;
     this.signatureInfo = null;
 
-    this.http.get(`${environment.apiBaseUrl}/api/admin-account-applications/signed-document-info/${accountNumber}`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/api/admin/signature-management/lookup/${accountNumber.trim()}`).subscribe({
       next: (info: any) => {
-        if (info.found) {
+        if (info.signatureCopyPath && info.accountType && info.accountId) {
           this.signatureInfo = info;
-          this.http.get(`${environment.apiBaseUrl}/api/admin-account-applications/view-signed-document/${accountNumber}`, {
+          this.http.get(`${environment.apiBaseUrl}/api/admin/signature-management/view/${info.accountType}/${info.accountId}`, {
             responseType: 'blob'
           }).subscribe({
             next: (blob: Blob) => {
@@ -505,12 +505,12 @@ export class AdminCheques implements OnInit {
               this.signatureLoading = false;
             },
             error: () => {
-              this.signatureError = 'Failed to load the signed document file.';
+              this.signatureError = 'Failed to load the uploaded signature file.';
               this.signatureLoading = false;
             }
           });
         } else {
-          this.signatureError = info.message || 'No signed document available for this account.';
+          this.signatureError = info.message || 'No uploaded signature available for this account.';
           this.signatureLoading = false;
         }
       },

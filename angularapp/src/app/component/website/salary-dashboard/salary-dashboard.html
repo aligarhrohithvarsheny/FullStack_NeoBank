@@ -78,6 +78,14 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
         <span *ngIf="!sidebarCollapsed">Debit Card</span>
       </a>
+      <a class="sdash-nav-item" [class.active]="activeSection === 'credit-card'" (click)="setActiveSection('credit-card')" [hidden]="!matchesSidebarSearch('Credit Card')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/><line x1="6" y1="16" x2="10" y2="16"/></svg>
+        <span *ngIf="!sidebarCollapsed">Credit Card</span>
+      </a>
+      <a class="sdash-nav-item" [class.active]="activeSection === 'passbook'" (click)="setActiveSection('passbook')" [hidden]="!matchesSidebarSearch('Passbook')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h13a3 3 0 0 1 3 3v13H7a3 3 0 0 1-3-3V4z"/><path d="M4 17h16M8 8h8M8 12h6"/></svg>
+        <span *ngIf="!sidebarCollapsed">Passbook</span>
+      </a>
       <a class="sdash-nav-item" [class.active]="activeSection === 'loan-eligibility'" (click)="setActiveSection('loan-eligibility')" [hidden]="!matchesSidebarSearch('Loan Eligibility')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
         <span *ngIf="!sidebarCollapsed">Loan Eligibility</span>
@@ -137,6 +145,8 @@
            activeSection === 'settings' ? 'Profile Settings' :
            activeSection === 'upi' ? 'UPI Payments' :
            activeSection === 'debit-card' ? 'Debit Card Management' :
+           activeSection === 'credit-card' ? 'Credit Card Application' :
+           activeSection === 'passbook' ? 'Salary Passbook' :
            activeSection === 'loan-eligibility' ? 'Loan Eligibility' :
            activeSection === 'auto-savings' ? 'Auto Savings' :
            activeSection === 'salary-advance' ? 'Salary Advance' :
@@ -1470,6 +1480,42 @@
       </div>
 
       <!-- ─── LOAN ELIGIBILITY ──────────────────────────── -->
+      <div *ngIf="activeSection === 'credit-card'" class="sdash-section">
+        <div class="sdash-card sdash-mb" style="padding:28px;">
+          <h2><i class="fa fa-credit-card"></i> Apply for Credit Card</h2>
+          <p>Use your salary and PAN details to receive an AI/ML-based CIBIL, eligibility, and limit prediction before applying.</p>
+          <div class="sdash-form-grid">
+            <label>PAN Number<input [(ngModel)]="creditCardPan" maxlength="10" placeholder="ABCDE1234F" /></label>
+            <label>Monthly Salary (₹)<input type="number" [(ngModel)]="creditCardIncome" [placeholder]="account?.monthlySalary || 0" /></label>
+          </div>
+          <button class="sdash-btn sdash-btn-primary" (click)="predictSalaryCreditCard()" [disabled]="isPredictingCredit">
+            <i class="fa" [class.fa-spinner]="isPredictingCredit" [class.fa-brain]="!isPredictingCredit" [class.fa-spin]="isPredictingCredit"></i>
+            {{ isPredictingCredit ? 'Analysing...' : 'Check AI/ML Prediction' }}
+          </button>
+          <div *ngIf="creditCardPrediction" class="sdash-card" style="margin-top:22px;padding:20px;background:#f8f9ff;">
+            <h3>Salary Credit Assessment</h3>
+            <div class="sdash-stats-grid">
+              <div><strong>Predicted CIBIL</strong><span>{{ creditCardPrediction.predictedCibil }}</span></div>
+              <div><strong>Suggested Limit</strong><span>₹{{ creditCardPrediction.suggestedLimit | number:'1.0-0' }}</span></div>
+              <div><strong>Card Type</strong><span>{{ creditCardPrediction.cardType }}</span></div>
+              <div><strong>Eligibility</strong><span>{{ creditCardPrediction.eligibility }}</span></div>
+            </div>
+            <button class="sdash-btn sdash-btn-primary" (click)="applyForSalaryCreditCard()" [disabled]="isApplyingCredit || creditCardApplicationSent">
+              <i class="fa fa-paper-plane"></i> {{ creditCardApplicationSent ? 'Application Submitted' : (isApplyingCredit ? 'Submitting...' : 'Apply Now') }}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div *ngIf="activeSection === 'passbook'" class="sdash-section">
+        <div class="sdash-card" style="padding:32px;text-align:center;">
+          <i class="fa fa-book" style="font-size:3rem;color:#4361ee;"></i>
+          <h2>Salary Account Passbook</h2>
+          <p>Generate a PDF passbook containing your salary credits and account transactions.</p>
+          <button class="sdash-btn sdash-btn-primary" (click)="generatePassbook()"><i class="fa fa-download"></i> Generate Passbook</button>
+        </div>
+      </div>
+
       <div *ngIf="activeSection === 'loan-eligibility'" class="sdash-section">
         <div *ngIf="isLoadingLoan" class="sdash-loading">
           <div class="sdash-spinner"></div>

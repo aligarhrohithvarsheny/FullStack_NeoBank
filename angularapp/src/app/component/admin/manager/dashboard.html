@@ -2070,7 +2070,8 @@
               <td>{{ acc.createdAt | date:'mediumDate' }}</td>
               <td class="sal-cell-actions">
                 <button class="sal-act-btn sal-act-view" (click)="viewSalaryAccountDetails(acc)" title="View Details"><i class="fa fa-eye"></i></button>
-                <button class="sal-act-btn sal-act-edit" (click)="openEditSalaryAccount(acc)" title="Update Salary"><i class="fa fa-edit"></i></button>
+                <button class="sal-act-btn sal-act-edit" (click)="openEditSalaryAccount(acc)" title="Edit all account details"><i class="fa fa-edit"></i></button>
+                <button class="sal-act-btn" (click)="generateSalaryPassbook(acc)" title="Generate salary passbook" style="background:#0d6efd;color:#fff;"><i class="fa fa-book"></i></button>
                 <button class="sal-act-btn sal-act-credit" (click)="creditSalaryToAccount(acc)" title="Credit Salary" *ngIf="acc.status==='Active'"><i class="fa fa-rupee-sign"></i></button>
                 <button class="sal-act-btn sal-act-freeze" (click)="toggleFreezeSalaryAccount(acc)" [title]="acc.status==='Frozen' ? 'Unfreeze' : 'Freeze'" *ngIf="acc.status!=='Closed'">
                   <i class="fa" [class.fa-lock]="acc.status!=='Frozen'" [class.fa-lock-open]="acc.status==='Frozen'"></i>
@@ -2152,6 +2153,18 @@
           <div *ngIf="!isLoadingSalaryTxns && salaryTransactions.length === 0" class="sal-empty">
             <p>No transactions yet.</p>
           </div>
+
+          <h5 class="sal-txn-heading"><i class="fa fa-edit"></i> Account Edit History</h5>
+          <div *ngIf="isLoadingSalaryEditHistory" class="sal-loading"><i class="fa fa-spinner fa-spin"></i> Loading history...</div>
+          <div *ngIf="!isLoadingSalaryEditHistory && salaryEditHistory.length === 0" class="sal-empty"><p>No edits recorded.</p></div>
+          <div *ngIf="!isLoadingSalaryEditHistory && salaryEditHistory.length > 0" class="sal-history-list">
+            <div *ngFor="let entry of salaryEditHistory" class="sal-history-item">
+              <strong>{{ entry.editedBy }}</strong>
+              <span>{{ entry.editedAt | date:'medium' }}</span>
+              <p>{{ entry.changesDescription }}</p>
+              <pre>{{ entry.fieldChanges }}</pre>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -2159,16 +2172,32 @@
       <div *ngIf="editingSalaryAccount" class="sal-modal-overlay" (click)="editingSalaryAccount = null">
         <div class="sal-modal" (click)="$event.stopPropagation()">
           <div class="sal-modal-head">
-            <h4><i class="fa fa-edit"></i> Update Salary Details</h4>
+            <h4><i class="fa fa-edit"></i> Edit Salary Account Details</h4>
             <button class="sal-modal-close" (click)="editingSalaryAccount = null"><i class="fa fa-times"></i></button>
           </div>
           <div class="sal-edit-grid">
             <div class="sal-field-row">
               <div class="sal-field"><label>Employee Name</label><input type="text" [(ngModel)]="editingSalaryAccount.employeeName" /></div>
-              <div class="sal-field"><label>Designation</label><input type="text" [(ngModel)]="editingSalaryAccount.designation" /></div>
+              <div class="sal-field"><label>Date of Birth</label><input type="date" [(ngModel)]="editingSalaryAccount.dob" /></div>
             </div>
             <div class="sal-field-row">
-              <div class="sal-field"><label>Monthly Salary (₹)</label><input type="number" [(ngModel)]="editingSalaryAccount.monthlySalary" /></div>
+              <div class="sal-field"><label>Mobile Number</label><input type="text" [(ngModel)]="editingSalaryAccount.mobileNumber" maxlength="10" /></div>
+              <div class="sal-field"><label>Email ID</label><input type="email" [(ngModel)]="editingSalaryAccount.email" /></div>
+            </div>
+            <div class="sal-field-row">
+              <div class="sal-field"><label>Aadhaar Number</label><input type="text" [(ngModel)]="editingSalaryAccount.aadharNumber" maxlength="12" /></div>
+              <div class="sal-field"><label>PAN Number</label><input type="text" [(ngModel)]="editingSalaryAccount.panNumber" maxlength="10" /></div>
+            </div>
+            <div class="sal-field-row">
+              <div class="sal-field"><label>Employer Address</label><input type="text" [(ngModel)]="editingSalaryAccount.employerAddress" /></div>
+              <div class="sal-field"><label>HR Contact Number</label><input type="text" [(ngModel)]="editingSalaryAccount.hrContactNumber" maxlength="10" /></div>
+            </div>
+            <div class="sal-field-row">
+              <div class="sal-field"><label>Designation</label><input type="text" [(ngModel)]="editingSalaryAccount.designation" /></div>
+              <div class="sal-field"><label>Address</label><input type="text" [(ngModel)]="editingSalaryAccount.address" /></div>
+            </div>
+            <div class="sal-field-row">
+              <div class="sal-field"><label>Monthly Salary (₹)</label><input type="number" [(ngModel)]="editingSalaryAccount.monthlySalary" min="0" /></div>
               <div class="sal-field"><label>Salary Credit Date</label><input type="number" [(ngModel)]="editingSalaryAccount.salaryCreditDate" min="1" max="28" /></div>
             </div>
             <div class="sal-field-row">
@@ -2176,8 +2205,32 @@
               <div class="sal-field"><label>Company ID</label><input type="text" [(ngModel)]="editingSalaryAccount.companyId" /></div>
             </div>
             <div class="sal-field-row">
+              <div class="sal-field"><label>Employer Address</label><input type="text" [(ngModel)]="editingSalaryAccount.employerAddress" /></div>
+              <div class="sal-field"><label>HR Contact Number</label><input type="text" [(ngModel)]="editingSalaryAccount.hrContactNumber" /></div>
+            </div>
+            <div class="sal-field-row">
               <div class="sal-field"><label>Branch Name</label><input type="text" [(ngModel)]="editingSalaryAccount.branchName" /></div>
               <div class="sal-field"><label>IFSC Code</label><input type="text" [(ngModel)]="editingSalaryAccount.ifscCode" /></div>
+            </div>
+            <div class="sal-field-row">
+              <div class="sal-field"><label>Net Banking</label><select [(ngModel)]="editingSalaryAccount.netBankingEnabled"><option [ngValue]="true">Enabled</option><option [ngValue]="false">Disabled</option></select></div>
+              <div class="sal-field"><label>UPI</label><select [(ngModel)]="editingSalaryAccount.upiEnabled"><option [ngValue]="true">Enabled</option><option [ngValue]="false">Disabled</option></select></div>
+            </div>
+            <div class="sal-field-row">
+              <div class="sal-field"><label>Auto Savings</label><select [(ngModel)]="editingSalaryAccount.autoSavingsEnabled"><option [ngValue]="true">Enabled</option><option [ngValue]="false">Disabled</option></select></div>
+              <div class="sal-field"><label>Auto Savings %</label><input type="number" [(ngModel)]="editingSalaryAccount.autoSavingsPercentage" min="0" max="100" /></div>
+            </div>
+            <div class="sal-field-row">
+              <div class="sal-field"><label>Debit Card Status</label><input type="text" [(ngModel)]="editingSalaryAccount.debitCardStatus" /></div>
+              <div class="sal-field"><label>Daily Limit (₹)</label><input type="number" [(ngModel)]="editingSalaryAccount.dailyLimit" min="0" /></div>
+            </div>
+            <div class="sal-field-row">
+              <div class="sal-field"><label>International Use</label><select [(ngModel)]="editingSalaryAccount.internationalEnabled"><option [ngValue]="true">Enabled</option><option [ngValue]="false">Disabled</option></select></div>
+              <div class="sal-field"><label>Online Use</label><select [(ngModel)]="editingSalaryAccount.onlineEnabled"><option [ngValue]="true">Enabled</option><option [ngValue]="false">Disabled</option></select></div>
+            </div>
+            <div class="sal-field-row">
+              <div class="sal-field"><label>Contactless Use</label><select [(ngModel)]="editingSalaryAccount.contactlessEnabled"><option [ngValue]="true">Enabled</option><option [ngValue]="false">Disabled</option></select></div>
+              <div class="sal-field"><label>Designation</label><input type="text" [(ngModel)]="editingSalaryAccount.designation" /></div>
             </div>
           </div>
           <div class="sal-form-footer">

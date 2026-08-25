@@ -6,6 +6,8 @@ import com.neo.springapp.model.CreditCardRequest;
 import com.neo.springapp.repository.CardRepository;
 import com.neo.springapp.repository.CreditCardRequestRepository;
 import com.neo.springapp.repository.CreditCardRepository;
+import com.neo.springapp.repository.SalaryAccountRepository;
+import com.neo.springapp.model.SalaryAccount;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.neo.springapp.model.Account;
@@ -22,13 +24,15 @@ public class CreditCardRequestService {
     private final CardRepository cardRepository;
     private final CreditCardRepository creditCardRepository;
     private final AccountService accountService;
+    private final SalaryAccountRepository salaryAccountRepository;
 
-    public CreditCardRequestService(CreditCardRequestRepository repo, CreditScorePredictorService predictor, CardRepository cardRepository, CreditCardRepository creditCardRepository, AccountService accountService) {
+    public CreditCardRequestService(CreditCardRequestRepository repo, CreditScorePredictorService predictor, CardRepository cardRepository, CreditCardRepository creditCardRepository, AccountService accountService, SalaryAccountRepository salaryAccountRepository) {
         this.repo = repo;
         this.predictor = predictor;
         this.cardRepository = cardRepository;
         this.creditCardRepository = creditCardRepository;
         this.accountService = accountService;
+        this.salaryAccountRepository = salaryAccountRepository;
     }
 
     public CreditCardRequest saveRequest(CreditCardRequest request, Double income) {
@@ -56,11 +60,13 @@ public class CreditCardRequestService {
         return repo.findById(id).map(req -> {
             // Ensure target account is active before issuing credit card
             Account account = accountService.getAccountByNumber(req.getAccountNumber());
-            if (account == null) {
+            SalaryAccount salaryAccount = account == null ? salaryAccountRepository.findByAccountNumber(req.getAccountNumber()) : null;
+            if (account == null && salaryAccount == null) {
                 throw new RuntimeException("Cannot approve credit card: account not found: " + req.getAccountNumber());
             }
-            if (!"ACTIVE".equalsIgnoreCase(account.getStatus())) {
-                throw new RuntimeException("Cannot approve credit card: account is not active: " + req.getAccountNumber() + " | status=" + account.getStatus());
+            String accountStatus = account != null ? account.getStatus() : salaryAccount.getStatus();
+            if (!"ACTIVE".equalsIgnoreCase(accountStatus)) {
+                throw new RuntimeException("Cannot approve credit card: account is not active: " + req.getAccountNumber() + " | status=" + accountStatus);
             }
             req.setStatus("Approved");
             req.setProcessedBy(adminName);
