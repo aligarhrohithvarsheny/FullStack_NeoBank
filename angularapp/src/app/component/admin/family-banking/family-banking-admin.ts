@@ -11,8 +11,19 @@ export class FamilyBankingAdminComponent implements OnInit {
   ngOnInit(): void { this.load(); }
   load(): void {
     this.loading = true; this.error = '';
-    const email = sessionStorage.getItem('adminEmail') || '';
+    const email = this.getAdminEmail();
     this.http.get<MinorApplication[]>(`${environment.apiBaseUrl}/api/family/admin/minor-applications`, { headers: { 'X-Admin-Email': email } }).subscribe({ next: value => { this.applications = value; this.loading = false; }, error: () => { this.error = 'Unable to load applications'; this.loading = false; } });
   }
-  review(app: MinorApplication, approve: boolean): void { const email = sessionStorage.getItem('adminEmail') || ''; this.busy = true; this.error = ''; this.http.post(`${environment.apiBaseUrl}/api/family/admin/minor-applications/${app.id}/review`, { userId: 0, approve }, { headers: { 'X-Admin-Email': email } }).subscribe({ next: () => { this.busy = false; this.message = approve ? 'Application approved' : 'Application declined'; this.load(); }, error: e => { this.busy = false; this.error = e?.error?.message || 'Review failed'; } }); }
+  review(app: MinorApplication, approve: boolean): void { const email = this.getAdminEmail(); this.busy = true; this.error = ''; this.http.post(`${environment.apiBaseUrl}/api/family/admin/minor-applications/${app.id}/review`, { userId: 0, approve }, { headers: { 'X-Admin-Email': email } }).subscribe({ next: () => { this.busy = false; this.message = approve ? 'Application approved' : 'Application declined'; this.load(); }, error: e => { this.busy = false; this.error = e?.error?.message || 'Review failed'; } }); }
+
+  private getAdminEmail(): string {
+    const direct = sessionStorage.getItem('adminEmail');
+    if (direct) return direct;
+    try {
+      const admin = JSON.parse(sessionStorage.getItem('admin') || '{}');
+      return admin.email || admin.username || '';
+    } catch {
+      return '';
+    }
+  }
 }

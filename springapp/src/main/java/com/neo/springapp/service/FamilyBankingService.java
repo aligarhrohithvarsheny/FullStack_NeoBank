@@ -243,6 +243,12 @@ public class FamilyBankingService {
     }
 
     private boolean isJointOwner(Long userId, String accountNumber) {
+        if (jointProfileRepository.findByJointAccountNumber(accountNumber)
+            .map(profile -> Objects.equals(profile.getPrimaryHolderUserId(), userId)
+                || Objects.equals(profile.getJointHolderUserId(), userId))
+            .orElse(false)) {
+            return true;
+        }
         return invitationRepository.findByAccountNumberAndStatus(accountNumber, "ACCEPTED").stream()
                 .anyMatch(i -> Objects.equals(i.getInviterUserId(), userId) || Objects.equals(i.getInviteeUserId(), userId));
     }
