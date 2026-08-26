@@ -189,6 +189,15 @@ export class SalaryDashboard implements OnInit, OnDestroy {
   myCreditCardBills: any[] = [];
   isLoadingMyCreditCardDetails = false;
   showMyCreditCardNumber = false;
+  showMyCreditCardPinForm = false;
+  newMyCreditCardPin = '';
+  confirmMyCreditCardPin = '';
+  isSettingMyCreditCardPin = false;
+  isTogglingMyCreditCardBlock = false;
+  isClosingMyCreditCard = false;
+  selectedBillForMyPayment: any = null;
+  myBillPaymentAmount: number | null = null;
+  isPayingMyBill = false;
 
   // ─── AI Fraud Detection ───────────────────────────────────
   fraudSummary: any = {};
@@ -390,6 +399,90 @@ export class SalaryDashboard implements OnInit, OnDestroy {
   maskedMyCreditCardNumber(card: any): string {
     if (!card?.cardNumber) return '';
     return this.showMyCreditCardNumber ? card.cardNumber : '**** **** **** ' + card.cardNumber.slice(-4);
+  }
+
+  // ─── Self-service Card Controls (PIN, block/unblock, close) ──
+
+  setMyCreditCardPin() {
+    const card = this.selectedMyCreditCard;
+    if (!card?.id) return;
+    if (!this.newMyCreditCardPin || this.newMyCreditCardPin.length !== 4 || !/^\d{4}$/.test(this.newMyCreditCardPin)) {
+      this.alertService.userError('Validation', 'PIN must be exactly 4 digits');
+      return;
+    }
+    if (this.newMyCreditCardPin !== this.confirmMyCreditCardPin) {
+      this.alertService.userError('Validation', 'PINs do not match');
+      return;
+    }
+    this.isSettingMyCreditCardPin = true;
+    this.http.put(`${environment.apiBaseUrl}/api/credit-cards/${card.id}/set-pin`, { pin: this.newMyCreditCardPin }).subscribe({
+      next: () => {
+        this.isSettingMyCreditCardPin = false;
+        this.showMyCreditCardPinForm = false;
+        this.newMyCreditCardPin = ''; this.confirmMyCreditCardPin = '';
+        this.alertService.userSuccess('PIN Updated', 'Your credit card PIN has been set successfully.');
+      },
+      error: () => { this.isSettingMyCreditCardPin = false; this.alertService.userError('Error', 'Failed to set PIN'); }
+    });
+  }
+
+  toggleMyCreditCardBlock() {
+    const card = this.selectedMyCreditCard;
+    if (!card?.id) return;
+    const newStatus = card.status === 'Blocked' ? 'Active' : 'Blocked';
+    this.isTogglingMyCreditCardBlock = true;
+    this.http.put(`${environment.apiBaseUrl}/api/credit-cards/${card.id}`, { status: newStatus }).subscribe({
+      next: () => {
+        this.isTogglingMyCreditCardBlock = false;
+        card.status = newStatus;
+        this.alertService.userSuccess('Card Updated', newStatus === 'Blocked' ? 'Your card has been blocked.' : 'Your card has been unblocked.');
+      },
+      error: () => { this.isTogglingMyCreditCardBlock = false; this.alertService.userError('Error', 'Failed to update card status'); }
+    });
+  }
+
+  canCloseMyCreditCard(card: any): boolean {
+    return !!card && card.status !== 'Closed' && Math.abs(card.currentBalance || 0) < 0.01;
+  }
+
+  closeMyCreditCard() {
+    const card = this.selectedMyCreditCard;
+    if (!card?.id || !this.canCloseMyCreditCard(card)) return;
+    this.isClosingMyCreditCard = true;
+    this.http.put(`${environment.apiBaseUrl}/api/credit-cards/${card.id}/close`, {}).subscribe({
+      next: () => {
+        this.isClosingMyCreditCard = false;
+        this.alertService.userSuccess('Card Closed', 'Your credit card has been closed.');
+        this.loadMyCreditCards();
+      },
+      error: () => { this.isClosingMyCreditCard = false; this.alertService.userError('Error', 'Cannot close card. Ensure balance is fully cleared.'); }
+    });
+  }
+
+  // ─── Self-service Bill Payment ────────────────────────────
+
+  openMyBillPayment(bill: any) {
+    this.selectedBillForMyPayment = bill;
+    this.myBillPaymentAmount = Math.max(0, (bill.totalAmount || 0) + (bill.fine || 0) + (bill.penalty || 0) - (bill.paidAmount || 0));
+  }
+
+  payMyCreditCardBill() {
+    const bill = this.selectedBillForMyPayment;
+    if (!bill || !this.myBillPaymentAmount || this.myBillPaymentAmount <= 0) {
+      this.alertService.userError('Validation', 'Enter a valid payment amount');
+      return;
+    }
+    this.isPayingMyBill = true;
+    this.http.post(`${environment.apiBaseUrl}/api/credit-cards/bills/${bill.id}/pay?amount=${this.myBillPaymentAmount}`, {}).subscribe({
+      next: () => {
+        this.isPayingMyBill = false;
+        this.selectedBillForMyPayment = null;
+        this.alertService.userSuccess('Payment Successful', 'Your credit card bill has been paid.');
+        if (this.selectedMyCreditCard) this.selectMyCreditCard(this.selectedMyCreditCard);
+        this.loadMyCreditCards();
+      },
+      error: () => { this.isPayingMyBill = false; this.alertService.userError('Payment Failed', 'Unable to process bill payment'); }
+    });
   }
 
   // ─── Salary Transactions ──────────────────────────────────

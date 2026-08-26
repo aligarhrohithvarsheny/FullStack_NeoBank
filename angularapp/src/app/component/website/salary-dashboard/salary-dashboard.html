@@ -1521,7 +1521,7 @@
               <div *ngIf="isLoadingMyCreditCardDetails">Loading bills...</div>
               <div *ngIf="!isLoadingMyCreditCardDetails && myCreditCardBills.length === 0">No bills generated yet.</div>
               <table *ngIf="!isLoadingMyCreditCardDetails && myCreditCardBills.length > 0" class="sdash-table">
-                <thead><tr><th>Billing Period</th><th>Due Date</th><th>Total Amount</th><th>Paid</th><th>Status</th></tr></thead>
+                <thead><tr><th>Billing Period</th><th>Due Date</th><th>Total Amount</th><th>Paid</th><th>Status</th><th>Action</th></tr></thead>
                 <tbody>
                   <tr *ngFor="let bill of myCreditCardBills">
                     <td>{{ bill.billingPeriod }}</td>
@@ -1529,9 +1529,23 @@
                     <td>₹{{ bill.totalAmount | number:'1.2-2' }}</td>
                     <td>₹{{ (bill.paidAmount || 0) | number:'1.2-2' }}</td>
                     <td>{{ bill.status }}</td>
+                    <td>
+                      <button class="sdash-btn sdash-btn-primary" style="padding:6px 12px;font-size:.85rem;"
+                              *ngIf="bill.status !== 'Paid'" (click)="openMyBillPayment(bill)">Pay</button>
+                    </td>
                   </tr>
                 </tbody>
               </table>
+              <div *ngIf="selectedBillForMyPayment" class="sdash-card" style="margin-top:12px;padding:16px;background:#f8f9ff;">
+                <h4>Pay Bill #{{ selectedBillForMyPayment.id }}</h4>
+                <label>Amount (₹)<input type="number" [(ngModel)]="myBillPaymentAmount" min="0.01" step="0.01" /></label>
+                <div style="margin-top:10px;display:flex;gap:8px;">
+                  <button class="sdash-btn sdash-btn-primary" (click)="payMyCreditCardBill()" [disabled]="isPayingMyBill">
+                    {{ isPayingMyBill ? 'Processing...' : 'Confirm Payment' }}
+                  </button>
+                  <button class="sdash-btn" (click)="selectedBillForMyPayment = null" [disabled]="isPayingMyBill">Cancel</button>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -1552,6 +1566,33 @@
                   </tr>
                 </tbody>
               </table>
+            </div>
+          </div>
+
+          <div class="sdash-card" style="margin-top:16px;">
+            <div class="sdash-card-header"><h3>Card Controls</h3></div>
+            <div class="sdash-card-body" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-start;">
+              <button class="sdash-btn" (click)="toggleMyCreditCardBlock()" [disabled]="isTogglingMyCreditCardBlock || selectedMyCreditCard.status === 'Closed'">
+                <i class="fa fa-lock"></i> {{ selectedMyCreditCard.status === 'Blocked' ? 'Unblock Card' : 'Block Card' }}
+              </button>
+              <button class="sdash-btn" (click)="showMyCreditCardPinForm = !showMyCreditCardPinForm">
+                <i class="fa fa-key"></i> Set/Change PIN
+              </button>
+              <button class="sdash-btn sdash-btn-danger" (click)="closeMyCreditCard()"
+                      [disabled]="!canCloseMyCreditCard(selectedMyCreditCard) || isClosingMyCreditCard"
+                      [title]="canCloseMyCreditCard(selectedMyCreditCard) ? '' : 'Balance must be ₹0 to close the card'">
+                <i class="fa fa-times"></i> {{ isClosingMyCreditCard ? 'Closing...' : 'Close Card' }}
+              </button>
+
+              <div *ngIf="showMyCreditCardPinForm" class="sdash-card" style="width:100%;margin-top:8px;padding:16px;background:#f8f9ff;">
+                <div class="sdash-form-grid">
+                  <label>New 4-digit PIN<input type="password" maxlength="4" [(ngModel)]="newMyCreditCardPin" /></label>
+                  <label>Confirm PIN<input type="password" maxlength="4" [(ngModel)]="confirmMyCreditCardPin" /></label>
+                </div>
+                <button class="sdash-btn sdash-btn-primary" (click)="setMyCreditCardPin()" [disabled]="isSettingMyCreditCardPin">
+                  {{ isSettingMyCreditCardPin ? 'Saving...' : 'Save PIN' }}
+                </button>
+              </div>
             </div>
           </div>
         </div>

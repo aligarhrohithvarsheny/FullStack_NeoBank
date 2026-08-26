@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface BusinessChequeRequestRepository extends JpaRepository<BusinessChequeRequest, Long> {
@@ -21,6 +22,9 @@ public interface BusinessChequeRequestRepository extends JpaRepository<BusinessC
     Page<BusinessChequeRequest> findByChequeNumberContainingIgnoreCaseOrderByCreatedAtDesc(String chequeNumber, Pageable pageable);
 
     List<BusinessChequeRequest> findByChequeNumberContainingIgnoreCase(String chequeNumber);
+
+    // Find exact cheque number (used by cross-account-type cheque verification)
+    Optional<BusinessChequeRequest> findByChequeNumber(String chequeNumber);
 
     Page<BusinessChequeRequest> findAllByOrderByCreatedAtDesc(Pageable pageable);
 

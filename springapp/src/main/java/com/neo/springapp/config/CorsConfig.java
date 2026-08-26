@@ -91,6 +91,7 @@ public class CorsConfig {
             "Accept",
             "Authorization",
             "X-Requested-With",
+            "X-Admin-Email",
             "Access-Control-Request-Method",
             "Access-Control-Request-Headers"
         ));

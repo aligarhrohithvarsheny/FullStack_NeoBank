@@ -1,9 +1,13 @@
 package com.neo.springapp.service;
 
 import com.neo.springapp.model.Account;
+import com.neo.springapp.model.CurrentAccount;
+import com.neo.springapp.model.SalaryAccount;
 import com.neo.springapp.model.DepositRequest;
 import com.neo.springapp.model.Transaction;
+import com.neo.springapp.repository.CurrentAccountRepository;
 import com.neo.springapp.repository.DepositRequestRepository;
+import com.neo.springapp.repository.SalaryAccountRepository;
 import com.neo.springapp.service.ChequeService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,15 +25,72 @@ public class DepositRequestService {
     private final AccountService accountService;
     private final TransactionService transactionService;
     private final ChequeService chequeService;
+    private final CurrentAccountRepository currentAccountRepository;
+    private final SalaryAccountRepository salaryAccountRepository;
 
     public DepositRequestService(DepositRequestRepository depositRequestRepository,
                                  AccountService accountService,
                                  TransactionService transactionService,
-                                 ChequeService chequeService) {
+                                 ChequeService chequeService,
+                                 CurrentAccountRepository currentAccountRepository,
+                                 SalaryAccountRepository salaryAccountRepository) {
         this.depositRequestRepository = depositRequestRepository;
         this.accountService = accountService;
         this.transactionService = transactionService;
         this.chequeService = chequeService;
+        this.currentAccountRepository = currentAccountRepository;
+        this.salaryAccountRepository = salaryAccountRepository;
+    }
+
+    /** Resolves an account number across savings, current, and salary accounts. */
+    private static class ResolvedAccount {
+        String type; // SAVINGS, CURRENT, SALARY
+        String name;
+        String status;
+    }
+
+    private ResolvedAccount resolveAnyAccount(String accountNumber) {
+        Account savings = accountService.getAccountByNumber(accountNumber);
+        if (savings != null) {
+            ResolvedAccount r = new ResolvedAccount();
+            r.type = "SAVINGS"; r.name = savings.getName(); r.status = savings.getStatus();
+            return r;
+        }
+        Optional<CurrentAccount> currentOpt = currentAccountRepository.findByAccountNumber(accountNumber);
+        if (currentOpt.isPresent()) {
+            CurrentAccount ca = currentOpt.get();
+            ResolvedAccount r = new ResolvedAccount();
+            r.type = "CURRENT"; r.name = ca.getBusinessName() != null ? ca.getBusinessName() : ca.getOwnerName(); r.status = ca.getStatus();
+            return r;
+        }
+        SalaryAccount sal = salaryAccountRepository.findByAccountNumber(accountNumber);
+        if (sal != null) {
+            ResolvedAccount r = new ResolvedAccount();
+            r.type = "SALARY"; r.name = sal.getEmployeeName(); r.status = sal.getStatus();
+            return r;
+        }
+        return null;
+    }
+
+    private Double creditAnyAccount(String accountNumber, String type, Double amount) {
+        switch (type) {
+            case "CURRENT": {
+                CurrentAccount ca = currentAccountRepository.findByAccountNumber(accountNumber)
+                        .orElseThrow(() -> new IllegalArgumentException("Account not found for number: " + accountNumber));
+                ca.setBalance((ca.getBalance() == null ? 0.0 : ca.getBalance()) + amount);
+                currentAccountRepository.save(ca);
+                return ca.getBalance();
+            }
+            case "SALARY": {
+                SalaryAccount sal = salaryAccountRepository.findByAccountNumber(accountNumber);
+                if (sal == null) throw new IllegalArgumentException("Account not found for number: " + accountNumber);
+                sal.setBalance((sal.getBalance() == null ? 0.0 : sal.getBalance()) + amount);
+                salaryAccountRepository.save(sal);
+                return sal.getBalance();
+            }
+            default:
+                return accountService.creditBalance(accountNumber, amount);
+        }
     }
 
     @Transactional
@@ -41,14 +102,14 @@ public class DepositRequestService {
             throw new IllegalArgumentException("Account number is required");
         }
 
-        // Ensure account exists
-        Account account = accountService.getAccountByNumber(request.getAccountNumber());
+        // Ensure account exists (savings, current, or salary)
+        ResolvedAccount account = resolveAnyAccount(request.getAccountNumber());
         if (account == null) {
             throw new IllegalArgumentException("Account not found for number: " + request.getAccountNumber());
         }
 
         // Prefill user friendly fields
-        request.setUserName(account.getName());
+        request.setUserName(account.name);
         if ("CHEQUE".equalsIgnoreCase(request.getMethod())) {
             if (request.getReferenceNumber() == null || request.getReferenceNumber().isBlank()) {
                 throw new IllegalArgumentException("Cheque number is required for cheque deposits");
@@ -129,17 +190,17 @@ public class DepositRequestService {
             chequeService.markDeposited(request.getReferenceNumber(), request.getRequestId());
         }
 
-        Account account = accountService.getAccountByNumber(request.getAccountNumber());
+        ResolvedAccount account = resolveAnyAccount(request.getAccountNumber());
         if (account == null) {
             throw new IllegalArgumentException("Account not found for number: " + request.getAccountNumber());
         }
 
         // Check if account is closed
-        if ("CLOSED".equalsIgnoreCase(account.getStatus())) {
+        if ("CLOSED".equalsIgnoreCase(account.status)) {
             throw new IllegalStateException("Cannot approve deposit for a closed account. Account number: " + request.getAccountNumber());
         }
 
-        Double newBalance = accountService.creditBalance(request.getAccountNumber(), request.getAmount());
+        Double newBalance = creditAnyAccount(request.getAccountNumber(), account.type, request.getAmount());
         if (newBalance == null) {
             throw new IllegalStateException("Unable to credit balance. Please verify account number.");
         }
@@ -152,7 +213,7 @@ public class DepositRequestService {
         transaction.setDescription(request.getNote() != null ? request.getNote() : "Deposit approved");
         transaction.setBalance(newBalance);
         transaction.setStatus("Completed");
-        transaction.setUserName(account.getName());
+        transaction.setUserName(account.name);
         transaction.setAccountNumber(request.getAccountNumber());
         Transaction savedTxn = transactionService.saveTransaction(transaction);
 
