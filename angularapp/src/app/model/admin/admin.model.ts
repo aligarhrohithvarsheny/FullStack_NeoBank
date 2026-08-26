@@ -149,6 +149,11 @@ export interface DepositRequest {
   rejectionReason?: string;
   resultingBalance?: number;
   createdAt?: string;
+  chequeValid?: boolean;
+  chequeAccountNumber?: string;
+  chequeAccountHolderName?: string;
+  chequeStatus?: string;
+  chequeAvailableBalance?: number;
 }
 
 export interface GoldLoan {

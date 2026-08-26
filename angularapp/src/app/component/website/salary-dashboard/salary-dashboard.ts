@@ -181,6 +181,15 @@ export class SalaryDashboard implements OnInit, OnDestroy {
   isApplyingCredit = false;
   creditCardApplicationSent = false;
 
+  // ─── Issued Credit Card(s) ────────────────────────────────
+  myCreditCards: any[] = [];
+  isLoadingMyCreditCards = false;
+  selectedMyCreditCard: any = null;
+  myCreditCardTransactions: any[] = [];
+  myCreditCardBills: any[] = [];
+  isLoadingMyCreditCardDetails = false;
+  showMyCreditCardNumber = false;
+
   // ─── AI Fraud Detection ───────────────────────────────────
   fraudSummary: any = {};
   fraudAlerts: SalaryFraudAlert[] = [];
@@ -312,6 +321,7 @@ export class SalaryDashboard implements OnInit, OnDestroy {
     else if (section === 'fraud-detection') { this.loadFraudSummary(); }
     else if (section === 'gold-loan') { this.loadCurrentGoldRate(); this.loadMyGoldLoans(); }
     else if (section === 'employee-profile') { this.initProfileForm(); }
+    else if (section === 'credit-card') { this.loadMyCreditCards(); }
   }
 
   generatePassbook(): void {
@@ -345,6 +355,41 @@ export class SalaryDashboard implements OnInit, OnDestroy {
       next: () => { this.isApplyingCredit = false; this.creditCardApplicationSent = true; this.alertService.userSuccess('Application Submitted', 'Your credit-card application is now visible to admin for review.'); },
       error: () => { this.isApplyingCredit = false; this.alertService.userError('Application Failed', 'Unable to submit credit-card application'); }
     });
+  }
+
+  // ─── Issued Credit Card(s) ────────────────────────────────
+
+  loadMyCreditCards(): void {
+    if (!this.account?.accountNumber) return;
+    this.isLoadingMyCreditCards = true;
+    this.http.get<any[]>(`${environment.apiBaseUrl}/api/credit-cards/account/${this.account.accountNumber}`).subscribe({
+      next: (cards) => {
+        this.myCreditCards = (cards || []).filter(c => c.status !== 'Closed');
+        this.isLoadingMyCreditCards = false;
+        if (this.myCreditCards.length > 0) this.selectMyCreditCard(this.myCreditCards[0]);
+      },
+      error: () => { this.isLoadingMyCreditCards = false; }
+    });
+  }
+
+  selectMyCreditCard(card: any): void {
+    this.selectedMyCreditCard = card;
+    this.showMyCreditCardNumber = false;
+    if (!card?.id) return;
+    this.isLoadingMyCreditCardDetails = true;
+    this.http.get<any[]>(`${environment.apiBaseUrl}/api/credit-cards/${card.id}/transactions`).subscribe({
+      next: (txns) => { this.myCreditCardTransactions = txns || []; },
+      error: () => { this.myCreditCardTransactions = []; }
+    });
+    this.http.get<any[]>(`${environment.apiBaseUrl}/api/credit-cards/${card.id}/bills`).subscribe({
+      next: (bills) => { this.myCreditCardBills = bills || []; this.isLoadingMyCreditCardDetails = false; },
+      error: () => { this.myCreditCardBills = []; this.isLoadingMyCreditCardDetails = false; }
+    });
+  }
+
+  maskedMyCreditCardNumber(card: any): string {
+    if (!card?.cardNumber) return '';
+    return this.showMyCreditCardNumber ? card.cardNumber : '**** **** **** ' + card.cardNumber.slice(-4);
   }
 
   // ─── Salary Transactions ──────────────────────────────────

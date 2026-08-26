@@ -1084,6 +1084,41 @@
   line-height: 1.6;
 }
 
+.info-box.valid-box {
+  flex-direction: column;
+  background: linear-gradient(135deg, #dcfce7, #bbf7d0);
+  border-left-color: #16a34a;
+}
+
+.info-box.valid-box strong {
+  color: #15803d;
+}
+
+.info-box.invalid-box {
+  flex-direction: column;
+  background: linear-gradient(135deg, #fee2e2, #fecaca);
+  border-left-color: #dc2626;
+}
+
+.info-box.invalid-box strong {
+  color: #b91c1c;
+}
+
+.fee-setting-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: #f1f5f9;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.fee-setting-box label {
+  font-weight: 600;
+  color: #334155;
+}
+
 /* History Modal */
 .history-modal {
   max-width: 800px;

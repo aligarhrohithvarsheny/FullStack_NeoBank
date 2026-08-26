@@ -22,6 +22,9 @@ public class CreditCardService {
     private final AccountService accountService;
     private final TransactionService transactionService;
     private final GlobalTransactionIdGenerator transactionIdGenerator;
+    private final ChequeRepository chequeRepository;
+    private final BranchAccountService branchAccountService;
+    private final CreditCardSettingsRepository settingsRepository;
 
     public CreditCardService(
             CreditCardRepository creditCardRepository,
@@ -29,13 +32,19 @@ public class CreditCardService {
             CreditCardBillRepository billRepository,
             AccountService accountService,
             TransactionService transactionService,
-            GlobalTransactionIdGenerator transactionIdGenerator) {
+            GlobalTransactionIdGenerator transactionIdGenerator,
+            ChequeRepository chequeRepository,
+            BranchAccountService branchAccountService,
+            CreditCardSettingsRepository settingsRepository) {
         this.creditCardRepository = creditCardRepository;
         this.transactionRepository = transactionRepository;
         this.billRepository = billRepository;
         this.accountService = accountService;
         this.transactionService = transactionService;
         this.transactionIdGenerator = transactionIdGenerator;
+        this.chequeRepository = chequeRepository;
+        this.branchAccountService = branchAccountService;
+        this.settingsRepository = settingsRepository;
     }
 
     // Get all credit cards (for admin)
@@ -137,6 +146,11 @@ public class CreditCardService {
         }
         
         CreditCard card = cardOpt.get();
+
+        // No outstanding balance means nothing to bill; do not generate a zero-amount statement
+        if (card.getCurrentBalance() == null || card.getCurrentBalance() <= 0.0) {
+            throw new IllegalArgumentException("No outstanding balance on this card. Statement not generated.");
+        }
         
         // Check if bill already exists for this month
         Optional<CreditCardBill> existingBill = billRepository.findFirstByCreditCardIdOrderByBillGenerationDateDesc(creditCardId);
@@ -255,6 +269,23 @@ public class CreditCardService {
         }
 
         String debitAccountNumber = request.getDebitAccountNumber();
+        Cheque cheque = null;
+        if ("CHEQUE".equals(paymentMethod)) {
+            if (debitAccountNumber == null || debitAccountNumber.isBlank()) {
+                debitAccountNumber = card.getAccountNumber();
+            }
+            cheque = chequeRepository.findByChequeNumber(request.getChequeNumber().trim())
+                    .orElseThrow(() -> new IllegalArgumentException("Cheque number not found"));
+            if (!debitAccountNumber.equals(cheque.getAccountNumber())) {
+                throw new IllegalArgumentException("This cheque belongs to another account and cannot be used here");
+            }
+            if (!cheque.isAvailable()) {
+                throw new IllegalArgumentException("Cheque is already used, drawn, cancelled, or bounced. Status: " + cheque.getStatus());
+            }
+            // Only the amount entered by the admin/user is locked against the cheque, not the cheque's own face amount
+            cheque.setAmount(amount);
+        }
+
         Double accountBalanceAfter = null;
         if ("ACCOUNT".equals(paymentMethod) || "CHEQUE".equals(paymentMethod)) {
             if (debitAccountNumber == null || debitAccountNumber.isBlank()) {
@@ -263,6 +294,10 @@ public class CreditCardService {
             accountBalanceAfter = accountService.debitBalance(debitAccountNumber, amount);
             if (accountBalanceAfter == null) {
                 throw new IllegalArgumentException("Account not found or insufficient balance");
+            }
+            if (cheque != null) {
+                cheque.markUsed("CREDIT_CARD_BILL_PAYMENT", "CARD-" + card.getId() + "-BILL-" + billId);
+                chequeRepository.save(cheque);
             }
         }
 
@@ -327,6 +362,7 @@ public class CreditCardService {
         result.put("payment", cardTransaction);
         result.put("accountBalanceAfter", accountBalanceAfter);
         result.put("debitAccountNumber", debitAccountNumber);
+        result.put("cheque", cheque);
         return result;
     }
 
@@ -334,6 +370,139 @@ public class CreditCardService {
         return transactionRepository.findById(transactionId)
                 .filter(transaction -> transaction.getChequeImage() != null)
                 .orElse(null);
+    }
+
+    /** Verify a cheque number for use in credit card bill payment: existence, ownership, valid/used status. */
+    public Map<String, Object> verifyChequeForCardPayment(String chequeNumber, String debitAccountNumber) {
+        Map<String, Object> result = new HashMap<>();
+        Optional<Cheque> chequeOpt = chequeRepository.findByChequeNumber(chequeNumber == null ? "" : chequeNumber.trim());
+        if (chequeOpt.isEmpty()) {
+            result.put("valid", false);
+            result.put("message", "Cheque number not found");
+            return result;
+        }
+        Cheque cheque = chequeOpt.get();
+        boolean ownerMatches = debitAccountNumber != null && debitAccountNumber.trim().equals(cheque.getAccountNumber());
+        boolean valid = cheque.isAvailable() && ownerMatches;
+        result.put("valid", valid);
+        result.put("chequeNumber", cheque.getChequeNumber());
+        result.put("accountNumber", cheque.getAccountNumber());
+        result.put("accountHolderName", cheque.getAccountHolderName());
+        result.put("status", cheque.getStatus());
+        result.put("ownerMatches", ownerMatches);
+        Account chequeAccount = accountService.getAccountByNumber(cheque.getAccountNumber());
+        result.put("availableBalance", chequeAccount == null || chequeAccount.getBalance() == null ? 0.0 : chequeAccount.getBalance());
+        if (!ownerMatches) result.put("message", "This cheque belongs to another account");
+        else if (!cheque.isAvailable()) result.put("message", "Cheque is already used or unavailable. Status: " + cheque.getStatus());
+        else result.put("message", "Cheque is valid and unused");
+        return result;
+    }
+
+    /** Get/update the admin-configurable credit card transfer fee percentage (default 2%). */
+    public double getTransferFeePercent() {
+        return settingsRepository.findAll().stream().findFirst().map(CreditCardSettings::getTransferFeePercent).orElse(2.0);
+    }
+
+    @Transactional
+    public CreditCardSettings updateTransferFeePercent(double feePercent, String updatedBy) {
+        if (feePercent < 0 || feePercent > 100) throw new IllegalArgumentException("Fee percent must be between 0 and 100");
+        CreditCardSettings settings = settingsRepository.findAll().stream().findFirst().orElseGet(CreditCardSettings::new);
+        settings.setTransferFeePercent(feePercent);
+        settings.setUpdatedBy(updatedBy);
+        settings.setUpdatedAt(LocalDateTime.now());
+        return settingsRepository.save(settings);
+    }
+
+    /**
+     * Transfer money from a credit card's available limit to any savings/salary/current account.
+     * A configurable percentage fee is deducted from the transferred amount and credited to the
+     * admin-linked branch account in real time; the destination account receives the remainder.
+     */
+    @Transactional
+    public Map<String, Object> transferToAccount(Long creditCardId, String destinationAccountNumber, Double amount, String adminName) {
+        if (amount == null || amount <= 0) throw new IllegalArgumentException("Transfer amount must be greater than zero");
+        if (destinationAccountNumber == null || destinationAccountNumber.isBlank()) throw new IllegalArgumentException("Destination account number is required");
+
+        CreditCard card = creditCardRepository.findById(creditCardId)
+                .orElseThrow(() -> new IllegalArgumentException("Credit card not found"));
+        if (!"Active".equalsIgnoreCase(card.getStatus())) throw new IllegalArgumentException("Credit card is not active");
+        if (card.getAvailableLimit() == null || card.getAvailableLimit() < amount) {
+            throw new IllegalArgumentException("Insufficient available credit limit. Available: ₹" + card.getAvailableLimit());
+        }
+
+        Account destination = accountService.getAccountByNumber(destinationAccountNumber.trim());
+        if (destination == null) throw new IllegalArgumentException("Destination account not found: " + destinationAccountNumber);
+        if (!"ACTIVE".equalsIgnoreCase(destination.getStatus())) throw new IllegalArgumentException("Destination account is not active");
+
+        double feePercent = getTransferFeePercent();
+        double fee = Math.round(amount * feePercent) / 100.0;
+        double creditedAmount = amount - fee;
+
+        // Charge the full amount to the card (increases balance / reduces available limit)
+        card.setCurrentBalance((card.getCurrentBalance() == null ? 0.0 : card.getCurrentBalance()) + amount);
+        card.setLastUsed(LocalDateTime.now());
+        card.calculateAvailableLimit();
+        card.calculateUsageLimit();
+        creditCardRepository.save(card);
+
+        Double destinationBalanceAfter = accountService.creditBalance(destinationAccountNumber.trim(), creditedAmount);
+
+        Long globalSequence = transactionIdGenerator.getNextTransactionId();
+        CreditCardTransaction cardTransaction = new CreditCardTransaction();
+        cardTransaction.setGlobalTransactionSequence(globalSequence);
+        cardTransaction.setCreditCardId(card.getId());
+        cardTransaction.setCardNumber(card.getCardNumber());
+        cardTransaction.setAccountNumber(card.getAccountNumber());
+        cardTransaction.setUserName(card.getUserName());
+        cardTransaction.setTransactionType("Transfer");
+        cardTransaction.setPaymentMethod("ACCOUNT");
+        cardTransaction.setDebitAccountNumber(destinationAccountNumber.trim());
+        cardTransaction.setProcessedBy(adminName);
+        cardTransaction.setAmount(amount);
+        cardTransaction.setDescription(String.format("Transfer to account %s (fee %.2f%% = ₹%.2f)", destinationAccountNumber.trim(), feePercent, fee));
+        cardTransaction.setBalanceAfter(card.getCurrentBalance());
+        transactionRepository.save(cardTransaction);
+
+        Transaction creditTxn = new Transaction();
+        creditTxn.setGlobalTransactionSequence(globalSequence);
+        creditTxn.setAccountNumber(destinationAccountNumber.trim());
+        creditTxn.setUserName(destination.getName());
+        creditTxn.setAmount(creditedAmount);
+        creditTxn.setType("Credit");
+        creditTxn.setMerchant("Credit Card Transfer");
+        creditTxn.setDescription("Credit card transfer from card ending " + card.getMaskedCardNumber());
+        creditTxn.setBalance(destinationBalanceAfter != null ? destinationBalanceAfter : creditedAmount);
+        creditTxn.setStatus("Completed");
+        transactionService.saveTransaction(creditTxn);
+
+        // Fee is already part of the amount charged to the card; credit it to the admin-linked
+        // branch account in real time without any additional debit from the user's account.
+        if (fee > 0) {
+            String branchAccountNumber = branchAccountService.getDepositAccountNumber();
+            Double branchBalanceAfter = accountService.creditBalance(branchAccountNumber, fee);
+            Transaction feeTxn = new Transaction();
+            feeTxn.setGlobalTransactionSequence(globalSequence);
+            feeTxn.setAccountNumber(branchAccountNumber);
+            feeTxn.setUserName("NeoBank");
+            feeTxn.setAmount(fee);
+            feeTxn.setType("Credit");
+            feeTxn.setMerchant("Credit Card Transfer Commission - " + card.getAccountNumber());
+            feeTxn.setDescription("Commission (" + feePercent + "%) on card transfer to " + destinationAccountNumber.trim() + " (from " + card.getAccountNumber() + ")");
+            feeTxn.setSourceAccountNumber(card.getAccountNumber());
+            feeTxn.setBalance(branchBalanceAfter != null ? branchBalanceAfter : fee);
+            feeTxn.setStatus("Completed");
+            transactionService.saveTransaction(feeTxn);
+        }
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("card", card);
+        result.put("transaction", cardTransaction);
+        result.put("feePercent", feePercent);
+        result.put("fee", fee);
+        result.put("creditedAmount", creditedAmount);
+        result.put("destinationBalanceAfter", destinationBalanceAfter);
+        result.put("branchAccount", branchAccountService.getDepositAccountNumber());
+        return result;
     }
 
     // Get statement

@@ -14,6 +14,13 @@
     <div class="section-header">
       <h2><i class="fa fa-credit-card"></i> Credit Card Management</h2>
       <div class="header-actions">
+        <div class="fee-setting-box">
+          <label>Transfer Fee %:</label>
+          <input type="number" min="0" max="100" step="0.1" [(ngModel)]="transferFeePercent" style="width:70px;" />
+          <button class="btn-secondary" (click)="saveTransferFeePercent()" [disabled]="isSavingTransferFee">
+            {{ isSavingTransferFee ? 'Saving...' : 'Save' }}
+          </button>
+        </div>
         <button class="btn-primary" (click)="showApplyCreditCardModal = true">
           <i class="fa fa-plus"></i> Apply for Credit Card
         </button>
@@ -289,6 +296,9 @@
             <button class="btn-warning" (click)="showLimitModal = true; limitAction = 'decrease'">
               <i class="fa fa-arrow-down"></i> Decrease Limit
             </button>
+            <button class="btn-info" (click)="openTransferModal()" *ngIf="selectedCreditCard.status !== 'Closed'">
+              <i class="fa fa-exchange-alt"></i> Transfer to Account
+            </button>
             <button 
               class="btn-danger" 
               [class.disabled]="!canCloseCard(selectedCreditCard)"
@@ -351,7 +361,18 @@
           </div>
           <div class="form-group" *ngIf="billPaymentForm.paymentMethod === 'CHEQUE'">
             <label>Cheque Payment Number:</label>
-            <input type="text" [(ngModel)]="billPaymentForm.chequeNumber" placeholder="Enter cheque number" />
+            <input type="text" [(ngModel)]="billPaymentForm.chequeNumber" placeholder="Enter cheque number" (blur)="verifyChequeForPayment()" />
+            <button type="button" class="btn-secondary" (click)="verifyChequeForPayment()" [disabled]="isVerifyingCheque || !billPaymentForm.chequeNumber">
+              {{ isVerifyingCheque ? 'Verifying...' : 'Verify Cheque' }}
+            </button>
+            <div class="info-box" *ngIf="chequeVerification" [ngClass]="chequeVerification.valid ? 'valid-box' : 'invalid-box'">
+              <strong>{{ chequeVerification.valid ? '✅ Valid & Unused' : '❌ Invalid' }}</strong>
+              <span>Cheque Number: {{ chequeVerification.chequeNumber }}</span>
+              <span>Account Holder: {{ chequeVerification.accountHolderName }}</span>
+              <span>Account Number: {{ chequeVerification.accountNumber }}</span>
+              <span>Status: {{ chequeVerification.status }}</span>
+              <span>{{ chequeVerification.message }}</span>
+            </div>
             <label>Cheque Image:</label>
             <input type="file" accept="image/jpeg,image/png,application/pdf" (change)="onChequeImageSelected($event)" />
             <small *ngIf="chequeImagePreviewName">Selected: {{ chequeImagePreviewName }}</small>
@@ -361,6 +382,51 @@
               <i class="fa fa-check"></i> {{ isPayingBill ? 'Processing...' : 'Confirm Payment' }}
             </button>
             <button class="btn-secondary" (click)="showBillPaymentModal = false" [disabled]="isPayingBill">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Transfer to Account Modal -->
+    <div class="modal-overlay" *ngIf="showTransferModal" (click)="showTransferModal = false">
+      <div class="modal-content" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h3><i class="fa fa-exchange-alt"></i> Transfer Credit Card Amount to Account</h3>
+          <button class="close-btn" (click)="showTransferModal = false">&times;</button>
+        </div>
+        <div class="modal-body" *ngIf="selectedCreditCard">
+          <div class="info-grid">
+            <div class="info-item"><label>Card Holder:</label><span>{{ selectedCreditCard.userName }}</span></div>
+            <div class="info-item"><label>Card Number:</label><span>{{ selectedCreditCard.maskedCardNumber || selectedCreditCard.cardNumber }}</span></div>
+            <div class="info-item"><label>Available Limit:</label><span class="amount">₹{{ selectedCreditCard.availableLimit | number:'1.2-2' }}</span></div>
+            <div class="info-item"><label>Fee:</label><span>{{ transferFeePercent }}% (admin configurable)</span></div>
+          </div>
+          <div class="form-group">
+            <label>Destination Account Number / UPI ID:</label>
+            <input type="text" [(ngModel)]="transferForm.destinationAccountNumber" (blur)="verifyTransferAccount()" placeholder="Enter savings, current, or salary account number" />
+            <button type="button" class="btn-secondary" (click)="verifyTransferAccount()" [disabled]="isVerifyingTransferAccount || !transferForm.destinationAccountNumber">
+              {{ isVerifyingTransferAccount ? 'Verifying...' : 'Verify Account' }}
+            </button>
+            <div class="info-box" *ngIf="transferAccountDetails" [ngClass]="transferAccountDetails.found ? 'valid-box' : 'invalid-box'">
+              <strong *ngIf="transferAccountDetails.found">✅ {{ transferAccountDetails.name }}</strong>
+              <span *ngIf="transferAccountDetails.found">Type: {{ transferAccountDetails.accountType }}</span>
+              <span *ngIf="transferAccountDetails.found">Bank: {{ transferAccountDetails.bankName }}</span>
+              <span *ngIf="!transferAccountDetails.found">❌ {{ transferAccountDetails.message }}</span>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Amount to Transfer:</label>
+            <input type="number" [(ngModel)]="transferForm.amount" min="0.01" step="0.01" />
+            <small *ngIf="transferForm.amount > 0">
+              Fee ({{ transferFeePercent }}%): ₹{{ (transferForm.amount * transferFeePercent / 100) | number:'1.2-2' }} &mdash;
+              Destination receives: ₹{{ (transferForm.amount - (transferForm.amount * transferFeePercent / 100)) | number:'1.2-2' }}
+            </small>
+          </div>
+          <div class="modal-actions">
+            <button class="btn-success" (click)="confirmTransferToAccount()" [disabled]="isTransferring">
+              <i class="fa fa-check"></i> {{ isTransferring ? 'Processing...' : 'Confirm Transfer' }}
+            </button>
+            <button class="btn-secondary" (click)="showTransferModal = false" [disabled]="isTransferring">Cancel</button>
           </div>
         </div>
       </div>

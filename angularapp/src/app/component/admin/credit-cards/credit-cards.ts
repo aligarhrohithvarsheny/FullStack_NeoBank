@@ -58,6 +58,17 @@ export class CreditCards implements OnInit {
   chequeImageFile: File | null = null;
   chequeImagePreviewName = '';
   paymentAccountDetails: any = null;
+  chequeVerification: any = null;
+  isVerifyingCheque: boolean = false;
+
+  // Transfer credit card amount to any account
+  showTransferModal: boolean = false;
+  transferForm = { destinationAccountNumber: '', amount: 0 };
+  transferAccountDetails: any = null;
+  isVerifyingTransferAccount: boolean = false;
+  isTransferring: boolean = false;
+  transferFeePercent: number = 2;
+  isSavingTransferFee: boolean = false;
 
   constructor(
     private router: Router,
@@ -79,6 +90,7 @@ export class CreditCards implements OnInit {
         }
       }
       this.loadCreditCards();
+      this.loadTransferFeePercent();
     }
   }
 
@@ -351,8 +363,21 @@ export class CreditCards implements OnInit {
       debitAccountNumber: this.selectedCreditCard?.accountNumber || '',
       chequeNumber: ''
     };
+    this.chequeVerification = null;
     this.showBillPaymentModal = true;
     this.loadPaymentAccountDetails();
+  }
+
+  verifyChequeForPayment() {
+    const chequeNumber = this.billPaymentForm.chequeNumber.trim();
+    const debitAccountNumber = (this.billPaymentForm.debitAccountNumber || this.selectedCreditCard?.accountNumber || '').trim();
+    this.chequeVerification = null;
+    if (!chequeNumber || !debitAccountNumber) return;
+    this.isVerifyingCheque = true;
+    this.http.get(`${environment.apiBaseUrl}/api/credit-cards/verify-cheque?chequeNumber=${encodeURIComponent(chequeNumber)}&debitAccountNumber=${encodeURIComponent(debitAccountNumber)}`).subscribe({
+      next: (res: any) => { this.chequeVerification = res; this.isVerifyingCheque = false; },
+      error: () => { this.chequeVerification = { valid: false, message: 'Unable to verify cheque' }; this.isVerifyingCheque = false; }
+    });
   }
 
   onChequeImageSelected(event: any) {
@@ -401,9 +426,15 @@ export class CreditCards implements OnInit {
       this.alertService.error('Validation Error', 'Enter a valid payment amount');
       return;
     }
-    if (form.paymentMethod === 'CHEQUE' && !form.chequeNumber.trim()) {
-      this.alertService.error('Validation Error', 'Cheque payment number is required');
-      return;
+    if (form.paymentMethod === 'CHEQUE') {
+      if (!form.chequeNumber.trim()) {
+        this.alertService.error('Validation Error', 'Cheque payment number is required');
+        return;
+      }
+      if (!this.chequeVerification || !this.chequeVerification.valid) {
+        this.alertService.error('Cheque Not Verified', 'Verify the cheque and ensure it is valid and unused before proceeding');
+        return;
+      }
     }
 
     this.isPayingBill = true;
@@ -739,5 +770,86 @@ export class CreditCards implements OnInit {
         message: `✗ Cannot close: Outstanding dues of ₹${Math.abs(totalBalance).toFixed(2)} must be cleared first` 
       };
     }
+  }
+
+  // ─── Transfer credit card amount to any account ───────────────────────────
+
+  openTransferModal() {
+    if (!this.selectedCreditCard) return;
+    this.transferForm = { destinationAccountNumber: '', amount: 0 };
+    this.transferAccountDetails = null;
+    this.showTransferModal = true;
+  }
+
+  verifyTransferAccount() {
+    const accountNumber = this.transferForm.destinationAccountNumber.trim();
+    this.transferAccountDetails = null;
+    if (!accountNumber) return;
+    this.isVerifyingTransferAccount = true;
+    // Reuses the current-account service's unified account lookup (checks savings/current/salary)
+    this.http.get(`${environment.apiBaseUrl}/api/current-accounts/verify-recipient/${encodeURIComponent(accountNumber)}`).subscribe({
+      next: (res: any) => { this.transferAccountDetails = res; this.isVerifyingTransferAccount = false; },
+      error: () => { this.transferAccountDetails = { found: false, message: 'Unable to verify account' }; this.isVerifyingTransferAccount = false; }
+    });
+  }
+
+  confirmTransferToAccount() {
+    if (!this.selectedCreditCard) return;
+    const form = this.transferForm;
+    if (!form.destinationAccountNumber.trim() || !form.amount || form.amount <= 0) {
+      this.alertService.error('Validation Error', 'Enter a destination account number/UPI ID and a valid amount');
+      return;
+    }
+    if (!this.transferAccountDetails || !this.transferAccountDetails.found) {
+      this.alertService.error('Account Not Verified', 'Verify the destination account before transferring');
+      return;
+    }
+    this.isTransferring = true;
+    const adminData = isPlatformBrowser(this.platformId) ? sessionStorage.getItem('adminData') : null;
+    const admin = adminData ? JSON.parse(adminData) : {};
+    this.http.post(`${environment.apiBaseUrl}/api/credit-cards/${this.selectedCreditCard.id}/transfer-to-account`, {
+      destinationAccountNumber: form.destinationAccountNumber.trim(),
+      amount: form.amount,
+      adminName: admin.name || admin.username || this.adminName
+    }).subscribe({
+      next: (res: any) => {
+        this.isTransferring = false;
+        this.alertService.success('Transfer Successful', `₹${form.amount} transferred. Fee ₹${res.fee?.toFixed?.(2) || res.fee} (${res.feePercent}%) credited to branch account. ₹${res.creditedAmount?.toFixed?.(2) || res.creditedAmount} credited to destination.`);
+        this.showTransferModal = false;
+        this.selectedCreditCard = res.card;
+        this.loadCreditCards();
+        this.loadCreditCardDetails(this.selectedCreditCard.id);
+      },
+      error: (err: any) => {
+        this.isTransferring = false;
+        this.alertService.error('Transfer Failed', err.error?.message || 'Unable to complete transfer');
+      }
+    });
+  }
+
+  // ─── Admin-configurable transfer fee percentage ───────────────────────────
+
+  loadTransferFeePercent() {
+    this.http.get(`${environment.apiBaseUrl}/api/credit-cards/transfer-fee-percent`).subscribe({
+      next: (res: any) => { this.transferFeePercent = res.transferFeePercent ?? 2; },
+      error: () => {}
+    });
+  }
+
+  saveTransferFeePercent() {
+    if (this.transferFeePercent == null || this.transferFeePercent < 0 || this.transferFeePercent > 100) {
+      this.alertService.error('Validation Error', 'Fee percent must be between 0 and 100');
+      return;
+    }
+    this.isSavingTransferFee = true;
+    const adminData = isPlatformBrowser(this.platformId) ? sessionStorage.getItem('adminData') : null;
+    const admin = adminData ? JSON.parse(adminData) : {};
+    this.http.put(`${environment.apiBaseUrl}/api/credit-cards/transfer-fee-percent`, {
+      transferFeePercent: this.transferFeePercent,
+      adminName: admin.name || admin.username || this.adminName
+    }).subscribe({
+      next: () => { this.isSavingTransferFee = false; this.alertService.success('Saved', 'Transfer fee percentage updated'); },
+      error: (err: any) => { this.isSavingTransferFee = false; this.alertService.error('Error', err.error?.message || 'Failed to update fee'); }
+    });
   }
 }

@@ -178,6 +178,44 @@ public class CreditCardController {
         }
     }
 
+    // Admin: verify a cheque number before using it to pay a credit card bill
+    @GetMapping("/verify-cheque")
+    public ResponseEntity<?> verifyChequeForCardPayment(@RequestParam String chequeNumber,
+                                                        @RequestParam String debitAccountNumber) {
+        return ResponseEntity.ok(creditCardService.verifyChequeForCardPayment(chequeNumber, debitAccountNumber));
+    }
+
+    // Admin: transfer amount from credit card's available limit to any account (savings/current/salary)
+    @PostMapping("/{id}/transfer-to-account")
+    public ResponseEntity<?> transferToAccount(@PathVariable Long id, @RequestBody Map<String, Object> request) {
+        try {
+            String destinationAccountNumber = String.valueOf(request.get("destinationAccountNumber"));
+            Double amount = request.get("amount") == null ? null : ((Number) request.get("amount")).doubleValue();
+            String adminName = request.get("adminName") == null ? null : String.valueOf(request.get("adminName"));
+            return ResponseEntity.ok(creditCardService.transferToAccount(id, destinationAccountNumber, amount, adminName));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
+    }
+
+    // Get current admin-configurable transfer fee percent
+    @GetMapping("/transfer-fee-percent")
+    public ResponseEntity<?> getTransferFeePercent() {
+        return ResponseEntity.ok(Map.of("transferFeePercent", creditCardService.getTransferFeePercent()));
+    }
+
+    // Admin: update the transfer fee percent
+    @PutMapping("/transfer-fee-percent")
+    public ResponseEntity<?> updateTransferFeePercent(@RequestBody Map<String, Object> request) {
+        try {
+            double feePercent = ((Number) request.get("transferFeePercent")).doubleValue();
+            String updatedBy = request.get("adminName") == null ? null : String.valueOf(request.get("adminName"));
+            return ResponseEntity.ok(creditCardService.updateTransferFeePercent(feePercent, updatedBy));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
+    }
+
     // Get statement
     @GetMapping("/{id}/statement")
     public ResponseEntity<List<CreditCardTransaction>> getStatement(

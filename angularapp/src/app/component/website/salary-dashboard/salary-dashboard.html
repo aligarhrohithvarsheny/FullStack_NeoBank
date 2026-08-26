@@ -1481,7 +1481,83 @@
 
       <!-- ─── LOAN ELIGIBILITY ──────────────────────────── -->
       <div *ngIf="activeSection === 'credit-card'" class="sdash-section">
-        <div class="sdash-card sdash-mb" style="padding:28px;">
+
+        <!-- Issued credit card(s) -->
+        <div *ngIf="isLoadingMyCreditCards" class="sdash-loading">
+          <div class="sdash-spinner"></div>
+          <span>Loading your credit card...</span>
+        </div>
+
+        <div *ngIf="!isLoadingMyCreditCards && myCreditCards.length > 0" class="sdash-card sdash-mb" style="padding:28px;">
+          <h2><i class="fa fa-credit-card"></i> My Credit Card</h2>
+
+          <div *ngIf="myCreditCards.length > 1" style="margin-bottom:16px;">
+            <label>Select Card
+              <select [(ngModel)]="selectedMyCreditCard" (ngModelChange)="selectMyCreditCard($event)">
+                <option *ngFor="let c of myCreditCards" [ngValue]="c">{{ '**** ' + c.cardNumber.slice(-4) }} ({{ c.status }})</option>
+              </select>
+            </label>
+          </div>
+
+          <div *ngIf="selectedMyCreditCard" class="sdash-stats-grid">
+            <div>
+              <strong>Card Number</strong>
+              <span>{{ maskedMyCreditCardNumber(selectedMyCreditCard) }}
+                <i class="fa" [class.fa-eye]="!showMyCreditCardNumber" [class.fa-eye-slash]="showMyCreditCardNumber"
+                   style="cursor:pointer;margin-left:8px;" (click)="showMyCreditCardNumber = !showMyCreditCardNumber"></i>
+              </span>
+            </div>
+            <div><strong>Status</strong><span>{{ selectedMyCreditCard.status }}</span></div>
+            <div><strong>Expiry</strong><span>{{ selectedMyCreditCard.expiryDate }}</span></div>
+            <div><strong>Approved Limit</strong><span>₹{{ selectedMyCreditCard.approvedLimit | number:'1.0-0' }}</span></div>
+            <div><strong>Current Balance</strong><span>₹{{ selectedMyCreditCard.currentBalance | number:'1.2-2' }}</span></div>
+            <div><strong>Available Limit</strong><span>₹{{ selectedMyCreditCard.availableLimit | number:'1.0-0' }}</span></div>
+            <div><strong>Usage</strong><span>{{ selectedMyCreditCard.usageLimit | number:'1.0-0' }}%</span></div>
+          </div>
+
+          <div class="sdash-card" style="margin-top:16px;">
+            <div class="sdash-card-header"><h3>Bills</h3></div>
+            <div class="sdash-card-body">
+              <div *ngIf="isLoadingMyCreditCardDetails">Loading bills...</div>
+              <div *ngIf="!isLoadingMyCreditCardDetails && myCreditCardBills.length === 0">No bills generated yet.</div>
+              <table *ngIf="!isLoadingMyCreditCardDetails && myCreditCardBills.length > 0" class="sdash-table">
+                <thead><tr><th>Billing Period</th><th>Due Date</th><th>Total Amount</th><th>Paid</th><th>Status</th></tr></thead>
+                <tbody>
+                  <tr *ngFor="let bill of myCreditCardBills">
+                    <td>{{ bill.billingPeriod }}</td>
+                    <td>{{ bill.dueDate | date:'dd MMM yyyy' }}</td>
+                    <td>₹{{ bill.totalAmount | number:'1.2-2' }}</td>
+                    <td>₹{{ (bill.paidAmount || 0) | number:'1.2-2' }}</td>
+                    <td>{{ bill.status }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="sdash-card" style="margin-top:16px;">
+            <div class="sdash-card-header"><h3>Card Transactions</h3></div>
+            <div class="sdash-card-body">
+              <div *ngIf="isLoadingMyCreditCardDetails">Loading transactions...</div>
+              <div *ngIf="!isLoadingMyCreditCardDetails && myCreditCardTransactions.length === 0">No card transactions found.</div>
+              <table *ngIf="!isLoadingMyCreditCardDetails && myCreditCardTransactions.length > 0" class="sdash-table">
+                <thead><tr><th>Date</th><th>Type</th><th>Amount</th><th>Description</th><th>Balance After</th></tr></thead>
+                <tbody>
+                  <tr *ngFor="let txn of myCreditCardTransactions">
+                    <td>{{ txn.transactionDate | date:'dd MMM yyyy' }}</td>
+                    <td>{{ txn.transactionType }}</td>
+                    <td>₹{{ txn.amount | number:'1.2-2' }}</td>
+                    <td>{{ txn.description || '-' }}</td>
+                    <td>₹{{ txn.balanceAfter | number:'1.2-2' }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Apply for a new credit card (shown when no active card exists) -->
+        <div *ngIf="!isLoadingMyCreditCards && myCreditCards.length === 0" class="sdash-card sdash-mb" style="padding:28px;">
           <h2><i class="fa fa-credit-card"></i> Apply for Credit Card</h2>
           <p>Use your salary and PAN details to receive an AI/ML-based CIBIL, eligibility, and limit prediction before applying.</p>
           <div class="sdash-form-grid">
