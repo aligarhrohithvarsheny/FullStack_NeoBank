@@ -1,4 +1,4 @@
-import { Component, OnInit, Inject, PLATFORM_ID, ViewEncapsulation } from '@angular/core';
+import { Component, OnInit, OnDestroy, Inject, PLATFORM_ID, ViewEncapsulation } from '@angular/core';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -13,7 +13,7 @@ import { environment } from '../../../../environment/environment';
   styleUrls: ['./fasttag-dashboard.css'],
   encapsulation: ViewEncapsulation.None
 })
-export class FasttagDashboard implements OnInit {
+export class FasttagDashboard implements OnInit, OnDestroy {
   user: any = null;
   fasttags: any[] = [];
   activeTags: any[] = [];
@@ -65,6 +65,7 @@ export class FasttagDashboard implements OnInit {
 
   // Linked Account
   linkedAccounts: any[] = [];
+  linkedAccountRefreshRef: any = null;
   showLinkAccountModal: boolean = false;
   linkAccountNumber: string = '';
   linkCustomerId: string = '';
@@ -99,6 +100,11 @@ export class FasttagDashboard implements OnInit {
     this.user = JSON.parse(fastagUser);
     this.fetchDetails();
     this.fetchLinkedAccounts();
+    this.startLinkedAccountRealtimeRefresh();
+  }
+
+  ngOnDestroy() {
+    this.stopLinkedAccountRealtimeRefresh();
   }
 
   fetchDetails() {
@@ -213,6 +219,10 @@ export class FasttagDashboard implements OnInit {
       this.openLinkAccountModal();
       return;
     }
+
+    // Always refresh just before recharge so the latest balance is shown.
+    this.fetchLinkedAccounts();
+
     this.rechargeTag = tag;
     this.rechargeAmount = null;
     this.rechargeMessage = '';
@@ -257,10 +267,14 @@ export class FasttagDashboard implements OnInit {
           this.rechargeMessage = res.message;
           this.rechargeSuccess = res.success;
           if (res.success) {
+            if (this.linkedAccounts.length > 0 && typeof res.accountBalance === 'number') {
+              this.linkedAccounts[0].availableBalance = res.accountBalance;
+            }
             this.showGlobalAlert('Recharge successful! ₹' + this.rechargeAmount?.toFixed(2) + ' added.', 'success');
             setTimeout(() => {
               this.closeRechargeModal();
               this.fetchDetails();
+              this.fetchLinkedAccounts();
             }, 1500);
           }
         },
@@ -402,10 +416,56 @@ export class FasttagDashboard implements OnInit {
         next: (res) => {
           if (res.success) {
             this.linkedAccounts = res.linkedAccounts || [];
+            if ((!this.user?.userName || String(this.user.userName).trim() === '') && this.linkedAccounts.length > 0) {
+              this.user = {
+                ...this.user,
+                userName: this.linkedAccounts[0].accountHolderName || this.user?.userName
+              };
+            }
           }
         },
         error: () => {}
       });
+  }
+
+  startLinkedAccountRealtimeRefresh() {
+    this.stopLinkedAccountRealtimeRefresh();
+    this.linkedAccountRefreshRef = setInterval(() => {
+      this.fetchLinkedAccounts();
+    }, 15000);
+  }
+
+  stopLinkedAccountRealtimeRefresh() {
+    if (this.linkedAccountRefreshRef) {
+      clearInterval(this.linkedAccountRefreshRef);
+      this.linkedAccountRefreshRef = null;
+    }
+  }
+
+  getPrimaryLinkedAccount(): any | null {
+    return this.linkedAccounts.length > 0 ? this.linkedAccounts[0] : null;
+  }
+
+  getDisplayUserName(): string {
+    const fromUser = this.user?.userName;
+    if (fromUser && String(fromUser).trim()) {
+      return String(fromUser).trim();
+    }
+    const primary = this.getPrimaryLinkedAccount();
+    if (primary?.accountHolderName) {
+      return primary.accountHolderName;
+    }
+    const gmail = this.user?.gmailId;
+    if (gmail && String(gmail).includes('@')) {
+      return String(gmail).split('@')[0];
+    }
+    return 'Customer';
+  }
+
+  formatAvailableBalance(value: any): string {
+    const balance = Number(value);
+    if (!Number.isFinite(balance)) return '0.00';
+    return balance.toFixed(2);
   }
 
   openLinkAccountModal() {

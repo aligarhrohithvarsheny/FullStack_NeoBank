@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.*;
 import java.io.File;
 import java.io.FileInputStream;
 import java.nio.file.Files;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -192,8 +193,24 @@ public class FastagLoginController {
             userData.put("gmailId", result.user.getGmailId());
             userData.put("isVerified", result.user.getIsVerified());
             userData.put("sessionToken", result.sessionToken);
-            response.put("user", userData);
+
             List<Fasttag> fasttags = fasttagService.findByEmail(result.user.getGmailId());
+            String displayName = fasttags.stream()
+                    .map(Fasttag::getUserName)
+                    .filter(name -> name != null && !name.isBlank())
+                    .findFirst()
+                    .orElse(null);
+
+            if (displayName == null || displayName.isBlank()) {
+                List<FastagLinkedAccount> linked = fastagLinkedAccountRepository.findByGmailIdAndStatus(
+                        result.user.getGmailId().trim().toLowerCase(), "ACTIVE");
+                if (!linked.isEmpty() && linked.get(0).getAccountHolderName() != null) {
+                    displayName = linked.get(0).getAccountHolderName();
+                }
+            }
+
+            userData.put("userName", displayName);
+            response.put("user", userData);
             response.put("fasttags", fasttags);
         }
         return ResponseEntity.ok(response);
@@ -655,8 +672,34 @@ public class FastagLoginController {
         try {
             String normalized = gmailId.trim().toLowerCase();
             List<FastagLinkedAccount> accounts = fastagLinkedAccountRepository.findByGmailIdAndStatus(normalized, "ACTIVE");
+
+            List<Map<String, Object>> linkedAccounts = new ArrayList<>();
+            for (FastagLinkedAccount linked : accounts) {
+                Map<String, Object> linkedAccount = new HashMap<>();
+                linkedAccount.put("id", linked.getId());
+                linkedAccount.put("gmailId", linked.getGmailId());
+                linkedAccount.put("accountNumber", linked.getAccountNumber());
+                linkedAccount.put("status", linked.getStatus());
+                linkedAccount.put("verified", linked.getVerified());
+                linkedAccount.put("linkedAt", linked.getLinkedAt());
+
+                Account account = accountService.getAccountByNumber(linked.getAccountNumber());
+                String holderName = linked.getAccountHolderName();
+                Double availableBalance = null;
+                if (account != null) {
+                    if (account.getName() != null && !account.getName().isBlank()) {
+                        holderName = account.getName();
+                    }
+                    availableBalance = account.getBalance();
+                }
+
+                linkedAccount.put("accountHolderName", holderName);
+                linkedAccount.put("availableBalance", availableBalance);
+                linkedAccounts.add(linkedAccount);
+            }
+
             response.put("success", true);
-            response.put("linkedAccounts", accounts);
+            response.put("linkedAccounts", linkedAccounts);
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             response.put("success", false);

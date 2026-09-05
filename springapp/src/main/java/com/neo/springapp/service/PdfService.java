@@ -998,147 +998,115 @@ public class PdfService {
 
     private String generateGoldLoanReceiptHtml(GoldLoan goldLoan) {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss");
-        String currentDate = java.time.LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd-MM-yyyy"));
-        String approvalDate = goldLoan.getApprovalDate() != null ? 
-            goldLoan.getApprovalDate().format(formatter) : currentDate;
-        
+        String receiptDate = java.time.LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd-MM-yyyy"));
+        String approvalDate = goldLoan.getApprovalDate() != null
+                ? goldLoan.getApprovalDate().format(formatter)
+                : receiptDate;
+
+        String customerName = safeText(goldLoan.getUserName());
+        String accountNumber = safeText(goldLoan.getAccountNumber());
+        String loanAccountNumber = safeText(goldLoan.getLoanAccountNumber());
+        String approvedBy = safeText(goldLoan.getApprovedBy());
+        String goldPurity = safeText(goldLoan.getGoldPurity());
+        String goldItems = safeText(goldLoan.getGoldItems());
+
+        String grams = goldLoan.getVerifiedGoldGrams() != null
+                ? String.format("%.2f", goldLoan.getVerifiedGoldGrams())
+                : (goldLoan.getGoldGrams() != null ? String.format("%.2f", goldLoan.getGoldGrams()) : "0.00");
+
+        String goldValue = goldLoan.getVerifiedGoldValue() != null
+                ? String.format("%.2f", goldLoan.getVerifiedGoldValue())
+                : (goldLoan.getGoldValue() != null ? String.format("%.2f", goldLoan.getGoldValue()) : "0.00");
+
+        String loanAmount = goldLoan.getLoanAmount() != null ? String.format("%.2f", goldLoan.getLoanAmount()) : "0.00";
+        String ratePerGram = goldLoan.getGoldRatePerGram() != null ? String.format("%.2f", goldLoan.getGoldRatePerGram()) : "0.00";
+        String interestRate = goldLoan.getInterestRate() != null ? String.format("%.2f", goldLoan.getInterestRate()) : "12.00";
+        String tenure = goldLoan.getTenure() != null ? String.valueOf(goldLoan.getTenure()) : "12";
+
         StringBuilder html = new StringBuilder();
         html.append("<!DOCTYPE html>")
-            .append("<html>")
-            .append("<head>")
-            .append("<meta charset=\"UTF-8\">")
-            .append("<title>Gold Loan Receipt - NeoBank</title>")
-            .append("<style>")
-            .append("body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f5f5f5; position: relative; }")
-            .append(".watermark { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-45deg); font-size: 60px; color: rgba(30, 64, 175, 0.1); font-weight: bold; z-index: -1; pointer-events: none; white-space: nowrap; }")
-            .append(".receipt-container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1); position: relative; z-index: 1; }")
-            .append(".header { text-align: center; border-bottom: 3px solid #667eea; padding-bottom: 20px; margin-bottom: 30px; }")
-            .append(".bank-logo { font-size: 28px; font-weight: bold; color: #667eea; margin-bottom: 10px; }")
-            .append(".bank-name { font-size: 22px; color: #333; margin-bottom: 5px; }")
-            .append(".bank-seal { position: absolute; top: 20px; right: 20px; width: 100px; height: 100px; border: 3px solid #667eea; border-radius: 50%; background: white; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 10px; font-weight: bold; color: #667eea; text-align: center; padding: 10px; }")
-            .append(".receipt-title { text-align: center; font-size: 20px; font-weight: bold; color: #333; margin-bottom: 30px; padding: 15px; background-color: #f8f9fa; border-radius: 5px; }")
-            .append(".info-section { margin-bottom: 25px; padding: 20px; background-color: #f8f9fa; border-radius: 8px; }")
-            .append(".info-row { display: flex; justify-content: space-between; margin-bottom: 12px; padding: 8px 0; border-bottom: 1px solid #e0e0e0; }")
-            .append(".info-row:last-child { border-bottom: none; }")
-            .append(".info-label { font-weight: bold; color: #555; font-size: 14px; }")
-            .append(".info-value { color: #333; font-size: 14px; text-align: right; }")
-            .append(".amount-section { background-color: #fff3cd; padding: 20px; border-radius: 8px; margin: 20px 0; border: 2px solid #ffc107; }")
-            .append(".amount-row { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 16px; }")
-            .append(".amount-row.total { font-size: 20px; font-weight: bold; color: #856404; border-top: 2px solid #ffc107; padding-top: 10px; margin-top: 10px; }")
-            .append(".gold-details { background-color: #e8f5e9; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #4caf50; }")
-            .append(".footer { text-align: center; margin-top: 30px; padding-top: 20px; border-top: 2px solid #e0e0e0; color: #666; font-size: 12px; }")
-            .append(".signature-section { display: flex; justify-content: space-between; margin-top: 30px; padding-top: 20px; border-top: 2px solid #e0e0e0; }")
-            .append(".signature-box { text-align: center; flex: 1; }")
-            .append(".signature-line { width: 200px; border-top: 2px solid #333; margin: 0 auto 5px; }")
-            .append(".signature-label { font-size: 11px; color: #666; }")
-            .append("</style>")
-            .append("</head>")
-            .append("<body>")
-            .append("<div class=\"watermark\">NeoBank</div>")
-            .append("<div class=\"receipt-container\">")
-            .append("<div class=\"bank-seal\">")
-            .append("<div>NEOBANK</div>")
-            .append("<div style=\"font-size: 8px; margin-top: 3px;\">SEAL</div>")
-            .append("<div style=\"font-size: 7px; margin-top: 2px;\">").append(currentDate).append("</div>")
-            .append("</div>")
-            .append("<div class=\"header\">")
-            .append("<div class=\"bank-logo\">🏦 NeoBank</div>")
-            .append("<div class=\"bank-name\">Gold Loan Receipt</div>")
-            .append("</div>")
-            .append("<div class=\"receipt-title\">Loan Approval Confirmation</div>")
-            .append("<div class=\"info-section\">")
-            .append("<div class=\"info-row\">")
-            .append("<span class=\"info-label\">Receipt Number:</span>")
-            .append("<span class=\"info-value\">GL-").append(goldLoan.getId()).append("</span>")
-            .append("</div>")
-            .append("<div class=\"info-row\">")
-            .append("<span class=\"info-label\">Loan Account Number:</span>")
-            .append("<span class=\"info-value\">").append(goldLoan.getLoanAccountNumber() != null ? goldLoan.getLoanAccountNumber() : "N/A").append("</span>")
-            .append("</div>")
-            .append("<div class=\"info-row\">")
-            .append("<span class=\"info-label\">Approval Date:</span>")
-            .append("<span class=\"info-value\">").append(approvalDate).append("</span>")
-            .append("</div>")
-            .append("<div class=\"info-row\">")
-            .append("<span class=\"info-label\">Status:</span>")
-            .append("<span class=\"info-value\"><strong style=\"color: #4caf50;\">APPROVED</strong></span>")
-            .append("</div>")
-            .append("<div class=\"info-row\">")
-            .append("<span class=\"info-label\">Customer Name:</span>")
-            .append("<span class=\"info-value\">").append(goldLoan.getUserName() != null ? goldLoan.getUserName() : "N/A").append("</span>")
-            .append("</div>")
-            .append("<div class=\"info-row\">")
-            .append("<span class=\"info-label\">Account Number:</span>")
-            .append("<span class=\"info-value\">").append(goldLoan.getAccountNumber() != null ? goldLoan.getAccountNumber() : "N/A").append("</span>")
-            .append("</div>")
-            .append("<div class=\"info-row\">")
-            .append("<span class=\"info-label\">Email:</span>")
-            .append("<span class=\"info-value\">").append(goldLoan.getUserEmail() != null ? goldLoan.getUserEmail() : "N/A").append("</span>")
-            .append("</div>")
-            .append("<div class=\"info-row\">")
-            .append("<span class=\"info-label\">Approved By:</span>")
-            .append("<span class=\"info-value\">").append(goldLoan.getApprovedBy() != null ? goldLoan.getApprovedBy() : "Admin").append("</span>")
-            .append("</div>")
-            .append("</div>")
-            .append("<div class=\"gold-details\">")
-            .append("<h3 style=\"margin-top: 0; color: #2e7d32;\">Gold Details</h3>")
-            .append("<div class=\"info-row\">")
-            .append("<span class=\"info-label\">Gold Weight (Grams):</span>")
-            .append("<span class=\"info-value\">").append(goldLoan.getGoldGrams() != null ? String.format("%.2f", goldLoan.getGoldGrams()) : "N/A").append(" grams</span>")
-            .append("</div>")
-            .append("<div class=\"info-row\">")
-            .append("<span class=\"info-label\">Gold Rate (per gram):</span>")
-            .append("<span class=\"info-value\">₹").append(goldLoan.getGoldRatePerGram() != null ? String.format("%.2f", goldLoan.getGoldRatePerGram()) : "N/A").append("</span>")
-            .append("</div>")
-            .append("<div class=\"info-row\">")
-            .append("<span class=\"info-label\">Gold Value:</span>")
-            .append("<span class=\"info-value\">₹").append(goldLoan.getGoldValue() != null ? String.format("%.2f", goldLoan.getGoldValue()) : "N/A").append("</span>")
-            .append("</div>");
-        
-        if (goldLoan.getGoldPurity() != null) {
-            html.append("<div class=\"info-row\">")
-                .append("<span class=\"info-label\">Gold Purity:</span>")
-                .append("<span class=\"info-value\">").append(goldLoan.getGoldPurity()).append("</span>")
-                .append("</div>");
-        }
-        
-        html.append("</div>")
-            .append("<div class=\"amount-section\">")
-            .append("<h3 style=\"margin-top: 0; color: #856404;\">Loan Details</h3>")
-            .append("<div class=\"amount-row\">")
-            .append("<span>Loan Amount (75% of Gold Value):</span>")
-            .append("<span>₹").append(goldLoan.getLoanAmount() != null ? String.format("%.2f", goldLoan.getLoanAmount()) : "N/A").append("</span>")
-            .append("</div>")
-            .append("<div class=\"amount-row\">")
-            .append("<span>Interest Rate:</span>")
-            .append("<span>").append(goldLoan.getInterestRate() != null ? String.format("%.2f", goldLoan.getInterestRate()) : "12.00").append("% per annum</span>")
-            .append("</div>")
-            .append("<div class=\"amount-row\">")
-            .append("<span>Tenure:</span>")
-            .append("<span>").append(goldLoan.getTenure() != null ? goldLoan.getTenure() : "12").append(" months</span>")
-            .append("</div>")
-            .append("</div>")
-            .append("<div class=\"signature-section\">")
-            .append("<div class=\"signature-box\">")
-            .append("<div class=\"signature-line\"></div>")
-            .append("<div class=\"signature-label\">Customer Signature</div>")
-            .append("</div>")
-            .append("<div class=\"signature-box\">")
-            .append("<div class=\"signature-line\"></div>")
-            .append("<div class=\"signature-label\">Authorized Signatory</div>")
-            .append("<div class=\"signature-label\" style=\"margin-top: 5px;\">NeoBank Ltd.</div>")
-            .append("</div>")
-            .append("</div>")
-            .append("<div class=\"footer\">")
-            .append("<p><strong>This is a computer-generated receipt and does not require signature.</strong></p>")
-            .append("<p>For any queries, contact us at: 1800 103 1906 | support@neobank.in</p>")
-            .append("<p>© ").append(java.time.Year.now()).append(" NeoBank. All rights reserved.</p>")
-            .append("</div>")
-            .append("</div>")
-            .append("</body>")
-            .append("</html>");
-        
+                .append("<html>")
+                .append("<head>")
+                .append("<meta charset=\"UTF-8\">")
+                .append("<title>NeoBank Gold Loan Acknowledgement Slip</title>")
+                .append("<style>")
+                .append("body{font-family:Arial,sans-serif;font-size:12px;color:#111;background:#fff;margin:14px;}")
+                .append(".slip{border:2px solid #0f172a;padding:10px;max-width:900px;margin:0 auto;}")
+                .append(".header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:1px solid #0f172a;padding-bottom:8px;}")
+                .append(".bank-box{border:1px solid #0f172a;padding:6px 10px;background:#fff6d6;display:inline-block;font-weight:700;font-size:14px;}")
+                .append(".bank-sub{font-size:11px;margin-top:6px;}")
+                .append(".title{text-align:center;flex:1;padding:0 12px;}")
+                .append(".title h2{margin:0;font-size:19px;}")
+                .append(".title .sub{margin-top:5px;font-size:12px;}")
+                .append(".meta{font-size:11px;text-align:right;line-height:1.5;}")
+                .append("table{width:100%;border-collapse:collapse;margin-top:8px;}")
+                .append("th,td{border:1px solid #111;padding:6px;vertical-align:top;}")
+                .append("th{background:#f3f4f6;text-align:left;}")
+                .append(".line{margin-top:10px;line-height:1.6;}")
+                .append(".total{font-weight:700;background:#f8fafc;}")
+                .append(".foot{margin-top:12px;display:flex;justify-content:space-between;align-items:flex-end;}")
+                .append(".sign{min-width:220px;text-align:center;}")
+                .append(".sign-line{border-top:1px solid #111;margin-top:24px;padding-top:4px;font-weight:600;}")
+                .append(".stamp{width:110px;height:110px;border:2px solid #334155;border-radius:55px;display:flex;align-items:center;justify-content:center;text-align:center;font-size:10px;color:#334155;margin-left:10px;}")
+                .append("</style>")
+                .append("</head>")
+                .append("<body>")
+                .append("<div class=\"slip\">")
+                .append("<div class=\"header\">")
+                .append("<div>")
+                .append("<div class=\"bank-box\">NeoBank</div>")
+                .append("<div class=\"bank-sub\">Memorandum in respect of Gold Jewellery/Ornaments deposited as security</div>")
+                .append("</div>")
+                .append("<div class=\"title\">")
+                .append("<h2>Gold Loan Acknowledgement Slip</h2>")
+                .append("<div class=\"sub\">Receipt for Approved Gold Loan</div>")
+                .append("</div>")
+                .append("<div class=\"meta\">")
+                .append("Branch: NeoBank Main Branch<br>")
+                .append("Receipt No: GL-").append(goldLoan.getId() == null ? "N/A" : goldLoan.getId()).append("<br>")
+                .append("Date: ").append(receiptDate).append("<br>")
+                .append("Approved On: ").append(approvalDate)
+                .append("</div>")
+                .append("</div>")
+                .append("<table>")
+                .append("<tr><th>Borrower Name</th><td>").append(customerName).append("</td><th>Loan Amount</th><td>Rs. ").append(loanAmount).append("</td></tr>")
+                .append("<tr><th>Account Number</th><td>").append(accountNumber).append("</td><th>Loan Account</th><td>").append(loanAccountNumber).append("</td></tr>")
+                .append("<tr><th>Interest Rate</th><td>").append(interestRate).append("% p.a.</td><th>Tenure</th><td>").append(tenure).append(" months</td></tr>")
+                .append("</table>")
+                .append("<table>")
+                .append("<tr><th colspan=\"5\">Schedule of Gold Jewellery/Ornaments</th></tr>")
+                .append("<tr><th>S. No.</th><th>Description</th><th>Purity</th><th>Weight (grams)</th><th>Remarks</th></tr>")
+                .append("<tr><td>1</td><td>").append(goldItems).append("</td><td>").append(goldPurity).append("</td><td>").append(grams).append("</td><td>Accepted as security</td></tr>")
+                .append("<tr class=\"total\"><td colspan=\"3\">Total Gold Value (at Rs. ").append(ratePerGram).append("/gram)</td><td colspan=\"2\">Rs. ").append(goldValue).append("</td></tr>")
+                .append("</table>")
+                .append("<div class=\"line\">")
+                .append("We acknowledge receipt of the above gold ornaments deposited as collateral security for the approved loan account mentioned above.")
+                .append("<br>Approved by: ").append(approvedBy)
+                .append("</div>")
+                .append("<div class=\"foot\">")
+                .append("<div class=\"sign\"><div class=\"sign-line\">Customer Signature</div></div>")
+                .append("<div style=\"display:flex;align-items:flex-end;\">")
+                .append("<div class=\"sign\"><div class=\"sign-line\">Authorized Signatory - NeoBank Ltd.</div></div>")
+                .append("<div class=\"stamp\">NEOBANK<br>AUTHORIZED<br>STAMP</div>")
+                .append("</div>")
+                .append("</div>")
+                .append("</div>")
+                .append("</body>")
+                .append("</html>");
+
         return html.toString();
+    }
+
+    private String safeText(String value) {
+        if (value == null || value.isBlank()) {
+            return "N/A";
+        }
+        return value
+                .replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace("\"", "&quot;")
+                .replace("'", "&#39;");
     }
 
     public byte[] generatePersonalLoanReceipt(Loan loan) throws IOException {

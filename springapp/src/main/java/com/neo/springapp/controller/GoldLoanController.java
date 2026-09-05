@@ -482,6 +482,43 @@ public class GoldLoanController {
         }
     }
 
+    // Download receipt for approved gold loan
+    @GetMapping("/{id}/receipt")
+    public ResponseEntity<?> downloadApprovedReceipt(
+            @PathVariable Long id,
+            @RequestParam(required = false) String accountNumber) {
+        try {
+            GoldLoan loan = goldLoanService.getGoldLoanById(id);
+            if (loan == null) {
+                return ResponseEntity.notFound().build();
+            }
+            if (!"Approved".equalsIgnoreCase(loan.getStatus())) {
+                return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Receipt is available only for approved loans."));
+            }
+
+            if (accountNumber != null && !accountNumber.trim().isEmpty()) {
+                String requestedAccount = accountNumber.trim();
+                String loanAccount = loan.getAccountNumber() != null ? loan.getAccountNumber().trim() : "";
+                if (!loanAccount.equalsIgnoreCase(requestedAccount)) {
+                    return ResponseEntity.status(403).body(Map.of("success", false, "message", "You are not allowed to download this receipt."));
+                }
+            }
+
+            byte[] pdfBytes = pdfService.generateGoldLoanReceipt(loan);
+            String fileName = "NeoBank-GoldLoan-Receipt-" + (loan.getLoanAccountNumber() != null ? loan.getLoanAccountNumber() : loan.getId()) + ".pdf";
+
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
+                    .contentType(MediaType.APPLICATION_PDF)
+                    .contentLength(pdfBytes.length)
+                    .body(pdfBytes);
+        } catch (IOException ex) {
+            return ResponseEntity.internalServerError().body(Map.of("success", false, "message", "Failed to generate receipt PDF."));
+        } catch (Exception ex) {
+            return ResponseEntity.internalServerError().body(Map.of("success", false, "message", "Unable to download receipt."));
+        }
+    }
+
     // Get EMI schedule for gold loan
     @GetMapping("/emi-schedule/{loanAccountNumber}")
     public ResponseEntity<List<com.neo.springapp.model.EmiPayment>> getEmiSchedule(@PathVariable String loanAccountNumber) {

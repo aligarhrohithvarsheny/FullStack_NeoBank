@@ -353,6 +353,17 @@
               📋 View & Accept Terms
             </button>
           </div>
+          <div class="terms-action">
+            <button
+              type="button"
+              class="accept-terms-btn"
+              (click)="downloadApprovedReceipt(loan)"
+              [disabled]="isDownloadingReceipt(loan.id)"
+            >
+              <span *ngIf="!isDownloadingReceipt(loan.id)">Download Approved Receipt</span>
+              <span *ngIf="isDownloadingReceipt(loan.id)">Generating Receipt...</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>

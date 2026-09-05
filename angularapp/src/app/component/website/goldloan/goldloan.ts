@@ -5,7 +5,7 @@ import { Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../../environment/environment';
 import { AlertService } from '../../../service/alert.service';
-import { timeout, catchError } from 'rxjs/operators';
+import { timeout, catchError, finalize } from 'rxjs/operators';
 import { of } from 'rxjs';
 
 interface GoldLoan {
@@ -88,6 +88,7 @@ export class Goldloan implements OnInit, OnDestroy {
   goldLoanOtpTimer: number = 0;
   goldLoanOtpTimerRef: any = null;
   isSendingGoldLoanOtp: boolean = false;
+  downloadingReceiptLoanIds = new Set<number>();
 
   constructor(
     private router: Router,
@@ -410,6 +411,55 @@ export class Goldloan implements OnInit, OnDestroy {
       default:
         return '';
     }
+  }
+
+  isDownloadingReceipt(loanId: number | undefined): boolean {
+    if (!loanId) return false;
+    return this.downloadingReceiptLoanIds.has(loanId);
+  }
+
+  downloadApprovedReceipt(loan: GoldLoan) {
+    if (!loan?.id || loan.status !== 'Approved') {
+      this.alertService.error('Download Unavailable', 'Receipt can be downloaded only for approved loans.');
+      return;
+    }
+
+    if (this.downloadingReceiptLoanIds.has(loan.id)) {
+      return;
+    }
+
+    this.downloadingReceiptLoanIds.add(loan.id);
+    const params = this.userAccountNumber ? `?accountNumber=${encodeURIComponent(this.userAccountNumber)}` : '';
+
+    this.http.get(`${environment.apiBaseUrl}/api/gold-loans/${loan.id}/receipt${params}`, { responseType: 'blob' })
+      .pipe(
+        timeout(20000),
+        finalize(() => this.downloadingReceiptLoanIds.delete(loan.id!)),
+        catchError(err => {
+          let message = err.error?.message || 'Failed to download receipt.';
+          if (err.status === 403) {
+            message = 'You are not authorized to download this receipt.';
+          } else if (err.status === 400) {
+            message = 'Receipt is available only for approved loans.';
+          } else if (err.name === 'TimeoutError') {
+            message = 'Receipt generation timed out. Please try again.';
+          }
+          this.alertService.error('Download Failed', message);
+          return of(null);
+        })
+      )
+      .subscribe((blob: Blob | null) => {
+        if (!blob) return;
+
+        const loanRef = loan.loanAccountNumber || loan.id;
+        const fileName = `NeoBank-GoldLoan-Receipt-${loanRef}.pdf`;
+        const fileUrl = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = fileUrl;
+        link.download = fileName;
+        link.click();
+        window.URL.revokeObjectURL(fileUrl);
+      });
   }
 
   showTermsAndAccept(loan: GoldLoan) {

@@ -39,7 +39,7 @@
   <div class="dashboard-content">
     <!-- Welcome -->
     <div class="welcome-bar">
-      <h1 class="welcome-greeting">Welcome, <strong>{{ user?.userName || user?.gmailId || 'NA' }}</strong></h1>
+      <h1 class="welcome-greeting">Welcome, <strong>{{ getDisplayUserName() }}</strong></h1>
     </div>
 
     <!-- Dashboard Grid Layout -->
@@ -215,6 +215,7 @@
                 <div class="linked-acc-info">
                   <span class="linked-acc-name">{{ acc.accountHolderName || 'Account Holder' }}</span>
                   <span class="linked-acc-number">A/C: {{ getMaskedAccountNumber(acc.accountNumber) }}</span>
+                  <span class="linked-acc-number">Available Balance: ₹{{ formatAvailableBalance(acc.availableBalance) }}</span>
                   <span class="linked-acc-status">
                     <svg viewBox="0 0 24 24" fill="none" width="12" height="12" stroke="#10B981" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
                     Verified & Linked
@@ -468,15 +469,16 @@
         </div>
 
         <!-- Linked Account Info -->
-        <div class="recharge-debit-info" *ngIf="linkedAccounts.length > 0">
+        <div class="recharge-debit-info" *ngIf="getPrimaryLinkedAccount() as primaryAccount">
           <div class="debit-label">Debiting From</div>
           <div class="debit-account-card">
             <svg viewBox="0 0 24 24" fill="none" width="20" height="20" stroke="#2563EB" stroke-width="1.8">
               <path d="M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11M20 10v11M8 14v3M12 14v3M16 14v3"/>
             </svg>
             <div class="debit-account-details">
-              <span class="debit-acc-name">{{ linkedAccounts[0].accountHolderName }}</span>
-              <span class="debit-acc-num">A/C: {{ getMaskedAccountNumber(linkedAccounts[0].accountNumber) }}</span>
+              <span class="debit-acc-name">{{ primaryAccount.accountHolderName || 'Account Holder' }}</span>
+              <span class="debit-acc-num">A/C: {{ getMaskedAccountNumber(primaryAccount.accountNumber) }}</span>
+              <span class="debit-acc-num">Available Balance: ₹{{ formatAvailableBalance(primaryAccount.availableBalance) }}</span>
             </div>
             <svg viewBox="0 0 24 24" fill="none" width="16" height="16" stroke="#10B981" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
           </div>
