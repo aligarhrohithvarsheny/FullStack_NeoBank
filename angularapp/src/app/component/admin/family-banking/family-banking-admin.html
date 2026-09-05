@@ -36,6 +36,7 @@
         </div>
         <div class="review-meta">
           <span>Daily ₹{{ app.dailyLimit | number:'1.0-0' }} · Monthly ₹{{ app.monthlyLimit | number:'1.0-0' }}</span>
+          <span *ngIf="app.assignedAccountNumber">Account: <strong>{{ app.assignedAccountNumber }}</strong> · Customer ID: <strong>{{ app.assignedCustomerId }}</strong></span>
           <b [class]="'status-' + app.status.toLowerCase()">{{ app.status }}</b>
           <div *ngIf="app.status === 'PENDING'" class="review-actions">
             <button [disabled]="busy" (click)="openEdit(app)">✏️ Edit & Review</button>
@@ -53,8 +54,25 @@
 
   <!-- HISTORY TAB -->
   <ng-container *ngIf="activeTab === 'history'">
-    <p *ngIf="!history.length" class="empty">No history records yet.</p>
-    <div class="review-list">
+    <p *ngIf="!allApplications.length" class="empty">No reviewed applications yet.</p>
+    <div class="review-list" *ngIf="allApplications.length">
+      <article class="review-row" *ngFor="let app of allApplications">
+        <div class="identity">
+          <span class="avatar">{{ app.minorName.charAt(0) }}</span>
+          <div>
+            <strong>{{ app.minorName }}</strong>
+            <span>Guardian #{{ app.guardianUserId }} · DOB {{ app.dateOfBirth }}</span>
+          </div>
+        </div>
+        <div class="review-meta">
+          <span *ngIf="app.assignedAccountNumber">Account: <strong>{{ app.assignedAccountNumber }}</strong> · Customer ID: <strong>{{ app.assignedCustomerId }}</strong></span>
+          <b [class]="'status-' + app.status.toLowerCase()">{{ app.status }}</b>
+        </div>
+      </article>
+    </div>
+
+    <p *ngIf="!history.length" class="empty">No audit records yet.</p>
+    <div class="review-list" *ngIf="history.length">
       <article class="review-row" *ngFor="let h of history">
         <div class="identity">
           <span class="avatar">{{ (h.action || 'A').charAt(0) }}</span>

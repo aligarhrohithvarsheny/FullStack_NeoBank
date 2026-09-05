@@ -31,4 +31,8 @@ public class MinorAccountApplication {
     private LocalDateTime reviewedAt;
     private String reviewedBy;
     private String rejectionReason;
+
+    // Populated on approval so the admin/guardian can see the auto-generated minor account
+    private String assignedAccountNumber;
+    private String assignedCustomerId;
 }

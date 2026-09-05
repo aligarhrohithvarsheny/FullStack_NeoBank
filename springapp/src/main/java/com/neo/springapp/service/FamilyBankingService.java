@@ -262,6 +262,8 @@ public class FamilyBankingService {
             // Auto-generate unique 9-digit customer ID
             childAccount.setCustomerId(accountService.generateCustomerIdForAccount(childAccount));
             Account savedAccount = accountService.saveAccount(childAccount);
+            app.setAssignedAccountNumber(savedAccount.getAccountNumber());
+            app.setAssignedCustomerId(savedAccount.getCustomerId());
 
             // Auto-generate a unique login email for the minor (avoid unique constraint violations)
             String minorEmail = generateUniqueMinorEmail(app.getId(), app.getMinorName());

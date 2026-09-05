@@ -593,8 +593,12 @@ public class GoldLoanController {
                     .contentLength(pdfBytes.length)
                     .body(pdfBytes);
         } catch (IOException ex) {
+            System.err.println("Gold loan receipt PDF generation failed for loan id=" + id + ": " + ex.getMessage());
+            ex.printStackTrace();
             return ResponseEntity.internalServerError().body(Map.of("success", false, "message", "Failed to generate receipt PDF."));
         } catch (Exception ex) {
+            System.err.println("Gold loan receipt download failed for loan id=" + id + ": " + ex.getMessage());
+            ex.printStackTrace();
             return ResponseEntity.internalServerError().body(Map.of("success", false, "message", "Unable to download receipt."));
         }
     }

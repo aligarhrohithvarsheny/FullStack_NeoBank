@@ -7,7 +7,7 @@ import { environment } from '../../../../environment/environment';
 
 @Component({ selector: 'app-family-banking-admin', standalone: true, imports: [CommonModule, FormsModule], templateUrl: './family-banking-admin.html', styleUrls: ['./family-banking-admin.css'] })
 export class FamilyBankingAdminComponent implements OnInit {
-  applications: MinorApplication[] = []; history: any[] = []; message = ''; error = ''; loading = false; busy = false;
+  applications: MinorApplication[] = []; allApplications: MinorApplication[] = []; history: any[] = []; message = ''; error = ''; loading = false; busy = false;
   activeTab: 'pending' | 'history' = 'pending';
   showEditModal = false; editing: MinorApplication | null = null;
   editForm: any = { minorName: '', dateOfBirth: '', monthlyLimit: 0, dailyLimit: 0, reason: '' };
@@ -26,6 +26,8 @@ export class FamilyBankingAdminComponent implements OnInit {
   loadHistory(): void {
     this.http.get<any[]>(`${environment.apiBaseUrl}/api/family/admin/minor-history`, { headers: this.headers() })
       .subscribe({ next: v => { this.history = v || []; }, error: () => { /* history optional */ } });
+    this.http.get<MinorApplication[]>(`${environment.apiBaseUrl}/api/family/admin/minor-applications/all`, { headers: this.headers() })
+      .subscribe({ next: v => { this.allApplications = (v || []).filter(a => a.status !== 'PENDING'); }, error: () => { /* optional */ } });
   }
 
   setTab(tab: 'pending' | 'history'): void { this.activeTab = tab; if (tab === 'history') this.loadHistory(); }

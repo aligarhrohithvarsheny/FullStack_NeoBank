@@ -5,7 +5,7 @@ import { environment } from '../../environment/environment';
 
 export interface FamilyInvitation { id: number; accountNumber: string; inviterUserId: number; inviteeUserId: number; status: string; createdAt: string; }
 export interface JointTransfer { id: number; accountNumber: string; fromUserId: number; approverUserId: number; toAccountNumber: string; amount: number; status: string; note?: string; transactionReference?: string; }
-export interface MinorApplication { id: number; guardianUserId: number; minorName: string; dateOfBirth: string; monthlyLimit: number; dailyLimit: number; status: string; }
+export interface MinorApplication { id: number; guardianUserId: number; minorName: string; dateOfBirth: string; monthlyLimit: number; dailyLimit: number; status: string; assignedAccountNumber?: string; assignedCustomerId?: string; }
 export interface FamilyNotification { id: number; recipientUserId: number; type: string; title: string; message: string; createdAt: string; readAt?: string; }
 
 export interface JointAccountProfile {
