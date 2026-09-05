@@ -2457,19 +2457,19 @@ public class UserController {
                 account.setDob((String) updateData.get("dob"));
             }
             if (updateData.containsKey("age")) {
-                account.setAge(((Number) updateData.get("age")).intValue());
+                account.setAge(toInteger(updateData.get("age"), account.getAge()));
             }
             if (updateData.containsKey("occupation")) {
                 account.setOccupation((String) updateData.get("occupation"));
             }
             if (updateData.containsKey("income")) {
-                account.setIncome(((Number) updateData.get("income")).doubleValue());
+                account.setIncome(toDouble(updateData.get("income"), account.getIncome()));
             }
             if (updateData.containsKey("accountType")) {
                 account.setAccountType((String) updateData.get("accountType"));
             }
             if (updateData.containsKey("balance")) {
-                account.setBalance(((Number) updateData.get("balance")).doubleValue());
+                account.setBalance(toDouble(updateData.get("balance"), account.getBalance()));
             }
             if (updateData.containsKey("pan")) {
                 account.setPan((String) updateData.get("pan"));
