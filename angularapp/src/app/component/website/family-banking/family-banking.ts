@@ -8,10 +8,11 @@ import { FamilyBankingService, FamilyInvitation, JointTransfer, MinorApplication
   templateUrl: './family-banking.html', styleUrls: ['./family-banking.css']
 })
 export class FamilyBankingComponent implements OnInit {
-  userId = 0; accountNumber = ''; inviteeEmail = ''; transferAccountNumber = ''; destinationAccount = ''; amount = 0; note = '';
+  userId = 0; accountNumber = ''; inviteeEmail = ''; inviteeName = ''; transferAccountNumber = ''; destinationAccount = ''; amount = 0; note = '';
   minorName = ''; dateOfBirth = ''; monthlyLimit = 5000; dailyLimit = 2000;
   invitations: FamilyInvitation[] = []; transfers: JointTransfer[] = []; applications: MinorApplication[] = []; links: any[] = []; notifications: FamilyNotification[] = [];
   jointAccounts: JointAccountProfile[] = [];
+  linkedAccounts: any[] = [];
   history: FamilyTransaction[] = []; selectedAccount: JointAccountProfile | null = null; operatingMode = 'JOINTLY';
   activeSection = 'overview'; message = ''; error = ''; busy = false; loading = false; loaded = false;
   lookupAccountNumber = ''; lookupResult: any = null; lookupBusy = false;
@@ -28,12 +29,16 @@ export class FamilyBankingComponent implements OnInit {
     this.load(this.family.pendingTransfers(this.userId), v => this.transfers = v);
     this.load(this.family.applications(this.userId), v => this.applications = v);
     this.load(this.family.guardianLinks(this.userId), v => this.links = v);
+    this.load(this.family.linkedAccounts(this.userId), v => this.linkedAccounts = v);
     this.load(this.family.notifications(this.userId), v => this.notifications = v, true);
   }
   selectAccount(account: JointAccountProfile): void { this.selectedAccount = account; this.operatingMode = account.operatingMode; this.transferAccountNumber = account.jointAccountNumber; this.loadHistory(); }
   loadHistory(): void { if (this.selectedAccount) this.load(this.family.history(this.userId, this.selectedAccount.jointAccountNumber), v => this.history = v); }
   saveSettings(): void { if (this.selectedAccount) this.run(this.family.updateSettings(this.userId, this.selectedAccount.jointAccountNumber, this.operatingMode), 'Joint account settings updated'); }
-  invite(): void { this.run(this.family.invite(this.userId, this.accountNumber, this.inviteeEmail), 'Invitation sent'); }
+  invite(): void {
+    if (!this.inviteeName.trim()) { this.error = 'Please enter the invitee name as registered on their account'; return; }
+    this.run(this.family.invite(this.userId, this.accountNumber, this.inviteeEmail, this.inviteeName), 'Invitation sent');
+  }
   respond(invitation: FamilyInvitation, approve: boolean): void { this.run(this.family.respondInvitation(this.userId, invitation.id, approve), approve ? 'Invitation accepted' : 'Invitation declined'); }
   requestTransfer(): void { this.run(this.family.requestTransfer(this.userId, this.transferAccountNumber, this.destinationAccount, this.amount, this.note), 'Transfer sent for joint approval'); }
   decide(transfer: JointTransfer, approve: boolean): void { this.run(this.family.decideTransfer(this.userId, transfer.id, approve), approve ? 'Transfer approved' : 'Transfer declined'); }

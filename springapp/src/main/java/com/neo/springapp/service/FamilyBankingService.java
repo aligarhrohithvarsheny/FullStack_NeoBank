@@ -51,12 +51,30 @@ public class FamilyBankingService {
 
     @Transactional
     public JointAccountInvitation invite(Long inviterId, String accountNumber, String inviteeEmail) {
+        return invite(inviterId, accountNumber, inviteeEmail, null);
+    }
+
+    @Transactional
+    public JointAccountInvitation invite(Long inviterId, String accountNumber, String inviteeEmail, String expectedName) {
         requireUser(inviterId);
         User invitee = userRepository.findByEmailIgnoreCase(inviteeEmail)
                 .orElseThrow(() -> new IllegalArgumentException("Invitee email is not registered"));
         if (Objects.equals(inviterId, invitee.getId())) throw new IllegalArgumentException("You cannot invite yourself");
         Account account = accountService.getAccountByNumber(accountNumber);
         if (account == null) throw new IllegalArgumentException("Account not found");
+
+        // Verify name matching: the provided name must match the invitee's account/user name
+        if (expectedName != null && !expectedName.isBlank()) {
+            String provided = expectedName.trim().replaceAll("\\s+", " ").toLowerCase();
+            String inviteeAccountName = invitee.getAccount() != null && invitee.getAccount().getName() != null
+                    ? invitee.getAccount().getName().trim().replaceAll("\\s+", " ").toLowerCase() : "";
+            String inviteeUsername = invitee.getUsername() != null
+                    ? invitee.getUsername().trim().replaceAll("\\s+", " ").toLowerCase() : "";
+            if (!provided.equals(inviteeAccountName) && !provided.equals(inviteeUsername)) {
+                throw new IllegalArgumentException("Name does not match the account holder. Please enter the exact registered name.");
+            }
+        }
+
         User inviter = userRepository.findById(inviterId).orElseThrow(() -> new SecurityException("Authenticated user is required"));
         if (inviter.getAccount() == null || !accountNumber.equals(inviter.getAccount().getAccountNumber()))
             throw new SecurityException("Only the account owner can create a joint invitation");
@@ -188,34 +206,163 @@ public class FamilyBankingService {
 
     @Transactional
     public MinorAccountApplication reviewMinor(Long applicationId, String adminEmail, boolean approve, String reason) {
+        return reviewMinor(applicationId, adminEmail, approve, reason, null, null, null, null);
+    }
+
+    @Transactional
+    public MinorAccountApplication reviewMinor(Long applicationId, String adminEmail, boolean approve, String reason,
+                                               String editedMinorName, LocalDate editedDob, Double editedMonthlyLimit, Double editedDailyLimit) {
         if (adminEmail == null || adminEmail.isBlank()) throw new SecurityException("Admin identity is required");
         MinorAccountApplication app = minorRepository.findById(applicationId).orElseThrow(() -> new IllegalArgumentException("Application not found"));
         if (!"PENDING".equals(app.getStatus())) throw new IllegalArgumentException("Application is no longer pending");
+
+        // Apply admin edits (before approval) and track the changes for history
+        StringBuilder editDetails = new StringBuilder();
+        if (editedMinorName != null && !editedMinorName.isBlank() && !editedMinorName.equals(app.getMinorName())) {
+            editDetails.append("minorName: '").append(app.getMinorName()).append("' → '").append(editedMinorName).append("'; ");
+            app.setMinorName(editedMinorName.trim());
+        }
+        if (editedDob != null && !editedDob.equals(app.getDateOfBirth())) {
+            if (!editedDob.isAfter(LocalDate.now().minusYears(18))) {
+                throw new IllegalArgumentException("Edited date of birth must still be a minor (under 18)");
+            }
+            editDetails.append("dateOfBirth: ").append(app.getDateOfBirth()).append(" → ").append(editedDob).append("; ");
+            app.setDateOfBirth(editedDob);
+        }
+        if (editedMonthlyLimit != null && editedMonthlyLimit > 0 && !editedMonthlyLimit.equals(app.getMonthlyLimit())) {
+            editDetails.append("monthlyLimit: ").append(app.getMonthlyLimit()).append(" → ").append(editedMonthlyLimit).append("; ");
+            app.setMonthlyLimit(editedMonthlyLimit);
+        }
+        if (editedDailyLimit != null && editedDailyLimit > 0 && !editedDailyLimit.equals(app.getDailyLimit())) {
+            if (editedDailyLimit > app.getMonthlyLimit()) {
+                throw new IllegalArgumentException("Daily limit cannot exceed monthly limit");
+            }
+            editDetails.append("dailyLimit: ").append(app.getDailyLimit()).append(" → ").append(editedDailyLimit).append("; ");
+            app.setDailyLimit(editedDailyLimit);
+        }
+        if (editDetails.length() > 0) {
+            audit(app.getGuardianUserId(), "MINOR_APPLICATION_EDITED", "MINOR_APPLICATION", applicationId,
+                    "edited by " + adminEmail + " before review: " + editDetails.toString().trim());
+        }
+
         app.setStatus(approve ? "ACTIVE" : "DECLINED"); app.setReviewedBy(adminEmail); app.setReviewedAt(LocalDateTime.now()); app.setRejectionReason(reason);
         if (approve) {
             User guardian = userRepository.findById(app.getGuardianUserId()).orElseThrow();
             Account guardianAccount = guardian.getAccount();
+
+            // Auto-generate a real unique account number and customer ID for the minor
+            String minorAccountNumber = accountService.generateUniqueAccountNumberForNewAccount();
+
             Account childAccount = new Account();
-            childAccount.setAccountNumber("MINOR" + accountService.generateUniqueAccountNumberForNewAccount());
+            childAccount.setAccountNumber(minorAccountNumber);
             childAccount.setName(app.getMinorName()); childAccount.setDob(app.getDateOfBirth().toString()); childAccount.setAge(0);
             childAccount.setAccountType("MINOR_SAVINGS"); childAccount.setStatus("ACTIVE"); childAccount.setBalance(0.0);
             childAccount.setAadharNumber("MINOR-AADHAR-" + app.getId()); childAccount.setPan("MINORPAN" + String.format("%04d", app.getId() % 10000) + "X"); childAccount.setPhone("MINOR" + app.getId());
             childAccount.setParentAccountId(guardianAccount == null ? null : guardianAccount.getId()); childAccount.setOccupation("Minor");
+            // Auto-generate unique 9-digit customer ID
+            childAccount.setCustomerId(accountService.generateCustomerIdForAccount(childAccount));
             Account savedAccount = accountService.saveAccount(childAccount);
-            User child = new User(); child.setUsername(app.getMinorName()); child.setEmail("minor." + app.getId() + "@neobank.local"); child.setStatus("APPROVED"); child.setAccount(savedAccount); child.setParentUser(guardian); userRepository.save(child);
+
+            // Auto-generate a unique login email for the minor (avoid unique constraint violations)
+            String minorEmail = generateUniqueMinorEmail(app.getId(), app.getMinorName());
+            User child = new User(); child.setUsername(app.getMinorName()); child.setEmail(minorEmail); child.setStatus("APPROVED"); child.setAccount(savedAccount); child.setParentUser(guardian); userRepository.save(child);
             GuardianLink link = new GuardianLink(); link.setGuardianUserId(app.getGuardianUserId()); link.setChildUserId(child.getId()); link.setStatus("ACTIVE"); guardianRepository.save(link);
         }
         MinorAccountApplication saved = minorRepository.save(app);
         notify(app.getGuardianUserId(), "MINOR_APPLICATION_DECISION", "Minor application " + (approve ? "approved" : "declined"), "The Family Banking minor application was " + (approve ? "approved." : "declined."));
-        audit(app.getGuardianUserId(), "MINOR_APPLICATION_REVIEWED", "MINOR_APPLICATION", applicationId, "reviewed by " + adminEmail + ": " + (approve ? "approved" : "declined"));
+        audit(app.getGuardianUserId(), approve ? "MINOR_APPLICATION_APPROVED" : "MINOR_APPLICATION_DECLINED", "MINOR_APPLICATION", applicationId,
+                (approve ? "approved" : "declined") + " by " + adminEmail + (reason != null && !reason.isBlank() ? " (reason: " + reason + ")" : ""));
         return saved;
+    }
+
+    // Generate a unique email for a minor's auto-created login account
+    private String generateUniqueMinorEmail(Long applicationId, String minorName) {
+        String base = "minor." + applicationId;
+        String candidate = base + "@neobank.local";
+        int suffix = 1;
+        while (userRepository.findByEmailIgnoreCase(candidate).isPresent()) {
+            candidate = base + "." + suffix + "@neobank.local";
+            suffix++;
+        }
+        return candidate;
     }
 
     public List<MinorAccountApplication> pendingMinorApplications() {
         return minorRepository.findByStatusOrderByCreatedAtAsc("PENDING");
     }
 
+    public List<MinorAccountApplication> allMinorApplications() {
+        return minorRepository.findAll();
+    }
+
+    public List<FamilyBankingAuditLog> minorHistory() {
+        return auditRepository.findAll().stream()
+                .filter(log -> "MINOR_APPLICATION".equals(log.getResourceType()))
+                .sorted((a, b) -> b.getCreatedAt() == null || a.getCreatedAt() == null ? 0 : b.getCreatedAt().compareTo(a.getCreatedAt()))
+                .toList();
+    }
+
     public List<GuardianLink> guardianLinks(Long guardianId) { requireUser(guardianId); return guardianRepository.findByGuardianUserIdAndStatus(guardianId, "ACTIVE"); }
+
+    // All account numbers linked to a user: own account + joint accounts + guardian/minor child accounts
+    public List<Map<String, Object>> linkedAccounts(Long userId) {
+        User user = userRepository.findById(userId).orElseThrow(() -> new SecurityException("Authenticated user is required"));
+        List<Map<String, Object>> result = new java.util.ArrayList<>();
+        java.util.Set<String> seen = new java.util.HashSet<>();
+
+        // Own account
+        if (user.getAccount() != null && user.getAccount().getAccountNumber() != null) {
+            result.add(linkedAccountEntry(user.getAccount(), "OWN", "Your account"));
+            seen.add(user.getAccount().getAccountNumber());
+        }
+
+        // Joint accounts (as primary or joint holder)
+        for (JointAccountProfile profile : jointProfileRepository.findByPrimaryHolderUserIdOrJointHolderUserId(userId, userId)) {
+            Account acc = accountService.getAccountByNumber(profile.getJointAccountNumber());
+            if (acc != null && !seen.contains(acc.getAccountNumber())) {
+                String relation = java.util.Objects.equals(profile.getPrimaryHolderUserId(), userId) ? "JOINT_PRIMARY" : "JOINT_HOLDER";
+                result.add(linkedAccountEntry(acc, "JOINT", relation + " · " + profile.getOperatingMode()));
+                seen.add(acc.getAccountNumber());
+            }
+        }
+
+        // Minor child accounts (as guardian)
+        for (GuardianLink link : guardianRepository.findByGuardianUserIdAndStatus(userId, "ACTIVE")) {
+            userRepository.findById(link.getChildUserId()).ifPresent(child -> {
+                Account acc = child.getAccount();
+                if (acc != null && !seen.contains(acc.getAccountNumber())) {
+                    result.add(linkedAccountEntry(acc, "MINOR", "Guardian of " + acc.getName()));
+                    seen.add(acc.getAccountNumber());
+                }
+            });
+        }
+
+        // Guardian accounts (as minor child)
+        for (GuardianLink link : guardianRepository.findByChildUserIdAndStatus(userId, "ACTIVE")) {
+            userRepository.findById(link.getGuardianUserId()).ifPresent(guardian -> {
+                Account acc = guardian.getAccount();
+                if (acc != null && !seen.contains(acc.getAccountNumber())) {
+                    result.add(linkedAccountEntry(acc, "GUARDIAN", "Guardian " + acc.getName()));
+                    seen.add(acc.getAccountNumber());
+                }
+            });
+        }
+
+        return result;
+    }
+
+    private Map<String, Object> linkedAccountEntry(Account acc, String type, String relation) {
+        Map<String, Object> entry = new java.util.LinkedHashMap<>();
+        entry.put("accountNumber", acc.getAccountNumber());
+        entry.put("name", acc.getName());
+        entry.put("accountType", acc.getAccountType());
+        entry.put("customerId", acc.getCustomerId());
+        entry.put("balance", acc.getBalance());
+        entry.put("status", acc.getStatus());
+        entry.put("linkType", type);
+        entry.put("relation", relation);
+        return entry;
+    }
 
     public Map<String, Object> lookupAccount(Long userId, String accountNumber) {
         requireUser(userId);

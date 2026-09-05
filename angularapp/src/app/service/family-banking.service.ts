@@ -35,8 +35,9 @@ export class FamilyBankingService {
   private readonly api = `${environment.apiBaseUrl}/api/family`;
   constructor(private http: HttpClient) {}
   invitations(userId: number): Observable<FamilyInvitation[]> { return this.http.get<FamilyInvitation[]>(`${this.api}/invitations`, { params: { userId } }); }
-  invite(userId: number, accountNumber: string, inviteeEmail: string): Observable<FamilyInvitation> { return this.http.post<FamilyInvitation>(`${this.api}/invitations`, { userId, accountNumber, inviteeEmail }); }
+  invite(userId: number, accountNumber: string, inviteeEmail: string, expectedName?: string): Observable<FamilyInvitation> { return this.http.post<FamilyInvitation>(`${this.api}/invitations`, { userId, accountNumber, inviteeEmail, expectedName }); }
   respondInvitation(userId: number, id: number, approve: boolean): Observable<FamilyInvitation> { return this.http.post<FamilyInvitation>(`${this.api}/invitations/${id}/respond`, { userId, approve }); }
+  linkedAccounts(userId: number): Observable<any[]> { return this.http.get<any[]>(`${this.api}/linked-accounts`, { params: { userId } }); }
   pendingTransfers(userId: number): Observable<JointTransfer[]> { return this.http.get<JointTransfer[]>(`${this.api}/transfers/pending`, { params: { userId } }); }
   requestTransfer(userId: number, accountNumber: string, toAccountNumber: string, amount: number, note: string): Observable<JointTransfer> { return this.http.post<JointTransfer>(`${this.api}/transfers`, { userId, accountNumber, toAccountNumber, amount, note }); }
   decideTransfer(userId: number, id: number, approve: boolean): Observable<JointTransfer> { return this.http.post<JointTransfer>(`${this.api}/transfers/${id}/decide`, { userId, approve }); }

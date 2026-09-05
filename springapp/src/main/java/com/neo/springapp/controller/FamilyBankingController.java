@@ -16,7 +16,7 @@ public class FamilyBankingController {
 
     @PostMapping("/invitations")
     public ResponseEntity<JointAccountInvitation> invite(@RequestBody InvitationRequest request) {
-        return ResponseEntity.ok(service.invite(request.userId(), request.accountNumber(), request.inviteeEmail()));
+        return ResponseEntity.ok(service.invite(request.userId(), request.accountNumber(), request.inviteeEmail(), request.expectedName()));
     }
     @GetMapping("/invitations")
     public List<JointAccountInvitation> invitations(@RequestParam Long userId) { return service.invitations(userId); }
@@ -48,6 +48,10 @@ public class FamilyBankingController {
     public List<GuardianLink> links(@RequestParam Long guardianUserId) { return service.guardianLinks(guardianUserId); }
     @GetMapping("/account-lookup/{accountNumber}")
     public Map<String, Object> accountLookup(@PathVariable String accountNumber, @RequestParam Long userId) { return service.lookupAccount(userId, accountNumber); }
+
+    // All account numbers linked to the user (own + joint + guardian/minor)
+    @GetMapping("/linked-accounts")
+    public List<Map<String, Object>> linkedAccounts(@RequestParam Long userId) { return service.linkedAccounts(userId); }
     @GetMapping("/notifications")
     public List<FamilyBankingNotification> notifications(@RequestParam Long userId) { return service.notifications(userId); }
     @PostMapping("/notifications/{id}/read")
@@ -60,14 +64,37 @@ public class FamilyBankingController {
     public ResponseEntity<MinorAccountApplication> review(@PathVariable Long id, @RequestHeader("X-Admin-Email") String adminEmail, @RequestBody DecisionRequest request) {
         return ResponseEntity.ok(service.reviewMinor(id, adminEmail, request.approve(), request.reason()));
     }
+
+    // Admin: edit application details before approving/declining
+    @PostMapping("/admin/minor-applications/{id}/edit-and-review")
+    public ResponseEntity<MinorAccountApplication> editAndReview(@PathVariable Long id, @RequestHeader("X-Admin-Email") String adminEmail, @RequestBody EditReviewRequest request) {
+        return ResponseEntity.ok(service.reviewMinor(id, adminEmail, request.approve(), request.reason(),
+                request.minorName(), request.dateOfBirth(), request.monthlyLimit(), request.dailyLimit()));
+    }
+
     @GetMapping("/admin/minor-applications")
     public List<MinorAccountApplication> pendingApplications(@RequestHeader(value = "X-Admin-Email", required = false) String adminEmail) {
         if (adminEmail == null || adminEmail.isBlank()) throw new SecurityException("Admin identity is required. Please sign in again.");
         return service.pendingMinorApplications();
     }
 
-    public record InvitationRequest(Long userId, String accountNumber, String inviteeEmail) {}
+    // Admin: all minor applications (approved, declined, pending) for history
+    @GetMapping("/admin/minor-applications/all")
+    public List<MinorAccountApplication> allApplications(@RequestHeader(value = "X-Admin-Email", required = false) String adminEmail) {
+        if (adminEmail == null || adminEmail.isBlank()) throw new SecurityException("Admin identity is required. Please sign in again.");
+        return service.allMinorApplications();
+    }
+
+    // Admin: audit history for minor applications (approved/edited/declined)
+    @GetMapping("/admin/minor-history")
+    public List<FamilyBankingAuditLog> minorHistory(@RequestHeader(value = "X-Admin-Email", required = false) String adminEmail) {
+        if (adminEmail == null || adminEmail.isBlank()) throw new SecurityException("Admin identity is required. Please sign in again.");
+        return service.minorHistory();
+    }
+
+    public record InvitationRequest(Long userId, String accountNumber, String inviteeEmail, String expectedName) {}
     public record DecisionRequest(Long userId, boolean approve, String reason) {}
+    public record EditReviewRequest(boolean approve, String reason, String minorName, LocalDate dateOfBirth, Double monthlyLimit, Double dailyLimit) {}
     public record TransferRequest(Long userId, String accountNumber, String toAccountNumber, Double amount, String note) {}
     public record MinorRequest(Long guardianUserId, String minorName, LocalDate dateOfBirth, Double monthlyLimit, Double dailyLimit) {}
     public record SettingsRequest(Long userId, String operatingMode) {}

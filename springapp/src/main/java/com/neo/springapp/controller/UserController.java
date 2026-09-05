@@ -128,13 +128,40 @@ public class UserController {
             accountData.put("pan", user.getAccount().getPan());
             accountData.put("address", user.getAccount().getAddress());
             accountData.put("dob", user.getAccount().getDob());
+            accountData.put("age", user.getAccount().getAge());
             accountData.put("occupation", user.getAccount().getOccupation());
             accountData.put("income", user.getAccount().getIncome());
             accountData.put("customerId", user.getAccount().getCustomerId());
+            accountData.put("status", user.getAccount().getStatus());
             userResponse.put("account", accountData);
         }
         
         return userResponse;
+    }
+
+    // Null-safe numeric parsing helpers for admin updates (avoids NPE on minor/family accounts)
+    private Double toDouble(Object value, Double fallback) {
+        if (value == null) return fallback;
+        if (value instanceof Number) return ((Number) value).doubleValue();
+        try {
+            String s = value.toString().trim();
+            if (s.isEmpty()) return fallback;
+            return Double.parseDouble(s);
+        } catch (NumberFormatException e) {
+            return fallback;
+        }
+    }
+
+    private Integer toInteger(Object value, Integer fallback) {
+        if (value == null) return fallback;
+        if (value instanceof Number) return ((Number) value).intValue();
+        try {
+            String s = value.toString().trim();
+            if (s.isEmpty()) return fallback;
+            return (int) Double.parseDouble(s);
+        } catch (NumberFormatException e) {
+            return fallback;
+        }
     }
 
     private ResponseEntity<Map<String, Object>> completeUserLogin(

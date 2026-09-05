@@ -1,1 +1,113 @@
-<section class="admin-family" aria-labelledby="admin-family-title"><header><div><p>ADMIN OPERATIONS / FAMILY BANKING</p><h1 id="admin-family-title">Review center</h1><span class="subtitle">Approve protected minor accounts and keep family services moving.</span></div><button type="button" (click)="load()" [disabled]="loading || busy" aria-label="Refresh applications">↻ Refresh</button></header><div class="admin-summary"><div><span>Open reviews</span><strong>{{ applications.length }}</strong></div><div><span>Queue status</span><strong>{{ loading ? 'Loading' : 'Live' }}</strong></div></div><p class="notice success" *ngIf="message" role="status">{{ message }}</p><p class="notice error" *ngIf="error" role="alert">{{ error }}</p><p *ngIf="loading" class="empty" role="status">Loading Family Banking applications…</p><div class="review-list" *ngIf="!loading"><article class="review-row" *ngFor="let app of applications"><div class="identity"><span class="avatar">{{ app.minorName.charAt(0) }}</span><div><strong>{{ app.minorName }}</strong><span>Guardian #{{ app.guardianUserId }} · DOB {{ app.dateOfBirth }}</span></div></div><div class="review-meta"><span>Daily ₹{{ app.dailyLimit | number:'1.0-0' }} · Monthly ₹{{ app.monthlyLimit | number:'1.0-0' }}</span><b [class]="'status-' + app.status.toLowerCase()">{{ app.status }}</b><div *ngIf="app.status === 'PENDING'" class="review-actions"><button [disabled]="busy" (click)="review(app, true)">Approve</button><button [disabled]="busy" class="quiet" (click)="review(app, false)">Decline</button></div></div></article></div><div *ngIf="!loading && !applications.length" class="empty-state"><strong>Queue is clear</strong><span>No pending minor applications need review.</span></div></section>
+<section class="admin-family" aria-labelledby="admin-family-title">
+  <header>
+    <div>
+      <p>ADMIN OPERATIONS / FAMILY BANKING</p>
+      <h1 id="admin-family-title">Review center</h1>
+      <span class="subtitle">Approve protected minor accounts and keep family services moving.</span>
+    </div>
+    <button type="button" (click)="load(); loadHistory()" [disabled]="loading || busy" aria-label="Refresh applications">↻ Refresh</button>
+  </header>
+
+  <div class="admin-summary">
+    <div><span>Open reviews</span><strong>{{ applications.length }}</strong></div>
+    <div><span>History records</span><strong>{{ history.length }}</strong></div>
+    <div><span>Queue status</span><strong>{{ loading ? 'Loading' : 'Live' }}</strong></div>
+  </div>
+
+  <div class="tab-bar">
+    <button type="button" [class.active]="activeTab === 'pending'" (click)="setTab('pending')">Pending Applications</button>
+    <button type="button" [class.active]="activeTab === 'history'" (click)="setTab('history')">History</button>
+  </div>
+
+  <p class="notice success" *ngIf="message" role="status">{{ message }}</p>
+  <p class="notice error" *ngIf="error" role="alert">{{ error }}</p>
+
+  <!-- PENDING TAB -->
+  <ng-container *ngIf="activeTab === 'pending'">
+    <p *ngIf="loading" class="empty" role="status">Loading Family Banking applications…</p>
+    <div class="review-list" *ngIf="!loading">
+      <article class="review-row" *ngFor="let app of applications">
+        <div class="identity">
+          <span class="avatar">{{ app.minorName.charAt(0) }}</span>
+          <div>
+            <strong>{{ app.minorName }}</strong>
+            <span>Guardian #{{ app.guardianUserId }} · DOB {{ app.dateOfBirth }}</span>
+          </div>
+        </div>
+        <div class="review-meta">
+          <span>Daily ₹{{ app.dailyLimit | number:'1.0-0' }} · Monthly ₹{{ app.monthlyLimit | number:'1.0-0' }}</span>
+          <b [class]="'status-' + app.status.toLowerCase()">{{ app.status }}</b>
+          <div *ngIf="app.status === 'PENDING'" class="review-actions">
+            <button [disabled]="busy" (click)="openEdit(app)">✏️ Edit & Review</button>
+            <button [disabled]="busy" class="quiet" (click)="review(app, true)">Approve</button>
+            <button [disabled]="busy" class="quiet" (click)="review(app, false)">Decline</button>
+          </div>
+        </div>
+      </article>
+    </div>
+    <div *ngIf="!loading && !applications.length" class="empty-state">
+      <strong>Queue is clear</strong>
+      <span>No pending minor applications need review.</span>
+    </div>
+  </ng-container>
+
+  <!-- HISTORY TAB -->
+  <ng-container *ngIf="activeTab === 'history'">
+    <p *ngIf="!history.length" class="empty">No history records yet.</p>
+    <div class="review-list">
+      <article class="review-row" *ngFor="let h of history">
+        <div class="identity">
+          <span class="avatar">{{ (h.action || 'A').charAt(0) }}</span>
+          <div>
+            <strong>{{ h.action }}</strong>
+            <span>{{ h.details }}</span>
+          </div>
+        </div>
+        <div class="review-meta">
+          <span>Application #{{ h.resourceId }}</span>
+          <span>{{ h.createdAt | date:'medium' }}</span>
+        </div>
+      </article>
+    </div>
+  </ng-container>
+
+  <!-- EDIT & REVIEW MODAL -->
+  <div class="fb-modal-overlay" *ngIf="showEditModal" (click)="closeEdit()">
+    <div class="fb-modal" (click)="$event.stopPropagation()">
+      <div class="fb-modal-header">
+        <h3>✏️ Edit Application Before Review</h3>
+        <button type="button" class="fb-close" (click)="closeEdit()">×</button>
+      </div>
+      <div class="fb-modal-body" *ngIf="editing">
+        <div class="fb-field">
+          <label>Minor Name</label>
+          <input type="text" [(ngModel)]="editForm.minorName" />
+        </div>
+        <div class="fb-field">
+          <label>Date of Birth</label>
+          <input type="date" [(ngModel)]="editForm.dateOfBirth" />
+        </div>
+        <div class="fb-field-row">
+          <div class="fb-field">
+            <label>Monthly Limit (₹)</label>
+            <input type="number" [(ngModel)]="editForm.monthlyLimit" min="1" />
+          </div>
+          <div class="fb-field">
+            <label>Daily Limit (₹)</label>
+            <input type="number" [(ngModel)]="editForm.dailyLimit" min="1" />
+          </div>
+        </div>
+        <div class="fb-field">
+          <label>Reason / Remarks</label>
+          <input type="text" [(ngModel)]="editForm.reason" placeholder="Saved in history" />
+        </div>
+        <p class="fb-note">On approve, an account number and customer ID are auto-generated for the minor.</p>
+      </div>
+      <div class="fb-modal-footer">
+        <button type="button" [disabled]="busy" class="fb-approve" (click)="submitEdit(true)">Save & Approve</button>
+        <button type="button" [disabled]="busy" class="fb-decline" (click)="submitEdit(false)">Save & Decline</button>
+        <button type="button" [disabled]="busy" class="fb-cancel" (click)="closeEdit()">Cancel</button>
+      </div>
+    </div>
+  </div>
+</section>
