@@ -89,6 +89,11 @@ public class GoldLoan {
     
     private String termsAcceptedBy; // User who accepted (account number or email)
 
+    // Processing charges & renewal
+    private Double processingCharges = 0.0; // Total processing charges applied (approval/renewal)
+    private Integer renewalCount = 0; // Number of times the loan has been renewed
+    private LocalDateTime lastRenewalDate; // Last renewal date/time
+
     // Constructors
     public GoldLoan() {
         this.applicationDate = LocalDateTime.now();

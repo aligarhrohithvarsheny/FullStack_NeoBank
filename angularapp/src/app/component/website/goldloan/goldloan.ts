@@ -413,13 +413,17 @@ export class Goldloan implements OnInit, OnDestroy {
     }
   }
 
+  isApproved(loan: GoldLoan): boolean {
+    return (loan?.status || '').toLowerCase() === 'approved';
+  }
+
   isDownloadingReceipt(loanId: number | undefined): boolean {
     if (!loanId) return false;
     return this.downloadingReceiptLoanIds.has(loanId);
   }
 
   downloadApprovedReceipt(loan: GoldLoan) {
-    if (!loan?.id || loan.status !== 'Approved') {
+    if (!loan?.id || !this.isApproved(loan)) {
       this.alertService.error('Download Unavailable', 'Receipt can be downloaded only for approved loans.');
       return;
     }

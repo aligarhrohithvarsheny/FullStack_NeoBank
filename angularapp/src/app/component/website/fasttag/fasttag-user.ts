@@ -62,6 +62,7 @@ export class FasttagUser implements OnInit {
   rechargeAmount: number | null = null;
   rechargeDebitAccount = '';
   rechargeAvailableBalance: number = 0;
+  rechargeVerifiedName = '';
 
   // My FASTags list
   myTags: FasttagApplication[] = [];
@@ -161,7 +162,7 @@ export class FasttagUser implements OnInit {
             accountNumber: acc.accountNumber,
             id: acc.accountNumber,
             name: acc.accountHolderName || 'Linked Account',
-            balance: 0
+            balance: acc.availableBalance != null ? acc.availableBalance : 0
           }));
         },
         error: () => { this.userAccounts = []; }
@@ -197,6 +198,7 @@ export class FasttagUser implements OnInit {
   onRechargeDebitAccountChange() {
     const acc = this.userAccounts.find((a: any) => String(a.accountNumber) === this.rechargeDebitAccount || String(a.id) === this.rechargeDebitAccount);
     this.rechargeAvailableBalance = acc ? acc.balance : 0;
+    this.rechargeVerifiedName = acc ? (acc.name || acc.accountHolderName || '') : '';
   }
 
   onRcFrontSelected(event: Event) {

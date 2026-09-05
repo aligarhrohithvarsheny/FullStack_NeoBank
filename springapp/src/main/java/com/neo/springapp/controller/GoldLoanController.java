@@ -482,6 +482,86 @@ public class GoldLoanController {
         }
     }
 
+    // Admin edit: update loan amount, gold details, approve time, processing charges (saved in history)
+    @PutMapping("/{id}/admin-edit")
+    public ResponseEntity<Map<String, Object>> adminEditGoldLoan(
+            @PathVariable Long id,
+            @RequestParam(required = false, defaultValue = "Admin") String changedBy,
+            @RequestBody Map<String, Object> updates) {
+
+        Map<String, Object> response = new HashMap<>();
+        try {
+            GoldLoan updated = goldLoanService.adminUpdateGoldLoan(id, updates, changedBy);
+            if (updated != null) {
+                response.put("success", true);
+                response.put("message", "Gold loan updated successfully");
+                response.put("goldLoan", updated);
+                return ResponseEntity.ok(response);
+            }
+            response.put("success", false);
+            response.put("message", "Gold loan not found");
+            return ResponseEntity.notFound().build();
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "Failed to update gold loan: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(response);
+        }
+    }
+
+    // Renew gold loan: extend tenure, add processing charges, regenerate EMI schedule (saved in history)
+    @PostMapping("/{id}/renew")
+    public ResponseEntity<Map<String, Object>> renewGoldLoan(
+            @PathVariable Long id,
+            @RequestParam(required = false, defaultValue = "Admin") String renewedBy,
+            @RequestBody Map<String, Object> renewalData) {
+
+        Map<String, Object> response = new HashMap<>();
+        try {
+            GoldLoan renewed = goldLoanService.renewGoldLoan(id, renewalData, renewedBy);
+
+            // Apply renewal processing charges: debit user, credit NeoBank A/C
+            Double processingCharges = 0.0;
+            if (renewalData != null && renewalData.get("processingCharges") != null) {
+                processingCharges = Double.valueOf(renewalData.get("processingCharges").toString());
+            }
+            if (processingCharges > 0 && bankChargesService != null && renewed.getAccountNumber() != null) {
+                try {
+                    String userName = renewed.getUserName() != null ? renewed.getUserName() : "Customer";
+                    boolean chargeApplied = bankChargesService.applyCharge(
+                        renewed.getAccountNumber(),
+                        processingCharges,
+                        "NeoBank - Gold Loan Renewal Processing Charge",
+                        "Gold Loan Renewal Processing Charge for " + renewed.getLoanAccountNumber(),
+                        userName
+                    );
+                    response.put("processingChargeApplied", chargeApplied);
+                } catch (Exception e) {
+                    System.err.println("Renewal processing charge could not be applied: " + e.getMessage());
+                    response.put("processingChargeApplied", false);
+                }
+            }
+
+            response.put("success", true);
+            response.put("message", "Gold loan renewed successfully");
+            response.put("goldLoan", renewed);
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException e) {
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(response);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "Failed to renew gold loan: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(response);
+        }
+    }
+
+    // Get gold loan change history
+    @GetMapping("/{id}/history")
+    public ResponseEntity<List<com.neo.springapp.model.GoldLoanHistory>> getGoldLoanHistory(@PathVariable Long id) {
+        return ResponseEntity.ok(goldLoanService.getGoldLoanHistory(id));
+    }
+
     // Download receipt for approved gold loan
     @GetMapping("/{id}/receipt")
     public ResponseEntity<?> downloadApprovedReceipt(

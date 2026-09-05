@@ -248,6 +248,13 @@
             </select>
           </div>
           <div class="ft-form-group">
+            <label>Verified Name</label>
+            <div class="ft-balance-value ft-verified-name">{{ rechargeVerifiedName || '—' }}</div>
+          </div>
+        </div>
+
+        <div class="ft-form-grid-2">
+          <div class="ft-form-group">
             <label>Available Balance</label>
             <div class="ft-balance-value">₹ {{ rechargeAvailableBalance | number:'1.2-2' }}</div>
           </div>

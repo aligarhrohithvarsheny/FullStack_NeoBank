@@ -35,6 +35,9 @@ interface GoldLoan {
   termsAcceptedDate?: string;
   termsAcceptedBy?: string;
   otpVerified?: boolean;
+  processingCharges?: number;
+  renewalCount?: number;
+  lastRenewalDate?: string;
 }
 
 interface GoldRate {
@@ -102,6 +105,39 @@ export class AdminGoldLoans implements OnInit {
   // EMI Details
   showEmiDetailsModal: boolean = false;
   emiSchedule: any[] = [];
+
+  // Edit loan (amount / gold details / approve time / processing charges)
+  showEditModal: boolean = false;
+  editingLoan: boolean = false;
+  editForm: any = {
+    loanAmount: 0,
+    goldItems: '',
+    goldDescription: '',
+    goldPurity: '22K',
+    verifiedGoldGrams: 0,
+    storageLocation: '',
+    verificationNotes: '',
+    interestRate: 12,
+    tenure: 12,
+    processingCharges: 0,
+    approvalDate: '',
+    remarks: ''
+  };
+
+  // Renewal
+  showRenewModal: boolean = false;
+  renewingLoan: boolean = false;
+  renewForm: any = {
+    additionalTenure: 6,
+    interestRate: null,
+    processingCharges: 0,
+    remarks: ''
+  };
+
+  // History
+  showHistoryModal: boolean = false;
+  historyList: any[] = [];
+  loadingHistory: boolean = false;
 
   constructor(
     private router: Router,
@@ -329,6 +365,176 @@ export class AdminGoldLoans implements OnInit {
     };
     this.jewelleryImageOne = null;
     this.jewelleryImageTwo = null;
+  }
+
+  // ─── Edit Loan (amount / gold details / approve time / processing charges) ───
+
+  openEditModal(loan: GoldLoan) {
+    this.selectedLoan = loan;
+    this.editForm = {
+      loanAmount: loan.loanAmount,
+      goldItems: loan.goldItems || '',
+      goldDescription: loan.goldDescription || '',
+      goldPurity: loan.goldPurity || '22K',
+      verifiedGoldGrams: loan.verifiedGoldGrams || loan.goldGrams,
+      storageLocation: loan.storageLocation || '',
+      verificationNotes: loan.verificationNotes || '',
+      interestRate: loan.interestRate,
+      tenure: loan.tenure,
+      processingCharges: loan.processingCharges || 0,
+      approvalDate: this.toDateTimeLocal(loan.approvalDate),
+      remarks: ''
+    };
+    this.showEditModal = true;
+  }
+
+  closeEditModal() {
+    this.showEditModal = false;
+    this.selectedLoan = null;
+  }
+
+  toDateTimeLocal(dateString: string | undefined): string {
+    if (!dateString) return '';
+    try {
+      const d = new Date(dateString);
+      if (isNaN(d.getTime())) return '';
+      const pad = (n: number) => n.toString().padStart(2, '0');
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    } catch (e) {
+      return '';
+    }
+  }
+
+  submitEdit() {
+    if (!this.selectedLoan || !this.selectedLoan.id) return;
+    if (!this.editForm.loanAmount || this.editForm.loanAmount <= 0) {
+      this.alertService.error('Validation Error', 'Please enter a valid loan amount');
+      return;
+    }
+
+    this.editingLoan = true;
+    const updates: any = {
+      loanAmount: this.editForm.loanAmount,
+      goldItems: this.editForm.goldItems,
+      goldDescription: this.editForm.goldDescription,
+      goldPurity: this.editForm.goldPurity,
+      verifiedGoldGrams: this.editForm.verifiedGoldGrams,
+      storageLocation: this.editForm.storageLocation,
+      verificationNotes: this.editForm.verificationNotes,
+      interestRate: this.editForm.interestRate,
+      tenure: this.editForm.tenure,
+      processingCharges: this.editForm.processingCharges,
+      remarks: this.editForm.remarks
+    };
+    if (this.editForm.approvalDate) {
+      updates.approvalDate = this.editForm.approvalDate; // yyyy-MM-ddTHH:mm (LocalDateTime format)
+    }
+
+    this.http.put(
+      `${environment.apiBaseUrl}/api/gold-loans/${this.selectedLoan.id}/admin-edit?changedBy=${encodeURIComponent(this.adminName)}`,
+      updates
+    ).subscribe({
+      next: (response: any) => {
+        this.editingLoan = false;
+        if (response.success) {
+          this.alertService.success('Loan Updated', 'Gold loan details updated and saved in history.');
+          this.closeEditModal();
+          this.loadGoldLoans();
+        } else {
+          this.alertService.error('Update Failed', response.message || 'Failed to update gold loan');
+        }
+      },
+      error: (err: any) => {
+        this.editingLoan = false;
+        this.alertService.error('Update Failed', err.error?.message || 'Failed to update gold loan');
+      }
+    });
+  }
+
+  // ─── Renew Loan ───
+
+  openRenewModal(loan: GoldLoan) {
+    this.selectedLoan = loan;
+    this.renewForm = {
+      additionalTenure: 6,
+      interestRate: null,
+      processingCharges: 0,
+      remarks: ''
+    };
+    this.showRenewModal = true;
+  }
+
+  closeRenewModal() {
+    this.showRenewModal = false;
+    this.selectedLoan = null;
+  }
+
+  submitRenewal() {
+    if (!this.selectedLoan || !this.selectedLoan.id) return;
+    if (!this.renewForm.additionalTenure || this.renewForm.additionalTenure <= 0) {
+      this.alertService.error('Validation Error', 'Please enter additional tenure of at least 1 month');
+      return;
+    }
+    if (this.renewForm.processingCharges < 0) {
+      this.alertService.error('Validation Error', 'Processing charges cannot be negative');
+      return;
+    }
+
+    this.renewingLoan = true;
+    const payload: any = {
+      additionalTenure: this.renewForm.additionalTenure,
+      processingCharges: this.renewForm.processingCharges || 0,
+      remarks: this.renewForm.remarks
+    };
+    if (this.renewForm.interestRate && this.renewForm.interestRate > 0) {
+      payload.interestRate = this.renewForm.interestRate;
+    }
+
+    this.http.post(
+      `${environment.apiBaseUrl}/api/gold-loans/${this.selectedLoan.id}/renew?renewedBy=${encodeURIComponent(this.adminName)}`,
+      payload
+    ).subscribe({
+      next: (response: any) => {
+        this.renewingLoan = false;
+        if (response.success) {
+          this.alertService.success('Loan Renewed', response.message || 'Gold loan renewed successfully. EMI schedule regenerated.');
+          this.closeRenewModal();
+          this.loadGoldLoans();
+        } else {
+          this.alertService.error('Renewal Failed', response.message || 'Failed to renew gold loan');
+        }
+      },
+      error: (err: any) => {
+        this.renewingLoan = false;
+        this.alertService.error('Renewal Failed', err.error?.message || 'Failed to renew gold loan');
+      }
+    });
+  }
+
+  // ─── History ───
+
+  viewHistory(loan: GoldLoan) {
+    if (!loan.id) return;
+    this.selectedLoan = loan;
+    this.showHistoryModal = true;
+    this.loadingHistory = true;
+    this.historyList = [];
+    this.http.get<any[]>(`${environment.apiBaseUrl}/api/gold-loans/${loan.id}/history`).subscribe({
+      next: (history) => {
+        this.historyList = Array.isArray(history) ? history : [];
+        this.loadingHistory = false;
+      },
+      error: () => {
+        this.loadingHistory = false;
+        this.alertService.error('Error', 'Failed to load loan history');
+      }
+    });
+  }
+
+  closeHistoryModal() {
+    this.showHistoryModal = false;
+    this.historyList = [];
+    this.selectedLoan = null;
   }
 
   formatDate(dateString: string | undefined): string {

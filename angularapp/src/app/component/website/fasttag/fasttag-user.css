@@ -375,6 +375,11 @@
   font-weight: 700;
   color: #1a3a5c;
 }
+.ft-verified-name {
+  color: #047857;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
 .ft-balance-display {
   padding: 10px 0;
   font-size: 13px;

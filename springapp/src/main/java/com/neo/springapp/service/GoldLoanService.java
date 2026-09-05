@@ -5,7 +5,9 @@ import com.neo.springapp.model.Account;
 import com.neo.springapp.model.SalaryAccount;
 import com.neo.springapp.model.SalaryNormalTransaction;
 import com.neo.springapp.model.EmiPayment;
+import com.neo.springapp.model.GoldLoanHistory;
 import com.neo.springapp.repository.GoldLoanRepository;
+import com.neo.springapp.repository.GoldLoanHistoryRepository;
 import com.neo.springapp.repository.EmiPaymentRepository;
 import com.neo.springapp.repository.SalaryAccountRepository;
 import com.neo.springapp.repository.SalaryNormalTransactionRepository;
@@ -33,6 +35,7 @@ public class GoldLoanService {
     private final UserService userService;
     private final SalaryAccountRepository salaryAccountRepository;
     private final SalaryNormalTransactionRepository salaryNormalTransactionRepository;
+    private final GoldLoanHistoryRepository goldLoanHistoryRepository;
 
     public GoldLoanService(GoldLoanRepository goldLoanRepository, 
                           GoldRateService goldRateService,
@@ -42,7 +45,8 @@ public class GoldLoanService {
                           EmailService emailService,
                           UserService userService,
                           SalaryAccountRepository salaryAccountRepository,
-                          SalaryNormalTransactionRepository salaryNormalTransactionRepository) {
+                          SalaryNormalTransactionRepository salaryNormalTransactionRepository,
+                          GoldLoanHistoryRepository goldLoanHistoryRepository) {
         this.goldLoanRepository = goldLoanRepository;
         this.goldRateService = goldRateService;
         this.accountService = accountService;
@@ -52,6 +56,7 @@ public class GoldLoanService {
         this.userService = userService;
         this.salaryAccountRepository = salaryAccountRepository;
         this.salaryNormalTransactionRepository = salaryNormalTransactionRepository;
+        this.goldLoanHistoryRepository = goldLoanHistoryRepository;
     }
 
     public Map<String, Object> requestApplyOtp(String accountNumber) {
@@ -294,9 +299,283 @@ public class GoldLoanService {
                 goldLoan.setTermsAcceptedBy(null);
             }
             
-            return goldLoanRepository.save(goldLoan);
+            GoldLoan savedLoan = goldLoanRepository.save(goldLoan);
+            recordHistory(savedLoan, status.toUpperCase(), approvedBy,
+                "Status changed to " + status, null, savedLoan.getLoanAmount(), null);
+            return savedLoan;
         }
         return null;
+    }
+
+    // Record a history entry for a gold loan action
+    public void recordHistory(GoldLoan loan, String action, String changedBy, String details,
+                              Double oldAmount, Double newAmount, String remarks) {
+        try {
+            GoldLoanHistory history = new GoldLoanHistory();
+            history.setGoldLoanId(loan.getId());
+            history.setLoanAccountNumber(loan.getLoanAccountNumber());
+            history.setAction(action);
+            history.setChangedBy(changedBy != null ? changedBy : "Admin");
+            history.setChangeDate(LocalDateTime.now());
+            history.setDetails(details);
+            history.setOldAmount(oldAmount);
+            history.setNewAmount(newAmount);
+            history.setRemarks(remarks);
+            goldLoanHistoryRepository.save(history);
+        } catch (Exception e) {
+            System.err.println("⚠️ Failed to record gold loan history: " + e.getMessage());
+        }
+    }
+
+    // Get history entries for a gold loan
+    public List<GoldLoanHistory> getGoldLoanHistory(Long goldLoanId) {
+        return goldLoanHistoryRepository.findByGoldLoanIdOrderByChangeDateDesc(goldLoanId);
+    }
+
+    // Admin edit: update loan amount, gold details, approve time, processing charges etc.
+    @Transactional
+    public GoldLoan adminUpdateGoldLoan(Long id, Map<String, Object> updates, String changedBy) {
+        GoldLoan goldLoan = goldLoanRepository.findById(id).orElse(null);
+        if (goldLoan == null || updates == null) return null;
+
+        StringBuilder changes = new StringBuilder();
+        Double oldAmount = goldLoan.getLoanAmount();
+
+        if (updates.containsKey("loanAmount") && updates.get("loanAmount") != null) {
+            Double newAmount = Double.valueOf(updates.get("loanAmount").toString());
+            if (newAmount > 0 && !newAmount.equals(goldLoan.getLoanAmount())) {
+                changes.append("Loan Amount: ₹").append(goldLoan.getLoanAmount())
+                       .append(" → ₹").append(newAmount).append("; ");
+                goldLoan.setLoanAmount(newAmount);
+            }
+        }
+        if (updates.containsKey("goldItems")) {
+            String v = String.valueOf(updates.getOrDefault("goldItems", ""));
+            if (!v.equals(String.valueOf(goldLoan.getGoldItems()))) {
+                changes.append("Gold Items updated; ");
+                goldLoan.setGoldItems(v);
+            }
+        }
+        if (updates.containsKey("goldDescription")) {
+            String v = String.valueOf(updates.getOrDefault("goldDescription", ""));
+            if (!v.equals(String.valueOf(goldLoan.getGoldDescription()))) {
+                changes.append("Gold Description updated; ");
+                goldLoan.setGoldDescription(v);
+            }
+        }
+        if (updates.containsKey("goldPurity")) {
+            String v = String.valueOf(updates.getOrDefault("goldPurity", ""));
+            if (!v.equals(String.valueOf(goldLoan.getGoldPurity()))) {
+                changes.append("Gold Purity: ").append(goldLoan.getGoldPurity())
+                       .append(" → ").append(v).append("; ");
+                goldLoan.setGoldPurity(v);
+            }
+        }
+        if (updates.containsKey("verifiedGoldGrams") && updates.get("verifiedGoldGrams") != null) {
+            Double grams = Double.valueOf(updates.get("verifiedGoldGrams").toString());
+            if (grams > 0 && !grams.equals(goldLoan.getVerifiedGoldGrams())) {
+                changes.append("Verified Weight: ").append(goldLoan.getVerifiedGoldGrams())
+                       .append("g → ").append(grams).append("g; ");
+                goldLoan.setVerifiedGoldGrams(grams);
+                if (goldLoan.getGoldRatePerGram() != null) {
+                    goldLoan.setVerifiedGoldValue(grams * goldLoan.getGoldRatePerGram());
+                }
+            }
+        }
+        if (updates.containsKey("storageLocation")) {
+            String v = String.valueOf(updates.getOrDefault("storageLocation", ""));
+            if (!v.equals(String.valueOf(goldLoan.getStorageLocation()))) {
+                changes.append("Storage Location updated; ");
+                goldLoan.setStorageLocation(v);
+            }
+        }
+        if (updates.containsKey("verificationNotes")) {
+            String v = String.valueOf(updates.getOrDefault("verificationNotes", ""));
+            if (!v.equals(String.valueOf(goldLoan.getVerificationNotes()))) {
+                changes.append("Verification Notes updated; ");
+                goldLoan.setVerificationNotes(v);
+            }
+        }
+        if (updates.containsKey("interestRate") && updates.get("interestRate") != null) {
+            Double rate = Double.valueOf(updates.get("interestRate").toString());
+            if (rate > 0 && !rate.equals(goldLoan.getInterestRate())) {
+                changes.append("Interest Rate: ").append(goldLoan.getInterestRate())
+                       .append("% → ").append(rate).append("%; ");
+                goldLoan.setInterestRate(rate);
+            }
+        }
+        if (updates.containsKey("tenure") && updates.get("tenure") != null) {
+            Integer tenure = Integer.valueOf(updates.get("tenure").toString());
+            if (tenure > 0 && !tenure.equals(goldLoan.getTenure())) {
+                changes.append("Tenure: ").append(goldLoan.getTenure())
+                       .append(" → ").append(tenure).append(" months; ");
+                goldLoan.setTenure(tenure);
+            }
+        }
+        if (updates.containsKey("processingCharges") && updates.get("processingCharges") != null) {
+            Double charges = Double.valueOf(updates.get("processingCharges").toString());
+            if (charges >= 0 && !charges.equals(goldLoan.getProcessingCharges())) {
+                changes.append("Processing Charges: ₹").append(goldLoan.getProcessingCharges())
+                       .append(" → ₹").append(charges).append("; ");
+                goldLoan.setProcessingCharges(charges);
+            }
+        }
+        if (updates.containsKey("approvalDate") && updates.get("approvalDate") != null) {
+            try {
+                String raw = updates.get("approvalDate").toString().trim();
+                LocalDateTime approveTime = LocalDateTime.parse(raw);
+                changes.append("Approve Time: ").append(goldLoan.getApprovalDate())
+                       .append(" → ").append(approveTime).append("; ");
+                goldLoan.setApprovalDate(approveTime);
+            } catch (Exception e) {
+                System.err.println("⚠️ Invalid approvalDate format for gold loan edit: " + e.getMessage());
+            }
+        }
+
+        if (changes.length() == 0) {
+            return goldLoan; // Nothing changed
+        }
+
+        GoldLoan saved = goldLoanRepository.save(goldLoan);
+        String remarks = updates.containsKey("remarks") && updates.get("remarks") != null
+                ? updates.get("remarks").toString() : null;
+        recordHistory(saved, "EDITED", changedBy, changes.toString().trim(),
+                oldAmount, saved.getLoanAmount(), remarks);
+        return saved;
+    }
+
+    // Renew gold loan: extend tenure, optionally update rate, add processing charges, regenerate pending EMIs
+    @Transactional
+    public GoldLoan renewGoldLoan(Long id, Map<String, Object> renewalData, String renewedBy) {
+        GoldLoan goldLoan = goldLoanRepository.findById(id).orElse(null);
+        if (goldLoan == null) return null;
+        if (!"Approved".equalsIgnoreCase(goldLoan.getStatus())) {
+            throw new RuntimeException("Only approved gold loans can be renewed");
+        }
+
+        int additionalTenure = 0;
+        if (renewalData != null && renewalData.get("additionalTenure") != null) {
+            additionalTenure = Integer.parseInt(renewalData.get("additionalTenure").toString());
+        }
+        if (additionalTenure <= 0) {
+            throw new RuntimeException("Additional tenure must be at least 1 month");
+        }
+
+        StringBuilder details = new StringBuilder();
+        Double oldAmount = goldLoan.getLoanAmount();
+
+        Integer oldTenure = goldLoan.getTenure() != null ? goldLoan.getTenure() : 0;
+        goldLoan.setTenure(oldTenure + additionalTenure);
+        details.append("Tenure extended: ").append(oldTenure).append(" → ")
+               .append(goldLoan.getTenure()).append(" months (+").append(additionalTenure).append("); ");
+
+        if (renewalData.get("interestRate") != null) {
+            Double newRate = Double.valueOf(renewalData.get("interestRate").toString());
+            if (newRate > 0 && !newRate.equals(goldLoan.getInterestRate())) {
+                details.append("Interest Rate: ").append(goldLoan.getInterestRate())
+                       .append("% → ").append(newRate).append("%; ");
+                goldLoan.setInterestRate(newRate);
+            }
+        }
+
+        Double renewalCharge = 0.0;
+        if (renewalData.get("processingCharges") != null) {
+            renewalCharge = Double.valueOf(renewalData.get("processingCharges").toString());
+            if (renewalCharge > 0) {
+                Double existing = goldLoan.getProcessingCharges() != null ? goldLoan.getProcessingCharges() : 0.0;
+                goldLoan.setProcessingCharges(existing + renewalCharge);
+                details.append("Renewal Processing Charge: ₹").append(renewalCharge).append("; ");
+            }
+        }
+
+        goldLoan.setRenewalCount((goldLoan.getRenewalCount() != null ? goldLoan.getRenewalCount() : 0) + 1);
+        goldLoan.setLastRenewalDate(LocalDateTime.now());
+
+        // Regenerate EMI schedule for remaining principal over extended tenure
+        try {
+            List<EmiPayment> pendingEmis = emiPaymentRepository.findByLoanIdAndStatusOrderByDueDateAsc(goldLoan.getId(), "Pending");
+            double remainingPrincipal = pendingEmis.stream()
+                    .mapToDouble(e -> e.getPrincipalAmount() != null ? e.getPrincipalAmount() : 0.0)
+                    .sum();
+            int remainingMonths = pendingEmis.size();
+            if (remainingPrincipal <= 0) {
+                remainingPrincipal = goldLoan.getLoanAmount();
+            }
+
+            // Cancel existing pending EMIs
+            for (EmiPayment emi : pendingEmis) {
+                emi.setStatus("Cancelled");
+            }
+            if (!pendingEmis.isEmpty()) {
+                emiPaymentRepository.saveAll(pendingEmis);
+            }
+
+            int newMonths = remainingMonths + additionalTenure;
+            generateRenewalEmiSchedule(goldLoan, remainingPrincipal, newMonths, LocalDate.now().plusMonths(1));
+            details.append("EMI schedule regenerated: ").append(newMonths)
+                   .append(" installments on remaining principal ₹")
+                   .append(Math.round(remainingPrincipal * 100.0) / 100.0).append("; ");
+        } catch (Exception e) {
+            System.err.println("⚠️ Error regenerating EMI schedule on renewal: " + e.getMessage());
+        }
+
+        GoldLoan saved = goldLoanRepository.save(goldLoan);
+        String remarks = renewalData.get("remarks") != null ? renewalData.get("remarks").toString() : null;
+        recordHistory(saved, "RENEWED", renewedBy, details.toString().trim(), oldAmount, saved.getLoanAmount(), remarks);
+        return saved;
+    }
+
+    // Generate a fresh EMI schedule for renewal (explicit principal/months/start date)
+    private void generateRenewalEmiSchedule(GoldLoan goldLoan, Double principal, int tenureMonths, LocalDate startDate) {
+        List<EmiPayment> emiPayments = new ArrayList<>();
+        Double annualRate = goldLoan.getInterestRate() != null ? goldLoan.getInterestRate() : 12.0;
+        Double monthlyRate = annualRate / (12 * 100);
+
+        Double emiAmount;
+        if (monthlyRate > 0) {
+            emiAmount = (principal * monthlyRate * Math.pow(1 + monthlyRate, tenureMonths)) /
+                        (Math.pow(1 + monthlyRate, tenureMonths) - 1);
+        } else {
+            emiAmount = principal / tenureMonths;
+        }
+        emiAmount = Math.round(emiAmount * 100.0) / 100.0;
+
+        Double remainingPrincipal = principal;
+        LocalDate currentDueDate = startDate;
+
+        for (int i = 1; i <= tenureMonths; i++) {
+            EmiPayment emi = new EmiPayment();
+            emi.setLoanId(goldLoan.getId());
+            emi.setLoanAccountNumber(goldLoan.getLoanAccountNumber());
+            emi.setAccountNumber(goldLoan.getAccountNumber());
+            emi.setEmiNumber(i);
+            emi.setDueDate(currentDueDate);
+            emi.setStatus("Pending");
+
+            Double interestForMonth = remainingPrincipal * monthlyRate;
+            interestForMonth = Math.round(interestForMonth * 100.0) / 100.0;
+
+            Double principalForMonth = emiAmount - interestForMonth;
+            principalForMonth = Math.round(principalForMonth * 100.0) / 100.0;
+
+            if (i == tenureMonths) {
+                principalForMonth = remainingPrincipal;
+                emiAmount = principalForMonth + interestForMonth;
+            }
+
+            emi.setPrincipalAmount(principalForMonth);
+            emi.setInterestAmount(interestForMonth);
+            emi.setTotalAmount(emiAmount);
+
+            remainingPrincipal -= principalForMonth;
+            remainingPrincipal = Math.max(0.0, Math.round(remainingPrincipal * 100.0) / 100.0);
+            emi.setRemainingPrincipal(remainingPrincipal);
+
+            emiPayments.add(emi);
+            currentDueDate = currentDueDate.plusMonths(1);
+        }
+
+        emiPaymentRepository.saveAll(emiPayments);
     }
 
     // Accept terms and conditions by user

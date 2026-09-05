@@ -297,7 +297,7 @@
         </div>
 
         <!-- Gold Details (if approved) -->
-        <div class="gold-details-section" *ngIf="loan.status === 'Approved' && loan.goldItems">
+        <div class="gold-details-section" *ngIf="isApproved(loan) && loan.goldItems">
           <h5>📦 Verified Gold Details</h5>
           <div class="details-grid">
             <div class="detail-row" *ngIf="loan.goldItems">
@@ -335,7 +335,7 @@
         </div>
 
         <!-- Terms Acceptance Section -->
-        <div class="terms-acceptance-section" *ngIf="loan.status === 'Approved'">
+        <div class="terms-acceptance-section" *ngIf="isApproved(loan)">
           <div class="terms-status" *ngIf="loan.termsAccepted">
             <p class="terms-accepted">
               ✓ Terms and conditions accepted on {{ formatDate(loan.termsAcceptedDate) }}

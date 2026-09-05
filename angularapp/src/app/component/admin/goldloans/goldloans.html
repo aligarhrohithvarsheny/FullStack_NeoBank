@@ -148,6 +148,29 @@
             >
               📅 EMI Details
             </button>
+            <button
+              type="button"
+              class="action-btn edit-btn"
+              (click)="openEditModal(loan)"
+            >
+              ✏️ Edit
+            </button>
+            <button
+              type="button"
+              class="action-btn renew-btn"
+              (click)="openRenewModal(loan)"
+            >
+              🔄 Renew
+            </button>
+          </div>
+          <div>
+            <button
+              type="button"
+              class="action-btn history-btn"
+              (click)="viewHistory(loan)"
+            >
+              📜 History
+            </button>
           </div>
         </div>
       </div>
@@ -199,12 +222,20 @@
             <span class="detail-value">{{ formatDate(loan.applicationDate) }}</span>
           </div>
           <div class="detail-item" *ngIf="loan.approvalDate">
-            <span class="detail-label">Approval Date:</span>
+            <span class="detail-label">Approve Time:</span>
             <span class="detail-value">{{ formatDate(loan.approvalDate) }}</span>
           </div>
           <div class="detail-item" *ngIf="loan.approvedBy">
             <span class="detail-label">Approved By:</span>
             <span class="detail-value">{{ loan.approvedBy }}</span>
+          </div>
+          <div class="detail-item" *ngIf="loan.processingCharges">
+            <span class="detail-label">Processing Charges:</span>
+            <span class="detail-value">₹{{ loan.processingCharges | number:'1.2-2' }}</span>
+          </div>
+          <div class="detail-item" *ngIf="loan.renewalCount">
+            <span class="detail-label">Renewals:</span>
+            <span class="detail-value">{{ loan.renewalCount }} time(s)<span *ngIf="loan.lastRenewalDate"> — Last: {{ formatDate(loan.lastRenewalDate) }}</span></span>
           </div>
         </div>
       </div>
@@ -612,6 +643,325 @@
     </div>
     <div class="modal-footer">
       <button class="btn-cancel" (click)="closeEmiDetailsModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Loan Modal -->
+<div class="modal-overlay" *ngIf="showEditModal" (click)="closeEditModal()">
+  <div class="modal-content" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3>✏️ Edit Gold Loan</h3>
+      <button class="close-btn" (click)="closeEditModal()">×</button>
+    </div>
+    <div class="modal-body" *ngIf="selectedLoan">
+      <form (ngSubmit)="submitEdit()">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="editLoanAmount">Loan Amount (₹) <span class="required">*</span></label>
+            <input
+              type="number"
+              id="editLoanAmount"
+              [(ngModel)]="editForm.loanAmount"
+              name="editLoanAmount"
+              class="form-input"
+              min="1"
+              step="0.01"
+              required
+            />
+            <small class="form-hint">Editable — changes are saved in history</small>
+          </div>
+
+          <div class="form-group">
+            <label for="editApprovalDate">Approve Time</label>
+            <input
+              type="datetime-local"
+              id="editApprovalDate"
+              [(ngModel)]="editForm.approvalDate"
+              name="editApprovalDate"
+              class="form-input"
+            />
+            <small class="form-hint">Edit approval date & time if needed</small>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="editGoldItems">Gold Items</label>
+          <input
+            type="text"
+            id="editGoldItems"
+            [(ngModel)]="editForm.goldItems"
+            name="editGoldItems"
+            class="form-input"
+            placeholder="e.g., 2 bangles, 1 chain, 3 rings"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="editGoldDescription">Gold Description</label>
+          <textarea
+            id="editGoldDescription"
+            [(ngModel)]="editForm.goldDescription"
+            name="editGoldDescription"
+            class="form-textarea"
+            rows="2"
+          ></textarea>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="editGoldPurity">Gold Purity</label>
+            <select
+              id="editGoldPurity"
+              [(ngModel)]="editForm.goldPurity"
+              name="editGoldPurity"
+              class="form-input"
+            >
+              <option value="22K">22 Karat (22K)</option>
+              <option value="18K">18 Karat (18K)</option>
+              <option value="24K">24 Karat (24K)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="editVerifiedGrams">Verified Weight (grams)</label>
+            <input
+              type="number"
+              id="editVerifiedGrams"
+              [(ngModel)]="editForm.verifiedGoldGrams"
+              name="editVerifiedGrams"
+              class="form-input"
+              min="0"
+              step="0.01"
+            />
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="editInterestRate">Interest Rate (% p.a.)</label>
+            <input
+              type="number"
+              id="editInterestRate"
+              [(ngModel)]="editForm.interestRate"
+              name="editInterestRate"
+              class="form-input"
+              min="0"
+              step="0.1"
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="editTenure">Tenure (months)</label>
+            <input
+              type="number"
+              id="editTenure"
+              [(ngModel)]="editForm.tenure"
+              name="editTenure"
+              class="form-input"
+              min="1"
+            />
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="editProcessingCharges">Processing Charges (₹)</label>
+            <input
+              type="number"
+              id="editProcessingCharges"
+              [(ngModel)]="editForm.processingCharges"
+              name="editProcessingCharges"
+              class="form-input"
+              min="0"
+              step="0.01"
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="editStorageLocation">Storage Location</label>
+            <input
+              type="text"
+              id="editStorageLocation"
+              [(ngModel)]="editForm.storageLocation"
+              name="editStorageLocation"
+              class="form-input"
+              placeholder="e.g., Vault A-123"
+            />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="editVerificationNotes">Verification Notes</label>
+          <textarea
+            id="editVerificationNotes"
+            [(ngModel)]="editForm.verificationNotes"
+            name="editVerificationNotes"
+            class="form-textarea"
+            rows="2"
+          ></textarea>
+        </div>
+
+        <div class="form-group">
+          <label for="editRemarks">Edit Remarks</label>
+          <input
+            type="text"
+            id="editRemarks"
+            [(ngModel)]="editForm.remarks"
+            name="editRemarks"
+            class="form-input"
+            placeholder="Reason for this edit (saved in history)"
+          />
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn-cancel" (click)="closeEditModal()" [disabled]="editingLoan">Cancel</button>
+          <button type="submit" class="btn-submit" [disabled]="editingLoan">
+            <span *ngIf="!editingLoan">💾 Save Changes</span>
+            <span *ngIf="editingLoan">Saving...</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Renew Loan Modal -->
+<div class="modal-overlay" *ngIf="showRenewModal" (click)="closeRenewModal()">
+  <div class="modal-content" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3>🔄 Renew Gold Loan</h3>
+      <button class="close-btn" (click)="closeRenewModal()">×</button>
+    </div>
+    <div class="modal-body" *ngIf="selectedLoan">
+      <div class="foreclosure-summary">
+        <h4>Current Loan</h4>
+        <div class="summary-grid">
+          <div class="summary-item">
+            <span class="label">Loan Amount:</span>
+            <span class="value">₹{{ selectedLoan.loanAmount | number:'1.2-2' }}</span>
+          </div>
+          <div class="summary-item">
+            <span class="label">Current Tenure:</span>
+            <span class="value">{{ selectedLoan.tenure }} months</span>
+          </div>
+          <div class="summary-item">
+            <span class="label">Interest Rate:</span>
+            <span class="value">{{ selectedLoan.interestRate }}% p.a.</span>
+          </div>
+          <div class="summary-item">
+            <span class="label">Renewals:</span>
+            <span class="value">{{ selectedLoan.renewalCount || 0 }}</span>
+          </div>
+        </div>
+      </div>
+
+      <form (ngSubmit)="submitRenewal()">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="renewAdditionalTenure">Extend Tenure By (months) <span class="required">*</span></label>
+            <input
+              type="number"
+              id="renewAdditionalTenure"
+              [(ngModel)]="renewForm.additionalTenure"
+              name="renewAdditionalTenure"
+              class="form-input"
+              min="1"
+              max="36"
+              required
+            />
+            <small class="form-hint">Pending EMIs will be rescheduled over the extended tenure</small>
+          </div>
+
+          <div class="form-group">
+            <label for="renewInterestRate">New Interest Rate (% p.a.)</label>
+            <input
+              type="number"
+              id="renewInterestRate"
+              [(ngModel)]="renewForm.interestRate"
+              name="renewInterestRate"
+              class="form-input"
+              min="0"
+              step="0.1"
+              placeholder="Leave empty to keep current"
+            />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="renewProcessingCharges">Processing Charges (₹)</label>
+          <input
+            type="number"
+            id="renewProcessingCharges"
+            [(ngModel)]="renewForm.processingCharges"
+            name="renewProcessingCharges"
+            class="form-input"
+            min="0"
+            step="0.01"
+          />
+          <small class="form-hint">Debited from user's account and credited to NeoBank A/C</small>
+        </div>
+
+        <div class="form-group">
+          <label for="renewRemarks">Remarks</label>
+          <input
+            type="text"
+            id="renewRemarks"
+            [(ngModel)]="renewForm.remarks"
+            name="renewRemarks"
+            class="form-input"
+            placeholder="Renewal remarks (saved in history)"
+          />
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn-cancel" (click)="closeRenewModal()" [disabled]="renewingLoan">Cancel</button>
+          <button type="submit" class="btn-submit" [disabled]="renewingLoan">
+            <span *ngIf="!renewingLoan">🔄 Renew Loan</span>
+            <span *ngIf="renewingLoan">Processing...</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Loan History Modal -->
+<div class="modal-overlay" *ngIf="showHistoryModal" (click)="closeHistoryModal()">
+  <div class="modal-content large-modal" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3>📜 Gold Loan History — #{{ selectedLoan?.loanAccountNumber }}</h3>
+      <button class="close-btn" (click)="closeHistoryModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div *ngIf="loadingHistory" class="loading-overlay">
+        <div class="loading-spinner"></div>
+        <p>Loading history...</p>
+      </div>
+      <div *ngIf="!loadingHistory && historyList.length === 0" class="no-loans">
+        <p>No history records found for this loan.</p>
+      </div>
+      <div *ngIf="!loadingHistory && historyList.length > 0" class="history-list">
+        <div *ngFor="let h of historyList" class="history-item">
+          <div class="history-header">
+            <span class="history-action" [ngClass]="'action-' + (h.action || '').toLowerCase()">{{ h.action }}</span>
+            <span class="history-date">{{ formatDate(h.changeDate) }}</span>
+          </div>
+          <div class="history-body">
+            <p class="history-details">{{ h.details }}</p>
+            <p class="history-meta">
+              <span>By: {{ h.changedBy }}</span>
+              <span *ngIf="h.oldAmount != null && h.newAmount != null">
+                | Amount: ₹{{ h.oldAmount | number:'1.2-2' }} → ₹{{ h.newAmount | number:'1.2-2' }}
+              </span>
+            </p>
+            <p class="history-remarks" *ngIf="h.remarks">📝 {{ h.remarks }}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" (click)="closeHistoryModal()">Close</button>
     </div>
   </div>
 </div>
