@@ -207,6 +207,55 @@ public class BusinessChequeDrawService {
         return response;
     }
 
+    /**
+     * Admin reverts a drawn/approved business cheque request within 24 hours
+     */
+    @Transactional
+    public Map<String, Object> revertChequeDrawRequest(Long id, String adminEmail, String reason) {
+        BusinessChequeRequest request = chequeRequestRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Business cheque request not found"));
+
+        if (!"APPROVED".equals(request.getStatus()) && !"CLEAR".equals(request.getStatus()) && !"PICKED_UP".equals(request.getStatus())) {
+            throw new RuntimeException("Only approved or drawn cheques can be reverted. Current status: " + request.getStatus());
+        }
+
+        LocalDateTime actionTime = request.getApprovedAt() != null ? request.getApprovedAt() : request.getUpdatedAt();
+        if (actionTime != null && LocalDateTime.now().isAfter(actionTime.plusHours(24))) {
+            throw new RuntimeException("Cheque drawing can only be reverted within 24 hours of approval.");
+        }
+
+        CurrentAccount senderAccount = currentAccountRepository.findById(request.getCurrentAccountId())
+                .orElseThrow(() -> new RuntimeException("Business account not found"));
+
+        BigDecimal amount = request.getAmount() != null ? request.getAmount() : BigDecimal.ZERO;
+        BigDecimal senderBalance = BigDecimal.valueOf(senderAccount.getBalance() != null ? senderAccount.getBalance() : 0.0);
+        BigDecimal newSenderBalance = senderBalance.add(amount);
+
+        // Refund/credit amount back to sender
+        senderAccount.setBalance(newSenderBalance.doubleValue());
+        senderAccount.setLastUpdated(LocalDateTime.now());
+        currentAccountRepository.save(senderAccount);
+
+        // Update status
+        request.setStatus("REVERTED");
+        request.setUpdatedAt(LocalDateTime.now());
+        chequeRequestRepository.save(request);
+
+        // Log audit
+        logAuditAction(id, adminEmail, "REVERT",
+                "Business cheque reverted by admin within 24h. Refunded ₹" + amount + " to " + senderAccount.getAccountNumber() +
+                ". Reason: " + (reason != null ? reason : "Admin Revert"));
+
+        Map<String, Object> resp = new HashMap<>();
+        resp.put("success", true);
+        resp.put("message", "Business cheque request reverted successfully. Amount ₹" + amount + " credited back to account " + senderAccount.getAccountNumber());
+        resp.put("chequeNumber", request.getChequeNumber());
+        resp.put("revertedAmount", amount.doubleValue());
+        resp.put("revertedAt", LocalDateTime.now());
+        resp.put("revertedBy", adminEmail);
+        return resp;
+    }
+
     // ==================== ADMIN OPERATIONS ====================
 
     public Map<String, Object> getAdminChequeDrawRequests(String status, String search, int page, int size) {

@@ -83,7 +83,7 @@ public class SalaryAccountService {
 
     // ─── Account CRUD ──────────────────────────────────────────
 
-    public SalaryAccount createAccount(SalaryAccount account) {
+    public SalaryAccount createAccount(SalaryAccount account, String createdBy) {
         if (account.getAccountNumber() == null || account.getAccountNumber().isEmpty()) {
             account.setAccountNumber(generateAccountNumber());
         }
@@ -101,7 +101,73 @@ public class SalaryAccountService {
         }
         account.setCreatedAt(LocalDateTime.now());
         account.setUpdatedAt(LocalDateTime.now());
-        return salaryAccountRepository.save(account);
+        if (account.getSignedDocumentName() != null && !account.getSignedDocumentName().isBlank()) {
+            account.setSignedDocumentUploadedAt(LocalDateTime.now());
+            if (account.getSignedDocumentUploadedBy() == null || account.getSignedDocumentUploadedBy().isBlank()) {
+                account.setSignedDocumentUploadedBy(createdBy != null ? createdBy : "Manager");
+            }
+            if (account.getSignatureCopyPath() == null || account.getSignatureCopyPath().isBlank()) {
+                account.setSignatureCopyPath(account.getSignedDocumentName());
+            }
+            if (account.getSignatureUploadedAt() == null) {
+                account.setSignatureUploadedAt(LocalDateTime.now());
+            }
+        }
+        SalaryAccount saved = salaryAccountRepository.save(account);
+
+        try {
+            SalaryAccountEditHistory history = new SalaryAccountEditHistory();
+            history.setSalaryAccountId(saved.getId());
+            history.setAccountNumber(saved.getAccountNumber());
+            history.setEditedBy(createdBy == null || createdBy.isBlank() ? "Manager" : createdBy);
+            String docInfo = saved.getSignedDocumentName() != null ? " with signed document (" + saved.getSignedDocumentName() + ")" : "";
+            history.setChangesDescription("Account created by Manager" + docInfo);
+            Map<String, Object> creationMeta = new HashMap<>();
+            creationMeta.put("action", "ACCOUNT_CREATED");
+            creationMeta.put("employeeName", saved.getEmployeeName());
+            creationMeta.put("companyName", saved.getCompanyName());
+            creationMeta.put("monthlySalary", saved.getMonthlySalary());
+            creationMeta.put("signedDocumentName", saved.getSignedDocumentName());
+            history.setFieldChanges(objectMapper.writeValueAsString(creationMeta));
+            salaryAccountEditHistoryRepository.save(history);
+        } catch (Exception ignored) {}
+
+        return saved;
+    }
+
+    public SalaryAccount createAccount(SalaryAccount account) {
+        return createAccount(account, "Manager");
+    }
+
+    public SalaryAccount uploadSignedDocument(Long accountId, String fileName, String fileType, String base64Data, String uploadedBy) {
+        SalaryAccount account = salaryAccountRepository.findById(accountId)
+                .orElseThrow(() -> new IllegalArgumentException("Salary account not found with ID: " + accountId));
+
+        account.setSignedDocumentName(fileName);
+        account.setSignedDocumentType(fileType);
+        account.setSignedDocumentData(base64Data);
+        account.setSignedDocumentUploadedAt(LocalDateTime.now());
+        account.setSignedDocumentUploadedBy(uploadedBy == null || uploadedBy.isBlank() ? "Manager" : uploadedBy);
+        account.setSignatureCopyPath(fileName);
+        account.setSignatureUploadedAt(LocalDateTime.now());
+        account.setUpdatedAt(LocalDateTime.now());
+        SalaryAccount saved = salaryAccountRepository.save(account);
+
+        try {
+            SalaryAccountEditHistory history = new SalaryAccountEditHistory();
+            history.setSalaryAccountId(saved.getId());
+            history.setAccountNumber(saved.getAccountNumber());
+            history.setEditedBy(uploadedBy == null || uploadedBy.isBlank() ? "Manager" : uploadedBy);
+            history.setChangesDescription("Signed document uploaded: " + fileName);
+            Map<String, Object> docMeta = new HashMap<>();
+            docMeta.put("action", "SIGNED_DOCUMENT_UPLOADED");
+            docMeta.put("documentName", fileName);
+            docMeta.put("documentType", fileType);
+            history.setFieldChanges(objectMapper.writeValueAsString(docMeta));
+            salaryAccountEditHistoryRepository.save(history);
+        } catch (Exception ignored) {}
+
+        return saved;
     }
 
     public Optional<SalaryAccount> getById(Long id) {

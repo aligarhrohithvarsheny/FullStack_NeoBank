@@ -24,11 +24,15 @@ public class PreloadedCustomerDataService {
     // ==================== Lookup ====================
 
     public Optional<PreloadedCustomerData> findByAadhar(String aadharNumber) {
-        return repository.findFirstByAadharNumberAndUsedFalseOrderByCreatedAtDesc(aadharNumber);
+        Optional<PreloadedCustomerData> opt = repository.findFirstByAadharNumberAndUsedFalseOrderByCreatedAtDesc(aadharNumber);
+        if (opt.isPresent()) return opt;
+        return repository.findFirstByAadharNumberOrderByCreatedAtDesc(aadharNumber);
     }
 
     public Optional<PreloadedCustomerData> findByPan(String panNumber) {
-        return repository.findFirstByPanNumberAndUsedFalseOrderByCreatedAtDesc(panNumber);
+        Optional<PreloadedCustomerData> opt = repository.findFirstByPanNumberAndUsedFalseOrderByCreatedAtDesc(panNumber);
+        if (opt.isPresent()) return opt;
+        return repository.findFirstByPanNumberOrderByCreatedAtDesc(panNumber);
     }
 
     public boolean existsByAadhar(String aadharNumber) {

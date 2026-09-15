@@ -527,6 +527,72 @@ public class ChequeDrawService {
     }
 
     /**
+     * Admin reverts a drawn/approved cheque request within 24 hours
+     */
+    @Transactional
+    public Map<String, Object> revertChequeDrawRequest(Long id, String adminEmail, String reason) {
+        ChequeRequest request = chequeRequestRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Cheque request not found"));
+
+        if (!"APPROVED".equals(request.getStatus()) && !"CLEAR".equals(request.getStatus()) && !"PICKED_UP".equals(request.getStatus())) {
+            throw new RuntimeException("Only approved or drawn cheques can be reverted. Current status: " + request.getStatus());
+        }
+
+        LocalDateTime actionTime = request.getApprovedAt() != null ? request.getApprovedAt() : request.getUpdatedAt();
+        if (actionTime != null && LocalDateTime.now().isAfter(actionTime.plusHours(24))) {
+            throw new RuntimeException("Cheque drawing can only be reverted within 24 hours of approval.");
+        }
+
+        SalaryAccount senderAccount = salaryAccountRepository.findById(request.getSalaryAccountId())
+                .orElseThrow(() -> new RuntimeException("Salary account not found"));
+
+        BigDecimal amount = request.getAmount() != null ? request.getAmount() : BigDecimal.ZERO;
+        BigDecimal senderBalance = BigDecimal.valueOf(senderAccount.getBalance() != null ? senderAccount.getBalance() : 0.0);
+        BigDecimal newSenderBalance = senderBalance.add(amount);
+
+        // Refund/credit amount back to sender
+        senderAccount.setBalance(newSenderBalance.doubleValue());
+        senderAccount.setUpdatedAt(LocalDateTime.now());
+        salaryAccountRepository.save(senderAccount);
+
+        // Log refund statement
+        Long globalTxnId = null;
+        try { globalTxnId = globalTransactionIdGenerator.getNextTransactionId(); } catch (Exception ignored) {}
+        SalaryNormalTransaction refundTxn = new SalaryNormalTransaction();
+        refundTxn.setGlobalTransactionSequence(globalTxnId);
+        refundTxn.setSalaryAccountId(senderAccount.getId());
+        refundTxn.setAccountNumber(senderAccount.getAccountNumber());
+        refundTxn.setType("Credit");
+        refundTxn.setAmount(amount.doubleValue());
+        refundTxn.setCharge(0.0);
+        refundTxn.setRemark("Cheque Reverted / Refunded - " + request.getChequeNumber() + " | By: " + adminEmail);
+        refundTxn.setPreviousBalance(senderBalance.doubleValue());
+        refundTxn.setNewBalance(newSenderBalance.doubleValue());
+        refundTxn.setStatus("Success");
+        refundTxn.setCreatedAt(LocalDateTime.now());
+        normalTransactionRepository.save(refundTxn);
+
+        // Update status
+        request.setStatus("REVERTED");
+        request.setUpdatedAt(LocalDateTime.now());
+        chequeRequestRepository.save(request);
+
+        // Log audit
+        logAuditAction(id, adminEmail, "REVERT",
+                "Cheque reverted by admin within 24h. Refunded ₹" + amount + " to " + senderAccount.getAccountNumber() +
+                ". Reason: " + (reason != null ? reason : "Admin Revert"));
+
+        Map<String, Object> resp = new HashMap<>();
+        resp.put("success", true);
+        resp.put("message", "Cheque request reverted successfully. Amount ₹" + amount + " credited back to account " + senderAccount.getAccountNumber());
+        resp.put("chequeNumber", request.getChequeNumber());
+        resp.put("revertedAmount", amount.doubleValue());
+        resp.put("revertedAt", LocalDateTime.now());
+        resp.put("revertedBy", adminEmail);
+        return resp;
+    }
+
+    /**
      * Admin marks cheque as picked up
      */
     @Transactional

@@ -2,8 +2,14 @@ package com.neo.springapp.service;
 
 import com.neo.springapp.model.Cheque;
 import com.neo.springapp.model.Account;
+import com.neo.springapp.model.SalaryAccount;
+import com.neo.springapp.model.CurrentAccount;
 import com.neo.springapp.repository.ChequeRepository;
 import com.neo.springapp.repository.AccountRepository;
+import com.neo.springapp.repository.SalaryAccountRepository;
+import com.neo.springapp.repository.CurrentAccountRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -29,6 +35,12 @@ public class ChequeService {
     private final OtpService otpService;
     private final EmailService emailService;
     private final UserService userService;
+
+    @Autowired
+    private SalaryAccountRepository salaryAccountRepository;
+
+    @Autowired
+    private CurrentAccountRepository currentAccountRepository;
 
     public ChequeService(ChequeRepository chequeRepository, AccountRepository accountRepository, 
                         AccountService accountService, TransactionService transactionService,
@@ -72,19 +84,55 @@ public class ChequeService {
         return response;
     }
 
+    private static class AccountHolderInfo {
+        String name;
+        String type;
+        Double balance;
+        Object accountObject;
+
+        AccountHolderInfo(String name, String type, Double balance, Object accountObject) {
+            this.name = name;
+            this.type = type;
+            this.balance = balance != null ? balance : 0.0;
+            this.accountObject = accountObject;
+        }
+    }
+
+    private AccountHolderInfo resolveAccountInfo(String accountNumber) {
+        if (accountNumber == null || accountNumber.isBlank()) return null;
+        String cleanAcc = accountNumber.trim();
+
+        Account savings = accountRepository.findByAccountNumber(cleanAcc);
+        if (savings != null) {
+            return new AccountHolderInfo(savings.getName(), savings.getAccountType() != null ? savings.getAccountType() : "Savings", savings.getBalance(), savings);
+        }
+
+        SalaryAccount salary = salaryAccountRepository.findByAccountNumber(cleanAcc);
+        if (salary != null) {
+            return new AccountHolderInfo(salary.getEmployeeName(), "Salary", salary.getBalance(), salary);
+        }
+
+        Optional<CurrentAccount> currentOpt = currentAccountRepository.findByAccountNumber(cleanAcc);
+        if (currentOpt.isPresent()) {
+            CurrentAccount current = currentOpt.get();
+            return new AccountHolderInfo(current.getOwnerName() != null ? current.getOwnerName() : current.getBusinessName(), "Business", current.getBalance(), current);
+        }
+
+        return null;
+    }
+
     // Create new cheque leaves for user
     public Cheque createCheque(String accountNumber, int numberOfCheques) {
-        // Get account details
-        Account account = accountRepository.findByAccountNumber(accountNumber);
-        if (account == null) {
-            throw new RuntimeException("Account not found");
+        AccountHolderInfo accInfo = resolveAccountInfo(accountNumber);
+        if (accInfo == null) {
+            throw new RuntimeException("Account not found: " + accountNumber);
         }
         
         // Create cheque leaves
         Cheque cheque = new Cheque();
         cheque.setAccountNumber(accountNumber);
-        cheque.setAccountHolderName(account.getName());
-        cheque.setAccountType(account.getAccountType());
+        cheque.setAccountHolderName(accInfo.name);
+        cheque.setAccountType(accInfo.type);
         cheque.setStatus("ACTIVE");
         cheque.setCreatedAt(LocalDateTime.now());
         
@@ -93,10 +141,9 @@ public class ChequeService {
 
     // Create multiple cheque leaves with amount
     public List<Cheque> createChequeLeaves(String accountNumber, int numberOfLeaves, Double amount) {
-        // Get account details
-        Account account = accountRepository.findByAccountNumber(accountNumber);
-        if (account == null) {
-            throw new RuntimeException("Account not found");
+        AccountHolderInfo accInfo = resolveAccountInfo(accountNumber);
+        if (accInfo == null) {
+            throw new RuntimeException("Account not found: " + accountNumber);
         }
         
         // Cheque policy: every request always issues a fixed cheque book of CHEQUE_BOOK_SIZE leaves,
@@ -108,8 +155,8 @@ public class ChequeService {
             Cheque cheque = new Cheque();
             cheque.setChequeNumber(generateUniqueChequeNumber());
             cheque.setAccountNumber(accountNumber);
-            cheque.setAccountHolderName(account.getName());
-            cheque.setAccountType(account.getAccountType());
+            cheque.setAccountHolderName(accInfo.name);
+            cheque.setAccountType(accInfo.type);
             cheque.setAmount(amount != null ? amount : 0.0);
             cheque.setStatus("ACTIVE");
             cheque.setCreatedAt(LocalDateTime.now());
@@ -182,8 +229,8 @@ public class ChequeService {
         result.put("accountType", cheque.getAccountType());
         result.put("amount", cheque.getAmount());
         result.put("status", cheque.getStatus());
-        Account account = accountRepository.findByAccountNumber(cheque.getAccountNumber());
-        result.put("availableBalance", account == null || account.getBalance() == null ? 0.0 : account.getBalance());
+        AccountHolderInfo accInfo = resolveAccountInfo(cheque.getAccountNumber());
+        result.put("availableBalance", accInfo != null ? accInfo.balance : 0.0);
         result.put("message", cheque.isAvailable() ? "Cheque is valid and unused" : "Cheque is already used or unavailable");
         return result;
     }
@@ -307,7 +354,7 @@ public class ChequeService {
     @Transactional
     public Cheque drawCheque(String chequeNumber, String drawnBy) {
         Cheque cheque = chequeRepository.findByChequeNumber(chequeNumber)
-                .orElseThrow(() -> new RuntimeException("Cheque not found"));
+                .orElseThrow(() -> new RuntimeException("Cheque not found with number: " + chequeNumber));
         
         if (!cheque.canBeDrawn()) {
             throw new RuntimeException("Cheque cannot be drawn. Status: " + cheque.getStatus() + ", Request Status: " + cheque.getRequestStatus());
@@ -317,31 +364,104 @@ public class ChequeService {
             throw new RuntimeException("Cheque amount is invalid or not set");
         }
         
-        // Check account balance
-        Account account = accountRepository.findByAccountNumber(cheque.getAccountNumber());
-        if (account == null) {
-            throw new RuntimeException("Account not found");
+        AccountHolderInfo accInfo = resolveAccountInfo(cheque.getAccountNumber());
+        if (accInfo == null) {
+            throw new RuntimeException("Account not found for account number: " + cheque.getAccountNumber());
         }
-        
-        Double currentBalance = account.getBalance() != null ? account.getBalance() : 0.0;
+
+        Double currentBalance = accInfo.balance;
         if (currentBalance < cheque.getAmount()) {
             throw new RuntimeException("Insufficient balance. Available: ₹" + currentBalance + ", Required: ₹" + cheque.getAmount());
         }
-        
-        // Debit amount from account (real-time update)
-        Double newBalance = accountService.debitBalance(cheque.getAccountNumber(), cheque.getAmount());
-        
+
+        Double newBalance = currentBalance - cheque.getAmount();
+
+        if (accInfo.accountObject instanceof Account) {
+            Account sa = (Account) accInfo.accountObject;
+            Double debited = accountService.debitBalance(sa.getAccountNumber(), cheque.getAmount());
+            newBalance = debited != null ? debited : newBalance;
+        } else if (accInfo.accountObject instanceof SalaryAccount) {
+            SalaryAccount sal = (SalaryAccount) accInfo.accountObject;
+            sal.setBalance(newBalance);
+            sal.setUpdatedAt(LocalDateTime.now());
+            salaryAccountRepository.save(sal);
+        } else if (accInfo.accountObject instanceof CurrentAccount) {
+            CurrentAccount ca = (CurrentAccount) accInfo.accountObject;
+            ca.setBalance(newBalance);
+            ca.setLastUpdated(LocalDateTime.now());
+            currentAccountRepository.save(ca);
+        }
+
         // Create transaction record
-        transactionService.createTransferTransaction(
-            cheque.getAccountNumber(),
-            "Cheque drawn - " + cheque.getChequeNumber(),
-            cheque.getAmount(),
-            "Debit",
-            newBalance
-        );
-        
+        try {
+            transactionService.createTransferTransaction(
+                cheque.getAccountNumber(),
+                "Cheque drawn - " + cheque.getChequeNumber(),
+                cheque.getAmount(),
+                "Debit",
+                newBalance
+            );
+        } catch (Exception ignored) {}
+
         // Update cheque status
         cheque.draw(drawnBy);
+        return chequeRepository.save(cheque);
+    }
+
+    // Revert cheque (withdraw refund) - Admin only within 24 hours
+    @Transactional
+    public Cheque revertCheque(String chequeNumber, String revertedBy, String reason) {
+        Cheque cheque = chequeRepository.findByChequeNumber(chequeNumber)
+                .orElseThrow(() -> new RuntimeException("Cheque not found with number: " + chequeNumber));
+
+        if (!cheque.canBeReverted()) {
+            if (!"DRAWN".equals(cheque.getStatus())) {
+                throw new RuntimeException("Only DRAWN cheques can be reverted. Current status: " + cheque.getStatus());
+            }
+            throw new RuntimeException("Cheque drawing can only be reverted within 24 hours of drawing.");
+        }
+
+        Double refundAmount = cheque.getAmount() != null ? cheque.getAmount() : 0.0;
+        if (refundAmount <= 0) {
+            throw new RuntimeException("Invalid cheque amount to refund");
+        }
+
+        String accNum = cheque.getAccountNumber();
+        AccountHolderInfo accInfo = resolveAccountInfo(accNum);
+        if (accInfo == null) {
+            throw new RuntimeException("Account not found for account number: " + accNum);
+        }
+
+        Double newBalance = accInfo.balance + refundAmount;
+
+        if (accInfo.accountObject instanceof Account) {
+            Account sa = (Account) accInfo.accountObject;
+            Double credited = accountService.creditBalance(sa.getAccountNumber(), refundAmount);
+            newBalance = credited != null ? credited : newBalance;
+        } else if (accInfo.accountObject instanceof SalaryAccount) {
+            SalaryAccount sal = (SalaryAccount) accInfo.accountObject;
+            sal.setBalance(newBalance);
+            sal.setUpdatedAt(LocalDateTime.now());
+            salaryAccountRepository.save(sal);
+        } else if (accInfo.accountObject instanceof CurrentAccount) {
+            CurrentAccount ca = (CurrentAccount) accInfo.accountObject;
+            ca.setBalance(newBalance);
+            ca.setLastUpdated(LocalDateTime.now());
+            currentAccountRepository.save(ca);
+        }
+
+        // Record refund transaction in history
+        try {
+            transactionService.createTransferTransaction(
+                accNum,
+                "Cheque Reverted / Refund - " + cheque.getChequeNumber() + " (By: " + revertedBy + ")",
+                refundAmount,
+                "Credit",
+                newBalance
+            );
+        } catch (Exception ignored) {}
+
+        cheque.revert(revertedBy, reason != null && !reason.isBlank() ? reason : "Admin Revert within 24h");
         return chequeRepository.save(cheque);
     }
 

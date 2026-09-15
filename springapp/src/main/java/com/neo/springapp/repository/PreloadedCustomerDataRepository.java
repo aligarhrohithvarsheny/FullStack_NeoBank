@@ -16,7 +16,11 @@ public interface PreloadedCustomerDataRepository extends JpaRepository<Preloaded
 
     Optional<PreloadedCustomerData> findFirstByAadharNumberAndUsedFalseOrderByCreatedAtDesc(String aadharNumber);
 
+    Optional<PreloadedCustomerData> findFirstByAadharNumberOrderByCreatedAtDesc(String aadharNumber);
+
     Optional<PreloadedCustomerData> findFirstByPanNumberAndUsedFalseOrderByCreatedAtDesc(String panNumber);
+
+    Optional<PreloadedCustomerData> findFirstByPanNumberOrderByCreatedAtDesc(String panNumber);
 
     List<PreloadedCustomerData> findByUploadBatchId(String uploadBatchId);
 

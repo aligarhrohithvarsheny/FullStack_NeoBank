@@ -32,10 +32,12 @@ public class SalaryAccountController {
     // ─── Create ──────────────────────────────────────────────
 
     @PostMapping("/create")
-    public ResponseEntity<Map<String, Object>> createAccount(@RequestBody SalaryAccount account) {
+    public ResponseEntity<Map<String, Object>> createAccount(
+            @RequestBody SalaryAccount account,
+            @RequestParam(required = false) String createdBy) {
         Map<String, Object> response = new HashMap<>();
         try {
-            SalaryAccount created = salaryAccountService.createAccount(account);
+            SalaryAccount created = salaryAccountService.createAccount(account, createdBy);
             response.put("success", true);
             response.put("message", "Salary account created successfully");
             response.put("account", created);
@@ -43,6 +45,28 @@ public class SalaryAccountController {
         } catch (Exception e) {
             response.put("success", false);
             response.put("message", "Failed to create salary account: " + e.getMessage());
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
+
+    @PostMapping("/{id:\\d+}/upload-document")
+    public ResponseEntity<Map<String, Object>> uploadSignedDocument(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> body) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            String fileName = body.get("fileName");
+            String fileType = body.get("fileType");
+            String base64Data = body.get("base64Data");
+            String uploadedBy = body.get("uploadedBy");
+            SalaryAccount updated = salaryAccountService.uploadSignedDocument(id, fileName, fileType, base64Data, uploadedBy);
+            response.put("success", true);
+            response.put("message", "Signed document uploaded successfully");
+            response.put("account", updated);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "Failed to upload document: " + e.getMessage());
             return ResponseEntity.badRequest().body(response);
         }
     }

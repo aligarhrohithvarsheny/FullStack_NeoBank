@@ -141,9 +141,31 @@ public class Cheque {
         }
     }
 
+    private LocalDateTime revertedDate;
+    private String revertedBy;
+    private String revertReason;
+    private Double revertedAmount;
+
     // Check if cheque can be bounced
     public boolean canBeBounced() {
         return "ACTIVE".equals(this.status);
+    }
+
+    // Check if cheque can be reverted (status is DRAWN and within 24 hours)
+    public boolean canBeReverted() {
+        if (!"DRAWN".equals(this.status)) return false;
+        if (this.drawnDate == null) return true;
+        return LocalDateTime.now().isBefore(this.drawnDate.plusHours(24));
+    }
+
+    // Revert cheque
+    public void revert(String revertedBy, String reason) {
+        this.status = "REVERTED";
+        this.revertedDate = LocalDateTime.now();
+        this.revertedBy = revertedBy;
+        this.revertReason = reason;
+        this.revertedAmount = this.amount;
+        this.requestStatus = "REVERTED";
     }
 
     // Cancel cheque

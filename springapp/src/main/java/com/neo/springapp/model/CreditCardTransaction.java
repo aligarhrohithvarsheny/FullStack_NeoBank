@@ -31,6 +31,7 @@ public class CreditCardTransaction {
     private byte[] chequeImage;
     private String chequeImageName;
     private String chequeImageType;
+    private String chequeHolderName;
     private Double amount;
     private String merchant;
     private String description;

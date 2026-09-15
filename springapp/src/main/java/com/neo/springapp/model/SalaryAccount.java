@@ -155,6 +155,7 @@ public class SalaryAccount {
     private String lockReason;
 
     // Signature fields
+    // Signature / Signed Document fields
     @Column(name = "signature_copy_path")
     private String signatureCopyPath;
 
@@ -169,6 +170,22 @@ public class SalaryAccount {
 
     @Column(name = "signature_verified_at")
     private LocalDateTime signatureVerifiedAt;
+
+    @Column(name = "signed_document_name")
+    private String signedDocumentName;
+
+    @Column(name = "signed_document_type")
+    private String signedDocumentType;
+
+    @Lob
+    @Column(name = "signed_document_data", columnDefinition = "LONGTEXT")
+    private String signedDocumentData;
+
+    @Column(name = "signed_document_uploaded_by")
+    private String signedDocumentUploadedBy;
+
+    @Column(name = "signed_document_uploaded_at")
+    private LocalDateTime signedDocumentUploadedAt;
 
     @Column(name = "closed_at")
     private LocalDateTime closedAt;

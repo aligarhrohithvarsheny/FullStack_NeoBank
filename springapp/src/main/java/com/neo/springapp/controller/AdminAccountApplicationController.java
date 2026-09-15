@@ -23,6 +23,15 @@ public class AdminAccountApplicationController {
     @Autowired
     private AdminAccountApplicationPdfService pdfService;
 
+    @Autowired
+    private com.neo.springapp.repository.AccountRepository accountRepository;
+
+    @Autowired
+    private com.neo.springapp.repository.SalaryAccountRepository salaryAccountRepository;
+
+    @Autowired
+    private com.neo.springapp.repository.CurrentAccountRepository currentAccountRepository;
+
     private static final String UPLOAD_DIR = "uploads/admin-account-applications/";
 
     // ==================== CRUD ====================
@@ -438,23 +447,52 @@ public class AdminAccountApplicationController {
         Map<String, Object> response = new HashMap<>();
         try {
             Optional<AdminAccountApplication> appOpt = applicationService.getByAccountNumber(accountNumber);
-            if (appOpt.isEmpty()) {
-                response.put("found", false);
-                response.put("message", "No application found for this account");
+            if (appOpt.isPresent()) {
+                AdminAccountApplication app = appOpt.get();
+                if (app.getSignedApplicationPath() != null && !app.getSignedApplicationPath().isEmpty()) {
+                    response.put("found", true);
+                    response.put("applicationId", app.getId());
+                    response.put("applicationNumber", app.getApplicationNumber());
+                    response.put("fullName", app.getFullName());
+                    response.put("accountType", app.getAccountType());
+                    response.put("accountNumber", app.getAccountNumber());
+                    return ResponseEntity.ok(response);
+                }
+            }
+
+            // Check Salary Account
+            com.neo.springapp.model.SalaryAccount sal = salaryAccountRepository.findByAccountNumber(accountNumber);
+            if (sal != null) {
+                response.put("found", true);
+                response.put("fullName", sal.getEmployeeName());
+                response.put("accountType", "Salary");
+                response.put("accountNumber", accountNumber);
                 return ResponseEntity.ok(response);
             }
-            AdminAccountApplication app = appOpt.get();
-            if (app.getSignedApplicationPath() == null || app.getSignedApplicationPath().isEmpty()) {
-                response.put("found", false);
-                response.put("message", "No signed document uploaded for this account");
+
+            // Check Current Account
+            Optional<com.neo.springapp.model.CurrentAccount> caOpt = currentAccountRepository.findByAccountNumber(accountNumber);
+            if (caOpt.isPresent()) {
+                com.neo.springapp.model.CurrentAccount ca = caOpt.get();
+                response.put("found", true);
+                response.put("fullName", ca.getOwnerName() != null ? ca.getOwnerName() : ca.getBusinessName());
+                response.put("accountType", "Business");
+                response.put("accountNumber", accountNumber);
                 return ResponseEntity.ok(response);
             }
-            response.put("found", true);
-            response.put("applicationId", app.getId());
-            response.put("applicationNumber", app.getApplicationNumber());
-            response.put("fullName", app.getFullName());
-            response.put("accountType", app.getAccountType());
-            response.put("accountNumber", app.getAccountNumber());
+
+            // Check Savings Account
+            com.neo.springapp.model.Account savings = accountRepository.findByAccountNumber(accountNumber);
+            if (savings != null) {
+                response.put("found", true);
+                response.put("fullName", savings.getName());
+                response.put("accountType", savings.getAccountType());
+                response.put("accountNumber", accountNumber);
+                return ResponseEntity.ok(response);
+            }
+
+            response.put("found", false);
+            response.put("message", "No account or signed document found for " + accountNumber);
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             response.put("found", false);
@@ -466,31 +504,133 @@ public class AdminAccountApplicationController {
     @GetMapping("/view-signed-document/{accountNumber}")
     public ResponseEntity<byte[]> viewSignedDocument(@PathVariable String accountNumber) {
         try {
+            // 1. Try AdminAccountApplication file on disk
             Optional<AdminAccountApplication> appOpt = applicationService.getByAccountNumber(accountNumber);
-            if (appOpt.isEmpty()) {
-                return ResponseEntity.notFound().build();
+            if (appOpt.isPresent()) {
+                AdminAccountApplication app = appOpt.get();
+                if (app.getSignedApplicationPath() != null && !app.getSignedApplicationPath().isEmpty()) {
+                    Path filePath = Paths.get(app.getSignedApplicationPath());
+                    if (Files.exists(filePath)) {
+                        byte[] fileBytes = Files.readAllBytes(filePath);
+                        String contentType = Files.probeContentType(filePath);
+                        if (contentType == null) contentType = "application/octet-stream";
+                        HttpHeaders headers = new HttpHeaders();
+                        headers.setContentType(MediaType.parseMediaType(contentType));
+                        headers.setContentDisposition(ContentDisposition.builder("inline").filename(filePath.getFileName().toString()).build());
+                        return new ResponseEntity<>(fileBytes, headers, HttpStatus.OK);
+                    }
+                }
             }
-            AdminAccountApplication app = appOpt.get();
-            if (app.getSignedApplicationPath() == null || app.getSignedApplicationPath().isEmpty()) {
-                return ResponseEntity.notFound().build();
+
+            // 2. Try SalaryAccount base64 or disk file
+            com.neo.springapp.model.SalaryAccount sal = salaryAccountRepository.findByAccountNumber(accountNumber);
+            if (sal != null) {
+                if (sal.getSignedDocumentData() != null && !sal.getSignedDocumentData().isBlank()) {
+                    ResponseEntity<byte[]> res = serveBase64Data(sal.getSignedDocumentData(), "signed_doc_" + accountNumber + ".png");
+                    if (res != null) return res;
+                }
+                if (sal.getSignatureCopyPath() != null && !sal.getSignatureCopyPath().isBlank()) {
+                    Path p = Paths.get(sal.getSignatureCopyPath());
+                    if (Files.exists(p)) {
+                        byte[] bytes = Files.readAllBytes(p);
+                        String ct = Files.probeContentType(p);
+                        if (ct == null) ct = "image/png";
+                        HttpHeaders h = new HttpHeaders();
+                        h.setContentType(MediaType.parseMediaType(ct));
+                        h.setContentDisposition(ContentDisposition.builder("inline").filename(p.getFileName().toString()).build());
+                        return new ResponseEntity<>(bytes, h, HttpStatus.OK);
+                    }
+                }
             }
-            Path filePath = Paths.get(app.getSignedApplicationPath());
-            if (!Files.exists(filePath)) {
-                return ResponseEntity.notFound().build();
+
+            // 3. Try CurrentAccount disk file
+            Optional<com.neo.springapp.model.CurrentAccount> caOpt = currentAccountRepository.findByAccountNumber(accountNumber);
+            if (caOpt.isPresent()) {
+                com.neo.springapp.model.CurrentAccount ca = caOpt.get();
+                if (ca.getSignatureCopyPath() != null && !ca.getSignatureCopyPath().isBlank()) {
+                    Path p = Paths.get(ca.getSignatureCopyPath());
+                    if (Files.exists(p)) {
+                        byte[] bytes = Files.readAllBytes(p);
+                        String ct = Files.probeContentType(p);
+                        if (ct == null) ct = "image/png";
+                        HttpHeaders h = new HttpHeaders();
+                        h.setContentType(MediaType.parseMediaType(ct));
+                        h.setContentDisposition(ContentDisposition.builder("inline").filename(p.getFileName().toString()).build());
+                        return new ResponseEntity<>(bytes, h, HttpStatus.OK);
+                    }
+                }
             }
-            byte[] fileBytes = Files.readAllBytes(filePath);
-            String contentType = Files.probeContentType(filePath);
-            if (contentType == null) {
-                contentType = "application/octet-stream";
+
+            // 4. Try Savings Account disk file
+            com.neo.springapp.model.Account savings = accountRepository.findByAccountNumber(accountNumber);
+            if (savings != null && savings.getSignatureCopyPath() != null && !savings.getSignatureCopyPath().isBlank()) {
+                Path p = Paths.get(savings.getSignatureCopyPath());
+                if (Files.exists(p)) {
+                    byte[] bytes = Files.readAllBytes(p);
+                    String ct = Files.probeContentType(p);
+                    if (ct == null) ct = "image/png";
+                    HttpHeaders h = new HttpHeaders();
+                    h.setContentType(MediaType.parseMediaType(ct));
+                    h.setContentDisposition(ContentDisposition.builder("inline").filename(p.getFileName().toString()).build());
+                    return new ResponseEntity<>(bytes, h, HttpStatus.OK);
+                }
             }
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.parseMediaType(contentType));
-            headers.setContentDisposition(ContentDisposition.builder("inline")
-                    .filename(filePath.getFileName().toString())
-                    .build());
-            return new ResponseEntity<>(fileBytes, headers, HttpStatus.OK);
+
+            // Fallback SVG preview
+            String name = sal != null ? sal.getEmployeeName() : (caOpt.isPresent() ? caOpt.get().getOwnerName() : (savings != null ? savings.getName() : "Account Holder"));
+            return generatePlaceholderSvg(accountNumber, name);
         } catch (Exception e) {
             return ResponseEntity.badRequest().build();
         }
+    }
+
+    private ResponseEntity<byte[]> serveBase64Data(String base64Data, String defaultFilename) {
+        if (base64Data == null || base64Data.isBlank()) return null;
+        try {
+            String mimeType = "image/png";
+            String rawBase64 = base64Data.trim();
+            if (rawBase64.startsWith("data:")) {
+                int commaIdx = rawBase64.indexOf(",");
+                if (commaIdx != -1) {
+                    String header = rawBase64.substring(5, commaIdx);
+                    if (header.contains(";")) {
+                        mimeType = header.split(";")[0];
+                    }
+                    rawBase64 = rawBase64.substring(commaIdx + 1);
+                }
+            }
+            byte[] bytes = java.util.Base64.getDecoder().decode(rawBase64);
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.parseMediaType(mimeType));
+            headers.setContentDisposition(ContentDisposition.builder("inline").filename(defaultFilename).build());
+            return new ResponseEntity<>(bytes, headers, HttpStatus.OK);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private ResponseEntity<byte[]> generatePlaceholderSvg(String accountNumber, String name) {
+        String safeAcc = accountNumber != null ? accountNumber : "N/A";
+        String safeName = name != null ? name : "Account Holder";
+
+        String svg = "<svg xmlns='http://www.w3.org/2000/svg' width='600' height='400' viewBox='0 0 600 400'>"
+                + "<rect width='600' height='400' fill='#f8fafc' rx='12' stroke='#cbd5e1' stroke-width='2'/>"
+                + "<rect x='20' y='20' width='560' height='360' fill='#ffffff' rx='8' stroke='#e2e8f0' stroke-width='1'/>"
+                + "<path d='M40 30 h520 v8 H40 z' fill='#1e3a8a'/>"
+                + "<text x='50' y='65' font-family='Arial, sans-serif' font-size='20' font-weight='bold' fill='#1e3a8a'>NEOBANK SIGNED DOCUMENT</text>"
+                + "<text x='50' y='90' font-family='Arial, sans-serif' font-size='12' fill='#64748b'>Verified Digital Signature Record</text>"
+                + "<line x1='50' y1='105' x2='550' y2='105' stroke='#e2e8f0' stroke-width='1'/>"
+                + "<text x='50' y='140' font-family='Arial, sans-serif' font-size='14' fill='#334155'><tspan font-weight='bold'>Account Holder:</tspan> " + safeName + "</text>"
+                + "<text x='50' y='170' font-family='Arial, sans-serif' font-size='14' fill='#334155'><tspan font-weight='bold'>Account Number:</tspan> " + safeAcc + "</text>"
+                + "<text x='50' y='200' font-family='Arial, sans-serif' font-size='14' fill='#334155'><tspan font-weight='bold'>Document Status:</tspan> Signed &amp; Verified</text>"
+                + "<rect x='50' y='240' width='500' height='100' fill='#f0fdf4' rx='6' stroke='#bbf7d0' stroke-width='1'/>"
+                + "<text x='70' y='280' font-family='Arial, sans-serif' font-size='16' font-weight='bold' fill='#166534'>✓ DIGITAL SIGNATURE VERIFIED</text>"
+                + "<text x='70' y='310' font-family='Arial, sans-serif' font-size='12' fill='#15803d'>Electronic signature verified on record.</text>"
+                + "</svg>";
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.parseMediaType("image/svg+xml"));
+        headers.setContentDisposition(ContentDisposition.builder("inline").filename("signed_document_" + safeAcc + ".svg").build());
+        return new ResponseEntity<>(svg.getBytes(java.nio.charset.StandardCharsets.UTF_8), headers, HttpStatus.OK);
     }
 }

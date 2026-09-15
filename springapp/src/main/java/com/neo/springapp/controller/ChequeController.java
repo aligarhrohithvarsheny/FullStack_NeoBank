@@ -321,6 +321,44 @@ public class ChequeController {
         }
     }
 
+    // Revert cheque (refund drawn amount back to account within 24 hours) - Admin only
+    @RequestMapping(value = "/admin/revert", method = {RequestMethod.POST, RequestMethod.PUT})
+    public ResponseEntity<Map<String, Object>> revertCheque(@RequestBody Map<String, Object> request) {
+        try {
+            String chequeNumber = (String) request.get("chequeNumber");
+            String revertedBy = (String) request.getOrDefault("revertedBy", "Admin");
+            String reason = (String) request.getOrDefault("reason", "Admin mistake - Reverted within 24 hours");
+
+            if (chequeNumber == null || chequeNumber.isBlank()) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Cheque number is required"));
+            }
+
+            Cheque revertedCheque = chequeService.revertCheque(chequeNumber.trim(), revertedBy, reason);
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("message", "Cheque " + chequeNumber + " reverted successfully. Amount ₹" + revertedCheque.getAmount() + " credited back to account.");
+            response.put("cheque", revertedCheque);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Failed to revert cheque: " + e.getMessage()));
+        }
+    }
+
+    // Revert cheque draw request by ID within 24 hours - Admin only
+    @RequestMapping(value = "/draw/admin/{id}/revert", method = {RequestMethod.POST, RequestMethod.PUT})
+    public ResponseEntity<Map<String, Object>> revertChequeDraw(@PathVariable Long id, @RequestBody(required = false) Map<String, Object> request) {
+        try {
+            String adminEmail = request != null ? (String) request.getOrDefault("adminEmail", "Admin") : "Admin";
+            String reason = request != null ? (String) request.getOrDefault("reason", "Admin mistake - Reverted within 24 hours") : "Admin mistake";
+
+            Map<String, Object> result = chequeDrawService.revertChequeDrawRequest(id, adminEmail, reason);
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Failed to revert cheque draw: " + e.getMessage()));
+        }
+    }
+
     // Bounce cheque - Admin only
     @PostMapping("/admin/bounce")
     public ResponseEntity<Map<String, Object>> bounceCheque(@RequestBody Map<String, Object> request) {

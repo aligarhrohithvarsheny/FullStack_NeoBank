@@ -11,5 +11,6 @@ public class AdminCreditCardPaymentRequest {
     private String chequeImageBase64;
     private String chequeImageName;
     private String chequeImageType;
+    private String chequeHolderName;
     private String adminName;
 }

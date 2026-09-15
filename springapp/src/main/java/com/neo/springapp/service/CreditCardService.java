@@ -63,6 +63,8 @@ public class CreditCardService {
     private static class ResolvedCheque {
         String source; // SAVINGS, SALARY, CURRENT
         boolean usable; // status allows it to be used for payment
+        boolean adminDrawn; // true if already drawn by admin
+        String drawnBy;
         String status;
         String accountNumber;
         String accountHolderName;
@@ -77,9 +79,33 @@ public class CreditCardService {
         if (savingsOpt.isPresent()) {
             Cheque c = savingsOpt.get();
             ResolvedCheque r = new ResolvedCheque();
-            r.source = "SAVINGS"; r.usable = c.isAvailable(); r.status = c.getStatus();
-            r.accountNumber = c.getAccountNumber(); r.accountHolderName = c.getAccountHolderName();
-            r.amount = c.getAmount(); r.savingsCheque = c;
+            r.source = "SAVINGS";
+            r.status = c.getStatus();
+            r.accountNumber = c.getAccountNumber();
+            r.accountHolderName = c.getAccountHolderName();
+            r.amount = c.getAmount();
+            r.savingsCheque = c;
+            r.drawnBy = c.getDrawnBy();
+
+            // Check usability:
+            // 1. ACTIVE: not yet drawn, admin can draw and pay it ("if not by admin admin then pay it")
+            // 2. DRAWN: already drawn by admin. If not already consumed for another bill/DD, admin can pay it!
+            if ("ACTIVE".equalsIgnoreCase(c.getStatus())) {
+                r.usable = true;
+                r.adminDrawn = false;
+            } else if ("DRAWN".equalsIgnoreCase(c.getStatus())) {
+                // If it was drawn by admin and not yet consumed for another specific purpose
+                if (c.getUsedFor() == null || c.getUsedFor().trim().isEmpty()) {
+                    r.usable = true;
+                    r.adminDrawn = true;
+                } else {
+                    r.usable = false; // Already consumed
+                    r.adminDrawn = true;
+                }
+            } else {
+                r.usable = false;
+                r.adminDrawn = false;
+            }
             return r;
         }
         Optional<ChequeRequest> salaryOpt = chequeRequestRepository.findByChequeNumber(chequeNumber);
@@ -87,8 +113,13 @@ public class CreditCardService {
             ChequeRequest req = salaryOpt.get();
             SalaryAccount sal = salaryAccountRepository.findById(req.getSalaryAccountId()).orElse(null);
             ResolvedCheque r = new ResolvedCheque();
-            r.source = "SALARY"; r.status = req.getStatus();
-            r.usable = "APPROVED".equals(req.getStatus()) || "COMPLETED".equals(req.getStatus());
+            r.source = "SALARY";
+            r.status = req.getStatus();
+            r.usable = "APPROVED".equalsIgnoreCase(req.getStatus())
+                    || "COMPLETED".equalsIgnoreCase(req.getStatus())
+                    || "DRAWN".equalsIgnoreCase(req.getStatus())
+                    || "PENDING".equalsIgnoreCase(req.getStatus());
+            r.adminDrawn = "DRAWN".equalsIgnoreCase(req.getStatus()) || "COMPLETED".equalsIgnoreCase(req.getStatus());
             r.accountNumber = sal != null ? sal.getAccountNumber() : null;
             r.accountHolderName = req.getPayeeName();
             r.amount = req.getAmount() != null ? req.getAmount().doubleValue() : null;
@@ -100,8 +131,13 @@ public class CreditCardService {
             BusinessChequeRequest req = businessOpt.get();
             CurrentAccount cur = currentAccountRepository.findById(req.getCurrentAccountId()).orElse(null);
             ResolvedCheque r = new ResolvedCheque();
-            r.source = "CURRENT"; r.status = req.getStatus();
-            r.usable = "APPROVED".equals(req.getStatus()) || "COMPLETED".equals(req.getStatus());
+            r.source = "CURRENT";
+            r.status = req.getStatus();
+            r.usable = "APPROVED".equalsIgnoreCase(req.getStatus())
+                    || "COMPLETED".equalsIgnoreCase(req.getStatus())
+                    || "DRAWN".equalsIgnoreCase(req.getStatus())
+                    || "PENDING".equalsIgnoreCase(req.getStatus());
+            r.adminDrawn = "DRAWN".equalsIgnoreCase(req.getStatus()) || "COMPLETED".equalsIgnoreCase(req.getStatus());
             r.accountNumber = cur != null ? cur.getAccountNumber() : null;
             r.accountHolderName = req.getPayeeName();
             r.amount = req.getAmount() != null ? req.getAmount().doubleValue() : null;
@@ -111,21 +147,42 @@ public class CreditCardService {
         return null;
     }
 
-    private void markChequeUsed(ResolvedCheque resolved, String usedReference) {
+    private void markChequeUsed(ResolvedCheque resolved, String usedReference, String adminName, String chequeHolderName) {
         switch (resolved.source) {
             case "SAVINGS":
-                resolved.savingsCheque.markUsed("CREDIT_CARD_BILL_PAYMENT", usedReference);
-                chequeRepository.save(resolved.savingsCheque);
+                Cheque chq = resolved.savingsCheque;
+                chq.setStatus("DRAWN");
+                if (chq.getDrawnBy() == null || chq.getDrawnBy().isBlank()) {
+                    chq.setDrawnBy(adminName != null ? adminName : "Admin");
+                }
+                if (chq.getDrawnDate() == null) {
+                    chq.setDrawnDate(LocalDateTime.now());
+                }
+                chq.setUsedFor("CREDIT_CARD_BILL_PAYMENT");
+                chq.setUsedReference(usedReference);
+                chq.setUsedDate(LocalDateTime.now());
+                if (chequeHolderName != null && !chequeHolderName.isBlank()) {
+                    chq.setAccountHolderName(chequeHolderName.trim());
+                }
+                chequeRepository.save(chq);
                 break;
             case "SALARY":
-                resolved.salaryChequeRequest.setStatus("CLEARED");
-                resolved.salaryChequeRequest.setClearedAt(LocalDateTime.now());
-                chequeRequestRepository.save(resolved.salaryChequeRequest);
+                ChequeRequest sReq = resolved.salaryChequeRequest;
+                sReq.setStatus("CLEARED");
+                sReq.setClearedAt(LocalDateTime.now());
+                if (chequeHolderName != null && !chequeHolderName.isBlank()) {
+                    sReq.setPayeeName(chequeHolderName.trim());
+                }
+                chequeRequestRepository.save(sReq);
                 break;
             case "CURRENT":
-                resolved.businessChequeRequest.setStatus("CLEARED");
-                resolved.businessChequeRequest.setClearedAt(LocalDateTime.now());
-                businessChequeRequestRepository.save(resolved.businessChequeRequest);
+                BusinessChequeRequest bReq = resolved.businessChequeRequest;
+                bReq.setStatus("CLEARED");
+                bReq.setClearedAt(LocalDateTime.now());
+                if (chequeHolderName != null && !chequeHolderName.isBlank()) {
+                    bReq.setPayeeName(chequeHolderName.trim());
+                }
+                businessChequeRequestRepository.save(bReq);
                 break;
         }
     }
@@ -354,25 +411,22 @@ public class CreditCardService {
         String debitAccountNumber = request.getDebitAccountNumber();
         ResolvedCheque resolvedCheque = null;
         if ("CHEQUE".equals(paymentMethod)) {
-            if (debitAccountNumber == null || debitAccountNumber.isBlank()) {
-                debitAccountNumber = card.getAccountNumber();
-            }
             resolvedCheque = resolveChequeForPayment(request.getChequeNumber().trim());
             if (resolvedCheque == null) {
                 throw new IllegalArgumentException("Cheque number not found");
             }
-            if (!debitAccountNumber.equals(resolvedCheque.accountNumber)) {
-                throw new IllegalArgumentException("This cheque belongs to another account and cannot be used here");
+            if (debitAccountNumber == null || debitAccountNumber.isBlank()) {
+                debitAccountNumber = resolvedCheque.accountNumber;
             }
             if (!resolvedCheque.usable) {
-                throw new IllegalArgumentException("Cheque is already used, drawn, cancelled, or bounced. Status: " + resolvedCheque.status);
+                throw new IllegalArgumentException("Cheque is already used or unavailable. Status: " + resolvedCheque.status);
             }
             // Only the amount entered by the admin/user is locked against the cheque, not the cheque's own face amount
             if (resolvedCheque.savingsCheque != null) resolvedCheque.savingsCheque.setAmount(amount);
         }
 
         Double accountBalanceAfter = null;
-        if ("ACCOUNT".equals(paymentMethod) || "CHEQUE".equals(paymentMethod)) {
+        if ("ACCOUNT".equals(paymentMethod)) {
             if (debitAccountNumber == null || debitAccountNumber.isBlank()) {
                 debitAccountNumber = card.getAccountNumber();
             }
@@ -380,8 +434,24 @@ public class CreditCardService {
             if (accountBalanceAfter == null) {
                 throw new IllegalArgumentException("Account not found or insufficient balance");
             }
+        } else if ("CHEQUE".equals(paymentMethod)) {
+            if (debitAccountNumber == null || debitAccountNumber.isBlank()) {
+                debitAccountNumber = resolvedCheque != null && resolvedCheque.accountNumber != null
+                        ? resolvedCheque.accountNumber : card.getAccountNumber();
+            }
+            if (resolvedCheque != null && resolvedCheque.adminDrawn) {
+                // Cheque was already drawn by admin (funds debited during drawCheque).
+                // Do not debit account a second time.
+                accountBalanceAfter = getAccountBalance(debitAccountNumber);
+            } else {
+                // Cheque was not drawn by admin yet -> Admin pays it now: debit the account
+                accountBalanceAfter = debitAnyAccount(debitAccountNumber, amount);
+                if (accountBalanceAfter == null) {
+                    throw new IllegalArgumentException("Account not found or insufficient balance to honour cheque");
+                }
+            }
             if (resolvedCheque != null) {
-                markChequeUsed(resolvedCheque, "CARD-" + card.getId() + "-BILL-" + billId);
+                markChequeUsed(resolvedCheque, "CARD-" + card.getId() + "-BILL-" + billId, request.getAdminName(), request.getChequeHolderName());
             }
         }
 
@@ -410,6 +480,7 @@ public class CreditCardService {
         cardTransaction.setTransactionType("Payment");
         cardTransaction.setPaymentMethod(paymentMethod);
         cardTransaction.setChequeNumber(request.getChequeNumber());
+        cardTransaction.setChequeHolderName(request.getChequeHolderName());
         if (request.getChequeImageBase64() != null && !request.getChequeImageBase64().isBlank()) {
             String imageData = request.getChequeImageBase64();
             int comma = imageData.indexOf(',');
@@ -422,7 +493,8 @@ public class CreditCardService {
         cardTransaction.setProcessedBy(request.getAdminName());
         cardTransaction.setAmount(amount);
         cardTransaction.setDescription("Admin bill payment via " + paymentMethod
-                + (request.getChequeNumber() == null ? "" : " - Cheque: " + request.getChequeNumber()));
+                + (request.getChequeNumber() == null ? "" : " - Cheque: " + request.getChequeNumber())
+                + (request.getChequeHolderName() == null || request.getChequeHolderName().isBlank() ? "" : " (" + request.getChequeHolderName() + ")"));
         cardTransaction.setBalanceAfter(cardBalanceAfter);
         transactionRepository.save(cardTransaction);
 
@@ -448,6 +520,17 @@ public class CreditCardService {
         result.put("debitAccountNumber", debitAccountNumber);
         result.put("cheque", resolvedCheque != null ? resolvedCheque.status : null);
         return result;
+    }
+
+    public Double getAccountBalance(String accountNumber) {
+        if (accountNumber == null) return null;
+        Account savingsAcc = accountService.getAccountByNumber(accountNumber);
+        if (savingsAcc != null) return savingsAcc.getBalance();
+        CurrentAccount cur = currentAccountRepository.findByAccountNumber(accountNumber).orElse(null);
+        if (cur != null) return cur.getBalance();
+        SalaryAccount sal = salaryAccountRepository.findByAccountNumber(accountNumber);
+        if (sal != null) return sal.getBalance();
+        return null;
     }
 
     /** Debits an account for a credit-card bill payment across savings, current, and salary accounts. */
@@ -488,33 +571,30 @@ public class CreditCardService {
             result.put("message", "Cheque number not found");
             return result;
         }
-        boolean ownerMatches = debitAccountNumber != null && debitAccountNumber.trim().equals(resolved.accountNumber);
-        boolean valid = resolved.usable && ownerMatches;
+        boolean ownerMatches = debitAccountNumber == null || debitAccountNumber.isBlank()
+                || debitAccountNumber.trim().equals(resolved.accountNumber);
+        boolean valid = resolved.usable;
         result.put("valid", valid);
         result.put("chequeNumber", chequeNumber);
         result.put("accountNumber", resolved.accountNumber);
         result.put("accountHolderName", resolved.accountHolderName);
         result.put("status", resolved.status);
+        result.put("adminDrawn", resolved.adminDrawn);
+        result.put("drawnBy", resolved.drawnBy);
         result.put("source", resolved.source);
         result.put("ownerMatches", ownerMatches);
         Double availableBalance = null;
         if (resolved.accountNumber != null) {
-            Account savingsAcc = accountService.getAccountByNumber(resolved.accountNumber);
-            if (savingsAcc != null) {
-                availableBalance = savingsAcc.getBalance();
-            } else {
-                CurrentAccount cur = currentAccountRepository.findByAccountNumber(resolved.accountNumber).orElse(null);
-                if (cur != null) availableBalance = cur.getBalance();
-                else {
-                    SalaryAccount sal = salaryAccountRepository.findByAccountNumber(resolved.accountNumber);
-                    if (sal != null) availableBalance = sal.getBalance();
-                }
-            }
+            availableBalance = getAccountBalance(resolved.accountNumber);
         }
         result.put("availableBalance", availableBalance != null ? availableBalance : 0.0);
-        if (!ownerMatches) result.put("message", "This cheque belongs to another account");
-        else if (!resolved.usable) result.put("message", "Cheque is already used or unavailable. Status: " + resolved.status);
-        else result.put("message", "Cheque is valid and unused");
+        if (!resolved.usable) {
+            result.put("message", "Cheque is already used or unavailable. Status: " + resolved.status);
+        } else if (resolved.adminDrawn) {
+            result.put("message", "Cheque is admin-drawn and available for bill payment");
+        } else {
+            result.put("message", "Cheque is valid and ready for admin payment");
+        }
         return result;
     }
 

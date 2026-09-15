@@ -223,6 +223,26 @@ public class BusinessChequeController {
         }
     }
 
+    @RequestMapping(value = "/draw/admin/{id}/revert", method = {RequestMethod.POST, RequestMethod.PUT})
+    public ResponseEntity<Map<String, Object>> revertChequeDrawRequest(
+            @PathVariable Long id,
+            @RequestBody(required = false) Map<String, Object> request,
+            @RequestHeader(value = "X-Admin-Email", required = false) String adminEmail) {
+        try {
+            if (adminEmail == null && request != null) {
+                adminEmail = (String) request.getOrDefault("adminEmail", "admin@neobank.com");
+            }
+            if (adminEmail == null) adminEmail = "admin@neobank.com";
+            String reason = request != null ? (String) request.getOrDefault("reason", "Admin mistake - Reverted within 24 hours") : "Admin mistake";
+
+            return ResponseEntity.ok(businessChequeDrawService.revertChequeDrawRequest(id, adminEmail, reason));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(
+                    Map.of("error", true, "message", e.getMessage())
+            );
+        }
+    }
+
     @PostMapping("/draw/admin/{id}/clear")
     public ResponseEntity<Map<String, Object>> clearCheque(
             @PathVariable Long id,
