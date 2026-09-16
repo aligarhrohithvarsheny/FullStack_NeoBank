@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 import java.util.ArrayList;
@@ -342,8 +343,8 @@ public class GoldLoanService {
         Double oldAmount = goldLoan.getLoanAmount();
 
         if (updates.containsKey("loanAmount") && updates.get("loanAmount") != null) {
-            Double newAmount = Double.valueOf(updates.get("loanAmount").toString());
-            if (newAmount > 0 && !newAmount.equals(goldLoan.getLoanAmount())) {
+            Double newAmount = toDouble(updates.get("loanAmount"));
+            if (newAmount != null && newAmount > 0 && !newAmount.equals(goldLoan.getLoanAmount())) {
                 changes.append("Loan Amount: ₹").append(goldLoan.getLoanAmount())
                        .append(" → ₹").append(newAmount).append("; ");
                 goldLoan.setLoanAmount(newAmount);
@@ -372,8 +373,8 @@ public class GoldLoanService {
             }
         }
         if (updates.containsKey("verifiedGoldGrams") && updates.get("verifiedGoldGrams") != null) {
-            Double grams = Double.valueOf(updates.get("verifiedGoldGrams").toString());
-            if (grams > 0 && !grams.equals(goldLoan.getVerifiedGoldGrams())) {
+            Double grams = toDouble(updates.get("verifiedGoldGrams"));
+            if (grams != null && grams > 0 && !grams.equals(goldLoan.getVerifiedGoldGrams())) {
                 changes.append("Verified Weight: ").append(goldLoan.getVerifiedGoldGrams())
                        .append("g → ").append(grams).append("g; ");
                 goldLoan.setVerifiedGoldGrams(grams);
@@ -397,38 +398,35 @@ public class GoldLoanService {
             }
         }
         if (updates.containsKey("interestRate") && updates.get("interestRate") != null) {
-            Double rate = Double.valueOf(updates.get("interestRate").toString());
-            if (rate > 0 && !rate.equals(goldLoan.getInterestRate())) {
+            Double rate = toDouble(updates.get("interestRate"));
+            if (rate != null && rate > 0 && !rate.equals(goldLoan.getInterestRate())) {
                 changes.append("Interest Rate: ").append(goldLoan.getInterestRate())
                        .append("% → ").append(rate).append("%; ");
                 goldLoan.setInterestRate(rate);
             }
         }
         if (updates.containsKey("tenure") && updates.get("tenure") != null) {
-            Integer tenure = Integer.valueOf(updates.get("tenure").toString());
-            if (tenure > 0 && !tenure.equals(goldLoan.getTenure())) {
+            Integer tenure = toInteger(updates.get("tenure"));
+            if (tenure != null && tenure > 0 && !tenure.equals(goldLoan.getTenure())) {
                 changes.append("Tenure: ").append(goldLoan.getTenure())
                        .append(" → ").append(tenure).append(" months; ");
                 goldLoan.setTenure(tenure);
             }
         }
         if (updates.containsKey("processingCharges") && updates.get("processingCharges") != null) {
-            Double charges = Double.valueOf(updates.get("processingCharges").toString());
-            if (charges >= 0 && !charges.equals(goldLoan.getProcessingCharges())) {
+            Double charges = toDouble(updates.get("processingCharges"));
+            if (charges != null && charges >= 0 && !charges.equals(goldLoan.getProcessingCharges())) {
                 changes.append("Processing Charges: ₹").append(goldLoan.getProcessingCharges())
                        .append(" → ₹").append(charges).append("; ");
                 goldLoan.setProcessingCharges(charges);
             }
         }
         if (updates.containsKey("approvalDate") && updates.get("approvalDate") != null) {
-            try {
-                String raw = updates.get("approvalDate").toString().trim();
-                LocalDateTime approveTime = LocalDateTime.parse(raw);
+            LocalDateTime approveTime = parseDateTime(updates.get("approvalDate"));
+            if (approveTime != null) {
                 changes.append("Approve Time: ").append(goldLoan.getApprovalDate())
                        .append(" → ").append(approveTime).append("; ");
                 goldLoan.setApprovalDate(approveTime);
-            } catch (Exception e) {
-                System.err.println("⚠️ Invalid approvalDate format for gold loan edit: " + e.getMessage());
             }
         }
 
@@ -455,7 +453,8 @@ public class GoldLoanService {
 
         int additionalTenure = 0;
         if (renewalData != null && renewalData.get("additionalTenure") != null) {
-            additionalTenure = Integer.parseInt(renewalData.get("additionalTenure").toString());
+            Integer parsedTenure = toInteger(renewalData.get("additionalTenure"));
+            additionalTenure = parsedTenure != null ? parsedTenure : 0;
         }
         if (additionalTenure <= 0) {
             throw new RuntimeException("Additional tenure must be at least 1 month");
@@ -470,7 +469,8 @@ public class GoldLoanService {
                .append(goldLoan.getTenure()).append(" months (+").append(additionalTenure).append("); ");
 
         if (renewalData.get("interestRate") != null) {
-            Double newRate = Double.valueOf(renewalData.get("interestRate").toString());
+            Double newRate = toDouble(renewalData.get("interestRate"));
+            if (newRate == null) newRate = 0.0;
             if (newRate > 0 && !newRate.equals(goldLoan.getInterestRate())) {
                 details.append("Interest Rate: ").append(goldLoan.getInterestRate())
                        .append("% → ").append(newRate).append("%; ");
@@ -480,7 +480,8 @@ public class GoldLoanService {
 
         Double renewalCharge = 0.0;
         if (renewalData.get("processingCharges") != null) {
-            renewalCharge = Double.valueOf(renewalData.get("processingCharges").toString());
+            Double parsedCharge = toDouble(renewalData.get("processingCharges"));
+            renewalCharge = parsedCharge != null ? parsedCharge : 0.0;
             if (renewalCharge > 0) {
                 Double existing = goldLoan.getProcessingCharges() != null ? goldLoan.getProcessingCharges() : 0.0;
                 goldLoan.setProcessingCharges(existing + renewalCharge);
@@ -868,6 +869,52 @@ public class GoldLoanService {
             return goldLoanRepository.save(goldLoan);
         }
         return null;
+    }
+
+    private static Double toDouble(Object value) {
+        if (value == null) return null;
+        if (value instanceof Number) return ((Number) value).doubleValue();
+        try {
+            String text = value.toString().trim();
+            if (text.isEmpty()) return null;
+            return Double.parseDouble(text);
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    private static Integer toInteger(Object value) {
+        Double parsed = toDouble(value);
+        return parsed == null ? null : parsed.intValue();
+    }
+
+    private static LocalDateTime parseDateTime(Object value) {
+        if (value == null) return null;
+        String raw = value.toString().trim();
+        if (raw.isEmpty()) return null;
+        String[] patterns = {
+            "yyyy-MM-dd'T'HH:mm:ss.SSS",
+            "yyyy-MM-dd'T'HH:mm:ss",
+            "yyyy-MM-dd'T'HH:mm",
+            "yyyy-MM-dd HH:mm:ss",
+            "yyyy-MM-dd HH:mm",
+            "yyyy-MM-dd"
+        };
+        for (String pattern : patterns) {
+            try {
+                if ("yyyy-MM-dd".equals(pattern)) {
+                    return LocalDate.parse(raw, DateTimeFormatter.ofPattern(pattern)).atStartOfDay();
+                }
+                return LocalDateTime.parse(raw, DateTimeFormatter.ofPattern(pattern));
+            } catch (Exception ignored) {
+            }
+        }
+        try {
+            return LocalDateTime.parse(raw);
+        } catch (Exception e) {
+            System.err.println("⚠️ Invalid approvalDate format for gold loan edit: " + e.getMessage());
+            return null;
+        }
     }
 }
 

@@ -483,15 +483,20 @@ public class GoldLoanController {
     }
 
     // Admin edit: update loan amount, gold details, approve time, processing charges (saved in history)
-    @PutMapping("/{id}/admin-edit")
+    // PUT and POST both supported — some hosts reject PUT and return 404.
+    @RequestMapping(value = {"/{id}/admin-edit", "/admin/{id}/edit"}, method = {RequestMethod.PUT, RequestMethod.POST})
     public ResponseEntity<Map<String, Object>> adminEditGoldLoan(
             @PathVariable Long id,
-            @RequestParam(required = false, defaultValue = "Admin") String changedBy,
-            @RequestBody Map<String, Object> updates) {
+            @RequestParam(required = false) String changedBy,
+            @RequestBody(required = false) Map<String, Object> updates) {
 
         Map<String, Object> response = new HashMap<>();
         try {
-            GoldLoan updated = goldLoanService.adminUpdateGoldLoan(id, updates, changedBy);
+            if (updates == null) {
+                updates = new HashMap<>();
+            }
+            String actor = firstNonBlank(changedBy, stringVal(updates.get("changedBy")), "Admin");
+            GoldLoan updated = goldLoanService.adminUpdateGoldLoan(id, updates, actor);
             if (updated != null) {
                 response.put("success", true);
                 response.put("message", "Gold loan updated successfully");
@@ -500,7 +505,7 @@ public class GoldLoanController {
             }
             response.put("success", false);
             response.put("message", "Gold loan not found");
-            return ResponseEntity.notFound().build();
+            return ResponseEntity.status(404).body(response);
         } catch (Exception e) {
             response.put("success", false);
             response.put("message", "Failed to update gold loan: " + e.getMessage());
@@ -509,15 +514,24 @@ public class GoldLoanController {
     }
 
     // Renew gold loan: extend tenure, add processing charges, regenerate EMI schedule (saved in history)
-    @PostMapping("/{id}/renew")
+    @RequestMapping(value = {"/{id}/renew", "/admin/{id}/renew"}, method = {RequestMethod.POST, RequestMethod.PUT})
     public ResponseEntity<Map<String, Object>> renewGoldLoan(
             @PathVariable Long id,
-            @RequestParam(required = false, defaultValue = "Admin") String renewedBy,
-            @RequestBody Map<String, Object> renewalData) {
+            @RequestParam(required = false) String renewedBy,
+            @RequestBody(required = false) Map<String, Object> renewalData) {
 
         Map<String, Object> response = new HashMap<>();
         try {
-            GoldLoan renewed = goldLoanService.renewGoldLoan(id, renewalData, renewedBy);
+            if (renewalData == null) {
+                renewalData = new HashMap<>();
+            }
+            String actor = firstNonBlank(renewedBy, stringVal(renewalData.get("renewedBy")), "Admin");
+            GoldLoan renewed = goldLoanService.renewGoldLoan(id, renewalData, actor);
+            if (renewed == null) {
+                response.put("success", false);
+                response.put("message", "Gold loan not found");
+                return ResponseEntity.status(404).body(response);
+            }
 
             // Apply renewal processing charges: debit user, credit NeoBank A/C
             Double processingCharges = 0.0;
@@ -608,6 +622,18 @@ public class GoldLoanController {
     public ResponseEntity<List<com.neo.springapp.model.EmiPayment>> getEmiSchedule(@PathVariable String loanAccountNumber) {
         List<com.neo.springapp.model.EmiPayment> schedule = goldLoanService.getEmiSchedule(loanAccountNumber);
         return ResponseEntity.ok(schedule);
+    }
+
+    private static String stringVal(Object value) {
+        return value == null ? null : value.toString().trim();
+    }
+
+    private static String firstNonBlank(String... values) {
+        if (values == null) return "";
+        for (String value : values) {
+            if (value != null && !value.isBlank()) return value.trim();
+        }
+        return "";
     }
 }
 
