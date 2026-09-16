@@ -1,13 +1,17 @@
 import { TestBed } from '@angular/core/testing';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 
-import { Transfer } from './transfer';
+import { TransferService } from './transfer';
 
-describe('Transfer', () => {
-  let service: Transfer;
+describe('TransferService', () => {
+  let service: TransferService;
 
   beforeEach(() => {
-    TestBed.configureTestingModule({});
-    service = TestBed.inject(Transfer);
+    TestBed.configureTestingModule({
+      providers: [provideHttpClient(), provideHttpClientTesting()]
+    });
+    service = TestBed.inject(TransferService);
   });
 
   it('should be created', () => {

@@ -333,6 +333,20 @@ export class ManagerDashboard implements OnInit, OnDestroy {
   salaryTransactions: SalaryTransaction[] = [];
   newSalaryAccount: SalaryAccount = this.getEmptySalaryAccount();
 
+  // Aadhaar Auto-Fetch
+  isSalaryAadharLoading: boolean = false;
+  salaryAadharSuccess: boolean = false;
+  salaryAadharMessage: string = '';
+  lastLookedUpSalaryAadhar: string = '';
+
+  // Signed Document Upload & Audit History
+  selectedSalaryDocName: string = '';
+  selectedSalaryDocSize: string = '';
+  selectedSalaryDocType: string = '';
+  selectedSalaryDocBase64: string = '';
+  salaryDocUploadError: string = '';
+  isUploadingSalaryDoc: boolean = false;
+
   // ─── Close Account ──────────────────────────────────────
   closingAccount: SalaryAccount | null = null;
   closeAccountPreCheck: any = null;
@@ -3161,18 +3175,119 @@ export class ManagerDashboard implements OnInit, OnDestroy {
     });
   }
 
+  onSalaryAadharInput(): void {
+    const aadhar = (this.newSalaryAccount.aadharNumber || '').trim();
+    if (aadhar.length === 12 && aadhar !== this.lastLookedUpSalaryAadhar && /^\d{12}$/.test(aadhar)) {
+      this.isSalaryAadharLoading = true;
+      this.salaryAadharMessage = 'Fetching customer details for Aadhaar...';
+      this.salaryAadharSuccess = false;
+      this.http.get<any>(`${environment.apiBaseUrl}/api/preloaded-customer-data/lookup/aadhar/${aadhar}`).subscribe({
+        next: (res) => {
+          this.isSalaryAadharLoading = false;
+          const data = res?.data || res;
+          if (data && (data.fullName || data.employeeName || data.name || data.panNumber)) {
+            this.lastLookedUpSalaryAadhar = aadhar;
+            this.salaryAadharSuccess = true;
+            this.salaryAadharMessage = 'Customer details auto-filled from Aadhaar!';
+            if (data.fullName || data.employeeName || data.name) {
+              this.newSalaryAccount.employeeName = data.fullName || data.employeeName || data.name;
+            }
+            if (data.dob) this.newSalaryAccount.dob = data.dob;
+            if (data.phoneNumber || data.mobileNumber) this.newSalaryAccount.mobileNumber = data.phoneNumber || data.mobileNumber;
+            if (data.email) this.newSalaryAccount.email = data.email;
+            if (data.panNumber) this.newSalaryAccount.panNumber = data.panNumber;
+            if (data.companyName) this.newSalaryAccount.companyName = data.companyName;
+            if (data.companyId) this.newSalaryAccount.companyId = data.companyId;
+            if (data.employerAddress || data.address) this.newSalaryAccount.employerAddress = data.employerAddress || data.address;
+            if (data.hrContactNumber) this.newSalaryAccount.hrContactNumber = data.hrContactNumber;
+            if (data.monthlySalary) this.newSalaryAccount.monthlySalary = Number(data.monthlySalary);
+            if (data.salaryCreditDate) this.newSalaryAccount.salaryCreditDate = Number(data.salaryCreditDate);
+            if (data.designation) this.newSalaryAccount.designation = data.designation;
+            if (data.branchName) this.newSalaryAccount.branchName = data.branchName;
+            if (data.ifscCode) this.newSalaryAccount.ifscCode = data.ifscCode;
+            this.alertService.success('Aadhaar Auto-Fetch', 'Customer data populated from Aadhaar records');
+          } else {
+            this.salaryAadharSuccess = false;
+            this.salaryAadharMessage = 'No pre-existing records found for this Aadhaar. Enter manually.';
+          }
+        },
+        error: () => {
+          this.isSalaryAadharLoading = false;
+          this.salaryAadharSuccess = false;
+          this.salaryAadharMessage = 'No pre-existing records found for this Aadhaar. Enter manually.';
+        }
+      });
+    } else if (aadhar.length < 12) {
+      this.salaryAadharSuccess = false;
+      this.salaryAadharMessage = '';
+      this.lastLookedUpSalaryAadhar = '';
+    }
+  }
+
+  onSalarySignedDocSelected(event: any): void {
+    const file = event.target?.files?.[0];
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      this.salaryDocUploadError = 'File size exceeds 10MB limit.';
+      return;
+    }
+    this.salaryDocUploadError = '';
+    this.selectedSalaryDocName = file.name;
+    this.selectedSalaryDocType = file.type || 'application/octet-stream';
+    this.selectedSalaryDocSize = (file.size / 1024).toFixed(1) + ' KB';
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      this.selectedSalaryDocBase64 = reader.result as string;
+      this.newSalaryAccount.signedDocumentName = this.selectedSalaryDocName;
+      this.newSalaryAccount.signedDocumentType = this.selectedSalaryDocType;
+      this.newSalaryAccount.signedDocumentData = this.selectedSalaryDocBase64;
+      this.newSalaryAccount.signatureCopyPath = this.selectedSalaryDocName;
+    };
+    reader.onerror = () => {
+      this.salaryDocUploadError = 'Failed to read document file.';
+    };
+    reader.readAsDataURL(file);
+  }
+
+  clearSalaryDoc(): void {
+    this.selectedSalaryDocName = '';
+    this.selectedSalaryDocSize = '';
+    this.selectedSalaryDocType = '';
+    this.selectedSalaryDocBase64 = '';
+    this.salaryDocUploadError = '';
+    if (this.newSalaryAccount) {
+      this.newSalaryAccount.signedDocumentName = undefined;
+      this.newSalaryAccount.signedDocumentType = undefined;
+      this.newSalaryAccount.signedDocumentData = undefined;
+      this.newSalaryAccount.signatureCopyPath = undefined;
+    }
+  }
+
   createSalaryAccount(): void {
     if (!this.newSalaryAccount.employeeName) {
       this.alertService.error('Validation', 'Employee Name is required');
       return;
     }
     this.isCreatingSalaryAccount = true;
+    if (this.selectedSalaryDocBase64) {
+      this.newSalaryAccount.signedDocumentName = this.selectedSalaryDocName;
+      this.newSalaryAccount.signedDocumentType = this.selectedSalaryDocType;
+      this.newSalaryAccount.signedDocumentData = this.selectedSalaryDocBase64;
+      this.newSalaryAccount.signatureCopyPath = this.selectedSalaryDocName;
+      this.newSalaryAccount.signedDocumentUploadedBy = this.managerName;
+    }
     this.salaryAccountService.createAccount(this.newSalaryAccount).subscribe({
       next: (res) => {
         this.alertService.success('Account Created',
           'Salary account created successfully.\nAccount No: ' + (res.account?.accountNumber || '') +
+          'Salary account created successfully with audit history.\nAccount No: ' + (res.account?.accountNumber || '') +
           '\nCustomer ID: ' + (res.account?.customerId || ''));
         this.newSalaryAccount = this.getEmptySalaryAccount();
+        this.clearSalaryDoc();
+        this.salaryAadharSuccess = false;
+        this.salaryAadharMessage = '';
+        this.lastLookedUpSalaryAadhar = '';
         this.showSalaryForm = false;
         this.isCreatingSalaryAccount = false;
         this.loadSalaryAccounts();
@@ -3183,6 +3298,56 @@ export class ManagerDashboard implements OnInit, OnDestroy {
         this.isCreatingSalaryAccount = false;
       }
     });
+  }
+
+  downloadSalarySignedDocument(acc: SalaryAccount): void {
+    if (!acc.signedDocumentData) {
+      this.alertService.error('No Document', 'No signed document is attached to this account.');
+      return;
+    }
+    const dataUrl = acc.signedDocumentData;
+    const link = document.createElement('a');
+    link.href = dataUrl;
+    link.download = acc.signedDocumentName || `Signed_Doc_${acc.accountNumber}.pdf`;
+    link.target = '_blank';
+    link.click();
+  }
+
+  uploadSalarySignedDocForAccount(acc: SalaryAccount, event: any): void {
+    const file = event.target?.files?.[0];
+    if (!file || !acc.id) return;
+    if (file.size > 10 * 1024 * 1024) {
+      this.alertService.error('File Too Large', 'Maximum file size is 10MB.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64 = reader.result as string;
+      this.salaryAccountService.uploadSignedDocument(acc.id!, {
+        fileName: file.name,
+        fileType: file.type || 'application/octet-stream',
+        base64Data: base64,
+        uploadedBy: this.managerName
+      }).subscribe({
+        next: (res) => {
+          this.alertService.success('Uploaded', 'Signed document uploaded and saved to audit history');
+          if (res.account) {
+            this.selectedSalaryAccount = res.account;
+            const idx = this.salaryAccounts.findIndex(a => a.id === acc.id);
+            if (idx >= 0) this.salaryAccounts[idx] = res.account;
+            this.filterSalaryAccounts();
+          }
+          // Reload history
+          this.salaryAccountService.getEditHistory(acc.id!).subscribe({
+            next: (h) => { this.salaryEditHistory = h || []; }
+          });
+        },
+        error: (err) => {
+          this.alertService.error('Upload Failed', err?.error?.message || 'Unable to upload document');
+        }
+      });
+    };
+    reader.readAsDataURL(file);
   }
 
   viewSalaryAccountDetails(acc: SalaryAccount): void {

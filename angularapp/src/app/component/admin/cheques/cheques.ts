@@ -58,7 +58,7 @@ export class AdminCheques implements OnInit {
   approving: boolean = false;
   rejecting: boolean = false;
   rejectReason: string = '';
-  
+
   // Reject modal
   showRejectModal: boolean = false;
 
@@ -463,6 +463,45 @@ export class AdminCheques implements OnInit {
   canDrawCheque(cheque: ChequeModel): boolean {
     // A cheque can be drawn if it's active and approved
     return cheque.status === 'ACTIVE' && cheque.requestStatus === 'APPROVED';
+  }
+
+  reverting: boolean = false;
+
+  canRevertCheque(cheque: ChequeModel): boolean {
+    if (cheque.status !== 'DRAWN' && cheque.requestStatus !== 'APPROVED') return false;
+    const actionDate = cheque.drawnDate || cheque.approvedDate;
+    if (!actionDate) return true;
+    const actionTime = new Date(actionDate).getTime();
+    const now = new Date().getTime();
+    const diffHours = (now - actionTime) / (1000 * 60 * 60);
+    return diffHours <= 24;
+  }
+
+  revertCheque(cheque: ChequeModel) {
+    if (!cheque.chequeNumber) return;
+    if (!confirm(`Are you sure you want to revert cheque #${cheque.chequeNumber}? The amount ₹${cheque.amount || 0} will be credited back in real-time.`)) {
+      return;
+    }
+    this.reverting = true;
+    this.http.post(`${environment.apiBaseUrl}/api/cheques/admin/revert`, {
+      chequeNumber: cheque.chequeNumber,
+      revertedBy: 'Admin',
+      reason: 'Admin mistake - Reverted within 24h'
+    }).subscribe({
+      next: (res: any) => {
+        this.reverting = false;
+        this.alertService.success('Cheque Reverted', res.message || 'Cheque reverted and amount credited back successfully.');
+        if (this.viewMode === 'PENDING') {
+          this.loadPendingRequests();
+        } else {
+          this.loadAllCheques();
+        }
+      },
+      error: (err: any) => {
+        this.reverting = false;
+        this.alertService.error('Revert Failed', err.error?.message || err.error?.error || 'Failed to revert cheque');
+      }
+    });
   }
 
   navigateToDashboard() {

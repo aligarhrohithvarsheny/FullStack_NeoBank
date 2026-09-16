@@ -44,6 +44,13 @@ export interface SalaryAccount {
   closedAt?: string;
   closedReason?: string;
   closedBy?: string;
+  signedDocumentName?: string;
+  signedDocumentType?: string;
+  signedDocumentData?: string;
+  signedDocumentUploadedAt?: string;
+  signedDocumentUploadedBy?: string;
+  signatureCopyPath?: string;
+  signatureUploadedAt?: string;
   createdAt?: string;
   updatedAt?: string;
 }

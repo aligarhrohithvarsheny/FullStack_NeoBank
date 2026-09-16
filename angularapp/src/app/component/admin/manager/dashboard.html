@@ -1985,6 +1985,17 @@
             </div>
             <div class="sal-field-row">
               <div class="sal-field"><label>Aadhaar Number</label><input type="text" [(ngModel)]="newSalaryAccount.aadharNumber" placeholder="12-digit Aadhaar" maxlength="12" /></div>
+              <div class="sal-field">
+                <label>
+                  Aadhaar Number
+                  <span *ngIf="isSalaryAadharLoading" style="color:#0ea5e9; font-size:11px; margin-left:6px;"><i class="fa fa-spinner fa-spin"></i> Auto-fetching...</span>
+                  <span *ngIf="salaryAadharSuccess" style="color:#10b981; font-size:11px; margin-left:6px;"><i class="fa fa-check-circle"></i> Auto-filled</span>
+                </label>
+                <input type="text" [(ngModel)]="newSalaryAccount.aadharNumber" (input)="onSalaryAadharInput()" (blur)="onSalaryAadharInput()" placeholder="12-digit Aadhaar" maxlength="12" />
+                <div *ngIf="salaryAadharMessage" style="font-size:11px; margin-top:3px;" [style.color]="salaryAadharSuccess ? '#10b981' : '#f59e0b'">
+                  {{ salaryAadharMessage }}
+                </div>
+              </div>
               <div class="sal-field"><label>PAN Number</label><input type="text" [(ngModel)]="newSalaryAccount.panNumber" placeholder="ABCDE1234F" maxlength="10" /></div>
             </div>
           </div>
@@ -2025,6 +2036,33 @@
             <div class="sal-field-row">
               <div class="sal-field"><label>IFSC Code</label><input type="text" [(ngModel)]="newSalaryAccount.ifscCode" placeholder="e.g. EZYV0001234" /></div>
               <div class="sal-field"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Row 3: Upload Signed Document & Save Audit History -->
+        <div class="sal-form-block" style="margin-top: 16px; background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 8px; padding: 14px;">
+          <h5><i class="fa fa-file-signature"></i> Upload Signed Document / Agreement</h5>
+          <div class="sal-field-row">
+            <div class="sal-field" style="flex: 2;">
+              <label>Signed Application / Agreement Document (PDF / Image)</label>
+              <input type="file" (change)="onSalarySignedDocSelected($event)" accept=".pdf,image/*" />
+              <div *ngIf="selectedSalaryDocName" style="margin-top: 6px; font-size: 12px; color: #10b981; display: flex; align-items: center; gap: 8px;">
+                <i class="fa fa-paperclip"></i>
+                <span><strong>Attached:</strong> {{ selectedSalaryDocName }} ({{ selectedSalaryDocSize }})</span>
+                <button type="button" (click)="clearSalaryDoc()" style="background: none; border: none; color: #ef4444; cursor: pointer; padding: 0 4px;" title="Remove document">
+                  <i class="fa fa-times-circle"></i> Remove
+                </button>
+              </div>
+              <div *ngIf="salaryDocUploadError" style="margin-top: 4px; font-size: 11px; color: #ef4444;">
+                {{ salaryDocUploadError }}
+              </div>
+            </div>
+            <div class="sal-field" style="flex: 1;">
+              <label>Audit & Future History Purpose</label>
+              <div style="font-size: 12px; color: #475569; padding-top: 4px;">
+                <p style="margin: 0;"><i class="fa fa-shield-alt" style="color: #6366f1;"></i> Document is permanently stored with the account and logged into audit history for future compliance and reference.</p>
+              </div>
             </div>
           </div>
         </div>
@@ -2126,6 +2164,26 @@
             <div class="sal-detail-item"><strong>IFSC</strong><span>{{ selectedSalaryAccount.ifscCode || '-' }}</span></div>
             <div class="sal-detail-item"><strong>Status</strong>
               <span class="sal-badge" [ngClass]="{'sal-badge-green': selectedSalaryAccount.status==='Active', 'sal-badge-blue': selectedSalaryAccount.status==='Frozen', 'sal-badge-red': selectedSalaryAccount.status==='Closed'}">{{ selectedSalaryAccount.status }}</span>
+            </div>
+            <div class="sal-detail-item" *ngIf="selectedSalaryAccount.signedDocumentName">
+              <strong>Signed Document</strong>
+              <span style="display:flex; align-items:center; gap:8px;">
+                <i class="fa fa-file-pdf" style="color: #ef4444;"></i>
+                <span>{{ selectedSalaryAccount.signedDocumentName }}</span>
+                <button type="button" class="sal-btn sal-btn-outline" style="padding: 2px 8px; font-size: 11px;" (click)="downloadSalarySignedDocument(selectedSalaryAccount)">
+                  <i class="fa fa-download"></i> View / Download
+                </button>
+              </span>
+            </div>
+            <div class="sal-detail-item" *ngIf="!selectedSalaryAccount.signedDocumentName">
+              <strong>Signed Document</strong>
+              <span style="display:flex; align-items:center; gap:8px;">
+                <span style="color:#94a3b8; font-style:italic;">No document attached</span>
+                <label class="sal-btn sal-btn-outline" style="padding: 2px 8px; font-size: 11px; cursor: pointer; margin: 0;">
+                  <i class="fa fa-upload"></i> Upload
+                  <input type="file" style="display:none;" (change)="uploadSalarySignedDocForAccount(selectedSalaryAccount, $event)" accept=".pdf,image/*" />
+                </label>
+              </span>
             </div>
             <div class="sal-detail-item" *ngIf="selectedSalaryAccount.closedAt"><strong>Closed At</strong><span>{{ selectedSalaryAccount.closedAt | date:'medium' }}</span></div>
             <div class="sal-detail-item" *ngIf="selectedSalaryAccount.closedReason"><strong>Closure Reason</strong><span>{{ selectedSalaryAccount.closedReason }}</span></div>

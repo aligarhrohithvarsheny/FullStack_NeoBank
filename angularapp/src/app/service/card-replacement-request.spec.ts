@@ -1,13 +1,17 @@
 import { TestBed } from '@angular/core/testing';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 
-import { CardReplacementRequest } from './card-replacement-request';
+import { CardReplacementRequestService } from './card-replacement-request';
 
-describe('CardReplacementRequest', () => {
-  let service: CardReplacementRequest;
+describe('CardReplacementRequestService', () => {
+  let service: CardReplacementRequestService;
 
   beforeEach(() => {
-    TestBed.configureTestingModule({});
-    service = TestBed.inject(CardReplacementRequest);
+    TestBed.configureTestingModule({
+      providers: [provideHttpClient(), provideHttpClientTesting()]
+    });
+    service = TestBed.inject(CardReplacementRequestService);
   });
 
   it('should be created', () => {

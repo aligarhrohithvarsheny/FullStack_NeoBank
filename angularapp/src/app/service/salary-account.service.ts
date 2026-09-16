@@ -59,6 +59,10 @@ export class SalaryAccountService {
     return this.http.get<any[]>(`${this.apiUrl}/${accountId}/edit-history`);
   }
 
+  uploadSignedDocument(id: number, data: { fileName: string; fileType: string; base64Data: string; uploadedBy?: string }): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/${id}/upload-document`, data);
+  }
+
   freezeAccount(id: number): Observable<any> {
     return this.http.put<any>(`${this.apiUrl}/freeze/${id}`, {});
   }

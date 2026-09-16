@@ -455,6 +455,37 @@ export class BusinessChequeManagementComponent implements OnInit, OnDestroy {
     return colors[status.toLowerCase()] || '#6b7280';
   }
 
+  canRevertItem(item: any): boolean {
+    if (!item) return false;
+    const status = (item.status || '').toUpperCase();
+    if (status !== 'APPROVED' && status !== 'COMPLETED' && status !== 'CLEAR' && status !== 'DRAWN') return false;
+    const actionDate = item.approvedAt || item.updatedAt;
+    if (!actionDate) return true;
+    const actionTime = new Date(actionDate).getTime();
+    const now = new Date().getTime();
+    const diffHours = (now - actionTime) / (1000 * 60 * 60);
+    return diffHours <= 24;
+  }
+
+  revertChequeDraw(item: any) {
+    if (!item || !item.id) return;
+    if (!confirm(`Are you sure you want to revert business cheque draw #${item.chequeNumber}? The amount ₹${item.amount || 0} will be credited back in real-time.`)) {
+      return;
+    }
+    this.http.post(`${environment.apiBaseUrl}/api/business-cheques/draw/admin/${item.id}/revert`, {
+      adminEmail: 'Admin',
+      reason: 'Admin mistake - Reverted within 24h'
+    }).subscribe({
+      next: (res: any) => {
+        this.alertService.success('Cheque Reverted', res.message || 'Business cheque draw reverted and amount credited back successfully.');
+        this.loadCheques();
+      },
+      error: (err: any) => {
+        this.alertService.error('Revert Failed', err.error?.message || err.error?.error || 'Failed to revert business cheque draw');
+      }
+    });
+  }
+
   // ==================== Signature Verification ====================
 
   loadSignatureDocument(accountNumber: string | undefined) {

@@ -44,9 +44,9 @@
     <h3>Search Cheque by Number</h3>
     <div class="search-form">
       <div class="search-input-group">
-        <input 
-          type="text" 
-          [(ngModel)]="searchChequeNumber" 
+        <input
+          type="text"
+          [(ngModel)]="searchChequeNumber"
           placeholder="Enter cheque number"
           class="search-input"
           (keyup.enter)="searchCheque()"
@@ -62,8 +62,8 @@
       <div *ngIf="searchResults.length > 0" class="search-results">
         <h4>Search Results ({{ searchResults.length }} found)</h4>
         <div class="results-list">
-          <div 
-            *ngFor="let cheque of searchResults" 
+          <div
+            *ngFor="let cheque of searchResults"
             class="result-item"
           >
             <div class="cheque-info">
@@ -73,8 +73,8 @@
               <span class="status-badge" [ngClass]="getStatusClass(cheque.status)">
                 {{ cheque.status }}
               </span>
-              <span *ngIf="cheque.requestStatus && cheque.requestStatus !== 'NONE'" 
-                    class="status-badge request-badge" 
+              <span *ngIf="cheque.requestStatus && cheque.requestStatus !== 'NONE'"
+                    class="status-badge request-badge"
                     [ngClass]="getRequestStatusClass(cheque.requestStatus)">
                 {{ cheque.requestStatus }}
               </span>
@@ -101,43 +101,43 @@
   <div class="filter-section">
     <h3>{{ viewMode === 'REQUESTS' ? 'Cheque Requests' : 'All Cheques' }}</h3>
     <div class="filter-buttons">
-      <button 
-        type="button" 
+      <button
+        type="button"
         (click)="filterCheques('PENDING')"
         [class.active]="filterStatus === 'PENDING'"
         class="filter-btn pending-filter">
         Pending Requests
       </button>
-      <button 
-        type="button" 
+      <button
+        type="button"
         (click)="filterCheques('APPROVED')"
         [class.active]="filterStatus === 'APPROVED'"
         class="filter-btn approved-filter">
         Approved
       </button>
-      <button 
-        type="button" 
+      <button
+        type="button"
         (click)="filterCheques('REJECTED')"
         [class.active]="filterStatus === 'REJECTED'"
         class="filter-btn rejected-filter">
         Rejected
       </button>
-      <button 
-        type="button" 
+      <button
+        type="button"
         (click)="filterCheques('ALL')"
         [class.active]="filterStatus === 'ALL'"
         class="filter-btn">
         All Cheques
       </button>
-      <button 
-        type="button" 
+      <button
+        type="button"
         (click)="filterCheques('DRAWN')"
         [class.active]="filterStatus === 'DRAWN'"
         class="filter-btn">
         Drawn
       </button>
-      <button 
-        type="button" 
+      <button
+        type="button"
         (click)="filterCheques('BOUNCED')"
         [class.active]="filterStatus === 'BOUNCED'"
         class="filter-btn">
@@ -170,36 +170,46 @@
           <span class="status-badge" [ngClass]="getStatusClass(cheque.status)">
             {{ cheque.status }}
           </span>
-          <span *ngIf="cheque.requestStatus && cheque.requestStatus !== 'NONE'" 
-                class="status-badge request-badge" 
+          <span *ngIf="cheque.requestStatus && cheque.requestStatus !== 'NONE'"
+                class="status-badge request-badge"
                 [ngClass]="getRequestStatusClass(cheque.requestStatus)">
             {{ cheque.requestStatus }}
           </span>
         </div>
         <div class="cheque-actions">
-          <button 
+          <button
             *ngIf="cheque.accountNumber"
             type="button"
             (click)="viewSignature(cheque.accountNumber)"
             class="action-btn signature-btn">
             <i class="fa fa-file-signature"></i> Verify Signature
           </button>
-          <button 
+          <button
             *ngIf="canApproveRequest(cheque)"
-            type="button" 
+            type="button"
             (click)="approveChequeRequest(cheque)"
             [disabled]="approving"
             class="action-btn approve-btn">
             <span *ngIf="!approving">Approve & Draw</span>
             <span *ngIf="approving">Approving...</span>
           </button>
-          <button 
+          <button
             *ngIf="canRejectRequest(cheque)"
-            type="button" 
+            type="button"
             (click)="openRejectModal(cheque)"
             [disabled]="rejecting"
             class="action-btn reject-btn">
             Reject
+          </button>
+          <button
+            *ngIf="canRevertCheque(cheque)"
+            type="button"
+            (click)="revertCheque(cheque)"
+            [disabled]="reverting"
+            class="action-btn revert-btn"
+            title="Revert cheque drawing within 24 hours">
+            <span *ngIf="!reverting">🔄 Revert (24h)</span>
+            <span *ngIf="reverting">Reverting...</span>
           </button>
         </div>
       </div>
@@ -295,7 +305,7 @@
         <p>Are you sure you want to reject the cheque draw request for cheque #{{ selectedRequest.chequeNumber }}?</p>
         <div class="form-group">
           <label for="rejectReason">Rejection Reason <span class="required">*</span></label>
-          <textarea 
+          <textarea
             id="rejectReason"
             [(ngModel)]="rejectReason"
             name="rejectReason"
@@ -305,15 +315,15 @@
         </div>
       </div>
       <div class="modal-footer">
-        <button 
-          type="button" 
+        <button
+          type="button"
           (click)="closeRejectModal()"
           class="btn-cancel"
           [disabled]="rejecting">
           Cancel
         </button>
-        <button 
-          type="button" 
+        <button
+          type="button"
           (click)="rejectChequeRequest()"
           class="btn-confirm reject-confirm"
           [disabled]="rejecting || !rejectReason || rejectReason.trim().length === 0">
@@ -326,8 +336,8 @@
 
   <!-- Pagination -->
   <div *ngIf="!loading && !error && totalPages > 1" class="pagination">
-    <button 
-      type="button" 
+    <button
+      type="button"
       (click)="goToPage(currentPage - 1)"
       [disabled]="currentPage === 0"
       class="page-btn">
@@ -336,8 +346,8 @@
     <span class="page-info">
       Page {{ currentPage + 1 }} of {{ totalPages }} ({{ totalElements }} cheques)
     </span>
-    <button 
-      type="button" 
+    <button
+      type="button"
       (click)="goToPage(currentPage + 1)"
       [disabled]="currentPage >= totalPages - 1"
       class="page-btn">

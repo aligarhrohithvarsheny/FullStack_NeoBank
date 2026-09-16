@@ -265,7 +265,7 @@ export class ChequeManagementComponent implements OnInit, OnDestroy {
     ).subscribe({
       next: (response: ChequeApprovalResponse) => {
         this.isProcessing = false;
-        
+
         if (response.success) {
           this.alertService.success(
             'Success',
@@ -309,7 +309,7 @@ export class ChequeManagementComponent implements OnInit, OnDestroy {
     this.chequeService.rejectCheque(this.selectedCheque.id, this.rejectionReason).subscribe({
       next: (response: ChequeApprovalResponse) => {
         this.isProcessing = false;
-        
+
         if (response.success) {
           this.alertService.success(
             'Success',
@@ -534,6 +534,37 @@ export class ChequeManagementComponent implements OnInit, OnDestroy {
       'rejected': '#ef4444'
     };
     return colors[status.toLowerCase()] || '#6b7280';
+  }
+
+  canRevertItem(item: any): boolean {
+    if (!item) return false;
+    const status = (item.status || '').toUpperCase();
+    if (status !== 'APPROVED' && status !== 'COMPLETED' && status !== 'CLEAR' && status !== 'DRAWN') return false;
+    const actionDate = item.approvedAt || item.updatedAt;
+    if (!actionDate) return true;
+    const actionTime = new Date(actionDate).getTime();
+    const now = new Date().getTime();
+    const diffHours = (now - actionTime) / (1000 * 60 * 60);
+    return diffHours <= 24;
+  }
+
+  revertChequeDraw(item: any) {
+    if (!item || !item.id) return;
+    if (!confirm(`Are you sure you want to revert cheque draw #${item.chequeNumber}? The amount ₹${item.amount || 0} will be credited back to account in real-time.`)) {
+      return;
+    }
+    this.http.post(`${environment.apiBaseUrl}/api/cheques/draw/admin/${item.id}/revert`, {
+      adminEmail: 'Admin',
+      reason: 'Admin mistake - Reverted within 24h'
+    }).subscribe({
+      next: (res: any) => {
+        this.alertService.success('Cheque Reverted', res.message || 'Cheque draw reverted and amount credited back successfully.');
+        this.loadCheques();
+      },
+      error: (err: any) => {
+        this.alertService.error('Revert Failed', err.error?.message || err.error?.error || 'Failed to revert cheque draw');
+      }
+    });
   }
 
   // ==================== Signature Verification ====================

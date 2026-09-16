@@ -171,6 +171,15 @@
                 >
                   <i class="fas fa-check-double"></i>
                 </button>
+                <button
+                  *ngIf="canRevertItem(cheque)"
+                  class="btn-action revert"
+                  title="Revert Cheque Draw (24h)"
+                  (click)="revertChequeDraw(cheque)"
+                  style="background-color: #f97316; color: white;"
+                >
+                  <i class="fas fa-undo"></i>
+                </button>
               </div>
             </td>
           </tr>
