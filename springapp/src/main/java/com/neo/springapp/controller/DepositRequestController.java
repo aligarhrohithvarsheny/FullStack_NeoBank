@@ -41,6 +41,30 @@ public class DepositRequestController {
         }
     }
 
+    @PostMapping("/admin/create-and-approve")
+    public ResponseEntity<?> createAndApproveDirectDeposit(
+            @RequestBody DepositRequest request,
+            @RequestParam(required = false, defaultValue = "Admin") String adminEmail) {
+        try {
+            DepositRequest approved = depositRequestService.createAndApproveDirectDeposit(request, adminEmail);
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("request", approved);
+            response.put("message", "Deposit processed and amount ₹" + approved.getAmount() + " credited instantly (Deposit ID: " + approved.getRequestId() + ")");
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("message", ex.getMessage());
+            return ResponseEntity.badRequest().body(response);
+        } catch (Exception ex) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("message", "Failed to process deposit: " + ex.getMessage());
+            return ResponseEntity.internalServerError().body(response);
+        }
+    }
+
     @GetMapping
     public List<DepositRequest> getAllRequests(@RequestParam(required = false) String status) {
         return depositRequestService.getAll(status);

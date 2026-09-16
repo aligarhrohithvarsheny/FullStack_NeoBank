@@ -149,6 +149,9 @@ export interface DepositRequest {
   rejectionReason?: string;
   resultingBalance?: number;
   createdAt?: string;
+  transferType?: string;
+  sourceAccountNumber?: string;
+  sourceAccountName?: string;
   chequeValid?: boolean;
   chequeAccountNumber?: string;
   chequeAccountHolderName?: string;

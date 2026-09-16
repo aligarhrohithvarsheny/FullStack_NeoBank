@@ -51,9 +51,9 @@
       <div class="search-form hero-search">
         <div class="search-input-group">
           <i class="fa fa-search search-icon"></i>
-          <input 
-            type="text" 
-            [(ngModel)]="universalSearchQuery" 
+          <input
+            type="text"
+            [(ngModel)]="universalSearchQuery"
             placeholder="Search by any ID, number, name, PAN, Aadhaar, email, phone..."
             class="universal-search-input"
             (keyup.enter)="performUniversalSearch()"
@@ -81,7 +81,7 @@
     <div class="universal-search-results" *ngIf="universalSearchResults && universalSearchResults.totalCount > 0">
       <div class="results-summary">
         <h4>
-          <i class="fa fa-check-circle"></i> 
+          <i class="fa fa-check-circle"></i>
           Found {{ universalSearchResults.totalCount }} result(s) for "{{ universalSearchQuery }}"
         </h4>
         <div class="results-breakdown">
@@ -752,7 +752,7 @@
           </button>
         </div>
       </div>
-      
+
       <div class="modal-body">
         <!-- Personal Information -->
         <div class="details-section">
@@ -899,7 +899,7 @@
         <i class="fa fa-times"></i>
       </button>
     </div>
-    
+
     <!-- Direct Deposit/Withdrawal Form -->
     <div class="transaction-form-section">
       <div class="form-row">
@@ -914,7 +914,7 @@
             <option value="current">Current Account</option>
           </select>
         </div>
-        
+
         <div class="form-group">
           <label for="operationType">Operation</label>
           <select id="operationType" [(ngModel)]="operationType" class="form-select">
@@ -928,21 +928,21 @@
         <div class="form-group">
           <label for="accountNumber">Account Number <span class="required">*</span></label>
           <div class="account-verify-container">
-            <input 
+            <input
               id="accountNumber"
-              type="text" 
-              [(ngModel)]="accountNumber" 
+              type="text"
+              [(ngModel)]="accountNumber"
               (ngModelChange)="onAccountNumberChange()"
               (blur)="verifyAccountNumber()"
-              name="accountNumber" 
+              name="accountNumber"
               placeholder="Enter account number"
               class="form-input"
               [class.verified]="isAccountVerified"
               [class.error]="accountVerificationError"
               required>
-            <button 
-              type="button" 
-              class="verify-btn" 
+            <button
+              type="button"
+              class="verify-btn"
               (click)="verifyAccountNumber()"
               [disabled]="!accountNumber || isVerifyingAccount">
               <span *ngIf="!isVerifyingAccount">✓ Verify</span>
@@ -957,33 +957,33 @@
           </div>
         </div>
       </div>
-      
+
       <div class="form-row">
         <div class="form-group">
           <label for="amount">Amount (₹)</label>
-          <input 
-            type="number" 
-            id="amount" 
-            [(ngModel)]="amount" 
+          <input
+            type="number"
+            id="amount"
+            [(ngModel)]="amount"
             placeholder="Enter amount"
             min="1"
             max="1000000"
             class="form-input"
           >
         </div>
-        
+
         <div class="form-group">
           <label for="description">Description</label>
-          <input 
-            type="text" 
-            id="description" 
-            [(ngModel)]="description" 
+          <input
+            type="text"
+            id="description"
+            [(ngModel)]="description"
             placeholder="Enter transaction description"
             class="form-input"
           >
         </div>
       </div>
-      
+
       <!-- Verified Account Info -->
       <div class="selected-user-display" *ngIf="isAccountVerified && verifiedAccountDetails">
         <h4><i class="fa fa-user"></i> Verified Account Details</h4>
@@ -1012,12 +1012,12 @@
           </div>
         </div>
       </div>
-      
+
       <!-- Action Buttons -->
       <div class="form-actions">
-        <button 
-          type="button" 
-          class="btn-process" 
+        <button
+          type="button"
+          class="btn-process"
           [ngClass]="operationType === 'deposit' ? 'btn-deposit' : 'btn-withdrawal'"
           (click)="processDirectTransaction()"
           [disabled]="!isAccountVerified || amount <= 0 || !description.trim()"
@@ -1025,12 +1025,12 @@
           <i class="fa" [ngClass]="operationType === 'deposit' ? 'fa-plus' : 'fa-minus'"></i>
           {{ operationType === 'deposit' ? 'Deposit' : 'Withdraw' }} ₹{{ amount | number:'1.2-2' }}
         </button>
-        
+
         <button type="button" class="btn-clear" (click)="clearForm()">
           Clear Form
         </button>
       </div>
-      
+
       <!-- Success/Error Messages -->
       <div class="message success-message" *ngIf="successMessage">
         <i class="fa fa-check-circle"></i>
@@ -1043,26 +1043,40 @@
       </div>
     </div>
 
-    <!-- Pending Deposit Requests from users -->
+    <!-- Central Deposit Management Tab from Admin Side -->
     <div class="deposit-requests-admin">
       <div class="section-header">
-        <h4><i class="fa fa-inbox"></i> Deposit Requests</h4>
-        <div class="section-header-actions">
-          <input type="text" [(ngModel)]="depositSlipLookupId" placeholder="Enter slip ID" (keyup.enter)="lookupDepositSlip()" style="padding:8px 10px;border:1px solid #ced4da;border-radius:4px;" />
-          <button class="refresh-btn" (click)="lookupDepositSlip()" [disabled]="isLookingUpDepositSlip"><i class="fa fa-search"></i> Find Slip</button>
-          <input type="text" [(ngModel)]="chequeDepositNumber" placeholder="Cheque number" (keyup.enter)="verifyChequeForDeposit()" style="padding:8px 10px;border:1px solid #ced4da;border-radius:4px;" />
-          <button class="refresh-btn" (click)="verifyChequeForDeposit()" [disabled]="isVerifyingChequeDeposit"><i class="fa fa-check-circle"></i> Verify Cheque</button>
-          <button class="refresh-btn" (click)="loadDepositRequests()"><i class="fa fa-sync-alt"></i> Refresh</button>
+        <h4><i class="fa fa-piggy-bank"></i> Admin Deposit Management</h4>
+        <div class="section-header-actions" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+          <!-- Search Bar -->
+          <div style="position:relative;display:inline-block;">
+            <input type="text" [(ngModel)]="depositAdminSearchTerm" placeholder="🔍 Search Deposit ID, Account, Name, Cheque #..." style="padding:8px 12px;border:1px solid #ced4da;border-radius:6px;width:280px;font-size:13px;" />
+          </div>
+          <button class="btn-deposit" (click)="openDirectDepositModal()" style="background:#10b981;color:#fff;border:none;padding:8px 14px;border-radius:6px;cursor:pointer;font-weight:600;">
+            <i class="fa fa-plus-circle"></i> ➕ New Deposit
+          </button>
+          <button class="refresh-btn" (click)="loadDepositRequests(depositAdminFilter)"><i class="fa fa-sync-alt"></i> Refresh</button>
           <button class="close-btn" (click)="setActiveSection('home')">
             <i class="fa fa-times"></i>
           </button>
         </div>
       </div>
+
+      <!-- Quick Filter Pills -->
+      <div style="display:flex;gap:8px;margin:12px 0 18px 0;flex-wrap:wrap;">
+        <button type="button" (click)="loadDepositRequests('ALL')" [style.background]="depositAdminFilter === 'ALL' ? '#1e3a8a' : '#e2e8f0'" [style.color]="depositAdminFilter === 'ALL' ? '#fff' : '#334155'" style="border:none;padding:6px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;">All Deposits</button>
+        <button type="button" (click)="loadDepositRequests('PENDING')" [style.background]="depositAdminFilter === 'PENDING' ? '#f59e0b' : '#e2e8f0'" [style.color]="depositAdminFilter === 'PENDING' ? '#fff' : '#334155'" style="border:none;padding:6px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;">Pending Approval</button>
+        <button type="button" (click)="loadDepositRequests('APPROVED')" [style.background]="depositAdminFilter === 'APPROVED' ? '#10b981' : '#e2e8f0'" [style.color]="depositAdminFilter === 'APPROVED' ? '#fff' : '#334155'" style="border:none;padding:6px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;">Approved &amp; Credited</button>
+        <button type="button" (click)="loadDepositRequests('REJECTED')" [style.background]="depositAdminFilter === 'REJECTED' ? '#ef4444' : '#e2e8f0'" [style.color]="depositAdminFilter === 'REJECTED' ? '#fff' : '#334155'" style="border:none;padding:6px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;">Rejected</button>
+        <button type="button" (click)="depositAdminFilter = 'CASH'" [style.background]="depositAdminFilter === 'CASH' ? '#3b82f6' : '#e2e8f0'" [style.color]="depositAdminFilter === 'CASH' ? '#fff' : '#334155'" style="border:none;padding:6px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;">Cash Deposits</button>
+        <button type="button" (click)="depositAdminFilter = 'CHEQUE'" [style.background]="depositAdminFilter === 'CHEQUE' ? '#8b5cf6' : '#e2e8f0'" [style.color]="depositAdminFilter === 'CHEQUE' ? '#fff' : '#334155'" style="border:none;padding:6px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;">Cheque Deposits &amp; Transfers</button>
+      </div>
+
       <div *ngIf="chequeDepositDetails" class="deposit-card" style="margin:12px 0;border-left:4px solid #0d6efd;">
         <strong>Cheque Verification</strong>
         <span [style.color]="chequeDepositDetails.valid ? '#198754' : '#dc3545'">{{ chequeDepositDetails.message }}</span>
         <div style="display:flex;gap:18px;flex-wrap:wrap;margin-top:8px;font-size:13px;">
-          <span>Cheque: {{ chequeDepositDetails.chequeNumber || chequeDepositNumber }}</span>
+          <span>Cheque #: {{ chequeDepositDetails.chequeNumber || chequeDepositNumber }}</span>
           <span>Owner: {{ chequeDepositDetails.accountHolderName || 'N/A' }}</span>
           <span>Account: {{ chequeDepositDetails.accountNumber || 'N/A' }}</span>
           <span>Amount: ₹{{ chequeDepositDetails.amount || 0 | number:'1.2-2' }}</span>
@@ -1070,40 +1084,103 @@
           <span>Status: {{ chequeDepositDetails.status || 'NOT FOUND' }}</span>
         </div>
       </div>
-      <div *ngIf="isLoadingDepositRequests" class="loading-state">Loading deposit requests...</div>
-      <div *ngIf="!isLoadingDepositRequests && depositRequests.length === 0" class="empty-state">
-        No pending deposit requests.
+
+      <div *ngIf="isLoadingDepositRequests" class="loading-state">Loading deposits...</div>
+      <div *ngIf="!isLoadingDepositRequests && getFilteredDepositRequests().length === 0" class="empty-state">
+        No deposits found matching your search and filter criteria.
       </div>
-      <div class="deposit-request-grid" *ngIf="!isLoadingDepositRequests && depositRequests.length > 0">
-        <div class="deposit-card" *ngFor="let req of depositRequests">
+
+      <!-- Deposit Cards Grid -->
+      <div class="deposit-request-grid" *ngIf="!isLoadingDepositRequests && getFilteredDepositRequests().length > 0">
+        <div class="deposit-card" *ngFor="let req of getFilteredDepositRequests()">
           <div class="card-header">
             <div>
               <h4>₹{{ req.amount | number:'1.2-2' }} • {{ req.method }}</h4>
-              <p class="muted">From: {{ req.userName }} ({{ req.accountNumber }})</p>
-              <p class="muted"><strong>Slip ID: {{ req.requestId }}</strong></p>
-              <p class="muted">Ref: {{ req.referenceNumber || 'N/A' }}</p>
+              <p class="muted">Target Account: <strong>{{ req.userName }}</strong> ({{ req.accountNumber }})</p>
+              <p class="muted"><strong style="color:#1e3a8a;">Deposit ID: {{ req.requestId }}</strong></p>
+              <p class="muted" *ngIf="req.referenceNumber">Ref / Cheque #: {{ req.referenceNumber }}</p>
             </div>
-            <span class="status-badge">{{ req.status }}</span>
+            <span class="status-badge" [style.background]="req.status === 'APPROVED' ? '#dcfce7' : (req.status === 'REJECTED' ? '#fee2e2' : '#fef3c7')" [style.color]="req.status === 'APPROVED' ? '#166534' : (req.status === 'REJECTED' ? '#991b1b' : '#92400e')">{{ req.status }}</span>
           </div>
+
           <div class="card-body">
             <p><strong>Note:</strong> {{ req.note || 'N/A' }}</p>
-            <p><strong>Created:</strong> {{ req.createdAt | date:'dd/MM/yyyy, h:mm a' }}</p>
-            <div *ngIf="req.method === 'Cheque'" style="margin-top:10px;padding:10px;background:#f8f9fa;border-left:3px solid #0d6efd;">
-              <p><strong>Cheque verification:</strong> <span [style.color]="req.chequeValid ? '#198754' : '#dc3545'">{{ req.chequeValid ? 'Valid / owned by deposit account' : 'Used or unavailable' }}</span></p>
-              <p><strong>Cheque account:</strong> {{ req.chequeAccountNumber || 'N/A' }} · {{ req.chequeAccountHolderName || 'N/A' }}</p>
-              <p><strong>Cheque status:</strong> {{ req.chequeStatus || 'N/A' }}</p>
-              <p><strong>Account balance:</strong> ₹{{ req.chequeAvailableBalance || 0 | number:'1.2-2' }}</p>
+            <p><strong>Created Date:</strong> {{ req.createdAt | date:'dd/MM/yyyy, h:mm a' }}</p>
+            <p *ngIf="req.processedBy"><strong>Processed By:</strong> {{ req.processedBy }} ({{ req.processedAt | date:'dd/MM/yyyy, h:mm a' }})</p>
+
+            <!-- Cheque & Transfer Details -->
+            <div *ngIf="req.method === 'Cheque' || req.method === 'CHEQUE'" style="margin-top:10px;padding:10px;background:#f8fafc;border-left:3px solid #8b5cf6;border-radius:4px;">
+              <p><strong>Transfer Type:</strong>
+                <span *ngIf="req.transferType === 'OTHER'" style="color:#2563eb;font-weight:600;">🔄 Other Account Cheque Transfer</span>
+                <span *ngIf="req.transferType !== 'OTHER'" style="color:#16a34a;font-weight:600;">👤 Self Cheque Deposit</span>
+              </p>
+              <p *ngIf="req.sourceAccountNumber"><strong>Source Account:</strong> {{ req.sourceAccountName }} ({{ req.sourceAccountNumber }})</p>
+              <p><strong>Cheque Verification:</strong> <span [style.color]="req.chequeValid ? '#166534' : '#dc3545'">{{ req.chequeValid ? '✓ Valid Cheque (Available)' : '⚠️ Used, Drawn, or Invalid Cheque' }}</span></p>
+              <p *ngIf="req.chequeStatus"><strong>Cheque Status:</strong> {{ req.chequeStatus }}</p>
+              <p *ngIf="req.chequeAvailableBalance !== undefined"><strong>Source Balance:</strong> ₹{{ req.chequeAvailableBalance | number:'1.2-2' }}</p>
             </div>
           </div>
-          <div class="card-footer">
+
+          <div class="card-footer" *ngIf="req.status === 'PENDING'">
             <button class="btn-deposit" (click)="approveDepositRequest(req)">
-              <i class="fa fa-check"></i> Approve & Credit
+              <i class="fa fa-check"></i> Approve &amp; Credit
             </button>
             <button class="btn-withdrawal" (click)="rejectDepositRequest(req)">
               <i class="fa fa-times"></i> Reject
             </button>
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- Direct Admin Deposit Modal -->
+    <div class="modal-overlay" *ngIf="showDirectDepositModal" (click)="closeDirectDepositModal()">
+      <div class="modal-content" (click)="$event.stopPropagation()" style="max-width:520px;padding:24px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
+          <h3 style="margin:0;color:#1e3a8a;"><i class="fa fa-plus-circle"></i> New Admin Deposit</h3>
+          <button (click)="closeDirectDepositModal()" style="background:none;border:none;font-size:20px;cursor:pointer;">×</button>
+        </div>
+
+        <form (ngSubmit)="submitDirectDeposit()">
+          <div style="margin-bottom:14px;">
+            <label style="display:block;font-weight:600;font-size:13px;margin-bottom:6px;">Target Account Number <span style="color:red;">*</span></label>
+            <input type="text" [(ngModel)]="directDepositForm.accountNumber" name="dirAccNum" placeholder="e.g. ACC100200" required style="width:100%;padding:8px 12px;border:1px solid #cbd5e1;border-radius:6px;" />
+          </div>
+
+          <div style="margin-bottom:14px;">
+            <label style="display:block;font-weight:600;font-size:13px;margin-bottom:6px;">Deposit Amount (₹) <span style="color:red;">*</span></label>
+            <input type="number" [(ngModel)]="directDepositForm.amount" name="dirAmt" placeholder="e.g. 5000" min="1" required style="width:100%;padding:8px 12px;border:1px solid #cbd5e1;border-radius:6px;" />
+          </div>
+
+          <div style="margin-bottom:14px;">
+            <label style="display:block;font-weight:600;font-size:13px;margin-bottom:6px;">Deposit Method <span style="color:red;">*</span></label>
+            <select [(ngModel)]="directDepositForm.method" name="dirMethod" style="width:100%;padding:8px 12px;border:1px solid #cbd5e1;border-radius:6px;">
+              <option value="CASH">💵 Cash Deposit</option>
+              <option value="CHEQUE">📜 Cheque Deposit / Transfer</option>
+              <option value="UPI">📱 UPI Transfer</option>
+              <option value="BRANCH_DEPOSIT">🏦 Branch Deposit</option>
+            </select>
+          </div>
+
+          <div style="margin-bottom:14px;" *ngIf="directDepositForm.method === 'CHEQUE'">
+            <label style="display:block;font-weight:600;font-size:13px;margin-bottom:6px;">Cheque Number <span style="color:red;">*</span></label>
+            <input type="text" [(ngModel)]="directDepositForm.referenceNumber" name="dirRefNum" placeholder="e.g. CHQ1726488..." required style="width:100%;padding:8px 12px;border:1px solid #cbd5e1;border-radius:6px;" />
+            <small style="color:#64748b;font-size:11px;">Cheque number must exist and be active/not drawn in system.</small>
+          </div>
+
+          <div style="margin-bottom:18px;">
+            <label style="display:block;font-weight:600;font-size:13px;margin-bottom:6px;">Remarks / Note</label>
+            <input type="text" [(ngModel)]="directDepositForm.note" name="dirNote" placeholder="e.g. Cash deposit counter #1" style="width:100%;padding:8px 12px;border:1px solid #cbd5e1;border-radius:6px;" />
+          </div>
+
+          <div style="display:flex;justify-content:flex-end;gap:10px;">
+            <button type="button" (click)="closeDirectDepositModal()" style="padding:8px 16px;border:1px solid #cbd5e1;background:#fff;border-radius:6px;cursor:pointer;">Cancel</button>
+            <button type="submit" [disabled]="submittingDirectDeposit" style="padding:8px 20px;border:none;background:#10b981;color:#fff;border-radius:6px;font-weight:600;cursor:pointer;">
+              <span *ngIf="!submittingDirectDeposit">✓ Credit Deposit</span>
+              <span *ngIf="submittingDirectDeposit">Processing...</span>
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   </div>
@@ -1120,7 +1197,7 @@
           <i class="fa fa-times"></i>
         </button>
       </div>
-      
+
       <div class="receipt-body">
         <div class="receipt-section">
           <div class="receipt-field">
@@ -1173,7 +1250,7 @@
           </div>
         </div>
       </div>
-      
+
       <div class="receipt-footer">
         <button class="btn-print" (click)="printReceipt()">
           <i class="fa fa-print"></i> Print Receipt
@@ -1212,10 +1289,10 @@
         <form class="transaction-form">
           <div class="form-group">
             <label for="amount">Amount (₹)</label>
-            <input 
-              type="number" 
-              id="amount" 
-              [(ngModel)]="amount" 
+            <input
+              type="number"
+              id="amount"
+              [(ngModel)]="amount"
               placeholder="Enter amount"
               min="1"
               max="1000000"
@@ -1225,9 +1302,9 @@
 
           <div class="form-group">
             <label for="description">Description</label>
-            <textarea 
-              id="description" 
-              [(ngModel)]="description" 
+            <textarea
+              id="description"
+              [(ngModel)]="description"
               placeholder="Enter transaction description"
               class="form-textarea"
               rows="3"
@@ -1248,9 +1325,9 @@
             <button type="button" class="btn-cancel" (click)="closeDepositWithdrawal()">
               Cancel
             </button>
-            <button 
-              type="button" 
-              class="btn-confirm" 
+            <button
+              type="button"
+              class="btn-confirm"
               [ngClass]="operationType === 'deposit' ? 'btn-deposit' : 'btn-withdrawal'"
               (click)="processTransaction()"
               [disabled]="amount <= 0 || !description.trim()"
@@ -1298,7 +1375,7 @@
 
     <!-- Toggle Cards -->
     <div *ngIf="!isLoadingNetBankingStatus" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:24px;margin-bottom:32px;">
-      
+
       <!-- Savings Account Toggle Card -->
       <div style="background:linear-gradient(135deg,#fff 0%,#f8f9ff 100%);border-radius:16px;padding:28px;box-shadow:0 4px 20px rgba(0,0,0,0.08);border:1px solid #e8e8f0;transition:transform 0.2s;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
@@ -1315,8 +1392,8 @@
           </div>
           <!-- Toggle Switch -->
           <label style="position:relative;display:inline-block;width:56px;height:30px;cursor:pointer;">
-            <input type="checkbox" 
-                   [checked]="netBankingServices.SAVINGS_ACCOUNT.enabled" 
+            <input type="checkbox"
+                   [checked]="netBankingServices.SAVINGS_ACCOUNT.enabled"
                    (change)="toggleNetBanking('SAVINGS_ACCOUNT', !netBankingServices.SAVINGS_ACCOUNT.enabled)"
                    [disabled]="isTogglingNetBanking"
                    style="opacity:0;width:0;height:0;">
@@ -1355,8 +1432,8 @@
           </div>
           <!-- Toggle Switch -->
           <label style="position:relative;display:inline-block;width:56px;height:30px;cursor:pointer;">
-            <input type="checkbox" 
-                   [checked]="netBankingServices.CURRENT_ACCOUNT.enabled" 
+            <input type="checkbox"
+                   [checked]="netBankingServices.CURRENT_ACCOUNT.enabled"
                    (change)="toggleNetBanking('CURRENT_ACCOUNT', !netBankingServices.CURRENT_ACCOUNT.enabled)"
                    [disabled]="isTogglingNetBanking"
                    style="opacity:0;width:0;height:0;">
@@ -1404,12 +1481,12 @@
           </button>
         </div>
         <div style="display:flex;flex:1;min-width:250px;gap:8px;">
-          <input type="text" [(ngModel)]="netBankingCustomerSearch" 
+          <input type="text" [(ngModel)]="netBankingCustomerSearch"
                  (keyup.enter)="searchNetBankingCustomers()"
                  placeholder="Search by name, account number, phone..."
                  style="flex:1;padding:10px 16px;border:1px solid #ddd;border-radius:10px;font-size:13px;outline:none;transition:border 0.2s;"
                  onfocus="this.style.borderColor='#4361ee'" onblur="this.style.borderColor='#ddd'">
-          <button (click)="searchNetBankingCustomers()" 
+          <button (click)="searchNetBankingCustomers()"
                   [disabled]="isSearchingNetBankingCustomers"
                   style="padding:10px 20px;background:#4361ee;color:#fff;border:none;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;white-space:nowrap;">
             <i class="fa" [class.fa-search]="!isSearchingNetBankingCustomers" [class.fa-spinner]="isSearchingNetBankingCustomers" [class.fa-spin]="isSearchingNetBankingCustomers"></i> Search
@@ -1460,8 +1537,8 @@
               </td>
               <td style="padding:10px 14px;text-align:center;">
                 <label style="position:relative;display:inline-block;width:48px;height:26px;cursor:pointer;">
-                  <input type="checkbox" 
-                         [checked]="customer.netBankingEnabled" 
+                  <input type="checkbox"
+                         [checked]="customer.netBankingEnabled"
                          (change)="toggleCustomerNetBanking(customer, !customer.netBankingEnabled)"
                          [disabled]="isTogglingCustomerNetBanking"
                          style="opacity:0;width:0;height:0;">
@@ -1484,7 +1561,7 @@
         </table>
         <!-- Pagination -->
         <div *ngIf="netBankingCustomerTotalPages > 1" style="display:flex;justify-content:center;gap:8px;margin-top:16px;">
-          <button (click)="searchNetBankingCustomers(netBankingCustomerCurrentPage - 1)" 
+          <button (click)="searchNetBankingCustomers(netBankingCustomerCurrentPage - 1)"
                   [disabled]="netBankingCustomerCurrentPage === 0"
                   style="padding:6px 14px;border:1px solid #ddd;border-radius:8px;background:#fff;cursor:pointer;font-size:12px;"
                   [style.opacity]="netBankingCustomerCurrentPage === 0 ? '0.5' : '1'">
@@ -1493,7 +1570,7 @@
           <span style="padding:6px 14px;font-size:13px;color:#555;display:flex;align-items:center;">
             Page {{ netBankingCustomerCurrentPage + 1 }} of {{ netBankingCustomerTotalPages }}
           </span>
-          <button (click)="searchNetBankingCustomers(netBankingCustomerCurrentPage + 1)" 
+          <button (click)="searchNetBankingCustomers(netBankingCustomerCurrentPage + 1)"
                   [disabled]="netBankingCustomerCurrentPage >= netBankingCustomerTotalPages - 1"
                   style="padding:6px 14px;border:1px solid #ddd;border-radius:8px;background:#fff;cursor:pointer;font-size:12px;"
                   [style.opacity]="netBankingCustomerCurrentPage >= netBankingCustomerTotalPages - 1 ? '0.5' : '1'">
@@ -1508,7 +1585,7 @@
       <h4 style="margin:0 0 16px 0;font-size:17px;font-weight:600;color:#1a1a2e;">
         <i class="fa fa-history" style="color:#4361ee;margin-right:8px;"></i> Toggle Change History
       </h4>
-      
+
       <div *ngIf="netBankingAuditHistory.length === 0" style="text-align:center;padding:30px;color:#888;">
         <i class="fa fa-clipboard-list fa-2x" style="color:#ddd;"></i>
         <p style="margin-top:10px;">No toggle changes recorded yet</p>
@@ -1527,7 +1604,7 @@
             </tr>
           </thead>
           <tbody>
-            <tr *ngFor="let audit of netBankingAuditHistory" style="border-bottom:1px solid #f0f0f5;transition:background 0.2s;" 
+            <tr *ngFor="let audit of netBankingAuditHistory" style="border-bottom:1px solid #f0f0f5;transition:background 0.2s;"
                 onmouseenter="this.style.background='#f8f9ff'" onmouseleave="this.style.background='transparent'">
               <td style="padding:12px 16px;">
                 <span style="font-weight:500;">{{ getServiceDisplayName(audit.serviceType) }}</span>
@@ -1569,9 +1646,9 @@
 
     <div class="tracking-filters">
       <div class="filter-group">
-        <input 
-          type="text" 
-          [(ngModel)]="trackingSearchQuery" 
+        <input
+          type="text"
+          [(ngModel)]="trackingSearchQuery"
           placeholder="Search by Tracking ID, Aadhar, Mobile, or Email..."
           class="search-input"
         >
@@ -1628,7 +1705,7 @@
             <td>{{ tracking.updatedBy || 'N/A' }}</td>
             <td>
               <div class="action-buttons">
-                <select 
+                <select
                   (change)="updateTrackingStatus(tracking, $any($event.target).value)"
                   [value]="tracking.status"
                   class="status-update-select"
@@ -1686,9 +1763,9 @@
 
     <div class="verification-filters">
       <div class="filter-group">
-        <input 
-          type="text" 
-          [(ngModel)]="aadharSearchQuery" 
+        <input
+          type="text"
+          [(ngModel)]="aadharSearchQuery"
           placeholder="Search by Tracking ID, Aadhar, Mobile, or Email..."
           class="search-input"
         >
@@ -1731,8 +1808,8 @@
             <td>{{ tracking.createdAt | date:'short' }}</td>
             <td>
               <div class="action-buttons">
-                <button 
-                  class="btn-verify-aadhar" 
+                <button
+                  class="btn-verify-aadhar"
                   (click)="verifyAadhar(tracking)"
                   [disabled]="verifyingAadhar === tracking.id"
                   *ngIf="tracking.status === 'PENDING' || tracking.status === 'ADMIN_SEEN'"
@@ -1799,10 +1876,10 @@
         <form (ngSubmit)="updateGoldRate()">
           <div class="form-group">
             <label for="newGoldRate">New Gold Rate (₹ per gram):</label>
-            <input 
-              type="number" 
+            <input
+              type="number"
               id="newGoldRate"
-              [(ngModel)]="newGoldRate" 
+              [(ngModel)]="newGoldRate"
               name="newGoldRate"
               step="0.01"
               min="0"
@@ -1813,8 +1890,8 @@
             >
             <small class="form-text">Current rate: ₹{{ currentGoldRate?.ratePerGram | number:'1.2-2' }}</small>
           </div>
-          <button 
-            type="submit" 
+          <button
+            type="submit"
             class="btn btn-primary"
             [disabled]="isLoadingGoldRate || !newGoldRate || newGoldRate <= 0"
           >
@@ -1844,7 +1921,7 @@
                 <td>{{ formatDateTime(record.changedAt) | slice:12:17 }}</td>
                 <td>₹{{ record.previousRate | number:'1.2-2' }}</td>
                 <td>₹{{ record.ratePerGram | number:'1.2-2' }}</td>
-                <td [class.positive]="record.ratePerGram > record.previousRate" 
+                <td [class.positive]="record.ratePerGram > record.previousRate"
                     [class.negative]="record.ratePerGram < record.previousRate">
                   {{ record.ratePerGram > record.previousRate ? '+' : '' }}
                   ₹{{ (record.ratePerGram - record.previousRate) | number:'1.2-2' }}
@@ -1943,32 +2020,32 @@
 
           <!-- Action Buttons -->
           <div class="loan-actions">
-            <button 
-              *ngIf="loan.status === 'Pending'" 
-              class="btn-approve" 
+            <button
+              *ngIf="loan.status === 'Pending'"
+              class="btn-approve"
               (click)="viewGoldLoanDetails(loan)"
               [disabled]="approvingLoan"
             >
               <i class="fa fa-check"></i> Approve
             </button>
-            <button 
-              *ngIf="loan.status === 'Pending'" 
-              class="btn-reject" 
+            <button
+              *ngIf="loan.status === 'Pending'"
+              class="btn-reject"
               (click)="rejectGoldLoan(loan)"
               [disabled]="approvingLoan"
             >
               <i class="fa fa-times"></i> Reject
             </button>
-            <button 
-              *ngIf="loan.status === 'Approved'" 
-              class="btn-foreclosure" 
+            <button
+              *ngIf="loan.status === 'Approved'"
+              class="btn-foreclosure"
               (click)="viewForeclosure(loan)"
             >
               <i class="fa fa-money-bill"></i> Foreclosure
             </button>
-            <button 
-              *ngIf="loan.status === 'Approved'" 
-              class="btn-emi" 
+            <button
+              *ngIf="loan.status === 'Approved'"
+              class="btn-emi"
               (click)="viewEmiDetails(loan)"
             >
               <i class="fa fa-calendar"></i> EMI Details
@@ -2189,9 +2266,9 @@
           </select>
         </div>
         <div class="filter-group">
-          <input 
-            type="text" 
-            [(ngModel)]="loginHistorySearchQuery" 
+          <input
+            type="text"
+            [(ngModel)]="loginHistorySearchQuery"
             placeholder="Search by name, email, account, IP, location..."
             class="search-input"
           >
@@ -2343,15 +2420,15 @@
     <div class="users-filter-section" *ngIf="!isLoadingTransactions">
       <h3><i class="fa fa-users"></i> Filter by User</h3>
       <div class="users-buttons-container">
-        <button 
-          class="user-filter-btn" 
+        <button
+          class="user-filter-btn"
           [class.active]="selectedUserForTransactions === null"
           (click)="selectedUserForTransactions = null; transactionsSearchQuery = ''; transactionsPANFilter = ''; transactionsDateFilter = '';"
         >
           <i class="fa fa-list"></i> All Users
         </button>
-        <button 
-          *ngFor="let user of users.slice(0, 20); trackBy: trackByUserId" 
+        <button
+          *ngFor="let user of users.slice(0, 20); trackBy: trackByUserId"
           class="user-filter-btn"
           [class.active]="selectedUserForTransactions === user.accountNumber"
           (click)="filterByUser(user.accountNumber)"
@@ -2373,9 +2450,9 @@
       <div class="filter-row">
         <div class="filter-group">
           <label><i class="fa fa-search"></i> Search:</label>
-          <input 
-            type="text" 
-            [(ngModel)]="transactionsSearchQuery" 
+          <input
+            type="text"
+            [(ngModel)]="transactionsSearchQuery"
             placeholder="Account Number, Name, Description, Loan Number, FD Number..."
             class="search-input"
             (input)="onTransactionSearchChange()"
@@ -2383,9 +2460,9 @@
         </div>
         <div class="filter-group">
           <label><i class="fa fa-id-card"></i> PAN Number:</label>
-          <input 
-            type="text" 
-            [(ngModel)]="transactionsPANFilter" 
+          <input
+            type="text"
+            [(ngModel)]="transactionsPANFilter"
             placeholder="Enter PAN number"
             class="search-input"
             (input)="onTransactionSearchChange()"
@@ -2393,9 +2470,9 @@
         </div>
         <div class="filter-group">
           <label><i class="fa fa-calendar"></i> Date:</label>
-          <input 
-            type="date" 
-            [(ngModel)]="transactionsDateFilter" 
+          <input
+            type="date"
+            [(ngModel)]="transactionsDateFilter"
             class="search-input"
             (change)="onTransactionSearchChange()"
           >
@@ -2724,8 +2801,8 @@
       <!-- Action Buttons -->
       <div class="biometric-actions" *ngIf="!isBiometricLoading">
         <!-- Register Face ID -->
-        <button 
-          class="biometric-action-btn register-btn" 
+        <button
+          class="biometric-action-btn register-btn"
           (click)="registerBiometric()"
           *ngIf="!biometricRegistered"
           [disabled]="!isBiometricSupported">
@@ -2734,8 +2811,8 @@
         </button>
 
         <!-- Re-register Face ID -->
-        <button 
-          class="biometric-action-btn reregister-btn" 
+        <button
+          class="biometric-action-btn reregister-btn"
           (click)="reRegisterBiometric()"
           *ngIf="biometricRegistered"
           [disabled]="!isBiometricSupported">
@@ -2744,8 +2821,8 @@
         </button>
 
         <!-- Remove Face ID -->
-        <button 
-          class="biometric-action-btn remove-btn" 
+        <button
+          class="biometric-action-btn remove-btn"
           (click)="removeBiometric()"
           *ngIf="biometricRegistered">
           <i class="fa fa-trash-alt"></i>
@@ -2806,9 +2883,9 @@
           </select>
         </div>
         <div class="filter-group">
-          <input 
-            type="text" 
-            [(ngModel)]="updateHistorySearchQuery" 
+          <input
+            type="text"
+            [(ngModel)]="updateHistorySearchQuery"
             placeholder="Search by user, admin, account, or field..."
             class="search-input"
           >
@@ -2838,7 +2915,7 @@
               </p>
             </div>
           </div>
-          
+
           <div class="history-changes">
             <div class="change-item" *ngFor="let change of history.changes">
               <div class="change-field">
@@ -2887,9 +2964,9 @@
             </select>
           </div>
           <div class="filter-group">
-            <input 
-              type="text" 
-              [(ngModel)]="profileUpdateSearchQuery" 
+            <input
+              type="text"
+              [(ngModel)]="profileUpdateSearchQuery"
               placeholder="Search by user, account, field..."
               class="search-input"
             />
@@ -2921,7 +2998,7 @@
                 </p>
               </div>
             </div>
-            
+
             <div class="request-details">
               <div class="detail-row">
                 <span class="detail-label">Field to Update:</span>
@@ -2968,7 +3045,7 @@
         <!-- Profile Update History -->
         <div class="update-history-subsection" style="margin-top: 40px;">
           <h4><i class="fa fa-history"></i> Profile Update History</h4>
-          
+
           <div class="filter-section" style="margin-top: 20px;">
             <div class="filter-group">
               <label>Filter by Date:</label>
@@ -2980,9 +3057,9 @@
               </select>
             </div>
             <div class="filter-group">
-              <input 
-                type="text" 
-                [(ngModel)]="profileUpdateHistorySearchQuery" 
+              <input
+                type="text"
+                [(ngModel)]="profileUpdateHistorySearchQuery"
                 placeholder="Search by user, account, field..."
                 class="search-input"
               />
@@ -3011,7 +3088,7 @@
                   </p>
                 </div>
               </div>
-              
+
               <div class="history-changes">
                 <div class="change-item">
                   <div class="change-field">
@@ -3053,9 +3130,9 @@
       <div class="report-controls">
         <div class="control-group">
           <label>Select Date:</label>
-          <input 
-            type="date" 
-            [(ngModel)]="selectedDate" 
+          <input
+            type="date"
+            [(ngModel)]="selectedDate"
             (change)="loadDailyActivities()"
             class="date-input"
           >
@@ -3205,9 +3282,9 @@
       <div class="prediction-filters">
         <div class="filter-group">
           <label>Search:</label>
-          <input 
-            type="text" 
-            [(ngModel)]="predictionSearchQuery" 
+          <input
+            type="text"
+            [(ngModel)]="predictionSearchQuery"
             placeholder="Search by name, account, PAN, loan type..."
             class="filter-input"
           />
@@ -3410,7 +3487,7 @@
           <td>
             <button *ngIf="fd.status === 'PENDING'" (click)="approveFixedDeposit(fd)" class="btn-approve">Approve</button>
             <button *ngIf="fd.status === 'PENDING'" (click)="rejectFixedDeposit(fd)" class="btn-reject">Reject</button>
-            <button *ngIf="fd.status === 'ACTIVE' && isFDMatured(fd)" 
+            <button *ngIf="fd.status === 'ACTIVE' && isFDMatured(fd)"
                     (click)="processFDMaturity(fd)" class="btn-process">Process Maturity</button>
           </td>
         </tr>
@@ -3762,8 +3839,8 @@
             </div>
             <div class="form-group">
               <label>{{ limitAction === 'increase' ? 'Increase' : 'Decrease' }} Amount:</label>
-              <input type="number" [(ngModel)]="limitChangeAmount" [min]="0" 
-                     [max]="limitAction === 'decrease' ? (selectedCreditCard.approvedLimit - selectedCreditCard.currentBalance) : null" 
+              <input type="number" [(ngModel)]="limitChangeAmount" [min]="0"
+                     [max]="limitAction === 'decrease' ? (selectedCreditCard.approvedLimit - selectedCreditCard.currentBalance) : null"
                      placeholder="Enter amount" />
             </div>
             <div class="form-group" *ngIf="limitChangeAmount">

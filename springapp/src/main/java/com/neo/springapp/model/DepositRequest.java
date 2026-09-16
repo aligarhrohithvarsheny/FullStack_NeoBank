@@ -29,6 +29,9 @@ public class DepositRequest {
     private String rejectionReason;
     private Double resultingBalance;
     private String transactionId;
+    private String transferType; // SELF or OTHER
+    private String sourceAccountNumber; // Source account for cheque transfer
+    private String sourceAccountName; // Source account owner name
     @Transient
     private Boolean chequeValid;
     @Transient

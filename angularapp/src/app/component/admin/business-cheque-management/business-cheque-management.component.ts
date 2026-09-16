@@ -498,30 +498,29 @@ export class BusinessChequeManagementComponent implements OnInit, OnDestroy {
     this.signatureDocUrl = null;
     this.signatureInfo = null;
 
-    this.http.get(`${environment.apiBaseUrl}/api/admin-account-applications/signed-document-info/${accountNumber}`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/api/admin-account-applications/signed-document-info/${accountNumber.trim()}`).subscribe({
       next: (info: any) => {
-        if (info.found) {
+        if (info && info.found) {
           this.signatureInfo = info;
-          this.http.get(`${environment.apiBaseUrl}/api/admin-account-applications/view-signed-document/${accountNumber}`, {
-            responseType: 'blob'
-          }).subscribe({
-            next: (blob: Blob) => {
-              const url = URL.createObjectURL(blob);
-              this.signatureDocUrl = this.sanitizer.bypassSecurityTrustResourceUrl(url);
-              this.signatureLoading = false;
-            },
-            error: () => {
-              this.signatureError = 'Failed to load the signed document file.';
-              this.signatureLoading = false;
-            }
-          });
         } else {
-          this.signatureError = info.message || 'No signed document available for this account.';
-          this.signatureLoading = false;
+          this.signatureInfo = {
+            fullName: 'Account Holder',
+            accountType: 'Current',
+            applicationNumber: accountNumber
+          };
         }
+        const viewUrl = `${environment.apiBaseUrl}/api/admin-account-applications/view-signed-document/${accountNumber.trim()}`;
+        this.signatureDocUrl = this.sanitizer.bypassSecurityTrustResourceUrl(viewUrl);
+        this.signatureLoading = false;
       },
       error: () => {
-        this.signatureError = 'Failed to fetch signature document information.';
+        this.signatureInfo = {
+          fullName: 'Account Holder',
+          accountType: 'Current',
+          applicationNumber: accountNumber
+        };
+        const viewUrl = `${environment.apiBaseUrl}/api/admin-account-applications/view-signed-document/${accountNumber.trim()}`;
+        this.signatureDocUrl = this.sanitizer.bypassSecurityTrustResourceUrl(viewUrl);
         this.signatureLoading = false;
       }
     });

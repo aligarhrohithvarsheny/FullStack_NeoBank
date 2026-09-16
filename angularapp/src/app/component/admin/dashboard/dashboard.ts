@@ -83,7 +83,7 @@ export class Dashboard implements OnInit, OnDestroy {
 
   // Transaction history
   adminTransactionHistory: TransactionRecord[] = [];
-  
+
   // Session tracking properties
   loginTime: Date | null = null;
   logoutTime: Date | null = null;
@@ -95,14 +95,14 @@ export class Dashboard implements OnInit, OnDestroy {
   showUpdateHistory: boolean = false;
   updateHistoryFilter: string = 'ALL'; // ALL, TODAY, WEEK, MONTH
   updateHistorySearchQuery: string = '';
-  
+
   // Profile update requests
   profileUpdateRequests: any[] = [];
   pendingProfileUpdates: any[] = [];
   isLoadingProfileUpdates: boolean = false;
   profileUpdateFilter: string = 'PENDING'; // PENDING, ALL, APPROVED, REJECTED, COMPLETED
   profileUpdateSearchQuery: string = '';
-  
+
   // Profile update history
   profileUpdateHistory: any[] = [];
   isLoadingProfileUpdateHistory: boolean = false;
@@ -202,7 +202,7 @@ export class Dashboard implements OnInit, OnDestroy {
   featureAccessWarningLogged: boolean = false; // Track if warning has been logged
   featureAccessLoading: boolean = false; // Track if feature access is currently loading
   featureAccessLoaded: boolean = false; // Track if feature access has been loaded at least once
-  
+
   // Navigation source tracking
   isFromManager: boolean = false;
 
@@ -444,7 +444,7 @@ export class Dashboard implements OnInit, OnDestroy {
   isLoadingLoginHistory: boolean = false;
   loginHistoryFilter: string = 'ALL'; // ALL, SUCCESS, FAILED
   loginHistorySearchQuery: string = '';
-  
+
   // All Transactions
   allTransactions: any[] = [];
   isLoadingTransactions: boolean = false;
@@ -466,7 +466,7 @@ export class Dashboard implements OnInit, OnDestroy {
   beneficiaries: any[] = [];
   beneficiariesSearchQuery: string = '';
   isLoadingBeneficiaries: boolean = false;
-  
+
   // Loan Prediction History
   loanPredictions: any[] = [];
   isLoadingPredictions: boolean = false;
@@ -725,13 +725,13 @@ export class Dashboard implements OnInit, OnDestroy {
     if (isPlatformBrowser(this.platformId)) {
       // Clean up any corrupted session data first
       this.cleanupCorruptedSessionData();
-      
+
       // Check if profile is complete, redirect if not, and get admin name
       const adminData = sessionStorage.getItem('admin');
       if (adminData) {
         try {
           const admin = JSON.parse(adminData);
-          
+
           // Validate obvious corruption markers only
           if (admin.email && (admin.email.includes('/') || admin.email.includes('api'))) {
             console.error('Detected corrupted admin email in session, clearing:', admin.email);
@@ -739,7 +739,7 @@ export class Dashboard implements OnInit, OnDestroy {
             this.router.navigate(['/admin/login']);
             return;
           }
-          
+
           // Set admin name
           this.adminName = admin.username || admin.name || 'Admin';
         } catch (e) {
@@ -748,13 +748,13 @@ export class Dashboard implements OnInit, OnDestroy {
           sessionStorage.removeItem('admin');
         }
       }
-      
+
       // Check if navigation is from manager dashboard
       const navigationSource = sessionStorage.getItem('navigationSource');
       if (navigationSource === 'MANAGER') {
         this.isFromManager = true;
       }
-      
+
       // Check if there's a section to open from manager dashboard
       const dashboardSection = sessionStorage.getItem('adminDashboardSection');
       if (dashboardSection) {
@@ -764,14 +764,14 @@ export class Dashboard implements OnInit, OnDestroy {
           this.setActiveSection(dashboardSection);
         }, 100);
       }
-      
+
       // Initialize session tracking
       this.initializeSessionTracking();
       this.startSessionTimer();
-      
+
       // Load feature access permissions first
       this.loadFeatureAccess();
-      
+
       // Set up a listener for localStorage changes (when manager updates features in another tab)
       window.addEventListener('storage', (e) => {
         if (e.key === 'adminFeatureAccess') {
@@ -779,7 +779,7 @@ export class Dashboard implements OnInit, OnDestroy {
           this.loadFeatureAccess();
         }
       });
-      
+
       // Also listen for custom events (for same-tab updates)
       window.addEventListener('featureAccessUpdated', (event: any) => {
         console.log('Feature access updated event received, reloading...');
@@ -805,7 +805,7 @@ export class Dashboard implements OnInit, OnDestroy {
           this.loadFeatureAccess();
         }
       });
-      
+
       // Listen for localStorage changes (cross-tab communication)
       window.addEventListener('storage', (e: StorageEvent) => {
         if (e.key && e.key.startsWith('adminFeatureAccess_')) {
@@ -826,7 +826,7 @@ export class Dashboard implements OnInit, OnDestroy {
           }
         }
       });
-      
+
       // Wake Render backend first, then load dashboard data
       this.backendWakeup.ensureAwake().finally(() => this.loadInitialData());
     }
@@ -834,17 +834,17 @@ export class Dashboard implements OnInit, OnDestroy {
 
   loadFeatureAccess() {
     if (!isPlatformBrowser(this.platformId)) return;
-    
+
     // Prevent multiple simultaneous loads
     if (this.featureAccessLoading) {
       return;
     }
-    
+
     this.featureAccessLoading = true;
-    
+
     // Clear existing feature access
     this.featureAccess.clear();
-    
+
     // Get current admin email from session
     const adminData = sessionStorage.getItem('admin');
     let adminEmail = '';
@@ -859,12 +859,12 @@ export class Dashboard implements OnInit, OnDestroy {
         return;
       }
     }
-    
+
     // Validate adminEmail - must be a valid email format and not contain URL paths
     // Check for corrupted email that contains URL paths
-    if (!adminEmail || 
-        !adminEmail.includes('@') || 
-        adminEmail.includes('/') || 
+    if (!adminEmail ||
+        !adminEmail.includes('@') ||
+        adminEmail.includes('/') ||
         adminEmail.includes('api') ||
         adminEmail.includes('feature-access') ||
         adminEmail.length > 100 ||
@@ -887,11 +887,11 @@ export class Dashboard implements OnInit, OnDestroy {
       this.featureAccessLoaded = true; // Mark as loaded to prevent warnings
       return;
     }
-    
+
     // Load per-admin feature access from localStorage first (fast)
     const savedKey = `adminFeatureAccess_${adminEmail}`;
     const savedFeatures = localStorage.getItem(savedKey);
-    
+
     if (savedFeatures) {
       try {
         const features = JSON.parse(savedFeatures);
@@ -909,11 +909,11 @@ export class Dashboard implements OnInit, OnDestroy {
     } else {
       console.log(`No saved feature access found for ${adminEmail} in localStorage`);
     }
-    
+
     // Also try to load from backend (this will override localStorage if backend has data)
     // Encode the email to prevent URL injection issues
     const encodedEmail = encodeURIComponent(adminEmail);
-    
+
     // Build URL safely - ensure environment.apiBaseUrl doesn't already contain the path
     let baseUrl = environment.apiBaseUrl;
     // Remove trailing slash if present
@@ -925,9 +925,9 @@ export class Dashboard implements OnInit, OnDestroy {
       console.error('Base URL already contains feature-access path, cleaning up');
       baseUrl = baseUrl.split('/api/admins/feature-access')[0];
     }
-    
+
     const featureAccessUrl = `${baseUrl}/api/admins/feature-access/${encodedEmail}`;
-    
+
     // Additional safety checks - ensure URL doesn't contain duplicate paths
     if (featureAccessUrl.includes('/api/admins/feature-access/api/admins/feature-access') ||
         featureAccessUrl.split('/api/admins/feature-access').length > 2) {
@@ -939,13 +939,13 @@ export class Dashboard implements OnInit, OnDestroy {
       this.featureAccessLoaded = true;
       return;
     }
-    
+
     this.http.get(featureAccessUrl)
       .pipe(
         timeout(10000), // 10 second timeout (increased from 8)
         catchError(err => {
           console.warn('Error loading feature access from backend (non-critical):', err);
-          
+
           let errorMessage = 'Failed to load feature access. ';
           if (err.name === 'TimeoutError' || err.error?.name === 'TimeoutError') {
             errorMessage = 'Feature access request timed out. ';
@@ -955,7 +955,7 @@ export class Dashboard implements OnInit, OnDestroy {
             errorMessage = 'Server error loading feature access. ';
           }
           console.warn(errorMessage + 'Using cached data if available.');
-          
+
           // Use localStorage data if backend fails
           this.featureAccessLoading = false;
           this.featureAccessLoaded = true; // Mark as loaded even if backend fails
@@ -966,7 +966,7 @@ export class Dashboard implements OnInit, OnDestroy {
         next: (response: any) => {
           this.featureAccessLoading = false;
           this.featureAccessLoaded = true;
-          
+
           if (response && response.success && response.features && Array.isArray(response.features)) {
             console.log(`Loading feature access for ${adminEmail} from backend:`, response.features);
             // Clear and reload from backend
@@ -1003,7 +1003,7 @@ export class Dashboard implements OnInit, OnDestroy {
           sessionStorage.removeItem('admin');
         }
       }
-      
+
       // Clean up any corrupted localStorage entries
       const keys = Object.keys(localStorage);
       keys.forEach(key => {
@@ -1023,14 +1023,14 @@ export class Dashboard implements OnInit, OnDestroy {
       // Return true during initial load to avoid blocking UI
       return true;
     }
-    
+
     // Check if feature is in the map
     if (this.featureAccess.has(featureId)) {
       const hasAccess = this.featureAccess.get(featureId)!;
       // Explicitly check for true (not just truthy)
       return hasAccess === true;
     }
-    
+
     // If feature is not in the map, check if we have any features loaded
     // If we have features loaded but this one is missing, default to false (more secure)
     // If no features are loaded at all, default to true (backward compatibility)
@@ -1038,7 +1038,7 @@ export class Dashboard implements OnInit, OnDestroy {
       // Features were loaded but this one is missing - deny access
       return false;
     }
-    
+
     // No features loaded yet or loading failed, default to true for backward compatibility
     // Only log once to avoid spam
     if (!this.featureAccessWarningLogged && this.featureAccessLoaded) {
@@ -1181,7 +1181,7 @@ export class Dashboard implements OnInit, OnDestroy {
               joinDate: user.joinDate || (user.createdAt ? new Date(user.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0])
             };
           });
-          
+
           // Save to localStorage as backup
           if (isPlatformBrowser(this.platformId)) {
             localStorage.setItem('userProfiles', JSON.stringify(this.users));
@@ -1247,7 +1247,7 @@ export class Dashboard implements OnInit, OnDestroy {
       },
       error: (err) => {
         console.error('Error loading initial data:', err);
-        
+
         // Try to load from localStorage as fallback
         if (isPlatformBrowser(this.platformId)) {
           const usersData = localStorage.getItem('userProfiles');
@@ -1263,7 +1263,7 @@ export class Dashboard implements OnInit, OnDestroy {
             this.users = [];
           }
         }
-        
+
         this.isLoadingInitialData = false;
         // Fallback to individual loads if forkJoin fails
         this.loadUsers();
@@ -1472,7 +1472,7 @@ export class Dashboard implements OnInit, OnDestroy {
 
   setActiveSection(section: string) {
     console.log('Setting active section:', section);
-    
+
     // Check feature access before navigating
     const featureAccessMap: { [key: string]: string } = {
       'transactions': 'transactions',
@@ -1496,13 +1496,13 @@ export class Dashboard implements OnInit, OnDestroy {
       'daily-report': 'daily-report',
       'bulk-export': 'manage-users'
     };
-    
+
     const featureId = featureAccessMap[section];
     if (featureId && !this.hasFeatureAccess(featureId)) {
       this.alertService.error('Access Denied', 'This feature has been disabled by the manager.');
       return;
     }
-    
+
     // Load transactions in dashboard if section is transactions
     if (section === 'transactions') {
       console.log('Loading transactions in dashboard');
@@ -1521,7 +1521,7 @@ export class Dashboard implements OnInit, OnDestroy {
       this.activeSection = section;
       return;
     }
-    
+
     // Navigate to external pages for these sections
     if (section === 'loans') {
       console.log('Navigating to loans page');
@@ -1573,10 +1573,10 @@ export class Dashboard implements OnInit, OnDestroy {
       this.navigateToGoldLoans();
       return;
     }
-    
+
     // For sections that stay in dashboard
     this.activeSection = section;
-    
+
     // Handle toggle sections
     if (section === 'tracking') {
       this.showTrackingSection = true;
@@ -1660,7 +1660,7 @@ export class Dashboard implements OnInit, OnDestroy {
       this.sigValidationResult = null;
       this.sigFormDownloaded = false;
     }
-    
+
     // Close other sections
     if (section !== 'tracking') this.showTrackingSection = false;
     if (section !== 'aadhar-verification') this.showAadharVerificationSection = false;
@@ -1675,7 +1675,7 @@ export class Dashboard implements OnInit, OnDestroy {
     if (section !== 'fixed-deposits') this.selectedFD = null;
     if (section !== 'emi-management') this.selectedEMI = null;
   }
-  
+
   // Investment Management Methods
   loadInvestments() {
     this.isLoadingInvestments = true;
@@ -1692,14 +1692,14 @@ export class Dashboard implements OnInit, OnDestroy {
       }
     });
   }
-  
+
   filterInvestments() {
     // Filtering is handled by status filter in template
   }
-  
+
   approveInvestment(investment: any) {
     if (!confirm(`Approve investment of ₹${investment.investmentAmount} for ${investment.userName}?`)) return;
-    
+
     // Ensure ID is a number
     const investmentId = typeof investment.id === 'number' ? investment.id : Number(investment.id);
     if (isNaN(investmentId)) {
@@ -1721,11 +1721,11 @@ export class Dashboard implements OnInit, OnDestroy {
       }
     });
   }
-  
+
   rejectInvestment(investment: any) {
     const reason = prompt('Enter rejection reason:');
     if (!reason) return;
-    
+
     // Ensure ID is a number
     const investmentId = typeof investment.id === 'number' ? investment.id : Number(investment.id);
     if (isNaN(investmentId)) {
@@ -1747,7 +1747,7 @@ export class Dashboard implements OnInit, OnDestroy {
       }
     });
   }
-  
+
   // Fixed Deposit Management Methods
   loadFixedDeposits() {
     this.isLoadingFDs = true;
@@ -1763,11 +1763,11 @@ export class Dashboard implements OnInit, OnDestroy {
       }
     });
   }
-  
+
   approveFixedDeposit(fd: any) {
     const reason = prompt('Enter approval reason (optional):');
     const reasonParam = reason ? `&approvalReason=${encodeURIComponent(reason)}` : '';
-    
+
     // Ensure ID is a number
     const fdId = typeof fd.id === 'number' ? fd.id : Number(fd.id);
     if (isNaN(fdId)) {
@@ -1789,11 +1789,11 @@ export class Dashboard implements OnInit, OnDestroy {
       }
     });
   }
-  
+
   rejectFixedDeposit(fd: any) {
     const reason = prompt('Enter rejection reason:');
     if (!reason) return;
-    
+
     // Ensure ID is a number
     const fdId = typeof fd.id === 'number' ? fd.id : Number(fd.id);
     if (isNaN(fdId)) {
@@ -1815,10 +1815,10 @@ export class Dashboard implements OnInit, OnDestroy {
       }
     });
   }
-  
+
   processFDMaturity(fd: any) {
     if (!confirm(`Process maturity for FD ${fd.fdAccountNumber}? Maturity amount ₹${fd.maturityAmount} will be credited to account.`)) return;
-    
+
     // Ensure ID is a number
     const fdId = typeof fd.id === 'number' ? fd.id : Number(fd.id);
     if (isNaN(fdId)) {
@@ -1840,7 +1840,7 @@ export class Dashboard implements OnInit, OnDestroy {
       }
     });
   }
-  
+
   // EMI Management Methods
   loadAllEMIs() {
     this.isLoadingAllEMIs = true;
@@ -1871,7 +1871,7 @@ export class Dashboard implements OnInit, OnDestroy {
   logout() {
     // Store logout timestamp
     this.logoutTime = new Date();
-    
+
     // Update sessionStorage with logout time
     const adminData = sessionStorage.getItem('admin');
     if (adminData) {
@@ -1883,7 +1883,7 @@ export class Dashboard implements OnInit, OnDestroy {
           sessionDuration: this.sessionDuration
         };
         sessionStorage.setItem('adminLogoutData', JSON.stringify(logoutData));
-        
+
         // Send logout data to backend
         this.http.post(`${environment.apiBaseUrl}/api/session-history/logout`, {
           userId: admin.id,
@@ -1901,17 +1901,17 @@ export class Dashboard implements OnInit, OnDestroy {
         console.error('Error updating logout time:', e);
       }
     }
-    
+
     // Clear session timer
     if (this.sessionTimer) {
       clearInterval(this.sessionTimer);
       this.sessionTimer = null;
     }
-    
+
     this.alertService.logoutSuccess();
     this.router.navigate(['/admin/login']);
   }
-  
+
   /**
    * Initialize session tracking - get login time from sessionStorage
    */
@@ -1930,19 +1930,19 @@ export class Dashboard implements OnInit, OnDestroy {
       sessionStorage.setItem('adminLoginTime', this.loginTime.toISOString());
     }
   }
-  
+
   /**
    * Start session timer to update duration every second
    */
   startSessionTimer() {
     if (!this.loginTime) return;
-    
+
     this.updateSessionDuration();
     this.sessionTimer = setInterval(() => {
       this.updateSessionDuration();
     }, 1000);
   }
-  
+
   /**
    * Update session duration display
    */
@@ -1951,20 +1951,20 @@ export class Dashboard implements OnInit, OnDestroy {
       this.sessionDuration = '00:00:00';
       return;
     }
-    
+
     const now = new Date();
     const diff = now.getTime() - this.loginTime.getTime();
-    
+
     const hours = Math.floor(diff / (1000 * 60 * 60));
     const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
     const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-    
-    this.sessionDuration = 
+
+    this.sessionDuration =
       String(hours).padStart(2, '0') + ':' +
       String(minutes).padStart(2, '0') + ':' +
       String(seconds).padStart(2, '0');
   }
-  
+
   /**
    * Format date and time for session display
    */
@@ -1997,7 +1997,7 @@ export class Dashboard implements OnInit, OnDestroy {
         }),
         catchError(err => {
           console.error('Error loading users from MySQL:', err);
-          
+
           let errorMessage = 'Failed to load users. ';
           if (err.name === 'TimeoutError' || err.error?.name === 'TimeoutError') {
             errorMessage = 'Request timed out. The server may be slow. ';
@@ -2008,9 +2008,9 @@ export class Dashboard implements OnInit, OnDestroy {
           } else if (err.status === 401 || err.status === 403) {
             errorMessage = 'Authentication error. Please log in again. ';
           }
-          
+
           console.error(errorMessage);
-          
+
           // Fallback to localStorage if database fails
           if (isPlatformBrowser(this.platformId)) {
             const usersData = localStorage.getItem('userProfiles');
@@ -2024,7 +2024,7 @@ export class Dashboard implements OnInit, OnDestroy {
               }
             }
           }
-          
+
           this.users = [];
           console.log('No users found in database or localStorage');
           return of({ content: [] });
@@ -2050,7 +2050,7 @@ export class Dashboard implements OnInit, OnDestroy {
             this.users = [];
             return;
           }
-          
+
           console.log('Users loaded from MySQL:', usersList.length, 'users');
           this.users = usersList.map((user: any) => ({
             id: user.id.toString(),
@@ -2071,12 +2071,12 @@ export class Dashboard implements OnInit, OnDestroy {
             joinDate: user.createdAt ? new Date(user.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
             customerId: user.account?.customerId || ''
           }));
-          
+
           // Save to localStorage as backup
           if (isPlatformBrowser(this.platformId)) {
             localStorage.setItem('userProfiles', JSON.stringify(this.users));
           }
-          
+
           console.log('Processed users for admin dashboard:', this.users.length, 'users');
         },
         error: (err: any) => {
@@ -2154,7 +2154,7 @@ export class Dashboard implements OnInit, OnDestroy {
       const userTransactionsKey = `transactions_${this.selectedUser!.accountNumber}`;
       const existingTransactions = localStorage.getItem(userTransactionsKey);
       const transactions = existingTransactions ? JSON.parse(existingTransactions) : [];
-      
+
       transactions.unshift(transaction);
       localStorage.setItem(userTransactionsKey, JSON.stringify(transactions));
     }
@@ -2166,11 +2166,104 @@ export class Dashboard implements OnInit, OnDestroy {
     this.resetForm();
   }
 
-  loadDepositRequests(status: string = 'PENDING') {
+  depositAdminFilter: string = 'ALL';
+  depositAdminSearchTerm: string = '';
+  showDirectDepositModal: boolean = false;
+  submittingDirectDeposit: boolean = false;
+  directDepositForm: any = {
+    accountNumber: '',
+    amount: null,
+    method: 'CASH',
+    referenceNumber: '',
+    note: ''
+  };
+
+  openDirectDepositModal() {
+    this.directDepositForm = {
+      accountNumber: '',
+      amount: null,
+      method: 'CASH',
+      referenceNumber: '',
+      note: ''
+    };
+    this.showDirectDepositModal = true;
+  }
+
+  closeDirectDepositModal() {
+    this.showDirectDepositModal = false;
+  }
+
+  submitDirectDeposit() {
+    if (!this.directDepositForm.accountNumber || !this.directDepositForm.accountNumber.trim()) {
+      this.alertService.error('Validation Error', 'Please enter account number');
+      return;
+    }
+    if (!this.directDepositForm.amount || this.directDepositForm.amount <= 0) {
+      this.alertService.error('Validation Error', 'Please enter a valid deposit amount');
+      return;
+    }
+    if (this.directDepositForm.method === 'CHEQUE' && (!this.directDepositForm.referenceNumber || !this.directDepositForm.referenceNumber.trim())) {
+      this.alertService.error('Validation Error', 'Cheque number is required for cheque deposits');
+      return;
+    }
+
+    const adminEmail = (this as any).adminEmail || (isPlatformBrowser(this.platformId) ? sessionStorage.getItem('adminEmail') : null) || 'Admin';
+    this.submittingDirectDeposit = true;
+    this.http.post(`${environment.apiBaseUrl}/api/deposit-requests/admin/create-and-approve?adminEmail=${encodeURIComponent(adminEmail)}`, {
+      accountNumber: this.directDepositForm.accountNumber.trim(),
+      amount: this.directDepositForm.amount,
+      method: this.directDepositForm.method,
+      referenceNumber: this.directDepositForm.referenceNumber ? this.directDepositForm.referenceNumber.trim() : null,
+      note: this.directDepositForm.note ? this.directDepositForm.note.trim() : 'Direct Admin Deposit'
+    }).subscribe({
+      next: (res: any) => {
+        this.submittingDirectDeposit = false;
+        this.alertService.success('Deposit Processed', res.message || 'Deposit processed successfully');
+        this.closeDirectDepositModal();
+        this.loadDepositRequests(this.depositAdminFilter);
+      },
+      error: (err: any) => {
+        this.submittingDirectDeposit = false;
+        this.alertService.error('Deposit Failed', err.error?.message || err.error?.error || 'Failed to process deposit');
+      }
+    });
+  }
+
+  getFilteredDepositRequests(): any[] {
+    if (!this.depositRequests) return [];
+    let list = this.depositRequests;
+
+    if (this.depositAdminFilter && this.depositAdminFilter !== 'ALL') {
+      const filter = this.depositAdminFilter.toUpperCase();
+      if (['PENDING', 'APPROVED', 'REJECTED'].includes(filter)) {
+        list = list.filter(r => (r.status || '').toUpperCase() === filter);
+      } else {
+        list = list.filter(r => (r.method || '').toUpperCase() === filter);
+      }
+    }
+
+    if (this.depositAdminSearchTerm && this.depositAdminSearchTerm.trim()) {
+      const term = this.depositAdminSearchTerm.trim().toLowerCase();
+      list = list.filter(r =>
+        (r.requestId && r.requestId.toLowerCase().includes(term)) ||
+        (r.accountNumber && r.accountNumber.toLowerCase().includes(term)) ||
+        (r.userName && r.userName.toLowerCase().includes(term)) ||
+        (r.referenceNumber && r.referenceNumber.toLowerCase().includes(term)) ||
+        (r.method && r.method.toLowerCase().includes(term)) ||
+        (r.status && r.status.toLowerCase().includes(term)) ||
+        (r.sourceAccountNumber && r.sourceAccountNumber.toLowerCase().includes(term))
+      );
+    }
+
+    return list;
+  }
+
+  loadDepositRequests(status: string = 'ALL') {
     this.isLoadingDepositRequests = true;
+    this.depositAdminFilter = status;
     let params = new HttpParams();
-    if (status) {
-      params = params.set('status', status);
+    if (status && status !== 'ALL' && ['PENDING', 'APPROVED', 'REJECTED'].includes(status.toUpperCase())) {
+      params = params.set('status', status.toUpperCase());
     }
     this.http.get(`${environment.apiBaseUrl}/api/deposit-requests`, { params }).subscribe({
       next: (requests: any) => {
@@ -2425,10 +2518,10 @@ export class Dashboard implements OnInit, OnDestroy {
     // First try to find by loan account number
     this.http.get(`${environment.apiBaseUrl}/api/loans`).subscribe({
       next: (loans: any) => {
-        const loan = Array.isArray(loans) ? loans.find((l: any) => 
+        const loan = Array.isArray(loans) ? loans.find((l: any) =>
           l.loanAccountNumber === accountNumber || l.accountNumber === accountNumber
         ) : null;
-        
+
         if (loan) {
           this.verifiedAccountDetails = {
             accountNumber: loan.loanAccountNumber || loan.accountNumber,
@@ -2495,10 +2588,10 @@ export class Dashboard implements OnInit, OnDestroy {
       )
       .subscribe({
         next: (loans: any) => {
-          const loan = Array.isArray(loans) ? loans.find((l: any) => 
+          const loan = Array.isArray(loans) ? loans.find((l: any) =>
             l.loanAccountNumber === accountNumber || l.accountNumber === accountNumber
           ) : null;
-        
+
         if (loan) {
           this.verifiedAccountDetails = {
             accountNumber: loan.loanAccountNumber || loan.accountNumber,
@@ -2695,7 +2788,7 @@ export class Dashboard implements OnInit, OnDestroy {
   }
 
   processRegularAccountTransaction(accountNumber: string, userName: string, currentBalance: number) {
-    const balanceEndpoint = this.operationType === 'deposit' 
+    const balanceEndpoint = this.operationType === 'deposit'
       ? `${environment.apiBaseUrl}/api/accounts/balance/credit/${accountNumber}?amount=${this.amount}`
       : `${environment.apiBaseUrl}/api/accounts/balance/debit/${accountNumber}?amount=${this.amount}`;
 
@@ -2717,10 +2810,10 @@ export class Dashboard implements OnInit, OnDestroy {
   processLoanAccountTransaction(accountNumber: string, userName: string, currentBalance: number) {
     // For loan accounts, we need to update the loan balance or create a transaction
     // Since loans have different structure, we'll create a transaction record
-    const newBalance = this.operationType === 'deposit' 
-      ? currentBalance + this.amount 
+    const newBalance = this.operationType === 'deposit'
+      ? currentBalance + this.amount
       : currentBalance - this.amount;
-    
+
     if (this.operationType === 'withdrawal' && newBalance < 0) {
       this.errorMessage = 'Insufficient balance for withdrawal';
       this.successMessage = '';
@@ -2732,10 +2825,10 @@ export class Dashboard implements OnInit, OnDestroy {
 
   processGoldLoanAccountTransaction(accountNumber: string, userName: string, currentBalance: number) {
     // Similar to loan accounts
-    const newBalance = this.operationType === 'deposit' 
-      ? currentBalance + this.amount 
+    const newBalance = this.operationType === 'deposit'
+      ? currentBalance + this.amount
       : currentBalance - this.amount;
-    
+
     if (this.operationType === 'withdrawal' && newBalance < 0) {
       this.errorMessage = 'Insufficient balance for withdrawal';
       this.successMessage = '';
@@ -2801,7 +2894,7 @@ export class Dashboard implements OnInit, OnDestroy {
 
   completeTransaction(accountNumber: string, userName: string, newBalance: number, accountType: string) {
     const transactionId = `TXN${Date.now()}`;
-    
+
     // Prepare transaction data for backend (without id and date - backend handles these)
     const backendTransactionData = {
       transactionId: transactionId,
@@ -2895,10 +2988,10 @@ export class Dashboard implements OnInit, OnDestroy {
       const adminTransactionsKey = 'adminTransactions';
       const existingTransactions = localStorage.getItem(adminTransactionsKey);
       const transactions = existingTransactions ? JSON.parse(existingTransactions) : [];
-      
+
       transactions.unshift(transaction);
       localStorage.setItem(adminTransactionsKey, JSON.stringify(transactions));
-      
+
       // Update local array
       this.adminTransactionHistory = transactions;
     }
@@ -2951,7 +3044,7 @@ export class Dashboard implements OnInit, OnDestroy {
         (h.userEmail && h.userEmail.toLowerCase().includes(query)) ||
         (h.accountNumber && h.accountNumber.toLowerCase().includes(query)) ||
         (h.adminName && h.adminName.toLowerCase().includes(query)) ||
-        (h.changes && h.changes.some((c: any) => 
+        (h.changes && h.changes.some((c: any) =>
           c.field.toLowerCase().includes(query) ||
           c.oldValue?.toLowerCase().includes(query) ||
           c.newValue?.toLowerCase().includes(query)
@@ -2983,7 +3076,7 @@ export class Dashboard implements OnInit, OnDestroy {
     this.http.get(`${environment.apiBaseUrl}/api/admins/profile-update/pending`).subscribe({
       next: (pendingRequests: any) => {
         this.pendingProfileUpdates = pendingRequests || [];
-        
+
         // Then load based on filter
         if (this.profileUpdateFilter === 'PENDING') {
           this.profileUpdateRequests = pendingRequests || [];
@@ -3044,16 +3137,16 @@ export class Dashboard implements OnInit, OnDestroy {
 
   approveProfileUpdate(request: any) {
     if (!confirm(`Approve ${request.fieldToUpdate === 'ADDRESS' ? 'address' : 'phone number'} update for ${request.userName}?`)) return;
-    
+
     const adminData = sessionStorage.getItem('admin');
     const adminName = adminData ? (JSON.parse(adminData).username || JSON.parse(adminData).name || 'Admin') : 'Admin';
-    
+
     const requestId = typeof request.id === 'number' ? request.id : Number(request.id);
     if (isNaN(requestId)) {
       this.alertService.error('Validation Error', 'Invalid request ID');
       return;
     }
-    
+
     this.http.put(`${environment.apiBaseUrl}/api/admins/profile-update/${requestId}/approve?approvedBy=${encodeURIComponent(adminName)}`, {}).subscribe({
       next: (response: any) => {
         if (response.success) {
@@ -3074,16 +3167,16 @@ export class Dashboard implements OnInit, OnDestroy {
   rejectProfileUpdate(request: any) {
     const reason = prompt('Enter rejection reason:');
     if (!reason) return;
-    
+
     const adminData = sessionStorage.getItem('admin');
     const adminName = adminData ? (JSON.parse(adminData).username || JSON.parse(adminData).name || 'Admin') : 'Admin';
-    
+
     const requestId = typeof request.id === 'number' ? request.id : Number(request.id);
     if (isNaN(requestId)) {
       this.alertService.error('Validation Error', 'Invalid request ID');
       return;
     }
-    
+
     this.http.put(`${environment.apiBaseUrl}/api/admins/profile-update/${requestId}/reject?rejectedBy=${encodeURIComponent(adminName)}&reason=${encodeURIComponent(reason)}`, {}).subscribe({
       next: (response: any) => {
         if (response.success) {
@@ -3191,13 +3284,13 @@ export class Dashboard implements OnInit, OnDestroy {
 
   loadDailyActivities() {
     if (!isPlatformBrowser(this.platformId)) return;
-    
+
     const selectedDateObj = new Date(this.selectedDate);
     const startOfDay = new Date(selectedDateObj.setHours(0, 0, 0, 0));
     const endOfDay = new Date(selectedDateObj.setHours(23, 59, 59, 999));
-    
+
     const allActivities: any[] = [];
-    
+
     // Load user updates
     const updateHistory = localStorage.getItem('adminUserUpdateHistory');
     if (updateHistory) {
@@ -3221,7 +3314,7 @@ export class Dashboard implements OnInit, OnDestroy {
         }
       });
     }
-    
+
     // Load transactions (deposits/withdrawals)
     const transactions = localStorage.getItem('adminTransactions');
     if (transactions) {
@@ -3246,7 +3339,7 @@ export class Dashboard implements OnInit, OnDestroy {
         }
       });
     }
-    
+
     // Load from backend - loans, cheques, subsidy claims, accounts
     this.loadActivitiesFromBackend(startOfDay, endOfDay, allActivities);
   }
@@ -3452,11 +3545,11 @@ export class Dashboard implements OnInit, OnDestroy {
 
   getFilteredDailyActivities(): any[] {
     let filtered = this.dailyActivities;
-    
+
     if (this.selectedActivityCategory !== 'ALL') {
       filtered = filtered.filter(a => a.type === this.selectedActivityCategory);
     }
-    
+
     return filtered;
   }
 
@@ -3477,7 +3570,7 @@ export class Dashboard implements OnInit, OnDestroy {
 
   printDailyActivityReport() {
     if (!isPlatformBrowser(this.platformId)) return;
-    
+
     const htmlContent = this.generateDailyActivityReportHTML();
     const printWindow = window.open('', '_blank');
     if (printWindow) {
@@ -3710,17 +3803,17 @@ export class Dashboard implements OnInit, OnDestroy {
 
   formatActivityDetails(activity: any): string {
     if (!activity.details) return 'N/A';
-    
+
     const details = activity.details;
     const parts: string[] = [];
-    
+
     if (details.accountNumber) parts.push(`Account: ${details.accountNumber}`);
     if (details.amount) parts.push(`Amount: ₹${details.amount}`);
     if (details.userName) parts.push(`User: ${details.userName}`);
     if (details.loanId || details.loanAccountNumber) parts.push(`Loan: ${details.loanId || details.loanAccountNumber}`);
     if (details.chequeNumber) parts.push(`Cheque: ${details.chequeNumber}`);
     if (details.status) parts.push(`Status: ${details.status}`);
-    
+
     return parts.join(' | ') || 'N/A';
   }
 
@@ -3753,7 +3846,7 @@ export class Dashboard implements OnInit, OnDestroy {
               balance: user.balance
             }
           };
-          
+
           // Ensure ID is a number
           const userId = typeof dbUser.id === 'number' ? dbUser.id : Number(dbUser.id);
           if (isNaN(userId)) {
@@ -3792,22 +3885,22 @@ export class Dashboard implements OnInit, OnDestroy {
       if (user.name.toLowerCase().includes(query)) {
         return true;
       }
-      
+
       // Search by mobile number
       if (user.phoneNumber && user.phoneNumber.includes(query)) {
         return true;
       }
-      
+
       // Search by account number
       if (user.accountNumber.includes(query)) {
         return true;
       }
-      
+
       // Search by email
       if (user.email.toLowerCase().includes(query)) {
         return true;
       }
-      
+
       return false;
     });
 
@@ -3823,24 +3916,24 @@ export class Dashboard implements OnInit, OnDestroy {
     // Search for cards with matching last 4 digits
     this.http.get(`${environment.apiBaseUrl}/api/cards`).subscribe({
       next: (cards: any) => {
-        const matchingCards = cards.filter((card: any) => 
+        const matchingCards = cards.filter((card: any) =>
           card.cardNumber && card.cardNumber.endsWith(lastFourDigits)
         );
-        
+
         if (matchingCards.length > 0) {
           // Get users for matching cards by account number
           const accountNumbers = matchingCards.map((card: any) => card.accountNumber);
-          const matchingUsers = this.users.filter(user => 
+          const matchingUsers = this.users.filter(user =>
             accountNumbers.includes(user.accountNumber)
           );
-          
+
           this.searchResults = [...this.searchResults, ...matchingUsers];
           // Remove duplicates
-          this.searchResults = this.searchResults.filter((user, index, self) => 
+          this.searchResults = this.searchResults.filter((user, index, self) =>
             index === self.findIndex(u => u.id === user.id)
           );
         }
-        
+
         this.isSearching = false;
       },
       error: (err: any) => {
@@ -4224,7 +4317,7 @@ export class Dashboard implements OnInit, OnDestroy {
 
     try {
       const pdfContent = this.generateUsersPDFContent();
-      
+
       // Create and download as HTML file (can be printed as PDF)
       const blob = new Blob([pdfContent], { type: 'text/html;charset=utf-8' });
       const url = window.URL.createObjectURL(blob);
@@ -4235,7 +4328,7 @@ export class Dashboard implements OnInit, OnDestroy {
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
-      
+
       // Show instruction to user
       setTimeout(() => {
         const userChoice = confirm('Document downloaded! Would you like to open it now to save as PDF?\n\nClick OK to open, or Cancel to download later.');
@@ -4250,7 +4343,7 @@ export class Dashboard implements OnInit, OnDestroy {
           }
         }
       }, 500);
-      
+
       console.log('Users PDF download initiated successfully');
     } catch (error) {
       console.error('Error downloading users PDF:', error);
@@ -4263,7 +4356,7 @@ export class Dashboard implements OnInit, OnDestroy {
     const currentDate = new Date().toLocaleDateString('en-IN');
     const currentTime = new Date().toLocaleTimeString('en-IN');
     const adminName = 'Admin'; // You can get this from authentication service
-    
+
     return `
 <!DOCTYPE html>
 <html>
@@ -4602,7 +4695,7 @@ export class Dashboard implements OnInit, OnDestroy {
   trackByAadharAndMobile() {
     const aadhar = prompt('Enter Aadhar Number:');
     const mobile = prompt('Enter Mobile Number:');
-    
+
     if (!aadhar || !mobile) {
       this.alertService.userError('Invalid Input', 'Please provide both Aadhar number and mobile number.');
       return;
@@ -4621,9 +4714,9 @@ export class Dashboard implements OnInit, OnDestroy {
       next: (response: any) => {
         if (response.success && response.tracking) {
           const tracking = response.tracking;
-          this.alertService.userSuccess('Tracking Found', 
+          this.alertService.userSuccess('Tracking Found',
             `Tracking ID: ${tracking.trackingId}\nStatus: ${this.getStatusLabel(tracking.status)}\nAadhar: ${tracking.aadharNumber}\nMobile: ${tracking.mobileNumber}`);
-          
+
           // Scroll to the tracking in the list if it exists
           const foundTracking = this.accountTrackings.find(t => t.id === tracking.id);
           if (foundTracking) {
@@ -4798,7 +4891,7 @@ export class Dashboard implements OnInit, OnDestroy {
     const params = new HttpParams()
       .set('ratePerGram', this.newGoldRate.toString())
       .set('updatedBy', this.adminName);
-    
+
     this.http.put<any>(`${environment.apiBaseUrl}/api/gold-rates/update`, {}, { params }).subscribe({
       next: (response) => {
         if (response.success) {
@@ -5119,7 +5212,7 @@ export class Dashboard implements OnInit, OnDestroy {
     const due = new Date(dueDate);
     const today = new Date();
     const daysUntilDue = Math.ceil((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-    
+
     if (daysUntilDue < 0) {
       return `Overdue by ${Math.abs(daysUntilDue)} day${Math.abs(daysUntilDue) !== 1 ? 's' : ''}`;
     } else if (daysUntilDue === 0) {
@@ -5161,7 +5254,7 @@ export class Dashboard implements OnInit, OnDestroy {
       next: (response) => {
         console.log('Pending Aadhar verifications loaded:', response);
         // Filter to show only PENDING and ADMIN_SEEN statuses
-        this.accountTrackings = response.filter(t => 
+        this.accountTrackings = response.filter(t =>
           t.status === 'PENDING' || t.status === 'ADMIN_SEEN'
         );
       },
@@ -5204,7 +5297,7 @@ export class Dashboard implements OnInit, OnDestroy {
   }
 
   get filteredAadharVerifications(): AccountTracking[] {
-    let filtered = this.accountTrackings.filter(t => 
+    let filtered = this.accountTrackings.filter(t =>
       t.status === 'PENDING' || t.status === 'ADMIN_SEEN'
     );
 
@@ -5222,7 +5315,7 @@ export class Dashboard implements OnInit, OnDestroy {
   }
 
   get pendingAadharVerifications(): number {
-    return this.accountTrackings.filter(t => 
+    return this.accountTrackings.filter(t =>
       t.status === 'PENDING' || t.status === 'ADMIN_SEEN'
     ).length;
   }
@@ -5234,7 +5327,7 @@ export class Dashboard implements OnInit, OnDestroy {
   // Load User Login History
   loadLoginHistory() {
     if (!isPlatformBrowser(this.platformId)) return;
-    
+
     this.isLoadingLoginHistory = true;
     this.http.get<any[]>(`${environment.apiBaseUrl}/api/admins/login-history/recent?limit=100`).subscribe({
       next: (history) => {
@@ -5263,7 +5356,7 @@ export class Dashboard implements OnInit, OnDestroy {
     try {
       const date = new Date(dateTimeString);
       if (isNaN(date.getTime())) return dateTimeString;
-      
+
       return date.toLocaleString('en-IN', {
         year: 'numeric',
         month: 'short',
@@ -5282,10 +5375,10 @@ export class Dashboard implements OnInit, OnDestroy {
   // Load all transactions including FD, Investment, Subsidy related
   loadAllTransactions() {
     if (!isPlatformBrowser(this.platformId)) return;
-    
+
     this.isLoadingTransactions = true;
     this.allTransactions = [];
-    
+
     // Load regular transactions
     this.http.get(`${environment.apiBaseUrl}/api/transactions?page=0&size=1000`).subscribe({
       next: (response: any) => {
@@ -5296,7 +5389,7 @@ export class Dashboard implements OnInit, OnDestroy {
         } else if (Array.isArray(response)) {
           transactionsData = response;
         }
-        
+
         // Map transactions and get user names
         transactionsData.forEach((transaction: any) => {
           const user = this.users.find(u => u.accountNumber === transaction.accountNumber);
@@ -5315,7 +5408,7 @@ export class Dashboard implements OnInit, OnDestroy {
             category: this.determineTransactionCategory(transaction)
           });
         });
-        
+
         // Load FD related transactions
         this.loadFDTransactions();
         // Load Investment transactions
@@ -5475,10 +5568,10 @@ export class Dashboard implements OnInit, OnDestroy {
     const uniqueTransactions = Array.from(
       new Map(this.allTransactions.map(t => [t.id, t])).values()
     );
-    
+
     // Sort by date (newest first)
     uniqueTransactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    
+
     this.allTransactions = uniqueTransactions;
     this.isLoadingTransactions = false;
     console.log('All transactions loaded:', this.allTransactions.length);
@@ -5526,12 +5619,12 @@ export class Dashboard implements OnInit, OnDestroy {
   // Get filtered transactions
   getFilteredTransactions(): any[] {
     let filtered = this.allTransactions;
-    
+
     // Filter by selected user
     if (this.selectedUserForTransactions) {
       filtered = filtered.filter(t => t.accountNumber === this.selectedUserForTransactions);
     }
-    
+
     // Filter by PAN number
     if (this.transactionsPANFilter && this.transactionsPANFilter.trim() !== '') {
       const panQuery = this.transactionsPANFilter.trim().toUpperCase();
@@ -5544,14 +5637,14 @@ export class Dashboard implements OnInit, OnDestroy {
         return user && user.pan && user.pan.toUpperCase().includes(panQuery);
       });
     }
-    
+
     // Filter by date
     if (this.transactionsDateFilter && this.transactionsDateFilter.trim() !== '') {
       const filterDate = new Date(this.transactionsDateFilter);
       filterDate.setHours(0, 0, 0, 0);
       const nextDay = new Date(filterDate);
       nextDay.setDate(nextDay.getDate() + 1);
-      
+
       filtered = filtered.filter(t => {
         if (!t.date) return false;
         const txnDate = new Date(t.date);
@@ -5559,12 +5652,12 @@ export class Dashboard implements OnInit, OnDestroy {
         return txnDate >= filterDate && txnDate < nextDay;
       });
     }
-    
+
     // Filter by type
     if (this.transactionsTypeFilter !== 'ALL') {
       filtered = filtered.filter(t => t.type === this.transactionsTypeFilter);
     }
-    
+
     // Filter by category
     if (this.transactionsCategoryFilter !== 'ALL') {
       filtered = filtered.filter(t => {
@@ -5572,7 +5665,7 @@ export class Dashboard implements OnInit, OnDestroy {
         return t.category === this.transactionsCategoryFilter;
       });
     }
-    
+
     // Filter by search query (account number, name, description, loan number, FD number, etc.)
     if (this.transactionsSearchQuery && this.transactionsSearchQuery.trim() !== '') {
       const query = this.transactionsSearchQuery.toLowerCase();
@@ -5588,32 +5681,32 @@ export class Dashboard implements OnInit, OnDestroy {
         // Check for loan number in description
         if (t.description && t.description.toLowerCase().includes('loan') && query.includes('loan')) return true;
         // Check for FD number in description
-        if (t.description && (t.description.toLowerCase().includes('fd') || t.description.toLowerCase().includes('fixed deposit')) && 
+        if (t.description && (t.description.toLowerCase().includes('fd') || t.description.toLowerCase().includes('fixed deposit')) &&
             (query.includes('fd') || query.includes('fixed'))) return true;
         // Check for subsidy in description
         if (t.description && t.description.toLowerCase().includes('subsidy') && query.includes('subsidy')) return true;
         // Check for investment/mutual fund in description
-        if (t.description && (t.description.toLowerCase().includes('investment') || t.description.toLowerCase().includes('mutual fund')) && 
+        if (t.description && (t.description.toLowerCase().includes('investment') || t.description.toLowerCase().includes('mutual fund')) &&
             (query.includes('investment') || query.includes('mutual'))) return true;
         return false;
       });
     }
-    
+
     return filtered;
   }
 
   getFilteredLoginHistory(): any[] {
     let filtered = this.loginHistory;
-    
+
     // Filter by status
     if (this.loginHistoryFilter !== 'ALL') {
       filtered = filtered.filter(h => h.status === this.loginHistoryFilter);
     }
-    
+
     // Filter by search query
     if (this.loginHistorySearchQuery && this.loginHistorySearchQuery.trim() !== '') {
       const query = this.loginHistorySearchQuery.toLowerCase();
-      filtered = filtered.filter(h => 
+      filtered = filtered.filter(h =>
         (h.userName && h.userName.toLowerCase().includes(query)) ||
         (h.userEmail && h.userEmail.toLowerCase().includes(query)) ||
         (h.accountNumber && h.accountNumber.toLowerCase().includes(query)) ||
@@ -5621,16 +5714,16 @@ export class Dashboard implements OnInit, OnDestroy {
         (h.loginLocation && h.loginLocation.toLowerCase().includes(query))
       );
     }
-    
+
     return filtered;
   }
-  
+
   // Load Loan Prediction History
   loadLoanPredictions() {
     if (!isPlatformBrowser(this.platformId)) return;
-    
+
     this.isLoadingPredictions = true;
-    
+
     this.http.get(`${environment.apiBaseUrl}/api/loans/predictions/all`).subscribe({
       next: (response: any) => {
         if (response.success) {
@@ -5650,52 +5743,52 @@ export class Dashboard implements OnInit, OnDestroy {
       }
     });
   }
-  
+
   // Filter predictions
   getFilteredPredictions() {
     let filtered = this.loanPredictions;
-    
+
     // Filter by result
     if (this.predictionFilter !== 'ALL') {
-      filtered = filtered.filter((p: any) => 
+      filtered = filtered.filter((p: any) =>
         p.predictionResult === this.predictionFilter
       );
     }
-    
+
     // Filter by loan type
     if (this.predictionLoanTypeFilter !== 'ALL') {
-      filtered = filtered.filter((p: any) => 
+      filtered = filtered.filter((p: any) =>
         p.loanType === this.predictionLoanTypeFilter
       );
     }
-    
+
     // Filter by search query
     if (this.predictionSearchQuery && this.predictionSearchQuery.trim() !== '') {
       const query = this.predictionSearchQuery.toLowerCase();
-      filtered = filtered.filter((p: any) => 
+      filtered = filtered.filter((p: any) =>
         (p.userName && p.userName.toLowerCase().includes(query)) ||
         (p.accountNumber && p.accountNumber.toLowerCase().includes(query)) ||
         (p.pan && p.pan.toLowerCase().includes(query)) ||
         (p.loanType && p.loanType.toLowerCase().includes(query))
       );
     }
-    
+
     return filtered;
   }
-  
+
   // Get prediction statistics
   getPredictionStats() {
     const all = this.loanPredictions.length;
     const approved = this.loanPredictions.filter((p: any) => p.predictionResult === 'Approved').length;
     const rejected = this.loanPredictions.filter((p: any) => p.predictionResult === 'Rejected').length;
     const pending = this.loanPredictions.filter((p: any) => p.predictionResult === 'Pending Review').length;
-    
+
     return { all, approved, rejected, pending };
   }
-  
+
   // Expose Math to template
   Math = Math;
-  
+
   // Helper methods for date comparisons in templates
   isFDMatured(fd: any): boolean {
     if (!fd || !fd.maturityDate || fd.isMatured) return false;
@@ -5703,7 +5796,7 @@ export class Dashboard implements OnInit, OnDestroy {
     const today = new Date();
     return maturityDate <= today;
   }
-  
+
   isEMIOverdue(emi: any): boolean {
     if (!emi || emi.status !== 'Pending' || !emi.dueDate) return false;
     const dueDate = new Date(emi.dueDate);
@@ -5721,8 +5814,8 @@ export class Dashboard implements OnInit, OnDestroy {
   getPendingLoansCount(): number {
     // Count pending loans from loan predictions or loan requests
     if (this.loanPredictions && this.loanPredictions.length > 0) {
-      return this.loanPredictions.filter((p: any) => 
-        p.predictionResult === 'Pending Review' || 
+      return this.loanPredictions.filter((p: any) =>
+        p.predictionResult === 'Pending Review' ||
         (p.status && p.status === 'PENDING')
       ).length;
     }
@@ -5806,11 +5899,11 @@ export class Dashboard implements OnInit, OnDestroy {
     const endDate = new Date();
     const startDate = new Date();
     startDate.setMonth(startDate.getMonth() - 1);
-    
+
     // Format dates properly for backend
     const startDateStr = startDate.toISOString().split('T')[0] + 'T00:00:00';
     const endDateStr = endDate.toISOString().split('T')[0] + 'T23:59:59';
-    
+
     this.http.get(`${environment.apiBaseUrl}/api/credit-cards/${cardId}/statement?startDate=${startDateStr}&endDate=${endDateStr}`).subscribe({
       next: (transactions: any) => {
         // Display statement - you can create a modal or download as PDF
@@ -5866,7 +5959,7 @@ export class Dashboard implements OnInit, OnDestroy {
       return;
     }
 
-    const newLimit = this.limitAction === 'increase' 
+    const newLimit = this.limitAction === 'increase'
       ? this.selectedCreditCard.approvedLimit + this.limitChangeAmount
       : this.selectedCreditCard.approvedLimit - this.limitChangeAmount;
 
@@ -5907,7 +6000,7 @@ export class Dashboard implements OnInit, OnDestroy {
   // Bill Payments Management Methods
   loadBillPayments() {
     if (!isPlatformBrowser(this.platformId)) return;
-    
+
     this.isLoadingBillPayments = true;
     this.http.get(`${environment.apiBaseUrl}/api/bill-payments/all`).subscribe({
       next: (payments: any) => {
@@ -5985,14 +6078,14 @@ export class Dashboard implements OnInit, OnDestroy {
       alert('Account Number and PAN are required');
       return;
     }
-    
+
     const payload = {
       accountNumber: this.applyCreditCardForm.accountNumber,
       userName: this.applyCreditCardForm.userName,
       userEmail: this.applyCreditCardForm.userEmail,
       pan: this.applyCreditCardForm.pan
     };
-    
+
     this.http.post(`${environment.apiBaseUrl}/api/credit-card-requests/create?income=${this.applyCreditCardForm.income || 0}`, payload).subscribe({
       next: (res: any) => {
         alert('Credit card application submitted successfully');
@@ -6012,7 +6105,7 @@ export class Dashboard implements OnInit, OnDestroy {
       }
     });
   }
-  
+
   // Support Ticket Methods
   loadSupportTickets() {
     this.isLoadingSupportTickets = true;

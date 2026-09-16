@@ -78,6 +78,7 @@ public class DepositRequestService {
                 CurrentAccount ca = currentAccountRepository.findByAccountNumber(accountNumber)
                         .orElseThrow(() -> new IllegalArgumentException("Account not found for number: " + accountNumber));
                 ca.setBalance((ca.getBalance() == null ? 0.0 : ca.getBalance()) + amount);
+                ca.setLastUpdated(LocalDateTime.now());
                 currentAccountRepository.save(ca);
                 return ca.getBalance();
             }
@@ -85,11 +86,48 @@ public class DepositRequestService {
                 SalaryAccount sal = salaryAccountRepository.findByAccountNumber(accountNumber);
                 if (sal == null) throw new IllegalArgumentException("Account not found for number: " + accountNumber);
                 sal.setBalance((sal.getBalance() == null ? 0.0 : sal.getBalance()) + amount);
+                sal.setUpdatedAt(LocalDateTime.now());
                 salaryAccountRepository.save(sal);
                 return sal.getBalance();
             }
             default:
                 return accountService.creditBalance(accountNumber, amount);
+        }
+    }
+
+    private Double debitAnyAccount(String accountNumber, String type, Double amount) {
+        switch (type) {
+            case "CURRENT": {
+                CurrentAccount ca = currentAccountRepository.findByAccountNumber(accountNumber)
+                        .orElseThrow(() -> new IllegalArgumentException("Source account not found for number: " + accountNumber));
+                Double currentBal = ca.getBalance() == null ? 0.0 : ca.getBalance();
+                if (currentBal < amount) {
+                    throw new IllegalArgumentException("Insufficient balance in source account " + accountNumber + ". Available: ₹" + currentBal + ", Required: ₹" + amount);
+                }
+                ca.setBalance(currentBal - amount);
+                ca.setLastUpdated(LocalDateTime.now());
+                currentAccountRepository.save(ca);
+                return ca.getBalance();
+            }
+            case "SALARY": {
+                SalaryAccount sal = salaryAccountRepository.findByAccountNumber(accountNumber);
+                if (sal == null) throw new IllegalArgumentException("Source account not found for number: " + accountNumber);
+                Double currentBal = sal.getBalance() == null ? 0.0 : sal.getBalance();
+                if (currentBal < amount) {
+                    throw new IllegalArgumentException("Insufficient balance in source account " + accountNumber + ". Available: ₹" + currentBal + ", Required: ₹" + amount);
+                }
+                sal.setBalance(currentBal - amount);
+                sal.setUpdatedAt(LocalDateTime.now());
+                salaryAccountRepository.save(sal);
+                return sal.getBalance();
+            }
+            default: {
+                Double newBal = accountService.debitBalance(accountNumber, amount);
+                if (newBal == null) {
+                    throw new IllegalArgumentException("Insufficient balance or inactive source account: " + accountNumber);
+                }
+                return newBal;
+            }
         }
     }
 
@@ -103,7 +141,7 @@ public class DepositRequestService {
         }
 
         // Ensure account exists (savings, current, or salary)
-        ResolvedAccount account = resolveAnyAccount(request.getAccountNumber());
+        ResolvedAccount account = resolveAnyAccount(request.getAccountNumber().trim());
         if (account == null) {
             throw new IllegalArgumentException("Account not found for number: " + request.getAccountNumber());
         }
@@ -114,21 +152,40 @@ public class DepositRequestService {
             if (request.getReferenceNumber() == null || request.getReferenceNumber().isBlank()) {
                 throw new IllegalArgumentException("Cheque number is required for cheque deposits");
             }
-            Map<String, Object> cheque = chequeService.verifyForDeposit(request.getReferenceNumber(), request.getAccountNumber());
+            String chequeNum = request.getReferenceNumber().trim();
+            Map<String, Object> cheque = chequeService.verifyForDeposit(chequeNum);
             if (!Boolean.TRUE.equals(cheque.get("valid"))) {
-                throw new IllegalArgumentException(String.valueOf(cheque.get("message")));
+                throw new IllegalArgumentException("Cheque is invalid or already used/drawn/cancelled: " + cheque.get("message"));
             }
+
+            String chqAccNum = String.valueOf(cheque.get("accountNumber"));
+            String chqAccHolder = String.valueOf(cheque.get("accountHolderName"));
+            String chqStatus = String.valueOf(cheque.get("status"));
+            Double chqBal = (Double) cheque.get("availableBalance");
+
             request.setChequeValid(true);
-            request.setChequeAccountNumber(String.valueOf(cheque.get("accountNumber")));
-            request.setChequeAccountHolderName(String.valueOf(cheque.get("accountHolderName")));
-            request.setChequeStatus(String.valueOf(cheque.get("status")));
-            request.setChequeAvailableBalance((Double) cheque.get("availableBalance"));
+            request.setChequeAccountNumber(chqAccNum);
+            request.setChequeAccountHolderName(chqAccHolder);
+            request.setChequeStatus(chqStatus);
+            request.setChequeAvailableBalance(chqBal);
+
+            // Determine if SELF or OTHER account cheque transfer
+            if (chqAccNum != null && chqAccNum.trim().equalsIgnoreCase(request.getAccountNumber().trim())) {
+                request.setTransferType("SELF");
+            } else {
+                request.setTransferType("OTHER");
+                request.setSourceAccountNumber(chqAccNum);
+                request.setSourceAccountName(chqAccHolder);
+            }
+        } else {
+            request.setTransferType("SELF");
         }
+
         request.setStatus("PENDING");
         String requestedSlipId = request.getRequestId() == null ? null : request.getRequestId().trim();
         if (requestedSlipId != null && !requestedSlipId.isEmpty()
             && depositRequestRepository.findByRequestId(requestedSlipId).isPresent()) {
-            throw new IllegalArgumentException("Cash deposit slip ID is already in use");
+            throw new IllegalArgumentException("Deposit ID is already in use");
         }
         request.setRequestId(requestedSlipId == null || requestedSlipId.isEmpty()
             ? "DEP" + System.currentTimeMillis() : requestedSlipId);
@@ -184,46 +241,83 @@ public class DepositRequestService {
             throw new IllegalStateException("Only pending requests can be approved");
         }
 
-        if ("CHEQUE".equalsIgnoreCase(request.getMethod())) {
-            if (request.getReferenceNumber() == null || request.getReferenceNumber().isBlank())
-                throw new IllegalArgumentException("Cheque number is required for cheque deposits");
-            chequeService.markDeposited(request.getReferenceNumber(), request.getRequestId());
-        }
-
-        ResolvedAccount account = resolveAnyAccount(request.getAccountNumber());
-        if (account == null) {
+        ResolvedAccount targetAccount = resolveAnyAccount(request.getAccountNumber());
+        if (targetAccount == null) {
             throw new IllegalArgumentException("Account not found for number: " + request.getAccountNumber());
         }
 
-        // Check if account is closed
-        if ("CLOSED".equalsIgnoreCase(account.status)) {
+        if ("CLOSED".equalsIgnoreCase(targetAccount.status)) {
             throw new IllegalStateException("Cannot approve deposit for a closed account. Account number: " + request.getAccountNumber());
         }
 
-        Double newBalance = creditAnyAccount(request.getAccountNumber(), account.type, request.getAmount());
+        // Handle Cheque Deposits & Transfers
+        if ("CHEQUE".equalsIgnoreCase(request.getMethod())) {
+            if (request.getReferenceNumber() == null || request.getReferenceNumber().isBlank()) {
+                throw new IllegalArgumentException("Cheque number is required for cheque deposits");
+            }
+
+            // Check if OTHER account cheque transfer
+            if ("OTHER".equalsIgnoreCase(request.getTransferType()) && request.getSourceAccountNumber() != null) {
+                ResolvedAccount sourceAccount = resolveAnyAccount(request.getSourceAccountNumber());
+                if (sourceAccount == null) {
+                    throw new IllegalArgumentException("Source cheque account not found: " + request.getSourceAccountNumber());
+                }
+
+                // Debit amount from source account
+                Double sourceNewBal = debitAnyAccount(request.getSourceAccountNumber(), sourceAccount.type, request.getAmount());
+
+                // Log Debit transaction for source account
+                Transaction sourceTxn = new Transaction();
+                sourceTxn.setMerchant("Cheque Transfer Debit");
+                sourceTxn.setAmount(request.getAmount());
+                sourceTxn.setType("Debit");
+                sourceTxn.setDescription("Cheque #" + request.getReferenceNumber() + " transferred to " + request.getAccountNumber() + " (Deposit ID: " + request.getRequestId() + ")");
+                sourceTxn.setBalance(sourceNewBal);
+                sourceTxn.setStatus("Completed");
+                sourceTxn.setUserName(sourceAccount.name);
+                sourceTxn.setAccountNumber(request.getSourceAccountNumber());
+                transactionService.saveTransaction(sourceTxn);
+            }
+
+            chequeService.markDeposited(request.getReferenceNumber(), request.getRequestId());
+        }
+
+        // Credit target account
+        Double newBalance = creditAnyAccount(request.getAccountNumber(), targetAccount.type, request.getAmount());
         if (newBalance == null) {
             throw new IllegalStateException("Unable to credit balance. Please verify account number.");
         }
 
-        // Save transaction
+        // Save Credit transaction
+        String desc = request.getNote() != null && !request.getNote().isBlank() ? request.getNote() : "Deposit approved - " + request.getRequestId();
+        if ("OTHER".equalsIgnoreCase(request.getTransferType()) && request.getSourceAccountNumber() != null) {
+            desc = "Cheque Transfer Credit from " + request.getSourceAccountName() + " (" + request.getSourceAccountNumber() + ") - Cheque #" + request.getReferenceNumber() + " | " + desc;
+        }
+
         Transaction transaction = new Transaction();
-        transaction.setMerchant("Deposit Request");
+        transaction.setMerchant("Deposit Request (" + (request.getMethod() != null ? request.getMethod() : "Cash") + ")");
         transaction.setAmount(request.getAmount());
         transaction.setType("Deposit");
-        transaction.setDescription(request.getNote() != null ? request.getNote() : "Deposit approved");
+        transaction.setDescription(desc);
         transaction.setBalance(newBalance);
         transaction.setStatus("Completed");
-        transaction.setUserName(account.name);
+        transaction.setUserName(targetAccount.name);
         transaction.setAccountNumber(request.getAccountNumber());
         Transaction savedTxn = transactionService.saveTransaction(transaction);
 
         request.setStatus("APPROVED");
-        request.setProcessedBy(processedBy);
+        request.setProcessedBy(processedBy != null ? processedBy : "Admin");
         request.setProcessedAt(LocalDateTime.now());
         request.setUpdatedAt(LocalDateTime.now());
         request.setResultingBalance(newBalance);
         request.setTransactionId(savedTxn.getTransactionId());
         return depositRequestRepository.save(request);
+    }
+
+    @Transactional
+    public DepositRequest createAndApproveDirectDeposit(DepositRequest request, String adminEmail) {
+        DepositRequest created = createRequest(request);
+        return approveRequest(created.getId(), adminEmail != null ? adminEmail : "Admin");
     }
 
     public DepositRequest rejectRequest(Long id, String processedBy, String reason) {
