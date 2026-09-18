@@ -590,9 +590,7 @@ export class ChequeManagementComponent implements OnInit, OnDestroy {
             applicationNumber: accountNumber
           };
         }
-        const viewUrl = `${environment.apiBaseUrl}/api/admin-account-applications/view-signed-document/${accountNumber.trim()}`;
-        this.signatureDocUrl = this.sanitizer.bypassSecurityTrustResourceUrl(viewUrl);
-        this.signatureLoading = false;
+        this.loadSignatureDocumentContent(accountNumber.trim());
       },
       error: () => {
         this.signatureInfo = {
@@ -600,8 +598,21 @@ export class ChequeManagementComponent implements OnInit, OnDestroy {
           accountType: 'Savings/Salary',
           applicationNumber: accountNumber
         };
-        const viewUrl = `${environment.apiBaseUrl}/api/admin-account-applications/view-signed-document/${accountNumber.trim()}`;
-        this.signatureDocUrl = this.sanitizer.bypassSecurityTrustResourceUrl(viewUrl);
+        this.loadSignatureDocumentContent(accountNumber.trim());
+      }
+    });
+  }
+
+  private loadSignatureDocumentContent(accountNumber: string) {
+    const viewUrl = `${environment.apiBaseUrl}/api/admin-account-applications/view-signed-document/${encodeURIComponent(accountNumber)}`;
+    this.http.get(viewUrl, { responseType: 'blob' }).subscribe({
+      next: (documentBlob: Blob) => {
+        const documentUrl = URL.createObjectURL(documentBlob);
+        this.signatureDocUrl = this.sanitizer.bypassSecurityTrustResourceUrl(documentUrl);
+        this.signatureLoading = false;
+      },
+      error: () => {
+        this.signatureError = 'Unable to load the account signature document.';
         this.signatureLoading = false;
       }
     });
