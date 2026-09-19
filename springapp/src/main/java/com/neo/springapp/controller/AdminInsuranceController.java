@@ -128,8 +128,7 @@ public class AdminInsuranceController {
                 throw new IllegalArgumentException("accountNumber and policyId are required");
             }
 
-            InsuranceApplication application = insuranceService.assignPolicyToAccount(accountNumber, policyId, premiumType, remark, customerName);
-            application = insuranceService.editApplication(application.getId(), payload);
+            InsuranceApplication application = insuranceService.assignPolicyToVerifiedAccount(accountNumber, policyId, premiumType, remark, customerName, payload);
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);
             response.put("application", application);

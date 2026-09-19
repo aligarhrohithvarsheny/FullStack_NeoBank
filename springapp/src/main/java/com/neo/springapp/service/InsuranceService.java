@@ -219,6 +219,35 @@ public class InsuranceService {
         return applicationRepository.save(application);
     }
 
+    @Transactional
+    public InsuranceApplication assignPolicyToVerifiedAccount(String accountNumber, Long policyId,
+                                                               String premiumType, String adminRemark,
+                                                               String customerName, Map<String, Object> details) {
+        Map<String, Object> verified = verifyLinkedAccount(accountNumber, customerName);
+        if (!Boolean.TRUE.equals(verified.get("valid"))) throw new RuntimeException(String.valueOf(verified.get("message")));
+        InsurancePolicy policy = policyRepository.findById(policyId).orElseThrow(() -> new RuntimeException("Policy not found"));
+        if (applicationRepository.existsNonRejectedByAccountAndPolicy(accountNumber, policyId)) {
+            throw new RuntimeException("This policy is already assigned/applied for this account.");
+        }
+        Optional<User> user = userService.getUserByAccountNumber(accountNumber);
+        InsuranceApplication application = new InsuranceApplication();
+        application.setPolicy(policy);
+        application.setUserId(user.map(User::getId).orElse(0L));
+        application.setAccountNumber(accountNumber.trim());
+        application.setNomineeName("ADMIN_ASSIGNED");
+        application.setNomineeRelation("");
+        application.setKycDocumentPath("");
+        application.setPremiumType(premiumType == null ? policy.getPremiumType() : premiumType);
+        application.setCreatedByAdmin(true);
+        application.setPaymentStatus("NOT_PAID");
+        application.setAdminRemark(adminRemark);
+        application.setLinkedAccountType(String.valueOf(verified.get("accountType")));
+        application.setPremiumAmountCalculated(calculatePremium(policy, application));
+        application.setStatus("PENDING_APPROVAL");
+        InsuranceApplication saved = applicationRepository.save(application);
+        return editApplication(saved.getId(), details);
+    }
+
     public Map<String, Object> verifyLinkedAccount(String accountNumber, String expectedName) {
         Map<String, Object> response = new HashMap<>();
         if (accountNumber == null || accountNumber.isBlank()) throw new IllegalArgumentException("Account number is required");
