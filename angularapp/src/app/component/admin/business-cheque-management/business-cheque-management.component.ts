@@ -458,7 +458,7 @@ export class BusinessChequeManagementComponent implements OnInit, OnDestroy {
   canRevertItem(item: any): boolean {
     if (!item) return false;
     const status = (item.status || '').toUpperCase();
-    if (status !== 'APPROVED' && status !== 'COMPLETED' && status !== 'CLEAR' && status !== 'DRAWN') return false;
+    if (status !== 'APPROVED' && status !== 'COMPLETED' && status !== 'CLEARED') return false;
     const actionDate = item.approvedAt || item.updatedAt;
     if (!actionDate) return true;
     const actionTime = new Date(actionDate).getTime();

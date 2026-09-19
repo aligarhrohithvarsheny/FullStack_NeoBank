@@ -468,7 +468,8 @@ export class AdminCheques implements OnInit {
   reverting: boolean = false;
 
   canRevertCheque(cheque: ChequeModel): boolean {
-    if (cheque.status !== 'DRAWN' && cheque.requestStatus !== 'APPROVED') return false;
+    // Backend only allows reverting cheques whose status is DRAWN (see ChequeService.revertCheque)
+    if (cheque.status !== 'DRAWN') return false;
     const actionDate = cheque.drawnDate || cheque.approvedDate;
     if (!actionDate) return true;
     const actionTime = new Date(actionDate).getTime();

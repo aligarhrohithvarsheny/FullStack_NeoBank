@@ -34,6 +34,28 @@ public class AdminAccountApplicationController {
 
     private static final String UPLOAD_DIR = "uploads/admin-account-applications/";
 
+    // Files.probeContentType() is unreliable on minimal Linux/Docker hosts (often returns null),
+    // which causes browsers to download instead of render the document inline. Fall back to
+    // extension-based detection so signed documents always render correctly.
+    private static String resolveContentType(Path filePath) {
+        try {
+            String detected = Files.probeContentType(filePath);
+            if (detected != null) return detected;
+        } catch (IOException ignored) {
+        }
+        String name = filePath.getFileName().toString().toLowerCase();
+        if (name.endsWith(".pdf")) return "application/pdf";
+        if (name.endsWith(".jpg") || name.endsWith(".jpeg")) return "image/jpeg";
+        if (name.endsWith(".png")) return "image/png";
+        if (name.endsWith(".gif")) return "image/gif";
+        if (name.endsWith(".bmp")) return "image/bmp";
+        if (name.endsWith(".webp")) return "image/webp";
+        if (name.endsWith(".svg")) return "image/svg+xml";
+        if (name.endsWith(".doc")) return "application/msword";
+        if (name.endsWith(".docx")) return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+        return "application/octet-stream";
+    }
+
     // ==================== CRUD ====================
 
     @PostMapping("/create")
@@ -396,10 +418,7 @@ public class AdminAccountApplicationController {
                 return ResponseEntity.notFound().build();
             }
             byte[] fileBytes = Files.readAllBytes(filePath);
-            String contentType = Files.probeContentType(filePath);
-            if (contentType == null) {
-                contentType = "application/octet-stream";
-            }
+            String contentType = resolveContentType(filePath);
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.parseMediaType(contentType));
             headers.setContentDisposition(ContentDisposition.builder("inline")
@@ -427,10 +446,7 @@ public class AdminAccountApplicationController {
                 return ResponseEntity.notFound().build();
             }
             byte[] fileBytes = Files.readAllBytes(filePath);
-            String contentType = Files.probeContentType(filePath);
-            if (contentType == null) {
-                contentType = "application/octet-stream";
-            }
+            String contentType = resolveContentType(filePath);
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.parseMediaType(contentType));
             headers.setContentDisposition(ContentDisposition.builder("inline")
@@ -512,8 +528,7 @@ public class AdminAccountApplicationController {
                     Path filePath = Paths.get(app.getSignedApplicationPath());
                     if (Files.exists(filePath)) {
                         byte[] fileBytes = Files.readAllBytes(filePath);
-                        String contentType = Files.probeContentType(filePath);
-                        if (contentType == null) contentType = "application/octet-stream";
+                        String contentType = resolveContentType(filePath);
                         HttpHeaders headers = new HttpHeaders();
                         headers.setContentType(MediaType.parseMediaType(contentType));
                         headers.setContentDisposition(ContentDisposition.builder("inline").filename(filePath.getFileName().toString()).build());
@@ -533,8 +548,7 @@ public class AdminAccountApplicationController {
                     Path p = Paths.get(sal.getSignatureCopyPath());
                     if (Files.exists(p)) {
                         byte[] bytes = Files.readAllBytes(p);
-                        String ct = Files.probeContentType(p);
-                        if (ct == null) ct = "image/png";
+                        String ct = resolveContentType(p);
                         HttpHeaders h = new HttpHeaders();
                         h.setContentType(MediaType.parseMediaType(ct));
                         h.setContentDisposition(ContentDisposition.builder("inline").filename(p.getFileName().toString()).build());
@@ -551,8 +565,7 @@ public class AdminAccountApplicationController {
                     Path p = Paths.get(ca.getSignatureCopyPath());
                     if (Files.exists(p)) {
                         byte[] bytes = Files.readAllBytes(p);
-                        String ct = Files.probeContentType(p);
-                        if (ct == null) ct = "image/png";
+                        String ct = resolveContentType(p);
                         HttpHeaders h = new HttpHeaders();
                         h.setContentType(MediaType.parseMediaType(ct));
                         h.setContentDisposition(ContentDisposition.builder("inline").filename(p.getFileName().toString()).build());
@@ -567,8 +580,7 @@ public class AdminAccountApplicationController {
                 Path p = Paths.get(savings.getSignatureCopyPath());
                 if (Files.exists(p)) {
                     byte[] bytes = Files.readAllBytes(p);
-                    String ct = Files.probeContentType(p);
-                    if (ct == null) ct = "image/png";
+                    String ct = resolveContentType(p);
                     HttpHeaders h = new HttpHeaders();
                     h.setContentType(MediaType.parseMediaType(ct));
                     h.setContentDisposition(ContentDisposition.builder("inline").filename(p.getFileName().toString()).build());

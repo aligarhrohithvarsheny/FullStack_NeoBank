@@ -215,7 +215,7 @@ public class BusinessChequeDrawService {
         BusinessChequeRequest request = chequeRequestRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Business cheque request not found"));
 
-        if (!"APPROVED".equals(request.getStatus()) && !"CLEAR".equals(request.getStatus()) && !"PICKED_UP".equals(request.getStatus())) {
+        if (!"APPROVED".equals(request.getStatus()) && !"COMPLETED".equals(request.getStatus()) && !"CLEARED".equals(request.getStatus())) {
             throw new RuntimeException("Only approved or drawn cheques can be reverted. Current status: " + request.getStatus());
         }
 
