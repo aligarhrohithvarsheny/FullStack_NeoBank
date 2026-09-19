@@ -1,6 +1,7 @@
 import { Component, OnInit, OnDestroy, Inject, PLATFORM_ID, ViewEncapsulation, ViewChild, ElementRef } from '@angular/core';
 import { Router } from '@angular/router';
 import { isPlatformBrowser } from '@angular/common';
+import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { HttpClient, HttpParams } from '@angular/common/http';
@@ -83,6 +84,33 @@ export class Dashboard implements OnInit, OnDestroy {
 
   // Transaction history
   adminTransactionHistory: TransactionRecord[] = [];
+
+  // Admin Cash Deposit/Withdrawal history (Quick Actions) - real backend history for all account types
+  adminCashTransactions: any[] = [];
+  adminCashSearchTerm: string = '';
+  loadingAdminCashTransactions: boolean = false;
+  revertingCashTxnId: number | null = null;
+
+  // Admin Update Fund Transfer (sender cheque verification + receiver lookup + 0.5% charge)
+  adminTransfers: any[] = [];
+  adminTransferSearchTerm: string = '';
+  loadingAdminTransfers: boolean = false;
+  aftSenderAccountNumber: string = '';
+  aftSenderChequeNumber: string = '';
+  aftSenderVerification: any = null;
+  aftVerifyingSender: boolean = false;
+  aftReceiverAccountNumber: string = '';
+  aftReceiverVerification: any = null;
+  aftVerifyingReceiver: boolean = false;
+  aftAmount: number | null = null;
+  aftDescription: string = '';
+  aftProcessing: boolean = false;
+  aftEditingId: number | null = null;
+  aftEditDescription: string = '';
+  aftRevertingId: number | null = null;
+  showAftSignatureModal: boolean = false;
+  aftSignatureUrl: SafeResourceUrl | null = null;
+  aftSignatureLoading: boolean = false;
 
   // Session tracking properties
   loginTime: Date | null = null;
@@ -717,7 +745,8 @@ export class Dashboard implements OnInit, OnDestroy {
     private alertService: AlertService,
     private backendWakeup: BackendWakeupService,
     private faceAuthService: FaceAuthService,
-    private pgService: PaymentGatewayService
+    private pgService: PaymentGatewayService,
+    private sanitizer: DomSanitizer
   ) {}
 
   ngOnInit() {
@@ -1634,9 +1663,13 @@ export class Dashboard implements OnInit, OnDestroy {
       }
       // Load deposit/withdraw form
       this.loadDepositRequests();
+      this.loadAdminCashTransactions();
     } else if (section === 'net-banking-control') {
       this.loadNetBankingStatus();
       this.loadNetBankingAuditHistory();
+    } else if (section === 'transfers') {
+      this.loadAllTransfers();
+      this.loadAdminTransfers();
     } else if (section === 'biometric') {
       this.loadBiometricCredentials();
     } else if (section === 'payment-gateway') {
@@ -2923,31 +2956,307 @@ export class Dashboard implements OnInit, OnDestroy {
       accountNumber: accountNumber
     };
 
-    this.http.post(`${environment.apiBaseUrl}/api/transactions`, backendTransactionData).subscribe({
-      next: (transactionResponse: any) => {
-        console.log('Transaction saved to database:', transactionResponse);
+    const balanceBefore = this.verifiedAccountDetails?.balance || 0;
 
-        // Generate receipt
-        this.generateReceipt(transactionId, accountNumber, userName, newBalance, accountType);
+    const finishUp = () => {
+      // Save to the real admin cash transaction history (backs history for ALL account types, with search + revert)
+      this.recordAdminCashTransaction(transactionId, accountNumber, userName, accountType, balanceBefore, newBalance);
 
-        // Save to admin transaction history (use the record with id and date)
-        this.saveAdminTransaction(transactionRecord);
+      // Generate receipt
+      this.generateReceipt(transactionId, accountNumber, userName, newBalance, accountType);
 
-        // Show success message
-        this.successMessage = `${this.operationType === 'deposit' ? 'Deposit' : 'Withdrawal'} of ₹${this.amount} successful!`;
-        this.errorMessage = '';
+      // Save to admin transaction history (use the record with id and date)
+      this.saveAdminTransaction(transactionRecord);
 
-        // Refresh user data
+      // Show success message
+      this.successMessage = `${this.operationType === 'deposit' ? 'Deposit' : 'Withdrawal'} of ₹${this.amount} successful!`;
+      this.errorMessage = '';
+
+      // Refresh user data
+      this.refreshUsersData();
+    };
+
+    // Regular (savings) accounts also back the shared /api/transactions table used by the
+    // account's own passbook/transaction history & receipts elsewhere in the app.
+    if (accountType === 'regular') {
+      this.http.post(`${environment.apiBaseUrl}/api/transactions`, backendTransactionData).subscribe({
+        next: (transactionResponse: any) => {
+          console.log('Transaction saved to database:', transactionResponse);
+          finishUp();
+        },
+        error: (txnErr: any) => {
+          console.error('Error saving transaction to database:', txnErr);
+          finishUp();
+        }
+      });
+    } else {
+      // Other account types (salary/current/loan/goldloan/cheque) don't share the regular
+      // Account entity, so posting to /api/transactions there silently failed/produced nothing
+      // usable — this is why history wasn't showing up for them. Just record it directly.
+      finishUp();
+    }
+  }
+
+  recordAdminCashTransaction(transactionId: string, accountNumber: string, userName: string, accountType: string, balanceBefore: number, balanceAfter: number) {
+    const payload = {
+      accountType,
+      accountId: this.verifiedAccountDetails?.accountId || null,
+      accountNumber,
+      accountHolderName: userName,
+      operationType: this.operationType,
+      amount: this.amount,
+      description: this.description,
+      balanceBefore,
+      balanceAfter,
+      performedBy: this.adminName
+    };
+    this.http.post(`${environment.apiBaseUrl}/api/admin-cash-transactions/record`, payload).subscribe({
+      next: () => this.loadAdminCashTransactions(),
+      error: (err: any) => console.error('Failed to save admin cash transaction history:', err)
+    });
+  }
+
+  loadAdminCashTransactions() {
+    this.loadingAdminCashTransactions = true;
+    this.http.get<any[]>(`${environment.apiBaseUrl}/api/admin-cash-transactions/all`).subscribe({
+      next: (list: any[]) => {
+        this.adminCashTransactions = list || [];
+        this.loadingAdminCashTransactions = false;
+      },
+      error: () => {
+        this.loadingAdminCashTransactions = false;
+      }
+    });
+  }
+
+  getFilteredAdminCashTransactions(): any[] {
+    if (!this.adminCashSearchTerm || !this.adminCashSearchTerm.trim()) {
+      return this.adminCashTransactions;
+    }
+    const term = this.adminCashSearchTerm.toLowerCase().trim();
+    return this.adminCashTransactions.filter(t =>
+      (t.refId || '').toLowerCase().includes(term) ||
+      (t.accountNumber || '').toLowerCase().includes(term) ||
+      (t.accountHolderName || '').toLowerCase().includes(term) ||
+      (t.description || '').toLowerCase().includes(term) ||
+      (t.accountType || '').toLowerCase().includes(term)
+    );
+  }
+
+  revertAdminCashTransaction(txn: any) {
+    if (!txn?.id) return;
+    if (!confirm(`Revert this ${txn.operationType} of ₹${txn.amount} on account ${txn.accountNumber}? The balance will be updated in real-time.`)) {
+      return;
+    }
+    this.revertingCashTxnId = txn.id;
+    this.http.post(`${environment.apiBaseUrl}/api/admin-cash-transactions/${txn.id}/revert`, {
+      revertedBy: this.adminName,
+      reason: 'Admin reverted cash transaction'
+    }).subscribe({
+      next: (res: any) => {
+        this.revertingCashTxnId = null;
+        this.alertService.success('Reverted', res.message || 'Transaction reverted successfully.');
+        this.loadAdminCashTransactions();
         this.refreshUsersData();
       },
-      error: (txnErr: any) => {
-        console.error('Error saving transaction to database:', txnErr);
-        console.error('Error details:', txnErr.error);
-        // Still generate receipt even if transaction save fails
-        this.generateReceipt(transactionId, accountNumber, userName, newBalance, accountType);
-        this.saveAdminTransaction(transactionRecord);
-        this.errorMessage = 'Transaction processed but failed to save transaction history.';
-        this.successMessage = `${this.operationType === 'deposit' ? 'Deposit' : 'Withdrawal'} completed!`;
+      error: (err: any) => {
+        this.revertingCashTxnId = null;
+        this.alertService.error('Revert Failed', err.error?.message || 'Failed to revert transaction');
+      }
+    });
+  }
+
+  // ==================== Admin Update Fund Transfer ====================
+
+  verifyAftSender() {
+    if (!this.aftSenderAccountNumber?.trim() || !this.aftSenderChequeNumber?.trim()) {
+      this.alertService.error('Missing Info', 'Enter sender account number and cheque number');
+      return;
+    }
+    this.aftVerifyingSender = true;
+    this.aftSenderVerification = null;
+    const params = new HttpParams()
+      .set('accountNumber', this.aftSenderAccountNumber.trim())
+      .set('chequeNumber', this.aftSenderChequeNumber.trim());
+    this.http.get(`${environment.apiBaseUrl}/api/admin-fund-transfers/verify-sender-cheque`, { params }).subscribe({
+      next: (res: any) => {
+        this.aftSenderVerification = res;
+        this.aftVerifyingSender = false;
+      },
+      error: (err: any) => {
+        this.aftSenderVerification = { valid: false, message: err.error?.message || 'Failed to verify sender cheque' };
+        this.aftVerifyingSender = false;
+      }
+    });
+  }
+
+  viewAftSenderSignature() {
+    if (!this.aftSenderAccountNumber?.trim()) return;
+    this.showAftSignatureModal = true;
+    this.aftSignatureLoading = true;
+    const viewUrl = `${environment.apiBaseUrl}/api/admin-account-applications/view-signed-document/${encodeURIComponent(this.aftSenderAccountNumber.trim())}`;
+    this.http.get(viewUrl, { responseType: 'blob' }).subscribe({
+      next: (blob: Blob) => {
+        const url = URL.createObjectURL(blob);
+        this.aftSignatureUrl = this.sanitizer.bypassSecurityTrustResourceUrl(url);
+        this.aftSignatureLoading = false;
+      },
+      error: () => {
+        this.aftSignatureLoading = false;
+      }
+    });
+  }
+
+  closeAftSignatureModal() {
+    this.showAftSignatureModal = false;
+    if (this.aftSignatureUrl) {
+      const url = (this.aftSignatureUrl as any).changingThisBreaksApplicationSecurity || '';
+      if (url.startsWith('blob:')) URL.revokeObjectURL(url);
+    }
+    this.aftSignatureUrl = null;
+  }
+
+  verifyAftReceiver() {
+    if (!this.aftReceiverAccountNumber?.trim()) {
+      this.alertService.error('Missing Info', 'Enter receiver account number');
+      return;
+    }
+    this.aftVerifyingReceiver = true;
+    this.aftReceiverVerification = null;
+    const params = new HttpParams().set('accountNumber', this.aftReceiverAccountNumber.trim());
+    this.http.get(`${environment.apiBaseUrl}/api/admin-fund-transfers/verify-receiver`, { params }).subscribe({
+      next: (res: any) => {
+        this.aftReceiverVerification = res;
+        this.aftVerifyingReceiver = false;
+      },
+      error: (err: any) => {
+        this.aftReceiverVerification = { found: false, message: err.error?.message || 'Receiver account not found' };
+        this.aftVerifyingReceiver = false;
+      }
+    });
+  }
+
+  getAftCharge(): number {
+    return this.aftAmount ? Math.round(this.aftAmount * 0.005 * 100) / 100 : 0;
+  }
+
+  sendAftTransfer() {
+    if (!this.aftSenderVerification?.valid) {
+      this.alertService.error('Sender Not Verified', 'Please verify the sender cheque first');
+      return;
+    }
+    if (!this.aftReceiverVerification?.found) {
+      this.alertService.error('Receiver Not Verified', 'Please verify the receiver account first');
+      return;
+    }
+    if (!this.aftAmount || this.aftAmount <= 0) {
+      this.alertService.error('Invalid Amount', 'Enter a valid transfer amount');
+      return;
+    }
+    this.aftProcessing = true;
+    this.http.post(`${environment.apiBaseUrl}/api/admin-fund-transfers/process`, {
+      senderAccountNumber: this.aftSenderAccountNumber.trim(),
+      senderChequeNumber: this.aftSenderChequeNumber.trim(),
+      receiverAccountNumber: this.aftReceiverAccountNumber.trim(),
+      amount: this.aftAmount,
+      description: this.aftDescription,
+      performedBy: this.adminName
+    }).subscribe({
+      next: (res: any) => {
+        this.aftProcessing = false;
+        this.alertService.success('Transfer Sent', `${res.message} Transfer ID: ${res.transfer?.transferId}`);
+        this.clearAftForm();
+        this.loadAdminTransfers();
+        this.refreshUsersData();
+      },
+      error: (err: any) => {
+        this.aftProcessing = false;
+        this.alertService.error('Transfer Failed', err.error?.message || 'Failed to process transfer');
+      }
+    });
+  }
+
+  clearAftForm() {
+    this.aftSenderAccountNumber = '';
+    this.aftSenderChequeNumber = '';
+    this.aftSenderVerification = null;
+    this.aftReceiverAccountNumber = '';
+    this.aftReceiverVerification = null;
+    this.aftAmount = null;
+    this.aftDescription = '';
+  }
+
+  loadAdminTransfers() {
+    this.loadingAdminTransfers = true;
+    this.http.get<any[]>(`${environment.apiBaseUrl}/api/admin-fund-transfers/all`).subscribe({
+      next: (list: any[]) => {
+        this.adminTransfers = list || [];
+        this.loadingAdminTransfers = false;
+      },
+      error: () => {
+        this.loadingAdminTransfers = false;
+      }
+    });
+  }
+
+  getFilteredAdminTransfers(): any[] {
+    if (!this.adminTransferSearchTerm || !this.adminTransferSearchTerm.trim()) {
+      return this.adminTransfers;
+    }
+    const term = this.adminTransferSearchTerm.toLowerCase().trim();
+    return this.adminTransfers.filter(t =>
+      (t.transferId || '').toLowerCase().includes(term) ||
+      (t.senderAccountNumber || '').toLowerCase().includes(term) ||
+      (t.receiverAccountNumber || '').toLowerCase().includes(term) ||
+      (t.senderName || '').toLowerCase().includes(term) ||
+      (t.receiverName || '').toLowerCase().includes(term)
+    );
+  }
+
+  startEditAftTransfer(t: any) {
+    this.aftEditingId = t.id;
+    this.aftEditDescription = t.description || '';
+  }
+
+  cancelEditAftTransfer() {
+    this.aftEditingId = null;
+    this.aftEditDescription = '';
+  }
+
+  saveEditAftTransfer(t: any) {
+    this.http.put(`${environment.apiBaseUrl}/api/admin-fund-transfers/${t.id}/edit`, {
+      description: this.aftEditDescription,
+      editedBy: this.adminName
+    }).subscribe({
+      next: (res: any) => {
+        this.alertService.success('Updated', res.message || 'Transfer details updated');
+        this.cancelEditAftTransfer();
+        this.loadAdminTransfers();
+      },
+      error: (err: any) => {
+        this.alertService.error('Update Failed', err.error?.message || 'Failed to update transfer details');
+      }
+    });
+  }
+
+  revertAftTransfer(t: any) {
+    if (!confirm(`Revert transfer #${t.transferId}? ₹${t.amount} will be debited back from the receiver and refunded to the sender (minus a 0.5% revert charge), updated in real-time.`)) {
+      return;
+    }
+    this.aftRevertingId = t.id;
+    this.http.post(`${environment.apiBaseUrl}/api/admin-fund-transfers/${t.id}/revert`, {
+      revertedBy: this.adminName,
+      reason: 'Admin reverted fund transfer'
+    }).subscribe({
+      next: (res: any) => {
+        this.aftRevertingId = null;
+        this.alertService.success('Transfer Reverted', res.message || 'Transfer reverted successfully.');
+        this.loadAdminTransfers();
+        this.refreshUsersData();
+      },
+      error: (err: any) => {
+        this.aftRevertingId = null;
+        this.alertService.error('Revert Failed', err.error?.message || 'Failed to revert transfer');
       }
     });
   }

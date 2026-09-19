@@ -1133,6 +1133,48 @@
       </div>
     </div>
 
+    <!-- Admin Cash Deposit/Withdrawal History (real backend history for ALL account types) -->
+    <div class="deposit-requests-admin" style="margin-top:24px;">
+      <div class="section-header">
+        <h4><i class="fa fa-history"></i> Cash Deposit / Withdrawal History</h4>
+        <div class="section-header-actions" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+          <div style="position:relative;display:inline-block;">
+            <input type="text" [(ngModel)]="adminCashSearchTerm" placeholder="🔍 Search Ref ID, Account, Name..." style="padding:8px 12px;border:1px solid #ced4da;border-radius:6px;width:280px;font-size:13px;" />
+          </div>
+          <button class="refresh-btn" (click)="loadAdminCashTransactions()"><i class="fa fa-sync-alt"></i> Refresh</button>
+        </div>
+      </div>
+
+      <div *ngIf="loadingAdminCashTransactions" class="loading-state">Loading history...</div>
+      <div *ngIf="!loadingAdminCashTransactions && getFilteredAdminCashTransactions().length === 0" class="empty-state">
+        No cash deposit/withdrawal history found.
+      </div>
+
+      <div class="deposit-request-grid" *ngIf="!loadingAdminCashTransactions && getFilteredAdminCashTransactions().length > 0">
+        <div class="deposit-card" *ngFor="let txn of getFilteredAdminCashTransactions()">
+          <div class="card-header">
+            <div>
+              <h4>₹{{ txn.amount | number:'1.2-2' }} • {{ txn.operationType }}</h4>
+              <p class="muted">Account: <strong>{{ txn.accountHolderName }}</strong> ({{ txn.accountNumber }}) — {{ txn.accountType }}</p>
+              <p class="muted"><strong style="color:#1e3a8a;">Ref ID: {{ txn.refId }}</strong></p>
+            </div>
+            <span class="status-badge" [style.background]="txn.status === 'REVERTED' ? '#fee2e2' : '#dcfce7'" [style.color]="txn.status === 'REVERTED' ? '#991b1b' : '#166534'">{{ txn.status }}</span>
+          </div>
+          <div class="card-body">
+            <p><strong>Description:</strong> {{ txn.description || 'N/A' }}</p>
+            <p><strong>Balance:</strong> ₹{{ txn.balanceBefore | number:'1.2-2' }} → ₹{{ txn.balanceAfter | number:'1.2-2' }}</p>
+            <p><strong>Performed By:</strong> {{ txn.performedBy }} ({{ txn.performedAt | date:'dd/MM/yyyy, h:mm a' }})</p>
+            <p *ngIf="txn.status === 'REVERTED'"><strong>Reverted By:</strong> {{ txn.revertedBy }} ({{ txn.revertedAt | date:'dd/MM/yyyy, h:mm a' }})</p>
+          </div>
+          <div class="card-footer" *ngIf="txn.status !== 'REVERTED'">
+            <button class="btn-withdrawal" (click)="revertAdminCashTransaction(txn)" [disabled]="revertingCashTxnId === txn.id">
+              <i class="fa fa-undo"></i> {{ revertingCashTxnId === txn.id ? 'Reverting...' : 'Revert (24h)' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Direct Admin Deposit Modal -->
     <div class="modal-overlay" *ngIf="showDirectDepositModal" (click)="closeDirectDepositModal()">
       <div class="modal-content" (click)="$event.stopPropagation()" style="max-width:520px;padding:24px;">
@@ -2658,6 +2700,209 @@
       <div *ngIf="getFilteredTransfers().length === 0" class="no-data">
         <i class="fa fa-inbox"></i>
         <p>No transfers found.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Admin Update Fund Transfer Section -->
+  <div class="admin-fund-transfer-section section-content" *ngIf="activeSection === 'transfers'">
+    <div class="section-header">
+      <h2><i class="fa fa-exchange-alt"></i> Admin-Initiated Fund Transfer (Cheque Verified + 0.5% Charge)</h2>
+      <button class="close-btn" (click)="setActiveSection('home')"><i class="fa fa-times"></i></button>
+    </div>
+
+    <!-- Transfer Form -->
+    <div class="transfer-form-container" style="background:#f8f9fa;padding:20px;border-radius:8px;margin-bottom:24px;border:1px solid #e9ecef;">
+      <div class="form-section">
+        <h4 style="margin-bottom:16px;"><i class="fa fa-user-check"></i> 1. Verify Sender's Cheque</h4>
+        <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:12px;align-items:flex-start;">
+          <div class="form-group">
+            <label>Sender Account Number *</label>
+            <input type="text" [(ngModel)]="aftSenderAccountNumber" placeholder="Enter sender account number" class="form-input" />
+          </div>
+          <div class="form-group">
+            <label>Sender Cheque Number *</label>
+            <input type="text" [(ngModel)]="aftSenderChequeNumber" placeholder="Enter sender cheque number" class="form-input" />
+          </div>
+          <div class="form-group" style="padding-top:24px;">
+            <button class="btn-primary" (click)="verifyAftSender()" [disabled]="aftVerifyingSender">
+              <i class="fa fa-search"></i> {{ aftVerifyingSender ? 'Verifying...' : 'Verify' }}
+            </button>
+          </div>
+        </div>
+
+        <!-- Sender Verification Result -->
+        <div *ngIf="aftSenderVerification" style="margin-top:16px;padding:12px;border-radius:6px;" [style.background]="aftSenderVerification.valid ? '#dcfce7' : '#fee2e2'" [style.border]="'1px solid ' + (aftSenderVerification.valid ? '#86efac' : '#fca5a5')">
+          <p *ngIf="!aftSenderVerification.valid" style="margin:0;color:#991b1b;"><i class="fa fa-times-circle"></i> {{ aftSenderVerification.message }}</p>
+          <div *ngIf="aftSenderVerification.valid" style="color:#166534;">
+            <p style="margin:8px 0;"><strong>✓ Sender Verified</strong></p>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:13px;">
+              <p style="margin:0;"><strong>Name:</strong> {{ aftSenderVerification.accountHolderName }}</p>
+              <p style="margin:0;"><strong>Account:</strong> {{ aftSenderVerification.accountNumber }}</p>
+              <p style="margin:0;"><strong>Type:</strong> {{ aftSenderVerification.accountType }}</p>
+              <p style="margin:0;"><strong>Balance:</strong> ₹{{ aftSenderVerification.balance | number:'1.2-2' }}</p>
+            </div>
+            <div *ngIf="!aftSenderVerification.nameMatches" style="margin-top:8px;padding:8px;background:#fef08a;border-radius:4px;border-left:3px solid #eab308;color:#78350f;font-size:13px;">
+              ⚠️ <strong>Name Mismatch!</strong> Cheque name does not match account holder name. Proceed with caution.
+            </div>
+            <button class="btn-link" (click)="viewAftSenderSignature()" style="margin-top:8px;"><i class="fa fa-image"></i> View Sender's Signature</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-section" style="margin-top:24px;">
+        <h4 style="margin-bottom:16px;"><i class="fa fa-user-plus"></i> 2. Verify Receiver Account</h4>
+        <div style="display:grid;grid-template-columns:1fr auto;gap:12px;align-items:flex-start;">
+          <div class="form-group">
+            <label>Receiver Account Number *</label>
+            <input type="text" [(ngModel)]="aftReceiverAccountNumber" placeholder="Enter receiver account number" class="form-input" />
+          </div>
+          <div class="form-group" style="padding-top:24px;">
+            <button class="btn-primary" (click)="verifyAftReceiver()" [disabled]="aftVerifyingReceiver">
+              <i class="fa fa-search"></i> {{ aftVerifyingReceiver ? 'Verifying...' : 'Verify' }}
+            </button>
+          </div>
+        </div>
+
+        <!-- Receiver Verification Result -->
+        <div *ngIf="aftReceiverVerification" style="margin-top:16px;padding:12px;border-radius:6px;" [style.background]="aftReceiverVerification.found ? '#dcfce7' : '#fee2e2'" [style.border]="'1px solid ' + (aftReceiverVerification.found ? '#86efac' : '#fca5a5')">
+          <p *ngIf="!aftReceiverVerification.found" style="margin:0;color:#991b1b;"><i class="fa fa-times-circle"></i> {{ aftReceiverVerification.message }}</p>
+          <div *ngIf="aftReceiverVerification.found" style="color:#166534;">
+            <p style="margin:8px 0;"><strong>✓ Receiver Verified</strong></p>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:13px;">
+              <p style="margin:0;"><strong>Name:</strong> {{ aftReceiverVerification.name }}</p>
+              <p style="margin:0;"><strong>Account:</strong> {{ aftReceiverVerification.accountNumber }}</p>
+              <p style="margin:0;"><strong>Type:</strong> {{ aftReceiverVerification.accountType }}</p>
+              <p style="margin:0;"><strong>Balance:</strong> ₹{{ aftReceiverVerification.balance | number:'1.2-2' }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-section" style="margin-top:24px;">
+        <h4 style="margin-bottom:16px;"><i class="fa fa-money-bill-wave"></i> 3. Transfer Details & Charge Calculation</h4>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="form-group">
+            <label>Amount (₹) *</label>
+            <input type="number" [(ngModel)]="aftAmount" placeholder="Enter transfer amount" class="form-input" />
+          </div>
+          <div class="form-group">
+            <label>Processing Charge (0.5%) <small style="color:#666;font-weight:normal;">Auto-calculated</small></label>
+            <input type="text" [value]="'₹' + (getAftCharge() | number:'1.2-2')" readonly class="form-input" style="background:#f0f0f0;cursor:not-allowed;" />
+          </div>
+          <div class="form-group" style="grid-column:1/-1;">
+            <label>Description</label>
+            <textarea [(ngModel)]="aftDescription" placeholder="Optional transfer description" class="form-input" style="resize:vertical;min-height:60px;"></textarea>
+          </div>
+        </div>
+
+        <!-- Summary -->
+        <div *ngIf="aftAmount && aftAmount > 0" style="margin-top:16px;padding:12px;background:#e0f2fe;border-radius:6px;border-left:4px solid #0284c7;color:#0c4a6e;">
+          <p style="margin:0;font-size:13px;"><strong>Summary:</strong></p>
+          <p style="margin:4px 0;font-size:13px;">Transfer Amount: <strong>₹{{ aftAmount | number:'1.2-2' }}</strong></p>
+          <p style="margin:4px 0;font-size:13px;">Charge (0.5%): <strong>₹{{ getAftCharge() | number:'1.2-2' }}</strong></p>
+          <p style="margin:4px 0;font-size:13px;"><strong>Total Debit from Sender: ₹{{ (aftAmount + getAftCharge()) | number:'1.2-2' }}</strong></p>
+        </div>
+
+        <div style="display:flex;gap:12px;margin-top:16px;">
+          <button class="btn-primary" (click)="sendAftTransfer()" [disabled]="!aftSenderVerification?.valid || !aftReceiverVerification?.found || !aftAmount || aftAmount <= 0 || aftProcessing">
+            <i class="fa fa-paper-plane"></i> {{ aftProcessing ? 'Processing...' : 'Send Transfer' }}
+          </button>
+          <button class="btn-secondary" (click)="clearAftForm()">
+            <i class="fa fa-redo"></i> Clear Form
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Signature Modal -->
+    <div *ngIf="showAftSignatureModal" class="modal-overlay" (click)="closeAftSignatureModal()">
+      <div class="modal-content" (click)="$event.stopPropagation();style='width:90%;max-width:600px;'">
+        <div class="modal-header">
+          <h3><i class="fa fa-image"></i> Sender's Signature Document</h3>
+          <button class="btn-close" (click)="closeAftSignatureModal()"><i class="fa fa-times"></i></button>
+        </div>
+        <div class="modal-body" *ngIf="aftSignatureLoading">
+          <i class="fa fa-spinner fa-spin"></i> Loading signature...
+        </div>
+        <div class="modal-body" *ngIf="!aftSignatureLoading && aftSignatureUrl">
+          <img [src]="aftSignatureUrl" style="width:100%;border-radius:6px;border:1px solid #ddd;" />
+        </div>
+        <div class="modal-body" *ngIf="!aftSignatureLoading && !aftSignatureUrl" style="color:#991b1b;">
+          <i class="fa fa-exclamation-circle"></i> Could not load signature document.
+        </div>
+      </div>
+    </div>
+
+    <!-- Admin Fund Transfer History -->
+    <div class="admin-transfers-history" style="margin-top:32px;">
+      <div class="section-header">
+        <h4><i class="fa fa-history"></i> Admin Fund Transfer History</h4>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input type="text" [(ngModel)]="adminTransferSearchTerm" placeholder="🔍 Search by Transfer ID, Account, Name..." style="padding:8px 12px;border:1px solid #ced4da;border-radius:6px;width:280px;font-size:13px;" />
+          <button class="refresh-btn" (click)="loadAdminTransfers()"><i class="fa fa-sync-alt"></i> Refresh</button>
+        </div>
+      </div>
+
+      <div *ngIf="loadingAdminTransfers" class="loading-state">Loading transfers...</div>
+      <div *ngIf="!loadingAdminTransfers && getFilteredAdminTransfers().length === 0" class="empty-state">
+        No admin-initiated fund transfers found.
+      </div>
+
+      <div class="admin-transfers-table-container" *ngIf="!loadingAdminTransfers && getFilteredAdminTransfers().length > 0" style="overflow-x:auto;">
+        <table class="admin-transfers-table" style="width:100%;border-collapse:collapse;font-size:13px;">
+          <thead style="background:#f8f9fa;border-bottom:2px solid #dee2e6;">
+            <tr>
+              <th style="padding:12px;text-align:left;">Transfer ID</th>
+              <th style="padding:12px;text-align:left;">Sender</th>
+              <th style="padding:12px;text-align:left;">Receiver</th>
+              <th style="padding:12px;text-align:right;">Amount</th>
+              <th style="padding:12px;text-align:right;">Charge</th>
+              <th style="padding:12px;text-align:left;">Status</th>
+              <th style="padding:12px;text-align:left;">Date</th>
+              <th style="padding:12px;text-align:center;">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let t of getFilteredAdminTransfers()" style="border-bottom:1px solid #e9ecef;hover:background-color:#f8f9fa;">
+              <td style="padding:12px;"><strong>{{ t.transferId }}</strong></td>
+              <td style="padding:12px;">
+                <div><strong>{{ t.senderName }}</strong></div>
+                <small style="color:#666;">{{ t.senderAccountNumber }} ({{ t.senderAccountType }})</small>
+              </td>
+              <td style="padding:12px;">
+                <div><strong>{{ t.receiverName }}</strong></div>
+                <small style="color:#666;">{{ t.receiverAccountNumber }} ({{ t.receiverAccountType }})</small>
+              </td>
+              <td style="padding:12px;text-align:right;"><strong>₹{{ t.amount | number:'1.2-2' }}</strong></td>
+              <td style="padding:12px;text-align:right;">₹{{ t.transferCharge | number:'1.2-2' }}</td>
+              <td style="padding:12px;">
+                <span style="padding:4px 8px;border-radius:4px;" [style.background]="t.status === 'COMPLETED' ? '#dcfce7' : '#fee2e2'" [style.color]="t.status === 'COMPLETED' ? '#166534' : '#991b1b';">
+                  {{ t.status }}
+                </span>
+              </td>
+              <td style="padding:12px;">{{ t.performedAt | date:'dd/MM/yyyy, h:mm a' }}</td>
+              <td style="padding:12px;text-align:center;">
+                <div style="display:flex;gap:4px;justify-content:center;flex-wrap:wrap;">
+                  <button class="btn-sm btn-primary" *ngIf="aftEditingId !== t.id" (click)="startEditAftTransfer(t)">Edit</button>
+                  <button class="btn-sm btn-danger" *ngIf="t.status === 'COMPLETED'" (click)="revertAftTransfer(t)" [disabled]="aftRevertingId === t.id">
+                    {{ aftRevertingId === t.id ? 'Reverting...' : 'Revert' }}
+                  </button>
+                </div>
+              </td>
+            </tr>
+            <tr *ngIf="aftEditingId" style="background:#f0f8ff;border-bottom:1px solid #e9ecef;">
+              <td colspan="8" style="padding:16px;">
+                <div style="display:grid;grid-template-columns:1fr 3fr auto auto;gap:12px;align-items:center;">
+                  <span style="font-weight:bold;">Edit Description:</span>
+                  <textarea [(ngModel)]="aftEditDescription" class="form-input" style="min-height:50px;"></textarea>
+                  <button class="btn-primary" (click)="saveEditAftTransfer(getFilteredAdminTransfers()[getFilteredAdminTransfers().findIndex(x => x.id === aftEditingId)])">Save</button>
+                  <button class="btn-secondary" (click)="cancelEditAftTransfer()">Cancel</button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
   </div>
