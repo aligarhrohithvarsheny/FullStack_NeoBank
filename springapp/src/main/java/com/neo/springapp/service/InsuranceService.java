@@ -44,6 +44,9 @@ public class InsuranceService {
     @Autowired
     private TransactionService transactionService;
 
+    @Autowired(required = false)
+    private BranchAccountService branchAccountService;
+
     @Autowired
     private CurrentAccountRepository currentAccountRepository;
 
@@ -456,6 +459,22 @@ public class InsuranceService {
         txn.setUserName(String.valueOf(verified.get("accountHolderName")));
         txn.setAccountNumber(accountNumber);
         transactionService.saveTransaction(txn);
+
+        if (branchAccountService != null) {
+            String branchNumber = branchAccountService.getDepositAccountNumber();
+            Double branchBalance = accountService.creditBalance(branchNumber, amount);
+            if (branchBalance != null) {
+                Transaction branchTxn = new Transaction();
+                branchTxn.setMerchant("Insurance Premium Income");
+                branchTxn.setAmount(amount);
+                branchTxn.setType("Credit");
+                branchTxn.setDescription("Insurance premium income for policy " + application.getPolicy().getPolicyNumber() + " (from " + accountNumber + ")");
+                branchTxn.setBalance(branchBalance);
+                branchTxn.setAccountNumber(branchNumber);
+                branchTxn.setSourceAccountNumber(accountNumber);
+                transactionService.saveTransaction(branchTxn);
+            }
+        }
 
         // Create insurance payment record
         InsurancePayment payment = new InsurancePayment();
