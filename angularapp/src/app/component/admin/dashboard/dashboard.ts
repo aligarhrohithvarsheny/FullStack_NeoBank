@@ -3223,6 +3223,15 @@ export class Dashboard implements OnInit, OnDestroy {
     this.aftEditDescription = '';
   }
 
+  saveCurrentAftEdit() {
+    const transfer = this.adminTransfers.find(t => t.id === this.aftEditingId);
+    if (!transfer) {
+      this.cancelEditAftTransfer();
+      return;
+    }
+    this.saveEditAftTransfer(transfer);
+  }
+
   saveEditAftTransfer(t: any) {
     this.http.put(`${environment.apiBaseUrl}/api/admin-fund-transfers/${t.id}/edit`, {
       description: this.aftEditDescription,

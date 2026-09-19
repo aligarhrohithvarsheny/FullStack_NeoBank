@@ -2896,7 +2896,7 @@
                 <div style="display:grid;grid-template-columns:1fr 3fr auto auto;gap:12px;align-items:center;">
                   <span style="font-weight:bold;">Edit Description:</span>
                   <textarea [(ngModel)]="aftEditDescription" class="form-input" style="min-height:50px;"></textarea>
-                  <button class="btn-primary" (click)="saveEditAftTransfer(getFilteredAdminTransfers()[getFilteredAdminTransfers().findIndex(x => x.id === aftEditingId)])">Save</button>
+                  <button class="btn-primary" (click)="saveCurrentAftEdit()">Save</button>
                   <button class="btn-secondary" (click)="cancelEditAftTransfer()">Cancel</button>
                 </div>
               </td>
