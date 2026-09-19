@@ -115,6 +115,11 @@ public class AdminInsuranceController {
         return ResponseEntity.ok(pending);
     }
 
+    @GetMapping("/insurance/applications/all")
+    public ResponseEntity<List<InsuranceApplication>> getAllInsuranceApplications() {
+        return ResponseEntity.ok(insuranceService.getAllApplications());
+    }
+
     @PostMapping("/insurance/assign-policy")
     public ResponseEntity<?> assignPolicyToAccount(@RequestBody Map<String, Object> payload) {
         try {

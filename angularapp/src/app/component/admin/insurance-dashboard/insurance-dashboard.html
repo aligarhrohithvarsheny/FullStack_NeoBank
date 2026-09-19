@@ -208,6 +208,7 @@
               <th>Duration</th>
               <th>Status</th>
               <th>Description</th>
+              <th>Certificate</th>
             </tr>
           </thead>
           <tbody>
@@ -242,6 +243,16 @@
                 </span>
               </td>
               <td class="ins-td-desc">{{ p.description || '—' }}</td>
+              <td>
+                <ng-container *ngIf="getApplicationForPolicy(p) as linkedApplication; else noCertificate">
+                  <button class="ins-btn ins-btn-xs ins-btn-accent"
+                          (click)="downloadCertificate(linkedApplication)"
+                          title="Download insurance certificate PDF">
+                    Download PDF
+                  </button>
+                </ng-container>
+                <ng-template #noCertificate><span class="ins-text-muted">Not linked</span></ng-template>
+              </td>
             </tr>
           </tbody>
         </table>

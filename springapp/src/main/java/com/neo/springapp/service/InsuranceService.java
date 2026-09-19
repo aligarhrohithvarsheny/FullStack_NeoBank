@@ -399,6 +399,10 @@ public class InsuranceService {
         return applicationRepository.findByStatus("APPROVED");
     }
 
+    public List<InsuranceApplication> getAllApplications() {
+        return applicationRepository.findAll();
+    }
+
     @Transactional
     public InsuranceApplication approveApplication(Long applicationId, String adminRemark) {
         InsuranceApplication application = applicationRepository.findById(applicationId)

@@ -19,6 +19,7 @@ export class AdminInsuranceDashboard implements OnInit {
   pendingApplications: any[] = [];
   pendingClaims: any[] = [];
   policies: any[] = [];
+  allApplications: any[] = [];
   customers: any[] = [];
 
   // Assign policy
@@ -79,6 +80,7 @@ export class AdminInsuranceDashboard implements OnInit {
     this.loadPendingApplications();
     this.loadPendingClaims();
     this.loadPolicies();
+    this.loadAllApplications();
     this.loadCustomers();
   }
 
@@ -108,6 +110,17 @@ export class AdminInsuranceDashboard implements OnInit {
       next: (res) => { this.policies = res || []; },
       error: () => { this.policies = []; }
     });
+  }
+
+  loadAllApplications() {
+    this.http.get<any[]>(`${environment.apiBaseUrl}/api/admin/insurance/applications/all`).subscribe({
+      next: (res) => this.allApplications = res || [],
+      error: () => this.allApplications = []
+    });
+  }
+
+  getApplicationForPolicy(policy: any): any {
+    return this.allApplications.find(app => app.policy?.id === policy?.id || app.policy?.policyNumber === policy?.policyNumber);
   }
 
   loadCustomers() {
@@ -214,7 +227,21 @@ export class AdminInsuranceDashboard implements OnInit {
   }
 
   downloadCertificate(app: any) {
-    window.open(`${environment.apiBaseUrl}/api/admin/insurance/applications/${app.id}/certificate`, '_blank');
+    if (!app?.id) {
+      this.alertService.adminError('Certificate', 'No customer application is linked to this policy yet.');
+      return;
+    }
+    this.http.get(`${environment.apiBaseUrl}/api/admin/insurance/applications/${app.id}/certificate`, { responseType: 'blob' }).subscribe({
+      next: (blob) => {
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = `insurance-certificate-${app.applicationNumber || app.id}.pdf`;
+        anchor.click();
+        URL.revokeObjectURL(url);
+      },
+      error: () => this.alertService.adminError('Certificate', 'Certificate could not be generated. Approve and pay the application first.')
+    });
   }
 
   searchClaimsByPolicyNumber() {
