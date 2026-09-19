@@ -2,12 +2,16 @@ package com.neo.springapp.service;
 
 import com.neo.springapp.model.Account;
 import com.neo.springapp.model.AdminFundTransfer;
+import com.neo.springapp.model.BusinessChequeRequest;
 import com.neo.springapp.model.Cheque;
+import com.neo.springapp.model.ChequeRequest;
 import com.neo.springapp.model.CurrentAccount;
 import com.neo.springapp.model.SalaryAccount;
 import com.neo.springapp.repository.AccountRepository;
 import com.neo.springapp.repository.AdminFundTransferRepository;
+import com.neo.springapp.repository.BusinessChequeRequestRepository;
 import com.neo.springapp.repository.ChequeRepository;
+import com.neo.springapp.repository.ChequeRequestRepository;
 import com.neo.springapp.repository.CurrentAccountRepository;
 import com.neo.springapp.repository.SalaryAccountRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -43,6 +47,12 @@ public class AdminFundTransferService {
     @Autowired
     private ChequeRepository chequeRepository;
 
+    @Autowired
+    private ChequeRequestRepository chequeRequestRepository;
+
+    @Autowired
+    private BusinessChequeRequestRepository businessChequeRequestRepository;
+
     public List<AdminFundTransfer> getAll(String search) {
         if (search != null && !search.isBlank()) {
             return repository.search(search.trim());
@@ -55,22 +65,10 @@ public class AdminFundTransferService {
     public Map<String, Object> verifySenderCheque(String accountNumber, String chequeNumber) {
         Map<String, Object> result = new HashMap<>();
 
-        Optional<Cheque> chequeOpt = chequeRepository.findByChequeNumber(chequeNumber.trim());
-        if (chequeOpt.isEmpty()) {
+        ResolvedCheque resolved = resolveCheque(chequeNumber, accountNumber);
+        if (resolved == null) {
             result.put("valid", false);
-            result.put("message", "Cheque number not found");
-            return result;
-        }
-        Cheque cheque = chequeOpt.get();
-
-        if (cheque.getAccountNumber() == null || !cheque.getAccountNumber().equalsIgnoreCase(accountNumber.trim())) {
-            result.put("valid", false);
-            result.put("message", "This cheque does not belong to account " + accountNumber);
-            return result;
-        }
-        if (!"ACTIVE".equals(cheque.getStatus())) {
-            result.put("valid", false);
-            result.put("message", "Cheque is not usable. Current status: " + cheque.getStatus());
+            result.put("message", "Approved cheque number not found for this account");
             return result;
         }
 
@@ -82,13 +80,16 @@ public class AdminFundTransferService {
         }
 
         String holderName = String.valueOf(accInfo.get("name"));
-        boolean nameMatches = holderName.equalsIgnoreCase(cheque.getAccountHolderName());
+        boolean nameMatches = resolved.accountHolderName == null
+            || holderName.equalsIgnoreCase(resolved.accountHolderName);
 
         result.put("valid", true);
         result.put("nameMatches", nameMatches);
-        result.put("chequeNumber", cheque.getChequeNumber());
-        result.put("chequeAccountHolderName", cheque.getAccountHolderName());
-        result.put("chequeStatus", cheque.getStatus());
+        result.put("chequeNumber", resolved.chequeNumber);
+        result.put("chequeAccountHolderName", resolved.accountHolderName != null
+            ? resolved.accountHolderName : holderName);
+        result.put("chequeStatus", resolved.status);
+        result.put("chequeSource", resolved.source);
         result.put("accountHolderName", holderName);
         result.put("accountNumber", accountNumber);
         result.put("accountType", accInfo.get("accountType"));
@@ -138,15 +139,11 @@ public class AdminFundTransferService {
         String senderType = (String) senderInfo.get("accountType");
         String receiverType = (String) receiverInfo.get("accountType");
 
-        Cheque cheque = null;
+        ResolvedCheque resolved = null;
         if (senderChequeNumber != null && !senderChequeNumber.isBlank()) {
-            cheque = chequeRepository.findByChequeNumber(senderChequeNumber.trim())
-                    .orElseThrow(() -> new RuntimeException("Cheque number not found"));
-            if (!"ACTIVE".equals(cheque.getStatus())) {
-                throw new RuntimeException("Cheque is not usable. Current status: " + cheque.getStatus());
-            }
-            if (cheque.getAccountNumber() == null || !cheque.getAccountNumber().equalsIgnoreCase(senderAccountNumber.trim())) {
-                throw new RuntimeException("Cheque does not belong to the sender account");
+            resolved = resolveCheque(senderChequeNumber, senderAccountNumber);
+            if (resolved == null) {
+                throw new RuntimeException("Approved cheque number not found for sender account");
             }
         }
 
@@ -159,11 +156,6 @@ public class AdminFundTransferService {
 
         adjustBalance(senderType, senderAccountNumber, -totalDebit);
         adjustBalance(receiverType, receiverAccountNumber, amount);
-
-        if (cheque != null) {
-            cheque.markUsed("ADMIN_FUND_TRANSFER", "PENDING");
-            chequeRepository.save(cheque);
-        }
 
         AdminFundTransfer transfer = new AdminFundTransfer();
         transfer.setTransferId("AFT" + System.currentTimeMillis());
@@ -182,15 +174,84 @@ public class AdminFundTransferService {
         transfer.setPerformedAt(LocalDateTime.now());
 
         AdminFundTransfer saved = repository.save(transfer);
-        if (cheque != null) {
-            cheque.setUsedReference(saved.getTransferId());
-            chequeRepository.save(cheque);
+        if (resolved != null) {
+            markChequeUsed(resolved, saved.getTransferId(), senderAccountNumber, performedBy);
         }
 
         result.put("success", true);
         result.put("message", "Transfer completed. ₹" + transferCharge + " (0.5%) charged as processing fee.");
         result.put("transfer", saved);
         return result;
+    }
+
+    private ResolvedCheque resolveCheque(String chequeNumber, String accountNumber) {
+        String number = chequeNumber == null ? "" : chequeNumber.trim();
+        String account = accountNumber == null ? "" : accountNumber.trim();
+
+        Optional<Cheque> standard = chequeRepository.findByChequeNumber(number);
+        if (standard.isPresent()) {
+            Cheque cheque = standard.get();
+            if ("ACTIVE".equalsIgnoreCase(cheque.getStatus())
+                    && account.equalsIgnoreCase(String.valueOf(cheque.getAccountNumber()))) {
+                return new ResolvedCheque("CHEQUES", cheque.getChequeNumber(), cheque.getAccountHolderName(), cheque.getStatus(), cheque);
+            }
+        }
+
+        for (ChequeRequest request : chequeRequestRepository.findAllByChequeNumber(number)) {
+            if (!"APPROVED".equalsIgnoreCase(request.getStatus())) {
+                continue;
+            }
+            SalaryAccount salaryAccount = salaryAccountRepository.findById(request.getSalaryAccountId()).orElse(null);
+            if (salaryAccount != null && account.equalsIgnoreCase(salaryAccount.getAccountNumber())) {
+                return new ResolvedCheque("SALARY_CHEQUE_REQUESTS", request.getChequeNumber(), null, request.getStatus(), request);
+            }
+        }
+
+        for (BusinessChequeRequest request : businessChequeRequestRepository.findAllByChequeNumber(number)) {
+            if (!"APPROVED".equalsIgnoreCase(request.getStatus())) {
+                continue;
+            }
+            CurrentAccount currentAccount = currentAccountRepository.findById(request.getCurrentAccountId()).orElse(null);
+            if (currentAccount != null && account.equalsIgnoreCase(currentAccount.getAccountNumber())) {
+                return new ResolvedCheque("BUSINESS_CHEQUE_REQUESTS", request.getChequeNumber(), null, request.getStatus(), request);
+            }
+        }
+        return null;
+    }
+
+    private void markChequeUsed(ResolvedCheque resolved, String transferId, String senderAccountNumber, String performedBy) {
+        if (resolved.value instanceof Cheque cheque) {
+            cheque.markUsed("ADMIN_FUND_TRANSFER", transferId);
+            chequeRepository.save(cheque);
+        } else if (resolved.value instanceof ChequeRequest request) {
+            request.setStatus("COMPLETED");
+            request.setTransactionReference(transferId);
+            request.setDebitedFromAccount(senderAccountNumber);
+            request.setApprovedBy(performedBy != null && !performedBy.isBlank() ? performedBy : request.getApprovedBy());
+            request.setUpdatedAt(LocalDateTime.now());
+            chequeRequestRepository.save(request);
+        } else if (resolved.value instanceof BusinessChequeRequest request) {
+            request.setStatus("COMPLETED");
+            request.setTransactionReference(transferId);
+            request.setUpdatedAt(LocalDateTime.now());
+            businessChequeRequestRepository.save(request);
+        }
+    }
+
+    private static class ResolvedCheque {
+        private final String source;
+        private final String chequeNumber;
+        private final String accountHolderName;
+        private final String status;
+        private final Object value;
+
+        private ResolvedCheque(String source, String chequeNumber, String accountHolderName, String status, Object value) {
+            this.source = source;
+            this.chequeNumber = chequeNumber;
+            this.accountHolderName = accountHolderName;
+            this.status = status;
+            this.value = value;
+        }
     }
 
     @Transactional

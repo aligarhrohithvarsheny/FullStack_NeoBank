@@ -30,6 +30,8 @@ public interface ChequeRequestRepository extends JpaRepository<ChequeRequest, Lo
 
     // Find exact cheque number (used by cross-account-type cheque verification)
     Optional<ChequeRequest> findByChequeNumber(String chequeNumber);
+
+    List<ChequeRequest> findAllByChequeNumber(String chequeNumber);
     
     // Find all ordered by created date
     Page<ChequeRequest> findAllByOrderByCreatedAtDesc(Pageable pageable);

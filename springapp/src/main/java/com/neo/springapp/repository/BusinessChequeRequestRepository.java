@@ -26,6 +26,8 @@ public interface BusinessChequeRequestRepository extends JpaRepository<BusinessC
     // Find exact cheque number (used by cross-account-type cheque verification)
     Optional<BusinessChequeRequest> findByChequeNumber(String chequeNumber);
 
+    List<BusinessChequeRequest> findAllByChequeNumber(String chequeNumber);
+
     Page<BusinessChequeRequest> findAllByOrderByCreatedAtDesc(Pageable pageable);
 
     long countByStatus(String status);
