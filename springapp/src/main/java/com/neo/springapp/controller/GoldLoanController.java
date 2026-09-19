@@ -484,7 +484,7 @@ public class GoldLoanController {
 
     // Admin edit: update loan amount, gold details, approve time, processing charges (saved in history)
     // PUT and POST both supported — some hosts reject PUT and return 404.
-    @RequestMapping(value = {"/{id}/admin-edit", "/admin/{id}/edit"}, method = {RequestMethod.PUT, RequestMethod.POST})
+    @RequestMapping(value = {"/{id}/admin-edit", "/admin/{id}/edit", "/admin/{id}/admin-edit"}, method = {RequestMethod.PUT, RequestMethod.POST})
     public ResponseEntity<Map<String, Object>> adminEditGoldLoan(
             @PathVariable Long id,
             @RequestParam(required = false) String changedBy,
@@ -514,7 +514,7 @@ public class GoldLoanController {
     }
 
     // Renew gold loan: extend tenure, add processing charges, regenerate EMI schedule (saved in history)
-    @RequestMapping(value = {"/{id}/renew", "/admin/{id}/renew"}, method = {RequestMethod.POST, RequestMethod.PUT})
+    @RequestMapping(value = {"/{id}/renew", "/admin/{id}/renew", "/admin/{id}/renewal"}, method = {RequestMethod.POST, RequestMethod.PUT})
     public ResponseEntity<Map<String, Object>> renewGoldLoan(
             @PathVariable Long id,
             @RequestParam(required = false) String renewedBy,

@@ -22,13 +22,13 @@ public class AdminFundTransferController {
         return ResponseEntity.ok(service.getAll(search));
     }
 
-    @GetMapping("/verify-sender-cheque")
+    @GetMapping(value = {"/verify-sender-cheque", "/verifySenderCheque"})
     public ResponseEntity<Map<String, Object>> verifySenderCheque(
             @RequestParam String accountNumber, @RequestParam String chequeNumber) {
         return ResponseEntity.ok(service.verifySenderCheque(accountNumber, chequeNumber));
     }
 
-    @GetMapping("/verify-receiver")
+    @GetMapping(value = {"/verify-receiver", "/verifyReceiver"})
     public ResponseEntity<Map<String, Object>> verifyReceiver(@RequestParam String accountNumber) {
         return ResponseEntity.ok(service.verifyReceiver(accountNumber));
     }
