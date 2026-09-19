@@ -1,3 +1,41 @@
+.branch-admin-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.branch-admin-kpis > div {
+  padding: 14px;
+  border: 1px solid #d9e3ee;
+  border-radius: 8px;
+  background: #f7fafc;
+}
+
+.branch-admin-kpis span {
+  display: block;
+  color: #64748b;
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+
+.branch-admin-kpis strong {
+  color: #12304a;
+  font-size: 18px;
+}
+
+.branch-admin-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin: 12px 0 22px;
+  color: #334155;
+  font-size: 13px;
+}
+
+.negative-value {
+  color: #b42318 !important;
+}
 /* ============================================
    PROFESSIONAL ADMIN DASHBOARD - ENHANCED UI
    Modern, Clean, and Rich Design

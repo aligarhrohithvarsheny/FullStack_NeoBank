@@ -2445,6 +2445,47 @@
   </div>
 
   <!-- All Transactions Section -->
+  <div class="section-content branch-operations-admin-section" *ngIf="activeSection === 'branch-operations'">
+    <div class="section-header">
+      <div class="header-content">
+        <div>
+          <h2><i class="fa fa-university"></i> Branch Operations</h2>
+          <p class="section-subtitle">Monitor daily allocation, all account balances, deposits, withdrawals, transfers, charges, interest, loans and profit/loss.</p>
+        </div>
+        <button class="refresh-btn" (click)="loadBranchOperations()" [disabled]="isLoadingBranchOperations"><i class="fa fa-sync-alt" [class.fa-spin]="isLoadingBranchOperations"></i> Refresh</button>
+      </div>
+    </div>
+    <div class="info-card">
+      <div class="details-grid">
+        <div class="detail-item"><label>Allocation Date</label><input type="date" [(ngModel)]="branchDailyAllocationDate" class="form-input"></div>
+        <div class="detail-item"><label>Daily Amount (₹)</label><input type="number" min="0" [(ngModel)]="branchDailyAllocationAmount" class="form-input"></div>
+        <div class="detail-item"><label>Note</label><input type="text" [(ngModel)]="branchDailyAllocationNote" class="form-input" placeholder="Branch operating limit"></div>
+        <div class="detail-item" style="display:flex;align-items:flex-end"><button class="refresh-btn" (click)="saveBranchDailyAllocation()" [disabled]="isSavingBranchAllocation"><i class="fa fa-save"></i> Save Allocation</button></div>
+      </div>
+      <div class="details-grid" style="margin-top:16px">
+        <div class="detail-item"><label>From</label><input type="date" [(ngModel)]="branchOperationsDate" class="form-input"></div>
+        <div class="detail-item"><label>To</label><input type="date" [(ngModel)]="branchOperationsToDate" class="form-input"></div>
+        <div class="detail-item" style="display:flex;align-items:flex-end"><button class="refresh-btn" (click)="loadBranchOperations()" [disabled]="isLoadingBranchOperations"><i class="fa fa-chart-line"></i> Load Statement</button></div>
+      </div>
+    </div>
+    <div class="info-card" *ngIf="branchOperations">
+      <div class="branch-admin-kpis">
+        <div><span>Allocated</span><strong>₹ {{ branchOperations.allocatedAmount | number:'1.2-2' }}</strong></div>
+        <div><span>Utilized</span><strong>₹ {{ branchOperations.utilizedAmount | number:'1.2-2' }}</strong></div>
+        <div><span>Remaining</span><strong>₹ {{ branchOperations.remainingAllocation | number:'1.2-2' }}</strong></div>
+        <div><span>Profit / Loss</span><strong [class.negative-value]="branchOperations.profitLoss < 0">₹ {{ branchOperations.profitLoss | number:'1.2-2' }}</strong></div>
+        <div><span>Branch Balance</span><strong>₹ {{ branchOperations.branchBalance | number:'1.2-2' }}</strong></div>
+      </div>
+      <div class="branch-admin-metrics" *ngIf="branchOperations.totals">
+        <span>Deposits ₹{{ branchOperations.totals.deposits | number:'1.2-2' }}</span><span>Withdrawals ₹{{ branchOperations.totals.withdrawals | number:'1.2-2' }}</span><span>Transfers ₹{{ branchOperations.totals.transfers | number:'1.2-2' }}</span><span>Loans ₹{{ branchOperations.totals.loanGiven | number:'1.2-2' }}</span><span>Charges ₹{{ branchOperations.totals.charges | number:'1.2-2' }}</span><span>Interest ₹{{ branchOperations.totals.interestEarned | number:'1.2-2' }}</span><span>Processing ₹{{ branchOperations.totals.processingCharges | number:'1.2-2' }}</span><span>CIBIL ₹{{ branchOperations.totals.cibilCharges | number:'1.2-2' }}</span>
+      </div>
+      <h4>All Account Balances</h4>
+      <div class="table-container" style="overflow-x:auto"><table class="data-table" *ngIf="branchOperations.accounts?.length"><thead><tr><th>Account</th><th>Name</th><th>Type</th><th>Balance</th></tr></thead><tbody><tr *ngFor="let account of branchOperations.accounts"><td>{{ account.accountNumber }}</td><td>{{ account.accountName || '—' }}</td><td>{{ account.accountType }}</td><td>₹ {{ account.balance | number:'1.2-2' }}</td></tr></tbody></table></div>
+      <h4>Transaction Statement</h4>
+      <div class="table-container" style="overflow-x:auto"><table class="data-table" *ngIf="branchOperations.entries?.length"><thead><tr><th>Date</th><th>Transaction</th><th>Account</th><th>Type</th><th>Amount</th><th>Description</th></tr></thead><tbody><tr *ngFor="let entry of branchOperations.entries"><td>{{ entry.date | date:'short' }}</td><td>{{ entry.transactionId }}</td><td>{{ entry.accountNumber || '—' }}</td><td>{{ entry.type }}</td><td>₹ {{ entry.amount | number:'1.2-2' }}</td><td>{{ entry.description || '—' }}</td></tr></tbody></table></div>
+    </div>
+  </div>
+
   <div class="transactions-section section-content" *ngIf="activeSection === 'transactions'">
     <div class="section-header">
       <h2><i class="fa fa-exchange-alt"></i> All User Transactions</h2>

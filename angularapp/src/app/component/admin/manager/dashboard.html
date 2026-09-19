@@ -1667,6 +1667,95 @@
         </div>
       </div>
 
+      <div class="info-card branch-operations-card" style="margin-top: 24px;">
+        <h4><i class="fa fa-chart-line"></i> Daily Branch Operations</h4>
+        <p class="section-description">Admin-allotted operating amount and live activity across savings, current, salary and branch accounts.</p>
+        <div class="details-grid">
+          <div class="detail-item">
+            <label>Allocation Date</label>
+            <input type="date" [(ngModel)]="dailyAllocationDate" class="form-input">
+          </div>
+          <div class="detail-item">
+            <label>Daily Amount (₹)</label>
+            <input type="number" min="0" [(ngModel)]="dailyAllocationAmount" class="form-input">
+          </div>
+          <div class="detail-item">
+            <label>Note</label>
+            <input type="text" [(ngModel)]="dailyAllocationNote" class="form-input" placeholder="Branch operating limit">
+          </div>
+          <div class="detail-item" style="display: flex; align-items: flex-end;">
+            <button type="button" class="refresh-btn" (click)="saveDailyAllocation()" [disabled]="isSavingDailyAllocation">
+              <i class="fa" [class.fa-save]="!isSavingDailyAllocation" [class.fa-spinner]="isSavingDailyAllocation" [class.fa-spin]="isSavingDailyAllocation"></i>
+              {{ isSavingDailyAllocation ? 'Saving...' : 'Save Daily Limit' }}
+            </button>
+          </div>
+        </div>
+        <div class="details-grid" style="margin-top: 16px;">
+          <div class="detail-item">
+            <label>Statement From</label>
+            <input type="date" [(ngModel)]="branchOperationsDate" class="form-input">
+          </div>
+          <div class="detail-item">
+            <label>Statement To</label>
+            <input type="date" [(ngModel)]="branchOperationsToDate" class="form-input">
+          </div>
+          <div class="detail-item" style="display: flex; align-items: flex-end;">
+            <button type="button" class="refresh-btn" (click)="loadBranchOperations()" [disabled]="isLoadingBranchOperations">
+              <i class="fa fa-sync-alt" [class.fa-spin]="isLoadingBranchOperations"></i> Refresh Statement
+            </button>
+          </div>
+        </div>
+
+        <div *ngIf="branchOperations" class="branch-kpi-grid">
+          <div class="branch-kpi"><span>Allocated</span><strong>₹ {{ branchOperations.allocatedAmount | number:'1.2-2' }}</strong></div>
+          <div class="branch-kpi"><span>Utilized</span><strong>₹ {{ branchOperations.utilizedAmount | number:'1.2-2' }}</strong></div>
+          <div class="branch-kpi"><span>Remaining</span><strong>₹ {{ branchOperations.remainingAllocation | number:'1.2-2' }}</strong></div>
+          <div class="branch-kpi"><span>Profit / Loss</span><strong [class.negative-value]="branchOperations.profitLoss < 0">₹ {{ branchOperations.profitLoss | number:'1.2-2' }}</strong></div>
+          <div class="branch-kpi"><span>Branch Balance</span><strong>₹ {{ branchOperations.branchBalance | number:'1.2-2' }}</strong></div>
+        </div>
+
+        <div *ngIf="branchOperations?.totals" class="branch-metric-list">
+          <span>Deposits: ₹ {{ branchOperations.totals.deposits | number:'1.2-2' }}</span>
+          <span>Withdrawals: ₹ {{ branchOperations.totals.withdrawals | number:'1.2-2' }}</span>
+          <span>Transfers: ₹ {{ branchOperations.totals.transfers | number:'1.2-2' }}</span>
+          <span>Loan Given: ₹ {{ branchOperations.totals.loanGiven | number:'1.2-2' }}</span>
+          <span>Charges: ₹ {{ branchOperations.totals.charges | number:'1.2-2' }}</span>
+          <span>Interest: ₹ {{ branchOperations.totals.interestEarned | number:'1.2-2' }}</span>
+          <span>Processing: ₹ {{ branchOperations.totals.processingCharges | number:'1.2-2' }}</span>
+          <span>CIBIL: ₹ {{ branchOperations.totals.cibilCharges | number:'1.2-2' }}</span>
+        </div>
+
+        <h5 style="margin-top: 22px;">Recent Daily Allocations</h5>
+        <div class="table-container" style="overflow-x: auto;" *ngIf="dailyAllocations.length">
+          <table class="data-table branch-txns-table">
+            <thead><tr><th>Date</th><th>Allocated</th><th>By</th><th>Note</th><th>Updated</th></tr></thead>
+            <tbody><tr *ngFor="let allocation of dailyAllocations">
+              <td>{{ allocation.allocationDate | date:'mediumDate' }}</td><td>₹ {{ allocation.allocatedAmount | number:'1.2-2' }}</td><td>{{ allocation.allocatedBy || '—' }}</td><td>{{ allocation.note || '—' }}</td><td>{{ allocation.updatedAt | date:'short' }}</td>
+            </tr></tbody>
+          </table>
+        </div>
+
+        <h5 style="margin-top: 22px;">All Account Balances</h5>
+        <div class="table-container" style="overflow-x: auto;" *ngIf="branchOperations?.accounts?.length">
+          <table class="data-table branch-txns-table">
+            <thead><tr><th>Account</th><th>Name</th><th>Type</th><th>Balance</th></tr></thead>
+            <tbody><tr *ngFor="let account of branchOperations.accounts">
+              <td>{{ account.accountNumber }}</td><td>{{ account.accountName || '—' }}</td><td>{{ account.accountType }}</td><td>₹ {{ account.balance | number:'1.2-2' }}</td>
+            </tr></tbody>
+          </table>
+        </div>
+
+        <h5 style="margin-top: 22px;">Statement Entries</h5>
+        <div class="table-container" style="overflow-x: auto;" *ngIf="branchOperations?.entries?.length">
+          <table class="data-table branch-txns-table">
+            <thead><tr><th>Date</th><th>Transaction</th><th>Account</th><th>Type</th><th>Amount</th><th>Description</th></tr></thead>
+            <tbody><tr *ngFor="let entry of branchOperations.entries">
+              <td>{{ entry.date | date:'short' }}</td><td>{{ entry.transactionId }}</td><td>{{ entry.accountNumber || '—' }}</td><td>{{ entry.type }}</td><td>₹ {{ entry.amount | number:'1.2-2' }}</td><td>{{ entry.description || '—' }}</td>
+            </tr></tbody>
+          </table>
+        </div>
+      </div>
+
       <div class="info-card branch-account-form-card" style="margin-top: 24px;">
         <h4><i class="fa fa-plus-circle"></i> Open / Set Branch Account</h4>
         <p class="section-description">

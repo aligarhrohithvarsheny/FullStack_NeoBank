@@ -399,6 +399,48 @@ public class AdminController {
         return ResponseEntity.ok(result);
     }
 
+    @PutMapping("/branch-account/daily-allocation")
+    public ResponseEntity<Map<String, Object>> saveBranchDailyAllocation(@RequestBody Map<String, Object> body) {
+        if (branchAccountService == null) {
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(Map.of("success", false, "message", "Branch account service not available"));
+        }
+        try {
+            LocalDate date = LocalDate.parse(String.valueOf(body.getOrDefault("allocationDate", LocalDate.now())));
+            Double amount = Double.valueOf(String.valueOf(body.getOrDefault("allocatedAmount", "0")));
+            Map<String, Object> allocation = branchAccountService.saveDailyAllocation(
+                    date, amount, (String) body.get("note"), (String) body.get("allocatedBy"));
+            return ResponseEntity.ok(Map.of("success", true, "allocation", allocation));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", e.getMessage()));
+        }
+    }
+
+    @GetMapping("/branch-account/operations")
+    public ResponseEntity<Map<String, Object>> getBranchOperations(
+            @RequestParam(required = false) String fromDate,
+            @RequestParam(required = false) String toDate) {
+        if (branchAccountService == null) {
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(Map.of("success", false, "message", "Branch account service not available"));
+        }
+        try {
+            LocalDate from = fromDate == null || fromDate.isBlank() ? LocalDate.now() : LocalDate.parse(fromDate);
+            LocalDate to = toDate == null || toDate.isBlank() ? from : LocalDate.parse(toDate);
+            return ResponseEntity.ok(branchAccountService.getBranchOperations(from, to));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", e.getMessage()));
+        }
+    }
+
+    @GetMapping("/branch-account/daily-allocations")
+    public ResponseEntity<List<Map<String, Object>>> getBranchDailyAllocations(
+            @RequestParam(required = false) String fromDate,
+            @RequestParam(required = false) String toDate) {
+        if (branchAccountService == null) return ResponseEntity.ok(List.of());
+        LocalDate from = fromDate == null || fromDate.isBlank() ? null : LocalDate.parse(fromDate);
+        LocalDate to = toDate == null || toDate.isBlank() ? null : LocalDate.parse(toDate);
+        return ResponseEntity.ok(branchAccountService.getDailyAllocations(from, to));
+    }
+
     @Transactional
     @PostMapping(value = "/login", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<Map<String, Object>> loginAdmin(

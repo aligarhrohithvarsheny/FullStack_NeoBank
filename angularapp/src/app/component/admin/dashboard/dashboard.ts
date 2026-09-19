@@ -180,6 +180,7 @@ export class Dashboard implements OnInit, OnDestroy {
     { section: 'bulk-export', icon: 'fa-file-download', label: 'Bulk Data Export', description: 'Export account data in bulk PDF/Excel', gradient: 'linear-gradient(135deg, #43e97b, #38f9d7)', featureKey: 'manage-users' },
     { section: 'bank-forms', icon: 'fa-file-alt', label: 'Bank Forms', description: 'Download 60 banking forms as PDF and upload by account number', gradient: 'linear-gradient(135deg, #667eea, #764ba2)' },
     { section: 'deposit-withdraw', icon: 'fa-exchange-alt', label: 'Deposit/Withdraw', description: 'Process deposits and withdrawals', gradient: 'linear-gradient(135deg, #fa709a, #fee140)', featureKey: 'deposit-withdraw' },
+    { section: 'branch-operations', icon: 'fa-university', label: 'Branch Operations', description: 'Daily allocation, balances, charges, loans and profit/loss', gradient: 'linear-gradient(135deg, #0f766e, #38bdf8)' },
     { section: 'transactions', icon: 'fa-chart-line', label: 'Transactions', description: 'View all transaction history', gradient: 'linear-gradient(135deg, #a18cd1, #fbc2eb)', featureKey: 'transactions' },
     { section: 'transfers', icon: 'fa-exchange-alt', label: 'Fund Transfers', description: 'NEFT, RTGS, IMPS transfers overview', gradient: 'linear-gradient(135deg, #fbc2eb, #a6c1ee)' },
     { section: 'beneficiaries', icon: 'fa-users', label: 'Beneficiaries', description: 'Manage registered beneficiaries', gradient: 'linear-gradient(135deg, #d4fc79, #96e6a1)' },
@@ -330,6 +331,14 @@ export class Dashboard implements OnInit, OnDestroy {
 
   // Sidebar Search
   sidebarSearchQuery: string = '';
+  branchOperations: any = null;
+  branchOperationsDate: string = new Date().toISOString().substring(0, 10);
+  branchOperationsToDate: string = new Date().toISOString().substring(0, 10);
+  branchDailyAllocationAmount: number = 0;
+  branchDailyAllocationDate: string = new Date().toISOString().substring(0, 10);
+  branchDailyAllocationNote: string = '';
+  isLoadingBranchOperations: boolean = false;
+  isSavingBranchAllocation: boolean = false;
   adminMenuSections: { title: string; items: { section: string; icon: string; label: string; featureKey?: string; action?: () => void; badge?: () => number }[] }[] = [
     {
       title: 'Main Menu',
@@ -345,6 +354,7 @@ export class Dashboard implements OnInit, OnDestroy {
       title: 'Financial Operations',
       items: [
         { section: 'deposit-withdraw', icon: 'fa-exchange-alt', label: 'Deposit/Withdraw', featureKey: 'deposit-withdraw' },
+        { section: 'branch-operations', icon: 'fa-university', label: 'Branch Operations' },
         { section: 'transactions', icon: 'fa-chart-line', label: 'Transactions', featureKey: 'transactions' },
         { section: 'transfers', icon: 'fa-exchange-alt', label: 'Fund Transfers' },
         { section: 'beneficiaries', icon: 'fa-users', label: 'Beneficiaries' },
@@ -1495,6 +1505,41 @@ export class Dashboard implements OnInit, OnDestroy {
     }
   }
 
+  loadBranchOperations() {
+    this.isLoadingBranchOperations = true;
+    const url = `${environment.apiBaseUrl}/api/admins/branch-account/operations?fromDate=${encodeURIComponent(this.branchOperationsDate)}&toDate=${encodeURIComponent(this.branchOperationsToDate)}`;
+    this.http.get<any>(url).subscribe({
+      next: (data) => { this.branchOperations = data; this.isLoadingBranchOperations = false; },
+      error: () => { this.branchOperations = null; this.isLoadingBranchOperations = false; }
+    });
+  }
+
+  saveBranchDailyAllocation() {
+    if (!this.branchDailyAllocationDate || this.branchDailyAllocationAmount < 0) {
+      this.alertService.error('Branch Allocation', 'Enter a valid date and amount');
+      return;
+    }
+    this.isSavingBranchAllocation = true;
+    this.http.put<any>(`${environment.apiBaseUrl}/api/admins/branch-account/daily-allocation`, {
+      allocationDate: this.branchDailyAllocationDate,
+      allocatedAmount: this.branchDailyAllocationAmount,
+      note: this.branchDailyAllocationNote,
+      allocatedBy: this.adminName
+    }).subscribe({
+      next: (response) => {
+        this.isSavingBranchAllocation = false;
+        if (response?.success) {
+          this.alertService.success('Branch Allocation', 'Daily branch amount saved.');
+          this.loadBranchOperations();
+        } else this.alertService.error('Branch Allocation', response?.message || 'Unable to save allocation');
+      },
+      error: (err) => {
+        this.isSavingBranchAllocation = false;
+        this.alertService.error('Branch Allocation', err.error?.message || 'Unable to save allocation');
+      }
+    });
+  }
+
   goToHome() {
     this.activeSection = 'home';
   }
@@ -1529,6 +1574,12 @@ export class Dashboard implements OnInit, OnDestroy {
     const featureId = featureAccessMap[section];
     if (featureId && !this.hasFeatureAccess(featureId)) {
       this.alertService.error('Access Denied', 'This feature has been disabled by the manager.');
+      return;
+    }
+
+    if (section === 'branch-operations') {
+      this.activeSection = section;
+      this.loadBranchOperations();
       return;
     }
 

@@ -239,6 +239,15 @@ export class ManagerDashboard implements OnInit, OnDestroy {
   branchTxnsTotalElements: number = 0;
   branchTxnsTotalPages: number = 0;
   isLoadingBranchTxns: boolean = false;
+  branchOperations: any = null;
+  branchOperationsDate: string = new Date().toISOString().substring(0, 10);
+  branchOperationsToDate: string = new Date().toISOString().substring(0, 10);
+  dailyAllocationAmount: number = 0;
+  dailyAllocationDate: string = new Date().toISOString().substring(0, 10);
+  dailyAllocationNote: string = '';
+  dailyAllocations: any[] = [];
+  isSavingDailyAllocation: boolean = false;
+  isLoadingBranchOperations: boolean = false;
 
   // Attendance & Salary
   attendanceDate: string = new Date().toISOString().substring(0, 10);
@@ -1616,6 +1625,8 @@ export class ManagerDashboard implements OnInit, OnDestroy {
     } else if (section === 'branch-account' && isPlatformBrowser(this.platformId)) {
       this.loadBranchAccountSummary();
       this.loadBranchAccountTransactions();
+      this.loadBranchOperations();
+      this.loadDailyAllocations();
     } else if (section === 'attendance-salary' && isPlatformBrowser(this.platformId)) {
       this.loadAttendanceSummary();
     } else if (section === 'attendance-admin' && isPlatformBrowser(this.platformId)) {
@@ -2385,6 +2396,51 @@ export class ManagerDashboard implements OnInit, OnDestroy {
       this.branchTxnsPage++;
       this.loadBranchAccountTransactions();
     }
+  }
+
+  saveDailyAllocation() {
+    if (this.dailyAllocationAmount < 0 || !this.dailyAllocationDate) {
+      this.alertService.error('Allocation', 'Enter a valid date and non-negative amount');
+      return;
+    }
+    this.isSavingDailyAllocation = true;
+    this.http.put<any>(`${environment.apiBaseUrl}/api/admins/branch-account/daily-allocation`, {
+      allocationDate: this.dailyAllocationDate,
+      allocatedAmount: this.dailyAllocationAmount,
+      note: this.dailyAllocationNote,
+      allocatedBy: this.managerName
+    }).subscribe({
+      next: (response) => {
+        this.isSavingDailyAllocation = false;
+        if (response?.success) {
+          this.alertService.success('Daily Allocation', 'Branch operating limit saved.');
+          this.loadBranchOperations();
+          this.loadDailyAllocations();
+        } else {
+          this.alertService.error('Allocation', response?.message || 'Unable to save allocation');
+        }
+      },
+      error: (err) => {
+        this.isSavingDailyAllocation = false;
+        this.alertService.error('Allocation', err.error?.message || 'Unable to save allocation');
+      }
+    });
+  }
+
+  loadBranchOperations() {
+    this.isLoadingBranchOperations = true;
+    const url = `${environment.apiBaseUrl}/api/admins/branch-account/operations?fromDate=${encodeURIComponent(this.branchOperationsDate)}&toDate=${encodeURIComponent(this.branchOperationsToDate)}`;
+    this.http.get<any>(url).subscribe({
+      next: (data) => { this.branchOperations = data; this.isLoadingBranchOperations = false; },
+      error: () => { this.branchOperations = null; this.isLoadingBranchOperations = false; }
+    });
+  }
+
+  loadDailyAllocations() {
+    this.http.get<any[]>(`${environment.apiBaseUrl}/api/admins/branch-account/daily-allocations`).subscribe({
+      next: (data) => this.dailyAllocations = data || [],
+      error: () => this.dailyAllocations = []
+    });
   }
 
   async printIdCardForSelectedAdmin() {
