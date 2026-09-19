@@ -2817,7 +2817,7 @@
 
     <!-- Signature Modal -->
     <div *ngIf="showAftSignatureModal" class="modal-overlay" (click)="closeAftSignatureModal()">
-      <div class="modal-content" (click)="$event.stopPropagation();style='width:90%;max-width:600px;'">
+      <div class="modal-content" (click)="$event.stopPropagation()" [ngStyle]="{'width':'90%','max-width':'600px'}">
         <div class="modal-header">
           <h3><i class="fa fa-image"></i> Sender's Signature Document</h3>
           <button class="btn-close" (click)="closeAftSignatureModal()"><i class="fa fa-times"></i></button>
@@ -2877,7 +2877,7 @@
               <td style="padding:12px;text-align:right;"><strong>₹{{ t.amount | number:'1.2-2' }}</strong></td>
               <td style="padding:12px;text-align:right;">₹{{ t.transferCharge | number:'1.2-2' }}</td>
               <td style="padding:12px;">
-                <span style="padding:4px 8px;border-radius:4px;" [style.background]="t.status === 'COMPLETED' ? '#dcfce7' : '#fee2e2'" [style.color]="t.status === 'COMPLETED' ? '#166534' : '#991b1b';">
+                <span style="padding:4px 8px;border-radius:4px;" [style.background]="t.status === 'COMPLETED' ? '#dcfce7' : '#fee2e2'" [style.color]="t.status === 'COMPLETED' ? '#166534' : '#991b1b'">
                   {{ t.status }}
                 </span>
               </td>
