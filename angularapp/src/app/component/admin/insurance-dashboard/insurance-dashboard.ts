@@ -27,6 +27,10 @@ export class AdminInsuranceDashboard implements OnInit {
   selectedPolicyIdForAssign: number | null = null;
   selectedPremiumTypeForAssign: 'MONTHLY' | 'YEARLY' = 'MONTHLY';
   assigningPolicy: boolean = false;
+  verifiedLinkedAccount: any = null;
+  vehicleDetails: any = { vehicleNumber: '', makeModel: '', chassisNumber: '', engineNumber: '', registrationDate: '' };
+  selectedInsuranceFiles: File[] = [];
+  editingApplicationId: number | null = null;
 
   // Tab navigation
   activeTab: 'policies' | 'applications' | 'claims' | 'customers' = 'policies';
@@ -142,6 +146,20 @@ export class AdminInsuranceDashboard implements OnInit {
 
   selectCustomer(c: any) {
     this.selectedCustomer = c;
+    this.verifySelectedAccount();
+  }
+
+  verifySelectedAccount() {
+    if (!this.selectedCustomer?.accountNumber) return;
+    this.http.get<any>(`${environment.apiBaseUrl}/api/admin/insurance/accounts/verify?accountNumber=${encodeURIComponent(this.selectedCustomer.accountNumber)}&customerName=${encodeURIComponent(this.selectedCustomer.account?.name || this.selectedCustomer.name || '')}`).subscribe({
+      next: (res) => this.verifiedLinkedAccount = res,
+      error: () => this.verifiedLinkedAccount = null
+    });
+  }
+
+  onInsuranceFilesSelected(event: Event) {
+    const input = event.target as HTMLInputElement;
+    this.selectedInsuranceFiles = input.files ? Array.from(input.files) : [];
   }
 
   assignPolicyToSelectedCustomer() {
@@ -155,11 +173,14 @@ export class AdminInsuranceDashboard implements OnInit {
       policyId: this.selectedPolicyIdForAssign,
       premiumType: this.selectedPremiumTypeForAssign,
       remark: `Assigned by admin to ${this.selectedCustomer.accountNumber}`,
-      customerName: this.selectedCustomer.account?.name || this.selectedCustomer.name || this.selectedCustomer.username
+      customerName: this.selectedCustomer.account?.name || this.selectedCustomer.name || this.selectedCustomer.username,
+      ...this.vehicleDetails,
+      linkedAccountType: this.verifiedLinkedAccount?.accountType
     };
     this.http.post(`${environment.apiBaseUrl}/api/admin/insurance/assign-policy`, payload).subscribe({
       next: (res: any) => {
         if (res?.success) {
+          if (this.selectedInsuranceFiles.length && res.application?.id) this.uploadInsuranceDocuments(res.application.id);
           this.alertService.adminSuccess('Assigned', res.message || 'Policy assigned.');
           this.loadPendingApplications();
           this.loadStats();
@@ -174,6 +195,26 @@ export class AdminInsuranceDashboard implements OnInit {
         this.alertService.adminError('Failed', err.error?.message || 'Unable to assign policy.');
       }
     });
+  }
+
+  uploadInsuranceDocuments(applicationId: number) {
+    const form = new FormData();
+    this.selectedInsuranceFiles.forEach(file => form.append('files', file));
+    this.http.post(`${environment.apiBaseUrl}/api/admin/insurance/applications/${applicationId}/documents`, form).subscribe();
+  }
+
+  editApplication(app: any) {
+    const updates = { vehicleNumber: app.vehicleNumber, makeModel: app.makeModel, chassisNumber: app.chassisNumber, engineNumber: app.engineNumber, registrationDate: app.registrationDate, nomineeName: app.nomineeName, nomineeRelation: app.nomineeRelation };
+    this.editingApplicationId = app.id;
+    this.http.put(`${environment.apiBaseUrl}/api/admin/insurance/applications/${app.id}`, updates).subscribe({ next: () => { this.editingApplicationId = null; this.loadPendingApplications(); }, error: () => this.editingApplicationId = null });
+  }
+
+  renewApplication(app: any) {
+    this.http.post(`${environment.apiBaseUrl}/api/admin/insurance/applications/${app.id}/renew?renewedBy=Admin`, {}).subscribe({ next: (res: any) => { if (res?.success) { this.alertService.adminSuccess('Insurance Renewed', 'Policy renewal saved.'); this.loadPendingApplications(); } }, error: (err) => this.alertService.adminError('Renewal Failed', err.error?.message || 'Unable to renew policy') });
+  }
+
+  downloadCertificate(app: any) {
+    window.open(`${environment.apiBaseUrl}/api/admin/insurance/applications/${app.id}/certificate`, '_blank');
   }
 
   searchClaimsByPolicyNumber() {

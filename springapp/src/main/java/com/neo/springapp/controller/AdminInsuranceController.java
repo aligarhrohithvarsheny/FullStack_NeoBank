@@ -7,6 +7,12 @@ import com.neo.springapp.service.InsuranceService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
+import java.time.LocalDateTime;
 
 import java.util.HashMap;
 import java.util.List;
@@ -123,6 +129,7 @@ public class AdminInsuranceController {
             }
 
             InsuranceApplication application = insuranceService.assignPolicyToAccount(accountNumber, policyId, premiumType, remark, customerName);
+            application = insuranceService.editApplication(application.getId(), payload);
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);
             response.put("application", application);
@@ -134,6 +141,53 @@ public class AdminInsuranceController {
             error.put("message", e.getMessage());
             return ResponseEntity.badRequest().body(error);
         }
+    }
+
+    @GetMapping("/insurance/accounts/verify")
+    public ResponseEntity<?> verifyInsuranceAccount(@RequestParam String accountNumber,
+                                                    @RequestParam(required = false) String customerName) {
+        try { return ResponseEntity.ok(insuranceService.verifyLinkedAccount(accountNumber, customerName)); }
+        catch (Exception e) { return ResponseEntity.badRequest().body(Map.of("valid", false, "message", e.getMessage())); }
+    }
+
+    @PutMapping("/insurance/applications/{id}")
+    public ResponseEntity<?> editInsuranceApplication(@PathVariable Long id, @RequestBody Map<String, Object> updates) {
+        try { return ResponseEntity.ok(Map.of("success", true, "application", insuranceService.editApplication(id, updates))); }
+        catch (Exception e) { return ResponseEntity.badRequest().body(Map.of("success", false, "message", e.getMessage())); }
+    }
+
+    @PostMapping("/insurance/applications/{id}/renew")
+    public ResponseEntity<?> renewInsuranceApplication(@PathVariable Long id,
+                                                        @RequestParam(required = false) String renewedBy) {
+        try { return ResponseEntity.ok(Map.of("success", true, "application", insuranceService.renewApplication(id, renewedBy))); }
+        catch (Exception e) { return ResponseEntity.badRequest().body(Map.of("success", false, "message", e.getMessage())); }
+    }
+
+    @PostMapping(value = "/insurance/applications/{id}/documents", consumes = "multipart/form-data")
+    public ResponseEntity<?> uploadInsuranceDocuments(@PathVariable Long id,
+                                                       @RequestParam("files") List<MultipartFile> files) {
+        try {
+            Path directory = Paths.get("uploads/insurance");
+            Files.createDirectories(directory);
+            List<String> paths = new java.util.ArrayList<>();
+            for (MultipartFile file : files) {
+                if (file == null || file.isEmpty()) continue;
+                String original = file.getOriginalFilename() == null ? "document" : file.getOriginalFilename();
+                String safe = original.replaceAll("[^A-Za-z0-9._-]", "_");
+                Path target = directory.resolve(id + "_" + System.currentTimeMillis() + "_" + safe).normalize();
+                Files.copy(file.getInputStream(), target, StandardCopyOption.REPLACE_EXISTING);
+                paths.add(target.toString());
+            }
+            InsuranceApplication application = insuranceService.editApplication(id, Map.of("vehicleDocumentPaths", String.join(",", paths)));
+            return ResponseEntity.ok(Map.of("success", true, "application", application, "files", paths));
+        } catch (Exception e) { return ResponseEntity.badRequest().body(Map.of("success", false, "message", e.getMessage())); }
+    }
+
+    @GetMapping("/insurance/applications/{id}/certificate")
+    public ResponseEntity<byte[]> downloadAdminCertificate(@PathVariable Long id) {
+        byte[] pdf = insuranceService.generatePolicyCertificatePdf(id);
+        return ResponseEntity.ok().header("Content-Type", "application/pdf")
+                .header("Content-Disposition", "attachment; filename=insurance-certificate-" + id + ".pdf").body(pdf);
     }
 
     @PostMapping("/insurance/applications/{id}/approve")

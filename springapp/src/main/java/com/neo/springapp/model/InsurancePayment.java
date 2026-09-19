@@ -45,6 +45,7 @@ public class InsurancePayment {
     private LocalDate nextDueDate;
 
     private boolean autoDebitEnabled = false;
+    private String accountType;
 
     public InsurancePayment() {
         this.paymentDate = LocalDateTime.now();

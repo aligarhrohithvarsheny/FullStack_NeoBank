@@ -5,6 +5,7 @@ import jakarta.persistence.*;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.time.LocalDate;
 
 @Entity
 @Data
@@ -61,6 +62,20 @@ public class InsuranceApplication {
 
     private Boolean autoDebitRequested = false;
     private Boolean autoDebitApproved = false;
+
+    private String linkedAccountType; // SAVINGS, CURRENT, SALARY
+    private String vehicleNumber;
+    private String makeModel;
+    private String chassisNumber;
+    private String engineNumber;
+    private String registrationDate;
+    @Column(columnDefinition = "TEXT")
+    private String vehicleDocumentPaths;
+    private LocalDate policyStartDate;
+    private LocalDate policyEndDate;
+    private Integer renewalCount = 0;
+    private LocalDateTime paidAt;
+    private LocalDateTime certificateGeneratedAt;
 
     private Double premiumAmountCalculated; // premium after risk/age/disease adjustments
 

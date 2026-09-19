@@ -349,6 +349,9 @@
                           [disabled]="processingApplicationId === app.id">
                     ✕ Reject
                   </button>
+                  <button class="ins-btn ins-btn-xs ins-btn-outline" (click)="editApplication(app)" [disabled]="editingApplicationId === app.id">Edit</button>
+                  <button class="ins-btn ins-btn-xs ins-btn-accent" *ngIf="app.status === 'ACTIVE'" (click)="renewApplication(app)">Renew</button>
+                  <button class="ins-btn ins-btn-xs ins-btn-ghost" *ngIf="app.paymentStatus === 'COMPLETED' || app.status === 'ACTIVE'" (click)="downloadCertificate(app)">PDF</button>
                 </div>
               </td>
             </tr>
@@ -495,6 +498,33 @@
           <button class="ins-btn ins-btn-accent" (click)="assignPolicyToSelectedCustomer()" [disabled]="assigningPolicy">
             {{ assigningPolicy ? 'Assigning...' : 'Assign Policy' }}
           </button>
+        </div>
+      </div>
+      <div class="ins-assign-row">
+        <div class="ins-field">
+          <label class="ins-label">Verified Account</label>
+          <span class="ins-text-muted">{{ verifiedLinkedAccount?.accountType || 'Select customer' }} · {{ verifiedLinkedAccount?.accountHolderName || '—' }} · ₹{{ verifiedLinkedAccount?.balance || 0 | number:'1.0-0' }}</span>
+        </div>
+        <div class="ins-field">
+          <label class="ins-label">Vehicle / Bike Number</label>
+          <input class="ins-input" [(ngModel)]="vehicleDetails.vehicleNumber" placeholder="e.g. UK07AB1234">
+        </div>
+        <div class="ins-field">
+          <label class="ins-label">Make / Model</label>
+          <input class="ins-input" [(ngModel)]="vehicleDetails.makeModel" placeholder="Car or bike model">
+        </div>
+        <div class="ins-field">
+          <label class="ins-label">Chassis / Engine</label>
+          <input class="ins-input" [(ngModel)]="vehicleDetails.chassisNumber" placeholder="Chassis number">
+          <input class="ins-input" style="margin-top:6px" [(ngModel)]="vehicleDetails.engineNumber" placeholder="Engine number">
+        </div>
+        <div class="ins-field">
+          <label class="ins-label">Registration Date</label>
+          <input class="ins-input" type="date" [(ngModel)]="vehicleDetails.registrationDate">
+        </div>
+        <div class="ins-field">
+          <label class="ins-label">Vehicle Documents</label>
+          <input class="ins-input" type="file" multiple accept="image/*,.pdf" (change)="onInsuranceFilesSelected($event)">
         </div>
       </div>
 

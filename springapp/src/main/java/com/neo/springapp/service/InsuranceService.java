@@ -5,9 +5,12 @@ import com.neo.springapp.repository.InsuranceApplicationRepository;
 import com.neo.springapp.repository.InsuranceClaimRepository;
 import com.neo.springapp.repository.InsurancePaymentRepository;
 import com.neo.springapp.repository.InsurancePolicyRepository;
+import com.neo.springapp.repository.CurrentAccountRepository;
+import com.neo.springapp.repository.SalaryAccountRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.itextpdf.html2pdf.HtmlConverter;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -40,6 +43,12 @@ public class InsuranceService {
 
     @Autowired
     private TransactionService transactionService;
+
+    @Autowired
+    private CurrentAccountRepository currentAccountRepository;
+
+    @Autowired
+    private SalaryAccountRepository salaryAccountRepository;
 
     @Autowired(required = false)
     private EmailService emailService;
@@ -210,6 +219,62 @@ public class InsuranceService {
         return applicationRepository.save(application);
     }
 
+    public Map<String, Object> verifyLinkedAccount(String accountNumber, String expectedName) {
+        Map<String, Object> response = new HashMap<>();
+        if (accountNumber == null || accountNumber.isBlank()) throw new IllegalArgumentException("Account number is required");
+        String number = accountNumber.trim();
+        Account savings = accountService.getAccountByNumber(number);
+        String name = null;
+        String type = null;
+        Double balance = null;
+        if (savings != null) {
+            name = savings.getName(); type = "SAVINGS"; balance = savings.getBalance();
+        } else {
+            var current = currentAccountRepository.findByAccountNumber(number).orElse(null);
+            if (current != null) { name = current.getOwnerName(); type = "CURRENT"; balance = current.getBalance(); }
+            else {
+                SalaryAccount salary = salaryAccountRepository.findByAccountNumber(number);
+                if (salary != null) { name = salary.getEmployeeName(); type = "SALARY"; balance = salary.getBalance(); }
+            }
+        }
+        if (name == null) { response.put("valid", false); response.put("message", "Savings, current or salary account not found"); return response; }
+        boolean nameMatches = expectedName == null || expectedName.isBlank() || name.equalsIgnoreCase(expectedName.trim());
+        response.put("valid", nameMatches); response.put("nameMatches", nameMatches); response.put("accountNumber", number);
+        response.put("accountHolderName", name); response.put("accountType", type); response.put("balance", balance == null ? 0.0 : balance);
+        response.put("message", nameMatches ? "Account verified and name matched" : "Account holder name does not match");
+        return response;
+    }
+
+    @Transactional
+    public InsuranceApplication editApplication(Long id, Map<String, Object> updates) {
+        InsuranceApplication app = applicationRepository.findById(id).orElseThrow(() -> new RuntimeException("Insurance application not found"));
+        if (updates == null) return app;
+        if (updates.get("vehicleNumber") != null) app.setVehicleNumber(String.valueOf(updates.get("vehicleNumber")));
+        if (updates.get("makeModel") != null) app.setMakeModel(String.valueOf(updates.get("makeModel")));
+        if (updates.get("chassisNumber") != null) app.setChassisNumber(String.valueOf(updates.get("chassisNumber")));
+        if (updates.get("engineNumber") != null) app.setEngineNumber(String.valueOf(updates.get("engineNumber")));
+        if (updates.get("registrationDate") != null) app.setRegistrationDate(String.valueOf(updates.get("registrationDate")));
+        if (updates.get("vehicleDocumentPaths") != null) app.setVehicleDocumentPaths(String.valueOf(updates.get("vehicleDocumentPaths")));
+        if (updates.get("nomineeName") != null) app.setNomineeName(String.valueOf(updates.get("nomineeName")));
+        if (updates.get("nomineeRelation") != null) app.setNomineeRelation(String.valueOf(updates.get("nomineeRelation")));
+        if (updates.get("premiumAmountCalculated") != null) app.setPremiumAmountCalculated(Double.valueOf(updates.get("premiumAmountCalculated").toString()));
+        return applicationRepository.save(app);
+    }
+
+    @Transactional
+    public InsuranceApplication renewApplication(Long id, String renewedBy) {
+        InsuranceApplication app = applicationRepository.findById(id).orElseThrow(() -> new RuntimeException("Insurance application not found"));
+        if (!"ACTIVE".equalsIgnoreCase(app.getStatus())) throw new RuntimeException("Only active insurance can be renewed");
+        LocalDate start = LocalDate.now();
+        app.setPolicyStartDate(start);
+        app.setPolicyEndDate(start.plusMonths(app.getPolicy().getDurationMonths() == null ? 12 : app.getPolicy().getDurationMonths()));
+        app.setRenewalCount((app.getRenewalCount() == null ? 0 : app.getRenewalCount()) + 1);
+        app.setPaymentStatus("NOT_PAID");
+        app.setStatus("APPROVED");
+        app.setAdminRemark("Renewed by " + (renewedBy == null || renewedBy.isBlank() ? "Admin" : renewedBy));
+        return applicationRepository.save(app);
+    }
+
     private double calculatePremium(InsurancePolicy policy, InsuranceApplication application) {
         double base = policy.getPremiumAmount() != null ? policy.getPremiumAmount() : 0.0;
         String cycle = application.getPremiumType() != null ? application.getPremiumType().toUpperCase() : "MONTHLY";
@@ -345,16 +410,12 @@ public class InsuranceService {
         String accountNumber = application.getAccountNumber();
 
         // Debit from account using existing transaction/balance logic
-        Account account = accountService.getAccountByNumber(accountNumber);
-        if (account == null) {
-            throw new RuntimeException("Account not found for premium payment");
-        }
-
-        if (account.getBalance() == null || account.getBalance() < amount) {
-            throw new RuntimeException("Insufficient balance for premium payment");
-        }
-
-        Double newBalance = accountService.debitBalance(accountNumber, amount);
+        Map<String, Object> verified = verifyLinkedAccount(accountNumber, null);
+        if (!Boolean.TRUE.equals(verified.get("valid"))) throw new RuntimeException("Account not found for premium payment");
+        String accountType = String.valueOf(verified.get("accountType"));
+        Double currentBalance = Double.valueOf(verified.get("balance").toString());
+        if (currentBalance < amount) throw new RuntimeException("Insufficient balance for premium payment");
+        Double newBalance = debitLinkedAccount(accountNumber, accountType, amount);
 
         // Create transaction record
         Transaction txn = new Transaction();
@@ -363,7 +424,7 @@ public class InsuranceService {
         txn.setType("Debit");
         txn.setDescription("Insurance premium for policy " + application.getPolicy().getPolicyNumber());
         txn.setBalance(newBalance);
-        txn.setUserName(account.getName());
+        txn.setUserName(String.valueOf(verified.get("accountHolderName")));
         txn.setAccountNumber(accountNumber);
         transactionService.saveTransaction(txn);
 
@@ -373,6 +434,7 @@ public class InsuranceService {
         payment.setUserId(application.getUserId());
         payment.setAccountNumber(accountNumber);
         payment.setAmount(amount);
+        payment.setAccountType(accountType);
         payment.setStatus("SUCCESS");
 
         // Simple next due date calculation based on premiumType
@@ -396,6 +458,10 @@ public class InsuranceService {
 
         // Mark payment completed on application
         application.setPaymentStatus("COMPLETED");
+        application.setLinkedAccountType(accountType);
+        application.setPaidAt(LocalDateTime.now());
+        application.setPolicyStartDate(LocalDate.now());
+        application.setPolicyEndDate(LocalDate.now().plusMonths(application.getPolicy().getDurationMonths() == null ? 12 : application.getPolicy().getDurationMonths()));
         // If admin already approved, activate now
         if ("APPROVED".equalsIgnoreCase(application.getStatus())) {
             application.setStatus("ACTIVE");
@@ -403,6 +469,17 @@ public class InsuranceService {
         applicationRepository.save(application);
 
         return paymentRepository.save(payment);
+    }
+
+    private Double debitLinkedAccount(String accountNumber, String accountType, Double amount) {
+        if ("SAVINGS".equals(accountType)) return accountService.debitBalance(accountNumber, amount);
+        if ("CURRENT".equals(accountType)) {
+            var account = currentAccountRepository.findByAccountNumber(accountNumber).orElseThrow(() -> new RuntimeException("Current account not found"));
+            account.setBalance(account.getBalance() - amount); currentAccountRepository.save(account); return account.getBalance();
+        }
+        SalaryAccount account = salaryAccountRepository.findByAccountNumber(accountNumber);
+        if (account == null) throw new RuntimeException("Salary account not found");
+        account.setBalance(account.getBalance() - amount); salaryAccountRepository.save(account); return account.getBalance();
     }
 
     @Transactional
@@ -621,23 +698,35 @@ public class InsuranceService {
                 .orElseThrow(() -> new RuntimeException("Application not found"));
         InsurancePolicy policy = app.getPolicy();
 
-        StringBuilder content = new StringBuilder();
-        content.append("NeoBank Insurance Policy Certificate\n\n");
-        content.append("Policy Number: ").append(policy.getPolicyNumber()).append("\n");
-        content.append("Policy Name: ").append(policy.getName()).append("\n");
-        content.append("Type: ").append(policy.getType()).append("\n");
-        content.append("Coverage Amount: ₹").append(policy.getCoverageAmount()).append("\n");
-        content.append("Premium: ₹").append(policy.getPremiumAmount()).append(" / ")
-                .append(policy.getPremiumType()).append("\n");
-        content.append("Duration: ").append(policy.getDurationMonths()).append(" months\n");
-        content.append("Nominee: ").append(app.getNomineeName()).append("\n");
-        content.append("Account Number: ").append(app.getAccountNumber()).append("\n");
-        content.append("Status: ").append(app.getStatus()).append("\n");
-        content.append("\nGenerated on: ").append(LocalDateTime.now()).append("\n");
+        String html = "<html><head><style>body{font-family:Arial;color:#14213d;padding:28px}h1{color:#0b7285;border-bottom:2px solid #0b7285;padding-bottom:10px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.row{border-bottom:1px solid #ddd;padding:8px}.label{font-weight:bold;color:#52606d}.badge{background:#d3f9d8;color:#087f5b;padding:5px 10px}</style></head><body>"
+                + "<h1>NeoBank Insurance Policy Certificate</h1><p><span class='badge'>" + safe(app.getStatus()) + "</span></p>"
+                + "<div class='grid'>"
+                + row("Policy Number", policy.getPolicyNumber()) + row("Policy Name", policy.getName())
+                + row("Insurance Type", policy.getType()) + row("Coverage", "Rs. " + policy.getCoverageAmount())
+                + row("Premium", "Rs. " + (app.getPremiumAmountCalculated() != null ? app.getPremiumAmountCalculated() : policy.getPremiumAmount()) + " / " + policy.getPremiumType())
+                + row("Duration", policy.getDurationMonths() + " months") + row("Account Number", app.getAccountNumber())
+                + row("Linked Account Type", app.getLinkedAccountType()) + row("Nominee", app.getNomineeName())
+                + row("Vehicle Number", app.getVehicleNumber()) + row("Make / Model", app.getMakeModel())
+                + row("Chassis Number", app.getChassisNumber()) + row("Engine Number", app.getEngineNumber())
+                + row("Policy Start", app.getPolicyStartDate()) + row("Policy End", app.getPolicyEndDate())
+                + "</div><p style='margin-top:28px'>Generated on: " + LocalDateTime.now() + "</p><p>This certificate is generated from NeoBank records after approval and successful premium payment.</p></body></html>";
+        try {
+            java.io.ByteArrayOutputStream output = new java.io.ByteArrayOutputStream();
+            HtmlConverter.convertToPdf(html, output);
+            app.setCertificateGeneratedAt(LocalDateTime.now());
+            applicationRepository.save(app);
+            return output.toByteArray();
+        } catch (Exception e) {
+            throw new RuntimeException("Unable to generate insurance certificate PDF", e);
+        }
+    }
 
-        // For simplicity we return a UTF-8 encoded text as "PDF" content.
-        // In production, integrate a real PDF library (e.g., iText, OpenPDF).
-        return content.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+    private String row(String label, Object value) {
+        return "<div class='row'><span class='label'>" + safe(label) + ": </span>" + safe(value) + "</div>";
+    }
+
+    private String safe(Object value) {
+        return String.valueOf(value == null ? "-" : value).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
     }
 }
 
