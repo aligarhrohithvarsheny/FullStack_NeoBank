@@ -313,6 +313,10 @@ export class SalaryDashboard implements OnInit, OnDestroy {
   }
 
   setActiveSection(section: string) {
+    if (section === 'positive-pay') {
+      this.router.navigate(['/website/positive-pay']);
+      return;
+    }
     this.activeSection = section;
     if (section === 'salary-transactions') this.loadSalaryTransactions();
     else if (section === 'transactions') this.loadNormalTransactions();

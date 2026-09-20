@@ -364,6 +364,7 @@ export class Dashboard implements OnInit, OnDestroy {
         { section: 'fixed-deposits', icon: 'fa-piggy-bank', label: 'Fixed Deposits' },
         { section: 'emi-management', icon: 'fa-calendar-check', label: 'EMI Management' },
         { section: 'cheques', icon: 'fa-file-invoice', label: 'Cheque Management', featureKey: 'cheques' },
+        { section: 'positive-pay', icon: 'fa-shield-alt', label: 'Positive Pay Requests', action: () => this.navigateTo('positive-pay') },
         { section: 'cheque-draw', icon: 'fa-receipt', label: 'Cheque Draw Requests', action: () => this.navigateTo('cheque-draw-management') },
         { section: 'business-cheque-draw', icon: 'fa-building', label: 'Business Cheque Draw', action: () => this.navigateTo('business-cheque-management') }
       ]

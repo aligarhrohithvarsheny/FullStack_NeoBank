@@ -524,6 +524,7 @@
       </div>
       <div class="loading" *ngIf="isLoadingCheques">Loading requests...</div>
     </section>
+    <button type="button" class="btn btn-primary" (click)="openPositivePay()">Positive Pay - Register Cheque Details</button>
 
     <!-- ==================== DRAW CHEQUE ==================== -->
     <section *ngIf="activeSection === 'draw-cheque'" class="section">

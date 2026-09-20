@@ -320,6 +320,8 @@ export class CurrentAccountDashboard implements OnInit, OnDestroy {
     // Real-time filtering handled by getFilteredCurrentMenu()
   }
 
+  openPositivePay() { this.router.navigate(['/website/positive-pay']); }
+
   getFilteredCurrentMenu() {
     let items = this.currentMenuItems;
 

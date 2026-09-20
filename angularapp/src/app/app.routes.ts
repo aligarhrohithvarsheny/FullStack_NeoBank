@@ -71,6 +71,8 @@ import { PgDashboard } from './component/website/pg-dashboard/pg-dashboard';
 import { PasswordSetupComponent } from './component/website/password-setup/password-setup.component';
 import { FamilyBankingComponent } from './component/website/family-banking/family-banking';
 import { FamilyBankingAdminComponent } from './component/admin/family-banking/family-banking-admin';
+import { PositivePayComponent } from './component/website/positive-pay/positive-pay.component';
+import { AdminPositivePayComponent } from './component/admin/positive-pay/admin-positive-pay.component';
 
 
 
@@ -108,6 +110,7 @@ export const routes: Routes = [
   { path: 'admin/agent-management', component: AgentManagement, canActivate: [adminAuthGuard] },
   { path: 'admin/admin-open-account', component: AdminOpenAccount, canActivate: [adminOrManagerAuthGuard] },
   { path: 'admin/family-banking', component: FamilyBankingAdminComponent, canActivate: [adminAuthGuard] },
+  { path: 'admin/positive-pay', component: AdminPositivePayComponent, canActivate: [adminAuthGuard] },
 
   // ------------------ WEBSITE ------------------
   {
@@ -126,6 +129,8 @@ export const routes: Routes = [
       { path: 'kycupdate', component: Kycupdate, canActivate: [userAuthGuard] },
       { path: 'profile', component: Profile, canActivate: [userAuthGuard] },
       { path: 'cheque', component: ChequeComponent, canActivate: [userAuthGuard] },
+      { path: 'positive-pay', component: PositivePayComponent, canActivate: [userAuthGuard] },
+      { path: 'accounts/:accountNumber/positive-pay', component: PositivePayComponent, canActivate: [userAuthGuard] },
       { path: 'fasttag', component: FasttagUser, canActivate: [userAuthGuard] },
       { path: 'goldloan', component: Goldloan, canActivate: [userAuthGuard] },
       { path: 'demand-draft', component: DemandDraftComponent, canActivate: [userAuthGuard] },

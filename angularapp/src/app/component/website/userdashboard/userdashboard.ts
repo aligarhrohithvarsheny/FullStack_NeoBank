@@ -478,6 +478,10 @@ export class Userdashboard implements OnInit, OnDestroy {
   }
   
   selectFeature(feature: string | null) {
+    if (feature === 'positive-pay') {
+      this.router.navigate(['/website/positive-pay']);
+      return;
+    }
     this.selectedFeature = feature;
     if (feature === 'deposit-request') {
       this.depositMessage = '';

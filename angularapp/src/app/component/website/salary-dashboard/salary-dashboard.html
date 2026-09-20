@@ -102,6 +102,10 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h18v4H3z"/><path d="M21 11v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-6"/></svg>
         <span *ngIf="!sidebarCollapsed">Draw Cheque</span>
       </a>
+      <a class="sdash-nav-item" [class.active]="activeSection === 'positive-pay'" (click)="setActiveSection('positive-pay')" [hidden]="!matchesSidebarSearch('Positive Pay')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7l8-4z"/><path d="M9 12l2 2 4-4"/></svg>
+        <span *ngIf="!sidebarCollapsed">Positive Pay</span>
+      </a>
       <a class="sdash-nav-item" [class.active]="activeSection === 'gold-loan'" (click)="setActiveSection('gold-loan')" [hidden]="!matchesSidebarSearch('Gold Loan')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v12M8 10h8M8 14h8"/></svg>
         <span *ngIf="!sidebarCollapsed">Gold Loan</span>
