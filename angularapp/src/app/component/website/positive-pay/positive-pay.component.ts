@@ -29,6 +29,11 @@ export class PositivePayComponent implements OnInit {
       this.accountType = u.accountType || u.account?.accountType || (sessionStorage.getItem('salaryEmployee') ? 'Salary' : sessionStorage.getItem('currentAccount') ? 'Current' : 'Savings');
     } catch {}
     if (routeAccount) this.accountNumber = routeAccount;
+    const draftRaw = sessionStorage.getItem('positivePayDraft');
+    if (draftRaw) {
+      try { const draft = JSON.parse(draftRaw); if (draft.accountNumber === this.accountNumber) { this.form.amount = draft.amount || null; this.form.payeeName = draft.payeeName || ''; } } catch {}
+      sessionStorage.removeItem('positivePayDraft');
+    }
     if (this.accountNumber) { this.refresh(); }
   }
   refresh() { this.loading = true; this.service.eligible(this.accountNumber).subscribe({ next: r => { this.cheques = r || []; this.loading = false; }, error: e => { this.error = e.error?.message || 'Unable to load eligible cheques'; this.loading = false; } }); this.service.history(this.accountNumber).subscribe({ next: r => this.requests = r || [] }); }

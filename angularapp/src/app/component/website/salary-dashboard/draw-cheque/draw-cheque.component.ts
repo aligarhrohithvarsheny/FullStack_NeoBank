@@ -6,6 +6,7 @@ import { SalaryAccountService } from '../../../../service/salary-account.service
 import { AlertService } from '../../../../service/alert.service';
 import { ChequeDrawRequest, ChequeHistoryEntry, ChequeStatus, ChequeLeaf } from '../../../../model/cheque/cheque.model';
 import { SalaryAccount } from '../../../../model/salary-account/salary-account.model';
+import { Router } from '@angular/router';
 
 @Component({
   selector: 'app-draw-cheque',
@@ -67,7 +68,8 @@ export class DrawChequeComponent implements OnInit, OnDestroy {
   constructor(
     private chequeService: ChequeService,
     private salaryService: SalaryAccountService,
-    private alertService: AlertService
+    private alertService: AlertService,
+    private router: Router
   ) {}
 
   ngOnInit() {
@@ -238,6 +240,11 @@ export class DrawChequeComponent implements OnInit, OnDestroy {
         this.isSubmitting = false;
         
         if (response.success) {
+          if (response.positivePayRequired) {
+            sessionStorage.setItem('positivePayDraft', JSON.stringify({ accountNumber: this.account?.accountNumber, accountType: 'Salary', chequeNumber: response.chequeNumber, amount: this.amount, payeeName: this.payeeName.trim() }));
+            this.router.navigate(['/website/accounts', this.account?.accountNumber, 'positive-pay']);
+            return;
+          }
           this.successMessage = `✓ Cheque request submitted successfully!
           Cheque Number: ${response.chequeNumber}
           Your request is waiting for admin approval.`;

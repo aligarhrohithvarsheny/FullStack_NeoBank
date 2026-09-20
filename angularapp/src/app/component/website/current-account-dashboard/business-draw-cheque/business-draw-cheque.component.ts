@@ -1,4 +1,5 @@
 import { Component, OnInit } from '@angular/core';
+import { Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { BusinessChequeService } from '../../../../service/business-cheque.service';
@@ -65,7 +66,7 @@ export class BusinessDrawChequeComponent implements OnInit {
     'CLEARED': '#059669'
   };
 
-  constructor(private businessChequeService: BusinessChequeService) {}
+  constructor(private businessChequeService: BusinessChequeService, private router: Router) {}
 
   ngOnInit() {
     this.loadAccountData();
@@ -194,6 +195,11 @@ export class BusinessDrawChequeComponent implements OnInit {
       next: (response) => {
         this.isSubmitting = false;
         if (response.success) {
+          if (response.positivePayRequired) {
+            sessionStorage.setItem('positivePayDraft', JSON.stringify({ accountNumber: this.account?.accountNumber, accountType: 'Current', chequeNumber: response.chequeNumber, amount: this.amount, payeeName: this.payeeName.trim() }));
+            this.router.navigate(['/website/accounts', this.account?.accountNumber, 'positive-pay']);
+            return;
+          }
           this.successMessage = `Cheque request submitted successfully! Cheque Number: ${response.chequeNumber}. Waiting for admin approval.`;
           setTimeout(() => {
             this.resetForm();

@@ -122,6 +122,9 @@ export interface ChequeApplyResponse {
   message: string;
   chequeNumber?: string;
   requestId?: number;
+  positivePayRequired?: boolean;
+  positivePayMessage?: string;
+  positivePayAccountNumber?: string;
 }
 
 export interface ChequeHistoryResponse {

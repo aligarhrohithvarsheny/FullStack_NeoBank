@@ -121,6 +121,11 @@ public class ChequeDrawService {
         response.put("chequeNumber", chequeNumber);
         response.put("requestId", saved.getId());
         response.put("status", "PENDING");
+        if (amount >= 10000.0) {
+            response.put("positivePayRequired", true);
+            response.put("positivePayMessage", "This cheque is ₹10,000 or above. Register it in Positive Pay before admin draw verification.");
+            response.put("positivePayAccountNumber", account.getAccountNumber());
+        }
 
         return response;
     }
