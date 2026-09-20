@@ -122,6 +122,25 @@ export const currentAccountAuthGuard: CanActivateFn = () => {
   return router.createUrlTree(['/website/current-account-login']);
 };
 
+export const positivePayAuthGuard: CanActivateFn = () => {
+  const router = inject(Router);
+  const platformId = inject(PLATFORM_ID);
+  if (!isPlatformBrowser(platformId)) return false;
+
+  const sessions = ['currentUser', 'salaryEmployee', 'currentAccount'];
+  for (const key of sessions) {
+    const raw = sessionStorage.getItem(key);
+    if (!raw) continue;
+    try {
+      const value = JSON.parse(raw);
+      if (value && (value.id || value.accountNumber || value.account?.accountNumber)) return true;
+    } catch {
+      sessionStorage.removeItem(key);
+    }
+  }
+  return router.createUrlTree(['/website/user']);
+};
+
 export const merchantSoundboxAuthGuard: CanActivateFn = () => {
   const router = inject(Router);
   const platformId = inject(PLATFORM_ID);

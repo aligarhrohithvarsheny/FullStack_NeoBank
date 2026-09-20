@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { userAuthGuard, adminAuthGuard, managerAuthGuard, salaryAuthGuard, currentAccountAuthGuard, merchantSoundboxAuthGuard, agentAuthGuard, adminOrManagerAuthGuard, pgMerchantAuthGuard } from './guard/auth.guard';
+import { userAuthGuard, adminAuthGuard, managerAuthGuard, salaryAuthGuard, currentAccountAuthGuard, positivePayAuthGuard, merchantSoundboxAuthGuard, agentAuthGuard, adminOrManagerAuthGuard, pgMerchantAuthGuard } from './guard/auth.guard';
 
 import { Dashboard } from './component/admin/dashboard/dashboard';
 import { Users } from './component/admin/users/users';
@@ -129,8 +129,8 @@ export const routes: Routes = [
       { path: 'kycupdate', component: Kycupdate, canActivate: [userAuthGuard] },
       { path: 'profile', component: Profile, canActivate: [userAuthGuard] },
       { path: 'cheque', component: ChequeComponent, canActivate: [userAuthGuard] },
-      { path: 'positive-pay', component: PositivePayComponent, canActivate: [userAuthGuard] },
-      { path: 'accounts/:accountNumber/positive-pay', component: PositivePayComponent, canActivate: [userAuthGuard] },
+      { path: 'positive-pay', component: PositivePayComponent, canActivate: [positivePayAuthGuard] },
+      { path: 'accounts/:accountNumber/positive-pay', component: PositivePayComponent, canActivate: [positivePayAuthGuard] },
       { path: 'fasttag', component: FasttagUser, canActivate: [userAuthGuard] },
       { path: 'goldloan', component: Goldloan, canActivate: [userAuthGuard] },
       { path: 'demand-draft', component: DemandDraftComponent, canActivate: [userAuthGuard] },

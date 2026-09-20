@@ -23,7 +23,11 @@ export class PositivePayComponent implements OnInit {
   loadAccount() {
     const routeAccount = this.route.snapshot.paramMap.get('accountNumber');
     const raw = sessionStorage.getItem('user') || sessionStorage.getItem('userProfile') || sessionStorage.getItem('currentUser') || sessionStorage.getItem('salaryEmployee') || sessionStorage.getItem('currentAccount');
-    try { const u = raw ? JSON.parse(raw) : {}; this.accountNumber = u.accountNumber || u.account?.accountNumber || ''; this.accountType = u.accountType || u.account?.accountType || 'Savings'; } catch {}
+    try {
+      const u = raw ? JSON.parse(raw) : {};
+      this.accountNumber = u.accountNumber || u.account?.accountNumber || '';
+      this.accountType = u.accountType || u.account?.accountType || (sessionStorage.getItem('salaryEmployee') ? 'Salary' : sessionStorage.getItem('currentAccount') ? 'Current' : 'Savings');
+    } catch {}
     if (routeAccount) this.accountNumber = routeAccount;
     if (this.accountNumber) { this.refresh(); }
   }
