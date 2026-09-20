@@ -42,6 +42,7 @@ export class CurrentAccountDashboard implements OnInit, OnDestroy {
     { section: 'overdraft', icon: '', label: 'Overdraft Usage' },
     { section: 'cheque', icon: '', label: 'Cheque Book Request' },
     { section: 'draw-cheque', icon: '', label: 'Draw Cheque' },
+    { section: 'positive-pay', icon: '', label: 'Positive Pay - Register Cheque' },
     { section: 'statement', icon: '', label: 'Account Statement' },
     { section: 'profile', icon: '', label: 'Profile Settings' },
     { section: 'invoices', icon: '', label: 'Invoice Generation' },

@@ -180,6 +180,7 @@ export class Dashboard implements OnInit, OnDestroy {
     { section: 'bulk-export', icon: 'fa-file-download', label: 'Bulk Data Export', description: 'Export account data in bulk PDF/Excel', gradient: 'linear-gradient(135deg, #43e97b, #38f9d7)', featureKey: 'manage-users' },
     { section: 'bank-forms', icon: 'fa-file-alt', label: 'Bank Forms', description: 'Download 60 banking forms as PDF and upload by account number', gradient: 'linear-gradient(135deg, #667eea, #764ba2)' },
     { section: 'deposit-withdraw', icon: 'fa-exchange-alt', label: 'Deposit/Withdraw', description: 'Process deposits and withdrawals', gradient: 'linear-gradient(135deg, #fa709a, #fee140)', featureKey: 'deposit-withdraw' },
+    { section: 'positive-pay', icon: 'fa-shield-alt', label: 'Positive Pay Requests', description: 'Verify customer cheque registrations', gradient: 'linear-gradient(135deg, #0284c7, #38bdf8)' },
     { section: 'branch-operations', icon: 'fa-university', label: 'Branch Operations', description: 'Daily allocation, balances, charges, loans and profit/loss', gradient: 'linear-gradient(135deg, #0f766e, #38bdf8)' },
     { section: 'transactions', icon: 'fa-chart-line', label: 'Transactions', description: 'View all transaction history', gradient: 'linear-gradient(135deg, #a18cd1, #fbc2eb)', featureKey: 'transactions' },
     { section: 'transfers', icon: 'fa-exchange-alt', label: 'Fund Transfers', description: 'NEFT, RTGS, IMPS transfers overview', gradient: 'linear-gradient(135deg, #fbc2eb, #a6c1ee)' },
