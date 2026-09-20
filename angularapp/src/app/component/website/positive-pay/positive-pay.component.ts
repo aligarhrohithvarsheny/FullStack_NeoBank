@@ -2,6 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { PositivePayService } from '../../../service/positive-pay.service';
+import { ActivatedRoute } from '@angular/router';
 
 @Component({ selector: 'app-positive-pay', standalone: true, imports: [CommonModule, FormsModule], templateUrl: './positive-pay.component.html', styleUrls: ['./positive-pay.component.css'] })
 export class PositivePayComponent implements OnInit {
@@ -17,11 +18,13 @@ export class PositivePayComponent implements OnInit {
   error = '';
   form: any = { chequeDate: '', amount: null, payeeName: '', payeeAccountNumber: '', payeeBankName: '', payeeIfsc: '', remarks: '', confirmation: false };
 
-  constructor(private service: PositivePayService) {}
+  constructor(private service: PositivePayService, private route: ActivatedRoute) {}
   ngOnInit() { this.loadAccount(); }
   loadAccount() {
-    const raw = sessionStorage.getItem('user') || sessionStorage.getItem('userProfile') || sessionStorage.getItem('currentUser');
+    const routeAccount = this.route.snapshot.paramMap.get('accountNumber');
+    const raw = sessionStorage.getItem('user') || sessionStorage.getItem('userProfile') || sessionStorage.getItem('currentUser') || sessionStorage.getItem('salaryEmployee') || sessionStorage.getItem('currentAccount');
     try { const u = raw ? JSON.parse(raw) : {}; this.accountNumber = u.accountNumber || u.account?.accountNumber || ''; this.accountType = u.accountType || u.account?.accountType || 'Savings'; } catch {}
+    if (routeAccount) this.accountNumber = routeAccount;
     if (this.accountNumber) { this.refresh(); }
   }
   refresh() { this.loading = true; this.service.eligible(this.accountNumber).subscribe({ next: r => { this.cheques = r || []; this.loading = false; }, error: e => { this.error = e.error?.message || 'Unable to load eligible cheques'; this.loading = false; } }); this.service.history(this.accountNumber).subscribe({ next: r => this.requests = r || [] }); }
