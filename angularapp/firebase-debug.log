@@ -1,0 +1,36 @@
+[debug] [2026-09-22T18:47:35.334Z] ----------------------------------------------------------------------
+[debug] [2026-09-22T18:47:35.337Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\sairo\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js deploy --only hosting
+[debug] [2026-09-22T18:47:35.338Z] CLI Version:   15.15.0
+[debug] [2026-09-22T18:47:35.338Z] Platform:      win32
+[debug] [2026-09-22T18:47:35.338Z] Node Version:  v22.18.0
+[debug] [2026-09-22T18:47:35.339Z] Time:          Wed Sep 23 2026 00:17:35 GMT+0530 (India Standard Time)
+[debug] [2026-09-22T18:47:35.339Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-09-22T18:48:18.082Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-09-22T18:48:18.082Z] > authorizing via signed-in user (sairohith669@gmail.com)
+[debug] [2026-09-22T18:48:18.083Z] [iam] checking project neo-bank-669 for permissions ["firebase.projects.get","firebasehosting.sites.update"]
+[debug] [2026-09-22T18:48:18.085Z] Checked if tokens are valid: false, expires at: 1790059369352
+[debug] [2026-09-22T18:48:18.085Z] Checked if tokens are valid: false, expires at: 1790059369352
+[debug] [2026-09-22T18:48:18.086Z] > refreshing access token with scopes: []
+[debug] [2026-09-22T18:48:18.088Z] >>> [apiv2][query] POST https://www.googleapis.com/oauth2/v3/token [none]
+[debug] [2026-09-22T18:48:18.089Z] >>> [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2026-09-22T18:48:18.398Z] <<< [apiv2][status] POST https://www.googleapis.com/oauth2/v3/token 200
+[debug] [2026-09-22T18:48:18.399Z] <<< [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2026-09-22T18:48:18.421Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/neo-bank-669:testIamPermissions [none]
+[debug] [2026-09-22T18:48:18.421Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/neo-bank-669:testIamPermissions  x-goog-user-project=neo-bank-669
+[debug] [2026-09-22T18:48:18.421Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/neo-bank-669:testIamPermissions {"permissions":["firebase.projects.get","firebasehosting.sites.update"]}
+[debug] [2026-09-22T18:48:19.833Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/neo-bank-669:testIamPermissions 200
+[debug] [2026-09-22T18:48:19.833Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/neo-bank-669:testIamPermissions {"permissions":["firebase.projects.get","firebasehosting.sites.update"]}
+[debug] [2026-09-22T18:48:19.833Z] Checked if tokens are valid: true, expires at: 1790106497399
+[debug] [2026-09-22T18:48:19.833Z] Checked if tokens are valid: true, expires at: 1790106497399
+[debug] [2026-09-22T18:48:19.834Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/neo-bank-669 [none]
+[debug] [2026-09-22T18:48:20.549Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects/neo-bank-669 200
+[debug] [2026-09-22T18:48:20.549Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects/neo-bank-669 {"projectId":"neo-bank-669","projectNumber":"777219590514","displayName":"neo-bank-669","name":"projects/neo-bank-669","resources":{"hostingSite":"neo-bank-669"},"state":"ACTIVE","labels":{"firebase":"enabled"},"etag":"1_6688e0aa-ad56-41d3-8fb3-28ceec6e1253"}
+[info] 
+[info] === Deploying to 'neo-bank-669'...
+[info] 
+[info] i  deploying hosting 
+[debug] [2026-09-22T18:48:20.561Z] Checked if tokens are valid: true, expires at: 1790106497399
+[debug] [2026-09-22T18:48:20.561Z] Checked if tokens are valid: true, expires at: 1790106497399
+[debug] [2026-09-22T18:48:20.561Z] >>> [apiv2][query] POST https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/neo-bank-669/versions [none]
+[debug] [2026-09-22T18:48:20.561Z] >>> [apiv2][body] POST https://firebasehosting.googleapis.com/v1beta1/projects/-/sites/neo-bank-669/versions {"status":"CREATED","labels":{"deployment-tool":"cli-firebase"}}
