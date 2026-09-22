@@ -829,6 +829,115 @@
   .pgd-table thead th, .pgd-table tbody td { padding: 8px 10px; }
 }
 
+/* NeoBank white dashboard theme: stable, readable, and free of blinking effects. */
+.pgd-wrapper {
+  background: #f8fafc;
+  color: #334155;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+}
+.pgd-wrapper *,
+.pgd-wrapper *::before,
+.pgd-wrapper *::after {
+  animation: none !important;
+}
+.pgd-bg-grid,
+.pgd-bg-orb {
+  display: none;
+}
+.pgd-header {
+  background: #ffffff;
+  backdrop-filter: none;
+  border-bottom: 1px solid #dbe5ef;
+  box-shadow: 0 2px 10px rgba(15, 23, 42, .06);
+}
+.pgd-brand-icon { display: none; }
+.pgd-neobank-logo {
+  width: 38px;
+  height: 38px;
+  object-fit: contain;
+}
+.pgd-brand-title { color: #0f3d68; }
+.pgd-brand-sub { color: #64748b; }
+.pgd-back-btn,
+.pgd-nav button,
+.pgd-action-btn,
+.pgd-icon-btn,
+.pgd-order-dropdown-section,
+.pgd-order-detail,
+.pgd-account-card,
+.pgd-table-wrap,
+.pgd-stat-card,
+.pgd-modal,
+.pgd-qr-card,
+.pgd-section-card {
+  background: #ffffff;
+  border-color: #dbe5ef;
+  color: #334155;
+}
+.pgd-back-btn { color: #0284c7; }
+.pgd-back-btn:hover { background: #f0f9ff; color: #0369a1; }
+.pgd-nav button { color: #64748b; }
+.pgd-nav button:hover,
+.pgd-nav button.active {
+  color: #0369a1;
+  background: #e0f2fe;
+  border-color: #7dd3fc;
+}
+.pgd-merchant-name,
+.pgd-stat-value,
+.pgd-tab-header h2,
+.pgd-detail-value,
+.pgd-acc-value { color: #0f172a; }
+.pgd-merchant-mid,
+.pgd-stat-label,
+.pgd-acc-label,
+.pgd-detail-label { color: #64748b; }
+.pgd-merchant-avatar {
+  background: #0284c7;
+  color: #fff;
+}
+.pgd-logout-btn {
+  background: #fff1f2;
+  border-color: #fecdd3;
+  color: #be123c;
+}
+.pgd-logout-btn:hover { background: #ffe4e6; color: #9f1239; }
+.pgd-stat-card:hover,
+.pgd-action-btn:hover { transform: none; }
+.pgd-stat-card { box-shadow: 0 4px 14px rgba(15, 23, 42, .05); }
+.pgd-stat-volume .pgd-stat-icon { background: #e0f2fe; color: #0284c7; }
+.pgd-stat-success .pgd-stat-icon { background: #dcfce7; color: #15803d; }
+.pgd-stat-failed .pgd-stat-icon { background: #fee2e2; color: #b91c1c; }
+.pgd-stat-fees .pgd-stat-icon { background: #fef3c7; color: #b45309; }
+.pgd-section-title { color: #334155; }
+.pgd-section-title i,
+.pgd-table thead th { color: #0284c7; }
+.pgd-action-btn { color: #0369a1; border-color: #bae6fd; }
+.pgd-action-btn:hover { background: #e0f2fe; color: #075985; }
+.pgd-account-row { border-color: #e2e8f0; }
+.pgd-table thead th { background: #f0f9ff; border-color: #dbe5ef; }
+.pgd-table tbody td { border-color: #e2e8f0; color: #334155; }
+.pgd-table tbody tr:hover { background: #f8fafc; }
+.pgd-method-badge { background: #e0f2fe; color: #0369a1; }
+.pgd-order-dropdown-section label { color: #0369a1; }
+.pgd-order-dropdown-section select,
+.pgd-form-control,
+.pgd-input,
+.pgd-modal input,
+.pgd-modal textarea,
+.pgd-modal select {
+  background: #ffffff;
+  border-color: #cbd5e1;
+  color: #1e293b;
+}
+.pgd-order-dropdown-section select:focus,
+.pgd-form-control:focus,
+.pgd-input:focus { border-color: #0ea5e9; box-shadow: 0 0 0 3px rgba(14, 165, 233, .14); }
+.pgd-modal-overlay { background: rgba(15, 23, 42, .35); backdrop-filter: blur(2px); }
+.pgd-modal-header { border-color: #e2e8f0; }
+.pgd-modal-header h3 { color: #0f172a; }
+.pgd-card-header { background: #0f3d68; }
+
 @media (max-width: 480px) {
   .pgd-stats-grid { grid-template-columns: 1fr; }
   .pgd-detail-grid, .pgd-detail-compact { grid-template-columns: 1fr 1fr; }
