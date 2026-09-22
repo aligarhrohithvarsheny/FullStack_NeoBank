@@ -779,6 +779,11 @@ export class Dashboard implements OnInit, OnDestroy {
     this.pgService.closeMerchant(this.pgSelectedMerchant.merchantId, this.adminName || 'Admin', reason).subscribe({ next: (res: any) => { this.pgSelectedMerchant = res.merchant; this.alertService.success('Merchant Closed', 'Merchant closure saved in history.'); this.pgService.getMerchantChanges(this.pgSelectedMerchant.merchantId).subscribe(logs => this.pgMerchantChangeLogs = logs || []); }, error: err => this.alertService.error('Close Merchant', err.error?.message || 'Unable to close merchant') });
   }
 
+  approvePgLinkedAccount() {
+    if (!this.pgSelectedMerchant) return;
+    this.pgService.approveLinkedAccount(this.pgSelectedMerchant.merchantId, this.adminName || 'Admin').subscribe({ next: (res: any) => { this.pgSelectedMerchant = res.merchant; this.alertService.success('Account Approved', 'Merchant settlements are now enabled for the approved linked account.'); this.pgService.getMerchantChanges(this.pgSelectedMerchant.merchantId).subscribe(logs => this.pgMerchantChangeLogs = logs || []); }, error: err => this.alertService.error('Account Approval', err.error?.message || 'Unable to approve linked account') });
+  }
+
   constructor(
     private router: Router,
     @Inject(PLATFORM_ID) private platformId: Object,

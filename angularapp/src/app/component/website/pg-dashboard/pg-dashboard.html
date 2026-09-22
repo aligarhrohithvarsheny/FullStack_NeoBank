@@ -106,6 +106,10 @@
             {{merchant.linkedAccountVerified ? 'Verified' : 'Pending'}}
           </span>
         </div>
+        <div class="pgd-account-row" *ngIf="merchant.pendingLinkedAccountNumber">
+          <span class="pgd-acc-label">Pending Approval</span>
+          <span class="pgd-acc-value pgd-unverified">{{merchant.pendingLinkedAccountNumber}} · {{merchant.pendingLinkedAccountCustomerId || 'Customer ID unavailable'}}</span>
+        </div>
         <div class="pgd-account-row">
           <button class="pgd-primary-btn" (click)="openLinkAccountModal()">
             <i class="fa fa-link"></i> Link / Update Receiving Account

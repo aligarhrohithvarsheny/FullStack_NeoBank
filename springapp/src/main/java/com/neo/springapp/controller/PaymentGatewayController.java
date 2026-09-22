@@ -397,6 +397,12 @@ public class PaymentGatewayController {
         catch (Exception e) { return ResponseEntity.badRequest().body(Map.of("success", false, "message", e.getMessage())); }
     }
 
+    @PostMapping("/admin/merchant/{merchantId}/approve-linked-account")
+    public ResponseEntity<?> approveLinkedAccount(@PathVariable String merchantId, @RequestBody Map<String, String> request) {
+        try { return ResponseEntity.ok(paymentGatewayService.approveLinkedAccount(merchantId, request.getOrDefault("approvedBy", "Admin"))); }
+        catch (Exception e) { return ResponseEntity.badRequest().body(Map.of("success", false, "message", e.getMessage())); }
+    }
+
     @PostMapping(value = "/admin/merchant/{merchantId}/signature", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<?> uploadMerchantSignature(@PathVariable String merchantId, @RequestParam("file") org.springframework.web.multipart.MultipartFile file) {
         try { return ResponseEntity.ok(paymentGatewayService.uploadMerchantSignature(merchantId, file)); }

@@ -106,6 +106,10 @@ export class PaymentGatewayService {
     return this.http.post(`${this.apiUrl}/admin/merchant/${encodeURIComponent(merchantId)}/close`, { closedBy, reason });
   }
 
+  approveLinkedAccount(merchantId: string, approvedBy: string): Observable<any> {
+    return this.http.post(`${this.apiUrl}/admin/merchant/${encodeURIComponent(merchantId)}/approve-linked-account`, { approvedBy });
+  }
+
   uploadMerchantSignature(merchantId: string, file: File): Observable<any> {
     const form = new FormData(); form.append('file', file);
     return this.http.post(`${this.apiUrl}/admin/merchant/${encodeURIComponent(merchantId)}/signature`, form);

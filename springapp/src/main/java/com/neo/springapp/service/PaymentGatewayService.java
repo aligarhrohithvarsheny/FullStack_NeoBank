@@ -177,16 +177,31 @@ public class PaymentGatewayService {
             return result;
         }
 
-        merchant.setLinkedAccountNumber(normalizedAccount);
-        merchant.setLinkedAccountHolderName(holderName);
-        merchant.setLinkedAccountType(accountType);
-        merchant.setLinkedAccountVerified(true);
+        String customerId = null;
+        if ("CURRENT".equals(accountType)) customerId = currentAccountRepository.findByAccountNumber(normalizedAccount).map(CurrentAccount::getCustomerId).orElse(null);
+        if ("SAVINGS".equals(accountType)) { Account account = accountRepository.findByAccountNumber(normalizedAccount); customerId = account == null ? null : account.getCustomerId(); }
+        if ("SALARY".equals(accountType)) { SalaryAccount account = salaryAccountRepository.findByAccountNumber(normalizedAccount); customerId = account == null ? null : account.getCustomerId(); }
+        merchant.setPendingLinkedAccountNumber(normalizedAccount);
+        merchant.setPendingLinkedAccountHolderName(holderName);
+        merchant.setPendingLinkedAccountType(accountType);
+        merchant.setPendingLinkedAccountCustomerId(customerId);
+        merchant.setLinkedAccountApprovalPending(true);
         PgMerchant saved = merchantRepository.save(merchant);
 
         result.put("success", true);
         result.put("merchant", saved);
-        result.put("message", "Receiving account linked successfully");
+        result.put("message", "Receiving account verified and sent for admin approval");
         return result;
+    }
+
+    @Transactional
+    public Map<String, Object> approveLinkedAccount(String merchantId, String approvedBy) {
+        PgMerchant merchant = merchantRepository.findByMerchantId(merchantId).orElseThrow(() -> new IllegalArgumentException("Merchant not found"));
+        if (!Boolean.TRUE.equals(merchant.getLinkedAccountApprovalPending()) || merchant.getPendingLinkedAccountNumber() == null) throw new IllegalArgumentException("No pending linked account request");
+        merchant.setLinkedAccountNumber(merchant.getPendingLinkedAccountNumber()); merchant.setLinkedAccountHolderName(merchant.getPendingLinkedAccountHolderName()); merchant.setLinkedAccountType(merchant.getPendingLinkedAccountType()); merchant.setLinkedAccountVerified(true); merchant.setLinkedAccountApprovalPending(false); merchant.setLinkedAccountApprovedBy(approvedBy); merchant.setLinkedAccountApprovedAt(LocalDateTime.now());
+        PgMerchant saved = merchantRepository.save(merchant);
+        PgMerchantChangeLog log = new PgMerchantChangeLog(); log.setMerchantId(merchantId); log.setMerchantName(saved.getBusinessName()); log.setChangedBy(approvedBy); log.setChangedFields("linkedAccountNumber, linkedAccountHolderName, linkedAccountType, linkedAccountVerified"); log.setPreviousDetails("Pending account approved"); log.setUpdatedDetails(merchantDetails(saved).toString()); changeLogRepository.save(log);
+        return Map.of("success", true, "merchant", saved, "message", "Linked account approved; settlements can now credit this account");
     }
 
     public List<PgMerchant> getAllMerchants() {
@@ -1316,6 +1331,7 @@ public class PaymentGatewayService {
             result.put("holderName", ca.getOwnerName());
             result.put("businessName", ca.getBusinessName());
             result.put("accountType", "CURRENT");
+            result.put("customerId", ca.getCustomerId());
             result.put("balance", ca.getBalance());
             return result;
         }
@@ -1328,6 +1344,7 @@ public class PaymentGatewayService {
             result.put("accountNumber", acc.getAccountNumber());
             result.put("holderName", acc.getName());
             result.put("accountType", "SAVINGS");
+            result.put("customerId", acc.getCustomerId());
             result.put("balance", acc.getBalance());
             return result;
         }
@@ -1340,6 +1357,7 @@ public class PaymentGatewayService {
             result.put("accountNumber", salAcc.getAccountNumber());
             result.put("holderName", salAcc.getEmployeeName());
             result.put("accountType", "SALARY");
+            result.put("customerId", salAcc.getCustomerId());
             result.put("balance", salAcc.getBalance());
             return result;
         }

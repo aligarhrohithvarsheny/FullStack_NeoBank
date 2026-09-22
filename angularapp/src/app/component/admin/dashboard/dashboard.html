@@ -5309,6 +5309,11 @@
         <button (click)="uploadPgMerchantSignature()" [disabled]="!pgMerchantSignatureFile" style="margin-left:8px;padding:8px 13px;background:#6366F1;color:#fff;border:0;border-radius:7px;cursor:pointer;"><i class="fa fa-upload"></i> Upload Signature</button>
         <span style="margin-left:8px;color:#64748B;font-size:12px;">Saved for future merchant PDFs and history.</span>
       </div>
+      <div *ngIf="!pgEditingMerchant && pgSelectedMerchant.linkedAccountApprovalPending" style="background:#FFF7ED;border:1px solid #FED7AA;border-radius:12px;padding:14px;margin-bottom:16px;">
+        <strong style="color:#9A3412;">Pending Receiving Account Approval</strong>
+        <div style="margin-top:8px;color:#475569;">Account: {{pgSelectedMerchant.pendingLinkedAccountNumber}} · Customer ID: {{pgSelectedMerchant.pendingLinkedAccountCustomerId || 'N/A'}} · Holder: {{pgSelectedMerchant.pendingLinkedAccountHolderName}} · Type: {{pgSelectedMerchant.pendingLinkedAccountType}}</div>
+        <button (click)="approvePgLinkedAccount()" style="margin-top:10px;padding:9px 14px;background:#16A34A;color:#fff;border:0;border-radius:8px;cursor:pointer;"><i class="fa fa-check"></i> Approve Linked Account</button>
+      </div>
       <div *ngIf="pgEditingMerchant" style="background:#fff;border:1px solid #E2E8F0;border-radius:12px;padding:16px;margin-bottom:16px;">
         <h3 style="margin:0 0 12px;color:#1E293B;">Edit Payment Gateway Details</h3>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;">

@@ -620,7 +620,7 @@ export class PgDashboard implements OnInit, OnDestroy {
           this.merchant = res.merchant;
           if (this.isBrowser) sessionStorage.setItem('pgMerchant', JSON.stringify(this.merchant));
           this.linkAccountSuccess = true;
-          this.linkAccountMessage = res.message || 'Account linked successfully.';
+          this.linkAccountMessage = res.message || 'Account verified and sent for admin approval.';
           this.loadData();
         } else {
           this.linkAccountMessage = res.error || 'Failed to link account.';

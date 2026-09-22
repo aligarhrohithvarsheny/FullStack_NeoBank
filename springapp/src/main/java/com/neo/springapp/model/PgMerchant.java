@@ -55,6 +55,13 @@ public class PgMerchant {
     private Boolean linkedAccountVerified = false;
     private String linkedAccountHolderName;
     private String linkedAccountType = "CURRENT";
+    private String pendingLinkedAccountNumber;
+    private String pendingLinkedAccountHolderName;
+    private String pendingLinkedAccountType;
+    private String pendingLinkedAccountCustomerId;
+    private Boolean linkedAccountApprovalPending = false;
+    private String linkedAccountApprovedBy;
+    private LocalDateTime linkedAccountApprovedAt;
     private String registrationStatus = "PENDING";
     private String rejectionReason;
     private Boolean closed = false;
