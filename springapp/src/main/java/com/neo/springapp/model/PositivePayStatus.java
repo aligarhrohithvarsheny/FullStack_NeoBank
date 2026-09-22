@@ -6,5 +6,16 @@ public enum PositivePayStatus {
     REJECTED,
     CANCELLED,
     MATCHED,
-    MISMATCH
+    MISMATCH;
+
+    public boolean isRegistrationStatus() {
+        return isRegistrationStatus(this);
+    }
+
+    public static boolean isRegistrationStatus(PositivePayStatus status) {
+        return status == PENDING_ADMIN_APPROVAL
+                || status == APPROVED
+                || status == MATCHED
+                || status == MISMATCH;
+    }
 }
