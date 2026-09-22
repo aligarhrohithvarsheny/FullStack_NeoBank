@@ -1301,6 +1301,66 @@
 .sdash-card-active { border-left: 4px solid #16a34a; }
 .sdash-card-inactive { border-left: 4px solid #94a3b8; }
 
+/* ── Salary credit card details ─────────────────────────── */
+.salary-credit-card-details {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.9fr) minmax(360px, 1.1fr);
+  gap: 24px;
+  align-items: stretch;
+  margin-top: 24px;
+}
+
+.salary-credit-card-visual {
+  min-height: 236px;
+  padding: 24px;
+  position: relative;
+  overflow: hidden;
+  border-radius: 20px;
+  color: #fff;
+  background: linear-gradient(135deg, #172554 0%, #1d4ed8 52%, #0f766e 100%);
+  box-shadow: 0 18px 35px rgba(30, 64, 175, 0.24);
+}
+
+.salary-credit-card-visual::after {
+  content: '';
+  width: 190px;
+  height: 190px;
+  position: absolute;
+  right: -70px;
+  bottom: -85px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 50%;
+  box-shadow: 0 0 0 20px rgba(255, 255, 255, 0.05), 0 0 0 40px rgba(255, 255, 255, 0.04);
+}
+
+.salary-credit-card-visual.is-blocked { filter: grayscale(.7); }
+.salary-credit-card-visual-top, .salary-credit-card-visual-bottom { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; position: relative; z-index: 1; }
+.salary-credit-card-brand { font-size: 1.05rem; font-weight: 800; letter-spacing: 1px; }
+.salary-credit-card-brand span { font-weight: 400; }
+.salary-credit-card-type, .salary-credit-card-visual small { color: rgba(255, 255, 255, .7); font-size: .64rem; letter-spacing: 1.2px; }
+.salary-credit-card-chip { width: 42px; height: 31px; margin: 28px 0 20px; border-radius: 7px; background: linear-gradient(135deg, #f8d78a, #b88938); position: relative; z-index: 1; }
+.salary-credit-card-chip::after { content: ''; position: absolute; inset: 0 13px; border-left: 1px solid rgba(84, 54, 12, .4); border-right: 1px solid rgba(84, 54, 12, .4); }
+.salary-credit-card-number { position: relative; z-index: 1; font: 600 1.18rem 'Courier New', monospace; letter-spacing: 2px; white-space: nowrap; }
+.salary-credit-card-visual-bottom { align-items: flex-end; margin-top: 18px; }
+.salary-credit-card-visual-bottom div { display: grid; gap: 5px; }
+.salary-credit-card-visual-bottom strong { font-size: .78rem; letter-spacing: .6px; text-transform: uppercase; }
+.salary-credit-card-status { position: absolute; right: 22px; bottom: 20px; z-index: 1; padding: 5px 9px; border-radius: 999px; background: rgba(255, 255, 255, .14); font-size: .7rem; font-weight: 700; }
+
+.salary-credit-card-info { padding: 22px; border: 1px solid rgba(148, 163, 184, .2); border-radius: 16px; background: rgba(248, 250, 252, .7); }
+.salary-credit-card-info-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 18px; }
+.salary-credit-card-info h3 { margin: 4px 0 0; color: #1e293b; font-size: 1.25rem; }
+.salary-card-number-toggle { border: 1px solid rgba(99, 102, 241, .22); border-radius: 8px; padding: 8px 10px; color: #4f46e5; background: #fff; cursor: pointer; font-size: .78rem; font-weight: 700; white-space: nowrap; }
+.salary-credit-card-detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.salary-credit-card-detail-grid div { min-width: 0; padding: 12px; border-radius: 10px; background: #fff; }
+.salary-credit-card-detail-grid span, .salary-credit-card-utilization span { display: block; margin-bottom: 5px; color: #64748b; font-size: .72rem; }
+.salary-credit-card-detail-grid strong { display: block; overflow: hidden; color: #1e293b; font-size: .9rem; text-overflow: ellipsis; white-space: nowrap; }
+.salary-card-status-text { color: #15803d !important; }
+.salary-credit-card-utilization { margin-top: 18px; }
+.salary-credit-card-utilization > div:first-child { display: flex; justify-content: space-between; align-items: center; }
+.salary-credit-card-utilization strong { color: #1e293b; font-size: .84rem; }
+.salary-credit-card-progress { height: 8px; overflow: hidden; border-radius: 999px; background: #e2e8f0; }
+.salary-credit-card-progress span { display: block; height: 100%; max-width: 100%; border-radius: inherit; background: linear-gradient(90deg, #2563eb, #14b8a6); transition: width .35s ease; }
+
 /* ── UPI ────────────────────────────────────────────────── */
 .sdash-upi-enable-box {
   display: flex;
@@ -1941,6 +2001,16 @@
 @media (max-width: 768px) {
   .sdash-content {
     padding: 18px 16px;
+  }
+  .salary-credit-card-details {
+    grid-template-columns: 1fr;
+  }
+  .salary-credit-card-number {
+    font-size: 1rem;
+    letter-spacing: 1px;
+  }
+  .salary-credit-card-info-heading {
+    flex-direction: column;
   }
   .sdash-header {
     padding: 14px 16px;

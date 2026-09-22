@@ -61,6 +61,28 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
            "LOWER(t.description) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
            "LOWER(t.transactionId) LIKE LOWER(CONCAT('%', :searchTerm, '%'))")
     Page<Transaction> searchTransactions(@Param("searchTerm") String searchTerm, Pageable pageable);
+
+    @Query("SELECT t FROM Transaction t WHERE t.accountNumber = :accountNumber " +
+          "AND (:searchTerm IS NULL OR LOWER(COALESCE(t.transactionId, '')) LIKE LOWER(CONCAT('%', :searchTerm, '%')) " +
+          "OR LOWER(COALESCE(t.merchant, '')) LIKE LOWER(CONCAT('%', :searchTerm, '%')) " +
+          "OR LOWER(COALESCE(t.description, '')) LIKE LOWER(CONCAT('%', :searchTerm, '%')) " +
+          "OR LOWER(COALESCE(t.recipientName, '')) LIKE LOWER(CONCAT('%', :searchTerm, '%')) " +
+          "OR LOWER(COALESCE(t.recipientAccountNumber, '')) LIKE LOWER(CONCAT('%', :searchTerm, '%'))) " +
+          "AND (:transactionId IS NULL OR LOWER(t.transactionId) LIKE LOWER(CONCAT('%', :transactionId, '%'))) " +
+          "AND (:type IS NULL OR LOWER(t.type) = LOWER(:type)) " +
+          "AND (:status IS NULL OR LOWER(t.status) = LOWER(:status)) " +
+          "AND (:minAmount IS NULL OR t.amount >= :minAmount) " +
+          "AND (:maxAmount IS NULL OR t.amount <= :maxAmount) " +
+          "ORDER BY t.date DESC")
+    Page<Transaction> searchAccountTransactions(
+           @Param("accountNumber") String accountNumber,
+           @Param("searchTerm") String searchTerm,
+           @Param("transactionId") String transactionId,
+           @Param("type") String type,
+           @Param("status") String status,
+           @Param("minAmount") Double minAmount,
+           @Param("maxAmount") Double maxAmount,
+           Pageable pageable);
     
     // JPQL Query to find transactions by account number and date range
     @Query("SELECT t FROM Transaction t WHERE t.accountNumber = :accountNumber AND t.date BETWEEN :startDate AND :endDate ORDER BY t.date DESC")

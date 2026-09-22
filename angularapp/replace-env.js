@@ -1,12 +1,13 @@
 const fs = require('fs');
 const path = require('path');
 
-// Step 1: Validate BACKEND_API_URL exists
-const backendUrl = process.env.BACKEND_API_URL;
+// Step 1: Always use the deployed Render backend unless an explicit Render URL is supplied.
+const renderBackendUrl = 'https://fullstack-neobank.onrender.com';
+const backendUrl = process.env.BACKEND_API_URL || renderBackendUrl;
 
-if (!backendUrl) {
-  console.error('❌ ERROR: BACKEND_API_URL environment variable is not set');
-  console.error('   Build cannot proceed without a backend URL.');
+if (/localhost|127\.0\.0\.1/i.test(backendUrl)) {
+  console.error('❌ ERROR: Localhost API URLs are not allowed.');
+  console.error(`   Use the Render backend: ${renderBackendUrl}`);
   process.exit(1);
 }
 

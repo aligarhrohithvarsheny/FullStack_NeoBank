@@ -191,21 +191,16 @@ public class TransactionController {
     @GetMapping("/search")
     public Page<Transaction> searchTransactions(
             @RequestParam(required = false) String accountNumber,
-            @RequestParam(required = false) String merchant,
+            @RequestParam(required = false) String searchTerm,
+            @RequestParam(required = false) String transactionId,
             @RequestParam(required = false) String type,
             @RequestParam(required = false) String status,
-            @RequestParam(required = false) String startDate,
-            @RequestParam(required = false) String endDate,
+            @RequestParam(required = false) Double minAmount,
+            @RequestParam(required = false) Double maxAmount,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size,
-            @RequestParam(defaultValue = "date") String sortBy,
-            @RequestParam(defaultValue = "desc") String sortDir) {
-        
-        LocalDateTime start = startDate != null ? LocalDateTime.parse(startDate) : null;
-        LocalDateTime end = endDate != null ? LocalDateTime.parse(endDate) : null;
-        
-        return transactionService.searchTransactions(accountNumber, merchant, type, status, 
-                                                    start, end, page, size, sortBy, sortDir);
+            @RequestParam(defaultValue = "20") int size) {
+        return transactionService.searchTransactions(accountNumber, searchTerm, transactionId, type, status,
+                                                    minAmount, maxAmount, page, size);
     }
 
     // Send bank statement via email

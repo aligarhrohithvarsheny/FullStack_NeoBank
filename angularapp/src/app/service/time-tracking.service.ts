@@ -20,6 +20,13 @@ export class TimeTrackingService {
 
   constructor(private http: HttpClient) {}
 
+  private formatLocalDate(date: Date): string {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
   // ==================== EMPLOYEE TIME TRACKING ====================
 
   /**
@@ -54,8 +61,8 @@ export class TimeTrackingService {
     endDate: Date
   ): Observable<EmployeeTimeRecord[]> {
     let params = new HttpParams()
-      .set('startDate', startDate.toISOString().split('T')[0])
-      .set('endDate', endDate.toISOString().split('T')[0]);
+      .set('startDate', this.formatLocalDate(startDate))
+      .set('endDate', this.formatLocalDate(endDate));
     
     return this.http.get<EmployeeTimeRecord[]>(
       `${this.apiUrl}/records/${adminId}`,
@@ -76,7 +83,7 @@ export class TimeTrackingService {
    * Get daily attendance statistics
    */
   getDailyAttendanceStats(date: Date): Observable<DailyAttendanceStats> {
-    const dateStr = date.toISOString().split('T')[0];
+    const dateStr = this.formatLocalDate(date);
     return this.http.get<DailyAttendanceStats>(
       `${this.apiUrl}/daily-attendance/${dateStr}`
     );
@@ -176,7 +183,7 @@ export class TimeTrackingService {
   markAbsent(adminId: string, date: Date, reason?: string): Observable<any> {
     return this.http.post(`${this.apiUrl}/mark-absent`, {
       adminId,
-      date,
+      date: this.formatLocalDate(date),
       reason
     });
   }
@@ -187,7 +194,7 @@ export class TimeTrackingService {
   markOnLeave(adminId: string, date: Date, reason?: string): Observable<any> {
     return this.http.post(`${this.apiUrl}/mark-leave`, {
       adminId,
-      date,
+      date: this.formatLocalDate(date),
       reason
     });
   }
@@ -224,8 +231,8 @@ export class TimeTrackingService {
     formatType: 'PDF' | 'CSV' | 'EXCEL' = 'PDF'
   ): Observable<Blob> {
     const params = new HttpParams()
-      .set('startDate', startDate.toISOString().split('T')[0])
-      .set('endDate', endDate.toISOString().split('T')[0])
+      .set('startDate', this.formatLocalDate(startDate))
+      .set('endDate', this.formatLocalDate(endDate))
       .set('format', formatType);
 
     return this.http.get(`${this.apiUrl}/report`, {

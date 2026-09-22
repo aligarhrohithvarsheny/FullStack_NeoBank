@@ -141,6 +141,34 @@ public class SessionHistoryController {
         }
     }
 
+    @GetMapping("/user/{userId}")
+    public ResponseEntity<Map<String, Object>> getUserSessions(@PathVariable Long userId) {
+        List<SessionHistory> sessions = sessionHistoryService.getSessionsByUserType("USER").stream()
+                .filter(session -> userId.equals(session.getUserId()))
+                .collect(Collectors.toList());
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", true);
+        response.put("sessions", sessions);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/{sessionId}/revoke")
+    public ResponseEntity<Map<String, Object>> revokeUserSession(@PathVariable Long sessionId,
+                                                                  @RequestBody Map<String, Object> request) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            Long userId = Long.parseLong(request.get("userId").toString());
+            sessionHistoryService.revokeUserSession(sessionId, userId);
+            response.put("success", true);
+            response.put("message", "Session logged out");
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
+
     /**
      * Get sessions by user type
      */

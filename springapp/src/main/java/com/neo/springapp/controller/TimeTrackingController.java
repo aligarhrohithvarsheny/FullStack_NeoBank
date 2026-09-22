@@ -189,16 +189,14 @@ public class TimeTrackingController {
             @RequestBody Map<String, String> adjustments) {
         try {
             DateTimeFormatter formatter = DateTimeFormatter.ISO_LOCAL_TIME;
-            LocalDateTime newCheckIn = null;
-            LocalDateTime newCheckOut = null;
+            java.time.LocalTime newCheckIn = null;
+            java.time.LocalTime newCheckOut = null;
             
             if (adjustments.get("checkInTime") != null) {
-                LocalDate date = LocalDate.now();
-                newCheckIn = LocalDateTime.of(date, java.time.LocalTime.parse(adjustments.get("checkInTime"), formatter));
+                newCheckIn = java.time.LocalTime.parse(adjustments.get("checkInTime"), formatter);
             }
             if (adjustments.get("checkOutTime") != null) {
-                LocalDate date = LocalDate.now();
-                newCheckOut = LocalDateTime.of(date, java.time.LocalTime.parse(adjustments.get("checkOutTime"), formatter));
+                newCheckOut = java.time.LocalTime.parse(adjustments.get("checkOutTime"), formatter);
             }
             
             String remarks = adjustments.get("remarks");

@@ -1507,20 +1507,51 @@
             </label>
           </div>
 
-          <div *ngIf="selectedMyCreditCard" class="sdash-stats-grid">
-            <div>
-              <strong>Card Number</strong>
-              <span>{{ maskedMyCreditCardNumber(selectedMyCreditCard) }}
-                <i class="fa" [class.fa-eye]="!showMyCreditCardNumber" [class.fa-eye-slash]="showMyCreditCardNumber"
-                   style="cursor:pointer;margin-left:8px;" (click)="showMyCreditCardNumber = !showMyCreditCardNumber"></i>
-              </span>
+          <div *ngIf="selectedMyCreditCard" class="salary-credit-card-details">
+            <div class="salary-credit-card-visual" [class.is-blocked]="selectedMyCreditCard.status === 'Blocked'">
+              <div class="salary-credit-card-visual-top">
+                <span class="salary-credit-card-brand">NEO<span>BANK</span></span>
+                <span class="salary-credit-card-type">CREDIT</span>
+              </div>
+              <div class="salary-credit-card-chip"></div>
+              <div class="salary-credit-card-number">{{ maskedMyCreditCardNumber(selectedMyCreditCard) }}</div>
+              <div class="salary-credit-card-visual-bottom">
+                <div>
+                  <small>CARDHOLDER</small>
+                  <strong>{{ selectedMyCreditCard.userName || account?.employeeName || 'CARDHOLDER' }}</strong>
+                </div>
+                <div>
+                  <small>VALID THRU</small>
+                  <strong>{{ selectedMyCreditCard.expiryDate || '--/--' }}</strong>
+                </div>
+              </div>
+              <span class="salary-credit-card-status">{{ selectedMyCreditCard.status }}</span>
             </div>
-            <div><strong>Status</strong><span>{{ selectedMyCreditCard.status }}</span></div>
-            <div><strong>Expiry</strong><span>{{ selectedMyCreditCard.expiryDate }}</span></div>
-            <div><strong>Approved Limit</strong><span>₹{{ selectedMyCreditCard.approvedLimit | number:'1.0-0' }}</span></div>
-            <div><strong>Current Balance</strong><span>₹{{ selectedMyCreditCard.currentBalance | number:'1.2-2' }}</span></div>
-            <div><strong>Available Limit</strong><span>₹{{ selectedMyCreditCard.availableLimit | number:'1.0-0' }}</span></div>
-            <div><strong>Usage</strong><span>{{ selectedMyCreditCard.usageLimit | number:'1.0-0' }}%</span></div>
+
+            <div class="salary-credit-card-info">
+              <div class="salary-credit-card-info-heading">
+                <div>
+                  <span class="sdash-eyebrow">ACCOUNT SUMMARY</span>
+                  <h3>Credit card details</h3>
+                </div>
+                <button type="button" class="salary-card-number-toggle" (click)="showMyCreditCardNumber = !showMyCreditCardNumber">
+                  <i class="fa" [class.fa-eye]="!showMyCreditCardNumber" [class.fa-eye-slash]="showMyCreditCardNumber"></i>
+                  {{ showMyCreditCardNumber ? 'Hide number' : 'Show number' }}
+                </button>
+              </div>
+              <div class="salary-credit-card-detail-grid">
+                <div><span>Card number</span><strong>{{ maskedMyCreditCardNumber(selectedMyCreditCard) }}</strong></div>
+                <div><span>PIN status</span><strong>{{ selectedMyCreditCard.pinSet ? 'PIN set' : 'PIN not set' }}</strong></div>
+                <div><span>Approved limit</span><strong>₹{{ selectedMyCreditCard.approvedLimit | number:'1.0-0' }}</strong></div>
+                <div><span>Available limit</span><strong>₹{{ selectedMyCreditCard.availableLimit | number:'1.0-0' }}</strong></div>
+                <div><span>Current balance</span><strong>₹{{ selectedMyCreditCard.currentBalance | number:'1.2-2' }}</strong></div>
+                <div><span>Card status</span><strong class="salary-card-status-text">{{ selectedMyCreditCard.status }}</strong></div>
+              </div>
+              <div class="salary-credit-card-utilization">
+                <div><span>Credit utilization</span><strong>{{ selectedMyCreditCard.usageLimit | number:'1.0-0' }}%</strong></div>
+                <div class="salary-credit-card-progress"><span [style.width.%]="selectedMyCreditCard.usageLimit || 0"></span></div>
+              </div>
+            </div>
           </div>
 
           <div class="sdash-card" style="margin-top:16px;">

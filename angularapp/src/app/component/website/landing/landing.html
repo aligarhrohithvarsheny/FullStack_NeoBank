@@ -61,6 +61,16 @@
     </div>
   </nav>
 
+  <aside class="mobile-login-bar" aria-label="Login options">
+    <button type="button" class="mobile-login-button user-login" routerLink="/website/user" aria-label="User login">User</button>
+    <button type="button" class="mobile-login-button fasttag-login" (click)="goTo('website/fasttag-login', $event)" aria-label="FASTag login">FASTag</button>
+    <button type="button" class="mobile-login-button merchant-login" (click)="goTo('website/merchant-login', $event)" aria-label="Merchant login">Merchant</button>
+    <button type="button" class="mobile-login-button agent-login" (click)="goTo('website/agent-login', $event)" aria-label="Agent login">Agent</button>
+    <button type="button" class="mobile-login-button payment-login" (click)="goTo('website/pg-login', $event)" aria-label="Payment gateway login">Gateway</button>
+    <button type="button" class="mobile-login-button corporate-login" (click)="goTo('admin/login', $event)" aria-label="Corporate login">Corporate</button>
+    <button type="button" class="mobile-login-button insurance-login" (click)="goTo('website/insurance-login', $event)" aria-label="Insurance login">Insurance</button>
+  </aside>
+
   <!-- ========== 1. HERO SECTION ========== -->
   <section class="hero-section">
     <div class="hero-bg-particles">

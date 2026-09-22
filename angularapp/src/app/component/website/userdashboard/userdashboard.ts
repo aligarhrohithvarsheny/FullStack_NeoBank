@@ -243,6 +243,15 @@ export class Userdashboard implements OnInit, OnDestroy {
   // Search functionality
   searchQuery: string = '';
   filteredMenuItems: any[] = [];
+  searchOpen = false;
+  isSearching = false;
+  searchResults: any[] = [];
+
+  // Login security and device sessions
+  activeSessions: any[] = [];
+  isLoadingSessions = false;
+  currentSessionId: number | null = null;
+  private sessionPollInterval: any = null;
 
   // Dashboard widgets
   dashboardFilter: string = 'all';
@@ -351,6 +360,8 @@ export class Userdashboard implements OnInit, OnDestroy {
       this.loadUserProfile();
       this.loadFasttag();
       this.loadRecentTransactions();
+      this.loadUserSessions();
+      this.sessionPollInterval = setInterval(() => this.loadUserSessions(), 15000);
       this.startSessionTimer();
       this.checkLinkedAccount();
     }
@@ -518,6 +529,49 @@ export class Userdashboard implements OnInit, OnDestroy {
           this.recentTransactions = (txns || []).slice(0, 10);
         });
     } catch (e) { /* silent */ }
+  }
+
+  loadUserSessions() {
+    if (!isPlatformBrowser(this.platformId)) return;
+    const rawUser = sessionStorage.getItem('currentUser');
+    if (!rawUser) return;
+    try {
+      const user = JSON.parse(rawUser);
+      if (!user.id) return;
+      this.isLoadingSessions = this.activeSessions.length === 0;
+      this.http.get<any>(`${environment.apiBaseUrl}/api/session-history/user/${user.id}`)
+        .pipe(timeout(5000), catchError(() => of({ sessions: [] })))
+        .subscribe((response: any) => {
+          const sessions = (response?.sessions || []).sort((a: any, b: any) =>
+            new Date(b.loginTime).getTime() - new Date(a.loginTime).getTime());
+          this.activeSessions = sessions.filter((session: any) => session.status === 'ACTIVE' && !session.logoutTime);
+          this.currentSessionId = this.activeSessions.length
+            ? this.activeSessions.reduce((closest: any, session: any) => {
+                if (!this.loginTime) return closest || session;
+                const sessionDistance = Math.abs(new Date(session.loginTime).getTime() - this.loginTime.getTime());
+                const closestDistance = closest ? Math.abs(new Date(closest.loginTime).getTime() - this.loginTime.getTime()) : Number.MAX_SAFE_INTEGER;
+                return sessionDistance < closestDistance ? session : closest;
+              }, null)?.id || null
+            : null;
+          this.isLoadingSessions = false;
+        });
+    } catch (e) {
+      this.isLoadingSessions = false;
+    }
+  }
+
+  revokeSession(session: any) {
+    const rawUser = sessionStorage.getItem('currentUser');
+    if (!rawUser || !session?.id || session.id === this.currentSessionId) return;
+    const user = JSON.parse(rawUser);
+    this.http.post(`${environment.apiBaseUrl}/api/session-history/${session.id}/revoke`, { userId: user.id })
+      .subscribe({
+        next: () => {
+          this.alertService.userSuccess('Session logged out', 'The selected device was logged out.');
+          this.loadUserSessions();
+        },
+        error: () => this.showTemporaryError('Unable to log out that session. Please try again.')
+      });
   }
 
   loadUserProfile() {
@@ -1441,6 +1495,10 @@ export class Userdashboard implements OnInit, OnDestroy {
     if (this.linkPollInterval) {
       clearInterval(this.linkPollInterval);
       this.linkPollInterval = null;
+    }
+    if (this.sessionPollInterval) {
+      clearInterval(this.sessionPollInterval);
+      this.sessionPollInterval = null;
     }
     // Clear any pending error timeout
     if (this.errorTimeout) {
@@ -2737,7 +2795,61 @@ export class Userdashboard implements OnInit, OnDestroy {
         return;
       }
     }
+    this.runSmartSearch(query);
+  }
+
+  private runSmartSearch(query: string) {
+    const normalized = query.toLowerCase();
+    const results: any[] = [];
+    const addResult = (label: string, detail: string, feature: string, icon: string) =>
+      results.push({ label, detail, feature, icon });
+
+    if (/^\d+(\.\d{1,2})?$/.test(query) || /txn|transaction|cheque|check|card|bill|vehicle|fastag|fasttag/i.test(query)) {
+      this.isSearching = true;
+      const params = new HttpParams()
+        .set('accountNumber', this.userAccountNumber)
+        .set('searchTerm', query)
+        .set('size', '20');
+      this.http.get<any>(`${environment.apiBaseUrl}/api/transactions/search`, { params })
+        .pipe(timeout(5000), catchError(() => of({ content: [] })))
+        .subscribe((response: any) => {
+          (response?.content || []).forEach((transaction: any) =>
+            addResult(`Transaction ${transaction.transactionId || transaction.id}`, `Rs ${transaction.amount || 0} | ${transaction.description || transaction.merchant || 'Account transaction'}`, 'transaction', '↔'));
+          this.finishSmartSearch(results, normalized);
+        });
+      return;
+    }
+
+    const account = this.userProfile?.account || {};
+    const personalText = [this.username, this.userAccountNumber, account.phone, account.address, account.pan, account.customerId]
+      .filter(Boolean).join(' ').toLowerCase();
+    if (personalText.includes(normalized)) {
+      addResult('Personal details', 'View your profile, contact and KYC details', 'accounts', '◉');
+    }
+    if (this.recentTransactions.some((transaction: any) => JSON.stringify(transaction).toLowerCase().includes(normalized))) {
+      addResult('Recent transactions', 'Search matches in your account activity', 'transaction', '↔');
+    }
+    if (this.fasttagStatusSummary.toLowerCase().includes(normalized)) {
+      addResult('FASTag vehicles', 'View linked vehicles and toll activity', 'fasttag', '▣');
+    }
+    this.finishSmartSearch(results, normalized);
+  }
+
+  private finishSmartSearch(results: any[], normalized: string) {
+    if (!results.length) {
+      const fallback = Object.entries({ cheque: 'cheque', check: 'cheque', card: 'card', bill: 'bill-payment', fastag: 'fasttag', vehicle: 'fasttag', profile: 'accounts' });
+      const match = fallback.find(([label]) => normalized.includes(label));
+      if (match) results.push({ label: match[0].toUpperCase(), detail: 'Open this service', feature: match[1], icon: '›' });
+    }
+    this.searchResults = results;
+    this.searchOpen = true;
+    this.isSearching = false;
+  }
+
+  openSearchResult(result: any) {
+    this.searchOpen = false;
     this.searchQuery = '';
+    this.selectFeature(result.feature);
   }
 
   private navigateToSearchResult(feature: string) {

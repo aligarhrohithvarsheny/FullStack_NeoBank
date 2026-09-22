@@ -105,14 +105,15 @@ public class TransactionService {
     }
 
     // Search transactions with multiple criteria
-    public Page<Transaction> searchTransactions(String accountNumber, String merchant, String type, String status, 
-                                              LocalDateTime startDate, LocalDateTime endDate, 
-                                              int page, int size, String sortBy, String sortDir) {
-        Sort sort = sortDir.equalsIgnoreCase("desc") ? Sort.by(sortBy).descending() : Sort.by(sortBy).ascending();
-        Pageable pageable = PageRequest.of(page, size, sort);
-        
-        // This would need a custom repository method for complex searches
-        // For now, return all transactions with pagination
-        return transactionRepository.findAll(pageable);
+    public Page<Transaction> searchTransactions(String accountNumber, String searchTerm, String transactionId,
+                                              String type, String status, Double minAmount, Double maxAmount,
+                                              int page, int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "date"));
+        return transactionRepository.searchAccountTransactions(accountNumber, blankToNull(searchTerm),
+                blankToNull(transactionId), blankToNull(type), blankToNull(status), minAmount, maxAmount, pageable);
+    }
+
+    private String blankToNull(String value) {
+        return value == null || value.trim().isEmpty() ? null : value.trim();
     }
 }

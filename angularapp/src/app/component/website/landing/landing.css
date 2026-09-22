@@ -112,6 +112,7 @@ html { scroll-behavior: smooth; }
 }
 .dropdown-item:hover { color: var(--primary); background: var(--bg-section); }
 .nav-actions { display: flex; gap: 12px; align-items: center; }
+.mobile-login-bar { display: none; }
 
 /* ---------- BUTTONS ---------- */
 .btn-glow {
@@ -1027,7 +1028,50 @@ html { scroll-behavior: smooth; }
 }
 
 @media (max-width: 640px) {
+  .mobile-login-bar {
+    position: fixed;
+    top: 50%;
+    left: 0;
+    z-index: 1100;
+    display: flex;
+    width: 82px;
+    padding: 8px 6px;
+    flex-direction: column;
+    gap: 6px;
+    transform: translateY(-50%);
+    background: rgba(255, 255, 255, 0.94);
+    border: 1px solid var(--border);
+    border-left: 0;
+    border-radius: 0 14px 14px 0;
+    box-shadow: var(--shadow-lg);
+    backdrop-filter: blur(16px);
+  }
+  .mobile-login-button {
+    min-height: 34px;
+    padding: 5px 2px;
+    border: 0;
+    border-radius: 7px;
+    color: #fff;
+    font: 600 0.62rem/1.1 var(--font-main);
+    cursor: pointer;
+    transition: transform 0.2s ease, filter 0.2s ease;
+  }
+  .mobile-login-button:hover,
+  .mobile-login-button:focus-visible {
+    filter: brightness(0.94);
+    transform: translateX(2px);
+    outline: 2px solid var(--text-heading);
+    outline-offset: 1px;
+  }
+  .user-login { background: var(--primary-hover); }
+  .fasttag-login { background: #0284C7; }
+  .merchant-login { background: #059669; }
+  .agent-login { background: #7C3AED; }
+  .payment-login { background: #4F46E5; }
+  .corporate-login { background: #334155; }
+  .insurance-login { background: #D97706; }
   .nav-links { display: none; }
+  .nav-actions { display: none; }
   .hero-title { font-size: 2.2rem; }
   .section-title { font-size: 2rem; }
   .feature-cards-grid { grid-template-columns: 1fr; }

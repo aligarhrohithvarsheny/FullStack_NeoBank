@@ -181,15 +181,15 @@ public class TimeTrackingService {
     /**
      * Adjust time record (admin override)
      */
-    public EmployeeTimeTracking adjustTimeRecord(Long recordId, LocalDateTime newCheckIn, LocalDateTime newCheckOut, String remarks) {
+    public EmployeeTimeTracking adjustTimeRecord(Long recordId, LocalTime newCheckIn, LocalTime newCheckOut, String remarks) {
         EmployeeTimeTracking tracking = timeTrackingRepository.findById(recordId)
             .orElseThrow(() -> new RuntimeException("Time record not found"));
         
         if (newCheckIn != null) {
-            tracking.setCheckInTime(newCheckIn);
+            tracking.setCheckInTime(LocalDateTime.of(tracking.getTrackingDate(), newCheckIn));
         }
         if (newCheckOut != null) {
-            tracking.setCheckOutTime(newCheckOut);
+            tracking.setCheckOutTime(LocalDateTime.of(tracking.getTrackingDate(), newCheckOut));
         }
         
         // Recalculate working hours

@@ -204,6 +204,21 @@ public class SessionHistoryService {
         return null;
     }
 
+    public SessionHistory revokeUserSession(Long sessionId, Long userId) {
+        SessionHistory session = sessionHistoryRepository.findById(sessionId)
+                .orElseThrow(() -> new RuntimeException("Session not found"));
+        if (!"USER".equals(session.getUserType()) || !userId.equals(session.getUserId())) {
+            throw new RuntimeException("Session does not belong to this user");
+        }
+        if (session.getLogoutTime() == null) {
+            session.setLogoutTime(LocalDateTime.now());
+            session.setSessionDuration(calculateSessionDuration(session.getLoginTime(), session.getLogoutTime()));
+            session.setStatus("REVOKED");
+            return sessionHistoryRepository.save(session);
+        }
+        return session;
+    }
+
     /**
      * Get all session history
      */
