@@ -80,6 +80,7 @@
 .pg-login-header h2 {
   font-size: 1.6rem;
   font-weight: 800;
+  background-clip: text;
   background: linear-gradient(135deg, #A78BFA, #6366F1);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -245,6 +246,117 @@
 @media (max-width: 480px) {
   .pg-login-card { margin: 16px; padding: 28px 20px; }
   .pg-footer-features { flex-direction: column; align-items: center; gap: 8px; }
+}
+
+/* NeoBank white brand theme */
+.pg-login-page {
+  background: #f8fafc;
+  color: #334155;
+}
+.pg-login-bg {
+  background: #f8fafc;
+}
+.pg-bg-orb,
+.pg-grid-overlay {
+  display: none;
+}
+.pg-back-btn {
+  background: #ffffff;
+  border-color: #dbe5ef;
+  color: #475569;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, .06);
+}
+.pg-back-btn:hover {
+  background: #ffffff;
+  border-color: #0ea5e9;
+  color: #0284c7;
+}
+.pg-login-card {
+  background: #ffffff;
+  border: 1px solid #dbe5ef;
+  border-radius: 16px;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, .10);
+  backdrop-filter: none;
+}
+.pg-login-icon {
+  display: flex;
+  justify-content: center;
+}
+.pg-neobank-logo {
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
+}
+.pg-login-header h2 {
+  background: none;
+  color: #0f3d68;
+  -webkit-text-fill-color: currentColor;
+}
+.pg-login-subtitle,
+.pg-label,
+.pg-hint,
+.pg-footer-features span,
+.pg-footer-note {
+  color: #64748b;
+}
+.pg-input-group {
+  background: #ffffff;
+  border-color: #cbd5e1;
+}
+.pg-input-group:focus-within {
+  border-color: #0ea5e9;
+  box-shadow: 0 0 0 3px rgba(14, 165, 233, .14);
+}
+.pg-input-group i,
+.pg-footer-features i {
+  color: #0284c7;
+}
+.pg-input {
+  color: #1e293b;
+}
+.pg-input::placeholder {
+  color: #94a3b8;
+}
+.pg-btn-primary {
+  background: #0284c7;
+  box-shadow: 0 4px 14px rgba(2, 132, 199, .22);
+}
+.pg-btn-primary:hover:not(:disabled) {
+  transform: none;
+  background: #0369a1;
+  box-shadow: 0 5px 16px rgba(2, 132, 199, .25);
+}
+.pg-btn-new-merchant {
+  border-color: #7dd3fc;
+  color: #0284c7;
+}
+.pg-btn-new-merchant:hover {
+  border-color: #0284c7;
+  background: #f0f9ff;
+  color: #0369a1;
+}
+.pg-login-footer,
+.pg-new-merchant-section {
+  border-color: #e2e8f0;
+}
+.pg-modal-overlay {
+  background: rgba(15, 23, 42, .35);
+  backdrop-filter: blur(2px);
+}
+.pg-modal {
+  background: #ffffff;
+  border-color: #dbe5ef;
+  box-shadow: 0 20px 50px rgba(15, 23, 42, .18);
+}
+.pg-modal-header,
+.pg-modal-footer {
+  border-color: #e2e8f0;
+}
+.pg-modal-header h3 {
+  color: #0f172a;
+}
+.pg-modal-close {
+  color: #64748b;
 }
 
 /* New Merchant Registration Button */
