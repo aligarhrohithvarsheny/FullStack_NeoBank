@@ -518,6 +518,11 @@ export class PgDashboard implements OnInit, OnDestroy {
     this.router.navigate(['/website/pg-login']);
   }
 
+  downloadMerchantDetailsPdf() {
+    if (!this.merchant?.merchantId) return;
+    this.pgService.downloadMerchantDetailsPdf(this.merchant.merchantId).subscribe(blob => { const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = `merchant-${this.merchant.merchantId}.pdf`; link.click(); URL.revokeObjectURL(url); });
+  }
+
   goToLanding() {
     this.router.navigate(['/website/landing']);
   }

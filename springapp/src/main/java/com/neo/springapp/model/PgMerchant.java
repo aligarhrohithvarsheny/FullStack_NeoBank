@@ -57,6 +57,12 @@ public class PgMerchant {
     private String linkedAccountType = "CURRENT";
     private String registrationStatus = "PENDING";
     private String rejectionReason;
+    private Boolean closed = false;
+    private String closedBy;
+    private LocalDateTime closedAt;
+    private String closeReason;
+    private String signaturePath;
+    private LocalDateTime signatureUploadedAt;
 
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

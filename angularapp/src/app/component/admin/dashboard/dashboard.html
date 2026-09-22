@@ -5056,6 +5056,20 @@
     ════════════════════════════════ -->
     <div *ngIf="!pgSelectedMerchant">
 
+      <div style="background:#fff;border:1px solid #E2E8F0;border-radius:12px;padding:16px;margin-bottom:18px;">
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input [(ngModel)]="pgGatewaySearchQuery" (keyup.enter)="searchPgGateway()" placeholder="Search merchant, email, order ID, transaction ID, refund ID..." style="flex:1;padding:11px;border:1px solid #CBD5E1;border-radius:8px;">
+          <button (click)="searchPgGateway()" style="padding:11px 16px;background:#0284C7;color:#fff;border:0;border-radius:8px;cursor:pointer;"><i class="fa fa-search"></i> Search</button>
+        </div>
+        <div *ngIf="pgGatewaySearching" style="padding:10px;color:#64748B;">Searching payment gateway records...</div>
+        <div *ngIf="!pgGatewaySearching && pgGatewaySearchResults.length" style="margin-top:10px;display:grid;gap:6px;">
+          <button *ngFor="let result of pgGatewaySearchResults" (click)="result.type === 'MERCHANT' && openMerchantDetails({merchantId: result.id, businessName: result.label, businessEmail: result.email})" style="text-align:left;padding:10px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:7px;cursor:pointer;">
+            <strong>{{result.type}}</strong> · {{result.id}} · {{result.label}} <span *ngIf="result.amount">· ₹{{result.amount}}</span>
+          </button>
+        </div>
+        <div *ngIf="!pgGatewaySearching && pgGatewaySearchQuery && !pgGatewaySearchResults.length" style="padding:10px;color:#64748B;">No matching gateway records found.</div>
+      </div>
+
       <!-- Tab Buttons -->
       <div style="display:flex;gap:10px;margin-bottom:24px;">
         <button (click)="pgActiveView='pending'; loadPgPendingMerchants()"
@@ -5286,6 +5300,14 @@
       <div *ngIf="!pgEditingMerchant" style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:14px;">
         <button (click)="startPgMerchantEdit()" style="padding:9px 14px;background:#6366F1;color:#fff;border:none;border-radius:8px;font-weight:600;cursor:pointer;"><i class="fa fa-edit"></i> Edit Merchant Details</button>
         <button (click)="downloadPgMerchantChanges()" style="padding:9px 14px;background:#0F766E;color:#fff;border:none;border-radius:8px;font-weight:600;cursor:pointer;"><i class="fa fa-download"></i> Download Changes</button>
+        <button (click)="downloadPgMerchantDetailsPdf()" style="padding:9px 14px;background:#0284C7;color:#fff;border:none;border-radius:8px;font-weight:600;cursor:pointer;"><i class="fa fa-file-pdf"></i> Merchant PDF</button>
+        <button (click)="closePgMerchant()" [disabled]="pgSelectedMerchant.closed" style="padding:9px 14px;background:#DC2626;color:#fff;border:none;border-radius:8px;font-weight:600;cursor:pointer;"><i class="fa fa-lock"></i> {{pgSelectedMerchant.closed ? 'Merchant Closed' : 'Close Merchant'}}</button>
+      </div>
+      <div *ngIf="!pgEditingMerchant" style="background:#fff;border:1px solid #E2E8F0;border-radius:12px;padding:14px;margin-bottom:16px;">
+        <h3 style="margin:0 0 10px;color:#1E293B;font-size:16px;">Merchant Signature</h3>
+        <input type="file" accept="image/*,.pdf" (change)="onPgSignatureSelected($event)">
+        <button (click)="uploadPgMerchantSignature()" [disabled]="!pgMerchantSignatureFile" style="margin-left:8px;padding:8px 13px;background:#6366F1;color:#fff;border:0;border-radius:7px;cursor:pointer;"><i class="fa fa-upload"></i> Upload Signature</button>
+        <span style="margin-left:8px;color:#64748B;font-size:12px;">Saved for future merchant PDFs and history.</span>
       </div>
       <div *ngIf="pgEditingMerchant" style="background:#fff;border:1px solid #E2E8F0;border-radius:12px;padding:16px;margin-bottom:16px;">
         <h3 style="margin:0 0 12px;color:#1E293B;">Edit Payment Gateway Details</h3>
@@ -5298,6 +5320,8 @@
           <label>Callback URL<input [(ngModel)]="pgMerchantEditForm.callbackUrl" /></label>
           <label>Account Number<input [(ngModel)]="pgMerchantEditForm.accountNumber" /></label>
           <label>Settlement Account<input [(ngModel)]="pgMerchantEditForm.settlementAccount" /></label>
+          <label>API Key<input [(ngModel)]="pgMerchantEditForm.apiKey" /></label>
+          <label>Secret Key<input [(ngModel)]="pgMerchantEditForm.secretKey" /></label>
           <label>Linked Account<input [(ngModel)]="pgMerchantEditForm.linkedAccountNumber" /></label>
           <label>Linked Holder<input [(ngModel)]="pgMerchantEditForm.linkedAccountHolderName" /></label>
           <label>Daily Limit<input type="number" [(ngModel)]="pgMerchantEditForm.dailyLimit" /></label>

@@ -56,6 +56,11 @@ public class PaymentGatewayController {
                 });
     }
 
+    @GetMapping("/merchants/{merchantId}/details.pdf")
+    public ResponseEntity<byte[]> merchantDetailsPdfForMerchant(@PathVariable String merchantId) {
+        return ResponseEntity.ok().header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=merchant-" + merchantId + ".pdf").contentType(MediaType.APPLICATION_PDF).body(paymentGatewayService.merchantDetailsPdf(merchantId));
+    }
+
     @GetMapping("/merchants")
     public ResponseEntity<List<PgMerchant>> getAllMerchants() {
         return ResponseEntity.ok(paymentGatewayService.getAllMerchants());
@@ -385,6 +390,26 @@ public class PaymentGatewayController {
         return ResponseEntity.ok().header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"merchant-" + merchantId + "-changes.csv\"")
                 .contentType(MediaType.parseMediaType("text/csv")).body(csv.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
     }
+
+    @PostMapping("/admin/merchant/{merchantId}/close")
+    public ResponseEntity<?> closeMerchant(@PathVariable String merchantId, @RequestBody Map<String, String> request) {
+        try { return ResponseEntity.ok(paymentGatewayService.closeMerchant(merchantId, request.getOrDefault("closedBy", "Admin"), request.getOrDefault("reason", "Closed by admin"))); }
+        catch (Exception e) { return ResponseEntity.badRequest().body(Map.of("success", false, "message", e.getMessage())); }
+    }
+
+    @PostMapping(value = "/admin/merchant/{merchantId}/signature", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> uploadMerchantSignature(@PathVariable String merchantId, @RequestParam("file") org.springframework.web.multipart.MultipartFile file) {
+        try { return ResponseEntity.ok(paymentGatewayService.uploadMerchantSignature(merchantId, file)); }
+        catch (Exception e) { return ResponseEntity.badRequest().body(Map.of("success", false, "message", e.getMessage())); }
+    }
+
+    @GetMapping("/admin/merchant/{merchantId}/details.pdf")
+    public ResponseEntity<byte[]> merchantDetailsPdf(@PathVariable String merchantId) {
+        return ResponseEntity.ok().header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=merchant-" + merchantId + ".pdf").contentType(MediaType.APPLICATION_PDF).body(paymentGatewayService.merchantDetailsPdf(merchantId));
+    }
+
+    @GetMapping("/admin/search")
+    public ResponseEntity<?> searchGateway(@RequestParam String query) { return ResponseEntity.ok(paymentGatewayService.searchGateway(query)); }
 
     private String csv(Object value) { return "\"" + String.valueOf(value == null ? "" : value).replace("\"", "\"\"") + "\""; }
 

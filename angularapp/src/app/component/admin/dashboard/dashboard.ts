@@ -157,6 +157,10 @@ export class Dashboard implements OnInit, OnDestroy {
   pgEditingMerchant = false;
   pgMerchantEditForm: any = {};
   pgMerchantChangeLogs: any[] = [];
+  pgGatewaySearchQuery = '';
+  pgGatewaySearchResults: any[] = [];
+  pgGatewaySearching = false;
+  pgMerchantSignatureFile: File | null = null;
 
   // Daily Activity Report
   showDailyActivityReport: boolean = false;
@@ -748,6 +752,31 @@ export class Dashboard implements OnInit, OnDestroy {
     this.pgMerchantTransactions = [];
     this.pgMerchantRefunds = [];
     this.pgMerchantAnalytics = null;
+  }
+
+  searchPgGateway() {
+    const query = this.pgGatewaySearchQuery.trim();
+    if (!query) { this.pgGatewaySearchResults = []; return; }
+    this.pgGatewaySearching = true;
+    this.pgService.searchGateway(query).subscribe({ next: r => { this.pgGatewaySearchResults = r || []; this.pgGatewaySearching = false; }, error: () => { this.pgGatewaySearchResults = []; this.pgGatewaySearching = false; } });
+  }
+
+  onPgSignatureSelected(event: Event) { const input = event.target as HTMLInputElement; this.pgMerchantSignatureFile = input.files?.[0] || null; }
+
+  uploadPgMerchantSignature() {
+    if (!this.pgSelectedMerchant || !this.pgMerchantSignatureFile) return;
+    this.pgService.uploadMerchantSignature(this.pgSelectedMerchant.merchantId, this.pgMerchantSignatureFile).subscribe({ next: () => { this.pgMerchantSignatureFile = null; this.alertService.success('Signature', 'Merchant signature saved.'); }, error: err => this.alertService.error('Signature', err.error?.message || 'Upload failed') });
+  }
+
+  downloadPgMerchantDetailsPdf() {
+    if (!this.pgSelectedMerchant) return;
+    this.pgService.downloadMerchantDetailsPdf(this.pgSelectedMerchant.merchantId).subscribe(blob => { const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = `merchant-${this.pgSelectedMerchant.merchantId}.pdf`; link.click(); URL.revokeObjectURL(url); });
+  }
+
+  closePgMerchant() {
+    if (!this.pgSelectedMerchant || !confirm('Close this merchant? This disables merchant login and payment access.')) return;
+    const reason = prompt('Enter closure reason:') || 'Closed by admin';
+    this.pgService.closeMerchant(this.pgSelectedMerchant.merchantId, this.adminName || 'Admin', reason).subscribe({ next: (res: any) => { this.pgSelectedMerchant = res.merchant; this.alertService.success('Merchant Closed', 'Merchant closure saved in history.'); this.pgService.getMerchantChanges(this.pgSelectedMerchant.merchantId).subscribe(logs => this.pgMerchantChangeLogs = logs || []); }, error: err => this.alertService.error('Close Merchant', err.error?.message || 'Unable to close merchant') });
   }
 
   constructor(

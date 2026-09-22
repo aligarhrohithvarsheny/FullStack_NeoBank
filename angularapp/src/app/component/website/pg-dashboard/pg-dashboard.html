@@ -34,6 +34,7 @@
         </div>
       </div>
       <button class="pgd-logout-btn" (click)="logout()"><i class="fa fa-sign-out"></i> Logout</button>
+      <button class="pgd-logout-btn" (click)="downloadMerchantDetailsPdf()" title="Download merchant details and terms PDF"><i class="fa fa-file-pdf-o"></i> Merchant PDF</button>
     </div>
   </header>
 
@@ -80,6 +81,7 @@
         <button class="pgd-action-btn" (click)="activeTab='payments'"><i class="fa fa-qrcode"></i> UPI QR Payment</button>
         <button class="pgd-action-btn" (click)="activeTab='settlements'"><i class="fa fa-university"></i> View Settlements</button>
         <button class="pgd-action-btn" (click)="activeTab='refunds'"><i class="fa fa-undo"></i> Process Refund</button>
+        <button class="pgd-action-btn" (click)="downloadMerchantDetailsPdf()"><i class="fa fa-file-pdf-o"></i> Merchant Details PDF</button>
       </div>
 
       <!-- Linked Account Info -->

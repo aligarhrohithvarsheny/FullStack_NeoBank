@@ -102,6 +102,21 @@ export class PaymentGatewayService {
     return this.http.get(`${this.apiUrl}/admin/merchant/${encodeURIComponent(merchantId)}/changes/download`, { responseType: 'blob' });
   }
 
+  closeMerchant(merchantId: string, closedBy: string, reason: string): Observable<any> {
+    return this.http.post(`${this.apiUrl}/admin/merchant/${encodeURIComponent(merchantId)}/close`, { closedBy, reason });
+  }
+
+  uploadMerchantSignature(merchantId: string, file: File): Observable<any> {
+    const form = new FormData(); form.append('file', file);
+    return this.http.post(`${this.apiUrl}/admin/merchant/${encodeURIComponent(merchantId)}/signature`, form);
+  }
+
+  downloadMerchantDetailsPdf(merchantId: string): Observable<Blob> {
+    return this.http.get(`${this.apiUrl}/merchants/${encodeURIComponent(merchantId)}/details.pdf`, { responseType: 'blob' });
+  }
+
+  searchGateway(query: string): Observable<any[]> { return this.http.get<any[]>(`${this.apiUrl}/admin/search`, { params: { query } }); }
+
   // UPI QR Payment Session
   createPaymentSession(data: any): Observable<any> {
     return this.http.post(`${this.apiUrl}/payment-session/create`, data);

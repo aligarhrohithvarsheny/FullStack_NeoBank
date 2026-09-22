@@ -12,6 +12,12 @@ import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
+import java.io.ByteArrayOutputStream;
+import com.itextpdf.html2pdf.HtmlConverter;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 
@@ -797,6 +803,8 @@ public class PaymentGatewayService {
         updateString(updates, "callbackUrl", merchant.getCallbackUrl(), merchant::setCallbackUrl, changed);
         updateString(updates, "accountNumber", merchant.getAccountNumber(), merchant::setAccountNumber, changed);
         updateString(updates, "settlementAccount", merchant.getSettlementAccount(), merchant::setSettlementAccount, changed);
+        updateString(updates, "apiKey", merchant.getApiKey(), merchant::setApiKey, changed);
+        updateString(updates, "secretKey", merchant.getSecretKey(), merchant::setSecretKey, changed);
         updateString(updates, "linkedAccountNumber", merchant.getLinkedAccountNumber(), merchant::setLinkedAccountNumber, changed);
         updateString(updates, "linkedAccountHolderName", merchant.getLinkedAccountHolderName(), merchant::setLinkedAccountHolderName, changed);
         if (updates.containsKey("dailyLimit")) {
@@ -821,6 +829,44 @@ public class PaymentGatewayService {
         return changeLogRepository.findByMerchantIdOrderByChangedAtDesc(merchantId);
     }
 
+    @Transactional
+    public Map<String, Object> closeMerchant(String merchantId, String closedBy, String reason) {
+        PgMerchant merchant = merchantRepository.findByMerchantId(merchantId).orElseThrow(() -> new IllegalArgumentException("Merchant not found"));
+        if (Boolean.TRUE.equals(merchant.getClosed())) throw new IllegalArgumentException("Merchant is already closed");
+        Map<String, Object> before = merchantDetails(merchant);
+        merchant.setClosed(true); merchant.setIsActive(false); merchant.setLoginEnabled(false); merchant.setCloseReason(reason); merchant.setClosedBy(closedBy); merchant.setClosedAt(LocalDateTime.now());
+        PgMerchant saved = merchantRepository.save(merchant);
+        PgMerchantChangeLog log = new PgMerchantChangeLog(); log.setMerchantId(merchantId); log.setMerchantName(saved.getBusinessName()); log.setChangedBy(closedBy); log.setChangedFields("closed, isActive, loginEnabled, closeReason"); log.setPreviousDetails(before.toString()); log.setUpdatedDetails(merchantDetails(saved).toString()); changeLogRepository.save(log);
+        return Map.of("success", true, "merchant", saved, "message", "Merchant closed successfully");
+    }
+
+    public byte[] merchantDetailsPdf(String merchantId) {
+        PgMerchant m = merchantRepository.findByMerchantId(merchantId).orElseThrow(() -> new IllegalArgumentException("Merchant not found"));
+        String html = "<html><head><style>body{font-family:Arial;padding:28px;color:#172033}h1{color:#0b7285;border-bottom:2px solid #0b7285;padding-bottom:10px}.row{padding:8px;border-bottom:1px solid #ddd}.label{font-weight:bold;color:#52606d}</style></head><body><h1>NeoBank Payment Gateway Merchant Details</h1>"
+                + row("Merchant ID", m.getMerchantId()) + row("Business Name", m.getBusinessName()) + row("Business Email", m.getBusinessEmail()) + row("Business Phone", m.getBusinessPhone()) + row("Business Type", m.getBusinessType()) + row("API Key", m.getApiKey()) + row("Settlement Account", m.getSettlementAccount()) + row("Linked Account", m.getLinkedAccountNumber()) + row("Daily Limit", m.getDailyLimit()) + row("Status", Boolean.TRUE.equals(m.getClosed()) ? "CLOSED" : String.valueOf(m.getRegistrationStatus())) + "<h2>Terms and Conditions</h2><ol><li>Merchant must protect API credentials and secret keys.</li><li>Merchant is responsible for accurate order and refund information.</li><li>NeoBank may suspend or close access for fraud, misuse, or regulatory reasons.</li><li>Settlements are subject to applicable fees, taxes, and verification.</li><li>Merchant must notify NeoBank of unauthorized access immediately.</li></ol><h2>Signature</h2><p>Merchant signature on file: " + (m.getSignaturePath() == null ? "Not uploaded" : "Uploaded") + "</p><p>Generated: " + LocalDateTime.now() + "</p></body></html>";
+        try { ByteArrayOutputStream out = new ByteArrayOutputStream(); HtmlConverter.convertToPdf(html, out); return out.toByteArray(); } catch (Exception e) { throw new RuntimeException("Unable to generate merchant PDF", e); }
+    }
+
+    private String row(String label, Object value) { return "<div class='row'><span class='label'>" + label + ": </span>" + String.valueOf(value == null ? "-" : value).replace("<", "&lt;").replace(">", "&gt;") + "</div>"; }
+
+    @Transactional
+    public Map<String, Object> uploadMerchantSignature(String merchantId, org.springframework.web.multipart.MultipartFile file) {
+        if (file == null || file.isEmpty()) throw new IllegalArgumentException("Signature file is required");
+        PgMerchant merchant = merchantRepository.findByMerchantId(merchantId).orElseThrow(() -> new IllegalArgumentException("Merchant not found"));
+        try { Path dir = Paths.get("uploads/payment-gateway/signatures"); Files.createDirectories(dir); String name = file.getOriginalFilename() == null ? "signature" : file.getOriginalFilename().replaceAll("[^A-Za-z0-9._-]", "_"); Path target = dir.resolve(merchantId + "_" + System.currentTimeMillis() + "_" + name).normalize(); Files.copy(file.getInputStream(), target, StandardCopyOption.REPLACE_EXISTING); merchant.setSignaturePath(target.toString()); merchant.setSignatureUploadedAt(LocalDateTime.now()); merchantRepository.save(merchant); return Map.of("success", true, "signaturePath", target.toString()); } catch (Exception e) { throw new RuntimeException("Unable to save signature", e); }
+    }
+
+    public List<Map<String, Object>> searchGateway(String query) {
+        String q = query == null ? "" : query.trim().toLowerCase(); List<Map<String, Object>> results = new ArrayList<>();
+        if (q.isBlank()) return results;
+        merchantRepository.findAll().stream().filter(m -> contains(m.getMerchantId(),q)||contains(m.getBusinessName(),q)||contains(m.getBusinessEmail(),q)).forEach(m -> results.add(Map.of("type","MERCHANT","id",m.getMerchantId(),"label",m.getBusinessName(),"email",m.getBusinessEmail())));
+        orderRepository.findAll().stream().filter(o -> contains(o.getOrderId(),q)||contains(o.getCustomerEmail(),q)||contains(o.getMerchantId(),q)).forEach(o -> results.add(Map.of("type","ORDER","id",o.getOrderId(),"label",o.getCustomerEmail() == null ? "Order" : o.getCustomerEmail(),"amount",o.getAmount())));
+        transactionRepository.findAll().stream().filter(t -> contains(t.getTransactionId(),q)||contains(t.getOrderId(),q)||contains(t.getMerchantId(),q)).forEach(t -> results.add(Map.of("type","TRANSACTION","id",t.getTransactionId(),"label",t.getOrderId(),"amount",t.getAmount())));
+        refundRepository.findAll().stream().filter(r -> contains(r.getRefundId(),q)||contains(r.getTransactionId(),q)||contains(r.getOrderId(),q)).forEach(r -> results.add(Map.of("type","REFUND","id",r.getRefundId(),"label",r.getTransactionId(),"amount",r.getAmount())));
+        return results;
+    }
+    private boolean contains(String value, String q) { return value != null && value.toLowerCase().contains(q); }
+
     private void updateString(Map<String, Object> updates, String key, String oldValue, java.util.function.Consumer<String> setter, Map<String, Object> changed) {
         if (!updates.containsKey(key)) return;
         String value = updates.get(key) == null ? null : String.valueOf(updates.get(key)).trim();
@@ -836,6 +882,7 @@ public class PaymentGatewayService {
         details.put("settlementAccount", m.getSettlementAccount()); details.put("linkedAccountNumber", m.getLinkedAccountNumber());
         details.put("linkedAccountHolderName", m.getLinkedAccountHolderName()); details.put("dailyLimit", m.getDailyLimit());
         details.put("loginEnabled", m.getLoginEnabled()); details.put("isActive", m.getIsActive());
+        details.put("closed", m.getClosed()); details.put("closedBy", m.getClosedBy()); details.put("closedAt", m.getClosedAt()); details.put("closeReason", m.getCloseReason());
         return details;
     }
 
