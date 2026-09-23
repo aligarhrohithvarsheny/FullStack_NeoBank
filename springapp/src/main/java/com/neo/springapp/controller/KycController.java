@@ -46,9 +46,8 @@ public class KycController {
             @RequestParam String customerId,
             @RequestParam String accountNumber,
             @RequestParam String dob) {
-        Account account = accountRepository.findByCustomerId(customerId.trim());
-        if (account == null || !accountNumber.trim().equals(account.getAccountNumber())
-                || !sameDate(dob, account.getDob())) {
+        Account account = findVerifiedAccount(customerId, accountNumber, dob);
+        if (account == null) {
             return ResponseEntity.status(404).body(Map.of("message", "The details could not be verified."));
         }
 
@@ -72,9 +71,8 @@ public class KycController {
             @RequestParam("panDocument") MultipartFile panDocument,
             @RequestParam("aadharDocument") MultipartFile aadharDocument) {
         try {
-            Account account = accountRepository.findByCustomerId(customerId.trim());
-            if (account == null || !accountNumber.trim().equals(account.getAccountNumber())
-                    || !sameDate(dob, account.getDob())) {
+                Account account = findVerifiedAccount(customerId, accountNumber, dob);
+                if (account == null) {
                 return ResponseEntity.badRequest().body(Map.of("message", "The details could not be verified."));
             }
             if (panDocument.isEmpty() || !"application/pdf".equalsIgnoreCase(panDocument.getContentType())) {
@@ -116,6 +114,13 @@ public class KycController {
     private boolean sameDate(String supplied, String stored) {
         return supplied != null && stored != null
                 && supplied.replaceAll("[^0-9]", "").equals(stored.replaceAll("[^0-9]", ""));
+    }
+
+    private Account findVerifiedAccount(String customerId, String accountNumber, String dob) {
+        if (customerId == null || accountNumber == null || dob == null) return null;
+        Account account = accountRepository.findByCustomerIdAndAccountNumber(
+                customerId.trim(), accountNumber.trim());
+        return account != null && sameDate(dob.trim(), account.getDob()) ? account : null;
     }
 
     private String lastName(String name) {
