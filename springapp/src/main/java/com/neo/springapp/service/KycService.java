@@ -111,21 +111,6 @@ public class KycService {
         if (requestOpt.isPresent()) {
             KycRequest request = requestOpt.get();
 
-            // Before approving KYC (which may update PAN/name), ensure user has an approved signature
-            try {
-                Optional<User> userOpt = userRepository.findByAccountNumber(request.getUserAccountNumber());
-                if (userOpt.isPresent()) {
-                    User user = userOpt.get();
-                    String signatureStatus = user.getSignatureStatus();
-                    if (signatureStatus == null || !"APPROVED".equalsIgnoreCase(signatureStatus)) {
-                        throw new IllegalStateException("User must have an APPROVED digital signature before KYC changes can be approved.");
-                    }
-                }
-            } catch (Exception e) {
-                // Surface a clear error instead of approving silently
-                throw new RuntimeException(e.getMessage(), e);
-            }
-
             request.setStatus("Approved");
             request.setApprovedDate(LocalDateTime.now());
             request.setApprovedBy(adminName);

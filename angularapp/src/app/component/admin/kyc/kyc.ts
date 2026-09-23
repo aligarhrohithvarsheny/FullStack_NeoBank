@@ -181,7 +181,7 @@ export class Kyc implements OnInit {
         },
         error: (err: any) => {
           console.error('Error approving KYC:', err);
-          alert('Failed to approve KYC. Please try again.');
+          alert(err.error?.message || err.error?.error || 'Failed to approve KYC. Please try again.');
         }
       });
     }
