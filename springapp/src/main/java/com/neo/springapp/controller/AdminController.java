@@ -74,6 +74,15 @@ public class AdminController {
     @Autowired
     private SalaryAccountService salaryAccountService;
 
+    @Autowired
+    private com.neo.springapp.service.CurrentAccountService currentAccountService;
+
+    @Autowired
+    private com.neo.springapp.service.InsuranceService insuranceService;
+
+    @Autowired
+    private com.neo.springapp.repository.LoanRepository loanRepository;
+
     /**
      * Assign mandatory Customer ID (9 digits: PAN 4 + DOB 5) to all existing accounts
      * that don't have one. Call this to migrate existing data.
@@ -117,31 +126,33 @@ public class AdminController {
         return ResponseEntity.ok(saved);
     }
 
-    @GetMapping("/corporate-availability")
-    public ResponseEntity<Map<String, Object>> corporateAvailability() {
+    @GetMapping("/hod-availability")
+    public ResponseEntity<Map<String, Object>> hodAvailability() {
         Map<String, Object> response = new HashMap<>();
-        response.put("available", !adminService.corporateAccountExists());
+        response.put("available", !adminService.getAllAdmins().stream()
+                .anyMatch(admin -> "HOD".equalsIgnoreCase(admin.getRole())));
         return ResponseEntity.ok(response);
     }
 
-    @PostMapping("/corporate-create")
-    public ResponseEntity<?> createCorporateAccount(@RequestBody Admin admin) {
+    @PostMapping("/hod-create")
+    public ResponseEntity<?> createHodAccount(@RequestBody Admin admin) {
         if (admin == null || admin.getEmail() == null || admin.getEmail().trim().isEmpty()
                 || admin.getPassword() == null || admin.getPassword().isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of(
                     "success", false,
                     "message", "Gmail and password are required"));
         }
-        if (adminService.corporateAccountExists()) {
+        if (adminService.getAllAdmins().stream()
+                .anyMatch(existing -> "HOD".equalsIgnoreCase(existing.getRole()))) {
             return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
                     "success", false,
-                    "message", "The corporate account has already been created."));
+                    "message", "The HOD account has already been created."));
         }
 
-        admin.setRole("ADMIN");
-        admin.setName("NeoBank Corporate Headquarters");
+        admin.setRole("HOD");
+        admin.setName("NeoBank Head of Department");
         Admin saved = adminService.saveAdmin(admin);
-        return ResponseEntity.ok(Map.of("success", true, "message", "Corporate account created", "admin", createSafeAdminResponse(saved)));
+        return ResponseEntity.ok(Map.of("success", true, "message", "HOD account created", "admin", createSafeAdminResponse(saved)));
     }
     
     /**
@@ -268,6 +279,38 @@ public class AdminController {
             .filter(a -> "ADMIN".equalsIgnoreCase(a.getRole()))
             .collect(java.util.stream.Collectors.toList());
         return ResponseEntity.ok(adminEmployees);
+    }
+
+    @GetMapping("/staff")
+    public ResponseEntity<List<Map<String, Object>>> getHodStaff() {
+        List<Map<String, Object>> staff = adminService.getAllAdmins().stream()
+                .filter(admin -> "ADMIN".equalsIgnoreCase(admin.getRole()) || "MANAGER".equalsIgnoreCase(admin.getRole()))
+                .map(this::createSafeAdminResponse)
+                .collect(java.util.stream.Collectors.toList());
+        return ResponseEntity.ok(staff);
+    }
+
+    @GetMapping("/hod-overview")
+    public ResponseEntity<Map<String, Object>> getHodOverview() {
+        Map<String, Object> overview = new HashMap<>();
+
+        Map<String, Object> savings = new HashMap<>();
+        savings.put("total", accountService.getTotalAccountsCount());
+        savings.put("active", accountService.getAccountsCountByStatus("ACTIVE"));
+        savings.put("totalBalance", accountService.getTotalBalanceByStatus("ACTIVE"));
+        overview.put("savingsAccounts", savings);
+        overview.put("salaryAccounts", salaryAccountService.getStats());
+        overview.put("businessAccounts", currentAccountService.getStatistics());
+        overview.put("insurance", insuranceService.getAdminDashboardStats());
+
+        Map<String, Object> loans = new HashMap<>();
+        loans.put("total", loanRepository.count());
+        loans.put("pending", loanRepository.countByStatus("Pending"));
+        loans.put("approved", loanRepository.countByStatus("Approved"));
+        loans.put("approvedAmount", loanRepository.getTotalApprovedLoanAmount());
+        overview.put("loans", loans);
+        overview.put("refreshedAt", java.time.OffsetDateTime.now().toString());
+        return ResponseEntity.ok(overview);
     }
 
     @GetMapping("/{id}")

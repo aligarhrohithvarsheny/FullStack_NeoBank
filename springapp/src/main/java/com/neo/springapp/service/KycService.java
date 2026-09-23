@@ -168,6 +168,10 @@ public class KycService {
             if (Boolean.TRUE.equals(currentAccount.getReKycRequired())) {
                 currentAccount.setReKycRequired(false);
                 if ("FROZEN".equalsIgnoreCase(currentAccount.getStatus())) currentAccount.setStatus("ACTIVE");
+                currentAccount.setAccountFrozen(false);
+                currentAccount.setFrozenReason(null);
+                currentAccount.setFrozenBy(null);
+                currentAccount.setFrozenDate(null);
                 currentAccount.setKycVerified(true);
                 currentAccount.setKycVerifiedDate(LocalDateTime.now());
                 currentAccountRepository.save(currentAccount);

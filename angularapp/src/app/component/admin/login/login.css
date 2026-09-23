@@ -112,28 +112,6 @@
   text-transform: uppercase;
 }
 
-.login-caption {
-  color: #64748b;
-  font-size: 14px;
-  margin: -16px 0 24px;
-}
-
-.create-account-link {
-  margin-top: 16px;
-  padding: 10px;
-  background: transparent;
-  color: #1e40af;
-  box-shadow: none;
-  text-transform: none;
-  font-size: 14px;
-}
-
-.create-account-link:hover {
-  color: #1d4ed8;
-  box-shadow: none;
-  transform: none;
-}
-
 /* Security Notice */
 .login-box::before {
   content: '🔒 SECURE ADMIN ACCESS';

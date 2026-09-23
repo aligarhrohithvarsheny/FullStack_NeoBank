@@ -1,0 +1,37 @@
+<div class="hod-login-page">
+  <div class="hod-login-card">
+    <img src="/favicon.ico" alt="NeoBank Logo" class="hod-logo">
+    <p class="hod-eyebrow">NeoBank Headquarters</p>
+    <h1>HOD Login</h1>
+    <p class="hod-caption">Secure access for the Head of Department</p>
+
+    <ng-container *ngIf="!showCreateAccount; else createForm">
+      <form (ngSubmit)="login()">
+        <label>Gmail</label>
+        <input type="email" [(ngModel)]="email" name="email" placeholder="Enter Gmail address" required>
+        <label>Password</label>
+        <input type="password" [(ngModel)]="password" name="password" placeholder="Enter password" required>
+        <p class="hod-error" *ngIf="errorMessage">{{ errorMessage }}</p>
+        <button type="submit" [disabled]="isLoading">{{ isLoading ? 'Signing in...' : 'HOD Login' }}</button>
+      </form>
+      <button *ngIf="accountAvailable" type="button" class="secondary-button" (click)="showCreateAccount = true; errorMessage = ''">
+        Create HOD Account
+      </button>
+      <p class="hod-account-note" *ngIf="!accountAvailable">The HOD account has already been created.</p>
+    </ng-container>
+
+    <ng-template #createForm>
+      <form (ngSubmit)="createAccount()">
+        <label>Gmail</label>
+        <input type="email" [(ngModel)]="createEmail" name="createEmail" placeholder="Enter Gmail address" required>
+        <label>Password</label>
+        <input type="password" [(ngModel)]="createPassword" name="createPassword" placeholder="Create password" required>
+        <label>Confirm Password</label>
+        <input type="password" [(ngModel)]="confirmPassword" name="confirmPassword" placeholder="Confirm password" required>
+        <p class="hod-error" *ngIf="errorMessage">{{ errorMessage }}</p>
+        <button type="submit" [disabled]="isCreating">{{ isCreating ? 'Creating...' : 'Create HOD Account' }}</button>
+      </form>
+      <button type="button" class="secondary-button" (click)="showCreateAccount = false; errorMessage = ''">Back to Login</button>
+    </ng-template>
+  </div>
+</div>

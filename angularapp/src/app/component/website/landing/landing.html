@@ -37,7 +37,6 @@
         <div class="nav-item dropdown">
           <a href="#" class="nav-link" (click)="toggleBusinessDropdown($event)">Business <span class="chevron">▾</span></a>
           <div class="dropdown-menu" [class.show]="showBusinessDropdown">
-            <a href="#" class="dropdown-item" (click)="goTo('admin/login', $event)">Corporate Headquarters Login</a>
             <a href="#" class="dropdown-item" (click)="goTo('website/merchant-login', $event)">Merchant Login</a>
             <a href="#" class="dropdown-item" (click)="goTo('website/agent-login', $event)">Agent Login</a>
             <a href="#" class="dropdown-item" (click)="goTo('website/pg-login', $event)">Payment Gateway Login</a>
@@ -55,6 +54,7 @@
 
       <div class="nav-actions">
 <button class="btn-ghost" routerLink="/website/user">Login</button>
+        <button class="btn-hod" (click)="goTo('hod/login', $event)">HOD Login</button>
         <button class="btn-fasttag" (click)="goTo('website/fasttag-login', $event)">FASTag Login</button>
         <button class="btn-merchant" (click)="goTo('website/merchant-login', $event)">Merchant Login</button>
         <button class="btn-glow" (click)="goTo('website/createaccount', $event)">Open Account</button>
@@ -68,7 +68,7 @@
     <button type="button" class="mobile-login-button merchant-login" (click)="goTo('website/merchant-login', $event)" aria-label="Merchant login">Merchant</button>
     <button type="button" class="mobile-login-button agent-login" (click)="goTo('website/agent-login', $event)" aria-label="Agent login">Agent</button>
     <button type="button" class="mobile-login-button payment-login" (click)="goTo('website/pg-login', $event)" aria-label="Payment gateway login">Gateway</button>
-    <button type="button" class="mobile-login-button corporate-login" (click)="goTo('admin/login', $event)" aria-label="Corporate login">Corporate</button>
+    <button type="button" class="mobile-login-button corporate-login" (click)="goTo('hod/login', $event)" aria-label="HOD login">HOD</button>
     <button type="button" class="mobile-login-button insurance-login" (click)="goTo('website/insurance-login', $event)" aria-label="Insurance login">Insurance</button>
   </aside>
 
@@ -169,7 +169,6 @@
         <span class="section-badge">Corporate Banking</span>
         <h2 class="section-title">NeoBank Headquarters</h2>
         <p class="section-desc">A secure command centre for bank operations, customer services, risk controls, and business growth.</p>
-        <button class="btn-glow" (click)="goTo('admin/login', $event)">Corporate Login</button>
       </div>
       <div class="headquarters-details">
         <div><strong>24/7</strong><span>Operations monitoring</span></div>

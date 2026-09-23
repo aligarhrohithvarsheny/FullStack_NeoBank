@@ -4,10 +4,7 @@
       <img src="/favicon.ico" alt="NeoBank Logo" class="brand-logo">
       NEOBANK
     </h1>
-    <h2>Corporate Headquarters</h2>
-
-    <ng-container *ngIf="!showCreateAccount; else createCorporateForm">
-    <p class="login-caption">Secure access for NeoBank administration</p>
+    <h2>Admin / Manager Login</h2>
 
     <form (ngSubmit)="onSubmit()">
       <div class="form-group">
@@ -25,14 +22,14 @@
       </div>
 
       <div class="form-group">
-        <label>Gmail</label>
+        <label>Email</label>
         <input
           type="email"
           id="email"
           [(ngModel)]="email"
           name="email"
           required
-          placeholder="Enter Gmail address"
+          placeholder="Enter email"
         />
       </div>
 
@@ -56,32 +53,5 @@
         <span *ngIf="isLoading">Logging in...</span>
       </button>
     </form>
-    <button *ngIf="corporateAccountAvailable" type="button" class="create-account-link" (click)="openCreateAccount()">
-      Create Corporate Account
-    </button>
-    </ng-container>
-
-    <ng-template #createCorporateForm>
-      <p class="login-caption">Create the single NeoBank corporate account</p>
-      <form (ngSubmit)="createCorporateAccount()">
-        <div class="form-group">
-          <label>Gmail</label>
-          <input type="email" [(ngModel)]="createEmail" name="createEmail" required placeholder="Enter Gmail address" />
-        </div>
-        <div class="form-group">
-          <label>Password</label>
-          <input type="password" [(ngModel)]="createPassword" name="createPassword" required placeholder="Create password" />
-        </div>
-        <div class="form-group">
-          <label>Confirm Password</label>
-          <input type="password" [(ngModel)]="confirmCreatePassword" name="confirmCreatePassword" required placeholder="Confirm password" />
-        </div>
-        <div *ngIf="errorMessage" class="error-message">{{ errorMessage }}</div>
-        <button type="submit" [disabled]="isCreatingAccount" class="login-btn">
-          {{ isCreatingAccount ? 'Creating account...' : 'Create Corporate Account' }}
-        </button>
-      </form>
-      <button type="button" class="create-account-link" (click)="backToLogin()">Back to Login</button>
-    </ng-template>
   </div>
 </div>

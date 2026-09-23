@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { userAuthGuard, adminAuthGuard, managerAuthGuard, salaryAuthGuard, currentAccountAuthGuard, positivePayAuthGuard, merchantSoundboxAuthGuard, agentAuthGuard, adminOrManagerAuthGuard, pgMerchantAuthGuard } from './guard/auth.guard';
+import { userAuthGuard, adminAuthGuard, hodAuthGuard, managerAuthGuard, salaryAuthGuard, currentAccountAuthGuard, positivePayAuthGuard, merchantSoundboxAuthGuard, agentAuthGuard, adminOrManagerAuthGuard, pgMerchantAuthGuard } from './guard/auth.guard';
 
 import { Dashboard } from './component/admin/dashboard/dashboard';
 import { Users } from './component/admin/users/users';
@@ -9,6 +9,8 @@ import { Cards } from './component/admin/cards/cards';
 import { Transactions } from './component/admin/transactions/transactions';
 import { Kyc } from './component/admin/kyc/kyc';
 import { Login } from './component/admin/login/login';
+import { HodLogin } from './component/website/hod-login/hod-login';
+import { HodDashboard } from './component/website/hod-dashboard/hod-dashboard';
 import { AdminCheques } from './component/admin/cheques/cheques';
 
 
@@ -80,6 +82,8 @@ import { AdminPositivePayComponent } from './component/admin/positive-pay/admin-
 export const routes: Routes = [
   // ------------------ ADMIN ------------------
   { path: 'admin/login', component: Login },
+  { path: 'hod/login', component: HodLogin },
+  { path: 'hod/dashboard', component: HodDashboard, canActivate: [hodAuthGuard] },
   { path: 'admin/dashboard', component: Dashboard, canActivate: [adminAuthGuard] },
   // ------------------ MANAGER ------------------
   { path: 'manager/dashboard', component: ManagerDashboard, canActivate: [managerAuthGuard] },

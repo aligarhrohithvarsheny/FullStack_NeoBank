@@ -42,6 +42,17 @@ export const adminAuthGuard: CanActivateFn = () => {
   return router.createUrlTree(['/admin/login']);
 };
 
+export const hodAuthGuard: CanActivateFn = () => {
+  const router = inject(Router);
+  const platformId = inject(PLATFORM_ID);
+  if (!isPlatformBrowser(platformId)) return false;
+
+  const admin = sessionStorage.getItem('admin');
+  const role = sessionStorage.getItem('userRole');
+  if (admin && role === 'HOD') return true;
+  return router.createUrlTree(['/hod/login']);
+};
+
 export const managerAuthGuard: CanActivateFn = () => {
   const router = inject(Router);
   const platformId = inject(PLATFORM_ID);

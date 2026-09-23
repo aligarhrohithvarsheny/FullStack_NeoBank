@@ -1,0 +1,59 @@
+<div class="hod-dashboard">
+  <header class="hod-topbar">
+    <div><span class="hod-kicker">NeoBank Headquarters</span><h1>HOD Operations Dashboard</h1></div>
+    <button type="button" class="logout-button" (click)="logout()">Sign out</button>
+  </header>
+
+  <main class="hod-content">
+    <section class="metric-grid" aria-label="Bank performance overview">
+      <article class="metric-card"><span>Bank Turnover</span><strong>{{ totalTurnover | currency:'INR':'symbol':'1.0-0' }}</strong><small>Across tracked cities</small></article>
+      <article class="metric-card"><span>Bank Profit</span><strong>{{ totalProfit | currency:'INR':'symbol':'1.0-0' }}</strong><small>Reported city profit</small></article>
+      <article class="metric-card"><span>All Bank Accounts</span><strong>{{ (overview?.savingsAccounts?.total || 0) + (overview?.salaryAccounts?.totalAccounts || overview?.salaryAccounts?.total || 0) + (overview?.businessAccounts?.total || overview?.businessAccounts?.totalAccounts || 0) | number }}</strong><small>Savings, salary, business</small></article>
+      <article class="metric-card"><span>Loan Portfolio</span><strong>{{ overview?.loans?.approvedAmount || 0 | currency:'INR':'symbol':'1.0-0' }}</strong><small>{{ overview?.loans?.approved || 0 }} approved loans</small></article>
+    </section>
+
+    <section class="live-data-grid">
+      <article class="live-card"><span>Savings Accounts</span><strong>{{ overview?.savingsAccounts?.total || 0 | number }}</strong><small>Balance {{ overview?.savingsAccounts?.totalBalance || 0 | currency:'INR':'symbol':'1.0-0' }}</small></article>
+      <article class="live-card"><span>Salary Accounts</span><strong>{{ overview?.salaryAccounts?.totalAccounts || overview?.salaryAccounts?.total || 0 | number }}</strong><small>Live database count</small></article>
+      <article class="live-card"><span>Business Accounts</span><strong>{{ overview?.businessAccounts?.total || overview?.businessAccounts?.totalAccounts || 0 | number }}</strong><small>Current accounts</small></article>
+      <article class="live-card"><span>Insurance Policies</span><strong>{{ overview?.insurance?.totalPolicies || overview?.insurance?.total || 0 | number }}</strong><small>Active portfolio</small></article>
+      <article class="live-card"><span>Pending Loans</span><strong>{{ overview?.loans?.pending || 0 | number }}</strong><small>Needs attention</small></article>
+      <article class="live-card"><span>Operations</span><strong>{{ totalOperations | number }}</strong><small>Tracked city operations</small></article>
+    </section>
+
+    <div class="refresh-line">Live data refreshes every 30 seconds <span *ngIf="lastRefreshed">· {{ lastRefreshed | date:'medium' }}</span><button type="button" (click)="refreshOverview()">Refresh now</button></div>
+
+    <p class="hod-error" *ngIf="errorMessage">{{ errorMessage }}</p>
+
+    <section class="dashboard-grid">
+      <div class="panel city-panel">
+        <div class="panel-heading"><div><span class="panel-kicker">Regional control</span><h2>City Bank Operations</h2></div><span class="count-badge">{{ cities.length }} cities</span></div>
+        <div class="empty-state" *ngIf="!cities.length">Add your first city, such as Tirupati, to begin tracking operations.</div>
+        <div class="city-list">
+          <button type="button" class="city-row" *ngFor="let city of cities" [class.selected]="selectedCity === city" (click)="selectCity(city)">
+            <span><strong>{{ city.city }}</strong><small>{{ city.status }}</small></span>
+            <span class="city-number">{{ city.turnover | currency:'INR':'symbol':'1.0-0' }}</span>
+          </button>
+        </div>
+        <form class="add-city-form" (ngSubmit)="addCity()">
+          <input [(ngModel)]="newCity.city" name="city" placeholder="City name, e.g. Tirupati" required>
+          <input type="number" [(ngModel)]="newCity.turnover" name="turnover" placeholder="Turnover">
+          <input type="number" [(ngModel)]="newCity.profit" name="profit" placeholder="Profit">
+          <input type="number" [(ngModel)]="newCity.operations" name="operations" placeholder="Operations">
+          <button type="submit">Add City</button>
+        </form>
+      </div>
+
+      <div class="panel staff-panel">
+        <div class="panel-heading"><div><span class="panel-kicker">People and access</span><h2>Existing Admins & Managers</h2></div><span class="count-badge">{{ staff.length }}</span></div>
+        <div class="staff-row" *ngFor="let person of staff"><span class="avatar">{{ (person.name || person.email || '?').charAt(0) | uppercase }}</span><span><strong>{{ person.name || 'Unnamed staff' }}</strong><small>{{ person.email }}</small></span><em>{{ person.role }}</em></div>
+        <div class="empty-state" *ngIf="!staff.length">No Admin or Manager accounts found.</div>
+      </div>
+    </section>
+
+    <section class="panel edit-panel" *ngIf="selectedCity as city">
+      <div class="panel-heading"><div><span class="panel-kicker">City detail</span><h2>{{ city.city }} Operations</h2></div><button type="button" class="delete-button" (click)="removeCity(city)">Remove city</button></div>
+      <div class="edit-fields"><label>Turnover<input type="number" [(ngModel)]="city.turnover" (ngModelChange)="updateCity()"></label><label>Profit<input type="number" [(ngModel)]="city.profit" (ngModelChange)="updateCity()"></label><label>Operations<input type="number" [(ngModel)]="city.operations" (ngModelChange)="updateCity()"></label><label>Status<select [(ngModel)]="city.status" (ngModelChange)="updateCity()"><option value="PLANNING">Planning</option><option value="ACTIVE">Active</option></select></label></div>
+    </section>
+  </main>
+</div>

@@ -65,6 +65,10 @@ public class PassbookController {
                     CurrentAccount current = currentAccountRepository.findById(id).orElse(null);
                     if (current == null) return ResponseEntity.notFound().build();
                     current.setReKycRequired(true);
+                    current.setAccountFrozen(true);
+                    current.setFrozenReason("Frozen pending re-KYC approval");
+                    current.setFrozenBy("Admin");
+                    current.setFrozenDate(java.time.LocalDateTime.now());
                     current.setStatus("FROZEN");
                     currentAccountRepository.save(current);
                     break;
