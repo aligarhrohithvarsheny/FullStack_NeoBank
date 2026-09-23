@@ -55,7 +55,10 @@ export class HodLogin {
   }
 
   private authenticateHod(credentials: { email: string; password: string; role?: string }, allowLegacyRetry: boolean): void {
-    this.http.post<any>(`${environment.apiBaseUrl}/api/admins/login`, credentials).subscribe({
+    const loginUrl = credentials.role
+      ? `${environment.apiBaseUrl}/api/admins/hod-login`
+      : `${environment.apiBaseUrl}/api/admins/login`;
+    this.http.post<any>(loginUrl, credentials).subscribe({
       next: response => {
         this.isLoading = false;
         const responseRole = response?.role || response?.admin?.role;
@@ -70,7 +73,7 @@ export class HodLogin {
         this.router.navigate(['/hod/dashboard']);
       },
       error: err => {
-        if (allowLegacyRetry && (err.status === 400 || err.status === 401 || err.status === 404 || err.status === 405)) {
+        if (allowLegacyRetry && (err.status === 400 || err.status === 404 || err.status === 405)) {
           this.authenticateHod({ email: credentials.email, password: credentials.password }, false);
           return;
         }

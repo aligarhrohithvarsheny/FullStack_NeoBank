@@ -154,6 +154,46 @@ public class AdminController {
         Admin saved = adminService.saveAdmin(admin);
         return ResponseEntity.ok(Map.of("success", true, "message", "HOD account created", "admin", createSafeAdminResponse(saved)));
     }
+
+    @Transactional
+    @PostMapping("/hod-login")
+    public ResponseEntity<Map<String, Object>> loginHod(@RequestBody Map<String, String> credentials) {
+        String email = credentials != null && credentials.get("email") != null
+                ? credentials.get("email").trim().toLowerCase() : null;
+        String password = credentials != null ? credentials.get("password") : null;
+        Map<String, Object> response = new HashMap<>();
+
+        if (email == null || email.isBlank() || password == null || password.isBlank()) {
+            response.put("success", false);
+            response.put("message", "Gmail and password are required");
+            return ResponseEntity.badRequest().body(response);
+        }
+
+        Admin existing = adminService.getAdminByEmail(email);
+        if (existing == null || existing.getRole() == null || !"HOD".equalsIgnoreCase(existing.getRole())) {
+            response.put("success", false);
+            response.put("message", "No HOD account exists for this Gmail");
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+        }
+        if (Boolean.TRUE.equals(existing.getAccountLocked())) {
+            response.put("success", false);
+            response.put("accountLocked", true);
+            response.put("message", "HOD account is locked. Reset the HOD password before trying again.");
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+        }
+
+        Admin loggedIn = adminService.login(email, password);
+        if (loggedIn == null) {
+            response.put("success", false);
+            response.put("message", "Invalid HOD Gmail or password");
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+        }
+
+        response.put("success", true);
+        response.put("role", "HOD");
+        response.put("admin", createSafeAdminResponse(loggedIn));
+        return ResponseEntity.ok(response);
+    }
     
     /**
      * Check if admin profile is complete
