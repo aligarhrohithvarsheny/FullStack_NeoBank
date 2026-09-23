@@ -129,8 +129,14 @@ public class AdminController {
     @GetMapping("/hod-availability")
     public ResponseEntity<Map<String, Object>> hodAvailability() {
         Map<String, Object> response = new HashMap<>();
-        response.put("available", !adminService.getAllAdmins().stream()
-                .anyMatch(admin -> "HOD".equalsIgnoreCase(admin.getRole())));
+        Admin existingHod = adminService.getAllAdmins().stream()
+            .filter(admin -> "HOD".equalsIgnoreCase(admin.getRole()))
+            .findFirst().orElse(null);
+        response.put("available", existingHod == null
+            || existingHod.getPassword() == null
+            || existingHod.getPassword().isBlank());
+        response.put("repairRequired", existingHod != null
+            && (existingHod.getPassword() == null || existingHod.getPassword().isBlank()));
         return ResponseEntity.ok(response);
     }
 
@@ -142,11 +148,22 @@ public class AdminController {
                     "success", false,
                     "message", "Gmail and password are required"));
         }
-        if (adminService.getAllAdmins().stream()
-                .anyMatch(existing -> "HOD".equalsIgnoreCase(existing.getRole()))) {
+        Admin existingHod = adminService.getAllAdmins().stream()
+            .filter(existing -> "HOD".equalsIgnoreCase(existing.getRole()))
+            .findFirst().orElse(null);
+        if (existingHod != null) {
+            if (existingHod.getPassword() != null && !existingHod.getPassword().isBlank()) {
             return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
-                    "success", false,
-                    "message", "The HOD account has already been created."));
+                "success", false,
+                "message", "The HOD account has already been created."));
+            }
+            existingHod.setEmail(admin.getEmail().trim().toLowerCase());
+            existingHod.setPassword(admin.getPassword());
+            existingHod.setAccountLocked(false);
+            existingHod.setFailedLoginAttempts(0);
+            existingHod.setLastFailedLoginTime(null);
+            Admin repaired = adminService.saveAdmin(existingHod);
+            return ResponseEntity.ok(Map.of("success", true, "message", "HOD account password repaired", "admin", createSafeAdminResponse(repaired)));
         }
 
         admin.setRole("HOD");

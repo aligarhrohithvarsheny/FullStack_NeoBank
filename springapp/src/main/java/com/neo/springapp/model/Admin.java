@@ -2,7 +2,7 @@ package com.neo.springapp.model;
 
 import jakarta.persistence.*;
 import lombok.Data;
-import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.time.LocalDateTime;
 
 @Entity
@@ -16,7 +16,7 @@ public class Admin {
 
     private String name;
     private String email;
-    @JsonIgnore // Don't serialize password in JSON responses
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     private String password;
     private String role;
     private String pan;
