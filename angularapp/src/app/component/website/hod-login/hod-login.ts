@@ -47,14 +47,19 @@ export class HodLogin {
 
     this.isLoading = true;
     this.errorMessage = '';
-    this.http.post<any>(`${environment.apiBaseUrl}/api/admins/login`, {
+    this.authenticateHod({
       email: this.email.trim(),
       password: this.password,
       role: 'HOD'
-    }).subscribe({
+    }, true);
+  }
+
+  private authenticateHod(credentials: { email: string; password: string; role?: string }, allowLegacyRetry: boolean): void {
+    this.http.post<any>(`${environment.apiBaseUrl}/api/admins/login`, credentials).subscribe({
       next: response => {
         this.isLoading = false;
-        if (!response?.success || response.role !== 'HOD') {
+        const responseRole = response?.role || response?.admin?.role;
+        if (!response?.success || responseRole !== 'HOD') {
           this.errorMessage = 'Invalid HOD credentials';
           return;
         }
@@ -65,6 +70,10 @@ export class HodLogin {
         this.router.navigate(['/hod/dashboard']);
       },
       error: err => {
+        if (allowLegacyRetry && (err.status === 400 || err.status === 401 || err.status === 404 || err.status === 405)) {
+          this.authenticateHod({ email: credentials.email, password: credentials.password }, false);
+          return;
+        }
         this.isLoading = false;
         this.errorMessage = err.error?.message || 'Invalid HOD credentials';
       }

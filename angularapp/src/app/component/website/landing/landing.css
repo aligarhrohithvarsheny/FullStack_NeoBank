@@ -134,6 +134,17 @@ html { scroll-behavior: smooth; }
   cursor: pointer; transition: all 0.2s;
 }
 .btn-ghost:hover { color: var(--primary); border-color: var(--primary); }
+.btn-manager {
+  background: #475569;
+  color: #fff;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 50px;
+  font-weight: 700;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.btn-manager:hover { background: #334155; }
 .btn-outline {
   background: transparent; color: var(--text-dark); border: 2px solid var(--border);
   padding: 14px 28px; border-radius: 50px; font-weight: 600; font-size: 0.95rem;

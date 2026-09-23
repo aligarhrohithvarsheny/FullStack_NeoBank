@@ -1,5 +1,6 @@
 import { Component } from '@angular/core';
 import { Router } from '@angular/router';
+import { ActivatedRoute } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
@@ -22,9 +23,17 @@ export class Login {
 
   constructor(
     private router: Router,
+    private route: ActivatedRoute,
     private alertService: AlertService,
     private http: HttpClient
-  ) {}
+  ) {
+    this.route.queryParams.subscribe(params => {
+      const role = String(params['role'] || '').toUpperCase();
+      if (role === 'ADMIN' || role === 'MANAGER') {
+        this.selectedRole = role;
+      }
+    });
+  }
 
   /**
    * Same model for Admin and Manager: POST /api/admins/login with email, password, role.
