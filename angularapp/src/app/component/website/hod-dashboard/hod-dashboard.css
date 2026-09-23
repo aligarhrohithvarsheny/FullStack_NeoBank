@@ -36,6 +36,11 @@
 .delete-button { color: #b42318; border-color: #f3c3bf; background: #fff7f6; }
 .edit-fields { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
 .edit-fields label { display: grid; gap: 7px; color: #668087; font-size: 12px; font-weight: 700; }
+.assignment-block { margin-top: 24px; padding-top: 20px; border-top: 1px solid #edf2f2; }
+.assignment-block h3 { margin: 7px 0 14px; font-size: 1rem; }
+.assignment-list { display: flex; flex-wrap: wrap; gap: 8px; }
+.assignment-list label { display: flex; align-items: center; gap: 7px; padding: 9px 11px; border: 1px solid #dce8e9; border-radius: 7px; color: #12313a; cursor: pointer; }
+.assignment-list label small { color: #0f766e; font-size: 10px; font-weight: 800; }
 .hod-error { color: #b42318; margin: 16px 0; }
 @media (max-width: 1100px) { .live-data-grid { grid-template-columns: repeat(3, 1fr); } }
 @media (max-width: 900px) { .metric-grid { grid-template-columns: repeat(2, 1fr); } .dashboard-grid { grid-template-columns: 1fr; } .add-city-form { grid-template-columns: 1fr 1fr; } .add-city-form input:first-child { grid-column: span 2; } .add-city-form button { min-height: 40px; } .edit-fields { grid-template-columns: repeat(2, 1fr); } }

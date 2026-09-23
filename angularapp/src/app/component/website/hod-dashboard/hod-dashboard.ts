@@ -11,6 +11,7 @@ interface CityOperation {
   profit: number;
   operations: number;
   status: 'ACTIVE' | 'PLANNING';
+  staffIds: string[];
 }
 
 @Component({
@@ -64,7 +65,7 @@ export class HodDashboard implements OnInit {
   addCity(): void {
     const city = this.newCity.city.trim();
     if (!city) return;
-    this.cities = [...this.cities, { ...this.newCity, city, status: 'PLANNING' }];
+    this.cities = [...this.cities, { ...this.newCity, city, status: 'PLANNING', staffIds: [] }];
     this.saveCities();
     this.newCity = { city: '', turnover: 0, profit: 0, operations: 0 };
   }
@@ -74,6 +75,19 @@ export class HodDashboard implements OnInit {
   updateCity(): void {
     if (!this.selectedCity) return;
     this.saveCities();
+  }
+
+  toggleStaff(city: CityOperation, person: any): void {
+    const staffId = String(person.id || person.email);
+    const assigned = city.staffIds || [];
+    city.staffIds = assigned.includes(staffId)
+      ? assigned.filter(id => id !== staffId)
+      : [...assigned, staffId];
+    this.updateCity();
+  }
+
+  isStaffAssigned(city: CityOperation, person: any): boolean {
+    return (city.staffIds || []).includes(String(person.id || person.email));
   }
 
   removeCity(city: CityOperation): void {
