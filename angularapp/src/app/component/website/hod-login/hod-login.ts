@@ -23,7 +23,7 @@ export class HodLogin {
   isLoading = false;
   isCreating = false;
   showCreateAccount = false;
-  accountAvailable = true;
+  showCreateAccountButton = true;
 
   constructor(
     private router: Router,
@@ -31,8 +31,10 @@ export class HodLogin {
     private alertService: AlertService
   ) {
     this.http.get<any>(`${environment.apiBaseUrl}/api/admins/hod-availability`).subscribe({
-      next: response => this.accountAvailable = response?.available === true,
-      error: () => this.accountAvailable = false
+      next: response => {
+        if (response?.available === false) this.showCreateAccountButton = false;
+      },
+      error: () => this.showCreateAccountButton = true
     });
   }
 
@@ -82,15 +84,44 @@ export class HodLogin {
 
     this.isCreating = true;
     this.errorMessage = '';
-    this.http.post<any>(`${environment.apiBaseUrl}/api/admins/hod-create`, {
+    const accountPayload = {
+      name: 'NeoBank Head of Department',
       email: this.createEmail.trim(),
-      password: this.createPassword
-    }).subscribe({
+      password: this.createPassword,
+      role: 'HOD'
+    };
+
+    this.http.post<any>(`${environment.apiBaseUrl}/api/admins/hod-create`, accountPayload).subscribe({
       next: () => {
         this.isCreating = false;
-        this.accountAvailable = false;
+        this.showCreateAccountButton = false;
         this.showCreateAccount = false;
         this.email = this.createEmail.trim();
+        this.password = '';
+        this.alertService.loginSuccess('HOD account created. Please sign in.');
+      },
+      error: err => {
+        if (err.status === 404 || err.status === 405) {
+          this.createWithLegacyAdminEndpoint(accountPayload);
+          return;
+        }
+        this.isCreating = false;
+        this.errorMessage = err.error?.message || 'Unable to create HOD account';
+        if (err.status === 409) {
+          this.showCreateAccountButton = false;
+          this.showCreateAccount = false;
+        }
+      }
+    });
+  }
+
+  private createWithLegacyAdminEndpoint(accountPayload: { name: string; email: string; password: string; role: string }): void {
+    this.http.post<any>(`${environment.apiBaseUrl}/api/admins/create`, accountPayload).subscribe({
+      next: () => {
+        this.isCreating = false;
+        this.showCreateAccountButton = false;
+        this.showCreateAccount = false;
+        this.email = accountPayload.email;
         this.password = '';
         this.alertService.loginSuccess('HOD account created. Please sign in.');
       },
@@ -98,7 +129,7 @@ export class HodLogin {
         this.isCreating = false;
         this.errorMessage = err.error?.message || 'Unable to create HOD account';
         if (err.status === 409) {
-          this.accountAvailable = false;
+          this.showCreateAccountButton = false;
           this.showCreateAccount = false;
         }
       }

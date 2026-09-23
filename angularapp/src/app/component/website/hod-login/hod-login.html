@@ -14,10 +14,10 @@
         <p class="hod-error" *ngIf="errorMessage">{{ errorMessage }}</p>
         <button type="submit" [disabled]="isLoading">{{ isLoading ? 'Signing in...' : 'HOD Login' }}</button>
       </form>
-      <button *ngIf="accountAvailable" type="button" class="secondary-button" (click)="showCreateAccount = true; errorMessage = ''">
+      <button *ngIf="showCreateAccountButton" type="button" class="secondary-button create-account-button" (click)="showCreateAccount = true; errorMessage = ''">
         Create HOD Account
       </button>
-      <p class="hod-account-note" *ngIf="!accountAvailable">The HOD account has already been created.</p>
+      <p class="hod-account-note" *ngIf="!showCreateAccountButton">The HOD account has already been created.</p>
     </ng-container>
 
     <ng-template #createForm>
