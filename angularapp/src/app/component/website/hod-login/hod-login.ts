@@ -51,14 +51,11 @@ export class HodLogin {
       email: this.email.trim(),
       password: this.password,
       role: 'HOD'
-    }, true);
+    });
   }
 
-  private authenticateHod(credentials: { email: string; password: string; role?: string }, allowLegacyRetry: boolean): void {
-    const loginUrl = credentials.role
-      ? `${environment.apiBaseUrl}/api/admins/hod-login`
-      : `${environment.apiBaseUrl}/api/admins/login`;
-    this.http.post<any>(loginUrl, credentials).subscribe({
+  private authenticateHod(credentials: { email: string; password: string; role: string }): void {
+    this.http.post<any>(`${environment.apiBaseUrl}/api/admins/hod-login`, credentials).subscribe({
       next: response => {
         this.isLoading = false;
         const responseRole = response?.role || response?.admin?.role;
@@ -73,12 +70,8 @@ export class HodLogin {
         this.router.navigate(['/hod/dashboard']);
       },
       error: err => {
-        if (allowLegacyRetry && (err.status === 400 || err.status === 404 || err.status === 405)) {
-          this.authenticateHod({ email: credentials.email, password: credentials.password }, false);
-          return;
-        }
         this.isLoading = false;
-        this.errorMessage = err.error?.message || 'Invalid HOD credentials';
+        this.errorMessage = err.error?.message || 'HOD login service is unavailable. Please deploy the HOD backend service.';
       }
     });
   }
@@ -113,12 +106,8 @@ export class HodLogin {
         this.alertService.loginSuccess('HOD account created. Please sign in.');
       },
       error: err => {
-        if (err.status === 404 || err.status === 405) {
-          this.createWithLegacyAdminEndpoint(accountPayload);
-          return;
-        }
         this.isCreating = false;
-        this.errorMessage = err.error?.message || 'Unable to create HOD account';
+        this.errorMessage = err.error?.message || 'HOD account service is unavailable. Please deploy the HOD backend service.';
         if (err.status === 409) {
           this.showCreateAccountButton = false;
           this.showCreateAccount = false;
@@ -127,24 +116,4 @@ export class HodLogin {
     });
   }
 
-  private createWithLegacyAdminEndpoint(accountPayload: { name: string; email: string; password: string; role: string }): void {
-    this.http.post<any>(`${environment.apiBaseUrl}/api/admins/create`, accountPayload).subscribe({
-      next: () => {
-        this.isCreating = false;
-        this.showCreateAccountButton = false;
-        this.showCreateAccount = false;
-        this.email = accountPayload.email;
-        this.password = '';
-        this.alertService.loginSuccess('HOD account created. Please sign in.');
-      },
-      error: err => {
-        this.isCreating = false;
-        this.errorMessage = err.error?.message || 'Unable to create HOD account';
-        if (err.status === 409) {
-          this.showCreateAccountButton = false;
-          this.showCreateAccount = false;
-        }
-      }
-    });
-  }
 }
