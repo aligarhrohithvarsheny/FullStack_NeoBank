@@ -259,6 +259,40 @@ html { scroll-behavior: smooth; }
 .section-header-center { text-align: center; margin-bottom: 48px; }
 .section-header-center .section-badge { margin-bottom: 12px; }
 
+/* ---------- CORPORATE HEADQUARTERS ---------- */
+.headquarters-section {
+  padding: 96px 32px;
+  background: linear-gradient(135deg, #0f172a 0%, #172554 58%, #0c4a6e 100%);
+  color: #fff;
+}
+.headquarters-container {
+  max-width: 1120px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 120px 1fr 260px;
+  gap: 40px;
+  align-items: center;
+}
+.headquarters-section .section-title { color: #fff; }
+.headquarters-section .section-desc { color: #cbd5e1; }
+.headquarters-mark {
+  width: 120px;
+  height: 120px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(125, 211, 252, 0.5);
+  border-radius: 24px;
+  color: #7dd3fc;
+  font-size: 2rem;
+  font-weight: 800;
+  letter-spacing: 2px;
+  background: rgba(255, 255, 255, 0.08);
+}
+.headquarters-details { display: grid; gap: 18px; }
+.headquarters-details div { display: grid; gap: 4px; }
+.headquarters-details strong { color: #7dd3fc; font-size: 1.15rem; }
+.headquarters-details span { color: #cbd5e1; font-size: 0.9rem; }
+
 /* ---------- HERO SECTION ---------- */
 .hero-section {
   min-height: 100vh; display: flex; align-items: center;
@@ -1025,9 +1059,14 @@ html { scroll-behavior: smooth; }
   .download-stats { justify-content: center; }
   .footer-grid { grid-template-columns: repeat(2, 1fr); }
   .section-desc { margin-left: auto; margin-right: auto; }
+  .headquarters-container { grid-template-columns: 1fr; text-align: center; }
+  .headquarters-mark { margin: 0 auto; }
+  .headquarters-details { grid-template-columns: repeat(3, 1fr); text-align: left; }
 }
 
 @media (max-width: 640px) {
+  .headquarters-section { padding: 68px 20px; }
+  .headquarters-details { grid-template-columns: 1fr; text-align: center; }
   .mobile-login-bar {
     position: fixed;
     top: 50%;

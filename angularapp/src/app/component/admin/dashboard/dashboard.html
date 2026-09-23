@@ -4660,6 +4660,9 @@
                 <button class="pb-action-btn unfreeze" *ngIf="(acc.status || '').toUpperCase() === 'FROZEN'" (click)="unfreezePassbookAccount(acc)" [disabled]="passbookActionLoading === acc.accountNumber" title="Unfreeze Account">
                   <i class="fa" [ngClass]="passbookActionLoading === acc.accountNumber ? 'fa-spinner fa-spin' : 'fa-fire'"></i>
                 </button>
+                <button class="pb-action-btn rekyc" *ngIf="(acc.status || 'ACTIVE').toUpperCase() !== 'CLOSED'" (click)="reKycPassbookAccount(acc)" [disabled]="passbookActionLoading === acc.accountNumber" title="Require Re-KYC">
+                  <i class="fa" [ngClass]="passbookActionLoading === acc.accountNumber ? 'fa-spinner fa-spin' : 'fa-id-card'"></i>
+                </button>
                 <!-- Close Button (show for active/frozen accounts, not already closed) -->
                 <button class="pb-action-btn close-acc" *ngIf="(acc.status || 'ACTIVE').toUpperCase() !== 'CLOSED'" (click)="closePassbookAccount(acc)" [disabled]="passbookActionLoading === acc.accountNumber" title="Close Account">
                   <i class="fa" [ngClass]="passbookActionLoading === acc.accountNumber ? 'fa-spinner fa-spin' : 'fa-times-circle'"></i>
@@ -4818,10 +4821,11 @@
             <i class="fa" [ngClass]="{
               'fa-snowflake': accountActionType === 'freeze',
               'fa-fire': accountActionType === 'unfreeze',
+              'fa-id-card': accountActionType === 'rekyc',
               'fa-times-circle': accountActionType === 'close',
               'fa-trash-alt': accountActionType === 'delete'
             }"></i>
-            {{ accountActionType === 'freeze' ? 'Freeze Account' : accountActionType === 'unfreeze' ? 'Unfreeze Account' : accountActionType === 'close' ? 'Close Account' : 'Delete Account' }}
+            {{ accountActionType === 'freeze' ? 'Freeze Account' : accountActionType === 'unfreeze' ? 'Unfreeze Account' : accountActionType === 'rekyc' ? 'Require Re-KYC' : accountActionType === 'close' ? 'Close Account' : 'Delete Account' }}
           </h3>
           <button class="pb-modal-close" (click)="showAccountActionModal = false"><i class="fa fa-times"></i></button>
         </div>
@@ -4829,15 +4833,17 @@
           <div class="pb-confirm-warning" [ngClass]="'pb-confirm-' + accountActionType">
             <i class="fa" [ngClass]="{
               'fa-exclamation-triangle': accountActionType === 'delete' || accountActionType === 'close',
-              'fa-info-circle': accountActionType === 'freeze' || accountActionType === 'unfreeze'
+              'fa-info-circle': accountActionType === 'freeze' || accountActionType === 'unfreeze' || accountActionType === 'rekyc'
             }"></i>
             <div>
               <strong *ngIf="accountActionType === 'freeze'">Are you sure you want to freeze this account?</strong>
               <strong *ngIf="accountActionType === 'unfreeze'">Are you sure you want to unfreeze this account?</strong>
+              <strong *ngIf="accountActionType === 'rekyc'">Require re-KYC for this account?</strong>
               <strong *ngIf="accountActionType === 'close'">Are you sure you want to close this account?</strong>
               <strong *ngIf="accountActionType === 'delete'">Are you sure you want to permanently delete this account?</strong>
               <p *ngIf="accountActionType === 'freeze'">The account holder will not be able to perform any transactions.</p>
               <p *ngIf="accountActionType === 'unfreeze'">The account will be reactivated and transactions will be enabled.</p>
+              <p *ngIf="accountActionType === 'rekyc'">The account will be frozen until an administrator approves the new KYC submission.</p>
               <p *ngIf="accountActionType === 'close'">This will mark the account as closed. It cannot be reopened easily.</p>
               <p *ngIf="accountActionType === 'delete'">This action is irreversible. All account data will be permanently removed.</p>
             </div>
@@ -4859,16 +4865,18 @@
           <button class="pb-btn" [ngClass]="{
             'pb-btn-freeze': accountActionType === 'freeze',
             'pb-btn-unfreeze': accountActionType === 'unfreeze',
+            'pb-btn-rekyc': accountActionType === 'rekyc',
             'pb-btn-close-acc': accountActionType === 'close',
             'pb-btn-delete': accountActionType === 'delete'
           }" (click)="confirmAccountAction()" [disabled]="passbookActionLoading">
             <i class="fa" [ngClass]="passbookActionLoading ? 'fa-spinner fa-spin' : {
               'fa-snowflake': accountActionType === 'freeze',
               'fa-fire': accountActionType === 'unfreeze',
+              'fa-id-card': accountActionType === 'rekyc',
               'fa-times-circle': accountActionType === 'close',
               'fa-trash-alt': accountActionType === 'delete'
             }"></i>
-            {{ accountActionType === 'freeze' ? 'Freeze Account' : accountActionType === 'unfreeze' ? 'Unfreeze Account' : accountActionType === 'close' ? 'Close Account' : 'Delete Account' }}
+            {{ accountActionType === 'freeze' ? 'Freeze Account' : accountActionType === 'unfreeze' ? 'Unfreeze Account' : accountActionType === 'rekyc' ? 'Require Re-KYC' : accountActionType === 'close' ? 'Close Account' : 'Delete Account' }}
           </button>
         </div>
       </div>

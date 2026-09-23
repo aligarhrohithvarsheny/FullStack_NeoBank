@@ -8993,6 +8993,8 @@ app-admin-dashboard .dashboard-container {
 .pb-action-btn.freeze:hover { background: linear-gradient(135deg, #5a67d8, #6b46c1); transform: scale(1.1); }
 .pb-action-btn.unfreeze { background: linear-gradient(135deg, #48bb78, #38a169); color: #fff; box-shadow: 0 2px 6px rgba(72,187,120,0.25); }
 .pb-action-btn.unfreeze:hover { background: linear-gradient(135deg, #38a169, #2f855a); transform: scale(1.1); }
+.pb-action-btn.rekyc { background: linear-gradient(135deg, #ed8936, #dd6b20); color: #fff; box-shadow: 0 2px 6px rgba(237,137,54,0.25); }
+.pb-action-btn.rekyc:hover { background: linear-gradient(135deg, #dd6b20, #c05621); transform: scale(1.1); }
 .pb-action-btn.close-acc { background: linear-gradient(135deg, #ed8936, #dd6b20); color: #fff; box-shadow: 0 2px 6px rgba(237,137,54,0.25); }
 .pb-action-btn.close-acc:hover { background: linear-gradient(135deg, #dd6b20, #c05621); transform: scale(1.1); }
 .pb-action-btn.delete { background: linear-gradient(135deg, #fc5c7d, #e53e3e); color: #fff; box-shadow: 0 2px 6px rgba(229,62,62,0.25); }
@@ -9136,6 +9138,8 @@ app-admin-dashboard .dashboard-container {
 .pb-btn-freeze:hover { background: linear-gradient(135deg, #5a67d8, #6b46c1) !important; }
 .pb-btn-unfreeze { background: linear-gradient(135deg, #48bb78, #38a169) !important; color: #fff !important; }
 .pb-btn-unfreeze:hover { background: linear-gradient(135deg, #38a169, #2f855a) !important; }
+.pb-btn-rekyc { background: linear-gradient(135deg, #ed8936, #dd6b20) !important; color: #fff !important; }
+.pb-btn-rekyc:hover { background: linear-gradient(135deg, #dd6b20, #c05621) !important; }
 .pb-btn-close-acc { background: linear-gradient(135deg, #ed8936, #dd6b20) !important; color: #fff !important; }
 .pb-btn-close-acc:hover { background: linear-gradient(135deg, #dd6b20, #c05621) !important; }
 .pb-btn-delete { background: linear-gradient(135deg, #fc5c7d, #e53e3e) !important; color: #fff !important; }
@@ -9143,6 +9147,7 @@ app-admin-dashboard .dashboard-container {
 
 .pb-modal-header-freeze { background: linear-gradient(135deg, #667eea, #764ba2) !important; }
 .pb-modal-header-unfreeze { background: linear-gradient(135deg, #48bb78, #38a169) !important; }
+.pb-modal-header-rekyc { background: linear-gradient(135deg, #ed8936, #dd6b20) !important; }
 .pb-modal-header-close { background: linear-gradient(135deg, #ed8936, #dd6b20) !important; }
 .pb-modal-header-delete { background: linear-gradient(135deg, #fc5c7d, #e53e3e) !important; }
 

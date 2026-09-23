@@ -51,6 +51,7 @@ public class Account {
 
     private boolean verifiedMatrix = false;
     private boolean kycVerified = false;
+    private boolean reKycRequired = false;
 
     // Net Banking control per customer
     private Boolean netBankingEnabled = true;

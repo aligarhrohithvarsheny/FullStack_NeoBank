@@ -19,12 +19,75 @@ export class Login {
   selectedRole = 'ADMIN';
   errorMessage = '';
   isLoading = false;
+  showCreateAccount = false;
+  corporateAccountAvailable = false;
+  createEmail = '';
+  createPassword = '';
+  confirmCreatePassword = '';
+  isCreatingAccount = false;
 
   constructor(
     private router: Router,
     private alertService: AlertService,
     private http: HttpClient
-  ) {}
+  ) {
+    this.checkCorporateAccountAvailability();
+  }
+
+  private checkCorporateAccountAvailability(): void {
+    this.http.get<any>(`${environment.apiBaseUrl}/api/admins/corporate-availability`).subscribe({
+      next: response => this.corporateAccountAvailable = response?.available === true,
+      error: () => this.corporateAccountAvailable = false
+    });
+  }
+
+  openCreateAccount(): void {
+    this.errorMessage = '';
+    this.showCreateAccount = true;
+  }
+
+  backToLogin(): void {
+    this.errorMessage = '';
+    this.showCreateAccount = false;
+  }
+
+  createCorporateAccount(): void {
+    if (this.isCreatingAccount) return;
+    if (!this.createEmail.trim() || !this.createPassword || !this.confirmCreatePassword) {
+      this.errorMessage = 'Please enter Gmail and both password fields';
+      return;
+    }
+    if (this.createPassword !== this.confirmCreatePassword) {
+      this.errorMessage = 'Passwords do not match';
+      return;
+    }
+
+    this.isCreatingAccount = true;
+    this.errorMessage = '';
+    this.http.post<any>(`${environment.apiBaseUrl}/api/admins/corporate-create`, {
+      email: this.createEmail.trim(),
+      password: this.createPassword
+    }).subscribe({
+      next: () => {
+        this.isCreatingAccount = false;
+        this.corporateAccountAvailable = false;
+        this.showCreateAccount = false;
+        this.email = this.createEmail.trim();
+        this.password = '';
+        this.alertService.loginSuccess('Corporate account created. Please sign in.');
+      },
+      error: err => {
+        this.isCreatingAccount = false;
+        this.errorMessage = err.status === 409
+          ? 'The corporate account has already been created.'
+          : (err.error?.message || 'Unable to create the corporate account');
+        if (err.status === 409) {
+          this.corporateAccountAvailable = false;
+          this.showCreateAccount = false;
+        }
+      }
+    });
+  }
 
   /**
    * Same model for Admin and Manager: POST /api/admins/login with email, password, role.

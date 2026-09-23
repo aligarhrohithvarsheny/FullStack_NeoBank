@@ -593,7 +593,7 @@ export class Dashboard implements OnInit, OnDestroy {
 
   // Account Action Management
   showAccountActionModal: boolean = false;
-  accountActionType: string = ''; // freeze, unfreeze, close, delete
+  accountActionType: string = ''; // freeze, unfreeze, rekyc, close, delete
   accountActionTarget: any = null;
   accountActionReason: string = '';
   passbookActionLoading: string = '';
@@ -6927,6 +6927,13 @@ export class Dashboard implements OnInit, OnDestroy {
     this.showAccountActionModal = true;
   }
 
+  reKycPassbookAccount(acc: any) {
+    this.accountActionType = 'rekyc';
+    this.accountActionTarget = acc;
+    this.accountActionReason = '';
+    this.showAccountActionModal = true;
+  }
+
   closePassbookAccount(acc: any) {
     this.accountActionType = 'close';
     this.accountActionTarget = acc;
@@ -6952,6 +6959,10 @@ export class Dashboard implements OnInit, OnDestroy {
     const reason = encodeURIComponent(this.accountActionReason || `${this.accountActionType}d by admin`);
 
     switch (this.accountActionType) {
+      case 'rekyc':
+        url = `${environment.apiBaseUrl}/api/passbook/rekyc/${acc.id}?accountType=${type}`;
+        method = 'post';
+        break;
       case 'freeze':
         url = `${environment.apiBaseUrl}/api/passbook/freeze/${acc.id}?accountType=${type}&reason=${reason}&frozenBy=Admin`;
         break;
@@ -6969,13 +6980,16 @@ export class Dashboard implements OnInit, OnDestroy {
 
     const request = method === 'delete'
       ? this.http.delete<any>(url)
-      : this.http.put<any>(url, {});
+      : method === 'post'
+        ? this.http.post<any>(url, {})
+        : this.http.put<any>(url, {});
 
     request.subscribe({
       next: (res: any) => {
         this.passbookActionLoading = '';
         this.showAccountActionModal = false;
-        const actionLabel = this.accountActionType === 'freeze' ? 'frozen' :
+        const actionLabel = this.accountActionType === 'rekyc' ? 'frozen for re-KYC' :
+          this.accountActionType === 'freeze' ? 'frozen' :
           this.accountActionType === 'unfreeze' ? 'unfrozen' :
           this.accountActionType === 'close' ? 'closed' : 'deleted';
         this.alertService.success('Success', `Account ${acc.accountNumber} has been ${actionLabel} successfully.`);

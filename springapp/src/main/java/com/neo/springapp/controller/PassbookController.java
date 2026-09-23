@@ -50,6 +50,40 @@ public class PassbookController {
     @Autowired
     private com.neo.springapp.repository.AccountRepository accountRepository;
 
+    @PostMapping("/rekyc/{id}")
+    public ResponseEntity<?> requireReKyc(@PathVariable Long id, @RequestParam String accountType) {
+        try {
+            switch (accountType.toLowerCase()) {
+                case "savings":
+                    Account savings = accountRepository.findById(id).orElse(null);
+                    if (savings == null) return ResponseEntity.notFound().build();
+                    savings.setReKycRequired(true);
+                    savings.setStatus("FROZEN");
+                    accountRepository.save(savings);
+                    break;
+                case "current":
+                    CurrentAccount current = currentAccountRepository.findById(id).orElse(null);
+                    if (current == null) return ResponseEntity.notFound().build();
+                    current.setReKycRequired(true);
+                    current.setStatus("FROZEN");
+                    currentAccountRepository.save(current);
+                    break;
+                case "salary":
+                    SalaryAccount salary = salaryAccountRepository.findById(id).orElse(null);
+                    if (salary == null) return ResponseEntity.notFound().build();
+                    salary.setReKycRequired(true);
+                    salary.setStatus("FROZEN");
+                    salaryAccountRepository.save(salary);
+                    break;
+                default:
+                    return ResponseEntity.badRequest().body(Map.of("message", "Invalid account type"));
+            }
+            return ResponseEntity.ok(Map.of("success", true, "message", "Account frozen until re-KYC approval"));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("message", "Failed to require re-KYC: " + e.getMessage()));
+        }
+    }
+
     /**
      * Generate passbook PDF for any account type (Savings, Current, Salary).
      * Query param: accountType = savings | current | salary

@@ -142,6 +142,10 @@ public class AdminService {
         return adminRepository.existsByEmailIgnoreCase(normalizedEmail);
     }
 
+    public boolean corporateAccountExists() {
+        return adminRepository.existsByRoleIgnoreCase("ADMIN");
+    }
+
     /**
      * Get admin by NeoBank ID card number
      */

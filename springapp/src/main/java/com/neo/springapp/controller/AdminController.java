@@ -116,6 +116,33 @@ public class AdminController {
         Admin saved = adminService.saveAdmin(admin);
         return ResponseEntity.ok(saved);
     }
+
+    @GetMapping("/corporate-availability")
+    public ResponseEntity<Map<String, Object>> corporateAvailability() {
+        Map<String, Object> response = new HashMap<>();
+        response.put("available", !adminService.corporateAccountExists());
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/corporate-create")
+    public ResponseEntity<?> createCorporateAccount(@RequestBody Admin admin) {
+        if (admin == null || admin.getEmail() == null || admin.getEmail().trim().isEmpty()
+                || admin.getPassword() == null || admin.getPassword().isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", "Gmail and password are required"));
+        }
+        if (adminService.corporateAccountExists()) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
+                    "success", false,
+                    "message", "The corporate account has already been created."));
+        }
+
+        admin.setRole("ADMIN");
+        admin.setName("NeoBank Corporate Headquarters");
+        Admin saved = adminService.saveAdmin(admin);
+        return ResponseEntity.ok(Map.of("success", true, "message", "Corporate account created", "admin", createSafeAdminResponse(saved)));
+    }
     
     /**
      * Check if admin profile is complete

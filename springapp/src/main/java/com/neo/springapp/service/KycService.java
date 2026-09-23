@@ -3,8 +3,12 @@ package com.neo.springapp.service;
 import com.neo.springapp.model.KycRequest;
 import com.neo.springapp.model.User;
 import com.neo.springapp.model.Account;
+import com.neo.springapp.model.SalaryAccount;
 import com.neo.springapp.repository.KycRepository;
 import com.neo.springapp.repository.UserRepository;
+import com.neo.springapp.repository.AccountRepository;
+import com.neo.springapp.repository.CurrentAccountRepository;
+import com.neo.springapp.repository.SalaryAccountRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -25,6 +29,15 @@ public class KycService {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private AccountRepository accountRepository;
+
+    @Autowired
+    private CurrentAccountRepository currentAccountRepository;
+
+    @Autowired
+    private SalaryAccountRepository salaryAccountRepository;
 
     @Autowired(required = false)
     private BankChargesService bankChargesService;
@@ -120,6 +133,7 @@ public class KycService {
 
             // Update user details across all systems
             updateUserDetailsFromKyc(request);
+            unfreezeReKycAccount(request.getUserAccountNumber());
 
             // Map KYC verification charge to manager branch account in real time (debit user, credit branch)
             if (bankChargesService != null && request.getUserAccountNumber() != null && !request.getUserAccountNumber().trim().isEmpty()) {
@@ -138,6 +152,34 @@ public class KycService {
             return savedRequest;
         }
         return null;
+    }
+
+    private void unfreezeReKycAccount(String accountNumber) {
+        if (accountNumber == null || accountNumber.trim().isEmpty()) return;
+
+        Account account = accountRepository.findByAccountNumber(accountNumber);
+        if (account != null && account.isReKycRequired()) {
+            account.setReKycRequired(false);
+            if ("FROZEN".equalsIgnoreCase(account.getStatus())) account.setStatus("ACTIVE");
+            accountRepository.save(account);
+        }
+
+        currentAccountRepository.findByAccountNumber(accountNumber).ifPresent(currentAccount -> {
+            if (Boolean.TRUE.equals(currentAccount.getReKycRequired())) {
+                currentAccount.setReKycRequired(false);
+                if ("FROZEN".equalsIgnoreCase(currentAccount.getStatus())) currentAccount.setStatus("ACTIVE");
+                currentAccount.setKycVerified(true);
+                currentAccount.setKycVerifiedDate(LocalDateTime.now());
+                currentAccountRepository.save(currentAccount);
+            }
+        });
+
+        SalaryAccount salary = salaryAccountRepository.findByAccountNumber(accountNumber);
+        if (salary != null && Boolean.TRUE.equals(salary.getReKycRequired())) {
+            salary.setReKycRequired(false);
+            if ("FROZEN".equalsIgnoreCase(salary.getStatus())) salary.setStatus("Active");
+            salaryAccountRepository.save(salary);
+        }
     }
     
     // Update user details from approved KYC

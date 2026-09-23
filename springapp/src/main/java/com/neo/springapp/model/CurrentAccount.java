@@ -69,6 +69,7 @@ public class CurrentAccount {
 
     // KYC
     private Boolean kycVerified = false;
+    private Boolean reKycRequired = false;
     private LocalDateTime kycVerifiedDate;
     private String kycVerifiedBy;
 

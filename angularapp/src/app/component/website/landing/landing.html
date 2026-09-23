@@ -37,7 +37,7 @@
         <div class="nav-item dropdown">
           <a href="#" class="nav-link" (click)="toggleBusinessDropdown($event)">Business <span class="chevron">▾</span></a>
           <div class="dropdown-menu" [class.show]="showBusinessDropdown">
-            <a href="#" class="dropdown-item" (click)="goTo('admin/login', $event)">Corporate Login</a>
+            <a href="#" class="dropdown-item" (click)="goTo('admin/login', $event)">Corporate Headquarters Login</a>
             <a href="#" class="dropdown-item" (click)="goTo('website/merchant-login', $event)">Merchant Login</a>
             <a href="#" class="dropdown-item" (click)="goTo('website/agent-login', $event)">Agent Login</a>
             <a href="#" class="dropdown-item" (click)="goTo('website/pg-login', $event)">Payment Gateway Login</a>
@@ -158,6 +158,23 @@
         <div class="floating-card fc-3">
           <div><strong>Secured</strong><small>256-bit encrypted</small></div>
         </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="headquarters-section" id="corporate">
+    <div class="headquarters-container">
+      <div class="headquarters-mark" aria-hidden="true">HQ</div>
+      <div>
+        <span class="section-badge">Corporate Banking</span>
+        <h2 class="section-title">NeoBank Headquarters</h2>
+        <p class="section-desc">A secure command centre for bank operations, customer services, risk controls, and business growth.</p>
+        <button class="btn-glow" (click)="goTo('admin/login', $event)">Corporate Login</button>
+      </div>
+      <div class="headquarters-details">
+        <div><strong>24/7</strong><span>Operations monitoring</span></div>
+        <div><strong>Secure</strong><span>Admin-grade access</span></div>
+        <div><strong>One team</strong><span>Unified oversight</span></div>
       </div>
     </div>
   </section>
