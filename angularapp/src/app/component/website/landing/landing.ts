@@ -130,6 +130,17 @@ export class Landing implements OnInit, OnDestroy {
     this.showInvestInsureDropdown = false;
   }
 
+  goToAdminRole(role: 'ADMIN' | 'MANAGER', event?: Event) {
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+    this.router.navigate(['/admin/login'], { queryParams: { role } });
+    this.showPersonalDropdown = false;
+    this.showBusinessDropdown = false;
+    this.showInvestInsureDropdown = false;
+  }
+
   @HostListener('document:click', ['$event'])
   onDocumentClick(event: Event) {
     const target = event.target as HTMLElement;

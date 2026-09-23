@@ -53,8 +53,8 @@
       </div>
 
       <div class="nav-actions">
-        <button class="btn-ghost" routerLink="/admin/login" [queryParams]="{ role: 'ADMIN' }">Admin Login</button>
-        <button class="btn-manager" routerLink="/admin/login" [queryParams]="{ role: 'MANAGER' }">Manager Login</button>
+        <button class="btn-ghost" (click)="goToAdminRole('ADMIN', $event)">Admin Login</button>
+        <button class="btn-manager" (click)="goToAdminRole('MANAGER', $event)">Manager Login</button>
         <button class="btn-hod" (click)="goTo('hod/login', $event)">HOD Login</button>
         <button class="btn-fasttag" (click)="goTo('website/fasttag-login', $event)">FASTag Login</button>
         <button class="btn-merchant" (click)="goTo('website/merchant-login', $event)">Merchant Login</button>
