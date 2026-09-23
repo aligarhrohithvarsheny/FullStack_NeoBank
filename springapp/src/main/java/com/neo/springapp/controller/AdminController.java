@@ -211,6 +211,36 @@ public class AdminController {
         response.put("admin", createSafeAdminResponse(loggedIn));
         return ResponseEntity.ok(response);
     }
+
+    @PostMapping("/hod-reset-password")
+    public ResponseEntity<Map<String, Object>> resetHodPassword(@RequestBody Map<String, String> credentials) {
+        String email = credentials != null && credentials.get("email") != null
+                ? credentials.get("email").trim().toLowerCase() : null;
+        String password = credentials != null ? credentials.get("password") : null;
+        Map<String, Object> response = new HashMap<>();
+        if (email == null || email.isBlank() || password == null || password.isBlank()) {
+            response.put("success", false);
+            response.put("message", "HOD Gmail and new password are required");
+            return ResponseEntity.badRequest().body(response);
+        }
+
+        Admin hod = adminService.getAdminByEmail(email);
+        if (hod == null || hod.getRole() == null || !"HOD".equalsIgnoreCase(hod.getRole())) {
+            response.put("success", false);
+            response.put("message", "No HOD account exists for this Gmail");
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+        }
+
+        hod.setPassword(password);
+        hod.setAccountLocked(false);
+        hod.setFailedLoginAttempts(0);
+        hod.setLastFailedLoginTime(null);
+        Admin saved = adminService.saveAdmin(hod);
+        response.put("success", true);
+        response.put("message", "HOD password reset successfully. You can now login.");
+        response.put("admin", createSafeAdminResponse(saved));
+        return ResponseEntity.ok(response);
+    }
     
     /**
      * Check if admin profile is complete

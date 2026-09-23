@@ -23,6 +23,7 @@ export class HodLogin {
   isLoading = false;
   isCreating = false;
   showCreateAccount = false;
+  showResetPassword = false;
   showCreateAccountButton = true;
 
   constructor(
@@ -112,6 +113,38 @@ export class HodLogin {
           this.showCreateAccountButton = false;
           this.showCreateAccount = false;
         }
+      }
+    });
+  }
+
+  resetPassword(): void {
+    if (this.isCreating) return;
+    if (!this.email.trim() || !this.createPassword || !this.confirmPassword) {
+      this.errorMessage = 'Enter your HOD Gmail and both new password fields';
+      return;
+    }
+    if (this.createPassword !== this.confirmPassword) {
+      this.errorMessage = 'Passwords do not match';
+      return;
+    }
+
+    this.isCreating = true;
+    this.errorMessage = '';
+    this.http.post<any>(`${environment.apiBaseUrl}/api/admins/hod-reset-password`, {
+      email: this.email.trim(),
+      password: this.createPassword
+    }).subscribe({
+      next: response => {
+        this.isCreating = false;
+        this.showResetPassword = false;
+        this.createPassword = '';
+        this.confirmPassword = '';
+        this.password = '';
+        this.alertService.loginSuccess(response?.message || 'HOD password reset. Please sign in.');
+      },
+      error: err => {
+        this.isCreating = false;
+        this.errorMessage = err.error?.message || 'Unable to reset HOD password';
       }
     });
   }

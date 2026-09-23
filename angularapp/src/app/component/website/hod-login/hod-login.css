@@ -27,4 +27,8 @@
 .secondary-button { margin-top: 12px; background: transparent; color: #0e7490; border: 1px solid #bae6fd; }
 .create-account-button { display: block; visibility: visible; opacity: 1; }
 .hod-account-note { margin: 14px 0 0; color: #64748b; font-size: 13px; }
+.hod-reset-panel { margin-top: 20px; padding-top: 20px; border-top: 1px solid #dbe7e8; text-align: left; }
+.hod-reset-panel h2 { margin: 0 0 8px; font-size: 18px; color: #0f172a; }
+.hod-reset-panel p { margin: 0 0 14px; color: #64748b; font-size: 13px; }
+.hod-reset-panel button { width: 100%; margin-top: 10px; }
 .hod-error { margin: 14px 0 0; color: #b91c1c; font-size: 13px; }
