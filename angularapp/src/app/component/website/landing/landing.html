@@ -28,6 +28,7 @@
           <a href="#" class="nav-link" (click)="togglePersonalDropdown($event)">Personal <span class="chevron">▾</span></a>
           <div class="dropdown-menu" [class.show]="showPersonalDropdown">
             <a href="#" class="dropdown-item" (click)="goTo('website/createaccount', $event)">Create Account</a>
+            <a href="#" class="dropdown-item" (click)="goTo('website/personal-kyc', $event)">Personal KYC</a>
             <a href="#" class="dropdown-item" (click)="goTo('website/user', $event)">User Login</a>
             <a href="#" class="dropdown-item" (click)="goTo('website/user', $event)">Internet Banking</a>
             <a href="#" class="dropdown-item" (click)="goTo('website/fasttag-login', $event)">FASTag Login</a>
@@ -62,7 +63,7 @@
   </nav>
 
   <aside class="mobile-login-bar" aria-label="Login options">
-    <button type="button" class="mobile-login-button user-login" routerLink="/website/user" aria-label="User login">User</button>
+    <a class="mobile-login-button user-login" href="https://neo-bank-669.web.app/website/user" aria-label="User login">User Login</a>
     <button type="button" class="mobile-login-button fasttag-login" (click)="goTo('website/fasttag-login', $event)" aria-label="FASTag login">FASTag</button>
     <button type="button" class="mobile-login-button merchant-login" (click)="goTo('website/merchant-login', $event)" aria-label="Merchant login">Merchant</button>
     <button type="button" class="mobile-login-button agent-login" (click)="goTo('website/agent-login', $event)" aria-label="Agent login">Agent</button>

@@ -4,6 +4,10 @@ import com.neo.springapp.model.KycRequest;
 import com.neo.springapp.service.KycService;
 import com.neo.springapp.service.EmailService;
 import com.neo.springapp.service.OtpService;
+import com.neo.springapp.model.Account;
+import com.neo.springapp.model.User;
+import com.neo.springapp.repository.AccountRepository;
+import com.neo.springapp.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpHeaders;
@@ -30,6 +34,107 @@ public class KycController {
     
     @Autowired
     private OtpService otpService;
+
+    @Autowired
+    private AccountRepository accountRepository;
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @GetMapping("/personal/lookup")
+    public ResponseEntity<Map<String, Object>> lookupPersonalKyc(
+            @RequestParam String customerId,
+            @RequestParam String accountNumber,
+            @RequestParam String dob) {
+        Account account = accountRepository.findByCustomerId(customerId.trim());
+        if (account == null || !accountNumber.trim().equals(account.getAccountNumber())
+                || !sameDate(dob, account.getDob())) {
+            return ResponseEntity.status(404).body(Map.of("message", "The details could not be verified."));
+        }
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("verified", true);
+        result.put("lastName", lastName(account.getName()));
+        result.put("maskedCustomerId", mask(account.getCustomerId(), 2));
+        result.put("maskedAccountNumber", mask(account.getAccountNumber(), 4));
+        result.put("maskedPanNumber", mask(account.getPan(), 4));
+        result.put("maskedAadharNumber", mask(account.getAadharNumber(), 4));
+        result.put("maskedPhone", mask(account.getPhone(), 4));
+        return ResponseEntity.ok(result);
+    }
+
+    @PostMapping(value = "/personal/submit", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<Map<String, Object>> submitPersonalKyc(
+            @RequestParam String customerId,
+            @RequestParam String accountNumber,
+            @RequestParam String dob,
+            @RequestParam String panNumber,
+            @RequestParam("panDocument") MultipartFile panDocument,
+            @RequestParam("aadharDocument") MultipartFile aadharDocument) {
+        try {
+            Account account = accountRepository.findByCustomerId(customerId.trim());
+            if (account == null || !accountNumber.trim().equals(account.getAccountNumber())
+                    || !sameDate(dob, account.getDob())) {
+                return ResponseEntity.badRequest().body(Map.of("message", "The details could not be verified."));
+            }
+            if (panDocument.isEmpty() || !"application/pdf".equalsIgnoreCase(panDocument.getContentType())) {
+                return ResponseEntity.badRequest().body(Map.of("message", "PAN document must be a PDF."));
+            }
+            if (aadharDocument.isEmpty() || !isSupportedDocument(aadharDocument)) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Aadhaar document is mandatory and must be PDF, JPG, or PNG."));
+            }
+            if (panDocument.getSize() > 5 * 1024 * 1024 || aadharDocument.getSize() > 5 * 1024 * 1024) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Each document must be 5MB or smaller."));
+            }
+            User user = userRepository.findByAccountNumber(account.getAccountNumber()).orElse(null);
+            if (user == null) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Customer account could not be found."));
+            }
+
+            KycRequest request = new KycRequest();
+            request.setPanNumber(panNumber.trim().toUpperCase());
+            request.setName(account.getName());
+            request.setUserId(String.valueOf(user.getId()));
+            request.setUserName(account.getName());
+            request.setUserEmail(user.getEmail());
+            request.setUserAccountNumber(account.getAccountNumber());
+            request.setStatus("Pending");
+            request.setPanDocument(panDocument.getBytes());
+            request.setPanDocumentType(panDocument.getContentType());
+            request.setPanDocumentName(panDocument.getOriginalFilename());
+            request.setAadharDocument(aadharDocument.getBytes());
+            request.setAadharDocumentType(aadharDocument.getContentType());
+            request.setAadharDocumentName(aadharDocument.getOriginalFilename());
+            KycRequest saved = kycService.saveKycRequest(request);
+            return ResponseEntity.ok(Map.of("success", true, "requestId", saved.getId(),
+                    "message", "Your KYC details were submitted for admin approval."));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("message", "Unable to submit KYC details."));
+        }
+    }
+
+    private boolean sameDate(String supplied, String stored) {
+        return supplied != null && stored != null
+                && supplied.replaceAll("[^0-9]", "").equals(stored.replaceAll("[^0-9]", ""));
+    }
+
+    private String lastName(String name) {
+        if (name == null || name.trim().isEmpty()) return "-";
+        String[] parts = name.trim().split("\\s+");
+        return parts[parts.length - 1];
+    }
+
+    private String mask(String value, int visible) {
+        if (value == null || value.isEmpty()) return "-";
+        int keep = Math.min(visible, value.length());
+        return "*".repeat(Math.max(0, value.length() - keep)) + value.substring(value.length() - keep);
+    }
+
+    private boolean isSupportedDocument(MultipartFile file) {
+        String type = file.getContentType();
+        return "application/pdf".equalsIgnoreCase(type) || "image/jpeg".equalsIgnoreCase(type)
+                || "image/jpg".equalsIgnoreCase(type) || "image/png".equalsIgnoreCase(type);
+    }
 
     // Check if user has existing KYC requests (to determine if OTP is needed)
     @GetMapping("/check-existing/{userAccountNumber}")

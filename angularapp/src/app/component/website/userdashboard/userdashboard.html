@@ -16,7 +16,7 @@
     <div class="cb-topnav-inner">
       <!-- Left: Menu + Logo -->
       <div class="cb-topnav-left">
-        <button class="cb-menu-btn" (click)="selectFeature(null)" title="Home">
+        <button type="button" class="cb-menu-btn" (click)="toggleSidebar()" [attr.aria-expanded]="isSidebarOpen" aria-label="Open features menu" title="Features menu">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22">
             <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
           </svg>
@@ -87,7 +87,7 @@
   </div>
 
   <!-- ═══ SERVICES ICON STRIP (Canara Bank Style) ═══ -->
-  <div class="cb-icon-strip">
+  <div class="cb-icon-strip" [class.open]="isSidebarOpen">
     <div class="cb-icon-strip-inner">
       <div class="cb-strip-item" [class.active]="!selectedFeature" (click)="selectFeature(null)">
         <div class="cb-strip-icon">

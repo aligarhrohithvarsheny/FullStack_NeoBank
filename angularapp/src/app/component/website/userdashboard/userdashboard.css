@@ -212,6 +212,9 @@
   background: transparent; border: none;
   padding: 8px; cursor: pointer; color: var(--text2);
   border-radius: 8px; transition: all 0.2s;
+  position: relative;
+  z-index: 600;
+  pointer-events: auto;
 }
 .cb-menu-btn:hover { background: var(--purple-pale); color: var(--purple); }
 .cb-menu-btn span { display: none; }

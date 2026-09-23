@@ -4568,6 +4568,7 @@
           <option value="type">Sort: Account Type</option>
         </select>
         <select class="pb-status-filter" [(ngModel)]="passbookStatusFilter" (change)="filterPassbookAccounts()">
+          <option value="active">Opened</option>
           <option value="all">All Status</option>
           <option value="active">Active</option>
           <option value="frozen">Frozen</option>
@@ -4613,6 +4614,7 @@
             <th class="th-phone">Phone</th>
             <th class="th-type">Account Type</th>
             <th class="th-bal" (click)="sortPassbookBy('balance')">Balance (₹) <i class="fa fa-sort"></i></th>
+            <th class="th-status">Passbooks Generated</th>
             <th class="th-status">Status</th>
             <th class="th-actions">Actions</th>
           </tr>
@@ -4636,6 +4638,7 @@
             <td class="td-bal">
               <span class="bal-amount" [class.bal-zero]="acc.balance === 0">₹ {{ acc.balance | number:'1.2-2' }}</span>
             </td>
+            <td class="td-status">{{ acc.passbookGenerationCount || 0 }}</td>
             <td class="td-status">
               <span class="pb-status-pill" [ngClass]="'pb-status-' + (acc.status || 'active').toLowerCase()">
                 <i class="fa fa-circle"></i> {{ acc.status || 'Active' }}

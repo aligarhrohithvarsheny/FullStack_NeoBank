@@ -21,6 +21,7 @@ import { Loan } from './component/website/loan/loan';
 import { Card } from './component/website/card/card';
 import { Transaction } from './component/website/transaction/transaction';
 import { Kycupdate } from './component/website/kycupdate/kycupdate';
+import { PersonalKyc } from './component/website/personal-kyc/personal-kyc';
 import { Profile } from './component/website/profile/profile';
 import { ChequeComponent } from './component/website/cheque/cheque';
 import { Goldloan } from './component/website/goldloan/goldloan';
@@ -127,6 +128,7 @@ export const routes: Routes = [
       { path: 'transaction', component: Transaction, canActivate: [userAuthGuard] },
       { path: 'landing', component: Landing },
       { path: 'kycupdate', component: Kycupdate, canActivate: [userAuthGuard] },
+      { path: 'personal-kyc', component: PersonalKyc },
       { path: 'profile', component: Profile, canActivate: [userAuthGuard] },
       { path: 'cheque', component: ChequeComponent, canActivate: [userAuthGuard] },
       { path: 'positive-pay', component: PositivePayComponent, canActivate: [positivePayAuthGuard] },

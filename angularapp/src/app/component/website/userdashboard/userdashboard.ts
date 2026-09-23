@@ -69,6 +69,7 @@ import { of } from 'rxjs';
 export class Userdashboard implements OnInit, OnDestroy {
   username: string = 'User'; // default
   selectedFeature: string | null = null;
+  isSidebarOpen = false;
   currentBalance: number = 0;
   userAccountNumber: string = '';
   loading: boolean = false;
@@ -488,7 +489,12 @@ export class Userdashboard implements OnInit, OnDestroy {
     }
   }
   
+  toggleSidebar() {
+    this.isSidebarOpen = !this.isSidebarOpen;
+  }
+
   selectFeature(feature: string | null) {
+    this.isSidebarOpen = false;
     if (feature === 'positive-pay') {
       this.router.navigate(['/website/positive-pay']);
       return;

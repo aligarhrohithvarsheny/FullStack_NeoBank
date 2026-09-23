@@ -5,8 +5,8 @@
 .jpm-login-page {
   display: flex;
   min-height: 100vh;
-  font-family: 'Georgia', 'Times New Roman', Times, serif;
-  background: #ffffff;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: linear-gradient(135deg, #f2feff 0%, #edf7ff 38%, #eef3ff 100%);
 }
 
 /* â”€â”€â”€ Left Section: Form Area â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
@@ -16,7 +16,8 @@
   flex-direction: column;
   justify-content: space-between;
   padding: 60px 80px 30px 80px;
-  background: #ffffff;
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(8px);
   min-height: 100vh;
   box-sizing: border-box;
 }
@@ -31,26 +32,117 @@
 
 /* â”€â”€â”€ Brand / Logo â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .jpm-brand {
-  margin-bottom: 50px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.jpm-brand-mark {
+  width: 72px;
+  height: 72px;
+  border-radius: 20px;
+  background: linear-gradient(135deg, #d9fbff 0%, #7feaf9 24%, #1ecad8 54%, #0b74b3 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 16px 32px rgba(18, 180, 198, 0.28);
+  overflow: hidden;
+  border: 1px solid rgba(11, 116, 179, 0.12);
+}
+
+.jpm-brand-mark img {
+  width: 54px;
+  height: 54px;
+  object-fit: contain;
+  filter: drop-shadow(0 8px 18px rgba(11, 116, 179, 0.18));
+}
+
+.jpm-brand-copy {
+  display: flex;
+  flex-direction: column;
 }
 
 .jpm-logo-text {
-  font-family: 'Georgia', 'Times New Roman', Times, serif;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   font-size: 36px;
-  font-weight: 700;
-  color: #1a1a1a;
-  letter-spacing: 1px;
-  margin: 0 0 4px 0;
+  font-weight: 800;
+  color: #0b152c;
+  letter-spacing: -0.04em;
+  margin: 0 0 2px 0;
 }
 
 .jpm-sub-brand {
   display: block;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   font-size: 11px;
-  font-weight: 600;
-  color: #1a1a1a;
+  font-weight: 700;
+  color: #0d6ba7;
   letter-spacing: 3px;
   text-transform: uppercase;
+}
+
+.jpm-brand-panel {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 8px;
+  width: fit-content;
+  max-width: 420px;
+  margin-bottom: 18px;
+  padding: 10px 14px;
+  border: 1px solid rgba(30, 202, 216, 0.2);
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(31, 202, 216, 0.08), rgba(11, 116, 179, 0.08));
+}
+
+.jpm-panel-badge {
+  display: inline-block;
+  width: fit-content;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #071422 0%, #0c3d7d 44%, #1ecad8 100%);
+  color: #f8fbff;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.jpm-brand-panel p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #46536d;
+}
+
+.jpm-security-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 26px;
+}
+
+.jpm-security-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.04);
+  border: 1px solid rgba(10, 169, 191, 0.12);
+  color: #1e3a5f;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.jpm-security-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #1ecad8 0%, #0f7fd4 100%);
+  box-shadow: 0 0 0 3px rgba(30, 202, 216, 0.12);
 }
 
 /* â”€â”€â”€ Form Section â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
@@ -172,22 +264,24 @@
 /* â”€â”€â”€ Sign In Button â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .jpm-signin-btn {
   display: inline-block;
-  padding: 14px 36px;
-  background: #3d3d3d;
+  padding: 15px 36px;
+  background: linear-gradient(135deg, #0f172a 0%, #1d4ed8 38%, #06b6d4 100%);
   color: #ffffff;
   border: none;
-  border-radius: 28px;
+  border-radius: 18px;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   font-size: 15px;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
-  transition: background 0.2s ease, transform 0.1s ease;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
   margin-top: 8px;
+  box-shadow: 0 14px 28px rgba(37, 99, 235, 0.28);
 }
 
 .jpm-signin-btn:hover:not(:disabled) {
-  background: #2a2a2a;
   transform: translateY(-1px);
+  box-shadow: 0 18px 32px rgba(37, 99, 235, 0.32);
+  filter: brightness(1.04);
 }
 
 .jpm-signin-btn:active:not(:disabled) {
@@ -482,57 +576,123 @@
 .jpm-right-section {
   flex: 0 0 45%;
   position: relative;
-  background: linear-gradient(135deg, #d4c5a9 0%, #b8a88a 30%, #8b7b6b 60%, #6b5b4b 100%);
-  background-image: url('data:image/svg+xml,\
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 1200">\
-      <defs>\
-        <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">\
-          <stop offset="0%25" stop-color="%23d4c5a9"/>\
-          <stop offset="50%25" stop-color="%23b0a08a"/>\
-          <stop offset="100%25" stop-color="%238b7b6b"/>\
-        </linearGradient>\
-        <linearGradient id="col" x1="0" y1="0" x2="0" y2="1">\
-          <stop offset="0%25" stop-color="%23e8dcc8"/>\
-          <stop offset="50%25" stop-color="%23d4c5a9"/>\
-          <stop offset="100%25" stop-color="%23c0b090"/>\
-        </linearGradient>\
-        <linearGradient id="shadow" x1="0" y1="0" x2="1" y2="0">\
-          <stop offset="0%25" stop-color="%23000" stop-opacity="0.15"/>\
-          <stop offset="100%25" stop-color="%23000" stop-opacity="0"/>\
-        </linearGradient>\
-        <linearGradient id="light" x1="1" y1="0" x2="0" y2="0">\
-          <stop offset="0%25" stop-color="%23fff" stop-opacity="0.3"/>\
-          <stop offset="100%25" stop-color="%23fff" stop-opacity="0"/>\
-        </linearGradient>\
-      </defs>\
-      <rect width="800" height="1200" fill="url(%23bg)"/>\
-      <rect x="80" y="0" width="100" height="1200" fill="url(%23col)" rx="8"/>\
-      <rect x="80" y="0" width="15" height="1200" fill="url(%23shadow)"/>\
-      <rect x="165" y="0" width="15" height="1200" fill="url(%23light)"/>\
-      <rect x="250" y="0" width="110" height="1200" fill="url(%23col)" rx="8"/>\
-      <rect x="250" y="0" width="15" height="1200" fill="url(%23shadow)"/>\
-      <rect x="345" y="0" width="15" height="1200" fill="url(%23light)"/>\
-      <rect x="440" y="0" width="100" height="1200" fill="url(%23col)" rx="8"/>\
-      <rect x="440" y="0" width="15" height="1200" fill="url(%23shadow)"/>\
-      <rect x="525" y="0" width="15" height="1200" fill="url(%23light)"/>\
-      <rect x="620" y="0" width="110" height="1200" fill="url(%23col)" rx="8"/>\
-      <rect x="620" y="0" width="15" height="1200" fill="url(%23shadow)"/>\
-      <rect x="715" y="0" width="15" height="1200" fill="url(%23light)"/>\
-      <rect x="380" y="0" width="80" height="1200" fill="%23fff" opacity="0.08"/>\
-      <rect x="0" y="1100" width="800" height="100" fill="url(%23col)" opacity="0.5"/>\
-    </svg>');
-  background-size: cover;
-  background-position: center;
+  background: linear-gradient(135deg, #0f172a 0%, #1f2a7a 28%, #1d4ed8 62%, #0ea5e9 100%);
   overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.jpm-right-section::before,
+.jpm-right-section::after {
+  content: '';
+  position: absolute;
+  inset: auto;
+  border-radius: 50%;
+  filter: blur(12px);
+  opacity: 0.32;
+}
+
+.jpm-right-section::before {
+  width: 420px;
+  height: 420px;
+  background: rgba(255, 226, 125, 0.35);
+  top: -90px;
+  right: -120px;
+}
+
+.jpm-right-section::after {
+  width: 480px;
+  height: 480px;
+  background: rgba(34, 211, 238, 0.26);
+  bottom: -140px;
+  left: -120px;
 }
 
 .jpm-image-overlay {
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.05) 100%);
+  inset: 0;
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.06) 0%, rgba(15, 23, 42, 0.3) 100%);
+}
+
+.jpm-hero-card {
+  position: relative;
+  z-index: 1;
+  width: min(78%, 420px);
+  background: rgba(10, 16, 34, 0.38);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 30px;
+  padding: 32px 28px;
+  box-shadow: 0 30px 50px rgba(3, 7, 18, 0.25);
+  backdrop-filter: blur(10px);
+}
+
+.jpm-hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #ebf3ff;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.jpm-hero-badge::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #facc15;
+  box-shadow: 0 0 10px rgba(250, 204, 21, 0.7);
+}
+
+.jpm-hero-card h2 {
+  margin: 22px 0 10px;
+  font-size: clamp(2rem, 3vw, 3rem);
+  line-height: 1.05;
+  letter-spacing: -0.06em;
+  color: #f8fbff;
+  font-weight: 800;
+}
+
+.jpm-hero-card p {
+  margin: 0 0 28px;
+  color: rgba(226, 232, 240, 0.95);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.jpm-hero-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(110px, 1fr));
+  gap: 14px;
+}
+
+.jpm-stat-box {
+  padding: 16px 14px;
+  border-radius: 18px;
+  background: rgba(15, 23, 42, 0.25);
+  border: 1px solid rgba(148, 163, 184, 0.24);
+}
+
+.jpm-stat-box strong {
+  display: block;
+  color: #f8fbff;
+  font-size: 22px;
+  line-height: 1.1;
+  margin-bottom: 5px;
+}
+
+.jpm-stat-box span {
+  color: rgba(191, 219, 254, 0.9);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 /* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•

@@ -78,6 +78,8 @@ public class SalaryAccount {
 
     private String status = "Active";
 
+    private Integer passbookGenerationCount = 0;
+
     @JsonIgnore
     private String password;
 

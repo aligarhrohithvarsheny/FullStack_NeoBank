@@ -1,0 +1,39 @@
+<main class="personal-kyc-page">
+  <section class="kyc-panel">
+    <button class="back-button" type="button" (click)="goBack()">Back to NeoBank</button>
+    <p class="eyebrow">Personal banking</p>
+    <h1>Update your KYC</h1>
+    <p class="intro">Verify your account to review masked details, then submit your latest documents for admin approval.</p>
+
+    <form class="kyc-form" (ngSubmit)="lookup()">
+      <div class="field-grid">
+        <label>Customer ID<input name="customerId" [(ngModel)]="customerId" required placeholder="Enter Customer ID"></label>
+        <label>Account number<input name="accountNumber" [(ngModel)]="accountNumber" required placeholder="Enter account number"></label>
+        <label>Date of birth<input name="dob" [(ngModel)]="dob" required type="date"></label>
+      </div>
+      <button class="primary-button" type="submit" [disabled]="loading">{{ loading ? 'Checking...' : 'Fetch masked details' }}</button>
+    </form>
+
+    <div *ngIf="accountSummary" class="verified-summary">
+      <div class="summary-heading"><span class="verified-mark">✓</span><div><strong>Account verified</strong><small>Only masked information is shown</small></div></div>
+      <div class="summary-grid">
+        <span>Last name<strong>{{ accountSummary.lastName }}</strong></span>
+        <span>Customer ID<strong>{{ accountSummary.maskedCustomerId }}</strong></span>
+        <span>Account number<strong>{{ accountSummary.maskedAccountNumber }}</strong></span>
+        <span>PAN on record<strong>{{ accountSummary.maskedPanNumber }}</strong></span>
+        <span>Aadhaar on record<strong>{{ accountSummary.maskedAadharNumber }}</strong></span>
+        <span>Phone<strong>{{ accountSummary.maskedPhone }}</strong></span>
+      </div>
+
+      <form class="document-form" (ngSubmit)="submit()">
+        <label>PAN number<input name="panNumber" [(ngModel)]="panNumber" required maxlength="10" placeholder="Enter PAN number"></label>
+        <label>PAN PDF <span class="required">required</span><input type="file" accept="application/pdf,.pdf" (change)="selectFile($event, 'pan')" required></label>
+        <label>Aadhaar document <span class="required">mandatory</span><input type="file" accept="application/pdf,image/jpeg,image/png,.pdf,.jpg,.jpeg,.png" (change)="selectFile($event, 'aadhar')" required></label>
+        <button class="primary-button" type="submit" [disabled]="submitting">{{ submitting ? 'Submitting...' : 'Submit KYC details' }}</button>
+      </form>
+    </div>
+
+    <p *ngIf="error" class="message error">{{ error }}</p>
+    <p *ngIf="success" class="message success">{{ success }}</p>
+  </section>
+</main>

@@ -81,6 +81,8 @@ public class PassbookController {
                 accountInfo.put("aadharNumber", ca.getAadharNumber());
                 accountInfo.put("balance", ca.getBalance());
                 accountInfo.put("modeOfOperation", "Single");
+                ca.setPassbookGenerationCount((ca.getPassbookGenerationCount() == null ? 0 : ca.getPassbookGenerationCount()) + 1);
+                currentAccountRepository.save(ca);
                 break;
 
             case "salary":
@@ -100,6 +102,8 @@ public class PassbookController {
                 accountInfo.put("aadharNumber", sa.getAadharNumber());
                 accountInfo.put("balance", sa.getBalance());
                 accountInfo.put("modeOfOperation", "Single");
+                sa.setPassbookGenerationCount((sa.getPassbookGenerationCount() == null ? 0 : sa.getPassbookGenerationCount()) + 1);
+                salaryAccountRepository.save(sa);
                 break;
 
             default: // savings
@@ -119,6 +123,8 @@ public class PassbookController {
                 accountInfo.put("aadharNumber", acc.getAadharNumber());
                 accountInfo.put("balance", acc.getBalance());
                 accountInfo.put("modeOfOperation", "Single");
+                acc.setPassbookGenerationCount((acc.getPassbookGenerationCount() == null ? 0 : acc.getPassbookGenerationCount()) + 1);
+                accountRepository.save(acc);
                 break;
         }
 
@@ -151,6 +157,7 @@ public class PassbookController {
         List<Account> savingsAccounts = accountService.getAllAccounts();
         if (savingsAccounts != null) {
             for (Account a : savingsAccounts) {
+                if ("DELETED".equalsIgnoreCase(a.getStatus())) continue;
                 Map<String, Object> row = new LinkedHashMap<>();
                 row.put("id", a.getId());
                 row.put("accountNumber", a.getAccountNumber());
@@ -160,6 +167,7 @@ public class PassbookController {
                 row.put("balance", a.getBalance());
                 row.put("status", a.getStatus());
                 row.put("customerId", a.getCustomerId());
+                row.put("passbookGenerationCount", a.getPassbookGenerationCount() == null ? 0 : a.getPassbookGenerationCount());
                 row.put("type", "savings");
                 result.add(row);
             }
@@ -169,6 +177,7 @@ public class PassbookController {
         List<CurrentAccount> currentAccounts = currentAccountRepository.findAll();
         if (currentAccounts != null) {
             for (CurrentAccount ca : currentAccounts) {
+                if ("DELETED".equalsIgnoreCase(ca.getStatus())) continue;
                 Map<String, Object> row = new LinkedHashMap<>();
                 row.put("id", ca.getId());
                 row.put("accountNumber", ca.getAccountNumber());
@@ -178,6 +187,7 @@ public class PassbookController {
                 row.put("balance", ca.getBalance());
                 row.put("status", ca.getStatus());
                 row.put("customerId", ca.getCustomerId());
+                row.put("passbookGenerationCount", ca.getPassbookGenerationCount() == null ? 0 : ca.getPassbookGenerationCount());
                 row.put("type", "current");
                 result.add(row);
             }
@@ -187,6 +197,7 @@ public class PassbookController {
         List<SalaryAccount> salaryAccounts = salaryAccountRepository.findAll();
         if (salaryAccounts != null) {
             for (SalaryAccount sa : salaryAccounts) {
+                if ("DELETED".equalsIgnoreCase(sa.getStatus())) continue;
                 Map<String, Object> row = new LinkedHashMap<>();
                 row.put("id", sa.getId());
                 row.put("accountNumber", sa.getAccountNumber());
@@ -196,6 +207,7 @@ public class PassbookController {
                 row.put("balance", sa.getBalance());
                 row.put("status", sa.getStatus());
                 row.put("customerId", sa.getCustomerId());
+                row.put("passbookGenerationCount", sa.getPassbookGenerationCount() == null ? 0 : sa.getPassbookGenerationCount());
                 row.put("type", "salary");
                 result.add(row);
             }

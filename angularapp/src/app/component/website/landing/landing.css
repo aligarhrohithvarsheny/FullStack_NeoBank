@@ -1047,12 +1047,16 @@ html { scroll-behavior: smooth; }
     backdrop-filter: blur(16px);
   }
   .mobile-login-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
     min-height: 34px;
     padding: 5px 2px;
     border: 0;
     border-radius: 7px;
     color: #fff;
     font: 600 0.62rem/1.1 var(--font-main);
+    text-decoration: none;
     cursor: pointer;
     transition: transform 0.2s ease, filter 0.2s ease;
   }

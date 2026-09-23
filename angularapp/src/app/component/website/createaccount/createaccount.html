@@ -732,6 +732,12 @@
 
   <!-- ==================== STEP 2: DOCUMENT UPLOAD ==================== -->
   <div *ngIf="currentStep === 2" class="step-content">
+    <div *ngIf="applicationNumber" class="application-download-banner">
+      <strong>Application ID: {{ applicationNumber }}</strong>
+      <button type="button" class="btn-secondary" (click)="downloadApplicationForm()">
+        <i class="fa fa-file-pdf"></i> Download Filled Application PDF
+      </button>
+    </div>
     <div class="document-upload-section">
       <p class="step-info"><i class="fa fa-info-circle"></i> Upload your Aadhaar and PAN documents for verification. Accepted formats: JPEG, PNG, PDF (Max 5MB each)</p>
 

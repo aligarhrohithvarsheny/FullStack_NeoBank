@@ -22,6 +22,8 @@ public class Account {
     private LocalDateTime lastUpdated;
     private String status = "ACTIVE"; // ACTIVE, INACTIVE, CLOSED
 
+    private Integer passbookGenerationCount = 0;
+
     @Column(unique = true, nullable = false)
     private String aadharNumber;
 

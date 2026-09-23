@@ -65,6 +65,8 @@ public class CurrentAccount {
     // Status
     private String status = "PENDING"; // PENDING, APPROVED, ACTIVE, FROZEN, CLOSED
 
+    private Integer passbookGenerationCount = 0;
+
     // KYC
     private Boolean kycVerified = false;
     private LocalDateTime kycVerifiedDate;

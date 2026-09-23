@@ -575,7 +575,7 @@ export class Dashboard implements OnInit, OnDestroy {
   paginatedPassbookAccounts: any[] = [];
   passbookSearchQuery: string = '';
   passbookAccountTypeFilter: string = 'all';
-  passbookStatusFilter: string = 'all';
+  passbookStatusFilter: string = 'active';
   passbookSortBy: string = 'name';
   isLoadingPassbookAccounts: boolean = false;
   passbookGeneratingFor: string = '';
@@ -589,6 +589,7 @@ export class Dashboard implements OnInit, OnDestroy {
   previewAccount: any = null;
   showPassbookHistoryModal: boolean = false;
   passbookDownloadHistory: any[] = [];
+  private passbookRefreshInterval: any = null;
 
   // Account Action Management
   showAccountActionModal: boolean = false;
@@ -1721,6 +1722,11 @@ export class Dashboard implements OnInit, OnDestroy {
       this.loadLoanPredictions();
     } else if (section === 'passbook') {
       this.loadPassbookAccounts();
+      if (!this.passbookRefreshInterval) {
+        this.passbookRefreshInterval = setInterval(() => {
+          if (this.activeSection === 'passbook' && !this.isLoadingPassbookAccounts) this.loadPassbookAccounts();
+        }, 10000);
+      }
     } else if (section === 'credit-cards') {
       // Navigate to separate credit card management page
       this.navigateTo('credit-cards');
@@ -6782,7 +6788,7 @@ export class Dashboard implements OnInit, OnDestroy {
           savings: accounts.filter((a: any) => a.type === 'savings').length,
           current: accounts.filter((a: any) => a.type === 'current').length,
           salary: accounts.filter((a: any) => a.type === 'salary').length,
-          total: accounts.length,
+          total: accounts.filter((a: any) => !['CLOSED', 'DELETED'].includes((a.status || '').toUpperCase())).length,
           frozen: accounts.filter((a: any) => (a.status || '').toUpperCase() === 'FROZEN').length,
           closed: accounts.filter((a: any) => (a.status || '').toUpperCase() === 'CLOSED').length
         };
@@ -6798,7 +6804,13 @@ export class Dashboard implements OnInit, OnDestroy {
   }
 
   filterPassbookAccounts() {
-    let filtered = [...this.passbookAccounts];
+    let filtered = this.passbookAccounts.filter(a => (a.status || '').toUpperCase() !== 'DELETED');
+
+    if (this.passbookStatusFilter === 'active') {
+      filtered = filtered.filter(a => (a.status || '').toUpperCase() !== 'CLOSED');
+    } else if (this.passbookStatusFilter === 'closed') {
+      filtered = this.passbookAccounts.filter(a => (a.status || '').toUpperCase() === 'CLOSED');
+    }
 
     // Filter by account type
     if (this.passbookAccountTypeFilter !== 'all') {
@@ -6999,8 +7011,10 @@ export class Dashboard implements OnInit, OnDestroy {
         // Add to history
         this.passbookDownloadHistory.unshift({
           ...account,
+          passbookGenerationCount: (account.passbookGenerationCount || 0) + 1,
           generatedAt: new Date().toLocaleString()
         });
+        account.passbookGenerationCount = (account.passbookGenerationCount || 0) + 1;
         this.alertService.success('Success', `Passbook generated for ${account.name} (${account.accountNumber})`);
       },
       error: (err) => {
@@ -7069,6 +7083,10 @@ export class Dashboard implements OnInit, OnDestroy {
   }
 
   ngOnDestroy() {
+    if (this.passbookRefreshInterval) {
+      clearInterval(this.passbookRefreshInterval);
+      this.passbookRefreshInterval = null;
+    }
     // Clear session timer
     if (this.sessionTimer) {
       clearInterval(this.sessionTimer);

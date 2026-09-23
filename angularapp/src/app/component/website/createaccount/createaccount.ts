@@ -41,6 +41,8 @@ export class Createaccount implements OnInit, OnDestroy {
   submitted = false;
   submitError = '';
   successMessage = '';
+  applicationId: number | null = null;
+  applicationNumber = '';
   loading = false;
   loadingMessage = 'Processing...';
   termsAccepted = false;
@@ -824,8 +826,8 @@ export class Createaccount implements OnInit, OnDestroy {
         this.successMessage = 'Registration successful! Please proceed to upload your documents.';
         this.submitted = false;
         
-        // Also submit user to backend for account creation tracking
-        this.submitUserToBackend(val);
+        // Keep a server-generated application number for the filled-form PDF.
+        this.createApplicationRecord(val);
         
         // Move to step 2 after a short delay
         setTimeout(() => {
@@ -837,6 +839,68 @@ export class Createaccount implements OnInit, OnDestroy {
         this.loading = false;
         this.submitError = err.error?.message || err.error?.error || 'Registration failed. Please try again.';
       }
+    });
+  }
+
+  private createApplicationRecord(val: any) {
+    const application = {
+      accountType: val.accountType || 'Savings',
+      fullName: val.name,
+      dateOfBirth: val.dob,
+      age: new Date().getFullYear() - new Date(val.dob).getFullYear(),
+      occupation: val.occupation || '',
+      income: Number(val.income) || 0,
+      phone: val.mobile,
+      email: val.email.toLowerCase(),
+      address: `${val.city || ''}, ${val.state || ''}`,
+      city: val.city,
+      state: val.state,
+      pincode: val.pincode || '',
+      aadharNumber: val.aadhar,
+      panNumber: val.pan.toUpperCase(),
+      businessName: val.businessName || '',
+      businessType: val.businessType || '',
+      businessRegistrationNumber: val.businessRegistrationNumber || '',
+      gstNumber: val.gstNumber || '',
+      shopAddress: val.shopAddress || '',
+      companyName: val.companyName || '',
+      companyId: val.companyId || '',
+      designation: val.designation || '',
+      monthlySalary: Number(val.monthlySalary) || 0,
+      salaryCreditDate: Number(val.salaryCreditDate) || 0,
+      employerAddress: val.employerAddress || '',
+      hrContactNumber: val.hrContactNumber || '',
+      branchName: val.branchName || val.salaryBranchName || 'NeoBank Main Branch',
+      ifscCode: val.ifscCode || val.salaryIfscCode || 'EZYV000123',
+      declarationAccepted: true,
+      createdBy: 'ONLINE_USER'
+    };
+
+    this.http.post<any>(`${environment.apiBaseUrl}/api/admin-account-applications/create`, application).subscribe({
+      next: (response) => {
+        const saved = response?.application;
+        this.applicationId = saved?.id || null;
+        this.applicationNumber = saved?.applicationNumber || '';
+        this.submitUserToBackend(val);
+      },
+      error: () => {
+        this.submitUserToBackend(val);
+      }
+    });
+  }
+
+  downloadApplicationForm() {
+    if (!this.applicationId) return;
+    this.http.get(`${environment.apiBaseUrl}/api/admin-account-applications/download-application/${this.applicationId}`, { responseType: 'blob' }).subscribe({
+      next: (blob) => {
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `NeoBank_Application_${this.applicationNumber || this.applicationId}.pdf`;
+        link.click();
+        window.URL.revokeObjectURL(url);
+      },
+      error: () => this.submitError = 'Unable to download the application form. Please try again.'
     });
   }
 
