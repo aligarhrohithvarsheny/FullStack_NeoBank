@@ -3,12 +3,22 @@ package com.neo.springapp.service;
 import com.neo.springapp.model.Account;
 import com.neo.springapp.model.AccountConversionRequest;
 import com.neo.springapp.model.AdminAuditLog;
+import com.neo.springapp.model.Cheque;
+import com.neo.springapp.model.CreditCard;
 import com.neo.springapp.model.CurrentAccount;
+import com.neo.springapp.model.DemandDraft;
+import com.neo.springapp.model.GoldLoan;
+import com.neo.springapp.model.Loan;
 import com.neo.springapp.model.SalaryAccount;
 import com.neo.springapp.repository.AccountConversionRequestRepository;
 import com.neo.springapp.repository.AccountRepository;
 import com.neo.springapp.repository.AdminAuditLogRepository;
+import com.neo.springapp.repository.ChequeRepository;
+import com.neo.springapp.repository.CreditCardRepository;
 import com.neo.springapp.repository.CurrentAccountRepository;
+import com.neo.springapp.repository.DemandDraftRepository;
+import com.neo.springapp.repository.GoldLoanRepository;
+import com.neo.springapp.repository.LoanRepository;
 import com.neo.springapp.repository.SalaryAccountRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -42,6 +52,21 @@ public class AccountConversionService {
 
     @Autowired
     private AdminAuditLogRepository adminAuditLogRepository;
+
+    @Autowired
+    private LoanRepository loanRepository;
+
+    @Autowired
+    private GoldLoanRepository goldLoanRepository;
+
+    @Autowired
+    private CreditCardRepository creditCardRepository;
+
+    @Autowired
+    private DemandDraftRepository demandDraftRepository;
+
+    @Autowired
+    private ChequeRepository chequeRepository;
 
     public static String normalizeSourceType(String sourceType) {
         if (sourceType == null || sourceType.isBlank()) {
@@ -116,6 +141,7 @@ public class AccountConversionService {
             throw new IllegalArgumentException("Unsupported conversion from " + sourceType + " to " + normalizedTarget);
         }
 
+        Map<String, Object> debtSummary = buildDebtSummary(accountNumber);
         String appNumber = "ACV-" + System.currentTimeMillis();
         String content = buildApplicationText(account, normalizedTarget, requestedBy, appNumber);
 
@@ -126,6 +152,9 @@ public class AccountConversionService {
         response.put("targetType", normalizedTarget);
         response.put("requestedBy", requestedBy != null && !requestedBy.isBlank() ? requestedBy : "Admin");
         response.put("applicationText", content);
+        response.put("debtSummary", debtSummary);
+        response.put("hasOpenDebt", Boolean.TRUE.equals(debtSummary.get("hasOpenDebt")));
+        response.put("canConvert", !Boolean.TRUE.equals(debtSummary.get("hasOpenDebt")));
         response.put("termsAndConditions", "Terms & Conditions: The account holder confirms the conversion request, accepts updated KYC and signature verification, and understands the account will be audited and may be reverted to the original account type with full historical traceability.");
         return response;
     }
@@ -244,6 +273,86 @@ public class AccountConversionService {
         return map;
     }
 
+    public List<String> getConversionBlockers(String accountNumber) {
+        if (accountNumber == null || accountNumber.isBlank()) {
+            return Collections.emptyList();
+        }
+        return validateSavingsToSalaryConversion(accountNumber);
+    }
+
+    public List<String> validateSavingsToSalaryConversion(String accountNumber) {
+        List<String> blockers = new ArrayList<>();
+        if (accountNumber == null || accountNumber.isBlank()) {
+            return blockers;
+        }
+
+        List<Loan> activeLoans = loanRepository.findByAccountNumber(accountNumber).stream()
+                .filter(loan -> loan != null && !"Closed".equalsIgnoreCase(loan.getStatus())
+                        && !"Rejected".equalsIgnoreCase(loan.getStatus())
+                        && !"Paid".equalsIgnoreCase(loan.getStatus())
+                        && !"Foreclosed".equalsIgnoreCase(loan.getStatus()))
+                .toList();
+        if (!activeLoans.isEmpty()) {
+            double total = activeLoans.stream().mapToDouble(loan -> loan.getRemainingPrincipal() != null ? loan.getRemainingPrincipal() : 0.0).sum();
+            blockers.add("Outstanding loan(s) remain: ₹" + String.format(Locale.US, "%.2f", total) + ". All loans must be closed before salary conversion.");
+        }
+
+        List<GoldLoan> activeGoldLoans = goldLoanRepository.findByAccountNumber(accountNumber).stream()
+                .filter(loan -> loan != null && !"Closed".equalsIgnoreCase(loan.getStatus())
+                        && !"Rejected".equalsIgnoreCase(loan.getStatus())
+                        && !"Paid".equalsIgnoreCase(loan.getStatus())
+                        && !"Foreclosed".equalsIgnoreCase(loan.getStatus()))
+                .toList();
+        if (!activeGoldLoans.isEmpty()) {
+            double total = activeGoldLoans.stream().mapToDouble(loan -> loan.getRemainingPrincipal() != null ? loan.getRemainingPrincipal() : 0.0).sum();
+            blockers.add("Outstanding gold loan(s) remain: ₹" + String.format(Locale.US, "%.2f", total) + ". Clear all gold loans before conversion.");
+        }
+
+        List<CreditCard> activeCards = creditCardRepository.findByAccountNumber(accountNumber).stream()
+                .filter(card -> card != null && ("Active".equalsIgnoreCase(card.getStatus()) || "Blocked".equalsIgnoreCase(card.getStatus()))
+                        && (card.getCurrentBalance() == null || card.getCurrentBalance() > 0 || "Active".equalsIgnoreCase(card.getStatus())))
+                .toList();
+        if (!activeCards.isEmpty()) {
+            double total = activeCards.stream().mapToDouble(card -> card.getCurrentBalance() != null ? card.getCurrentBalance() : 0.0).sum();
+            blockers.add("Active credit/debit card debt remains: ₹" + String.format(Locale.US, "%.2f", total) + ". Close and clear all cards before conversion.");
+        }
+
+        List<Cheque> activeCheques = chequeRepository.findByAccountNumber(accountNumber).stream()
+                .filter(cheque -> cheque != null && !"CANCELLED".equalsIgnoreCase(cheque.getStatus())
+                        && !"USED".equalsIgnoreCase(cheque.getStatus())
+                        && !"DRAWN".equalsIgnoreCase(cheque.getStatus())
+                        && !"BOUNCED".equalsIgnoreCase(cheque.getStatus()))
+                .toList();
+        if (!activeCheques.isEmpty()) {
+            blockers.add("Active cheque books must be permanently closed before salary conversion.");
+        }
+
+        List<DemandDraft> activeDrafts = demandDraftRepository.findByAccountNumberOrderByCreatedAtDesc(accountNumber).stream()
+                .filter(draft -> draft != null && !"CANCELLED".equalsIgnoreCase(draft.getStatus())
+                        && !"PAID".equalsIgnoreCase(draft.getStatus())
+                        && !"REJECTED".equalsIgnoreCase(draft.getStatus()))
+                .toList();
+        if (!activeDrafts.isEmpty()) {
+            blockers.add("Demand drafts are still active and must be closed before salary conversion.");
+        }
+
+        return blockers;
+    }
+
+    private Map<String, Object> buildDebtSummary(String accountNumber) {
+        Map<String, Object> summary = new LinkedHashMap<>();
+        summary.put("accountNumber", accountNumber);
+        List<String> blockers = getConversionBlockers(accountNumber);
+        summary.put("hasOpenDebt", !blockers.isEmpty());
+        summary.put("blockers", blockers);
+        summary.put("loans", loanRepository.findByAccountNumber(accountNumber).stream().filter(Objects::nonNull).toList());
+        summary.put("goldLoans", goldLoanRepository.findByAccountNumber(accountNumber).stream().filter(Objects::nonNull).toList());
+        summary.put("creditCards", creditCardRepository.findByAccountNumber(accountNumber).stream().filter(Objects::nonNull).toList());
+        summary.put("cheques", chequeRepository.findByAccountNumber(accountNumber).stream().filter(Objects::nonNull).toList());
+        summary.put("demandDrafts", demandDraftRepository.findByAccountNumberOrderByCreatedAtDesc(accountNumber).stream().filter(Objects::nonNull).toList());
+        return summary;
+    }
+
     private String buildApplicationText(Map<String, Object> account, String targetType, String requestedBy, String appNumber) {
         String name = String.valueOf(account.getOrDefault("name", ""));
         String accountNumber = String.valueOf(account.getOrDefault("accountNumber", ""));
@@ -259,42 +368,91 @@ public class AccountConversionService {
                 + "Signature verification is required before final approval. The bank may review and revert the account if the account type change is not valid.";
     }
 
+    private void closeSavingsLinkedProducts(String accountNumber, String approvedBy) {
+        chequeRepository.findByAccountNumber(accountNumber).forEach(cheque -> {
+            if (cheque != null && !"CANCELLED".equalsIgnoreCase(cheque.getStatus())) {
+                cheque.setStatus("CANCELLED");
+                cheque.setCancelledDate(LocalDateTime.now());
+                cheque.setCancelledBy(approvedBy != null && !approvedBy.isBlank() ? approvedBy : "Admin");
+                cheque.setCancellationReason("Permanent closure due to savings-to-salary conversion");
+                chequeRepository.save(cheque);
+            }
+        });
+
+        demandDraftRepository.findByAccountNumberOrderByCreatedAtDesc(accountNumber).forEach(draft -> {
+            if (draft != null && !"CANCELLED".equalsIgnoreCase(draft.getStatus())) {
+                draft.setStatus("CANCELLED");
+                draft.setUpdatedAt(LocalDateTime.now());
+                draft.setApprovedBy(approvedBy != null && !approvedBy.isBlank() ? approvedBy : "Admin");
+                draft.setReason(draft.getReason() == null || draft.getReason().isBlank() ? "Closed on salary conversion" : draft.getReason());
+                demandDraftRepository.save(draft);
+            }
+        });
+
+        creditCardRepository.findByAccountNumber(accountNumber).forEach(card -> {
+            if (card != null && !"Closed".equalsIgnoreCase(card.getStatus())) {
+                card.setStatus("Closed");
+                card.setBlocked(true);
+                card.setDeactivated(true);
+                card.setClosureDate(LocalDateTime.now());
+                card.setCurrentBalance(0.0);
+                card.setAvailableLimit(0.0);
+                card.setUsageLimit(0.0);
+                card.setOverdueAmount(0.0);
+                creditCardRepository.save(card);
+            }
+        });
+    }
+
     private boolean applyAccountTypeChange(String accountNumber, String fromType, String toType, String approvedBy) {
         String sourceType = normalizeSourceType(fromType);
         String targetType = normalizeTargetType(toType);
 
         if ("Savings".equals(sourceType) && "Salary".equals(targetType)) {
+            List<String> blockers = validateSavingsToSalaryConversion(accountNumber);
+            if (!blockers.isEmpty()) {
+                throw new IllegalStateException(String.join("; ", blockers));
+            }
+
             Account account = accountRepository.findByAccountNumber(accountNumber);
             if (account == null) {
                 throw new IllegalArgumentException("Savings account not found: " + accountNumber);
             }
+
+            closeSavingsLinkedProducts(accountNumber, approvedBy);
+
             account.setAccountType("Salary");
-            account.setStatus("ACTIVE");
+            account.setStatus("CONVERTED_TO_SALARY");
+            account.setNetBankingEnabled(false);
             account.setLastUpdated(LocalDateTime.now());
             accountRepository.save(account);
 
-            SalaryAccount salary = salaryAccountRepository.findByAccountNumber(accountNumber);
+            SalaryAccount salary = salaryAccountRepository.findByCustomerId(account.getCustomerId());
+            if (salary == null) {
+                salary = salaryAccountRepository.findByAccountNumber(accountNumber);
+            }
             if (salary == null) {
                 salary = new SalaryAccount();
                 salary.setAccountNumber(accountNumber);
-                salary.setEmployeeName(account.getName());
-                salary.setMobileNumber(account.getPhone());
-                salary.setAadharNumber(account.getAadharNumber());
-                salary.setPanNumber(account.getPan());
-                salary.setAddress(account.getAddress());
-                salary.setBalance(account.getBalance());
-                salary.setStatus("ACTIVE");
-                salary.setCustomerId(account.getCustomerId());
-            } else {
-                salary.setEmployeeName(account.getName());
-                salary.setMobileNumber(account.getPhone());
-                salary.setAadharNumber(account.getAadharNumber());
-                salary.setPanNumber(account.getPan());
-                salary.setAddress(account.getAddress());
-                salary.setBalance(account.getBalance());
-                salary.setStatus("ACTIVE");
                 salary.setCustomerId(account.getCustomerId());
             }
+
+            salary.setEmployeeName(account.getName());
+            salary.setMobileNumber(account.getPhone());
+            salary.setAadharNumber(account.getAadharNumber());
+            salary.setPanNumber(account.getPan());
+            salary.setAddress(account.getAddress());
+            salary.setBalance(account.getBalance());
+            salary.setStatus("Active");
+            salary.setPasswordSet(false);
+            salary.setPassword(null);
+            salary.setDebitCardStatus("Closed");
+            salary.setNetBankingEnabled(true);
+            salary.setUpiEnabled(false);
+            salary.setOnlineEnabled(false);
+            salary.setContactlessEnabled(false);
+            salary.setAccountLocked(false);
+            salary.setUpdatedAt(LocalDateTime.now());
             salaryAccountRepository.save(salary);
             return true;
         }

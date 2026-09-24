@@ -64,6 +64,7 @@
   </nav>
 
   <aside class="mobile-login-bar" aria-label="Login options">
+    <button type="button" class="mobile-login-button admin-login" (click)="goToAdminRole('ADMIN', $event)" aria-label="Admin login">Admin</button>
     <a class="mobile-login-button user-login" href="https://neo-bank-669.web.app/website/user" aria-label="User login">User Login</a>
     <button type="button" class="mobile-login-button fasttag-login" (click)="goTo('website/fasttag-login', $event)" aria-label="FASTag login">FASTag</button>
     <button type="button" class="mobile-login-button merchant-login" (click)="goTo('website/merchant-login', $event)" aria-label="Merchant login">Merchant</button>

@@ -1133,6 +1133,7 @@ html { scroll-behavior: smooth; }
     outline-offset: 1px;
   }
   .user-login { background: var(--primary-hover); }
+  .admin-login { background: #0f766e; }
   .fasttag-login { background: #0284C7; }
   .merchant-login { background: #059669; }
   .agent-login { background: #7C3AED; }
