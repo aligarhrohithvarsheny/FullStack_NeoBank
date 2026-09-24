@@ -88,6 +88,9 @@ public class AdminController {
     @Autowired
     private BranchCityRepository branchCityRepository;
 
+    @Autowired
+    private com.neo.springapp.service.BranchCityMetricsService branchCityMetricsService;
+
     /**
      * Assign mandatory Customer ID (9 digits: PAN 4 + DOB 5) to all existing accounts
      * that don't have one. Call this to migrate existing data.
@@ -385,6 +388,11 @@ public class AdminController {
     @GetMapping("/hod/cities")
     public ResponseEntity<List<BranchCity>> getHodCities() {
         return ResponseEntity.ok(branchCityRepository.findAllByOrderByCityAsc());
+    }
+
+    @GetMapping("/hod/cities/metrics")
+    public ResponseEntity<Map<String, Map<String, Object>>> getHodCityMetrics() {
+        return ResponseEntity.ok(branchCityMetricsService.metricsByCity(branchCityRepository.findAllByOrderByCityAsc()));
     }
 
     @PostMapping("/hod/cities")

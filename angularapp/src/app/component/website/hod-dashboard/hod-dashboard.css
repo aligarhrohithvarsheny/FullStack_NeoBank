@@ -45,6 +45,11 @@
 .delete-button { color: #b42318; border-color: #f3c3bf; background: #fff7f6; }
 .edit-fields { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
 .edit-fields label { display: grid; gap: 7px; color: #668087; font-size: 12px; font-weight: 700; }
+.city-metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 20px; }
+.city-metrics article { display: grid; gap: 5px; padding: 12px; border: 1px solid #dce8e9; border-radius: 8px; background: #f7fbfb; }
+.city-metrics span, .city-metrics small { color: #668087; font-size: 11px; }
+.city-metrics strong { color: #0d5f5b; font-size: 1rem; }
+.city-metrics .loss-value { color: #b42318; }
 .assignment-block { margin-top: 24px; padding-top: 20px; border-top: 1px solid #edf2f2; }
 .assignment-block h3 { margin: 7px 0 14px; font-size: 1rem; }
 .assignment-list { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -53,5 +58,5 @@
 .assignment-list label small { color: #0f766e; font-size: 10px; font-weight: 800; }
 .hod-error { color: #b42318; margin: 16px 0; }
 @media (max-width: 1100px) { .live-data-grid { grid-template-columns: repeat(3, 1fr); } }
-@media (max-width: 900px) { .metric-grid { grid-template-columns: repeat(2, 1fr); } .dashboard-grid { grid-template-columns: 1fr; } .add-city-form { grid-template-columns: 1fr 1fr; } .add-city-form input:first-child { grid-column: span 2; } .add-city-form button { min-height: 40px; } .edit-fields { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 520px) { .hod-topbar { align-items: flex-start; flex-direction: column; } .metric-grid, .live-data-grid { grid-template-columns: 1fr; } .add-city-form, .edit-fields, .profile-grid { grid-template-columns: 1fr; } .profile-wide { grid-column: auto; } .add-city-form input:first-child { grid-column: auto; } }
+@media (max-width: 900px) { .metric-grid { grid-template-columns: repeat(2, 1fr); } .dashboard-grid { grid-template-columns: 1fr; } .add-city-form { grid-template-columns: 1fr 1fr; } .add-city-form input:first-child { grid-column: span 2; } .add-city-form button { min-height: 40px; } .edit-fields, .city-metrics { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 520px) { .hod-topbar { align-items: flex-start; flex-direction: column; } .metric-grid, .live-data-grid { grid-template-columns: 1fr; } .add-city-form, .edit-fields, .profile-grid, .city-metrics { grid-template-columns: 1fr; } .profile-wide { grid-column: auto; } .add-city-form input:first-child { grid-column: auto; } }

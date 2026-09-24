@@ -13,6 +13,7 @@ interface CityOperation {
   operations: number;
   status: 'ACTIVE' | 'PLANNING';
   staffIds: string[];
+  metrics?: any;
 }
 
 @Component({
@@ -32,12 +33,14 @@ export class HodDashboard implements OnInit {
   lastRefreshed = '';
   staffSearch = '';
   selectedStaff: any = null;
+  cityMetrics: Record<string, any> = {};
   private refreshTimer?: ReturnType<typeof setInterval>;
 
   constructor(private http: HttpClient, private router: Router) {}
 
   ngOnInit(): void {
     this.loadCities();
+    this.loadCityMetrics();
     this.refreshOverview();
     this.refreshTimer = setInterval(() => this.refreshOverview(), 30000);
   }
@@ -47,6 +50,7 @@ export class HodDashboard implements OnInit {
   }
 
   refreshOverview(): void {
+    this.loadCityMetrics();
     this.http.get<any>(`${environment.apiBaseUrl}/api/admins/hod-overview`).subscribe({
       next: overview => {
         this.overview = overview;
@@ -64,6 +68,20 @@ export class HodDashboard implements OnInit {
   get totalTurnover(): number { return this.cities.reduce((sum, city) => sum + Number(city.turnover || 0), 0); }
   get totalProfit(): number { return this.cities.reduce((sum, city) => sum + Number(city.profit || 0), 0); }
   get totalOperations(): number { return this.cities.reduce((sum, city) => sum + Number(city.operations || 0), 0); }
+
+  metricsFor(city: CityOperation): any {
+    return this.cityMetrics[city.city.toLowerCase()] || {};
+  }
+
+  private loadCityMetrics(): void {
+    this.http.get<Record<string, any>>(`${environment.apiBaseUrl}/api/admins/hod/cities/metrics`).subscribe({
+      next: metrics => {
+        this.cityMetrics = metrics || {};
+        this.cities = this.cities.map(city => ({ ...city, metrics: this.metricsFor(city) }));
+      },
+      error: () => this.errorMessage = 'City financial metrics are temporarily unavailable.'
+    });
+  }
 
   get filteredStaff(): any[] {
     const query = this.staffSearch.trim().toLowerCase();
