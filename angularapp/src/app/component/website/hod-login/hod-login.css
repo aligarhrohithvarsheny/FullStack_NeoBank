@@ -25,6 +25,7 @@
 .hod-login-card form button, .secondary-button { width: 100%; margin-top: 22px; padding: 13px 16px; border: 0; border-radius: 9px; background: #0e7490; color: #fff; font-weight: 700; cursor: pointer; }
 .hod-login-card button:disabled { opacity: 0.65; cursor: wait; }
 .secondary-button { margin-top: 12px; background: transparent; color: #0e7490; border: 1px solid #bae6fd; }
+.reset-button { margin-top: 12px; background: #ecfeff; border-color: #0891b2; }
 .create-account-button { display: block; visibility: visible; opacity: 1; }
 .hod-account-note { margin: 14px 0 0; color: #64748b; font-size: 13px; }
 .hod-reset-panel { margin-top: 20px; padding-top: 20px; border-top: 1px solid #dbe7e8; text-align: left; }

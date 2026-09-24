@@ -15,6 +15,7 @@ import { environment } from '../../../../environment/environment';
 })
 export class HodLogin {
   email = '';
+  resetEmail = '';
   password = '';
   createEmail = '';
   createPassword = '';
@@ -72,6 +73,10 @@ export class HodLogin {
       },
       error: err => {
         this.isLoading = false;
+        if (err.error?.accountLocked) {
+          this.resetEmail = this.email.trim();
+          this.showResetPassword = true;
+        }
         this.errorMessage = err.error?.message || 'HOD login service is unavailable. Please deploy the HOD backend service.';
       }
     });
@@ -119,7 +124,7 @@ export class HodLogin {
 
   resetPassword(): void {
     if (this.isCreating) return;
-    if (!this.email.trim() || !this.createPassword || !this.confirmPassword) {
+    if (!this.resetEmail.trim() || !this.createPassword || !this.confirmPassword) {
       this.errorMessage = 'Enter your HOD Gmail and both new password fields';
       return;
     }
@@ -131,7 +136,7 @@ export class HodLogin {
     this.isCreating = true;
     this.errorMessage = '';
     this.http.post<any>(`${environment.apiBaseUrl}/api/admins/hod-reset-password`, {
-      email: this.email.trim(),
+      email: this.resetEmail.trim(),
       password: this.createPassword
     }).subscribe({
       next: response => {

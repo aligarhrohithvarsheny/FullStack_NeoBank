@@ -14,11 +14,13 @@
         <p class="hod-error" *ngIf="errorMessage">{{ errorMessage }}</p>
         <button type="submit" [disabled]="isLoading">{{ isLoading ? 'Signing in...' : 'HOD Login' }}</button>
       </form>
+      <button type="button" class="secondary-button reset-button" (click)="resetEmail = email.trim(); showResetPassword = true; errorMessage = ''">
+        Reset HOD Password
+      </button>
       <button *ngIf="showCreateAccountButton" type="button" class="secondary-button create-account-button" (click)="showCreateAccount = true; errorMessage = ''">
         Create HOD Account
       </button>
       <p class="hod-account-note" *ngIf="!showCreateAccountButton">The HOD account has already been created.</p>
-      <button type="button" class="secondary-button" (click)="showResetPassword = true; errorMessage = ''">Reset HOD Password</button>
     </ng-container>
 
     <ng-template #createForm>
@@ -38,6 +40,8 @@
     <section *ngIf="showResetPassword" class="hod-reset-panel">
       <h2>Reset HOD Password</h2>
       <p>Use this separate HOD recovery flow to unlock the account.</p>
+      <label>HOD Gmail</label>
+      <input type="email" [(ngModel)]="resetEmail" name="resetEmail" placeholder="Enter HOD Gmail address" required>
       <label>New Password</label>
       <input type="password" [(ngModel)]="createPassword" name="resetPassword" placeholder="Create new password">
       <label>Confirm New Password</label>
