@@ -6,6 +6,7 @@ import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../../environment/environment';
 
 interface CityOperation {
+  id?: number;
   city: string;
   turnover: number;
   profit: number;
@@ -29,6 +30,8 @@ export class HodDashboard implements OnInit {
   newCity = { city: '', turnover: 0, profit: 0, operations: 0 };
   errorMessage = '';
   lastRefreshed = '';
+  staffSearch = '';
+  selectedStaff: any = null;
   private refreshTimer?: ReturnType<typeof setInterval>;
 
   constructor(private http: HttpClient, private router: Router) {}
@@ -62,38 +65,73 @@ export class HodDashboard implements OnInit {
   get totalProfit(): number { return this.cities.reduce((sum, city) => sum + Number(city.profit || 0), 0); }
   get totalOperations(): number { return this.cities.reduce((sum, city) => sum + Number(city.operations || 0), 0); }
 
+  get filteredStaff(): any[] {
+    const query = this.staffSearch.trim().toLowerCase();
+    if (!query) return this.staff;
+    return this.staff.filter(person => [person.name, person.email, person.role, person.assignedCity, person.employeeId]
+      .some(value => String(value || '').toLowerCase().includes(query)));
+  }
+
   addCity(): void {
     const city = this.newCity.city.trim();
     if (!city) return;
-    this.cities = [...this.cities, { ...this.newCity, city, status: 'PLANNING', staffIds: [] }];
-    this.saveCities();
-    this.newCity = { city: '', turnover: 0, profit: 0, operations: 0 };
+    this.http.post<CityOperation>(`${environment.apiBaseUrl}/api/admins/hod/cities`, {
+      ...this.newCity, city, status: 'PLANNING'
+    }).subscribe({
+      next: saved => {
+        this.cities = [...this.cities, saved];
+        this.newCity = { city: '', turnover: 0, profit: 0, operations: 0 };
+      },
+      error: err => this.errorMessage = err.error?.message || 'Unable to add city'
+    });
   }
 
   selectCity(city: CityOperation): void { this.selectedCity = city; }
 
   updateCity(): void {
     if (!this.selectedCity) return;
-    this.saveCities();
+    if (!this.selectedCity.id) return;
+    this.http.put<CityOperation>(`${environment.apiBaseUrl}/api/admins/hod/cities/${this.selectedCity.id}`, this.selectedCity)
+      .subscribe({ next: saved => this.selectedCity = saved, error: () => this.errorMessage = 'Unable to update city' });
   }
 
   toggleStaff(city: CityOperation, person: any): void {
-    const staffId = String(person.id || person.email);
-    const assigned = city.staffIds || [];
-    city.staffIds = assigned.includes(staffId)
-      ? assigned.filter(id => id !== staffId)
-      : [...assigned, staffId];
-    this.updateCity();
+    const nextCity = this.isStaffAssigned(city, person) ? '' : city.city;
+    if (nextCity && person.assignedCity && person.assignedCity.toLowerCase() !== city.city.toLowerCase()) {
+      this.errorMessage = `${person.name || person.email} is already assigned to ${person.assignedCity}`;
+      return;
+    }
+    this.http.put<any>(`${environment.apiBaseUrl}/api/admins/hod/staff/${person.id}/city`, { city: nextCity })
+      .subscribe({
+        next: updated => {
+          const index = this.staff.findIndex(item => item.id === person.id);
+          if (index >= 0) this.staff[index] = updated;
+          this.errorMessage = '';
+        },
+        error: err => this.errorMessage = err.error?.message || 'Unable to update staff location'
+      });
   }
 
   isStaffAssigned(city: CityOperation, person: any): boolean {
-    return (city.staffIds || []).includes(String(person.id || person.email));
+    return !!person.assignedCity && person.assignedCity.toLowerCase() === city.city.toLowerCase();
   }
 
+  canAssignStaff(city: CityOperation, person: any): boolean {
+    return !person.assignedCity || this.isStaffAssigned(city, person);
+  }
+
+  showStaffProfile(person: any): void { this.selectedStaff = person; }
+
   removeCity(city: CityOperation): void {
-    this.cities = this.cities.filter(item => item !== city);
-    if (this.selectedCity === city) this.selectedCity = null;
-    this.saveCities();
+    if (!city.id) return;
+    this.http.delete(`${environment.apiBaseUrl}/api/admins/hod/cities/${city.id}`).subscribe({
+      next: () => {
+        this.cities = this.cities.filter(item => item.id !== city.id);
+        if (this.selectedCity?.id === city.id) this.selectedCity = null;
+        this.refreshOverview();
+      },
+      error: () => this.errorMessage = 'Unable to remove city'
+    });
   }
 
   logout(): void {
@@ -104,8 +142,9 @@ export class HodDashboard implements OnInit {
   }
 
   private loadCities(): void {
-    try { this.cities = JSON.parse(localStorage.getItem('hodCityOperations') || '[]'); } catch { this.cities = []; }
+    this.http.get<CityOperation[]>(`${environment.apiBaseUrl}/api/admins/hod/cities`).subscribe({
+      next: cities => this.cities = cities || [],
+      error: () => this.errorMessage = 'City data is temporarily unavailable.'
+    });
   }
-
-  private saveCities(): void { localStorage.setItem('hodCityOperations', JSON.stringify(this.cities)); }
 }

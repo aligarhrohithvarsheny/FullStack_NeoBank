@@ -46,15 +46,22 @@
 
       <div class="panel staff-panel">
         <div class="panel-heading"><div><span class="panel-kicker">People and access</span><h2>Existing Admins & Managers</h2></div><span class="count-badge">{{ staff.length }}</span></div>
-        <div class="staff-row" *ngFor="let person of staff"><span class="avatar">{{ (person.name || person.email || '?').charAt(0) | uppercase }}</span><span><strong>{{ person.name || 'Unnamed staff' }}</strong><small>{{ person.email }}</small></span><em>{{ person.role }}</em></div>
+        <input class="staff-search" [(ngModel)]="staffSearch" placeholder="Search name, email, role or city">
+        <button type="button" class="staff-row" *ngFor="let person of filteredStaff" (click)="showStaffProfile(person)"><span class="avatar">{{ (person.name || person.email || '?').charAt(0) | uppercase }}</span><span><strong>{{ person.name || 'Unnamed staff' }}</strong><small>{{ person.email }} · {{ person.assignedCity || 'No city assigned' }}</small></span><em>{{ person.role }}</em></button>
         <div class="empty-state" *ngIf="!staff.length">No Admin or Manager accounts found.</div>
+        <div class="empty-state" *ngIf="staff.length && !filteredStaff.length">No staff match this search.</div>
       </div>
+    </section>
+
+    <section class="panel profile-panel" *ngIf="selectedStaff as person">
+      <div class="panel-heading"><div><span class="panel-kicker">Staff profile</span><h2>{{ person.name || person.email }}</h2></div><button type="button" class="close-button" (click)="selectedStaff = null">Close</button></div>
+      <div class="profile-grid"><div><strong>Email</strong><span>{{ person.email }}</span></div><div><strong>Role</strong><span>{{ person.role }}</span></div><div><strong>Employee ID</strong><span>{{ person.employeeId || 'Not set' }}</span></div><div><strong>Mobile</strong><span>{{ person.mobileNumber || 'Not set' }}</span></div><div><strong>Qualifications</strong><span>{{ person.qualifications || 'Not set' }}</span></div><div><strong>Location</strong><span>{{ person.assignedCity || 'No city assigned' }}</span></div><div class="profile-wide"><strong>Address</strong><span>{{ person.address || 'Not set' }}</span></div></div>
     </section>
 
     <section class="panel edit-panel" *ngIf="selectedCity as city">
       <div class="panel-heading"><div><span class="panel-kicker">City detail</span><h2>{{ city.city }} Operations</h2></div><button type="button" class="delete-button" (click)="removeCity(city)">Remove city</button></div>
       <div class="edit-fields"><label>Turnover<input type="number" [(ngModel)]="city.turnover" (ngModelChange)="updateCity()"></label><label>Profit<input type="number" [(ngModel)]="city.profit" (ngModelChange)="updateCity()"></label><label>Operations<input type="number" [(ngModel)]="city.operations" (ngModelChange)="updateCity()"></label><label>Status<select [(ngModel)]="city.status" (ngModelChange)="updateCity()"><option value="PLANNING">Planning</option><option value="ACTIVE">Active</option></select></label></div>
-      <div class="assignment-block"><span class="panel-kicker">City team</span><h3>Assign existing Admins and Managers</h3><div class="assignment-list"><label *ngFor="let person of staff"><input type="checkbox" [checked]="isStaffAssigned(city, person)" (change)="toggleStaff(city, person)"><span>{{ person.name || person.email }}</span><small>{{ person.role }}</small></label></div></div>
+      <div class="assignment-block"><span class="panel-kicker">City team</span><h3>Assign existing Admins and Managers</h3><div class="assignment-list"><label *ngFor="let person of staff" [class.assignment-disabled]="!canAssignStaff(city, person)"><input type="checkbox" [checked]="isStaffAssigned(city, person)" [disabled]="!canAssignStaff(city, person)" (change)="toggleStaff(city, person)"><span>{{ person.name || person.email }}</span><small>{{ person.role }} · {{ person.assignedCity || 'Unassigned' }}</small></label></div></div>
     </section>
   </main>
 </div>

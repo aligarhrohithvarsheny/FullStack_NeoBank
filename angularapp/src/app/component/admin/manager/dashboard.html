@@ -60,7 +60,7 @@
         <h2>Manager Dashboard</h2>
       </div>
       <div class="header-right">
-          <span class="admin-name">{{ managerName }}</span>
+          <span class="admin-name">{{ managerName }}<small class="assigned-city" *ngIf="managerAssignedCity">{{ managerAssignedCity }}</small></span>
           <div class="manager-session-info" *ngIf="managerLoginTimeIso">
             <small>Logged in at: {{ managerLoginTimeIso | date:'short' }}</small>
             <br>
@@ -96,6 +96,7 @@
               <h5>{{ admin.name || 'Admin' }}</h5>
               <p class="admin-email">{{ admin.email }}</p>
               <p class="admin-id" *ngIf="admin.employeeId">ID: {{ admin.employeeId }}</p>
+              <p class="admin-id" *ngIf="admin.assignedCity"><i class="fa fa-map-marker-alt"></i> {{ admin.assignedCity }}</p>
             </div>
             <div class="admin-status">
               <span class="status-badge" [ngClass]="admin.profileComplete ? 'complete' : 'incomplete'">

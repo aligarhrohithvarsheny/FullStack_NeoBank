@@ -452,6 +452,7 @@ export class Dashboard implements OnInit, OnDestroy {
   goldRateHistory: any[] = [];
   isLoadingGoldRate: boolean = false;
   adminName: string = 'Admin';
+  assignedCity: string = '';
 
   /** Multi-select for bulk PDF/Excel export (key = savings account number) */
   bulkExportSelection: Record<string, boolean> = {};
@@ -818,6 +819,7 @@ export class Dashboard implements OnInit, OnDestroy {
 
           // Set admin name
           this.adminName = admin.username || admin.name || 'Admin';
+          this.assignedCity = admin.assignedCity || '';
         } catch (e) {
           console.error('Error parsing admin data:', e);
           // Clear corrupted session data

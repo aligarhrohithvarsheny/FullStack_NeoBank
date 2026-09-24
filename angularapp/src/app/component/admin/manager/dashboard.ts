@@ -33,6 +33,7 @@ interface AdminFeature {
 })
 export class ManagerDashboard implements OnInit, OnDestroy {
   managerName: string = 'Manager';
+  managerAssignedCity: string = '';
   // Manager login/session timing
   managerLoginTimeIso: string | null = null; // ISO string from sessionStorage
   managerSessionDuration: string = ''; // Human readable duration
@@ -387,6 +388,7 @@ export class ManagerDashboard implements OnInit, OnDestroy {
   ) {}
 
   private sessionTimerHandle: any = null;
+  private staffLocationTimer: any = null;
 
   ngOnInit() {
     if (isPlatformBrowser(this.platformId)) {
@@ -419,6 +421,7 @@ export class ManagerDashboard implements OnInit, OnDestroy {
       this.loginActivityRealTimeTimer = setInterval(() => {
         this.refreshUsedTimes();
       }, 1000);
+      this.staffLocationTimer = setInterval(() => this.loadAllAdmins(), 30000);
     }
   }
 
@@ -434,6 +437,10 @@ export class ManagerDashboard implements OnInit, OnDestroy {
     if (this.loginActivityRealTimeTimer) {
       clearInterval(this.loginActivityRealTimeTimer);
       this.loginActivityRealTimeTimer = null;
+    }
+    if (this.staffLocationTimer) {
+      clearInterval(this.staffLocationTimer);
+      this.staffLocationTimer = null;
     }
   }
   
@@ -1475,6 +1482,7 @@ export class ManagerDashboard implements OnInit, OnDestroy {
       try {
         const admin = JSON.parse(adminData);
         this.managerName = admin.name || admin.username || 'Manager';
+        this.managerAssignedCity = admin.assignedCity || '';
       } catch (e) {
         console.error('Error parsing admin data:', e);
       }

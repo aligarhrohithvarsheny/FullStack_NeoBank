@@ -1,6 +1,7 @@
 package com.neo.springapp.controller;
 
 import com.neo.springapp.model.Admin;
+import com.neo.springapp.model.BranchCity;
 import com.neo.springapp.model.ProfileUpdateRequest;
 import com.neo.springapp.model.AdminProfileUpdateRequest;
 import com.neo.springapp.model.SalaryAccount;
@@ -10,6 +11,7 @@ import com.neo.springapp.service.AdminService;
 import com.neo.springapp.service.UserLoginHistoryService;
 import com.neo.springapp.service.ProfileUpdateService;
 import com.neo.springapp.service.SalaryAccountService;
+import com.neo.springapp.repository.BranchCityRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpHeaders;
@@ -82,6 +84,9 @@ public class AdminController {
 
     @Autowired
     private com.neo.springapp.repository.LoanRepository loanRepository;
+
+    @Autowired
+    private BranchCityRepository branchCityRepository;
 
     /**
      * Assign mandatory Customer ID (9 digits: PAN 4 + DOB 5) to all existing accounts
@@ -375,6 +380,60 @@ public class AdminController {
                 .map(this::createSafeAdminResponse)
                 .collect(java.util.stream.Collectors.toList());
         return ResponseEntity.ok(staff);
+    }
+
+    @GetMapping("/hod/cities")
+    public ResponseEntity<List<BranchCity>> getHodCities() {
+        return ResponseEntity.ok(branchCityRepository.findAllByOrderByCityAsc());
+    }
+
+    @PostMapping("/hod/cities")
+    public ResponseEntity<?> addHodCity(@RequestBody BranchCity city) {
+        String name = city == null || city.getCity() == null ? "" : city.getCity().trim();
+        if (name.isBlank()) return ResponseEntity.badRequest().body(Map.of("message", "City name is required"));
+        if (branchCityRepository.existsByCityIgnoreCase(name)) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("message", "This city has already been added"));
+        }
+        city.setId(null);
+        city.setCity(name);
+        if (city.getStatus() == null || city.getStatus().isBlank()) city.setStatus("PLANNING");
+        return ResponseEntity.ok(branchCityRepository.save(city));
+    }
+
+    @PutMapping("/hod/cities/{id}")
+    public ResponseEntity<?> updateHodCity(@PathVariable Long id, @RequestBody BranchCity details) {
+        BranchCity city = branchCityRepository.findById(id).orElse(null);
+        if (city == null) return ResponseEntity.notFound().build();
+        if (details.getTurnover() != null) city.setTurnover(details.getTurnover());
+        if (details.getProfit() != null) city.setProfit(details.getProfit());
+        if (details.getOperations() != null) city.setOperations(details.getOperations());
+        if (details.getStatus() != null && !details.getStatus().isBlank()) city.setStatus(details.getStatus());
+        return ResponseEntity.ok(branchCityRepository.save(city));
+    }
+
+    @DeleteMapping("/hod/cities/{id}")
+    public ResponseEntity<?> removeHodCity(@PathVariable Long id) {
+        if (!branchCityRepository.existsById(id)) return ResponseEntity.notFound().build();
+        BranchCity city = branchCityRepository.findById(id).orElseThrow();
+        adminService.getAllAdmins().stream()
+                .filter(admin -> city.getCity().equalsIgnoreCase(admin.getAssignedCity()))
+                .forEach(admin -> { admin.setAssignedCity(null); adminService.saveAdmin(admin); });
+        branchCityRepository.deleteById(id);
+        return ResponseEntity.ok(Map.of("success", true));
+    }
+
+    @PutMapping("/hod/staff/{adminId}/city")
+    public ResponseEntity<?> assignStaffCity(@PathVariable Long adminId, @RequestBody Map<String, String> payload) {
+        Admin admin = adminService.getAdminById(adminId);
+        if (admin == null || !("ADMIN".equalsIgnoreCase(admin.getRole()) || "MANAGER".equalsIgnoreCase(admin.getRole()))) {
+            return ResponseEntity.notFound().build();
+        }
+        String city = payload == null || payload.get("city") == null ? "" : payload.get("city").trim();
+        if (!city.isBlank() && !branchCityRepository.existsByCityIgnoreCase(city)) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Add this city before assigning staff"));
+        }
+        admin.setAssignedCity(city.isBlank() ? null : city);
+        return ResponseEntity.ok(createSafeAdminResponse(adminService.saveAdmin(admin)));
     }
 
     @GetMapping("/hod-overview")
@@ -1258,6 +1317,7 @@ public class AdminController {
         adminResponse.put("branchAccountNumber", admin.getBranchAccountNumber());
         adminResponse.put("branchAccountName", admin.getBranchAccountName());
         adminResponse.put("branchAccountIfsc", admin.getBranchAccountIfsc());
+        adminResponse.put("assignedCity", admin.getAssignedCity());
         adminResponse.put("salaryAccountNumber", admin.getSalaryAccountNumber());
         adminResponse.put("salaryAccountLinked", admin.getSalaryAccountLinked() != null ? admin.getSalaryAccountLinked() : false);
         return adminResponse;

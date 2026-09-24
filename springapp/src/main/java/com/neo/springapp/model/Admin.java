@@ -61,6 +61,9 @@ public class Admin {
     private String branchAccountName;
     private String branchAccountIfsc;
 
+    // City assigned by HOD; an admin or manager can belong to only one city.
+    private String assignedCity;
+
     // Salary payout account (admin employee NeoBank account number)
     private String salaryAccountNumber;
 

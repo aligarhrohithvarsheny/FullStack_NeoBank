@@ -34,7 +34,7 @@
             <span class="session-value duration">{{ sessionDuration }}</span>
           </div>
         </div>
-        <span class="admin-name"><i class="fa fa-user-shield"></i> {{ adminName }}</span>
+        <span class="admin-name"><i class="fa fa-user-shield"></i> {{ adminName }}<small class="assigned-city" *ngIf="assignedCity">{{ assignedCity }}</small></span>
         <button class="header-forms-tab" (click)="navigateTo('profile')" title="Open Admin Profile">
           <i class="fa fa-user-cog"></i> Profile
         </button>
