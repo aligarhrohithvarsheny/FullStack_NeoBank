@@ -60,16 +60,13 @@ export class AdminProfile implements OnInit {
     if (adminData) {
       try {
         const admin = JSON.parse(adminData);
-        const emailOk = admin && admin.email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(admin.email);
-        if (!emailOk) {
-          console.error('Invalid admin.email found in sessionStorage, clearing session:', admin && admin.email);
-          sessionStorage.removeItem('admin');
-          sessionStorage.removeItem('userRole');
-          this.alertService.error('Error', 'Admin session invalid. Please login again.');
-          this.router.navigate(['/admin/login']);
+        const email = typeof admin?.email === 'string' ? admin.email.trim() : '';
+        if (!email) {
+          console.error('Admin session has no email; keeping the session intact.');
+          this.alertService.error('Error', 'Admin email is unavailable. Please login again.');
           return;
         }
-        this.adminEmail = admin.email || admin.username;
+        this.adminEmail = email;
         this.loadProfile();
       } catch (e) {
         console.error('Error parsing admin data:', e);

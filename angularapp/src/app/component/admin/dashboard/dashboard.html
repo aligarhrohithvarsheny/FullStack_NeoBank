@@ -6259,6 +6259,119 @@
   <!-- End ATM Management Section -->
 
   <!-- ══════════════════════════════════════════════════════════════════ -->
+  <!-- ACCOUNT CONVERSION SECTION -->
+  <!-- ══════════════════════════════════════════════════════════════════ -->
+  <div *ngIf="activeSection === 'account-conversion'" class="sig-management-container">
+    <div class="sig-header">
+      <div class="sig-header-icon" style="background: linear-gradient(135deg, #f59e0b, #f97316);">
+        <i class="fas fa-exchange-alt"></i>
+      </div>
+      <div>
+        <h2>Account Conversion</h2>
+        <p>Convert savings, salary, minor and individual accounts with approval, document upload, and full audit trail.</p>
+      </div>
+    </div>
+
+    <div class="sig-lookup-card">
+      <h3><i class="fas fa-search"></i> Fetch Account</h3>
+      <div class="sig-lookup-form">
+        <input type="text" [(ngModel)]="accountConversionLookupNumber" placeholder="Enter account number" class="sig-lookup-input" (keydown.enter)="accountConversionLookup()" />
+        <button (click)="accountConversionLookup()" class="sig-lookup-btn" [disabled]="accountConversionIsLookingUp">
+          <i class="fas" [ngClass]="accountConversionIsLookingUp ? 'fa-spinner fa-spin' : 'fa-search'"></i>
+          {{ accountConversionIsLookingUp ? 'Searching...' : 'Fetch' }}
+        </button>
+      </div>
+      <p *ngIf="accountConversionLookupError" class="sig-error">{{ accountConversionLookupError }}</p>
+    </div>
+
+    <div *ngIf="accountConversionLookupResult" class="sig-result-container">
+      <div class="sig-profile-card">
+        <div class="sig-profile-header">
+          <div class="sig-account-badge sig-badge-savings">{{ accountConversionLookupResult.sourceType || 'Savings' }}</div>
+          <span class="sig-status-tag sig-verified">
+            <i class="fas fa-check-circle"></i>
+            {{ accountConversionLookupResult.status || 'ACTIVE' }}
+          </span>
+        </div>
+
+        <div class="sig-profile-details">
+          <div class="sig-detail-row"><span class="sig-detail-label">Account Number</span><span class="sig-detail-value">{{ accountConversionLookupResult.accountNumber }}</span></div>
+          <div class="sig-detail-row"><span class="sig-detail-label">Customer</span><span class="sig-detail-value">{{ accountConversionLookupResult.name }}</span></div>
+          <div class="sig-detail-row"><span class="sig-detail-label">Balance</span><span class="sig-detail-value">{{ accountConversionLookupResult.balance | currency:'INR':'symbol':'1.0-0' }}</span></div>
+          <div class="sig-detail-row"><span class="sig-detail-label">Phone</span><span class="sig-detail-value">{{ accountConversionLookupResult.phone || 'N/A' }}</span></div>
+          <div class="sig-detail-row"><span class="sig-detail-label">Aadhaar</span><span class="sig-detail-value">{{ accountConversionLookupResult.aadharNumber || 'N/A' }}</span></div>
+          <div class="sig-detail-row"><span class="sig-detail-label">PAN</span><span class="sig-detail-value">{{ accountConversionLookupResult.pan || 'N/A' }}</span></div>
+        </div>
+      </div>
+
+      <div class="sig-action-card">
+        <div class="sig-step-badge">Step 1</div>
+        <h3><i class="fas fa-exchange-alt"></i> Choose Conversion</h3>
+        <label style="display:block; margin-bottom:10px; font-weight:600; color:#1f2937;">Target Account Type</label>
+        <select [(ngModel)]="accountConversionTargetType" style="width:100%; padding:12px; border:1px solid #e2e8f0; border-radius:10px; background:#fff; font-size:14px; margin-bottom:12px;">
+          <option value="Salary">Savings → Salary</option>
+          <option value="Savings">Salary → Savings</option>
+          <option value="Savings">Minor → Savings</option>
+          <option value="Joint">Individual → Joint</option>
+        </select>
+        <button (click)="accountConversionGenerateApplication()" class="sig-btn sig-btn-download">Generate Conversion Application</button>
+      </div>
+
+      <div *ngIf="accountConversionApplication" class="sig-action-card">
+        <div class="sig-step-badge">Step 2</div>
+        <h3><i class="fas fa-file-alt"></i> Auto-filled Application</h3>
+        <textarea readonly rows="12" [(ngModel)]="accountConversionApplication.applicationText" style="width:100%; padding:12px; border:1px solid #e2e8f0; border-radius:10px; resize:vertical;"></textarea>
+        <div style="margin-top: 12px;">
+          <label style="display:block; margin-bottom:8px; font-weight:600; color:#1f2937;">Approval Reason</label>
+          <textarea [(ngModel)]="accountConversionReason" rows="3" style="width:100%; padding:12px; border:1px solid #e2e8f0; border-radius:10px; resize:vertical;"></textarea>
+        </div>
+      </div>
+
+      <div class="sig-action-card">
+        <div class="sig-step-badge">Step 3</div>
+        <h3><i class="fas fa-upload"></i> Upload Terms & Conditions</h3>
+        <input type="file" (change)="accountConversionOnTermsSelected($event)" accept="image/*,.pdf" style="width:100%; padding:10px; border:1px solid #e2e8f0; border-radius:10px; background:#fff;" />
+        <button (click)="accountConversionUploadTerms()" class="sig-btn sig-btn-upload" [disabled]="accountConversionTermsUploading || !accountConversionTermsFile" style="margin-top:12px;">
+          <i class="fas" [ngClass]="accountConversionTermsUploading ? 'fa-spinner fa-spin' : 'fa-cloud-upload-alt'"></i>
+          {{ accountConversionTermsUploading ? 'Uploading...' : 'Upload Signed Terms' }}
+        </button>
+        <p *ngIf="accountConversionTermsPath" style="margin-top:10px; color:#0f766e; font-weight:600;">Uploaded document: {{ accountConversionTermsPath }}</p>
+      </div>
+
+      <div class="sig-action-card">
+        <div class="sig-step-badge">Step 4</div>
+        <h3><i class="fas fa-check-double"></i> Approval & Audit</h3>
+        <button (click)="accountConversionSubmit()" class="sig-btn sig-btn-verify" [disabled]="accountConversionSubmitting">
+          <i class="fas" [ngClass]="accountConversionSubmitting ? 'fa-spinner fa-spin' : 'fa-paper-plane'"></i>
+          {{ accountConversionSubmitting ? 'Submitting...' : 'Submit for Approval' }}
+        </button>
+      </div>
+    </div>
+
+    <div *ngIf="accountConversionHistory.length" class="sig-action-card" style="margin-top:24px;">
+      <div class="sig-step-badge">Audit History</div>
+      <h3><i class="fas fa-history"></i> Conversion History</h3>
+      <div *ngFor="let item of accountConversionHistory" style="border:1px solid #e2e8f0; border-radius:12px; padding:12px; margin-bottom:12px; background:#fff;">
+        <div style="display:flex; flex-wrap:wrap; gap:10px; justify-content:space-between; align-items:center; margin-bottom:8px;">
+          <strong>{{ item.accountNumber }}</strong>
+          <span style="padding:4px 10px; border-radius:999px; background:#dbeafe; color:#1d4ed8; font-size:12px; font-weight:700;">{{ item.requestStatus }}</span>
+        </div>
+        <p style="margin:4px 0; color:#475569;">{{ item.accountHolderName }} · {{ item.originalAccountType }} → {{ item.targetAccountType }}</p>
+        <p style="margin:4px 0; color:#475569;">{{ item.auditSummary || item.reason || 'No summary provided' }}</p>
+        <p style="margin:4px 0; color:#64748b; font-size:12px;">Requested: {{ item.requestedAt | date:'medium' }} • Approved by: {{ item.approvedBy || 'Pending' }}</p>
+        <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:10px;">
+          <button *ngIf="item.requestStatus !== 'APPROVED' && item.requestStatus !== 'REVERTED'" (click)="accountConversionApprove(item.id)" class="sig-btn sig-btn-verify" style="padding:8px 12px; font-size:12px;">
+            Approve Conversion
+          </button>
+          <button *ngIf="item.requestStatus === 'APPROVED'" (click)="accountConversionRevert(item.id)" class="sig-btn sig-btn-reject" style="padding:8px 12px; font-size:12px;">
+            Revert to Original
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════ -->
   <!-- SIGNATURE MANAGEMENT SECTION -->
   <!-- ══════════════════════════════════════════════════════════════════ -->
   <div *ngIf="activeSection === 'signature-management'" class="sig-management-container">

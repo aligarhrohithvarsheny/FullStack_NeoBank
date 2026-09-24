@@ -228,7 +228,8 @@ export class Dashboard implements OnInit, OnDestroy {
     { section: 'payment-gateway', icon: 'fa-bolt', label: 'Payment Gateway', description: 'Approve merchants, manage PG access', gradient: 'linear-gradient(135deg, #6366F1, #8B5CF6)' },
     { section: 'upi-management', icon: 'fa-mobile-alt', label: 'UPI Management', description: 'Manage all UPI accounts, block/enable, view transactions', gradient: 'linear-gradient(135deg, #0d9488, #059669)' },
     { section: 'atm-management', icon: 'fa-university', label: 'ATM Management', description: 'Manage ATMs, load cash, monitor transactions & incidents', gradient: 'linear-gradient(135deg, #f97316, #ef4444)' },
-    { section: 'signature-management', icon: 'fa-signature', label: 'Signature Management', description: 'Upload & verify customer signatures for existing accounts', gradient: 'linear-gradient(135deg, #7c3aed, #a78bfa)' }
+    { section: 'signature-management', icon: 'fa-signature', label: 'Signature Management', description: 'Upload & verify customer signatures for existing accounts', gradient: 'linear-gradient(135deg, #7c3aed, #a78bfa)' },
+    { section: 'account-conversion', icon: 'fa-exchange-alt', label: 'Account Conversion', description: 'Convert savings, salary, minor, and joint accounts with audit history', gradient: 'linear-gradient(135deg, #f59e0b, #f97316)' }
   ];
 
   // Feature Access Control
@@ -293,6 +294,21 @@ export class Dashboard implements OnInit, OnDestroy {
   sigUploadPreview: string | null = null;
   sigValidationResult: any = null; // Stores auto-read validation results
   sigFormDownloaded: boolean = false; // Track if form was downloaded for current account
+
+  // Account Conversion
+  accountConversionLookupNumber: string = '';
+  accountConversionLookupResult: any = null;
+  accountConversionLookupError: string = '';
+  accountConversionIsLookingUp: boolean = false;
+  accountConversionTargetType: string = 'Salary';
+  accountConversionApplication: any = null;
+  accountConversionTermsFile: File | null = null;
+  accountConversionTermsPath: string = '';
+  accountConversionTermsUploading: boolean = false;
+  accountConversionSubmitting: boolean = false;
+  accountConversionApproving: boolean = false;
+  accountConversionHistory: any[] = [];
+  accountConversionReason: string = 'Customer requested Account Conversion';
 
   // Support Tickets
   supportTickets: any[] = [];
@@ -1619,6 +1635,12 @@ export class Dashboard implements OnInit, OnDestroy {
     if (section === 'branch-operations') {
       this.activeSection = section;
       this.loadBranchOperations();
+      return;
+    }
+
+    if (section === 'account-conversion') {
+      this.activeSection = section;
+      this.loadAccountConversionHistory();
       return;
     }
 
@@ -7743,5 +7765,159 @@ export class Dashboard implements OnInit, OnDestroy {
       case 'business': return 'Business/Current Account';
       default: return type;
     }
+  }
+
+  // ── Account Conversion Management ───────────────────────────────
+
+  loadAccountConversionHistory() {
+    this.http.get<any[]>(`${environment.apiBaseUrl}/api/admin/account-conversion/history`).subscribe({
+      next: (res) => this.accountConversionHistory = res || [],
+      error: () => this.accountConversionHistory = []
+    });
+  }
+
+  accountConversionLookup() {
+    const accountNumber = (this.accountConversionLookupNumber || '').trim();
+    if (!accountNumber) {
+      this.accountConversionLookupError = 'Please enter an account number';
+      return;
+    }
+
+    this.accountConversionIsLookingUp = true;
+    this.accountConversionLookupError = '';
+    this.accountConversionLookupResult = null;
+    this.accountConversionApplication = null;
+    this.accountConversionTermsPath = '';
+
+    this.http.get(`${environment.apiBaseUrl}/api/admin/account-conversion/lookup/${accountNumber}`).subscribe({
+      next: (res: any) => {
+        this.accountConversionIsLookingUp = false;
+        this.accountConversionLookupResult = res;
+        const sourceType = (res.sourceType || 'Savings').toLowerCase();
+        if (sourceType === 'savings') {
+          this.accountConversionTargetType = 'Salary';
+        } else if (sourceType === 'salary') {
+          this.accountConversionTargetType = 'Savings';
+        } else if (sourceType === 'minor') {
+          this.accountConversionTargetType = 'Savings';
+        } else {
+          this.accountConversionTargetType = 'Joint';
+        }
+      },
+      error: (err: any) => {
+        this.accountConversionIsLookingUp = false;
+        this.accountConversionLookupError = err.error?.error || 'Account not found';
+      }
+    });
+  }
+
+  accountConversionGenerateApplication() {
+    if (!this.accountConversionLookupResult) {
+      this.accountConversionLookupError = 'Fetch account details first';
+      return;
+    }
+
+    this.http.post(`${environment.apiBaseUrl}/api/admin/account-conversion/generate-application`, {
+      accountNumber: this.accountConversionLookupResult.accountNumber,
+      targetType: this.accountConversionTargetType,
+      requestedBy: 'Admin'
+    }).subscribe({
+      next: (res: any) => {
+        this.accountConversionApplication = res;
+        this.accountConversionReason = this.accountConversionReason || 'Customer requested Account Conversion';
+      },
+      error: (err: any) => {
+        this.alertService.error('Conversion Error', err.error?.error || 'Unable to generate application');
+      }
+    });
+  }
+
+  accountConversionOnTermsSelected(event: any) {
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
+    this.accountConversionTermsFile = file;
+  }
+
+  accountConversionUploadTerms() {
+    if (!this.accountConversionTermsFile || !this.accountConversionLookupResult) {
+      this.alertService.error('Document Required', 'Select the signed terms document before submitting');
+      return;
+    }
+
+    this.accountConversionTermsUploading = true;
+    const formData = new FormData();
+    formData.append('file', this.accountConversionTermsFile);
+    formData.append('accountNumber', this.accountConversionLookupResult.accountNumber);
+
+    this.http.post(`${environment.apiBaseUrl}/api/admin/account-conversion/upload`, formData).subscribe({
+      next: (res: any) => {
+        this.accountConversionTermsUploading = false;
+        this.accountConversionTermsPath = res.path || '';
+        this.alertService.success('Document Uploaded', 'Terms and conditions uploaded successfully.');
+      },
+      error: (err: any) => {
+        this.accountConversionTermsUploading = false;
+        this.alertService.error('Upload Failed', err.error?.error || 'Terms upload failed');
+      }
+    });
+  }
+
+  accountConversionSubmit() {
+    if (!this.accountConversionLookupResult || !this.accountConversionApplication) {
+      this.alertService.error('No Request', 'Please fetch the account and generate the application first');
+      return;
+    }
+
+    this.accountConversionSubmitting = true;
+    const payload = {
+      accountNumber: this.accountConversionLookupResult.accountNumber,
+      sourceType: this.accountConversionLookupResult.sourceType || 'Savings',
+      targetType: this.accountConversionTargetType,
+      requestedBy: 'Admin',
+      reason: this.accountConversionReason,
+      termsAndConditionsPath: this.accountConversionTermsPath,
+      applicationNumber: this.accountConversionApplication.applicationNumber,
+      applicationText: this.accountConversionApplication.applicationText
+    };
+
+    this.http.post(`${environment.apiBaseUrl}/api/admin/account-conversion/submit`, payload).subscribe({
+      next: (res: any) => {
+        this.accountConversionSubmitting = false;
+        this.alertService.success('Request Submitted', 'Account conversion request submitted for approval.');
+        this.loadAccountConversionHistory();
+        this.accountConversionApplication = null;
+      },
+      error: (err: any) => {
+        this.accountConversionSubmitting = false;
+        this.alertService.error('Submission Failed', err.error?.error || 'Unable to submit conversion request');
+      }
+    });
+  }
+
+  accountConversionApprove(requestId: number) {
+    this.accountConversionApproving = true;
+    this.http.post(`${environment.apiBaseUrl}/api/admin/account-conversion/${requestId}/approve`, { approvedBy: 'Admin' }).subscribe({
+      next: () => {
+        this.accountConversionApproving = false;
+        this.alertService.success('Approved', 'Account conversion approved and applied in real time.');
+        this.loadAccountConversionHistory();
+      },
+      error: (err: any) => {
+        this.accountConversionApproving = false;
+        this.alertService.error('Approval Failed', err.error?.error || 'Unable to approve conversion');
+      }
+    });
+  }
+
+  accountConversionRevert(requestId: number) {
+    this.http.post(`${environment.apiBaseUrl}/api/admin/account-conversion/${requestId}/revert`, { revertedBy: 'Admin' }).subscribe({
+      next: () => {
+        this.alertService.success('Reverted', 'Account type was reverted to the original value.');
+        this.loadAccountConversionHistory();
+      },
+      error: (err: any) => {
+        this.alertService.error('Revert Failed', err.error?.error || 'Unable to revert conversion');
+      }
+    });
   }
 }
