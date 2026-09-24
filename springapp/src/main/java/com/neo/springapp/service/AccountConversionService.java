@@ -404,6 +404,30 @@ public class AccountConversionService {
         });
     }
 
+    private void validateSavingsConversionData(SalaryAccount salary) {
+        if (salary == null) {
+            throw new IllegalArgumentException("Salary account is required for conversion.");
+        }
+        if (salary.getAccountNumber() == null || salary.getAccountNumber().isBlank()) {
+            throw new IllegalArgumentException("Salary account number is missing.");
+        }
+        if (salary.getCustomerId() == null || salary.getCustomerId().isBlank()) {
+            throw new IllegalArgumentException("Salary account customer ID is missing.");
+        }
+        if (salary.getEmployeeName() == null || salary.getEmployeeName().isBlank()) {
+            throw new IllegalArgumentException("Salary account holder name is missing.");
+        }
+        if (salary.getMobileNumber() == null || salary.getMobileNumber().isBlank()) {
+            throw new IllegalArgumentException("Salary account mobile number is missing.");
+        }
+        if (salary.getAadharNumber() == null || salary.getAadharNumber().isBlank()) {
+            throw new IllegalArgumentException("Salary account Aadhar is missing; conversion to savings is blocked.");
+        }
+        if (salary.getPanNumber() == null || salary.getPanNumber().isBlank()) {
+            throw new IllegalArgumentException("Salary account PAN is missing; conversion to savings is blocked.");
+        }
+    }
+
     private boolean applyAccountTypeChange(String accountNumber, String fromType, String toType, String approvedBy) {
         String sourceType = normalizeSourceType(fromType);
         String targetType = normalizeTargetType(toType);
@@ -462,32 +486,31 @@ public class AccountConversionService {
             if (salary == null) {
                 throw new IllegalArgumentException("Salary account not found: " + accountNumber);
             }
+            validateSavingsConversionData(salary);
+
             Account account = accountRepository.findByAccountNumber(accountNumber);
+            if (account == null) {
+                account = accountRepository.findByCustomerId(salary.getCustomerId());
+            }
             if (account == null) {
                 account = new Account();
                 account.setAccountNumber(accountNumber);
-                account.setName(salary.getEmployeeName());
-                account.setPhone(salary.getMobileNumber());
-                account.setAadharNumber(salary.getAadharNumber());
-                account.setPan(salary.getPanNumber());
-                account.setAddress(salary.getAddress());
-                account.setCustomerId(salary.getCustomerId());
-                account.setStatus("ACTIVE");
-                account.setBalance(salary.getBalance());
-                account.setAccountType("Savings");
-            } else {
-                account.setName(salary.getEmployeeName());
-                account.setPhone(salary.getMobileNumber());
-                account.setAadharNumber(salary.getAadharNumber());
-                account.setPan(salary.getPanNumber());
-                account.setAddress(salary.getAddress());
-                account.setCustomerId(salary.getCustomerId());
-                account.setStatus("ACTIVE");
-                account.setBalance(salary.getBalance());
-                account.setAccountType("Savings");
             }
+
+            account.setName(salary.getEmployeeName());
+            account.setPhone(salary.getMobileNumber());
+            account.setAadharNumber(salary.getAadharNumber());
+            account.setPan(salary.getPanNumber());
+            account.setAddress(salary.getAddress());
+            account.setCustomerId(salary.getCustomerId());
+            account.setStatus("ACTIVE");
+            account.setBalance(salary.getBalance() != null ? salary.getBalance() : 0.0);
+            account.setAccountType("Savings");
+            account.setLastUpdated(LocalDateTime.now());
             accountRepository.save(account);
+
             salary.setStatus("CONVERTED_TO_SAVINGS");
+            salary.setUpdatedAt(LocalDateTime.now());
             salaryAccountRepository.save(salary);
             return true;
         }

@@ -101,4 +101,33 @@ class AccountConversionServiceTest {
         assertThat(blockers.toString()).contains("Outstanding loan");
         assertThat(blockers.toString()).contains("credit/debit card debt remains");
     }
+
+    @Test
+    void refusesSalaryToSavingsConversionWhenKycIsIncomplete() {
+        com.neo.springapp.model.AccountConversionRequest request = new com.neo.springapp.model.AccountConversionRequest();
+        request.setId(1L);
+        request.setAccountNumber("SAL-500");
+        request.setOriginalAccountType("Salary");
+        request.setTargetAccountType("Savings");
+
+        com.neo.springapp.model.SalaryAccount salary = new com.neo.springapp.model.SalaryAccount();
+        salary.setAccountNumber("SAL-500");
+        salary.setCustomerId("CID-500");
+        salary.setEmployeeName("Test User");
+        salary.setMobileNumber("9999999999");
+        salary.setAadharNumber(null);
+        salary.setPanNumber(null);
+
+        when(conversionRepository.findById(1L)).thenReturn(java.util.Optional.of(request));
+        when(salaryAccountRepository.findByAccountNumber("SAL-500")).thenReturn(salary);
+
+        try {
+            service.approveRequest(1L, "Admin");
+        } catch (IllegalArgumentException ex) {
+            assertThat(ex.getMessage()).contains("Aadhar");
+            return;
+        }
+
+        throw new AssertionError("Expected the public approval flow to reject incomplete salary KYC before applying the conversion");
+    }
 }
