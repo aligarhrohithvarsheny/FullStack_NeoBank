@@ -207,11 +207,97 @@ export class Userdashboard implements OnInit, OnDestroy {
   depositMessage: string = '';
   depositError: string = '';
 
+  // NeoBank cash deposit slip
+  depositAccountType: 'Savings' | 'Salary' | 'Current' = 'Savings';
+  depositSlipDate: string = new Date().toISOString().slice(0, 10);
+  depositDenominations = [
+    { value: 2000, count: 0 },
+    { value: 500, count: 0 },
+    { value: 200, count: 0 },
+    { value: 100, count: 0 },
+    { value: 50, count: 0 },
+    { value: 20, count: 0 },
+    { value: 10, count: 0 }
+  ];
+
+  get depositSlipAccount(): any {
+    const account = this.userProfile?.account || {};
+    const currentAccount = this.linkedCurrentAccountDetails || {};
+    const isCurrent = this.depositAccountType === 'Current';
+    return {
+      accountNumber: isCurrent ? (currentAccount.accountNumber || this.userAccountNumber) : this.userAccountNumber,
+      holderName: isCurrent ? (currentAccount.ownerName || this.username) : (account.name || this.username),
+      mobile: account.phone || account.mobile || account.mobileNumber || '',
+      email: this.userProfile?.email || account.email || '',
+      pan: account.pan || account.panNumber || '',
+      branch: account.branchName || currentAccount.branchName || 'NeoBank Digital Branch',
+      ifsc: account.ifscCode || currentAccount.ifscCode || 'NEOB0001234'
+    };
+  }
+
+  get depositDenominationTotal(): number {
+    return this.depositDenominations.reduce((total, note) => total + note.value * note.count, 0);
+  }
+
+  get depositAmountInWords(): string {
+    return this.amountToWords(Number(this.depositForm.amount) || 0);
+  }
+
   onDepositMethodChange(): void {
     if (this.depositForm.method !== 'Cheque') {
       this.depositForm.referenceNumber = '';
     }
     this.depositError = '';
+  }
+
+  onDepositAmountChange(): void {
+    const amount = Math.max(0, Math.floor(Number(this.depositForm.amount) || 0));
+    let remaining = amount;
+    this.depositDenominations = this.depositDenominations.map(note => {
+      const count = Math.floor(remaining / note.value);
+      remaining %= note.value;
+      return { ...note, count };
+    });
+  }
+
+  printDepositSlip(): void {
+    if (!this.depositForm.amount || this.depositForm.amount <= 0) {
+      this.depositError = 'Enter a deposit amount before printing the slip.';
+      return;
+    }
+    this.onDepositAmountChange();
+    const details = this.depositSlipAccount;
+    const denominationRows = this.depositDenominations
+      .filter(note => note.count > 0)
+      .map(note => `<tr><td>${note.value}</td><td>${note.count}</td><td>${note.value * note.count}</td></tr>`)
+      .join('') || '<tr><td colspan="3">No denominations entered</td></tr>';
+    const printWindow = window.open('', '_blank', 'width=980,height=760');
+    if (!printWindow) {
+      this.depositError = 'Allow pop-ups to print the NeoBank deposit slip.';
+      return;
+    }
+    printWindow.document.write(`<!doctype html><html><head><title>NeoBank Deposit Slip</title><style>
+      *{box-sizing:border-box}body{margin:0;padding:24px;background:#eef3f6;font-family:Arial,sans-serif;color:#17212b}.slip{max-width:900px;margin:auto;background:#fff;border:1px solid #9aa8b2;padding:24px}.brand{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #0f766e;padding-bottom:14px}.brand h1{margin:0;color:#0f766e;letter-spacing:2px;font-size:28px}.brand p{margin:4px 0 0;color:#64748b;font-size:12px}.date{font-size:13px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:0 28px;margin-top:18px}.field{border-bottom:1px solid #9aa8b2;padding:8px 0;font-size:13px}.field b{display:inline-block;min-width:118px;color:#475569}.title{text-align:center;font-weight:700;letter-spacing:1px;margin:18px 0 8px;color:#0f766e}.layout{display:grid;grid-template-columns:1.1fr 1fr;gap:20px}.notes{width:100%;border-collapse:collapse}.notes th,.notes td{border:1px solid #9aa8b2;padding:8px;text-align:center;font-size:13px}.notes th{background:#e6f4f2}.total{font-size:16px;font-weight:700;text-align:right;margin-top:12px}.footer{display:flex;justify-content:space-between;margin-top:42px;font-size:12px}.print{margin:18px auto 0;display:block;padding:10px 20px;background:#0f766e;color:#fff;border:0;border-radius:5px}@media print{body{padding:0;background:#fff}.slip{border:0}.print{display:none}}
+    </style></head><body><main class="slip"><header class="brand"><div><h1>NEOBANK</h1><p>Simple banking for every day</p></div><div class="date">Date: <b>${new Date(this.depositSlipDate).toLocaleDateString('en-IN')}</b></div></header><div class="grid"><div class="field"><b>Account type</b>${this.depositAccountType}</div><div class="field"><b>Account number</b>${details.accountNumber || 'N/A'}</div><div class="field"><b>Name</b>${details.holderName || 'N/A'}</div><div class="field"><b>Mobile</b>${details.mobile || 'N/A'}</div><div class="field"><b>Branch</b>${details.branch}</div><div class="field"><b>IFSC</b>${details.ifsc}</div></div><div class="title">CASH DEPOSIT</div><div class="layout"><table class="notes"><thead><tr><th>Note</th><th>Nos.</th><th>Amount</th></tr></thead><tbody>${denominationRows}</tbody></table><div><div class="field"><b>Amount</b>Rs. ${Number(this.depositForm.amount).toLocaleString('en-IN')}</div><div class="field"><b>In words</b>${this.depositAmountInWords}</div><div class="field"><b>Method</b>${this.depositForm.method}</div><div class="field"><b>Reference</b>${this.depositForm.referenceNumber || 'N/A'}</div><div class="total">Total: Rs. ${this.depositDenominationTotal.toLocaleString('en-IN')}</div></div></div><div class="footer"><span>Depositor signature</span><span>For NeoBank use</span></div></main><button class="print" onclick="window.print()">Print Slip</button></body></html>`);
+    printWindow.document.close();
+  }
+
+  private amountToWords(amount: number): string {
+    if (!amount) return 'Zero rupees only';
+    const units = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+    const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+    const underThousand = (value: number): string => {
+      if (value < 20) return units[value];
+      if (value < 100) return `${tens[Math.floor(value / 10)]} ${units[value % 10]}`.trim();
+      return `${units[Math.floor(value / 100)]} Hundred ${underThousand(value % 100)}`.trim();
+    };
+    let remaining = Math.floor(amount);
+    const parts: string[] = [];
+    if (remaining >= 10000000) { parts.push(`${underThousand(Math.floor(remaining / 10000000))} Crore`); remaining %= 10000000; }
+    if (remaining >= 100000) { parts.push(`${underThousand(Math.floor(remaining / 100000))} Lakh`); remaining %= 100000; }
+    if (remaining >= 1000) { parts.push(`${underThousand(Math.floor(remaining / 1000))} Thousand`); remaining %= 1000; }
+    if (remaining) parts.push(underThousand(remaining));
+    return `${parts.join(' ')} Rupees Only`;
   }
   
   // Credit Card properties

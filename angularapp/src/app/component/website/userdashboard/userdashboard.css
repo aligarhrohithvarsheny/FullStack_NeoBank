@@ -772,6 +772,14 @@ select.ud-input { cursor: pointer; }
 .ud-deposit-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
 .ud-deposit-body { font-size: 13px; color: #475569; }
 .ud-deposit-body p { margin: 4px 0; }
+.ud-denomination-panel { margin: 20px 0; padding: 16px; background: #f0fdfa; border: 1px solid #99f6e4; border-radius: 12px; }
+.ud-slip-section-heading { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 12px; color: #115e59; }
+.ud-slip-section-heading span { color: #64748b; font-size: 12px; }
+.ud-denomination-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 18px; }
+.ud-denomination-row { display: grid; grid-template-columns: 56px 1fr 80px; align-items: center; gap: 8px; font-size: 13px; }
+.ud-denomination-row .ud-input { padding: 7px 9px; }
+.ud-denomination-row strong { text-align: right; color: #0f766e; }
+.ud-denomination-total { border-top: 1px solid #99f6e4; margin-top: 12px; padding-top: 10px; text-align: right; color: #115e59; font-weight: 800; }
 
 /* ══════════════════════════════════════════════════════
    MODALS
@@ -933,6 +941,10 @@ select.ud-input { cursor: pointer; }
   .cb-welcome-block { display: none; }
   .ud-result-details { grid-template-columns: 1fr; }
   .ud-form-grid { grid-template-columns: 1fr; }
+  .ud-denomination-grid { grid-template-columns: 1fr; }
+  .ud-feature-header { gap: 12px; }
+  .ud-feature-header h2 { font-size: 19px; }
+  .ud-form-actions { flex-wrap: wrap; }
 }
 
 /* ─── Legacy class compatibility ─── */
