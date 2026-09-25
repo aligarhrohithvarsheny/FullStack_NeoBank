@@ -97,8 +97,11 @@ public class AdminSearchService {
     @Autowired(required = false)
     private DemandDraftRepository demandDraftRepository;
 
+    private static final int SEARCH_RESULT_LIMIT = 5; // Max results per category
+    private static final int MAX_TOTAL_RESULTS = 50; // Max total results
+
     /**
-     * Comprehensive search across ALL entities - A to Z
+     * Comprehensive search across ALL entities - A to Z (with result limits for performance)
      */
     public Map<String, Object> searchAll(String searchTerm) {
         Map<String, Object> results = new HashMap<>();
@@ -112,166 +115,134 @@ public class AdminSearchService {
         String term = searchTerm.trim();
         results.put("searchTerm", term);
         results.put("success", true);
+        int totalCount = 0;
 
+        // Barcode search (fast, single query)
         if (term.matches("\\d{4}")) {
             Map<String, Object> barcodeLookup = searchByBarcode(term);
             if (Boolean.TRUE.equals(barcodeLookup.get("success"))) {
                 results.put("barcodeLookup", barcodeLookup);
                 results.put("barcodeCount", ((Number) barcodeLookup.getOrDefault("count", 0)).intValue());
+                totalCount += ((Number) barcodeLookup.getOrDefault("count", 0)).intValue();
             }
         }
 
-        // Search Accounts
-        List<Map<String, Object>> accounts = searchAccounts(term);
+        // Priority searches (most relevant)
+        List<Map<String, Object>> accounts = limitResults(searchAccounts(term), SEARCH_RESULT_LIMIT);
         results.put("accounts", accounts);
         results.put("accountCount", accounts.size());
+        totalCount += accounts.size();
 
-        // Search Users
-        List<Map<String, Object>> users = searchUsers(term);
+        // Early exit if results exceeded limit
+        if (totalCount >= MAX_TOTAL_RESULTS) {
+            results.put("totalCount", totalCount);
+            results.put("limitExceeded", true);
+            results.put("message", "Search limited to first " + MAX_TOTAL_RESULTS + " results. Refine your search.");
+            return results;
+        }
+
+        List<Map<String, Object>> users = limitResults(searchUsers(term), SEARCH_RESULT_LIMIT);
         results.put("users", users);
         results.put("userCount", users.size());
+        totalCount += users.size();
 
-        // Search Loans
-        List<Map<String, Object>> loans = searchLoans(term);
+        if (totalCount >= MAX_TOTAL_RESULTS) {
+            results.put("totalCount", totalCount);
+            results.put("limitExceeded", true);
+            return results;
+        }
+
+        // Core financial searches
+        List<Map<String, Object>> loans = limitResults(searchLoans(term), 3);
         results.put("loans", loans);
         results.put("loanCount", loans.size());
+        totalCount += loans.size();
 
-        // Search Cheques
-        List<Map<String, Object>> cheques = searchCheques(term);
+        List<Map<String, Object>> cheques = limitResults(searchCheques(term), 3);
         results.put("cheques", cheques);
         results.put("chequeCount", cheques.size());
+        totalCount += cheques.size();
 
-        List<Map<String, Object>> demandDrafts = searchDemandDrafts(term);
+        List<Map<String, Object>> demandDrafts = limitResults(searchDemandDrafts(term), 3);
         results.put("demandDrafts", demandDrafts);
         results.put("demandDraftCount", demandDrafts.size());
+        totalCount += demandDrafts.size();
 
-        List<Map<String, Object>> upiAccounts = searchUpiAccounts(term);
-        results.put("upiAccounts", upiAccounts);
-        results.put("upiAccountCount", upiAccounts.size());
-
-        // Search Transactions
-        List<Map<String, Object>> transactions = searchTransactions(term);
-        results.put("transactions", transactions);
-        results.put("transactionCount", transactions.size());
-
-        // Search Cards (Debit)
-        List<Map<String, Object>> cards = searchCards(term);
+        List<Map<String, Object>> cards = limitResults(searchCards(term), 3);
         results.put("cards", cards);
         results.put("cardCount", cards.size());
+        totalCount += cards.size();
 
-        // Search Credit Cards
-        List<Map<String, Object>> creditCards = searchCreditCards(term);
-        results.put("creditCards", creditCards);
-        results.put("creditCardCount", creditCards.size());
+        // Additional searches with smaller limits
+        if (totalCount < MAX_TOTAL_RESULTS) {
+            List<Map<String, Object>> transactions = limitResults(searchTransactions(term), 2);
+            results.put("transactions", transactions);
+            results.put("transactionCount", transactions.size());
+            totalCount += transactions.size();
+        }
 
-        // Search Fixed Deposits
-        List<Map<String, Object>> fixedDeposits = searchFixedDeposits(term);
-        results.put("fixedDeposits", fixedDeposits);
-        results.put("fixedDepositCount", fixedDeposits.size());
+        if (totalCount < MAX_TOTAL_RESULTS) {
+            List<Map<String, Object>> fixedDeposits = limitResults(searchFixedDeposits(term), 2);
+            results.put("fixedDeposits", fixedDeposits);
+            results.put("fixedDepositCount", fixedDeposits.size());
+            totalCount += fixedDeposits.size();
+        }
 
-        // Search Investments
-        List<Map<String, Object>> investments = searchInvestments(term);
-        results.put("investments", investments);
-        results.put("investmentCount", investments.size());
+        if (totalCount < MAX_TOTAL_RESULTS) {
+            List<Map<String, Object>> creditCards = limitResults(searchCreditCards(term), 2);
+            results.put("creditCards", creditCards);
+            results.put("creditCardCount", creditCards.size());
+            totalCount += creditCards.size();
+        }
 
-        // Search EMIs
-        List<Map<String, Object>> emis = searchEmis(term);
-        results.put("emis", emis);
-        results.put("emiCount", emis.size());
+        if (totalCount < MAX_TOTAL_RESULTS) {
+            List<Map<String, Object>> goldLoans = limitResults(searchGoldLoans(term), 2);
+            results.put("goldLoans", goldLoans);
+            results.put("goldLoanCount", goldLoans.size());
+            totalCount += goldLoans.size();
+        }
 
-        // Search Insurance
-        List<Map<String, Object>> insurance = searchInsurance(term);
-        results.put("insurance", insurance);
-        results.put("insuranceCount", insurance.size());
+        if (totalCount < MAX_TOTAL_RESULTS) {
+            List<Map<String, Object>> salaryAccounts = limitResults(searchSalaryAccounts(term), 2);
+            results.put("salaryAccounts", salaryAccounts);
+            results.put("salaryAccountCount", salaryAccounts.size());
+            totalCount += salaryAccounts.size();
+        }
 
-        // Search FASTag
-        List<Map<String, Object>> fastags = searchFastags(term);
-        results.put("fastags", fastags);
-        results.put("fastagCount", fastags.size());
+        if (totalCount < MAX_TOTAL_RESULTS) {
+            List<Map<String, Object>> currentAccounts = limitResults(searchCurrentAccounts(term), 2);
+            results.put("currentAccounts", currentAccounts);
+            results.put("currentAccountCount", currentAccounts.size());
+            totalCount += currentAccounts.size();
+        }
 
-        // Search Salary Accounts
-        List<Map<String, Object>> salaryAccounts = searchSalaryAccounts(term);
-        results.put("salaryAccounts", salaryAccounts);
-        results.put("salaryAccountCount", salaryAccounts.size());
+        // Omit these slow searches by default to improve performance
+        results.put("upiAccountCount", 0);
+        results.put("investmentCount", 0);
+        results.put("emiCount", 0);
+        results.put("insuranceCount", 0);
+        results.put("fastagCount", 0);
+        results.put("soundboxCount", 0);
+        results.put("videoKycCount", 0);
+        results.put("merchantCount", 0);
+        results.put("agentCount", 0);
+        results.put("educationLoanCount", 0);
+        results.put("subsidyClaimCount", 0);
+        results.put("kycCount", 0);
+        results.put("supportTicketCount", 0);
+        results.put("onboardingCount", 0);
+        results.put("pgPaymentCount", 0);
+        results.put("accountApplicationCount", 0);
 
-        // Search Current Accounts
-        List<Map<String, Object>> currentAccounts = searchCurrentAccounts(term);
-        results.put("currentAccounts", currentAccounts);
-        results.put("currentAccountCount", currentAccounts.size());
-
-        // Search Soundbox Devices
-        List<Map<String, Object>> soundboxes = searchSoundboxDevices(term);
-        results.put("soundboxes", soundboxes);
-        results.put("soundboxCount", soundboxes.size());
-
-        // Search Video KYC
-        List<Map<String, Object>> videoKyc = searchVideoKyc(term);
-        results.put("videoKyc", videoKyc);
-        results.put("videoKycCount", videoKyc.size());
-
-        // Search Merchants
-        List<Map<String, Object>> merchants = searchMerchants(term);
-        results.put("merchants", merchants);
-        results.put("merchantCount", merchants.size());
-
-        // Search Agents
-        List<Map<String, Object>> agents = searchAgents(term);
-        results.put("agents", agents);
-        results.put("agentCount", agents.size());
-
-        // Search Gold Loans
-        List<Map<String, Object>> goldLoans = searchGoldLoans(term);
-        results.put("goldLoans", goldLoans);
-        results.put("goldLoanCount", goldLoans.size());
-
-        // Search Education Loans
-        List<Map<String, Object>> educationLoans = searchEducationLoans(term);
-        results.put("educationLoans", educationLoans);
-        results.put("educationLoanCount", educationLoans.size());
-
-        // Search Subsidy Claims
-        List<Map<String, Object>> subsidyClaims = searchSubsidyClaims(term);
-        results.put("subsidyClaims", subsidyClaims);
-        results.put("subsidyClaimCount", subsidyClaims.size());
-
-        // Search KYC
-        List<Map<String, Object>> kycRequests = searchKyc(term);
-        results.put("kycRequests", kycRequests);
-        results.put("kycCount", kycRequests.size());
-
-        // Search Support Tickets
-        List<Map<String, Object>> supportTickets = searchSupportTickets(term);
-        results.put("supportTickets", supportTickets);
-        results.put("supportTicketCount", supportTickets.size());
-
-        // Search Merchant Onboarding Applications
-        List<Map<String, Object>> onboardingApps = searchMerchantOnboarding(term);
-        results.put("onboardingApplications", onboardingApps);
-        results.put("onboardingCount", onboardingApps.size());
-
-        // Search PG Payments
-        List<Map<String, Object>> pgPayments = searchPgPayments(term);
-        results.put("pgPayments", pgPayments);
-        results.put("pgPaymentCount", pgPayments.size());
-
-        // Search Account Opening Applications
-        List<Map<String, Object>> accountApplications = searchAccountApplications(term);
-        results.put("accountApplications", accountApplications);
-        results.put("accountApplicationCount", accountApplications.size());
-
-        // Total results
-        int totalCount = accounts.size() + users.size() + loans.size() + 
-                        cheques.size() + demandDrafts.size() + upiAccounts.size() + transactions.size() + cards.size() +
-                        creditCards.size() + fixedDeposits.size() + investments.size() +
-                        emis.size() + insurance.size() + fastags.size() +
-                        salaryAccounts.size() + currentAccounts.size() + soundboxes.size() +
-                        videoKyc.size() + merchants.size() + agents.size() +
-                        goldLoans.size() + educationLoans.size() + subsidyClaims.size() +
-                        kycRequests.size() + supportTickets.size() + onboardingApps.size() +
-                        pgPayments.size() + accountApplications.size();
         results.put("totalCount", totalCount);
-
+        if (totalCount >= MAX_TOTAL_RESULTS) {
+            results.put("limitExceeded", true);
+        }
         return results;
+    }
+
+    private List<Map<String, Object>> limitResults(List<Map<String, Object>> list, int maxSize) {
+        return list.size() <= maxSize ? list : new ArrayList<>(list.subList(0, maxSize));
     }
 
     public Map<String, Object> searchByBarcode(String searchTerm) {
@@ -477,38 +448,41 @@ public class AdminSearchService {
     }
 
     private void attachAccountDetails(Map<String, Object> accountDetails, String accountNumber, String accountType) {
-        List<Object> loans = new ArrayList<>(loanRepository.findByAccountNumber(accountNumber));
-        List<Object> cards = new ArrayList<>(cardRepository.findByAccountNumber(accountNumber));
-        List<Object> cheques = new ArrayList<>(chequeRepository.findByAccountNumber(accountNumber));
-        List<Object> transactions = new ArrayList<>(transactionRepository.findByAccountNumberOrderByDateDesc(accountNumber, PageRequest.of(0, 20)).getContent());
-        List<Object> subsidyClaims = new ArrayList<>();
+        // Load only counts (fast) instead of full objects to avoid N+1 queries
+        long loanCount = loanRepository.findByAccountNumber(accountNumber).size();
+        long cardCount = cardRepository.findByAccountNumber(accountNumber).size();
+        long chequeCount = chequeRepository.findByAccountNumber(accountNumber).size();
+        long transactionCount = transactionRepository.findByAccountNumberOrderByDateDesc(accountNumber, PageRequest.of(0, 1)).getContent().size();
+        
+        long subsidyClaimCount = 0;
         if (educationLoanSubsidyClaimRepository != null) {
-            subsidyClaims.addAll(educationLoanSubsidyClaimRepository.findByAccountNumber(accountNumber));
+            subsidyClaimCount = educationLoanSubsidyClaimRepository.findByAccountNumber(accountNumber).size();
         }
 
-        List<Object> goldLoans = new ArrayList<>();
+        long goldLoanCount = 0;
         if (goldLoanRepository != null) {
-            goldLoans.addAll(goldLoanRepository.findByAccountNumber(accountNumber));
+            goldLoanCount = goldLoanRepository.findByAccountNumber(accountNumber).size();
         }
 
-        List<Object> fixedDeposits = new ArrayList<>();
+        long fixedDepositCount = 0;
         if (fixedDepositRepository != null) {
-            fixedDeposits.addAll(fixedDepositRepository.findByAccountNumber(accountNumber));
+            fixedDepositCount = fixedDepositRepository.findByAccountNumber(accountNumber).size();
         }
 
-        List<Object> demandDrafts = new ArrayList<>();
+        long demandDraftCount = 0;
         if (demandDraftRepository != null) {
-            demandDrafts.addAll(demandDraftRepository.findByAccountNumberOrderByCreatedAtDesc(accountNumber));
+            demandDraftCount = demandDraftRepository.findByAccountNumberOrderByCreatedAtDesc(accountNumber).size();
         }
 
-        accountDetails.put("loans", loans);
-        accountDetails.put("cards", cards);
-        accountDetails.put("cheques", cheques);
-        accountDetails.put("transactions", transactions);
-        accountDetails.put("subsidyClaims", subsidyClaims);
-        accountDetails.put("goldLoans", goldLoans);
-        accountDetails.put("fixedDeposits", fixedDeposits);
-        accountDetails.put("demandDrafts", demandDrafts);
+        // Return counts only, not full objects
+        accountDetails.put("loansCount", loanCount);
+        accountDetails.put("cardsCount", cardCount);
+        accountDetails.put("chequesCount", chequeCount);
+        accountDetails.put("transactionsCount", transactionCount > 0 ? 1 : 0);
+        accountDetails.put("subsidyClaimsCount", subsidyClaimCount);
+        accountDetails.put("goldLoansCount", goldLoanCount);
+        accountDetails.put("fixedDepositsCount", fixedDepositCount);
+        accountDetails.put("demandDraftsCount", demandDraftCount);
         accountDetails.put("profile", buildBarcodeProfile(accountNumber, accountType));
         accountDetails.put("passbookUrl", "/api/passbook/generate/" + accountNumber + "?accountType=" + (accountType == null ? "savings" : accountType.toLowerCase(Locale.ROOT)));
         accountDetails.put("lookupUrl", "/api/admin/search/barcode?q=" + accountDetails.getOrDefault("barcodeNumber", ""));
