@@ -120,17 +120,47 @@
               <span class="badge barcode-badge">{{ match.accountType }}</span>
               <span class="barcode-number">Barcode: {{ match.barcodeNumber }}</span>
             </div>
-            <p><strong>Name:</strong> {{ match.name || 'N/A' }}</p>
-            <p><strong>Account Number:</strong> {{ match.accountNumber }}</p>
-            <p><strong>Customer ID:</strong> {{ match.customerId || 'N/A' }}</p>
-            <p><strong>Balance:</strong> ₹{{ match.balance | number:'1.2-2' }}</p>
-            <p><strong>Status:</strong> {{ match.status || 'N/A' }}</p>
-            <div *ngIf="match.loans?.length || match.cards?.length || match.cheques?.length || match.transactions?.length || match.subsidyClaims?.length">
-              <p><strong>Loans:</strong> {{ (match.loans || []).length }}</p>
-              <p><strong>Cards:</strong> {{ (match.cards || []).length }}</p>
-              <p><strong>Cheques:</strong> {{ (match.cheques || []).length }}</p>
-              <p><strong>Fund Activity:</strong> {{ (match.transactions || []).length }}</p>
-              <p><strong>Subsidy Claims:</strong> {{ (match.subsidyClaims || []).length }}</p>
+
+            <div class="barcode-profile-grid">
+              <p><strong>Name:</strong> {{ match.name || match.profile?.name || 'N/A' }}</p>
+              <p><strong>Account Number:</strong> {{ match.accountNumber || 'N/A' }}</p>
+              <p><strong>Customer ID:</strong> {{ match.customerId || match.profile?.customerId || 'N/A' }}</p>
+              <p><strong>Balance:</strong> ₹{{ (match.balance ?? match.profile?.balance ?? 0) | number:'1.2-2' }}</p>
+              <p><strong>Status:</strong> {{ match.status || match.profile?.status || 'N/A' }}</p>
+              <p><strong>Phone:</strong> {{ match.phone || match.profile?.phone || 'N/A' }}</p>
+            </div>
+
+            <div class="barcode-detail-grid">
+              <div class="barcode-detail-box">
+                <strong>Loans:</strong> {{ (match.loans || []).length }}
+              </div>
+              <div class="barcode-detail-box">
+                <strong>Gold Loans:</strong> {{ (match.goldLoans || []).length }}
+              </div>
+              <div class="barcode-detail-box">
+                <strong>Subsidy Claims:</strong> {{ (match.subsidyClaims || []).length }}
+              </div>
+              <div class="barcode-detail-box">
+                <strong>Fixed Deposits:</strong> {{ (match.fixedDeposits || []).length }}
+              </div>
+              <div class="barcode-detail-box">
+                <strong>Demand Drafts:</strong> {{ (match.demandDrafts || []).length }}
+              </div>
+              <div class="barcode-detail-box">
+                <strong>Cheques:</strong> {{ (match.cheques || []).length }}
+              </div>
+              <div class="barcode-detail-box">
+                <strong>Cards:</strong> {{ (match.cards || []).length }}
+              </div>
+              <div class="barcode-detail-box">
+                <strong>Transactions:</strong> {{ (match.transactions || []).length }}
+              </div>
+            </div>
+
+            <div class="barcode-actions" *ngIf="match.passbookUrl">
+              <a class="barcode-passbook-link" [href]="match.passbookUrl" target="_blank" rel="noopener noreferrer">
+                Generate Passbook
+              </a>
             </div>
           </div>
         </div>

@@ -955,6 +955,43 @@
   color: #334155;
 }
 
+.barcode-profile-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 8px 18px;
+  margin: 12px 0 18px;
+}
+
+.barcode-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 10px;
+  margin: 12px 0 16px;
+}
+
+.barcode-detail-box {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 13px;
+  color: #1e3a8a;
+}
+
+.barcode-actions {
+  margin-top: 12px;
+}
+
+.barcode-passbook-link {
+  display: inline-block;
+  padding: 10px 16px;
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  color: #fff;
+  border-radius: 10px;
+  text-decoration: none;
+  font-weight: 700;
+}
+
 @media (max-width: 900px) {
   .barcode-lookup-grid {
     grid-template-columns: 1fr;

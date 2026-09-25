@@ -317,25 +317,20 @@ public class AdminSearchService {
             return result;
         }
 
+        for (Map<String, Object> accountDetails : matches) {
+            String accountNumber = (String) accountDetails.get("accountNumber");
+            String accountType = (String) accountDetails.get("accountType");
+            if (accountNumber != null) {
+                attachAccountDetails(accountDetails, accountNumber, accountType);
+            }
+        }
+
         result.put("success", true);
         result.put("barcode", barcode);
         result.put("count", matches.size());
         result.put("matches", matches);
         result.put("account", matches.get(0));
-
-        Map<String, Object> accountDetails = matches.get(0);
-        String accountNumber = (String) accountDetails.get("accountNumber");
-        if (accountNumber != null) {
-            accountDetails.put("loans", loanRepository.findByAccountNumber(accountNumber));
-            accountDetails.put("cards", cardRepository.findByAccountNumber(accountNumber));
-            accountDetails.put("cheques", chequeRepository.findByAccountNumber(accountNumber));
-            accountDetails.put("transactions", transactionRepository.findByAccountNumberOrderByDateDesc(accountNumber, PageRequest.of(0, 20)).getContent());
-            if (educationLoanSubsidyClaimRepository != null) {
-                accountDetails.put("subsidyClaims", educationLoanSubsidyClaimRepository.findByAccountNumber(accountNumber));
-            }
-            accountDetails.put("profile", buildBarcodeProfile(accountNumber, accountDetails.get("accountType").toString()));
-        }
-
+        result.put("lookupUrl", "/api/admin/search/barcode?q=" + barcode);
         return result;
     }
 
@@ -391,6 +386,8 @@ public class AdminSearchService {
         result.put("accountType", resolvedType);
         result.put("accountNumber", normalizedAccountNumber);
         result.put("barcodeNumber", finalBarcode);
+        result.put("lookupUrl", "/api/admin/search/barcode?q=" + finalBarcode);
+        result.put("passbookUrl", "/api/passbook/generate/" + normalizedAccountNumber + "?accountType=" + resolvedType.toLowerCase(Locale.ROOT));
         result.put("message", "Barcode generated successfully");
         return result;
     }
@@ -477,6 +474,44 @@ public class AdminSearchService {
         result.put("barcodeNumber", account.getBarcodeNumber());
         result.put("customerId", account.getCustomerId());
         return result;
+    }
+
+    private void attachAccountDetails(Map<String, Object> accountDetails, String accountNumber, String accountType) {
+        List<Object> loans = new ArrayList<>(loanRepository.findByAccountNumber(accountNumber));
+        List<Object> cards = new ArrayList<>(cardRepository.findByAccountNumber(accountNumber));
+        List<Object> cheques = new ArrayList<>(chequeRepository.findByAccountNumber(accountNumber));
+        List<Object> transactions = new ArrayList<>(transactionRepository.findByAccountNumberOrderByDateDesc(accountNumber, PageRequest.of(0, 20)).getContent());
+        List<Object> subsidyClaims = new ArrayList<>();
+        if (educationLoanSubsidyClaimRepository != null) {
+            subsidyClaims.addAll(educationLoanSubsidyClaimRepository.findByAccountNumber(accountNumber));
+        }
+
+        List<Object> goldLoans = new ArrayList<>();
+        if (goldLoanRepository != null) {
+            goldLoans.addAll(goldLoanRepository.findByAccountNumber(accountNumber));
+        }
+
+        List<Object> fixedDeposits = new ArrayList<>();
+        if (fixedDepositRepository != null) {
+            fixedDeposits.addAll(fixedDepositRepository.findByAccountNumber(accountNumber));
+        }
+
+        List<Object> demandDrafts = new ArrayList<>();
+        if (demandDraftRepository != null) {
+            demandDrafts.addAll(demandDraftRepository.findByAccountNumberOrderByCreatedAtDesc(accountNumber));
+        }
+
+        accountDetails.put("loans", loans);
+        accountDetails.put("cards", cards);
+        accountDetails.put("cheques", cheques);
+        accountDetails.put("transactions", transactions);
+        accountDetails.put("subsidyClaims", subsidyClaims);
+        accountDetails.put("goldLoans", goldLoans);
+        accountDetails.put("fixedDeposits", fixedDeposits);
+        accountDetails.put("demandDrafts", demandDrafts);
+        accountDetails.put("profile", buildBarcodeProfile(accountNumber, accountType));
+        accountDetails.put("passbookUrl", "/api/passbook/generate/" + accountNumber + "?accountType=" + (accountType == null ? "savings" : accountType.toLowerCase(Locale.ROOT)));
+        accountDetails.put("lookupUrl", "/api/admin/search/barcode?q=" + accountDetails.getOrDefault("barcodeNumber", ""));
     }
 
     private Map<String, Object> buildBarcodeProfile(String accountNumber, String accountType) {
