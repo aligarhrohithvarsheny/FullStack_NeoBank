@@ -8,6 +8,7 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfigurationSource;
 
 /**
@@ -26,6 +27,9 @@ public class SpringSecurityConfig {
 
     @Autowired
     private CorsConfigurationSource corsConfigurationSource;
+
+    @Autowired
+    private UserSessionTokenFilter userSessionTokenFilter;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -81,7 +85,8 @@ public class SpringSecurityConfig {
             // Disable default login/logout pages (prevents redirects)
             .formLogin(form -> form.disable())
             .httpBasic(basic -> basic.disable())
-            .logout(logout -> logout.disable());
+            .logout(logout -> logout.disable())
+            .addFilterBefore(userSessionTokenFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }

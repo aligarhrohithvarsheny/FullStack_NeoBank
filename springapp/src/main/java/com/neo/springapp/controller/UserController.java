@@ -83,6 +83,9 @@ public class UserController {
     private com.neo.springapp.service.SessionHistoryService sessionHistoryService;
 
     @Autowired
+    private com.neo.springapp.service.UserSessionTokenService userSessionTokenService;
+
+    @Autowired
     private com.neo.springapp.service.FraudAlertService fraudAlertService;
 
     @Autowired
@@ -189,6 +192,7 @@ public class UserController {
         Map<String, Object> response = new HashMap<>();
         response.put("success", true);
         response.put("user", createUserResponse(user));
+        response.put("token", userSessionTokenService.issue(user.getId(), user.getAccountNumber()));
         response.put("role", "USER");
         response.put("message", "Login successful");
         System.out.println("Login successful for user: " + user.getUsername());
