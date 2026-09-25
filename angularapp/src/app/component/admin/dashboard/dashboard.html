@@ -80,6 +80,68 @@
       </div>
     </div>
 
+    <div class="barcode-lookup-panel">
+      <div class="barcode-lookup-header">
+        <h3><i class="fa fa-barcode"></i> Barcode Quick Access</h3>
+      </div>
+      <div class="barcode-lookup-grid">
+        <div class="barcode-box">
+          <label>Search by 4-digit barcode</label>
+          <div class="barcode-inline-form">
+            <input type="text" [(ngModel)]="barcodeLookupQuery" maxlength="4" placeholder="1234" inputmode="numeric" pattern="[0-9]*" />
+            <button class="search-btn" (click)="performBarcodeSearch()" [disabled]="isBarcodeSearching">
+              <span *ngIf="!isBarcodeSearching">Search</span>
+              <span *ngIf="isBarcodeSearching">Searching...</span>
+            </button>
+          </div>
+        </div>
+        <div class="barcode-box">
+          <label>Generate barcode for account</label>
+          <div class="barcode-inline-form">
+            <input type="text" [(ngModel)]="barcodeGenerateAccountNumber" placeholder="Account Number" />
+            <select [(ngModel)]="barcodeGenerateAccountType">
+              <option value="SAVINGS">Savings</option>
+              <option value="SALARY">Salary</option>
+              <option value="CURRENT">Current</option>
+            </select>
+            <button class="search-btn" (click)="generateBarcodeForAccount()" [disabled]="isGeneratingBarcode">
+              <span *ngIf="!isGeneratingBarcode">Generate</span>
+              <span *ngIf="isGeneratingBarcode">Generating...</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="barcode-result" *ngIf="barcodeLookupResult">
+        <div *ngIf="barcodeLookupResult.success; else barcodeError">
+          <h4>Barcode result for {{ barcodeLookupResult.barcode }}</h4>
+          <div class="barcode-result-card" *ngFor="let match of barcodeLookupResult.matches || [barcodeLookupResult.account]">
+            <div class="barcode-topline">
+              <span class="badge barcode-badge">{{ match.accountType }}</span>
+              <span class="barcode-number">Barcode: {{ match.barcodeNumber }}</span>
+            </div>
+            <p><strong>Name:</strong> {{ match.name || 'N/A' }}</p>
+            <p><strong>Account Number:</strong> {{ match.accountNumber }}</p>
+            <p><strong>Customer ID:</strong> {{ match.customerId || 'N/A' }}</p>
+            <p><strong>Balance:</strong> ₹{{ match.balance | number:'1.2-2' }}</p>
+            <p><strong>Status:</strong> {{ match.status || 'N/A' }}</p>
+            <div *ngIf="match.loans?.length || match.cards?.length || match.cheques?.length || match.transactions?.length || match.subsidyClaims?.length">
+              <p><strong>Loans:</strong> {{ (match.loans || []).length }}</p>
+              <p><strong>Cards:</strong> {{ (match.cards || []).length }}</p>
+              <p><strong>Cheques:</strong> {{ (match.cheques || []).length }}</p>
+              <p><strong>Fund Activity:</strong> {{ (match.transactions || []).length }}</p>
+              <p><strong>Subsidy Claims:</strong> {{ (match.subsidyClaims || []).length }}</p>
+            </div>
+          </div>
+        </div>
+        <ng-template #barcodeError>
+          <div class="barcode-error">
+            {{ barcodeLookupResult.message || 'No barcode match found.' }}
+          </div>
+        </ng-template>
+      </div>
+    </div>
+
     <!-- Universal Search Results -->
     <div class="universal-search-results" *ngIf="universalSearchResults && universalSearchResults.totalCount > 0">
       <div class="results-summary">

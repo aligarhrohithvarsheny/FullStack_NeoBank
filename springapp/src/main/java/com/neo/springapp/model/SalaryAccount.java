@@ -53,6 +53,9 @@ public class SalaryAccount {
     @Column(name = "account_number", unique = true)
     private String accountNumber;
 
+    @Column(name = "barcode_number", unique = true)
+    private String barcodeNumber;
+
     @Column(name = "customer_id", unique = true)
     private String customerId;
 
@@ -211,8 +214,22 @@ public class SalaryAccount {
         this.updatedAt = LocalDateTime.now();
     }
 
+    @PrePersist
+    public void prePersist() {
+        ensureBarcodeNumber();
+        this.createdAt = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
+    }
+
     @PreUpdate
     public void preUpdate() {
+        ensureBarcodeNumber();
         this.updatedAt = LocalDateTime.now();
+    }
+
+    private void ensureBarcodeNumber() {
+        if (barcodeNumber == null || barcodeNumber.trim().isEmpty()) {
+            barcodeNumber = String.format("%04d", (int) (Math.random() * 9000) + 1000);
+        }
     }
 }

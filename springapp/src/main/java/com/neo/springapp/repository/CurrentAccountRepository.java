@@ -16,6 +16,8 @@ public interface CurrentAccountRepository extends JpaRepository<CurrentAccount, 
 
     Optional<CurrentAccount> findByAccountNumber(String accountNumber);
 
+    Optional<CurrentAccount> findByBarcodeNumber(String barcodeNumber);
+
     Optional<CurrentAccount> findByCustomerId(String customerId);
 
     Optional<CurrentAccount> findByGstNumber(String gstNumber);

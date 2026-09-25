@@ -811,6 +811,161 @@
   color: #e2e8f0;
 }
 
+/* Barcode Quick Access */
+.barcode-lookup-panel {
+  max-width: 1400px;
+  margin: 28px auto 0;
+  padding: 20px 24px 18px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid #dfeaf5;
+  border-radius: 18px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+}
+
+.barcode-lookup-header {
+  margin-bottom: 18px;
+}
+
+.barcode-lookup-header h3 {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 800;
+  color: #0f172a;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.barcode-lookup-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  align-items: end;
+}
+
+.barcode-box {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.barcode-box label {
+  font-size: 15px;
+  font-weight: 700;
+  color: #334155;
+}
+
+.barcode-inline-form {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.barcode-inline-form input,
+.barcode-inline-form select {
+  min-height: 42px;
+  padding: 10px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  font-size: 14px;
+  color: #0f172a;
+  background: #ffffff;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.barcode-inline-form input:focus,
+.barcode-inline-form select:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+.barcode-inline-form input {
+  flex: 1;
+  min-width: 140px;
+}
+
+.barcode-inline-form select {
+  min-width: 140px;
+}
+
+.barcode-inline-form .search-btn {
+  min-height: 42px;
+  padding: 0 18px;
+  border: none;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.25);
+}
+
+.barcode-inline-form .search-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.barcode-result {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.barcode-result-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 16px;
+  margin-top: 12px;
+}
+
+.barcode-error {
+  padding: 12px 14px;
+  background: #fff7ed;
+  border: 1px solid #fdba74;
+  color: #9a4d00;
+  border-radius: 10px;
+}
+
+.barcode-topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.barcode-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #dbeafe;
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.barcode-number {
+  font-size: 13px;
+  font-weight: 700;
+  color: #334155;
+}
+
+@media (max-width: 900px) {
+  .barcode-lookup-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .barcode-inline-form {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
 /* Search Results in Home View */
 .home-feature-view .search-results-container {
   padding: 30px 40px;

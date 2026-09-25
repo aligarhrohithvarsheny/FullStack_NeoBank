@@ -18,6 +18,9 @@ public class CurrentAccount {
     private String accountNumber;
 
     @Column(unique = true)
+    private String barcodeNumber;
+
+    @Column(unique = true)
     private String customerId;
 
     // Business Details
@@ -122,11 +125,17 @@ public class CurrentAccount {
         if (customerId == null) {
             customerId = generateCustomerId();
         }
+        if (barcodeNumber == null || barcodeNumber.trim().isEmpty()) {
+            barcodeNumber = String.format("%04d", (int) (Math.random() * 9000) + 1000);
+        }
     }
 
     @PreUpdate
     protected void onUpdate() {
         lastUpdated = LocalDateTime.now();
+        if (barcodeNumber == null || barcodeNumber.trim().isEmpty()) {
+            barcodeNumber = String.format("%04d", (int) (Math.random() * 9000) + 1000);
+        }
     }
 
     private String generateAccountNumber() {

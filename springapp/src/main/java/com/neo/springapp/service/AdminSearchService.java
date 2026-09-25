@@ -113,6 +113,14 @@ public class AdminSearchService {
         results.put("searchTerm", term);
         results.put("success", true);
 
+        if (term.matches("\\d{4}")) {
+            Map<String, Object> barcodeLookup = searchByBarcode(term);
+            if (Boolean.TRUE.equals(barcodeLookup.get("success"))) {
+                results.put("barcodeLookup", barcodeLookup);
+                results.put("barcodeCount", ((Number) barcodeLookup.getOrDefault("count", 0)).intValue());
+            }
+        }
+
         // Search Accounts
         List<Map<String, Object>> accounts = searchAccounts(term);
         results.put("accounts", accounts);
@@ -264,6 +272,247 @@ public class AdminSearchService {
         results.put("totalCount", totalCount);
 
         return results;
+    }
+
+    public Map<String, Object> searchByBarcode(String searchTerm) {
+        Map<String, Object> result = new HashMap<>();
+        if (searchTerm == null || searchTerm.trim().isEmpty()) {
+            result.put("success", false);
+            result.put("message", "Barcode search term cannot be empty");
+            return result;
+        }
+
+        String barcode = searchTerm.trim();
+        if (!barcode.matches("\\d{4}")) {
+            result.put("success", false);
+            result.put("message", "Barcode lookup requires exactly 4 numeric digits");
+            return result;
+        }
+
+        List<Map<String, Object>> matches = new ArrayList<>();
+
+        Account savings = accountRepository.findByBarcodeNumber(barcode);
+        if (savings != null) {
+            matches.add(buildBarcodeMatch("SAVINGS", savings));
+        }
+
+        if (salaryAccountRepository != null) {
+            SalaryAccount salary = salaryAccountRepository.findByBarcodeNumber(barcode);
+            if (salary != null && matches.stream().noneMatch(m -> m.get("accountNumber").equals(salary.getAccountNumber()))) {
+                matches.add(buildBarcodeMatch("SALARY", salary));
+            }
+        }
+
+        if (currentAccountRepository != null) {
+            Optional<CurrentAccount> current = currentAccountRepository.findByBarcodeNumber(barcode);
+            if (current.isPresent() && matches.stream().noneMatch(m -> m.get("accountNumber").equals(current.get().getAccountNumber()))) {
+                matches.add(buildBarcodeMatch("CURRENT", current.get()));
+            }
+        }
+
+        if (matches.isEmpty()) {
+            result.put("success", false);
+            result.put("message", "No account found for barcode " + barcode);
+            result.put("barcode", barcode);
+            return result;
+        }
+
+        result.put("success", true);
+        result.put("barcode", barcode);
+        result.put("count", matches.size());
+        result.put("matches", matches);
+        result.put("account", matches.get(0));
+
+        Map<String, Object> accountDetails = matches.get(0);
+        String accountNumber = (String) accountDetails.get("accountNumber");
+        if (accountNumber != null) {
+            accountDetails.put("loans", loanRepository.findByAccountNumber(accountNumber));
+            accountDetails.put("cards", cardRepository.findByAccountNumber(accountNumber));
+            accountDetails.put("cheques", chequeRepository.findByAccountNumber(accountNumber));
+            accountDetails.put("transactions", transactionRepository.findByAccountNumberOrderByDateDesc(accountNumber, PageRequest.of(0, 20)).getContent());
+            if (educationLoanSubsidyClaimRepository != null) {
+                accountDetails.put("subsidyClaims", educationLoanSubsidyClaimRepository.findByAccountNumber(accountNumber));
+            }
+            accountDetails.put("profile", buildBarcodeProfile(accountNumber, accountDetails.get("accountType").toString()));
+        }
+
+        return result;
+    }
+
+    public Map<String, Object> generateBarcodeForAccount(String accountNumber, String accountType) {
+        Map<String, Object> result = new HashMap<>();
+        String normalizedAccountNumber = accountNumber == null ? "" : accountNumber.trim();
+        String normalizedType = accountType == null ? "" : accountType.trim().toUpperCase(Locale.ROOT);
+
+        if (normalizedAccountNumber.isEmpty()) {
+            result.put("success", false);
+            result.put("message", "Account number is required");
+            return result;
+        }
+
+        String finalBarcode = null;
+        String resolvedType = "SAVINGS";
+
+        if (normalizedType.isEmpty() || "SAVINGS".equals(normalizedType) || "REGULAR".equals(normalizedType)) {
+            Account savings = accountRepository.findByAccountNumber(normalizedAccountNumber);
+            if (savings != null) {
+                resolvedType = "SAVINGS";
+                finalBarcode = ensureBarcodeForSavingsAccount(savings);
+            }
+        }
+
+        if (finalBarcode == null && (normalizedType.isEmpty() || "SALARY".equals(normalizedType))) {
+            if (salaryAccountRepository != null) {
+                SalaryAccount salary = salaryAccountRepository.findByAccountNumber(normalizedAccountNumber);
+                if (salary != null) {
+                    resolvedType = "SALARY";
+                    finalBarcode = ensureBarcodeForSalaryAccount(salary);
+                }
+            }
+        }
+
+        if (finalBarcode == null && (normalizedType.isEmpty() || "CURRENT".equals(normalizedType))) {
+            if (currentAccountRepository != null) {
+                Optional<CurrentAccount> current = currentAccountRepository.findByAccountNumber(normalizedAccountNumber);
+                if (current.isPresent()) {
+                    resolvedType = "CURRENT";
+                    finalBarcode = ensureBarcodeForCurrentAccount(current.get());
+                }
+            }
+        }
+
+        if (finalBarcode == null) {
+            result.put("success", false);
+            result.put("message", "No account found for account number " + normalizedAccountNumber);
+            return result;
+        }
+
+        result.put("success", true);
+        result.put("accountType", resolvedType);
+        result.put("accountNumber", normalizedAccountNumber);
+        result.put("barcodeNumber", finalBarcode);
+        result.put("message", "Barcode generated successfully");
+        return result;
+    }
+
+    private String ensureBarcodeForSavingsAccount(Account account) {
+        if (account.getBarcodeNumber() != null && !account.getBarcodeNumber().isBlank()) {
+            return account.getBarcodeNumber();
+        }
+        String barcode = generateUniqueBarcode();
+        account.setBarcodeNumber(barcode);
+        accountRepository.save(account);
+        return barcode;
+    }
+
+    private String ensureBarcodeForSalaryAccount(SalaryAccount account) {
+        if (account.getBarcodeNumber() != null && !account.getBarcodeNumber().isBlank()) {
+            return account.getBarcodeNumber();
+        }
+        String barcode = generateUniqueBarcode();
+        account.setBarcodeNumber(barcode);
+        salaryAccountRepository.save(account);
+        return barcode;
+    }
+
+    private String ensureBarcodeForCurrentAccount(CurrentAccount account) {
+        if (account.getBarcodeNumber() != null && !account.getBarcodeNumber().isBlank()) {
+            return account.getBarcodeNumber();
+        }
+        String barcode = generateUniqueBarcode();
+        account.setBarcodeNumber(barcode);
+        currentAccountRepository.save(account);
+        return barcode;
+    }
+
+    private String generateUniqueBarcode() {
+        for (int i = 0; i < 50; i++) {
+            String candidate = String.format("%04d", (int) (Math.random() * 9000) + 1000);
+            if (accountRepository.findByBarcodeNumber(candidate) == null &&
+                (salaryAccountRepository == null || salaryAccountRepository.findByBarcodeNumber(candidate) == null) &&
+                (currentAccountRepository == null || currentAccountRepository.findByBarcodeNumber(candidate).isEmpty())) {
+                return candidate;
+            }
+        }
+        return String.format("%04d", (int) (System.currentTimeMillis() % 10000));
+    }
+
+    private Map<String, Object> buildBarcodeMatch(String accountType, Account account) {
+        Map<String, Object> result = new HashMap<>();
+        result.put("accountType", accountType);
+        result.put("accountNumber", account.getAccountNumber());
+        result.put("name", account.getName());
+        result.put("phone", account.getPhone());
+        result.put("email", account.getAadharNumber());
+        result.put("balance", account.getBalance());
+        result.put("status", account.getStatus());
+        result.put("barcodeNumber", account.getBarcodeNumber());
+        result.put("customerId", account.getCustomerId());
+        return result;
+    }
+
+    private Map<String, Object> buildBarcodeMatch(String accountType, SalaryAccount account) {
+        Map<String, Object> result = new HashMap<>();
+        result.put("accountType", accountType);
+        result.put("accountNumber", account.getAccountNumber());
+        result.put("name", account.getEmployeeName());
+        result.put("phone", account.getMobileNumber());
+        result.put("email", account.getEmail());
+        result.put("balance", account.getBalance());
+        result.put("status", account.getStatus());
+        result.put("barcodeNumber", account.getBarcodeNumber());
+        result.put("customerId", account.getCustomerId());
+        return result;
+    }
+
+    private Map<String, Object> buildBarcodeMatch(String accountType, CurrentAccount account) {
+        Map<String, Object> result = new HashMap<>();
+        result.put("accountType", accountType);
+        result.put("accountNumber", account.getAccountNumber());
+        result.put("name", account.getOwnerName());
+        result.put("phone", account.getMobile());
+        result.put("email", account.getEmail());
+        result.put("balance", account.getBalance());
+        result.put("status", account.getStatus());
+        result.put("barcodeNumber", account.getBarcodeNumber());
+        result.put("customerId", account.getCustomerId());
+        return result;
+    }
+
+    private Map<String, Object> buildBarcodeProfile(String accountNumber, String accountType) {
+        Map<String, Object> profile = new HashMap<>();
+        if ("SAVINGS".equalsIgnoreCase(accountType)) {
+            Account account = accountRepository.findByAccountNumber(accountNumber);
+            if (account != null) {
+                profile.put("name", account.getName());
+                profile.put("phone", account.getPhone());
+                profile.put("email", account.getAadharNumber());
+                profile.put("accountType", account.getAccountType());
+                profile.put("balance", account.getBalance());
+                profile.put("status", account.getStatus());
+            }
+        } else if ("SALARY".equalsIgnoreCase(accountType)) {
+            SalaryAccount salary = salaryAccountRepository.findByAccountNumber(accountNumber);
+            if (salary != null) {
+                profile.put("name", salary.getEmployeeName());
+                profile.put("phone", salary.getMobileNumber());
+                profile.put("email", salary.getEmail());
+                profile.put("accountType", "Salary Account");
+                profile.put("balance", salary.getBalance());
+                profile.put("status", salary.getStatus());
+            }
+        } else if ("CURRENT".equalsIgnoreCase(accountType)) {
+            Optional<CurrentAccount> current = currentAccountRepository.findByAccountNumber(accountNumber);
+            if (current.isPresent()) {
+                profile.put("name", current.get().getOwnerName());
+                profile.put("phone", current.get().getMobile());
+                profile.put("email", current.get().getEmail());
+                profile.put("accountType", "Current Account");
+                profile.put("balance", current.get().getBalance());
+                profile.put("status", current.get().getStatus());
+            }
+        }
+        return profile;
     }
 
     /**

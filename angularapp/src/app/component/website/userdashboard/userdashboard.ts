@@ -2,7 +2,7 @@ import { Component, OnInit, OnDestroy, Inject, PLATFORM_ID } from '@angular/core
 import { Router } from '@angular/router';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient, HttpParams, HttpHeaders } from '@angular/common/http';
 import { AlertService } from '../../../service/alert.service';
 import { FasttagService } from '../../../service/fasttag.service';
 import { CurrentAccountService } from '../../../service/current-account.service';
@@ -375,6 +375,10 @@ export class Userdashboard implements OnInit, OnDestroy {
 
   recentTransactions: any[] = [];
 
+  aiAnalysis: any = null;
+  isLoadingAiAnalysis = false;
+  aiAnalysisError = '';
+
   expenseBars = [
     { pct: 65, value: 12000, color: '#0d9488' },
     { pct: 45, value: 8500, color: '#14b8a6' },
@@ -476,6 +480,7 @@ export class Userdashboard implements OnInit, OnDestroy {
       this.loadUserProfile();
       this.loadFasttag();
       this.loadRecentTransactions();
+      this.loadAiAnalysis();
       this.loadUserSessions();
       this.sessionPollInterval = setInterval(() => this.loadUserSessions(), 15000);
       this.startSessionTimer();
@@ -650,6 +655,36 @@ export class Userdashboard implements OnInit, OnDestroy {
           this.recentTransactions = (txns || []).slice(0, 10);
         });
     } catch (e) { /* silent */ }
+  }
+
+  loadAiAnalysis() {
+    if (!isPlatformBrowser(this.platformId)) return;
+    const rawUser = sessionStorage.getItem('currentUser');
+    if (!rawUser) return;
+    try {
+      const user = JSON.parse(rawUser);
+      if (!user.authToken) {
+        this.aiAnalysisError = 'Please sign in again to view secure analysis.';
+        return;
+      }
+      this.isLoadingAiAnalysis = true;
+      this.aiAnalysisError = '';
+      const headers = new HttpHeaders({ Authorization: `Bearer ${user.authToken}` });
+      this.http.get<any>(`${environment.apiBaseUrl}/api/ai/analyze`, { headers })
+        .pipe(timeout(8000))
+        .subscribe({
+          next: (analysis) => {
+            this.aiAnalysis = analysis;
+            this.isLoadingAiAnalysis = false;
+          },
+          error: () => {
+            this.aiAnalysisError = 'Secure analysis is temporarily unavailable.';
+            this.isLoadingAiAnalysis = false;
+          }
+        });
+    } catch (e) {
+      this.aiAnalysisError = 'Please sign in again to view secure analysis.';
+    }
   }
 
   loadUserSessions() {

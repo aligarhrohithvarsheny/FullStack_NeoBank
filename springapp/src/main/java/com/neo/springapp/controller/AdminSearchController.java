@@ -30,6 +30,37 @@ public class AdminSearchController {
             return ResponseEntity.internalServerError().body(error);
         }
     }
+
+    @GetMapping("/barcode")
+    public ResponseEntity<Map<String, Object>> searchByBarcode(@RequestParam String q) {
+        try {
+            Map<String, Object> results = adminSearchService.searchByBarcode(q);
+            return ResponseEntity.ok(results);
+        } catch (Exception e) {
+            Map<String, Object> error = new java.util.HashMap<>();
+            error.put("success", false);
+            error.put("message", "Barcode search failed: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(error);
+        }
+    }
+
+    @PostMapping("/barcode/generate")
+    public ResponseEntity<Map<String, Object>> generateBarcode(
+            @RequestParam String accountNumber,
+            @RequestParam(required = false) String accountType) {
+        try {
+            Map<String, Object> result = adminSearchService.generateBarcodeForAccount(accountNumber, accountType);
+            if (Boolean.TRUE.equals(result.get("success"))) {
+                return ResponseEntity.ok(result);
+            }
+            return ResponseEntity.badRequest().body(result);
+        } catch (Exception e) {
+            Map<String, Object> error = new java.util.HashMap<>();
+            error.put("success", false);
+            error.put("message", "Barcode generation failed: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(error);
+        }
+    }
 }
 
 

@@ -448,6 +448,14 @@ export class Dashboard implements OnInit, OnDestroy {
   universalSearchResults: any = null;
   isUniversalSearching: boolean = false;
 
+  // Barcode quick lookup functionality
+  barcodeLookupQuery: string = '';
+  barcodeGenerateAccountNumber: string = '';
+  barcodeGenerateAccountType: string = 'SAVINGS';
+  barcodeLookupResult: any = null;
+  isBarcodeSearching: boolean = false;
+  isGeneratingBarcode: boolean = false;
+
   // Account Tracking
   accountTrackings: AccountTracking[] = [];
   selectedTracking: AccountTracking | null = null;
@@ -4376,6 +4384,72 @@ export class Dashboard implements OnInit, OnDestroy {
         this.isSearching = false;
       }
     });
+  }
+
+  performBarcodeSearch() {
+    if (!this.barcodeLookupQuery || !this.barcodeLookupQuery.trim()) {
+      this.barcodeLookupResult = null;
+      return;
+    }
+
+    const query = this.barcodeLookupQuery.trim();
+    if (!/^\d{4}$/.test(query)) {
+      this.alertService.error('Barcode Search', 'Please enter exactly 4 numeric digits.');
+      return;
+    }
+
+    this.isBarcodeSearching = true;
+    this.http.get(`${environment.apiBaseUrl}/api/admin/search/barcode?q=${encodeURIComponent(query)}`)
+      .pipe(
+        timeout(30000),
+        catchError(err => {
+          console.error('Error searching by barcode:', err);
+          this.isBarcodeSearching = false;
+          this.alertService.error('Barcode Search', err.error?.message || 'Barcode lookup failed.');
+          return of(null);
+        })
+      )
+      .subscribe((result: any) => {
+        this.isBarcodeSearching = false;
+        this.barcodeLookupResult = result;
+        if (result?.success) {
+          this.alertService.success('Barcode Found', `Barcode ${query} matched ${result.count} account(s).`);
+        }
+      });
+  }
+
+  generateBarcodeForAccount() {
+    if (!this.barcodeGenerateAccountNumber || !this.barcodeGenerateAccountNumber.trim()) {
+      this.alertService.error('Generate Barcode', 'Please enter an account number first.');
+      return;
+    }
+
+    this.isGeneratingBarcode = true;
+    const params = new HttpParams()
+      .set('accountNumber', this.barcodeGenerateAccountNumber.trim())
+      .set('accountType', this.barcodeGenerateAccountType || 'SAVINGS');
+
+    this.http.post(`${environment.apiBaseUrl}/api/admin/search/barcode/generate`, null, { params })
+      .pipe(
+        timeout(30000),
+        catchError(err => {
+          console.error('Error generating barcode:', err);
+          this.isGeneratingBarcode = false;
+          this.alertService.error('Generate Barcode', err.error?.message || 'Unable to generate barcode.');
+          return of(null);
+        })
+      )
+      .subscribe((result: any) => {
+        this.isGeneratingBarcode = false;
+        if (!result) return;
+        if (result.success) {
+          this.barcodeLookupQuery = result.barcodeNumber;
+          this.barcodeLookupResult = result;
+          this.alertService.success('Barcode Generated', `Barcode ${result.barcodeNumber} assigned to ${result.accountNumber}.`);
+        } else {
+          this.alertService.error('Generate Barcode', result.message || 'Barcode generation failed.');
+        }
+      });
   }
 
   // Universal Search Methods

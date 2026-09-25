@@ -488,6 +488,25 @@
 
       <!-- ═══ ANALYTICS ═══ -->
       <div class="ud-section-title">Analytics</div>
+      <div class="ud-ai-summary" *ngIf="isLoadingAiAnalysis || aiAnalysis || aiAnalysisError">
+        <div class="ud-ai-summary-head">
+          <div>
+            <span class="ud-widget-title">Secure AI transaction analysis</span>
+            <small>Based only on this signed-in savings account</small>
+          </div>
+          <button type="button" class="ud-chip-btn" (click)="loadAiAnalysis()" [disabled]="isLoadingAiAnalysis">{{ isLoadingAiAnalysis ? 'Analyzing...' : 'Refresh' }}</button>
+        </div>
+        <div *ngIf="aiAnalysis?.spendingMetrics" class="ud-ai-metrics">
+          <div><strong>{{ aiAnalysis.spendingMetrics.totalSpending | currency:'INR':'symbol':'1.0-0' }}</strong><span>Expenses</span></div>
+          <div><strong>{{ aiAnalysis.spendingMetrics.totalIncome | currency:'INR':'symbol':'1.0-0' }}</strong><span>Credits</span></div>
+          <div><strong>{{ aiAnalysis.spendingMetrics.savingsRate | number:'1.0-1' }}%</strong><span>Savings rate</span></div>
+          <div><strong>{{ aiAnalysis.spendingMetrics.currentBalance | currency:'INR':'symbol':'1.0-0' }}</strong><span>Balance</span></div>
+        </div>
+        <div *ngIf="aiAnalysis?.insights?.length" class="ud-ai-insights">
+          <div *ngFor="let insight of aiAnalysis.insights.slice(0, 3)"><b>{{ insight.title }}</b><span>{{ insight.message }}</span></div>
+        </div>
+        <span *ngIf="aiAnalysisError" class="ud-ai-error">{{ aiAnalysisError }}</span>
+      </div>
       <div class="ud-analytics-grid">
         <!-- Monthly Spending -->
         <div class="ud-widget ud-analytics-card">

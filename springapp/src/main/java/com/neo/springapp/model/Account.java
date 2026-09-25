@@ -33,6 +33,9 @@ public class Account {
     @Column(unique = true)
     private String accountNumber;
 
+    @Column(unique = true)
+    private String barcodeNumber;
+
     /**
      * Mandatory unique 9-digit Customer ID for every account.
      * Format: 4 digits from PAN (numeric part) + 5 digits from DOB (DDMMY).
@@ -78,6 +81,14 @@ public class Account {
     private String studies; // Child's studies/education details
     private String form60; // Form 60 details for child account
     private String panChildForm; // PAN child form details
+
+    @PrePersist
+    @PreUpdate
+    public void ensureBarcodeNumber() {
+        if (barcodeNumber == null || barcodeNumber.trim().isEmpty()) {
+            barcodeNumber = String.format("%04d", (int) (Math.random() * 9000) + 1000);
+        }
+    }
 
     // Constructors
     public Account() {

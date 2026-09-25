@@ -257,6 +257,7 @@ export class User implements OnInit, OnDestroy {
               accountNumber: userData.accountNumber,
               status: userData.status,
               passwordSet: userData.passwordSet === true,
+              authToken: authResponse.token,
               loginTime: new Date().toISOString()
             };
             
@@ -390,6 +391,7 @@ export class User implements OnInit, OnDestroy {
               accountNumber: userData.accountNumber,
               status: userData.status,
               passwordSet: userData.passwordSet === true,
+              authToken: response.token,
               loginTime: new Date().toISOString()
             };
 
@@ -604,6 +606,7 @@ export class User implements OnInit, OnDestroy {
               accountNumber: userData.accountNumber,
               status: userData.status,
               passwordSet: userData.passwordSet === true,
+              authToken: authResponse.token,
               loginTime: new Date().toISOString()
             };
             
