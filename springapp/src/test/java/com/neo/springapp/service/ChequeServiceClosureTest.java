@@ -48,6 +48,8 @@ class ChequeServiceClosureTest {
                 null,
                 null,
                 null,
+                null,
+                null,
                 null
         );
 
