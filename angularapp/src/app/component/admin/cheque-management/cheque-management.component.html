@@ -52,6 +52,94 @@
     </div>
   </div>
 
+  <!-- Cheque Book Closure -->
+  <div class="filter-section" style="margin-top: 20px; margin-bottom: 20px; background: #fff7ed; border: 1px solid #fdba74; border-radius: 12px; padding: 18px;">
+    <div style="display: flex; flex-wrap: wrap; gap: 16px; align-items: end; width: 100%;">
+      <div class="filter-group" style="flex: 1 1 300px; min-width: 220px;">
+        <label for="closureAccountNumber">Close cheque book by account number:</label>
+        <div class="search-wrapper">
+          <input
+            type="text"
+            id="closureAccountNumber"
+            [(ngModel)]="closureAccountNumber"
+            (keyup.enter)="fetchChequeBooksForClosure()"
+            placeholder="Enter salary/current/savings account number"
+            class="search-input"
+          />
+          <button class="search-btn" (click)="fetchChequeBooksForClosure()" [disabled]="isLoadingClosureBooks">
+            <i class="fas fa-search"></i>
+          </button>
+        </div>
+      </div>
+
+      <button class="search-btn" style="background: #dc2626; color: white;" (click)="closeChequeBooksForAccount()" [disabled]="isClosingBooks || !closureBooks.length">
+        <i class="fas fa-lock"></i> {{ isClosingBooks ? 'Closing...' : 'Close Cheque Books' }}
+      </button>
+    </div>
+
+    <div *ngIf="isLoadingClosureBooks" style="margin-top: 12px; color: #9a6a00;">
+      <i class="fas fa-spinner fa-spin"></i> Loading cheque books...
+    </div>
+
+    <div *ngIf="!isLoadingClosureBooks && closureBooks.length > 0" style="margin-top: 18px;">
+      <h3 style="margin: 0 0 12px; font-size: 1.05rem; color: #7c2d12;">Fetched Cheque Books</h3>
+      <div class="table-responsive">
+        <table class="cheques-table">
+          <thead>
+            <tr>
+              <th>Account</th>
+              <th>Type</th>
+              <th>Book</th>
+              <th>Serial Range</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let book of closureBooks">
+              <td>{{ book.accountNumber }}</td>
+              <td>{{ book.accountType }}</td>
+              <td>{{ book.chequeBookNumber }}</td>
+              <td>{{ book.serialFrom || '—' }} - {{ book.serialTo || '—' }}</td>
+              <td>
+                <span class="status-badge" [style.backgroundColor]="book.status === 'CLOSED' ? '#ef4444' : '#10b981'">
+                  {{ book.status }}
+                </span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div *ngIf="!isLoadingClosureBooks && closureAccountNumber && closureBooks.length === 0" style="margin-top: 12px; color: #7c2d12;">
+      No active or historical cheque books found for this account.
+    </div>
+
+    <div *ngIf="closureHistory.length > 0" style="margin-top: 22px;">
+      <h3 style="margin: 0 0 12px; font-size: 1.05rem; color: #7c2d12;">Closure History</h3>
+      <div class="table-responsive">
+        <table class="cheques-table">
+          <thead>
+            <tr>
+              <th>Book</th>
+              <th>Closed By</th>
+              <th>Reason</th>
+              <th>Closed At</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let item of closureHistory">
+              <td>{{ item.chequeBookNumber || 'Legacy Book' }}</td>
+              <td>{{ item.closedBy }}</td>
+              <td>{{ item.reason || 'Admin closure' }}</td>
+              <td>{{ item.closedAt | date:'medium' }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
   <!-- Filters -->
   <div class="filter-section">
     <div class="filter-group">

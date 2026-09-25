@@ -29,6 +29,7 @@ import { BeneficiaryManagementComponent } from '../beneficiary-management/benefi
 import { AtmSimulatorComponent } from '../atm-simulator/atm-simulator';
 import { FasttagUser } from '../fasttag/fasttag-user';
 import { FamilyBankingComponent } from '../family-banking/family-banking';
+import { DepositSlipComponent } from '../deposit-slip/deposit-slip.component';
 import { timeout, catchError } from 'rxjs/operators';
 import { of } from 'rxjs';
 // import { UserService } from '../../service/user';
@@ -61,7 +62,8 @@ import { of } from 'rxjs';
     BeneficiaryManagementComponent,
     AtmSimulatorComponent,
     FasttagUser,
-    FamilyBankingComponent
+    FamilyBankingComponent,
+    DepositSlipComponent
   ],
   templateUrl: './userdashboard.html',
   styleUrls: ['./userdashboard.css']
@@ -207,7 +209,6 @@ export class Userdashboard implements OnInit, OnDestroy {
   depositMessage: string = '';
   depositError: string = '';
 
-  // NeoBank cash deposit slip
   depositAccountType: 'Savings' | 'Salary' | 'Current' = 'Savings';
   depositSlipDate: string = new Date().toISOString().slice(0, 10);
   depositDenominations = [
@@ -223,15 +224,27 @@ export class Userdashboard implements OnInit, OnDestroy {
   get depositSlipAccount(): any {
     const account = this.userProfile?.account || {};
     const currentAccount = this.linkedCurrentAccountDetails || {};
+    const salaryAccount = this.userProfile?.salaryAccount || {};
     const isCurrent = this.depositAccountType === 'Current';
+    const isSalary = this.depositAccountType === 'Salary';
     return {
-      accountNumber: isCurrent ? (currentAccount.accountNumber || this.userAccountNumber) : this.userAccountNumber,
-      holderName: isCurrent ? (currentAccount.ownerName || this.username) : (account.name || this.username),
-      mobile: account.phone || account.mobile || account.mobileNumber || '',
-      email: this.userProfile?.email || account.email || '',
-      pan: account.pan || account.panNumber || '',
-      branch: account.branchName || currentAccount.branchName || 'NeoBank Digital Branch',
-      ifsc: account.ifscCode || currentAccount.ifscCode || 'NEOB0001234'
+      accountNumber: isCurrent ? (currentAccount.accountNumber || this.userAccountNumber) : (isSalary ? (salaryAccount.accountNumber || this.userAccountNumber) : this.userAccountNumber),
+      holderName: isCurrent ? (currentAccount.ownerName || this.username) : (isSalary ? (salaryAccount.employeeName || this.username) : (account.name || this.username)),
+      mobile: account.phone || account.mobile || account.mobileNumber || salaryAccount.mobileNumber || '',
+      email: this.userProfile?.email || account.email || salaryAccount.email || '',
+      pan: account.pan || account.panNumber || salaryAccount.panNumber || '',
+      branch: account.branchName || salaryAccount.branchName || currentAccount.branchName || 'NeoBank Digital Branch',
+      ifsc: account.ifscCode || salaryAccount.ifscCode || currentAccount.ifscCode || 'NEOB0001234'
+    };
+  }
+
+  get depositSlipUser(): any {
+    const account = this.depositSlipAccount;
+    return {
+      name: account.holderName,
+      accountNumber: account.accountNumber,
+      mobile: account.mobile,
+      branch: account.branch
     };
   }
 
@@ -280,6 +293,22 @@ export class Userdashboard implements OnInit, OnDestroy {
       *{box-sizing:border-box}body{margin:0;padding:24px;background:#eef3f6;font-family:Arial,sans-serif;color:#17212b}.slip{max-width:900px;margin:auto;background:#fff;border:1px solid #9aa8b2;padding:24px}.brand{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #0f766e;padding-bottom:14px}.brand h1{margin:0;color:#0f766e;letter-spacing:2px;font-size:28px}.brand p{margin:4px 0 0;color:#64748b;font-size:12px}.date{font-size:13px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:0 28px;margin-top:18px}.field{border-bottom:1px solid #9aa8b2;padding:8px 0;font-size:13px}.field b{display:inline-block;min-width:118px;color:#475569}.title{text-align:center;font-weight:700;letter-spacing:1px;margin:18px 0 8px;color:#0f766e}.layout{display:grid;grid-template-columns:1.1fr 1fr;gap:20px}.notes{width:100%;border-collapse:collapse}.notes th,.notes td{border:1px solid #9aa8b2;padding:8px;text-align:center;font-size:13px}.notes th{background:#e6f4f2}.total{font-size:16px;font-weight:700;text-align:right;margin-top:12px}.footer{display:flex;justify-content:space-between;margin-top:42px;font-size:12px}.print{margin:18px auto 0;display:block;padding:10px 20px;background:#0f766e;color:#fff;border:0;border-radius:5px}@media print{body{padding:0;background:#fff}.slip{border:0}.print{display:none}}
     </style></head><body><main class="slip"><header class="brand"><div><h1>NEOBANK</h1><p>Simple banking for every day</p></div><div class="date">Date: <b>${new Date(this.depositSlipDate).toLocaleDateString('en-IN')}</b></div></header><div class="grid"><div class="field"><b>Account type</b>${this.depositAccountType}</div><div class="field"><b>Account number</b>${details.accountNumber || 'N/A'}</div><div class="field"><b>Name</b>${details.holderName || 'N/A'}</div><div class="field"><b>Mobile</b>${details.mobile || 'N/A'}</div><div class="field"><b>Branch</b>${details.branch}</div><div class="field"><b>IFSC</b>${details.ifsc}</div></div><div class="title">CASH DEPOSIT</div><div class="layout"><table class="notes"><thead><tr><th>Note</th><th>Nos.</th><th>Amount</th></tr></thead><tbody>${denominationRows}</tbody></table><div><div class="field"><b>Amount</b>Rs. ${Number(this.depositForm.amount).toLocaleString('en-IN')}</div><div class="field"><b>In words</b>${this.depositAmountInWords}</div><div class="field"><b>Method</b>${this.depositForm.method}</div><div class="field"><b>Reference</b>${this.depositForm.referenceNumber || 'N/A'}</div><div class="total">Total: Rs. ${this.depositDenominationTotal.toLocaleString('en-IN')}</div></div></div><div class="footer"><span>Depositor signature</span><span>For NeoBank use</span></div></main><button class="print" onclick="window.print()">Print Slip</button></body></html>`);
     printWindow.document.close();
+  }
+
+  downloadDepositSlip(): void {
+    if (!this.depositForm.amount || this.depositForm.amount <= 0) {
+      this.depositError = 'Enter a deposit amount before downloading the slip.';
+      return;
+    }
+    this.onDepositAmountChange();
+    const details = this.depositSlipAccount;
+    const rows = this.depositDenominations.map(note => `<tr><td>${note.value}</td><td>${note.count}</td><td>${note.value * note.count}</td></tr>`).join('');
+    const html = `<!doctype html><html><head><meta charset="utf-8"><title>NeoBank Deposit Slip</title><style>body{font-family:Arial;color:#17212b;padding:24px}.slip{max-width:850px;margin:auto;border:1px solid #687780;padding:24px}.head{display:flex;justify-content:space-between;border-bottom:3px solid #0f766e;padding-bottom:14px}.brand{color:#0f766e;font-size:28px;font-weight:800;letter-spacing:2px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:18px 0}.field{border-bottom:1px solid #9aa8b2;padding:8px}.field b{display:inline-block;min-width:120px}.title{text-align:center;color:#0f766e;font-weight:800;margin:16px}.columns{display:grid;grid-template-columns:1fr 1fr;gap:24px}.notes{width:100%;border-collapse:collapse}.notes th,.notes td{border:1px solid #687780;padding:9px;text-align:center}.notes th{background:#e6f4f2}.sign{display:flex;justify-content:space-between;margin-top:52px;font-size:12px}</style></head><body><main class="slip"><div class="head"><div><div class="brand">NEOBANK</div><small>Cash deposit slip</small></div><div>Date: ${new Date(this.depositSlipDate).toLocaleDateString('en-IN')}</div></div><div class="grid"><div class="field"><b>Account type</b>${this.depositAccountType}</div><div class="field"><b>Account number</b>${details.accountNumber}</div><div class="field"><b>Name</b>${details.holderName}</div><div class="field"><b>Mobile</b>${details.mobile || 'N/A'}</div><div class="field"><b>Branch</b>${details.branch}</div><div class="field"><b>IFSC</b>${details.ifsc}</div></div><div class="title">DEPOSIT / PAY IN SLIP</div><div class="columns"><table class="notes"><tr><th>Note</th><th>No.</th><th>Amount</th></tr>${rows}<tr><th colspan="2">Total</th><th>${this.depositDenominationTotal}</th></tr></table><div><div class="field"><b>Amount</b>Rs. ${Number(this.depositForm.amount).toLocaleString('en-IN')}</div><div class="field"><b>In words</b>${this.depositAmountInWords}</div><div class="field"><b>Method</b>${this.depositForm.method}</div><div class="field"><b>Reference</b>${this.depositForm.referenceNumber || 'N/A'}</div></div></div><div class="sign"><span>Depositor signature</span><span>For NeoBank use</span></div></main></body></html>`;
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' }));
+    link.download = `NeoBank_Deposit_Slip_${details.accountNumber || 'account'}.html`;
+    link.click();
+    URL.revokeObjectURL(link.href);
   }
 
   private amountToWords(amount: number): string {
@@ -2738,6 +2767,8 @@ export class Userdashboard implements OnInit, OnDestroy {
     const payload = {
       accountNumber: this.userAccountNumber,
       userName: this.username,
+      accountType: this.depositAccountType,
+      depositDate: this.depositSlipDate,
       requestId: this.depositForm.requestId.trim() || undefined,
       amount: this.depositForm.amount,
       method: this.depositForm.method,
@@ -2785,6 +2816,7 @@ export class Userdashboard implements OnInit, OnDestroy {
       referenceNumber: '',
       note: ''
     };
+    this.depositDenominations = this.depositDenominations.map(note => ({ ...note, count: 0 }));
   }
 
   // Search: only run navigate/clear on Enter (submit), so typing does not erase input

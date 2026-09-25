@@ -647,10 +647,11 @@
             <div class="ud-form-group ud-full"><label>Note</label><textarea [(ngModel)]="depositForm.note" class="ud-input ud-textarea" rows="3" placeholder="Note for admin"></textarea></div>
           </div>
           <div class="ud-denomination-panel"><div class="ud-slip-section-heading"><strong>Denominations</strong><span>Auto-calculated from amount</span></div><div class="ud-denomination-grid"><div *ngFor="let note of depositDenominations" class="ud-denomination-row"><span>&#8377;{{ note.value }}</span><input type="number" min="0" [(ngModel)]="note.count" (ngModelChange)="depositForm.amount = depositDenominationTotal" class="ud-input"/><strong>&#8377;{{ note.value * note.count | number:'1.0-0' }}</strong></div></div><div class="ud-denomination-total">Total: &#8377;{{ depositDenominationTotal | number:'1.0-0' }}</div></div>
-          <div class="ud-form-actions"><button class="ud-btn-primary" (click)="submitDepositRequest()" [disabled]="isSubmittingDeposit">{{ isSubmittingDeposit ? 'Submitting...' : 'Submit Request' }}</button><button class="ud-btn-outline" (click)="printDepositSlip()">Print Filled Slip</button><button class="ud-btn-outline" (click)="resetDepositForm()">Clear</button></div>
+          <div class="ud-form-actions"><button class="ud-btn-primary" (click)="submitDepositRequest()" [disabled]="isSubmittingDeposit">{{ isSubmittingDeposit ? 'Submitting...' : 'Submit Request' }}</button><button class="ud-btn-outline" (click)="resetDepositForm()">Clear</button></div>
           <div class="ud-msg ud-msg-success" *ngIf="depositMessage">{{ depositMessage }}</div>
           <div class="ud-msg ud-msg-error" *ngIf="depositError">{{ depositError }}</div>
         </div>
+        <app-deposit-slip [user]="depositSlipUser" [accountType]="depositAccountType + ' Account'" [amount]="depositForm.amount" [paymentMode]="depositForm.method" [referenceNumber]="depositForm.referenceNumber" [depositDate]="depositSlipDate"></app-deposit-slip>
         <div class="ud-section-title" style="margin-top:28px">Recent Requests</div>
         <div *ngIf="isLoadingDepositRequests" class="ud-empty">Loading deposit requests...</div>
         <div *ngIf="!isLoadingDepositRequests && depositRequests.length === 0" class="ud-empty">No deposit requests found.</div>

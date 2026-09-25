@@ -1,0 +1,58 @@
+<div class="slip-actions no-print">
+  <button type="button" class="back-btn" (click)="printSlip()">Print Deposit Slip</button>
+  <button type="button" class="download-btn" (click)="downloadSlip()">Download Slip</button>
+</div>
+
+<div class="deposit-slip">
+  <div class="slip-header">
+    <div class="bank-brand">
+      <div class="bank-logo">N</div>
+      <div><div class="bank-name">NEOBANK</div><div class="bank-tagline">DIGITAL BANKING</div></div>
+    </div>
+    <div class="branch-section"><strong>Branch / शाखा</strong><div class="branch-line">{{ user.branch || 'NEOBANK DIGITAL BRANCH' }}</div></div>
+    <div class="date-section"><strong>Date / दिनांक</strong><div class="date-box">{{ depositDate | date:'dd' }} <span>/</span> {{ depositDate | date:'MM' }} <span>/</span> {{ depositDate | date:'yyyy' }}</div></div>
+  </div>
+
+  <div class="slip-title"><strong>DEPOSIT / PAY-IN SLIP</strong><span>ग्राहक प्रति / CUSTOMER COPY</span></div>
+
+  <div class="customer-section">
+    <div class="field"><label>A/c No. / खाता संख्या</label><div class="account-number">{{ user.accountNumber || 'N/A' }}</div></div>
+    <div class="field"><label>Account Type</label><div>{{ accountType }}</div></div>
+    <div class="field"><label>Name / नाम</label><div>{{ user.name || 'N/A' }}</div></div>
+    <div class="field"><label>Mobile No.</label><div>{{ user.mobile || 'N/A' }}</div></div>
+  </div>
+
+  <div class="amount-section">
+    <div><label>Amount / राशि</label><div class="amount-box">₹ {{ totalCash | number:'1.0-0' }}</div></div>
+    <div class="words"><label>Rupees in words</label><div>{{ numberToWords(totalCash) }}</div></div>
+  </div>
+
+  <div class="main-grid">
+    <div class="payment-details">
+      <h3>Payment Details</h3>
+      <div class="detail-row"><span>Payment Mode</span><strong>{{ paymentMode }}</strong></div>
+      <div class="detail-row"><span>Cheque / Ref No.</span><strong>{{ referenceNumber || 'N/A' }}</strong></div>
+      <div class="detail-row"><span>Bank / Branch</span><strong>{{ user.branch || 'NEOBANK' }}</strong></div>
+      <div class="detail-row"><span>Transaction Type</span><strong>Cash Deposit</strong></div>
+      <div class="detail-row"><span>Customer ID</span><strong>NB-{{ (user.accountNumber || '').slice(-6) }}</strong></div>
+    </div>
+
+    <div class="denomination">
+      <h3>Cash Deposit / नकद जमा</h3>
+      <table>
+        <thead><tr><th>Notes</th><th>No.</th><th>Amount ₹</th></tr></thead>
+        <tbody><tr *ngFor="let item of denominations"><td>₹ {{ item.note }}</td><td>{{ item.quantity }}</td><td>₹ {{ item.amount | number:'1.0-0' }}</td></tr></tbody>
+        <tfoot><tr><th colspan="2">Total</th><th>₹ {{ totalCash | number:'1.0-0' }}</th></tr></tfoot>
+      </table>
+    </div>
+  </div>
+
+  <div class="declaration"><strong>Customer Declaration</strong><p>I confirm that the above details are correct and authorize NeoBank to process this deposit transaction.</p><ul><li>Cash will be accepted subject to verification.</li><li>Cheques are subject to realization.</li><li>Please retain this slip as transaction proof.</li></ul></div>
+
+  <div class="slip-footer">
+    <div><strong>Transaction ID</strong><br>NB{{ depositDate | date:'yyyyMMddHHmmss' }}</div>
+    <div><strong>Generated On</strong><br>{{ depositDate | date:'dd-MM-yyyy HH:mm' }}</div>
+    <div class="signature">Customer Signature<div class="signature-line"></div></div>
+  </div>
+  <div class="bottom-brand"><strong>NEOBANK</strong><span>Secure - Simple - Digital</span></div>
+</div>

@@ -67,6 +67,13 @@ export class ChequeManagementComponent implements OnInit, OnDestroy {
   auditLog: any[] = [];
   showAuditLog: boolean = false;
 
+  // Cheque book closure
+  closureAccountNumber: string = '';
+  closureBooks: any[] = [];
+  closureHistory: any[] = [];
+  isLoadingClosureBooks: boolean = false;
+  isClosingBooks: boolean = false;
+
   // Signature Verification
   signatureDocUrl: SafeResourceUrl | null = null;
   signatureLoading: boolean = false;
@@ -151,6 +158,65 @@ export class ChequeManagementComponent implements OnInit, OnDestroy {
   onSearch() {
     this.currentPage = 0;
     this.loadCheques();
+  }
+
+  fetchChequeBooksForClosure() {
+    const accountNumber = this.closureAccountNumber?.trim();
+    if (!accountNumber) {
+      this.alertService.error('Missing Info', 'Enter an account number to fetch cheque books');
+      return;
+    }
+
+    this.isLoadingClosureBooks = true;
+    this.chequeService.getChequeBooksByAccountNumber(accountNumber).subscribe({
+      next: (books: any[]) => {
+        this.closureBooks = books || [];
+        this.isLoadingClosureBooks = false;
+        this.loadChequeClosureHistory(accountNumber);
+      },
+      error: (err: any) => {
+        this.isLoadingClosureBooks = false;
+        this.closureBooks = [];
+        this.alertService.error('Unable to load cheque books', err?.error?.error || 'Please check the account number and try again.');
+      }
+    });
+  }
+
+  loadChequeClosureHistory(accountNumber: string) {
+    const account = accountNumber?.trim();
+    if (!account) {
+      this.closureHistory = [];
+      return;
+    }
+    this.chequeService.getChequeBookClosureHistory(account).subscribe({
+      next: (history: any[]) => this.closureHistory = history || [],
+      error: () => this.closureHistory = []
+    });
+  }
+
+  closeChequeBooksForAccount() {
+    const accountNumber = this.closureAccountNumber?.trim();
+    if (!accountNumber) {
+      this.alertService.error('Missing Info', 'Enter an account number first');
+      return;
+    }
+
+    if (!confirm(`Close all active cheque books for ${accountNumber}?\n\nOnce closed, all cheque numbers from this account will become invalid for future use.`)) {
+      return;
+    }
+
+    this.isClosingBooks = true;
+    this.chequeService.closeChequeBooksByAccountNumber(accountNumber, 'Admin closed cheque book from dashboard', this.adminName).subscribe({
+      next: (response: any) => {
+        this.isClosingBooks = false;
+        this.alertService.success('Cheque Book Closed', response?.message || 'Cheque book closure saved successfully');
+        this.fetchChequeBooksForClosure();
+      },
+      error: (err: any) => {
+        this.isClosingBooks = false;
+        this.alertService.error('Closure Failed', err?.error?.error || 'Unable to close cheque books for this account');
+      }
+    });
   }
 
   /**

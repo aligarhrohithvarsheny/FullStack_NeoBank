@@ -189,6 +189,31 @@ export class ChequeService {
   }
 
   /**
+   * Fetch all cheque books currently linked to an account number for salary/current/savings accounts
+   */
+  getChequeBooksByAccountNumber(accountNumber: string): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiBaseUrl}/account/${encodeURIComponent(accountNumber)}/books`);
+  }
+
+  /**
+   * Close all active cheque books for an account and invalidate future cheque numbers
+   */
+  closeChequeBooksByAccountNumber(accountNumber: string, reason?: string, closedBy?: string): Observable<any> {
+    return this.http.post<any>(`${this.apiBaseUrl}/admin/close-books`, {
+      accountNumber,
+      reason: reason || 'Admin closed cheque book',
+      closedBy: closedBy || 'admin@neobank.com'
+    });
+  }
+
+  /**
+   * Fetch historical cheque-book closure entries for an account
+   */
+  getChequeBookClosureHistory(accountNumber: string): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiBaseUrl}/account/${encodeURIComponent(accountNumber)}/closure-history`);
+  }
+
+  /**
    * Search cheques by cheque number
    */
   searchChequeNumber(chequeNumber: string): Observable<ChequeRequestAdmin> {
