@@ -4,11 +4,20 @@ import com.neo.springapp.model.Cheque;
 import com.neo.springapp.model.Account;
 import com.neo.springapp.model.SalaryAccount;
 import com.neo.springapp.model.CurrentAccount;
+import com.neo.springapp.model.ChequeBookClosureHistory;
+import com.neo.springapp.model.ChequeBankRange;
+import com.neo.springapp.model.BusinessChequeBankRange;
+import com.neo.springapp.model.ChequeLeaf;
+import com.neo.springapp.model.BusinessChequeLeaf;
 import com.neo.springapp.repository.ChequeRepository;
 import com.neo.springapp.repository.AccountRepository;
 import com.neo.springapp.repository.SalaryAccountRepository;
 import com.neo.springapp.repository.CurrentAccountRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.neo.springapp.repository.ChequeBankRangeRepository;
+import com.neo.springapp.repository.BusinessChequeBankRangeRepository;
+import com.neo.springapp.repository.ChequeLeafRepository;
+import com.neo.springapp.repository.BusinessChequeLeafRepository;
+import com.neo.springapp.repository.ChequeBookClosureHistoryRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -18,6 +27,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -41,6 +52,21 @@ public class ChequeService {
 
     @Autowired
     private CurrentAccountRepository currentAccountRepository;
+
+    @Autowired
+    private ChequeBankRangeRepository chequeBankRangeRepository;
+
+    @Autowired
+    private BusinessChequeBankRangeRepository businessChequeBankRangeRepository;
+
+    @Autowired
+    private ChequeLeafRepository chequeLeafRepository;
+
+    @Autowired
+    private BusinessChequeLeafRepository businessChequeLeafRepository;
+
+    @Autowired
+    private ChequeBookClosureHistoryRepository chequeBookClosureHistoryRepository;
 
     public ChequeService(ChequeRepository chequeRepository, AccountRepository accountRepository, 
                         AccountService accountService, TransactionService transactionService,
@@ -184,6 +210,198 @@ public class ChequeService {
             attempts++;
         } while (chequeRepository.findByChequeNumber(candidate).isPresent() && attempts < 20);
         return candidate;
+    }
+
+    public List<Map<String, Object>> fetchChequeBooksByAccountNumber(String accountNumber) {
+        if (accountNumber == null || accountNumber.isBlank()) {
+            return List.of();
+        }
+
+        String cleanAcc = accountNumber.trim();
+        List<Map<String, Object>> books = new ArrayList<>();
+
+        SalaryAccount salaryAccount = salaryAccountRepository.findByAccountNumber(cleanAcc);
+        if (salaryAccount != null) {
+            List<ChequeBankRange> ranges = chequeBankRangeRepository.findBySalaryAccountId(salaryAccount.getId());
+            if (!ranges.isEmpty()) {
+                for (ChequeBankRange range : ranges) {
+                    books.add(buildChequeBookMap(salaryAccount.getAccountNumber(), "Salary", range.getChequeBookNumber(), "SALARY",
+                            range.getSerialFrom(), range.getSerialTo(), range.getStatus(), range.getIssuedDate()));
+                }
+            }
+            List<ChequeLeaf> leaves = chequeLeafRepository.findBySalaryAccountIdOrderByLeafNumberAsc(salaryAccount.getId());
+            if (ranges.isEmpty() && !leaves.isEmpty()) {
+                String first = leaves.get(0).getLeafNumber();
+                String last = leaves.get(leaves.size() - 1).getLeafNumber();
+                books.add(buildChequeBookMap(salaryAccount.getAccountNumber(), "Salary", "LEGACY-SALARY", "SALARY",
+                        first, last, "ACTIVE", salaryAccount.getCreatedAt() != null ? salaryAccount.getCreatedAt().toLocalDate() : LocalDateTime.now().toLocalDate()));
+            }
+        }
+
+        Optional<CurrentAccount> currentOpt = currentAccountRepository.findByAccountNumber(cleanAcc);
+        if (currentOpt.isPresent()) {
+            CurrentAccount currentAccount = currentOpt.get();
+            List<BusinessChequeBankRange> ranges = businessChequeBankRangeRepository.findByCurrentAccountId(currentAccount.getId());
+            if (!ranges.isEmpty()) {
+                for (BusinessChequeBankRange range : ranges) {
+                    books.add(buildChequeBookMap(currentAccount.getAccountNumber(), "Business", range.getChequeBookNumber(), "CURRENT",
+                            range.getSerialFrom(), range.getSerialTo(), range.getStatus(), range.getIssuedDate()));
+                }
+            }
+            List<BusinessChequeLeaf> leaves = businessChequeLeafRepository.findByCurrentAccountIdOrderByLeafNumberAsc(currentAccount.getId());
+            if (ranges.isEmpty() && !leaves.isEmpty()) {
+                String first = leaves.get(0).getLeafNumber();
+                String last = leaves.get(leaves.size() - 1).getLeafNumber();
+                books.add(buildChequeBookMap(currentAccount.getAccountNumber(), "Business", "LEGACY-CURRENT", "CURRENT",
+                        first, last, "ACTIVE", currentAccount.getCreatedAt() != null ? currentAccount.getCreatedAt().toLocalDate() : LocalDateTime.now().toLocalDate()));
+            }
+        }
+
+        Account savingsAccount = accountRepository.findByAccountNumber(cleanAcc);
+        if (savingsAccount != null) {
+            List<Cheque> cheques = chequeRepository.findByAccountNumber(cleanAcc);
+            if (!cheques.isEmpty() && books.stream().noneMatch(b -> "SAVINGS".equals(b.get("bookType")))) {
+                String first = cheques.stream().map(Cheque::getChequeNumber).min(String::compareTo).orElse(cleanAcc);
+                String last = cheques.stream().map(Cheque::getChequeNumber).max(String::compareTo).orElse(cleanAcc);
+                books.add(buildChequeBookMap(savingsAccount.getAccountNumber(), savingsAccount.getAccountType() != null ? savingsAccount.getAccountType() : "Savings",
+                        "LEGACY-SAVINGS", "SAVINGS", first, last, "ACTIVE", LocalDateTime.now().toLocalDate()));
+            }
+        }
+
+        return books;
+    }
+
+    public Map<String, Object> closeChequeBooksForAccount(String accountNumber, String closedBy, String reason) {
+        if (accountNumber == null || accountNumber.isBlank()) {
+            throw new IllegalArgumentException("Account number is required");
+        }
+
+        String cleanAcc = accountNumber.trim();
+        String adminName = closedBy == null || closedBy.isBlank() ? "ADMIN" : closedBy.trim();
+        String closureReason = reason == null ? "Chequebook closed by admin" : reason.trim();
+        int closedBooks = 0;
+        LocalDateTime now = LocalDateTime.now();
+
+        SalaryAccount salaryAccount = salaryAccountRepository.findByAccountNumber(cleanAcc);
+        if (salaryAccount != null) {
+            List<ChequeBankRange> ranges = chequeBankRangeRepository.findBySalaryAccountId(salaryAccount.getId());
+            for (ChequeBankRange range : ranges) {
+                if (!"CLOSED".equalsIgnoreCase(range.getStatus())) {
+                    range.setStatus("CLOSED");
+                    range.setUpdatedAt(now);
+                    chequeBankRangeRepository.save(range);
+                    closedBooks++;
+                    chequeBookClosureHistoryRepository.save(new ChequeBookClosureHistory(cleanAcc, "Salary", range.getChequeBookNumber(), "SALARY",
+                            range.getSerialFrom(), range.getSerialTo(), adminName, closureReason, 30));
+                }
+            }
+
+            List<ChequeLeaf> leaves = chequeLeafRepository.findBySalaryAccountIdOrderByLeafNumberAsc(salaryAccount.getId());
+            for (ChequeLeaf leaf : leaves) {
+                if (!"CLOSED".equalsIgnoreCase(leaf.getStatus())) {
+                    leaf.setStatus("CLOSED");
+                    chequeLeafRepository.save(leaf);
+                }
+            }
+        }
+
+        Optional<CurrentAccount> currentOpt = currentAccountRepository.findByAccountNumber(cleanAcc);
+        if (currentOpt.isPresent()) {
+            CurrentAccount currentAccount = currentOpt.get();
+            List<BusinessChequeBankRange> ranges = businessChequeBankRangeRepository.findByCurrentAccountId(currentAccount.getId());
+            for (BusinessChequeBankRange range : ranges) {
+                if (!"CLOSED".equalsIgnoreCase(range.getStatus())) {
+                    range.setStatus("CLOSED");
+                    range.setUpdatedAt(now);
+                    businessChequeBankRangeRepository.save(range);
+                    closedBooks++;
+                    chequeBookClosureHistoryRepository.save(new ChequeBookClosureHistory(cleanAcc, "Business", range.getChequeBookNumber(), "CURRENT",
+                            range.getSerialFrom(), range.getSerialTo(), adminName, closureReason, 30));
+                }
+            }
+
+            List<BusinessChequeLeaf> leaves = businessChequeLeafRepository.findByCurrentAccountIdOrderByLeafNumberAsc(currentAccount.getId());
+            for (BusinessChequeLeaf leaf : leaves) {
+                if (!"CLOSED".equalsIgnoreCase(leaf.getStatus())) {
+                    leaf.setStatus("CLOSED");
+                    businessChequeLeafRepository.save(leaf);
+                }
+            }
+        }
+
+        Account savingsAccount = accountRepository.findByAccountNumber(cleanAcc);
+        if (savingsAccount != null) {
+            List<Cheque> accountCheques = chequeRepository.findByAccountNumber(cleanAcc);
+            if (!accountCheques.isEmpty()) {
+                int activeCheques = 0;
+                for (Cheque cheque : accountCheques) {
+                    if (cheque.isAvailable()) {
+                        cheque.cancel(adminName, closureReason);
+                        chequeRepository.save(cheque);
+                        activeCheques++;
+                    }
+                }
+                if (activeCheques > 0) {
+                    closedBooks++;
+                    chequeBookClosureHistoryRepository.save(new ChequeBookClosureHistory(cleanAcc,
+                            savingsAccount.getAccountType() != null ? savingsAccount.getAccountType() : "Savings",
+                            "LEGACY-SAVINGS", "SAVINGS", null, null, adminName, closureReason, activeCheques));
+                }
+            }
+        }
+
+        if (closedBooks == 0) {
+            throw new IllegalArgumentException("No active cheque books were found for this account number");
+        }
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", true);
+        response.put("message", "Cheque book(s) closed successfully. Future cheque numbers from this account are now invalid.");
+        response.put("accountNumber", cleanAcc);
+        response.put("closedBooks", closedBooks);
+        response.put("closedBy", adminName);
+        response.put("reason", closureReason);
+        return response;
+    }
+
+    public List<Map<String, Object>> getChequeBookClosureHistory(String accountNumber) {
+        if (accountNumber == null || accountNumber.isBlank()) {
+            return List.of();
+        }
+
+        List<Map<String, Object>> history = new ArrayList<>();
+        for (ChequeBookClosureHistory entry : chequeBookClosureHistoryRepository.findByAccountNumberOrderByClosedAtDesc(accountNumber.trim())) {
+            Map<String, Object> item = new HashMap<>();
+            item.put("id", entry.getId());
+            item.put("accountNumber", entry.getAccountNumber());
+            item.put("accountType", entry.getAccountType());
+            item.put("chequeBookNumber", entry.getChequeBookNumber());
+            item.put("bookType", entry.getBookType());
+            item.put("serialFrom", entry.getSerialFrom());
+            item.put("serialTo", entry.getSerialTo());
+            item.put("closedBy", entry.getClosedBy());
+            item.put("reason", entry.getReason());
+            item.put("closedCount", entry.getClosedCount());
+            item.put("status", entry.getStatus());
+            item.put("closedAt", entry.getClosedAt());
+            history.add(item);
+        }
+        return history;
+    }
+
+    private Map<String, Object> buildChequeBookMap(String accountNumber, String accountType, String chequeBookNumber,
+                                                  String bookType, String serialFrom, String serialTo,
+                                                  String status, java.time.LocalDate issuedDate) {
+        Map<String, Object> book = new HashMap<>();
+        book.put("accountNumber", accountNumber);
+        book.put("accountType", accountType);
+        book.put("chequeBookNumber", chequeBookNumber);
+        book.put("bookType", bookType);
+        book.put("serialFrom", serialFrom);
+        book.put("serialTo", serialTo);
+        book.put("status", status != null ? status : "ACTIVE");
+        book.put("issuedDate", issuedDate);
+        return book;
     }
 
     // Get all cheques for an account

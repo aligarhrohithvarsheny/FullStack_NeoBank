@@ -291,6 +291,41 @@ public class ChequeController {
         }
     }
 
+    @GetMapping("/account/{accountNumber}/books")
+    public ResponseEntity<List<Map<String, Object>>> getChequeBooksByAccountNumber(@PathVariable String accountNumber) {
+        try {
+            return ResponseEntity.ok(chequeService.fetchChequeBooksByAccountNumber(accountNumber));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(List.of(Map.of("error", e.getMessage())));
+        }
+    }
+
+    @GetMapping("/account/{accountNumber}/closure-history")
+    public ResponseEntity<List<Map<String, Object>>> getChequeBookClosureHistory(@PathVariable String accountNumber) {
+        try {
+            return ResponseEntity.ok(chequeService.getChequeBookClosureHistory(accountNumber));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(List.of(Map.of("error", e.getMessage())));
+        }
+    }
+
+    @PostMapping("/admin/close-books")
+    public ResponseEntity<Map<String, Object>> closeChequeBooks(@RequestBody Map<String, Object> request) {
+        try {
+            String accountNumber = (String) request.get("accountNumber");
+            String closedBy = request.get("closedBy") != null ? request.get("closedBy").toString() : "admin@neobank.com";
+            String reason = request.get("reason") != null ? request.get("reason").toString() : "Admin closed cheque book";
+
+            if (accountNumber == null || accountNumber.isBlank()) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Account number is required"));
+            }
+
+            return ResponseEntity.ok(chequeService.closeChequeBooksForAccount(accountNumber, closedBy, reason));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
     // ==================== ADMIN ENDPOINTS ====================
 
     // Draw cheque (withdraw amount) - Admin only
