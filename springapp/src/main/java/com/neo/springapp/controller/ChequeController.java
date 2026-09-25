@@ -7,6 +7,7 @@ import com.neo.springapp.service.PdfService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -297,6 +298,17 @@ public class ChequeController {
             return ResponseEntity.ok(chequeService.fetchChequeBooksByAccountNumber(accountNumber));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(List.of(Map.of("error", e.getMessage())));
+        }
+    }
+
+    @GetMapping("/admin/lookup")
+    public ResponseEntity<Map<String, Object>> lookupChequeByNumber(@RequestParam String chequeNumber) {
+        try {
+            return ResponseEntity.ok(chequeService.lookupChequeByNumber(chequeNumber));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("error", "Unable to look up cheque number"));
         }
     }
 

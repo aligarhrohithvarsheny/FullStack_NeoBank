@@ -107,6 +107,11 @@ public class PreloadedCustomerDataService {
 
     @Transactional
     public Map<String, Object> parseAndSaveExcel(MultipartFile file, String uploadedBy) {
+        return parseAndSaveExcel(file, uploadedBy, null);
+    }
+
+    @Transactional
+    public Map<String, Object> parseAndSaveExcel(MultipartFile file, String uploadedBy, String selectedAccountType) {
         Map<String, Object> result = new HashMap<>();
         String batchId = "BATCH_" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
         int savedCount = 0;
@@ -154,7 +159,9 @@ public class PreloadedCustomerDataService {
                     PreloadedCustomerData data = new PreloadedCustomerData();
                     data.setAadharNumber(aadhar);
                     data.setPanNumber(cleanUpperCase(getColumnValue(row, columnMap, "pan_number", "pan", "pan_no")));
-                    data.setAccountType(getColumnValueOrDefault(row, columnMap, "Savings", "account_type", "type"));
+                        String rowAccountType = getColumnValueOrDefault(row, columnMap, "Savings", "account_type", "type");
+                        data.setAccountType(normalizeAccountType(selectedAccountType != null && !selectedAccountType.isBlank()
+                            ? selectedAccountType : rowAccountType));
                     data.setFullName(getColumnValue(row, columnMap, "full_name", "name", "customer_name", "applicant_name"));
                     data.setDateOfBirth(getColumnValue(row, columnMap, "date_of_birth", "dob", "birth_date"));
                     data.setAge(getColumnIntValue(row, columnMap, "age"));
@@ -217,6 +224,14 @@ public class PreloadedCustomerDataService {
         }
 
         return result;
+    }
+
+    private String normalizeAccountType(String accountType) {
+        if (accountType == null) return "Savings";
+        String normalized = accountType.trim().toLowerCase(Locale.ROOT);
+        if (normalized.startsWith("current")) return "Current";
+        if (normalized.startsWith("salary")) return "Salary";
+        return "Savings";
     }
 
     // ==================== Excel Template Generation ====================

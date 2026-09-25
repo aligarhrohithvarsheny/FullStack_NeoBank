@@ -26,7 +26,8 @@ public class PreloadedCustomerDataController {
     @PostMapping("/upload-excel")
     public ResponseEntity<Map<String, Object>> uploadExcel(
             @RequestParam("file") MultipartFile file,
-            @RequestParam("uploadedBy") String uploadedBy) {
+            @RequestParam("uploadedBy") String uploadedBy,
+            @RequestParam(defaultValue = "Savings") String accountType) {
 
         if (file.isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("success", false, "message", "File is empty"));
@@ -37,7 +38,7 @@ public class PreloadedCustomerDataController {
             return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Only .xlsx and .xls files are supported"));
         }
 
-        Map<String, Object> result = service.parseAndSaveExcel(file, uploadedBy);
+        Map<String, Object> result = service.parseAndSaveExcel(file, uploadedBy, accountType);
         return ResponseEntity.ok(result);
     }
 

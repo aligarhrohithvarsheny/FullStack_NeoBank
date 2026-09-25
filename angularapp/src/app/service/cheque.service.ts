@@ -195,6 +195,11 @@ export class ChequeService {
     return this.http.get<any[]>(`${this.apiBaseUrl}/account/${encodeURIComponent(accountNumber)}/books`);
   }
 
+  lookupChequeByNumber(chequeNumber: string): Observable<any> {
+    const params = new HttpParams().set('chequeNumber', chequeNumber.trim());
+    return this.http.get<any>(`${this.apiBaseUrl}/admin/lookup`, { params });
+  }
+
   /**
    * Close all active cheque books for an account and invalidate future cheque numbers
    */

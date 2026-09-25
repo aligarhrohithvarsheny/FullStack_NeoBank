@@ -2074,7 +2074,6 @@
               <div class="sal-field"><label>Email ID</label><input type="email" [(ngModel)]="newSalaryAccount.email" placeholder="email@example.com" /></div>
             </div>
             <div class="sal-field-row">
-              <div class="sal-field"><label>Aadhaar Number</label><input type="text" [(ngModel)]="newSalaryAccount.aadharNumber" placeholder="12-digit Aadhaar" maxlength="12" /></div>
               <div class="sal-field">
                 <label>
                   Aadhaar Number
@@ -2084,6 +2083,9 @@
                 <input type="text" [(ngModel)]="newSalaryAccount.aadharNumber" (input)="onSalaryAadharInput()" (blur)="onSalaryAadharInput()" placeholder="12-digit Aadhaar" maxlength="12" />
                 <div *ngIf="salaryAadharMessage" style="font-size:11px; margin-top:3px;" [style.color]="salaryAadharSuccess ? '#10b981' : '#f59e0b'">
                   {{ salaryAadharMessage }}
+                </div>
+                <div *ngIf="salaryExistingAccountMessage" style="font-size:11px; color:#dc2626; margin-top:4px; font-weight:600;">
+                  <i class="fa fa-ban"></i> {{ salaryExistingAccountMessage }}
                 </div>
               </div>
               <div class="sal-field"><label>PAN Number</label><input type="text" [(ngModel)]="newSalaryAccount.panNumber" placeholder="ABCDE1234F" maxlength="10" /></div>
@@ -2158,7 +2160,7 @@
         </div>
 
         <div class="sal-form-footer">
-          <button class="sal-btn sal-btn-success" (click)="createSalaryAccount()" [disabled]="isCreatingSalaryAccount">
+          <button class="sal-btn sal-btn-success" (click)="createSalaryAccount()" [disabled]="isCreatingSalaryAccount || salaryAadharBlocked">
             <i class="fa" [class.fa-spinner]="isCreatingSalaryAccount" [class.fa-plus-circle]="!isCreatingSalaryAccount" [class.fa-spin]="isCreatingSalaryAccount"></i>
             {{ isCreatingSalaryAccount ? 'Creating...' : 'Create Salary Account' }}
           </button>
@@ -2263,6 +2265,10 @@
                 <button type="button" class="sal-btn sal-btn-outline" style="padding: 2px 8px; font-size: 11px;" (click)="downloadSalarySignedDocument(selectedSalaryAccount)">
                   <i class="fa fa-download"></i> View / Download
                 </button>
+                <label class="sal-btn sal-btn-outline" style="padding: 2px 8px; font-size: 11px; cursor: pointer; margin: 0;">
+                  <i class="fa fa-sync-alt"></i> Replace
+                  <input type="file" style="display:none;" (change)="uploadSalarySignedDocForAccount(selectedSalaryAccount, $event)" accept=".pdf,image/*" />
+                </label>
               </span>
             </div>
             <div class="sal-detail-item" *ngIf="!selectedSalaryAccount.signedDocumentName">
@@ -3000,6 +3006,12 @@
         </div>
         <div class="card-body" style="padding: 20px;">
           <div style="display: flex; gap: 12px; align-items: center; margin-bottom: 16px;">
+            <select [(ngModel)]="customerDataAccountType" aria-label="Customer account type"
+              style="padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px; background: white; font-weight: 600;">
+              <option value="Savings">Savings</option>
+              <option value="Current">Current</option>
+              <option value="Salary">Salary</option>
+            </select>
             <input type="file" accept=".xlsx,.xls" (change)="onCustomerDataFileSelect($event)"
               style="padding: 10px; border: 2px dashed #d1d5db; border-radius: 8px; flex: 1; cursor: pointer;">
             <button (click)="uploadCustomerDataExcel()" [disabled]="!customerDataFile || isUploadingCustomerData"
@@ -3011,7 +3023,7 @@
           </div>
           <div style="font-size: 0.8rem; color: #6b7280;">
             <i class="fa fa-info-circle"></i>
-            Supported format: .xlsx / .xls. First row must be headers. Required column: <strong>aadhar_number</strong>. 
+            Uploading as <strong>{{ customerDataAccountType }}</strong>. Supported format: .xlsx / .xls. First row must be headers. Required column: <strong>aadhar_number</strong>.
             Other columns: pan_number, account_type, full_name, date_of_birth, age, gender, occupation, income, phone, email, address, city, state, pincode, etc.
           </div>
 

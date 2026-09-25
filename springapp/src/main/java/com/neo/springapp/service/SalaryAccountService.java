@@ -84,6 +84,10 @@ public class SalaryAccountService {
     // ─── Account CRUD ──────────────────────────────────────────
 
     public SalaryAccount createAccount(SalaryAccount account, String createdBy) {
+        if (account.getAadharNumber() != null && !account.getAadharNumber().isBlank()
+                && salaryAccountRepository.findByAadharNumber(account.getAadharNumber()) != null) {
+            throw new IllegalArgumentException("A salary account already exists for this Aadhaar number. A new salary account cannot be opened.");
+        }
         if (account.getAccountNumber() == null || account.getAccountNumber().isEmpty()) {
             account.setAccountNumber(generateAccountNumber());
         }
@@ -143,6 +147,22 @@ public class SalaryAccountService {
         SalaryAccount account = salaryAccountRepository.findById(accountId)
                 .orElseThrow(() -> new IllegalArgumentException("Salary account not found with ID: " + accountId));
 
+        return saveSignedDocument(account, fileName, fileType, base64Data, uploadedBy);
+    }
+
+    public SalaryAccount replaceSignedDocument(Long accountId, String fileName, String fileType, String base64Data, String uploadedBy) {
+        SalaryAccount account = salaryAccountRepository.findById(accountId)
+                .orElseThrow(() -> new IllegalArgumentException("Salary account not found with ID: " + accountId));
+        if (account.getSignedDocumentName() == null || account.getSignedDocumentName().isBlank()) {
+            throw new IllegalArgumentException("No existing signed document to replace");
+        }
+
+        return saveSignedDocument(account, fileName, fileType, base64Data, uploadedBy);
+    }
+
+    private SalaryAccount saveSignedDocument(SalaryAccount account, String fileName, String fileType, String base64Data, String uploadedBy) {
+        boolean replacing = account.getSignedDocumentName() != null && !account.getSignedDocumentName().isBlank();
+
         account.setSignedDocumentName(fileName);
         account.setSignedDocumentType(fileType);
         account.setSignedDocumentData(base64Data);
@@ -158,9 +178,9 @@ public class SalaryAccountService {
             history.setSalaryAccountId(saved.getId());
             history.setAccountNumber(saved.getAccountNumber());
             history.setEditedBy(uploadedBy == null || uploadedBy.isBlank() ? "Manager" : uploadedBy);
-            history.setChangesDescription("Signed document uploaded: " + fileName);
+            history.setChangesDescription("Signed document " + (replacing ? "replaced" : "uploaded") + ": " + fileName);
             Map<String, Object> docMeta = new HashMap<>();
-            docMeta.put("action", "SIGNED_DOCUMENT_UPLOADED");
+            docMeta.put("action", replacing ? "SIGNED_DOCUMENT_REPLACED" : "SIGNED_DOCUMENT_UPLOADED");
             docMeta.put("documentName", fileName);
             docMeta.put("documentType", fileType);
             history.setFieldChanges(objectMapper.writeValueAsString(docMeta));

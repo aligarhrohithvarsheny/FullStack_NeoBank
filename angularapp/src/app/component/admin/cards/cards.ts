@@ -171,6 +171,7 @@ export class Cards implements OnInit {
         userAccountNumber: 'ACC002',
         cardNumber: '5555555555554444',
         cardType: 'Mastercard Debit',
+        cardSource: 'debit',
         cvv: '456',
         expiry: '08/29',
         status: 'Blocked',

@@ -73,6 +73,9 @@ export class ChequeManagementComponent implements OnInit, OnDestroy {
   closureHistory: any[] = [];
   isLoadingClosureBooks: boolean = false;
   isClosingBooks: boolean = false;
+  chequeLookupNumber: string = '';
+  chequeLookupResult: any = null;
+  isLookingUpCheque: boolean = false;
 
   // Signature Verification
   signatureDocUrl: SafeResourceUrl | null = null;
@@ -178,6 +181,27 @@ export class ChequeManagementComponent implements OnInit, OnDestroy {
         this.isLoadingClosureBooks = false;
         this.closureBooks = [];
         this.alertService.error('Unable to load cheque books', err?.error?.error || 'Please check the account number and try again.');
+      }
+    });
+  }
+
+  lookupChequeByNumber() {
+    const chequeNumber = this.chequeLookupNumber?.trim();
+    if (!chequeNumber) {
+      this.alertService.error('Missing Info', 'Enter a cheque number to fetch its data');
+      return;
+    }
+
+    this.isLookingUpCheque = true;
+    this.chequeLookupResult = null;
+    this.chequeService.lookupChequeByNumber(chequeNumber).subscribe({
+      next: result => {
+        this.chequeLookupResult = result;
+        this.isLookingUpCheque = false;
+      },
+      error: err => {
+        this.isLookingUpCheque = false;
+        this.alertService.error('Cheque Not Found', err?.error?.error || 'No cheque was found for that number');
       }
     });
   }

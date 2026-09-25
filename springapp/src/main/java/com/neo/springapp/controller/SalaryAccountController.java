@@ -71,6 +71,29 @@ public class SalaryAccountController {
         }
     }
 
+    @PutMapping("/{id:\\d+}/replace-document")
+    public ResponseEntity<Map<String, Object>> replaceSignedDocument(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> body) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            SalaryAccount updated = salaryAccountService.replaceSignedDocument(
+                    id,
+                    body.get("fileName"),
+                    body.get("fileType"),
+                    body.get("base64Data"),
+                    body.get("uploadedBy"));
+            response.put("success", true);
+            response.put("message", "Signed document replaced successfully");
+            response.put("account", updated);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "Failed to replace document: " + e.getMessage());
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
+
     // ─── Read ────────────────────────────────────────────────
 
     @GetMapping("/all")

@@ -77,6 +77,34 @@
       </button>
     </div>
 
+    <div style="display: flex; flex-wrap: wrap; gap: 16px; align-items: end; width: 100%; margin-top: 16px;">
+      <div class="filter-group" style="flex: 1 1 300px; min-width: 220px;">
+        <label for="chequeLookupNumber">Fetch cheque details by number:</label>
+        <div class="search-wrapper">
+          <input
+            type="text"
+            id="chequeLookupNumber"
+            [(ngModel)]="chequeLookupNumber"
+            (keyup.enter)="lookupChequeByNumber()"
+            placeholder="Enter cheque number"
+            class="search-input"
+          />
+          <button class="search-btn" (click)="lookupChequeByNumber()" [disabled]="isLookingUpCheque">
+            <i class="fas fa-search"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div *ngIf="chequeLookupResult" style="margin-top: 16px; padding: 14px; background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px;">
+      <strong>Cheque {{ chequeLookupResult.chequeNumber }}</strong>
+      <span style="margin-left: 18px;">Account: {{ chequeLookupResult.accountNumber || '—' }}</span>
+      <span style="margin-left: 18px;">Type: {{ chequeLookupResult.accountType || '—' }}</span>
+      <span style="margin-left: 18px;">Status: {{ chequeLookupResult.status || '—' }}</span>
+      <span style="margin-left: 18px;">Amount: {{ chequeLookupResult.amount ?? '—' }}</span>
+      <span *ngIf="chequeLookupResult.usedReference" style="margin-left: 18px;">Used Ref: {{ chequeLookupResult.usedReference }}</span>
+    </div>
+
     <div *ngIf="isLoadingClosureBooks" style="margin-top: 12px; color: #9a6a00;">
       <i class="fas fa-spinner fa-spin"></i> Loading cheque books...
     </div>
@@ -91,6 +119,9 @@
               <th>Type</th>
               <th>Book</th>
               <th>Serial Range</th>
+              <th>Generated</th>
+              <th>Used</th>
+              <th>Available</th>
               <th>Status</th>
             </tr>
           </thead>
@@ -100,6 +131,9 @@
               <td>{{ book.accountType }}</td>
               <td>{{ book.chequeBookNumber }}</td>
               <td>{{ book.serialFrom || '—' }} - {{ book.serialTo || '—' }}</td>
+              <td>{{ book.generatedCount ?? 0 }}</td>
+              <td>{{ book.usedCount ?? 0 }}</td>
+              <td>{{ book.availableCount ?? 0 }}</td>
               <td>
                 <span class="status-badge" [style.backgroundColor]="book.status === 'CLOSED' ? '#ef4444' : '#10b981'">
                   {{ book.status }}

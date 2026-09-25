@@ -114,6 +114,7 @@ export class ManagerDashboard implements OnInit, OnDestroy {
   customerDataUploadResult: any = null;
   customerDataSearchQuery: string = '';
   customerDataViewMode: string = 'all'; // all, unused
+  customerDataAccountType: string = 'Savings';
 
   // ─── CIBIL Reports Upload ──────────────────────────────────
   cibilFile: File | null = null;
@@ -348,6 +349,8 @@ export class ManagerDashboard implements OnInit, OnDestroy {
   salaryAadharSuccess: boolean = false;
   salaryAadharMessage: string = '';
   lastLookedUpSalaryAadhar: string = '';
+  salaryAadharBlocked: boolean = false;
+  salaryExistingAccountMessage: string = '';
 
   // Signed Document Upload & Audit History
   selectedSalaryDocName: string = '';
@@ -3243,6 +3246,8 @@ export class ManagerDashboard implements OnInit, OnDestroy {
     const aadhar = (this.newSalaryAccount.aadharNumber || '').trim();
     if (aadhar.length === 12 && aadhar !== this.lastLookedUpSalaryAadhar && /^\d{12}$/.test(aadhar)) {
       this.isSalaryAadharLoading = true;
+      this.salaryAadharBlocked = false;
+      this.salaryExistingAccountMessage = '';
       this.salaryAadharMessage = 'Fetching customer details for Aadhaar...';
       this.salaryAadharSuccess = false;
       this.http.get<any>(`${environment.apiBaseUrl}/api/preloaded-customer-data/lookup/aadhar/${aadhar}`).subscribe({
@@ -3281,10 +3286,27 @@ export class ManagerDashboard implements OnInit, OnDestroy {
           this.salaryAadharMessage = 'No pre-existing records found for this Aadhaar. Enter manually.';
         }
       });
+      this.http.get<any>(`${environment.apiBaseUrl}/api/admin-account-applications/check-existing-accounts/${aadhar}`).subscribe({
+        next: (res) => {
+          const salaryAccount = (res?.existingAccounts || []).find((account: any) => account.type === 'Salary');
+          this.salaryAadharBlocked = !!salaryAccount || (res?.blockedTypes || []).includes('Salary');
+          if (this.salaryAadharBlocked) {
+            this.salaryExistingAccountMessage = salaryAccount
+              ? `Salary account already opened (${salaryAccount.accountNumber || salaryAccount.status}). A new salary account cannot be opened.`
+              : 'A salary account or pending salary application already exists for this Aadhaar.';
+          }
+        },
+        error: () => {
+          this.salaryAadharBlocked = false;
+          this.salaryExistingAccountMessage = '';
+        }
+      });
     } else if (aadhar.length < 12) {
       this.salaryAadharSuccess = false;
       this.salaryAadharMessage = '';
       this.lastLookedUpSalaryAadhar = '';
+      this.salaryAadharBlocked = false;
+      this.salaryExistingAccountMessage = '';
     }
   }
 
@@ -3333,6 +3355,10 @@ export class ManagerDashboard implements OnInit, OnDestroy {
       this.alertService.error('Validation', 'Employee Name is required');
       return;
     }
+    if (this.salaryAadharBlocked) {
+      this.alertService.error('Account Already Exists', this.salaryExistingAccountMessage);
+      return;
+    }
     this.isCreatingSalaryAccount = true;
     if (this.selectedSalaryDocBase64) {
       this.newSalaryAccount.signedDocumentName = this.selectedSalaryDocName;
@@ -3352,6 +3378,8 @@ export class ManagerDashboard implements OnInit, OnDestroy {
         this.salaryAadharSuccess = false;
         this.salaryAadharMessage = '';
         this.lastLookedUpSalaryAadhar = '';
+        this.salaryAadharBlocked = false;
+        this.salaryExistingAccountMessage = '';
         this.showSalaryForm = false;
         this.isCreatingSalaryAccount = false;
         this.loadSalaryAccounts();
@@ -3387,14 +3415,19 @@ export class ManagerDashboard implements OnInit, OnDestroy {
     const reader = new FileReader();
     reader.onload = () => {
       const base64 = reader.result as string;
-      this.salaryAccountService.uploadSignedDocument(acc.id!, {
+      const documentRequest = {
         fileName: file.name,
         fileType: file.type || 'application/octet-stream',
         base64Data: base64,
         uploadedBy: this.managerName
-      }).subscribe({
+      };
+      const request = acc.signedDocumentName
+        ? this.salaryAccountService.replaceSignedDocument(acc.id!, documentRequest)
+        : this.salaryAccountService.uploadSignedDocument(acc.id!, documentRequest);
+      request.subscribe({
         next: (res) => {
-          this.alertService.success('Uploaded', 'Signed document uploaded and saved to audit history');
+          this.alertService.success(acc.signedDocumentName ? 'Replaced' : 'Uploaded',
+            `Signed document ${acc.signedDocumentName ? 'replaced' : 'uploaded'} and saved to audit history`);
           if (res.account) {
             this.selectedSalaryAccount = res.account;
             const idx = this.salaryAccounts.findIndex(a => a.id === acc.id);
@@ -3888,6 +3921,7 @@ export class ManagerDashboard implements OnInit, OnDestroy {
     const formData = new FormData();
     formData.append('file', this.customerDataFile);
     formData.append('uploadedBy', this.managerName || 'Manager');
+    formData.append('accountType', this.customerDataAccountType);
     this.http.post<any>(`${environment.apiBaseUrl}/api/preloaded-customer-data/upload-excel`, formData).subscribe({
       next: (result) => {
         this.isUploadingCustomerData = false;
