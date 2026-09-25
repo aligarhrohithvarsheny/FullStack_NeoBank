@@ -106,9 +106,10 @@ public class CardService {
     public Card blockCard(Long cardId) {
         Card card = cardRepository.findById(cardId).orElse(null);
         if (card != null) {
+            String oldStatus = card.getStatus();
             card.setBlocked(true);
             card.setStatus("Blocked");
-            recordAction(card, "BLOCK", card.getStatus(), "Blocked", "ADMIN");
+            recordAction(card, "BLOCK", oldStatus, "Blocked", "ADMIN");
             return cardRepository.save(card);
         }
         return null;
@@ -155,8 +156,10 @@ public class CardService {
     public Card deactivateCard(Long cardId) {
         Card card = cardRepository.findById(cardId).orElse(null);
         if (card != null) {
+            String oldStatus = card.getStatus();
             card.setDeactivated(true);
             card.setStatus("Deactivated");
+            recordAction(card, "DEACTIVATE", oldStatus, "Deactivated", "ADMIN");
             return cardRepository.save(card);
         }
         return null;
@@ -220,6 +223,28 @@ public class CardService {
         replacement.setStatus("Active");
         replacement.setPinSet(false);
         return replaceCard(cardId, replacement);
+    }
+
+    public Card addOnCard(Long cardId) {
+        Card parent = cardRepository.findById(cardId).orElse(null);
+        if (parent == null || parent.getAccountNumber() == null) return null;
+        Card addOn = new Card(generateCardNumber(), "Add-on Debit", parent.getUserName(),
+                parent.getAccountNumber(), parent.getUserEmail());
+        Card saved = cardRepository.save(addOn);
+        recordAction(parent, "ADD_ON", "NONE", "CARD_" + saved.getId(), "ADMIN");
+        return saved;
+    }
+
+    public Card mergeCards(Long cardId, Long targetCardId) {
+        Card source = cardRepository.findById(cardId).orElse(null);
+        Card target = cardRepository.findById(targetCardId).orElse(null);
+        if (source == null || target == null || source.getAccountNumber() == null
+                || !source.getAccountNumber().equals(target.getAccountNumber())) return null;
+        String oldStatus = source.getStatus();
+        source.setDeactivated(true);
+        source.setStatus("Merged");
+        recordAction(source, "MERGE", oldStatus, "CARD_" + target.getId(), "ADMIN");
+        return cardRepository.save(source);
     }
 
     // Generate new card

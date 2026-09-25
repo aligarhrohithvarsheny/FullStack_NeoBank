@@ -12,7 +12,9 @@
 .dashboard-wrapper .main-content,
 .dashboard-wrapper .sidebar.collapsed ~ .main-content {
   margin-left: 0;
-  width: 100%;
+  width: auto;
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
 /* Mobile keeps overlay-style behavior */

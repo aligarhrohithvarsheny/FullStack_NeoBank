@@ -3,6 +3,7 @@ import { Router } from '@angular/router';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
+import { catchError, forkJoin, of } from 'rxjs';
 import { environment } from '../../../../environment/environment';
 
 interface CardDetails {
@@ -15,7 +16,9 @@ interface CardDetails {
   cardType: string;
   cvv: string;
   expiry: string;
-  status: 'Active' | 'Blocked' | 'Replaced' | 'Deactivated';
+  status: string;
+  cardSource: 'debit' | 'credit' | 'virtual';
+  accountType?: string;
   pinSet: boolean;
   pinLocked?: boolean;
   blocked?: boolean;
@@ -99,72 +102,49 @@ export class Cards implements OnInit {
 
   loadCards() {
     if (!isPlatformBrowser(this.platformId)) return;
-    
-    // Load cards from MySQL database
-    console.log('Loading cards from MySQL database...');
-    this.http.get(`${environment.apiBaseUrl}/api/cards?page=0&size=100`).subscribe({
-      next: (response: any) => {
-        console.log('Cards loaded from MySQL:', response);
-        console.log('Response type:', typeof response);
-        console.log('Response length:', response?.length || 'N/A');
-        if (response.content) {
-          this.cards = response.content.map((card: any) => ({
-            id: card.id.toString(),
-            userId: card.accountNumber,
-            userName: card.userName,
-            userAccountNumber: card.accountNumber,
-            customerId: card.customerId,
-            cardNumber: card.cardNumber,
-            cardType: card.cardType,
-            cvv: card.cvv,
-            expiry: card.expiryDate,
-            status: card.status,
-            pinSet: card.pinSet,
-            pinLocked: card.pinLocked,
-            blocked: card.blocked,
-            cardSource: 'savings',
-            createdAt: card.createdAt || new Date().toISOString(),
-            lastUpdated: card.lastUpdated || new Date().toISOString()
-          }));
-        } else {
-          this.cards = (Array.isArray(response) ? response : []).map((card: any) => ({
-            id: card.id.toString(),
-            userId: card.accountNumber,
-            userName: card.userName,
-            userAccountNumber: card.accountNumber,
-            customerId: card.customerId,
-            cardNumber: card.cardNumber,
-            cardType: card.cardType,
-            cvv: card.cvv,
-            expiry: card.expiryDate,
-            status: card.status,
-            pinSet: card.pinSet,
-            pinLocked: card.pinLocked,
-            blocked: card.blocked,
-            cardSource: 'savings',
-            createdAt: card.createdAt || new Date().toISOString(),
-            lastUpdated: card.lastUpdated || new Date().toISOString()
-          }));
-        }
-        
-        // Also save to localStorage as backup
+
+    forkJoin({
+      debit: this.http.get<any>(`${environment.apiBaseUrl}/api/cards?page=0&size=100`).pipe(catchError(() => of({ content: [] }))),
+      credit: this.http.get<any[]>(`${environment.apiBaseUrl}/api/credit-cards/all`).pipe(catchError(() => of([]))),
+      virtual: this.http.get<any>(`${environment.apiBaseUrl}/api/virtual-cards/all`).pipe(catchError(() => of({ cards: [] })))
+    }).subscribe({
+      next: ({ debit, credit, virtual }) => {
+        const debitCards = (debit?.content || (Array.isArray(debit) ? debit : [])).map((card: any) => this.normalizeCard(card, 'debit'));
+        const creditCards = (Array.isArray(credit) ? credit : []).map((card: any) => this.normalizeCard(card, 'credit'));
+        const virtualCards = (virtual?.cards || []).map((card: any) => this.normalizeCard(card, 'virtual'));
+        this.cards = [...debitCards, ...creditCards, ...virtualCards];
         this.saveCards();
         this.applyFilters();
       },
-      error: (err: any) => {
-        console.error('Error loading cards from database:', err);
-        // Fallback to localStorage
+      error: () => {
         const savedCards = localStorage.getItem('user_cards');
-        if (savedCards) {
-          this.cards = JSON.parse(savedCards);
-        } else {
-          // No cards found in database - show empty list
-          this.cards = [];
-          console.log('No cards found in database');
-        }
+        this.cards = savedCards ? JSON.parse(savedCards) : [];
         this.applyFilters();
       }
     });
+  }
+
+  private normalizeCard(card: any, cardSource: CardDetails['cardSource']): CardDetails {
+    const virtual = cardSource === 'virtual';
+    return {
+      id: `${cardSource}-${card.id}`,
+      userId: card.accountNumber,
+      userName: card.userName || card.cardholderName || 'Unknown customer',
+      userAccountNumber: card.accountNumber,
+      customerId: card.customerId,
+      cardNumber: card.cardNumber,
+      cardType: card.cardType || (virtual ? 'Virtual Debit' : cardSource === 'credit' ? 'Credit Card' : 'Debit Card'),
+      cvv: card.cvv,
+      expiry: card.expiryDate,
+      status: card.status,
+      cardSource,
+      accountType: card.accountType,
+      pinSet: card.pinSet || false,
+      pinLocked: card.pinLocked,
+      blocked: card.blocked || card.status === 'Blocked' || card.status === 'FROZEN',
+      createdAt: card.createdAt || card.issueDate || new Date().toISOString(),
+      lastUpdated: card.updatedAt || card.lastUpdated || new Date().toISOString()
+    };
   }
 
   createSampleCards() {
@@ -176,6 +156,7 @@ export class Cards implements OnInit {
         userAccountNumber: 'ACC001',
         cardNumber: '4111111111111234',
         cardType: 'Visa Debit',
+        cardSource: 'debit',
         cvv: '123',
         expiry: '12/28',
         status: 'Active',
@@ -270,12 +251,11 @@ export class Cards implements OnInit {
 
   applyFilters() {
     this.filteredCards = this.cards.filter(card => {
-      const matchesStatus = this.statusFilter === 'All' || card.status === this.statusFilter;
+      const normalizedStatus = card.status.toLowerCase();
+      const matchesStatus = this.statusFilter === 'All' || normalizedStatus === this.statusFilter.toLowerCase();
       const matchesSearch = !this.searchTerm || 
-        card.userName.toLowerCase().includes(this.searchTerm.toLowerCase()) ||
-        card.userAccountNumber.toLowerCase().includes(this.searchTerm.toLowerCase()) ||
-        card.cardNumber.toLowerCase().includes(this.searchTerm.toLowerCase()) ||
-        card.cardType.toLowerCase().includes(this.searchTerm.toLowerCase());
+        [card.userName, card.userAccountNumber, card.cardNumber, card.cardType, card.cardSource]
+          .some(value => value?.toLowerCase().includes(this.searchTerm.toLowerCase()));
       
       return matchesStatus && matchesSearch;
     });
@@ -313,6 +293,7 @@ export class Cards implements OnInit {
           userAccountNumber: resolvedAccount,
           cardNumber: cardNumber,
           cardType: 'Visa Debit',
+          cardSource: 'debit',
           cvv: cvv,
           expiry: `${expiryMonth}/${expiryYear.slice(-2)}`,
           status: 'Active',
@@ -362,6 +343,7 @@ export class Cards implements OnInit {
           userAccountNumber: userProfile.accountNumber,
           cardNumber: cardNumber,
           cardType: 'Visa Debit',
+          cardSource: 'debit',
           cvv: cvv,
           expiry: `${expiryMonth}/${expiryYear.slice(-2)}`,
           status: 'Active',
@@ -381,9 +363,15 @@ export class Cards implements OnInit {
 
   blockCard(card: CardDetails) {
     if (confirm(`Block card ending with ${card.cardNumber.slice(-4)} for ${card.userName}?`)) {
-      this.http.put(`${environment.apiBaseUrl}/api/cards/${card.id}/block`, {}).subscribe({
+      const id = card.id.split('-').pop();
+      const request = card.cardSource === 'credit'
+        ? this.http.put(`${environment.apiBaseUrl}/api/credit-cards/${id}`, { status: 'Blocked' })
+        : card.cardSource === 'virtual'
+          ? this.http.put(`${environment.apiBaseUrl}/api/virtual-cards/${id}/freeze`, {})
+          : this.http.put(`${environment.apiBaseUrl}/api/cards/${id}/block`, {});
+      request.subscribe({
         next: (updated: any) => {
-          card.status = updated?.status || 'Blocked';
+          card.status = updated?.status || updated?.card?.status || 'Blocked';
           card.blocked = true;
           card.lastUpdated = new Date().toISOString();
           this.saveCards();
@@ -397,9 +385,15 @@ export class Cards implements OnInit {
 
   unblockCard(card: CardDetails) {
     if (confirm(`Unblock card ending with ${card.cardNumber.slice(-4)} for ${card.userName}?`)) {
-      this.http.put(`${environment.apiBaseUrl}/api/cards/${card.id}/unblock`, {}).subscribe({
+      const id = card.id.split('-').pop();
+      const request = card.cardSource === 'credit'
+        ? this.http.put(`${environment.apiBaseUrl}/api/credit-cards/${id}`, { status: 'Active' })
+        : card.cardSource === 'virtual'
+          ? this.http.put(`${environment.apiBaseUrl}/api/virtual-cards/${id}/unfreeze`, {})
+          : this.http.put(`${environment.apiBaseUrl}/api/cards/${id}/unblock`, {});
+      request.subscribe({
         next: (updated: any) => {
-          card.status = updated?.status || 'Active';
+          card.status = updated?.status || updated?.card?.status || 'Active';
           card.blocked = false;
           card.pinLocked = false;
           card.lastUpdated = new Date().toISOString();
@@ -413,6 +407,10 @@ export class Cards implements OnInit {
   }
 
   replaceCard(card: CardDetails) {
+    if (card.cardSource !== 'debit') {
+      alert('Replacement is currently supported for physical debit cards. Use the source-specific card workflow for this card.');
+      return;
+    }
     if (confirm(`Replace card ending with ${card.cardNumber.slice(-4)} for ${card.userName}?`)) {
       this.http.post(`${environment.apiBaseUrl}/api/cards/${card.id}/replace-auto`, {}).subscribe({
         next: (updated: any) => {
@@ -435,17 +433,56 @@ export class Cards implements OnInit {
     }
   }
 
+  addOnCard(card: CardDetails) {
+    if (card.cardSource !== 'debit') return;
+    if (!confirm(`Issue an add-on card linked to ${card.userAccountNumber}?`)) return;
+    const id = card.id.split('-').pop();
+    this.http.post(`${environment.apiBaseUrl}/api/cards/${id}/add-on`, {}).subscribe({
+      next: (created: any) => {
+        this.cards.push(this.normalizeCard(created, 'debit'));
+        this.applyFilters();
+        alert(`Add-on card issued ending ${created.cardNumber?.slice(-4)}.`);
+      },
+      error: () => alert('Failed to issue add-on card.')
+    });
+  }
+
+  mergeCard(card: CardDetails) {
+    if (card.cardSource !== 'debit') return;
+    const target = prompt('Enter the target debit card ID to merge this card into:');
+    if (!target || !confirm(`Merge card ending ${card.cardNumber.slice(-4)} into card ${target}?`)) return;
+    const id = card.id.split('-').pop();
+    this.http.post(`${environment.apiBaseUrl}/api/cards/${id}/merge`, { targetCardId: Number(target) }).subscribe({
+      next: (updated: any) => {
+        card.status = updated.status;
+        card.blocked = false;
+        this.applyFilters();
+        this.viewCardDetails(card);
+      },
+      error: () => alert('Cards must belong to the same linked account and the target ID must be valid.')
+    });
+  }
+
   viewCardDetails(card: CardDetails) {
     this.selectedCard = card;
     this.showCardDetailsModal = true;
     this.isLoadingCardDetails = true;
     this.cardTransactions = [];
     this.cardActionHistory = [];
-    this.http.get(`${environment.apiBaseUrl}/api/cards/${card.id}/transactions`).subscribe({
-      next: (txns) => { this.cardTransactions = Array.isArray(txns) ? txns : []; },
-      error: () => { this.cardTransactions = []; }
-    });
-    this.http.get(`${environment.apiBaseUrl}/api/cards/${card.id}/action-history`).subscribe({
+    const numericId = card.id.split('-').pop();
+    const transactionsUrl = card.cardSource === 'credit'
+      ? `${environment.apiBaseUrl}/api/credit-cards/${numericId}/transactions`
+      : `${environment.apiBaseUrl}/api/cards/${numericId}/transactions`;
+    if (card.cardSource !== 'virtual') {
+      this.http.get(transactionsUrl).subscribe({
+        next: (txns) => { this.cardTransactions = Array.isArray(txns) ? txns : []; },
+        error: () => { this.cardTransactions = []; }
+      });
+    }
+    const historyUrl = card.cardSource === 'debit'
+      ? `${environment.apiBaseUrl}/api/cards/${numericId}/action-history`
+      : `${environment.apiBaseUrl}/api/audit/card-history?cardSource=${card.cardSource}&cardId=${numericId}`;
+    this.http.get(historyUrl).subscribe({
       next: (history) => {
         this.cardActionHistory = Array.isArray(history) ? history : [];
         this.isLoadingCardDetails = false;
@@ -678,13 +715,24 @@ export class Cards implements OnInit {
   }
 
   getStatusClass(status: string): string {
-    switch (status) {
-      case 'Active': return 'status-active';
-      case 'Blocked': return 'status-blocked';
-      case 'Replaced': return 'status-replaced';
-      case 'Deactivated': return 'status-deactivated';
+    switch (status?.toLowerCase()) {
+      case 'active': return 'status-active';
+      case 'blocked':
+      case 'frozen': return 'status-blocked';
+      case 'replaced': return 'status-replaced';
+      case 'deactivated':
+      case 'cancelled':
+      case 'closed': return 'status-deactivated';
       default: return '';
     }
+  }
+
+  isCardBlocked(card: CardDetails): boolean {
+    return ['blocked', 'frozen'].includes(card.status?.toLowerCase()) || !!card.blocked;
+  }
+
+  isCardActive(card: CardDetails): boolean {
+    return ['active'].includes(card.status?.toLowerCase()) && !card.blocked;
   }
 
   getRequestStatusClass(status: string): string {

@@ -132,6 +132,18 @@ public class CardController {
         return cardService.replaceCardAuto(cardId);
     }
 
+    @PostMapping("/{cardId}/add-on")
+    public ResponseEntity<Card> addOnCard(@PathVariable Long cardId) {
+        Card card = cardService.addOnCard(cardId);
+        return card == null ? ResponseEntity.badRequest().build() : ResponseEntity.ok(card);
+    }
+
+    @PostMapping("/{cardId}/merge")
+    public ResponseEntity<Card> mergeCards(@PathVariable Long cardId, @RequestBody Map<String, Long> request) {
+        Card card = cardService.mergeCards(cardId, request.get("targetCardId"));
+        return card == null ? ResponseEntity.badRequest().build() : ResponseEntity.ok(card);
+    }
+
     // Deactivate a card
     @PutMapping("/{cardId}/deactivate")
     public Card deactivateCard(@PathVariable Long cardId) {

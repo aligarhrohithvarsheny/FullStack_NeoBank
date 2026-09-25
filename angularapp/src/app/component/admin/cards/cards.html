@@ -126,6 +126,7 @@
           <tr>
             <th>User Name</th>
             <th>Account Number</th>
+            <th>Account Type</th>
             <th>Card Number</th>
             <th>Card Type</th>
             <th>Expiry</th>
@@ -140,7 +141,8 @@
           <tr *ngFor="let card of filteredCards; trackBy: trackByCardId">
             <td class="user-name">{{ card.userName }}</td>
             <td class="account-number">{{ card.userAccountNumber }}</td>
-            <td class="card-number">**** **** **** {{ card.cardNumber.slice(-4) }}</td>
+            <td>{{ card.accountType || 'Linked account' }}</td>
+            <td class="card-number">{{ card.cardNumber }}</td>
             <td class="card-type">{{ card.cardType }}</td>
             <td class="expiry">{{ card.expiry }}</td>
             <td [ngClass]="getStatusClass(card.status)">
@@ -159,14 +161,14 @@
               <div class="action-buttons">
                 <button (click)="viewCardDetails(card)" class="view-btn">Details</button>
                 <button 
-                  *ngIf="card.status === 'Active'"
+                  *ngIf="isCardActive(card)"
                   (click)="blockCard(card)" 
                   class="block-btn"
                 >
                   Block
                 </button>
                 <button 
-                  *ngIf="card.status === 'Blocked'"
+                  *ngIf="isCardBlocked(card)"
                   (click)="unblockCard(card)" 
                   class="unblock-btn"
                 >
@@ -175,10 +177,12 @@
                 <button 
                   (click)="replaceCard(card)" 
                   class="replace-btn"
-                  [disabled]="card.status === 'Deactivated'"
+                  [disabled]="card.cardSource !== 'debit' || card.status.toLowerCase() === 'deactivated'"
                 >
                   Replace
                 </button>
+                <button *ngIf="card.cardSource === 'debit'" (click)="addOnCard(card)" class="approve-btn">Add-on</button>
+                <button *ngIf="card.cardSource === 'debit'" (click)="mergeCard(card)" class="view-btn">Merge</button>
                 <button 
                   (click)="deactivateCard(card)" 
                   class="deactivate-btn"
@@ -308,7 +312,9 @@
       <div class="modal-body">
         <div class="detail-grid">
           <p><strong>Account:</strong> {{ selectedCard.userAccountNumber }}</p>
-          <p><strong>Card:</strong> **** **** **** {{ selectedCard.cardNumber.slice(-4) }}</p>
+          <p><strong>Card:</strong> {{ selectedCard.cardNumber }}</p>
+          <p><strong>Type:</strong> {{ selectedCard.cardType }} ({{ selectedCard.cardSource }})</p>
+          <p><strong>Account Type:</strong> {{ selectedCard.accountType || 'Linked account' }}</p>
           <p><strong>Status:</strong> {{ selectedCard.status }}</p>
           <p><strong>PIN Set:</strong> {{ selectedCard.pinSet ? 'Yes' : 'No' }}</p>
           <p><strong>PIN Locked:</strong> {{ selectedCard.pinLocked ? 'Yes' : 'No' }}</p>
@@ -320,9 +326,12 @@
           <tbody>
             <tr *ngFor="let t of cardTransactions">
               <td>{{ t.date | date:'short' }}</td>
-              <td>{{ t.type }}</td>
+              <td>{{ t.type || t.transactionType }}</td>
               <td>₹{{ t.amount }}</td>
-              <td>{{ t.description || t.merchant }}</td>
+              <td [class.debit-amount]="(t.type || t.transactionType)?.toLowerCase().includes('debit') || (t.type || t.transactionType)?.toLowerCase().includes('purchase')"
+                  [class.credit-amount]="(t.type || t.transactionType)?.toLowerCase().includes('credit') || (t.type || t.transactionType)?.toLowerCase().includes('payment')">
+                {{ t.description || t.merchant || '-' }}
+              </td>
               <td>{{ t.status }}</td>
             </tr>
           </tbody>
@@ -342,6 +351,10 @@
           </tbody>
         </table>
         <p *ngIf="cardActionHistory.length === 0">No action history recorded.</p>
+        <div class="modal-actions" *ngIf="selectedCard.cardSource === 'debit'">
+          <button class="approve-btn" (click)="addOnCard(selectedCard)">Add-on Card</button>
+          <button class="view-btn" (click)="mergeCard(selectedCard)">Merge Card</button>
+        </div>
       </div>
     </div>
   </div>

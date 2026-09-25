@@ -277,6 +277,16 @@
   color: #383d41;
 }
 
+.debit-amount {
+  color: #b42318;
+  font-weight: 600;
+}
+
+.credit-amount {
+  color: #067647;
+  font-weight: 600;
+}
+
 /* PIN Status */
 .pin-set {
   color: #28a745;
