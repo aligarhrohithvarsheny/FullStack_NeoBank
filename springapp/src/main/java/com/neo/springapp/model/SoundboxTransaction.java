@@ -19,6 +19,11 @@ public class SoundboxTransaction {
     @Column(nullable = false)
     private String accountNumber;
 
+    private String soundboxAccountNumber;
+    private String accountType;
+    private String approvedBy;
+    private LocalDateTime approvedAt;
+
     private String deviceId;
 
     @Column(nullable = false)

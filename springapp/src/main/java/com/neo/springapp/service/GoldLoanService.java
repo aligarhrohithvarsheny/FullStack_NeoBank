@@ -6,6 +6,7 @@ import com.neo.springapp.model.SalaryAccount;
 import com.neo.springapp.model.SalaryNormalTransaction;
 import com.neo.springapp.model.EmiPayment;
 import com.neo.springapp.model.GoldLoanHistory;
+import com.neo.springapp.model.Transaction;
 import com.neo.springapp.repository.GoldLoanRepository;
 import com.neo.springapp.repository.GoldLoanHistoryRepository;
 import com.neo.springapp.repository.EmiPaymentRepository;
@@ -37,6 +38,9 @@ public class GoldLoanService {
     private final SalaryAccountRepository salaryAccountRepository;
     private final SalaryNormalTransactionRepository salaryNormalTransactionRepository;
     private final GoldLoanHistoryRepository goldLoanHistoryRepository;
+    private final AllocationUtilizationService allocationUtilizationService;
+    private final ChargeManagementService chargeManagementService;
+    private final TransactionService transactionService;
 
     public GoldLoanService(GoldLoanRepository goldLoanRepository, 
                           GoldRateService goldRateService,
@@ -47,7 +51,10 @@ public class GoldLoanService {
                           UserService userService,
                           SalaryAccountRepository salaryAccountRepository,
                           SalaryNormalTransactionRepository salaryNormalTransactionRepository,
-                          GoldLoanHistoryRepository goldLoanHistoryRepository) {
+                          GoldLoanHistoryRepository goldLoanHistoryRepository,
+                          AllocationUtilizationService allocationUtilizationService,
+                          ChargeManagementService chargeManagementService,
+                          TransactionService transactionService) {
         this.goldLoanRepository = goldLoanRepository;
         this.goldRateService = goldRateService;
         this.accountService = accountService;
@@ -58,6 +65,9 @@ public class GoldLoanService {
         this.salaryAccountRepository = salaryAccountRepository;
         this.salaryNormalTransactionRepository = salaryNormalTransactionRepository;
         this.goldLoanHistoryRepository = goldLoanHistoryRepository;
+        this.allocationUtilizationService = allocationUtilizationService;
+        this.chargeManagementService = chargeManagementService;
+        this.transactionService = transactionService;
     }
 
     public Map<String, Object> requestApplyOtp(String accountNumber) {
@@ -168,9 +178,19 @@ public class GoldLoanService {
     }
 
     // Approve or reject gold loan
+    @Transactional
     public GoldLoan approveGoldLoan(Long id, String status, String approvedBy, Map<String, Object> goldDetails) {
         GoldLoan goldLoan = goldLoanRepository.findById(id).orElse(null);
         if (goldLoan != null) {
+            Long allocationId = null;
+            Long performedByAdminId = null;
+            if ("Approved".equals(status)) {
+                if (goldDetails == null || goldDetails.get("allocationId") == null || goldDetails.get("performedByAdminId") == null) {
+                    throw new IllegalArgumentException("Select a verified allocation and confirm the admin session before approval.");
+                }
+                allocationId = Long.valueOf(goldDetails.get("allocationId").toString());
+                performedByAdminId = Long.valueOf(goldDetails.get("performedByAdminId").toString());
+            }
             goldLoan.setStatus(status);
             goldLoan.setApprovalDate(LocalDateTime.now());
             goldLoan.setApprovedBy(approvedBy);
@@ -221,6 +241,23 @@ public class GoldLoanService {
                 // This ensures loan amount is based on actual verified gold, not user's input
                 goldLoan.calculateLoanAmountFromVerified();
                 Double recalculatedLoanAmount = goldLoan.getLoanAmount();
+                if (recalculatedLoanAmount == null || recalculatedLoanAmount <= 0) {
+                    throw new IllegalArgumentException("Calculated gold loan amount must be greater than zero.");
+                }
+
+                Map<String, Object> allocationDebit = allocationUtilizationService.debitAllocationFunds(
+                    allocationId,
+                    recalculatedLoanAmount,
+                    "GOLD_LOAN",
+                    goldLoan.getAccountNumber(),
+                    goldLoan.getUserName(),
+                    "GOLD-LOAN-" + goldLoan.getLoanAccountNumber(),
+                    "Gold loan disbursement " + goldLoan.getLoanAccountNumber(),
+                    performedByAdminId
+                );
+                if (!Boolean.TRUE.equals(allocationDebit.get("success"))) {
+                    throw new IllegalStateException("Allocation disbursement failed: " + allocationDebit.get("message"));
+                }
                 System.out.println("✅ Recalculated loan amount: ₹" + recalculatedLoanAmount + 
                                  " (75% of verified gold value: ₹" + verifiedValue + ")");
                 
@@ -252,13 +289,18 @@ public class GoldLoanService {
                 // Credit the recalculated loan amount (75% of verified gold value) to user's account
                 Account account = accountService.getAccountByNumber(goldLoan.getAccountNumber());
                 if (account != null) {
-                    accountService.creditBalance(goldLoan.getAccountNumber(), recalculatedLoanAmount);
+                    Double creditedBalance = accountService.creditBalance(goldLoan.getAccountNumber(), recalculatedLoanAmount);
+                    if (creditedBalance == null) throw new IllegalStateException("Unable to credit the approved loan to the customer account.");
+                    saveGoldLoanCreditTransaction(goldLoan, recalculatedLoanAmount, creditedBalance);
                     System.out.println("✅ Loan amount ₹" + recalculatedLoanAmount + 
                                      " credited to account: " + goldLoan.getAccountNumber());
                 } else {
                     // Fallback: check salary_accounts table
                     SalaryAccount salaryAccount = salaryAccountRepository.findByAccountNumber(goldLoan.getAccountNumber());
                     if (salaryAccount != null) {
+                        if (!"ACTIVE".equalsIgnoreCase(salaryAccount.getStatus())) {
+                            throw new IllegalStateException("Cannot disburse a gold loan to an inactive salary account.");
+                        }
                         Double balanceBefore = salaryAccount.getBalance() != null ? salaryAccount.getBalance() : 0.0;
                         Double updatedBal = balanceBefore + recalculatedLoanAmount;
                         salaryAccount.setBalance(updatedBal);
@@ -275,13 +317,28 @@ public class GoldLoanService {
                         salTxn.setNewBalance(updatedBal);
                         salTxn.setStatus("Success");
                         salaryNormalTransactionRepository.save(salTxn);
+                        saveGoldLoanCreditTransaction(goldLoan, recalculatedLoanAmount, updatedBal);
 
                         System.out.println("✅ Loan amount ₹" + recalculatedLoanAmount + 
                                          " credited to salary account: " + goldLoan.getAccountNumber());
                     } else {
-                        System.out.println("⚠️ Account not found in both accounts and salary_accounts: " + goldLoan.getAccountNumber());
+                        throw new IllegalStateException("Customer account not found; gold loan cannot be disbursed.");
                     }
                 }
+
+                String chargeUserName = goldLoan.getUserName() != null ? goldLoan.getUserName() : "Customer";
+                chargeManagementService.processCharge(
+                    allocationId, "CIBIL", "CIBIL report charge for gold loan " + goldLoan.getLoanAccountNumber(),
+                    java.math.BigDecimal.valueOf(com.neo.springapp.service.BankChargesService.CIBIL_CHARGE_RS),
+                    goldLoan.getAccountNumber(), chargeUserName, "GOLD_LOAN",
+                    "GOLD-CIBIL-" + goldLoan.getLoanAccountNumber(), null, null
+                );
+                chargeManagementService.processCharge(
+                    allocationId, "OTHER", "Gold loan processing charge " + goldLoan.getLoanAccountNumber(),
+                    java.math.BigDecimal.valueOf(com.neo.springapp.service.BankChargesService.LOAN_CHARGE_RS),
+                    goldLoan.getAccountNumber(), chargeUserName, "GOLD_LOAN",
+                    "GOLD-PROCESSING-" + goldLoan.getLoanAccountNumber(), null, null
+                );
                 
                 // Set EMI start date
                 goldLoan.setEmiStartDate(LocalDate.now());
@@ -306,6 +363,20 @@ public class GoldLoanService {
             return savedLoan;
         }
         return null;
+    }
+
+    private void saveGoldLoanCreditTransaction(GoldLoan goldLoan, Double amount, Double balance) {
+        Transaction transaction = new Transaction();
+        transaction.setMerchant("Gold Loan Disbursement");
+        transaction.setAmount(amount);
+        transaction.setType("Loan Credit");
+        transaction.setAccountNumber(goldLoan.getAccountNumber());
+        transaction.setDescription("Gold Loan Approved: " + goldLoan.getLoanAccountNumber() +
+                " | Gold: " + goldLoan.getGoldGrams() + " grams | Loan ID: " + goldLoan.getId());
+        transaction.setDate(LocalDateTime.now());
+        transaction.setStatus("Completed");
+        transaction.setBalance(balance);
+        transactionService.saveTransaction(transaction);
     }
 
     // Record a history entry for a gold loan action

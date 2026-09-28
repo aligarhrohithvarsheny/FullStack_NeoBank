@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { SoundboxDevice, SoundboxRequest, SoundboxTransaction } from '../model/soundbox/soundbox.model';
+import { SoundboxDevice, SoundboxLinkedAccount, SoundboxRequest, SoundboxTransaction } from '../model/soundbox/soundbox.model';
 import { environment } from '../../environment/environment';
 
 @Injectable({
@@ -30,10 +30,11 @@ export class SoundboxService {
     return this.http.get<SoundboxRequest[]>(`${this.apiUrl}/requests/all`);
   }
 
-  approveRequest(id: number, adminName: string, deviceId: string, monthlyCharge?: number, deviceCharge?: number): Observable<any> {
+  approveRequest(id: number, adminName: string, deviceId: string, monthlyCharge: number | undefined, deviceCharge: number | undefined, allocationId: number): Observable<any> {
     let params = new HttpParams()
       .set('adminName', adminName)
-      .set('deviceId', deviceId);
+      .set('deviceId', deviceId)
+      .set('allocationId', allocationId.toString());
     if (monthlyCharge != null) params = params.set('monthlyCharge', monthlyCharge.toString());
     if (deviceCharge != null) params = params.set('deviceCharge', deviceCharge.toString());
     return this.http.put<any>(`${this.apiUrl}/requests/approve/${id}`, null, { params });
@@ -91,8 +92,44 @@ export class SoundboxService {
     return this.http.post<any>(`${this.apiUrl}/payment/process`, transaction);
   }
 
+  lookupLinkedAccount(customerId: string, accountNumber: string): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/accounts/lookup`, { customerId, accountNumber });
+  }
+
+  requestLinkedAccount(soundboxAccountNumber: string, customerId: string, accountNumber: string): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/accounts/link`, { soundboxAccountNumber, customerId, accountNumber });
+  }
+
+  getLinkedAccounts(soundboxAccountNumber: string): Observable<SoundboxLinkedAccount[]> {
+    return this.http.get<SoundboxLinkedAccount[]>(`${this.apiUrl}/accounts/linked/${soundboxAccountNumber}`);
+  }
+
+  getPendingLinkedAccounts(): Observable<SoundboxLinkedAccount[]> {
+    return this.http.get<SoundboxLinkedAccount[]>(`${this.apiUrl}/admin/accounts/pending`);
+  }
+
+  reviewLinkedAccount(id: number, adminName: string, approve: boolean, remarks = ''): Observable<any> {
+    const params = new HttpParams().set('adminName', adminName).set('remarks', remarks);
+    const action = approve ? 'approve' : 'reject';
+    return this.http.put<any>(`${this.apiUrl}/admin/accounts/${id}/${action}`, null, { params });
+  }
+
+  getPendingPayments(): Observable<SoundboxTransaction[]> {
+    return this.http.get<SoundboxTransaction[]>(`${this.apiUrl}/admin/payments/pending`);
+  }
+
+  reviewPayment(id: number, adminName: string, approve: boolean): Observable<any> {
+    const params = new HttpParams().set('adminName', adminName);
+    const action = approve ? 'approve' : 'reject';
+    return this.http.put<any>(`${this.apiUrl}/admin/payments/${id}/${action}`, null, { params });
+  }
+
   getTransactionsByAccount(accountNumber: string): Observable<SoundboxTransaction[]> {
     return this.http.get<SoundboxTransaction[]>(`${this.apiUrl}/transactions/${accountNumber}`);
+  }
+
+  getTransactionsBySoundbox(accountNumber: string): Observable<SoundboxTransaction[]> {
+    return this.http.get<SoundboxTransaction[]>(`${this.apiUrl}/transactions/soundbox/${accountNumber}`);
   }
 
   getTransactionsPaginated(accountNumber: string, page: number = 0, size: number = 10): Observable<any> {
@@ -106,6 +143,10 @@ export class SoundboxService {
 
   getUserStats(accountNumber: string): Observable<any> {
     return this.http.get<any>(`${this.apiUrl}/stats/user/${accountNumber}`);
+  }
+
+  getSoundboxStats(accountNumber: string): Observable<any> {
+    return this.http.get<any>(`${this.apiUrl}/stats/soundbox/${accountNumber}`);
   }
 
   getAdminStats(): Observable<any> {

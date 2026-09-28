@@ -3,9 +3,8 @@ import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { SoundboxService } from '../../../service/soundbox.service';
-import { SoundboxDevice, SoundboxTransaction } from '../../../model/soundbox/soundbox.model';
+import { SoundboxDevice, SoundboxLinkedAccount, SoundboxTransaction } from '../../../model/soundbox/soundbox.model';
 import { MerchantOnboardingService } from '../../../service/merchant-onboarding.service';
-import { PaymentGatewayService } from '../../../service/payment-gateway.service';
 
 @Component({
   selector: 'app-soundbox-payment',
@@ -50,10 +49,15 @@ export class SoundboxPayment implements OnInit, OnDestroy {
   payerUpi: string = '';
   paymentMethod: string = 'UPI';
   processingPayment = false;
-  paymentSuccess = false;
+  paymentPending = false;
   paymentError = '';
   lastPaymentTxn: any = null;
-  receiveAccountNumber = '';
+  linkedCustomerId = '';
+  linkedAccountNumber = '';
+  linkedAccountLookup: any = null;
+  linkedAccounts: SoundboxLinkedAccount[] = [];
+  selectedReceivingAccountNumber = '';
+  lookingUpLinkedAccount = false;
   linkingReceiveAccount = false;
   receiveAccountMessage = '';
 
@@ -64,7 +68,6 @@ export class SoundboxPayment implements OnInit, OnDestroy {
     private router: Router,
     private soundboxService: SoundboxService,
     private merchantService: MerchantOnboardingService,
-    private pgService: PaymentGatewayService,
     @Inject(PLATFORM_ID) private platformId: Object
   ) {
     this.isBrowser = isPlatformBrowser(this.platformId);
@@ -81,7 +84,6 @@ export class SoundboxPayment implements OnInit, OnDestroy {
       }
 
       this.merchant = JSON.parse(merchantStr);
-      this.receiveAccountNumber = this.merchant?.linkedAccountNumber || this.merchant?.accountNumber || '';
       if (deviceStr) {
         this.device = JSON.parse(deviceStr);
         this.settingsForm.voiceEnabled = this.device?.voiceEnabled ?? true;
@@ -96,6 +98,7 @@ export class SoundboxPayment implements OnInit, OnDestroy {
         this.loadStats();
         this.loadTransactions();
       }
+      this.loadLinkedAccounts();
     }
   }
   loadMerchantPortalData() {
@@ -130,7 +133,7 @@ export class SoundboxPayment implements OnInit, OnDestroy {
   loadStats() {
     if (!this.merchant?.accountNumber) return;
     this.loadingStats = true;
-    this.soundboxService.getUserStats(this.merchant.accountNumber).subscribe({
+    this.soundboxService.getSoundboxStats(this.merchant.accountNumber).subscribe({
       next: (data) => {
         this.stats = data;
         this.loadingStats = false;
@@ -142,7 +145,7 @@ export class SoundboxPayment implements OnInit, OnDestroy {
   loadTransactions() {
     if (!this.merchant?.accountNumber) return;
     this.loadingTransactions = true;
-    this.soundboxService.getTransactionsByAccount(this.merchant.accountNumber).subscribe({
+    this.soundboxService.getTransactionsBySoundbox(this.merchant.accountNumber).subscribe({
       next: (data) => {
         this.transactions = data;
         this.filteredTransactions = [...data];
@@ -173,7 +176,7 @@ export class SoundboxPayment implements OnInit, OnDestroy {
 
   processPayment() {
     this.paymentError = '';
-    this.paymentSuccess = false;
+    this.paymentPending = false;
     this.lastPaymentTxn = null;
 
     if (!this.paymentAmount || this.paymentAmount <= 0) {
@@ -186,10 +189,16 @@ export class SoundboxPayment implements OnInit, OnDestroy {
       return;
     }
 
+    if (!this.selectedReceivingAccountNumber) {
+      this.paymentError = 'Choose an approved receiving account.';
+      return;
+    }
+
     this.processingPayment = true;
 
     const transaction: SoundboxTransaction = {
-      accountNumber: this.receiveAccountNumber || this.merchant.accountNumber,
+      accountNumber: this.selectedReceivingAccountNumber,
+      soundboxAccountNumber: this.merchant.accountNumber,
       deviceId: this.device?.deviceId,
       amount: this.paymentAmount,
       txnType: 'CREDIT',
@@ -202,14 +211,12 @@ export class SoundboxPayment implements OnInit, OnDestroy {
       next: (res) => {
         this.processingPayment = false;
         if (res.success) {
-          this.paymentSuccess = true;
+          this.paymentPending = true;
           this.lastPaymentTxn = res.transaction;
-          this.playVoiceAlert(this.paymentAmount, this.payerName);
           this.loadTransactions();
           this.loadStats();
-          // Reset after 5 seconds
           setTimeout(() => {
-            this.paymentSuccess = false;
+            this.paymentPending = false;
             this.paymentAmount = 0;
             this.payerName = '';
             this.payerUpi = '';
@@ -226,20 +233,41 @@ export class SoundboxPayment implements OnInit, OnDestroy {
     });
   }
 
+  lookupReceivingAccount() {
+    if (!this.linkedCustomerId.trim() || !this.linkedAccountNumber.trim()) return;
+    this.lookingUpLinkedAccount = true;
+    this.receiveAccountMessage = '';
+    this.linkedAccountLookup = null;
+    this.soundboxService.lookupLinkedAccount(this.linkedCustomerId.trim(), this.linkedAccountNumber.trim()).subscribe({
+      next: (res: any) => {
+        this.lookingUpLinkedAccount = false;
+        this.linkedAccountLookup = res.account || null;
+        if (!res.success) this.receiveAccountMessage = res.error || 'Account could not be verified.';
+      },
+      error: (err: any) => {
+        this.lookingUpLinkedAccount = false;
+        this.receiveAccountMessage = err.error?.error || 'Account could not be verified.';
+      }
+    });
+  }
+
   linkReceiveAccount() {
-    if (!this.merchant?.merchantId || !this.receiveAccountNumber?.trim()) return;
+    if (!this.merchant?.accountNumber || !this.linkedAccountLookup) return;
     this.linkingReceiveAccount = true;
     this.receiveAccountMessage = '';
-    this.pgService.linkMerchantReceivingAccount(this.merchant.merchantId, this.receiveAccountNumber.trim()).subscribe({
+    this.soundboxService.requestLinkedAccount(
+      this.merchant.accountNumber,
+      this.linkedCustomerId.trim(),
+      this.linkedAccountNumber.trim()
+    ).subscribe({
       next: (res: any) => {
         this.linkingReceiveAccount = false;
-        if (res.success && res.merchant) {
-          this.merchant = { ...this.merchant, ...res.merchant };
-          this.receiveAccountNumber = this.merchant.linkedAccountNumber || this.receiveAccountNumber;
-          this.receiveAccountMessage = 'Account linked successfully for receiving payments.';
-          if (this.isBrowser) {
-            sessionStorage.setItem('merchantSoundbox', JSON.stringify(this.merchant));
-          }
+        if (res.success) {
+          this.receiveAccountMessage = 'Link request submitted. Admin approval is required before receiving payments.';
+          this.linkedCustomerId = '';
+          this.linkedAccountNumber = '';
+          this.linkedAccountLookup = null;
+          this.loadLinkedAccounts();
         } else {
           this.receiveAccountMessage = res.error || 'Unable to link account.';
         }
@@ -248,6 +276,19 @@ export class SoundboxPayment implements OnInit, OnDestroy {
         this.linkingReceiveAccount = false;
         this.receiveAccountMessage = err.error?.error || 'Unable to link account.';
       }
+    });
+  }
+
+  loadLinkedAccounts() {
+    if (!this.merchant?.accountNumber) return;
+    this.soundboxService.getLinkedAccounts(this.merchant.accountNumber).subscribe({
+      next: (accounts) => {
+        this.linkedAccounts = accounts || [];
+        if (!this.linkedAccounts.some(a => a.linkedAccountNumber === this.selectedReceivingAccountNumber && a.status === 'APPROVED')) {
+          this.selectedReceivingAccountNumber = this.linkedAccounts.find(a => a.status === 'APPROVED')?.linkedAccountNumber || '';
+        }
+      },
+      error: () => this.linkedAccounts = []
     });
   }
 

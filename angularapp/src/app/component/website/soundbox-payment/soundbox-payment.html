@@ -24,6 +24,9 @@
       <button [class.active]="activeTab === 'receive'" (click)="activeTab = 'receive'">
         <span class="nav-icon">💰</span> Receive Payment
       </button>
+      <button [class.active]="activeTab === 'accounts'" (click)="activeTab = 'accounts'">
+        <span class="nav-icon">🏦</span> Linked Accounts
+      </button>
       <button [class.active]="activeTab === 'transactions'" (click)="activeTab = 'transactions'">
         <span class="nav-icon">📋</span> Transactions
       </button>
@@ -45,6 +48,7 @@
         <ng-container [ngSwitch]="activeTab">
           <span *ngSwitchCase="'overview'">Dashboard Overview</span>
           <span *ngSwitchCase="'receive'">Receive Payment</span>
+          <span *ngSwitchCase="'accounts'">Linked NeoBank Accounts</span>
           <span *ngSwitchCase="'transactions'">Transaction History</span>
           <span *ngSwitchCase="'device'">Device Settings</span>
         </ng-container>
@@ -158,34 +162,32 @@
     <!-- ==================== RECEIVE PAYMENT TAB ==================== -->
     <div class="tab-content" *ngIf="activeTab === 'receive'">
       <div class="payment-container">
-        <!-- Payment Success State -->
-        <div class="payment-success-card" *ngIf="paymentSuccess">
+        <div class="payment-success-card" *ngIf="paymentPending">
           <div class="success-animation">
             <div class="success-circle">✓</div>
           </div>
-          <h2>Payment Received!</h2>
+          <h2>Payment Submitted</h2>
           <p class="success-amount">{{ formatCurrency(lastPaymentTxn?.amount || paymentAmount) }}</p>
           <p class="success-payer">from {{ payerName }}</p>
+          <p>Awaiting admin approval before the account is credited.</p>
           <p class="success-txn" *ngIf="lastPaymentTxn?.txnId">Txn ID: {{ lastPaymentTxn.txnId }}</p>
         </div>
 
         <!-- Payment Form -->
-        <div class="payment-form-card" *ngIf="!paymentSuccess">
+        <div class="payment-form-card" *ngIf="!paymentPending">
           <div class="payment-header">
             <h2>Receive Payment</h2>
             <p>Process incoming payment to your soundbox</p>
           </div>
 
-          <div class="pgd-form-group" *ngIf="merchant?.merchantId">
-            <label>Linked Receiving Account Number</label>
-            <div style="display:flex; gap:8px;">
-              <input type="text" [(ngModel)]="receiveAccountNumber" class="form-input" placeholder="Enter NeoBank account number" style="flex:1;" />
-              <button class="pgd-primary-btn" (click)="linkReceiveAccount()" [disabled]="linkingReceiveAccount || !receiveAccountNumber">
-                <i class="fa" [ngClass]="linkingReceiveAccount ? 'fa-spinner fa-spin' : 'fa-link'"></i>
-                {{linkingReceiveAccount ? 'Linking...' : 'Link'}}
-              </button>
-            </div>
-            <small *ngIf="receiveAccountMessage">{{ receiveAccountMessage }}</small>
+          <div class="form-group">
+            <label>Approved receiving account</label>
+            <select [(ngModel)]="selectedReceivingAccountNumber" class="form-input">
+              <option value="">Select an approved account</option>
+              <option *ngFor="let linked of linkedAccounts" [value]="linked.linkedAccountNumber" [disabled]="linked.status !== 'APPROVED'">
+                {{ linked.linkedAccountName }} · {{ linked.linkedAccountNumber }} · {{ linked.status }}
+              </option>
+            </select>
           </div>
 
           <div class="payment-error" *ngIf="paymentError">
@@ -224,12 +226,59 @@
               </div>
             </div>
 
-            <button class="pay-btn" (click)="processPayment()" [disabled]="processingPayment || !paymentAmount || paymentAmount <= 0 || !payerName.trim()">
+            <button class="pay-btn" (click)="processPayment()" [disabled]="processingPayment || !selectedReceivingAccountNumber || !paymentAmount || paymentAmount <= 0 || !payerName.trim()">
               <span class="btn-loader" *ngIf="processingPayment"></span>
               <span *ngIf="!processingPayment">Process Payment</span>
               <span *ngIf="processingPayment">Processing...</span>
             </button>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-content" *ngIf="activeTab === 'accounts'">
+      <div class="payment-container">
+        <div class="payment-form-card">
+          <div class="payment-header">
+            <h2>Link a NeoBank account</h2>
+            <p>Verify the customer ID and account number. Admin approval is required before it can receive payments.</p>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Customer ID</label>
+              <input type="text" [(ngModel)]="linkedCustomerId" class="form-input" placeholder="Enter NeoBank customer ID" />
+            </div>
+            <div class="form-group">
+              <label>Account number</label>
+              <input type="text" [(ngModel)]="linkedAccountNumber" class="form-input" placeholder="Enter NeoBank account number" />
+            </div>
+          </div>
+          <button class="pgd-primary-btn" (click)="lookupReceivingAccount()" [disabled]="lookingUpLinkedAccount || !linkedCustomerId.trim() || !linkedAccountNumber.trim()">
+            <i class="fa" [ngClass]="lookingUpLinkedAccount ? 'fa-spinner fa-spin' : 'fa-search'"></i>
+            {{ lookingUpLinkedAccount ? 'Verifying...' : 'Verify account' }}
+          </button>
+          <div class="payment-error" *ngIf="receiveAccountMessage">{{ receiveAccountMessage }}</div>
+          <div class="info-item" *ngIf="linkedAccountLookup">
+            <span class="info-label">Verified account</span>
+            <span class="info-value">{{ linkedAccountLookup.name }} · {{ linkedAccountLookup.accountNumber }} · {{ linkedAccountLookup.accountType }}</span>
+            <button class="pgd-primary-btn" (click)="linkReceiveAccount()" [disabled]="linkingReceiveAccount">
+              <i class="fa" [ngClass]="linkingReceiveAccount ? 'fa-spinner fa-spin' : 'fa-link'"></i>
+              {{ linkingReceiveAccount ? 'Submitting...' : 'Request link' }}
+            </button>
+          </div>
+        </div>
+        <div class="section-card">
+          <h3 class="section-title">Linked account requests</h3>
+          <div class="txn-list" *ngIf="linkedAccounts.length">
+            <div class="txn-item" *ngFor="let linked of linkedAccounts">
+              <div class="txn-details">
+                <strong>{{ linked.linkedAccountName }}</strong>
+                <small>{{ linked.accountType }} · {{ linked.linkedAccountNumber }} · Customer {{ linked.linkedCustomerId }}</small>
+              </div>
+              <span class="txn-status">{{ linked.status }}</span>
+            </div>
+          </div>
+          <div class="empty-state" *ngIf="!linkedAccounts.length"><p>No linked accounts yet</p></div>
         </div>
       </div>
     </div>

@@ -75,13 +75,6 @@ public class GoldLoanController {
             GoldLoan savedLoan = otp != null && !otp.trim().isEmpty()
                 ? goldLoanService.applyGoldLoan(goldLoan, otp)
                 : goldLoanService.applyGoldLoan(goldLoan);
-            if (savedLoan != null && bankChargesService != null && savedLoan.getAccountNumber() != null) {
-                try {
-                    bankChargesService.applyCibilChargeAtLoanApply(savedLoan.getAccountNumber(), savedLoan.getUserName());
-                } catch (Exception ex) {
-                    System.err.println("CIBIL charge could not be applied: " + ex.getMessage());
-                }
-            }
             response.put("success", true);
             response.put("message", "Gold loan application submitted successfully");
             response.put("goldLoan", savedLoan);
@@ -181,22 +174,6 @@ public class GoldLoanController {
             if (approvedLoan != null) {
                 // If approved, create transaction record
                 if ("Approved".equals(status)) {
-                    Transaction loanTransaction = new Transaction();
-                    loanTransaction.setMerchant("Gold Loan Disbursement");
-                    loanTransaction.setAmount(approvedLoan.getLoanAmount());
-                    loanTransaction.setType("Loan Credit");
-                    loanTransaction.setAccountNumber(approvedLoan.getAccountNumber());
-                    loanTransaction.setDescription("Gold Loan Approved: " + approvedLoan.getLoanAccountNumber() + 
-                        " | Gold: " + approvedLoan.getGoldGrams() + " grams | Loan ID: " + approvedLoan.getId());
-                    loanTransaction.setDate(LocalDateTime.now());
-                    loanTransaction.setStatus("Completed");
-                    
-                    // Get updated balance
-                    Double currentBalance = accountService.getBalanceByAccountNumber(approvedLoan.getAccountNumber());
-                    loanTransaction.setBalance(currentBalance != null ? currentBalance : approvedLoan.getCurrentBalance() + approvedLoan.getLoanAmount());
-                    
-                    transactionService.saveTransaction(loanTransaction);
-                    
                     // Generate and send gold loan receipt PDF via email
                     if (approvedLoan.getUserEmail() != null && !approvedLoan.getUserEmail().trim().isEmpty()) {
                         try {
@@ -217,17 +194,6 @@ public class GoldLoanController {
                             System.err.println("Error sending gold loan receipt email: " + emailException.getMessage());
                             response.put("emailSent", false);
                             response.put("emailError", emailException.getMessage());
-                        }
-                    }
-                    // Automatic loan processing charge Rs 1180 - debit from user, credit to NeoBank A/C
-                    if (bankChargesService != null && approvedLoan.getAccountNumber() != null) {
-                        try {
-                            String userName = approvedLoan.getUserName() != null ? approvedLoan.getUserName() : "Customer";
-                            boolean loanChargeApplied = bankChargesService.applyLoanChargeAtApproval(approvedLoan.getAccountNumber(), userName);
-                            response.put("loanChargeApplied", loanChargeApplied);
-                        } catch (Exception e) {
-                            System.err.println("Loan charge could not be applied: " + e.getMessage());
-                            response.put("loanChargeApplied", false);
                         }
                     }
                 }

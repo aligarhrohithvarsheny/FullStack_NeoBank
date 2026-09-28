@@ -301,6 +301,9 @@ public class ChargeManagementService {
      * Update allocation charge tracking
      */
     private void updateAllocationChargeTracking(FundsAllocation allocation, String chargeType, BigDecimal chargeAmount) {
+        Double amount = chargeAmount.doubleValue();
+        allocation.setCurrentBalance((allocation.getCurrentBalance() != null ? allocation.getCurrentBalance() : 0.0) + amount);
+        allocation.setTotalCredited((allocation.getTotalCredited() != null ? allocation.getTotalCredited() : 0.0) + amount);
         // Update total charges collected
         allocation.setTotalChargesCollected(
             (allocation.getTotalChargesCollected() != null ? allocation.getTotalChargesCollected() : BigDecimal.ZERO)
@@ -340,6 +343,8 @@ public class ChargeManagementService {
                 );
                 break;
         }
+            allocation.setUpdatedAt(LocalDateTime.now());
+            allocationRepository.save(allocation);
         
         allocation.setChargeTransactionCount((allocation.getChargeTransactionCount() != null ? allocation.getChargeTransactionCount() : 0) + 1);
         allocation.setUpdatedAt(LocalDateTime.now());

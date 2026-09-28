@@ -1206,6 +1206,57 @@
       </div>
     </div>
 
+    <div class="section-card" *ngIf="pendingSoundboxLinks.length > 0">
+      <h3 class="section-title"><i class="fa fa-link"></i> Pending NeoBank Account Links ({{ pendingSoundboxLinks.length }})</h3>
+      <div class="table-responsive">
+        <table class="data-table">
+          <thead>
+            <tr><th>Soundbox Account</th><th>Customer ID</th><th>Receiving Account</th><th>Account Type</th><th>Name</th><th>Requested</th><th>Actions</th></tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let link of pendingSoundboxLinks">
+              <td><code>{{ link.soundboxAccountNumber }}</code></td>
+              <td><code>{{ link.linkedCustomerId }}</code></td>
+              <td><code>{{ link.linkedAccountNumber }}</code></td>
+              <td>{{ link.accountType }}</td>
+              <td>{{ link.linkedAccountName }}</td>
+              <td>{{ link.requestedAt | date:'medium' }}</td>
+              <td>
+                <button class="btn btn-sm btn-approve" (click)="reviewSoundboxLink(link, true)"><i class="fa fa-check"></i> Approve</button>
+                <button class="btn btn-sm btn-reject" (click)="reviewSoundboxLink(link, false)"><i class="fa fa-times"></i> Reject</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="section-card" *ngIf="pendingSoundboxPayments.length > 0">
+      <h3 class="section-title"><i class="fa fa-clock"></i> Pending Soundbox Payment Credits ({{ pendingSoundboxPayments.length }})</h3>
+      <div class="table-responsive">
+        <table class="data-table">
+          <thead>
+            <tr><th>Soundbox Account</th><th>Credit Account</th><th>Account Type</th><th>Payer</th><th>Method</th><th>Amount</th><th>Received</th><th>Actions</th></tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let payment of pendingSoundboxPayments">
+              <td><code>{{ payment.soundboxAccountNumber }}</code></td>
+              <td><code>{{ payment.accountNumber }}</code></td>
+              <td>{{ payment.accountType }}</td>
+              <td>{{ payment.payerName || 'Unknown' }}</td>
+              <td>{{ payment.paymentMethod }}</td>
+              <td>₹{{ payment.amount | number:'1.2-2' }}</td>
+              <td>{{ payment.createdAt | date:'medium' }}</td>
+              <td>
+                <button class="btn btn-sm btn-approve" (click)="reviewSoundboxPayment(payment, true)"><i class="fa fa-check"></i> Approve credit</button>
+                <button class="btn btn-sm btn-reject" (click)="reviewSoundboxPayment(payment, false)"><i class="fa fa-times"></i> Reject</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
     <!-- Pending Soundbox Requests -->
     <div class="section-card" *ngIf="pendingSoundboxRequests.length > 0">
       <h3 class="section-title"><i class="fa fa-inbox"></i> Pending Soundbox Requests ({{ pendingSoundboxRequests.length }})</h3>
@@ -1775,6 +1826,17 @@
           <p><strong>Delivery:</strong> {{ selectedSbRequest.deliveryAddress }}, {{ selectedSbRequest.city }}</p>
         </div>
         <div class="form-group">
+          <label><i class="fa fa-university"></i> Credit charge to verified allocation *</label>
+          <select class="form-input" [(ngModel)]="sbSelectedAllocationId" [disabled]="sbAllocationLoading || sbAllocationOptions.length === 0">
+            <option [ngValue]="null">{{ sbAllocationLoading ? 'Loading verified allocations...' : 'Select allocation account' }}</option>
+            <option *ngFor="let allocation of sbAllocationOptions" [ngValue]="allocation.id">
+              {{ allocation.allocationId }} · {{ allocation.managerName }} · {{ allocation.branchName }} · {{ allocation.accountNumber }}
+            </option>
+          </select>
+          <small class="form-hint" *ngIf="sbAllocationError">{{ sbAllocationError }}</small>
+          <small class="form-hint" *ngIf="!sbAllocationError">The device fee is debited from this customer and credited to this allocation account.</small>
+        </div>
+        <div class="form-group">
           <label><i class="fa fa-microchip"></i> Assign Device ID</label>
           <input type="text" [(ngModel)]="sbApproveDeviceId" class="form-input" placeholder="Device ID" />
         </div>
@@ -1790,7 +1852,7 @@
         </div>
       </div>
       <div class="modal-footer">
-        <button class="btn btn-success" (click)="approveSoundboxRequest()" [disabled]="!sbApproveDeviceId.trim()">
+        <button class="btn btn-success" (click)="approveSoundboxRequest()" [disabled]="!sbApproveDeviceId.trim() || !sbSelectedAllocationId || sbAllocationLoading">
           <i class="fa fa-check"></i> Approve & Assign Device
         </button>
         <button class="btn btn-secondary" (click)="closeSbApproveModal()">Cancel</button>

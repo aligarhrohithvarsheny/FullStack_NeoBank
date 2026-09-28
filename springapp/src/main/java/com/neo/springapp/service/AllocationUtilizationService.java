@@ -27,6 +27,9 @@ public class AllocationUtilizationService {
     private FundsAllocationRepository allocationRepository;
 
     @Autowired
+    private AllocationAccountRepository allocationAccountRepository;
+
+    @Autowired
     private AllocationMetricsRepository metricsRepository;
 
     /**
@@ -50,6 +53,37 @@ public class AllocationUtilizationService {
         if (allocation == null) {
             result.put("success", false);
             result.put("message", "Allocation not found");
+            return result;
+        }
+
+        if (amount == null || amount <= 0) {
+            result.put("success", false);
+            result.put("message", "Debit amount must be greater than zero");
+            return result;
+        }
+
+        if (allocation.getAllocationAccountId() == null ||
+                !"VERIFIED".equals(allocation.getAccountStatus()) ||
+                !Boolean.TRUE.equals(allocation.getChargeManagementEnabled())) {
+            result.put("success", false);
+            result.put("message", "Allocation must have an active, verified linked account before funds can be used");
+            return result;
+        }
+        var linkedAccount = allocationAccountRepository.findById(allocation.getAllocationAccountId()).orElse(null);
+        if (linkedAccount == null || !"VERIFIED".equals(linkedAccount.getVerificationStatus()) ||
+                !"ACTIVE".equals(linkedAccount.getAccountStatus())) {
+            result.put("success", false);
+            result.put("message", "The linked allocation account is not active and verified");
+            return result;
+        }
+
+        java.math.BigDecimal linkedBalance = linkedAccount.getCurrentBalance() != null
+                ? linkedAccount.getCurrentBalance()
+                : (linkedAccount.getAccountBalance() != null ? linkedAccount.getAccountBalance() : java.math.BigDecimal.ZERO);
+        java.math.BigDecimal debitAmount = java.math.BigDecimal.valueOf(amount);
+        if (linkedBalance.compareTo(debitAmount) < 0) {
+            result.put("success", false);
+            result.put("message", "Insufficient linked account balance. Available: " + linkedBalance + ", Required: " + debitAmount);
             return result;
         }
 
@@ -98,6 +132,13 @@ public class AllocationUtilizationService {
         allocation.setCurrentBalance(allocation.getCurrentBalance() - amount);
         allocation.setUpdatedAt(LocalDateTime.now());
         allocationRepository.save(allocation);
+
+        java.math.BigDecimal remainingLinkedBalance = linkedBalance.subtract(debitAmount);
+        linkedAccount.setCurrentBalance(remainingLinkedBalance);
+        linkedAccount.setAccountBalance(remainingLinkedBalance);
+        linkedAccount.setTotalDebited((linkedAccount.getTotalDebited() != null ? linkedAccount.getTotalDebited() : java.math.BigDecimal.ZERO).add(debitAmount));
+        linkedAccount.setUpdatedAt(LocalDateTime.now());
+        allocationAccountRepository.save(linkedAccount);
 
         // Update metrics
         updateMetrics(allocationId, productType, "DEBIT", amount);

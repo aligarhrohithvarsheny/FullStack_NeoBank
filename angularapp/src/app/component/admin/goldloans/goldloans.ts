@@ -67,10 +67,14 @@ export class AdminGoldLoans implements OnInit {
   selectedLoan: GoldLoan | null = null;
   approving: boolean = false;
   adminName: string = 'Admin';
+  adminId: number | null = null;
+  verifiedAllocations: any[] = [];
   
   // Gold details form (for acceptance)
   showGoldDetailsModal: boolean = false;
   goldDetailsForm: any = {
+    allocationId: null,
+    performedByAdminId: null,
     goldItems: '',
     goldDescription: '',
     goldPurity: '22K',
@@ -158,7 +162,8 @@ export class AdminGoldLoans implements OnInit {
     const admin = sessionStorage.getItem('admin');
     if (admin) {
       const adminData = JSON.parse(admin);
-      this.adminName = adminData.username || 'Admin';
+      this.adminName = adminData.name || adminData.username || 'Admin';
+      this.adminId = adminData.id || null;
     }
   }
 
@@ -236,16 +241,37 @@ export class AdminGoldLoans implements OnInit {
     // If approving, show gold details form
     if (status === 'Approved') {
       this.selectedLoan = loan;
+      this.verifiedAllocations = [];
       // Pre-fill form with loan data
       this.goldDetailsForm.verifiedGoldGrams = loan.goldGrams;
       this.goldDetailsForm.goldPurity = '22K';
+      this.goldDetailsForm.allocationId = null;
+      this.goldDetailsForm.performedByAdminId = this.adminId;
       this.showGoldDetailsModal = true;
+      this.loadVerifiedAllocations();
       // Calculate initial values
       this.calculateLoanDetails();
     } else {
       // For rejection, proceed directly
       this.processApproval(loan, status, null);
     }
+  }
+
+  loadVerifiedAllocations(): void {
+    this.http.get<any>(`${environment.apiBaseUrl}/api/hod/allocations?status=ACTIVE&page=0&size=100`).subscribe({
+      next: response => {
+        const allocations = response?.content || response?.allocations || [];
+        this.verifiedAllocations = allocations.filter((allocation: any) =>
+          allocation.status === 'ACTIVE' &&
+          allocation.accountVerificationStatus === 'VERIFIED' &&
+          allocation.chargeManagementEnabled === true &&
+          !!allocation.allocationAccountId
+        );
+      },
+      error: err => {
+        this.alertService.error('Allocation Lookup', err.error?.message || 'Could not load verified allocation accounts.');
+      }
+    });
   }
   
   calculateLoanDetails() {
@@ -323,6 +349,11 @@ export class AdminGoldLoans implements OnInit {
 
   submitGoldDetails() {
     if (!this.selectedLoan || !this.selectedLoan.id) return;
+
+    if (!this.goldDetailsForm.allocationId || !this.adminId) {
+      this.alertService.error('Allocation Required', 'Select a verified allocation account before approving this loan.');
+      return;
+    }
 
     // Validate required fields
     if (!this.goldDetailsForm.goldItems || this.goldDetailsForm.goldItems.trim() === '') {

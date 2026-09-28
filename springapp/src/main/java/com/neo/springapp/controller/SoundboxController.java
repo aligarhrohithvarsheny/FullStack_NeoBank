@@ -3,6 +3,7 @@ package com.neo.springapp.controller;
 import com.neo.springapp.model.SoundboxDevice;
 import com.neo.springapp.model.SoundboxRequest;
 import com.neo.springapp.model.SoundboxTransaction;
+import com.neo.springapp.model.SoundboxLinkedAccount;
 import com.neo.springapp.service.SoundboxService;
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
@@ -20,6 +21,73 @@ public class SoundboxController {
 
     public SoundboxController(SoundboxService soundboxService) {
         this.soundboxService = soundboxService;
+    }
+
+    @PostMapping("/accounts/lookup")
+    public ResponseEntity<Map<String, Object>> lookupLinkedAccount(@RequestBody Map<String, String> request) {
+        Map<String, Object> result = soundboxService.lookupLinkedAccount(request.get("customerId"), request.get("accountNumber"));
+        return Boolean.TRUE.equals(result.get("success")) ? ResponseEntity.ok(result) : ResponseEntity.badRequest().body(result);
+    }
+
+    @PostMapping("/accounts/link")
+    public ResponseEntity<Map<String, Object>> requestLinkedAccount(@RequestBody Map<String, String> request) {
+        try {
+            SoundboxLinkedAccount linkedAccount = soundboxService.requestLinkedAccount(
+                request.get("soundboxAccountNumber"), request.get("customerId"), request.get("accountNumber"));
+            return ResponseEntity.ok(Map.of("success", true, "linkedAccount", linkedAccount, "message", "Account link request submitted for admin approval."));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "error", e.getMessage()));
+        }
+    }
+
+    @GetMapping("/accounts/linked/{soundboxAccountNumber}")
+    public ResponseEntity<List<SoundboxLinkedAccount>> getLinkedAccounts(@PathVariable String soundboxAccountNumber) {
+        return ResponseEntity.ok(soundboxService.getLinkedAccounts(soundboxAccountNumber));
+    }
+
+    @GetMapping("/admin/accounts/pending")
+    public ResponseEntity<List<SoundboxLinkedAccount>> getPendingLinkedAccounts() {
+        return ResponseEntity.ok(soundboxService.getPendingLinkedAccounts());
+    }
+
+    @PutMapping("/admin/accounts/{id}/approve")
+    public ResponseEntity<Map<String, Object>> approveLinkedAccount(@PathVariable Long id, @RequestParam String adminName) {
+        return reviewLinkedAccount(id, adminName, "", true);
+    }
+
+    @PutMapping("/admin/accounts/{id}/reject")
+    public ResponseEntity<Map<String, Object>> rejectLinkedAccount(@PathVariable Long id, @RequestParam String adminName,
+                                                                    @RequestParam(required = false, defaultValue = "") String remarks) {
+        return reviewLinkedAccount(id, adminName, remarks, false);
+    }
+
+    private ResponseEntity<Map<String, Object>> reviewLinkedAccount(Long id, String adminName, String remarks, boolean approve) {
+        try {
+            SoundboxLinkedAccount linkedAccount = soundboxService.reviewLinkedAccount(id, adminName, remarks, approve);
+            return ResponseEntity.ok(Map.of("success", true, "linkedAccount", linkedAccount));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "error", e.getMessage()));
+        }
+    }
+
+    @GetMapping("/admin/payments/pending")
+    public ResponseEntity<List<SoundboxTransaction>> getPendingPayments() {
+        return ResponseEntity.ok(soundboxService.getPendingPayments());
+    }
+
+    @PutMapping("/admin/payments/{id}/approve")
+    public ResponseEntity<Map<String, Object>> approvePayment(@PathVariable Long id, @RequestParam String adminName) {
+        return reviewPayment(id, adminName, true);
+    }
+
+    @PutMapping("/admin/payments/{id}/reject")
+    public ResponseEntity<Map<String, Object>> rejectPayment(@PathVariable Long id, @RequestParam String adminName) {
+        return reviewPayment(id, adminName, false);
+    }
+
+    private ResponseEntity<Map<String, Object>> reviewPayment(Long id, String adminName, boolean approve) {
+        Map<String, Object> result = soundboxService.reviewPayment(id, adminName, approve);
+        return Boolean.TRUE.equals(result.get("success")) ? ResponseEntity.ok(result) : ResponseEntity.badRequest().body(result);
     }
 
     // ==================== Request Operations ====================
@@ -60,13 +128,19 @@ public class SoundboxController {
             @PathVariable Long id,
             @RequestParam String adminName,
             @RequestParam String deviceId,
+            @RequestParam Long allocationId,
             @RequestParam(required = false) Double monthlyCharge,
             @RequestParam(required = false) Double deviceCharge) {
-        Map<String, Object> result = soundboxService.approveRequest(id, adminName, deviceId, monthlyCharge, deviceCharge);
-        if ((boolean) result.get("success")) {
-            return ResponseEntity.ok(result);
+        try {
+            Map<String, Object> result = soundboxService.approveRequest(
+                id, adminName, deviceId, monthlyCharge, deviceCharge, allocationId);
+            if ((boolean) result.get("success")) {
+                return ResponseEntity.ok(result);
+            }
+            return ResponseEntity.badRequest().body(result);
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "error", e.getMessage()));
         }
-        return ResponseEntity.badRequest().body(result);
     }
 
     @PutMapping("/requests/reject/{id}")
@@ -211,6 +285,11 @@ public class SoundboxController {
         return ResponseEntity.ok(soundboxService.getTransactionsByAccount(accountNumber));
     }
 
+    @GetMapping("/transactions/soundbox/{soundboxAccountNumber}")
+    public ResponseEntity<List<SoundboxTransaction>> getTransactionsBySoundbox(@PathVariable String soundboxAccountNumber) {
+        return ResponseEntity.ok(soundboxService.getTransactionsBySoundbox(soundboxAccountNumber));
+    }
+
     @GetMapping("/transactions/{accountNumber}/paginated")
     public ResponseEntity<Page<SoundboxTransaction>> getTransactionsPaginated(
             @PathVariable String accountNumber,
@@ -224,6 +303,11 @@ public class SoundboxController {
     @GetMapping("/stats/user/{accountNumber}")
     public ResponseEntity<Map<String, Object>> getUserStats(@PathVariable String accountNumber) {
         return ResponseEntity.ok(soundboxService.getUserSoundboxStats(accountNumber));
+    }
+
+    @GetMapping("/stats/soundbox/{soundboxAccountNumber}")
+    public ResponseEntity<Map<String, Object>> getSoundboxStats(@PathVariable String soundboxAccountNumber) {
+        return ResponseEntity.ok(soundboxService.getSoundboxStats(soundboxAccountNumber));
     }
 
     @GetMapping("/stats/admin")

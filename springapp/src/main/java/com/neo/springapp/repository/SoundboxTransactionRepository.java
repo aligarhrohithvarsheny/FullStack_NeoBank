@@ -16,11 +16,15 @@ public interface SoundboxTransactionRepository extends JpaRepository<SoundboxTra
 
     List<SoundboxTransaction> findByAccountNumberOrderByCreatedAtDesc(String accountNumber);
 
+    List<SoundboxTransaction> findBySoundboxAccountNumberOrderByCreatedAtDesc(String soundboxAccountNumber);
+
     Page<SoundboxTransaction> findByAccountNumber(String accountNumber, Pageable pageable);
 
     List<SoundboxTransaction> findByDeviceId(String deviceId);
 
     List<SoundboxTransaction> findByStatus(String status);
+
+    List<SoundboxTransaction> findByStatusOrderByCreatedAtDesc(String status);
 
     @Query("SELECT COALESCE(SUM(t.amount), 0) FROM SoundboxTransaction t WHERE t.accountNumber = :accountNumber AND t.txnType = 'CREDIT' AND t.status = 'SUCCESS'")
     Double getTotalReceivedByAccount(@Param("accountNumber") String accountNumber);
@@ -39,4 +43,13 @@ public interface SoundboxTransactionRepository extends JpaRepository<SoundboxTra
 
     @Query("SELECT COALESCE(SUM(t.amount), 0) FROM SoundboxTransaction t WHERE t.status = 'SUCCESS' AND t.createdAt >= :startOfDay")
     Double getTodayTotalAmount(@Param("startOfDay") LocalDateTime startOfDay);
+
+    @Query("SELECT COALESCE(SUM(t.amount), 0) FROM SoundboxTransaction t WHERE t.soundboxAccountNumber = :accountNumber AND t.txnType = 'CREDIT' AND t.status = 'SUCCESS'")
+    Double getTotalReceivedBySoundbox(@Param("accountNumber") String accountNumber);
+
+    @Query("SELECT COALESCE(SUM(t.amount), 0) FROM SoundboxTransaction t WHERE t.soundboxAccountNumber = :accountNumber AND t.txnType = 'CREDIT' AND t.status = 'SUCCESS' AND t.createdAt >= :startOfDay")
+    Double getTodayReceivedBySoundbox(@Param("accountNumber") String accountNumber, @Param("startOfDay") LocalDateTime startOfDay);
+
+    @Query("SELECT COUNT(t) FROM SoundboxTransaction t WHERE t.soundboxAccountNumber = :accountNumber AND t.createdAt >= :startOfDay")
+    long countTodayTransactionsBySoundbox(@Param("accountNumber") String accountNumber, @Param("startOfDay") LocalDateTime startOfDay);
 }

@@ -198,14 +198,25 @@ public class AllocationAccountLinkingController {
     @PostMapping("/admin/verify-account")
     public ResponseEntity<?> verifyAccount(@RequestBody Map<String, Object> request) {
         try {
-            boolean approved = Boolean.parseBoolean(request.get("approved").toString());
+            String allocationIdValue = requiredValue(request, "allocationId");
+            String adminIdValue = requiredValue(request, "verifiedByAdminId");
+            Object approvedValue = request.get("approved");
+            if (approvedValue == null) {
+                throw new IllegalArgumentException("Approval decision is required.");
+            }
+            boolean approved = approvedValue instanceof Boolean
+                ? (Boolean) approvedValue
+                : Boolean.parseBoolean(approvedValue.toString());
+            String verificationNotes = request.get("verificationNotes") == null
+                ? "" : request.get("verificationNotes").toString().trim();
+            Long adminId = Long.parseLong(adminIdValue);
             
             AllocationAccount account = accountLinkingService.verifyChequeAndAccount(
-                Long.parseLong(request.get("allocationId").toString()),
+                Long.parseLong(allocationIdValue),
                 approved,
-                request.get("verificationNotes").toString(),
-                Long.parseLong(request.get("verifiedByAdminId").toString()),
-                request.get("verifiedByAdminName").toString()
+                verificationNotes,
+                adminId,
+                null
             );
             
             String message = approved ? 
@@ -223,6 +234,14 @@ public class AllocationAccountLinkingController {
                 "message", e.getMessage()
             ));
         }
+    }
+
+    private String requiredValue(Map<String, Object> request, String fieldName) {
+        Object value = request.get(fieldName);
+        if (value == null || value.toString().isBlank()) {
+            throw new IllegalArgumentException(fieldName + " is required.");
+        }
+        return value.toString().trim();
     }
     
     /**

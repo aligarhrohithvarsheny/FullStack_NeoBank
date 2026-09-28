@@ -43,6 +43,10 @@ export interface SoundboxTransaction {
   id?: number;
   txnId?: string;
   accountNumber: string;
+  soundboxAccountNumber?: string;
+  accountType?: string;
+  approvedBy?: string;
+  approvedAt?: string;
   deviceId?: string;
   amount: number;
   txnType?: string; // CREDIT, DEBIT
@@ -53,6 +57,20 @@ export interface SoundboxTransaction {
   voicePlayed?: boolean;
   voiceMessage?: string;
   createdAt?: string;
+}
+
+export interface SoundboxLinkedAccount {
+  id?: number;
+  soundboxAccountNumber: string;
+  linkedAccountNumber: string;
+  linkedCustomerId: string;
+  linkedAccountName: string;
+  accountType: string;
+  status: string;
+  requestedAt?: string;
+  processedAt?: string;
+  processedBy?: string;
+  adminRemarks?: string;
 }
 
 export interface SoundboxStats {

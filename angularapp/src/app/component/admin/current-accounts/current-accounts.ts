@@ -5,8 +5,9 @@ import { Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { CurrentAccountService } from '../../../service/current-account.service';
 import { SoundboxService } from '../../../service/soundbox.service';
+import { AllocationAccountService } from '../../../service/allocation-account.service';
 import { CurrentAccount, BusinessTransaction, TransactionSummary, CurrentAccountEditHistory, LinkedAccount, SavingsAccountDetails } from '../../../model/current-account/current-account.model';
-import { SoundboxDevice, SoundboxRequest, SoundboxTransaction, AdminSoundboxStats } from '../../../model/soundbox/soundbox.model';
+import { SoundboxDevice, SoundboxLinkedAccount, SoundboxRequest, SoundboxTransaction, AdminSoundboxStats } from '../../../model/soundbox/soundbox.model';
 import { UpiService } from '../../../service/upi.service';
 import { UpiPayment, AdminUpiStats } from '../../../model/upi/upi.model';
 import { environment } from '../../../../environment/environment';
@@ -133,9 +134,15 @@ export class CurrentAccounts implements OnInit {
   soundboxRequests: SoundboxRequest[] = [];
   soundboxDevices: SoundboxDevice[] = [];
   pendingSoundboxRequests: SoundboxRequest[] = [];
+  pendingSoundboxLinks: SoundboxLinkedAccount[] = [];
+  pendingSoundboxPayments: SoundboxTransaction[] = [];
   sbApproveDeviceId: string = '';
   sbApproveMonthlyCharge: number = 100;
   sbApproveDeviceCharge: number = 499;
+  sbAllocationOptions: any[] = [];
+  sbSelectedAllocationId: number | null = null;
+  sbAllocationLoading = false;
+  sbAllocationError = '';
   sbRejectRemarks: string = '';
   showSbApproveModal: boolean = false;
   showSbRejectModal: boolean = false;
@@ -184,7 +191,8 @@ export class CurrentAccounts implements OnInit {
     private http: HttpClient,
     private currentAccountService: CurrentAccountService,
     private soundboxService: SoundboxService,
-    private upiService: UpiService
+    private upiService: UpiService,
+    private allocationAccountService: AllocationAccountService
   ) {}
 
   ngOnInit() {
@@ -1033,6 +1041,44 @@ export class CurrentAccounts implements OnInit {
       next: (devices) => { this.soundboxDevices = devices; },
       error: () => {}
     });
+    this.soundboxService.getPendingLinkedAccounts().subscribe({
+      next: (accounts) => { this.pendingSoundboxLinks = accounts || []; },
+      error: () => {}
+    });
+    this.soundboxService.getPendingPayments().subscribe({
+      next: (payments) => { this.pendingSoundboxPayments = payments || []; },
+      error: () => {}
+    });
+  }
+
+  reviewSoundboxLink(link: SoundboxLinkedAccount, approve: boolean): void {
+    if (!link.id) return;
+    this.soundboxService.reviewLinkedAccount(link.id, this.adminName, approve).subscribe({
+      next: (res) => {
+        if (res.success) {
+          this.showAlertMessage(approve ? 'NeoBank account link approved.' : 'NeoBank account link rejected.', 'success');
+          this.loadSoundboxData();
+        } else {
+          this.showAlertMessage(res.error || 'Could not review account link.', 'error');
+        }
+      },
+      error: (err) => this.showAlertMessage(err.error?.error || 'Could not review account link.', 'error')
+    });
+  }
+
+  reviewSoundboxPayment(payment: SoundboxTransaction, approve: boolean): void {
+    if (!payment.id) return;
+    this.soundboxService.reviewPayment(payment.id, this.adminName, approve).subscribe({
+      next: (res) => {
+        if (res.success) {
+          this.showAlertMessage(approve ? 'Soundbox payment approved and credited.' : 'Soundbox payment rejected.', 'success');
+          this.loadSoundboxData();
+        } else {
+          this.showAlertMessage(res.error || 'Could not review payment.', 'error');
+        }
+      },
+      error: (err) => this.showAlertMessage(err.error?.error || 'Could not review payment.', 'error')
+    });
   }
 
   openSbApproveModal(request: SoundboxRequest): void {
@@ -1040,7 +1086,40 @@ export class CurrentAccounts implements OnInit {
     this.sbApproveDeviceId = 'SB' + Date.now().toString().slice(-8);
     this.sbApproveMonthlyCharge = 100;
     this.sbApproveDeviceCharge = 499;
+    this.sbSelectedAllocationId = null;
+    this.sbAllocationOptions = [];
+    this.sbAllocationError = '';
     this.showSbApproveModal = true;
+    this.loadSoundboxAllocationOptions(request);
+  }
+
+  private loadSoundboxAllocationOptions(request: SoundboxRequest): void {
+    this.sbAllocationLoading = true;
+    this.allocationAccountService.getAllocations().subscribe({
+      next: (response: any) => {
+        const allocations = response.content || response.allocations || [];
+        const requestCity = String(request.city || '').trim().toLowerCase();
+        this.sbAllocationOptions = allocations.filter((allocation: any) =>
+          allocation.status === 'ACTIVE' &&
+          allocation.accountStatus === 'VERIFIED' &&
+          allocation.chargeManagementEnabled === true &&
+          !!allocation.allocationAccountId &&
+          (!requestCity || !allocation.city || String(allocation.city).trim().toLowerCase() === requestCity)
+        );
+        if (this.sbAllocationOptions.length === 1) {
+          this.sbSelectedAllocationId = Number(this.sbAllocationOptions[0].id);
+        } else if (this.sbAllocationOptions.length === 0) {
+          this.sbAllocationError = requestCity
+            ? `No verified allocation account is available for ${request.city}.`
+            : 'No verified allocation account is available. Link and verify an account first.';
+        }
+        this.sbAllocationLoading = false;
+      },
+      error: (error: any) => {
+        this.sbAllocationError = error.error?.message || 'Could not load verified allocation accounts.';
+        this.sbAllocationLoading = false;
+      }
+    });
   }
 
   closeSbApproveModal(): void {
@@ -1049,13 +1128,14 @@ export class CurrentAccounts implements OnInit {
   }
 
   approveSoundboxRequest(): void {
-    if (!this.selectedSbRequest?.id || !this.sbApproveDeviceId.trim()) return;
+    if (!this.selectedSbRequest?.id || !this.sbApproveDeviceId.trim() || !this.sbSelectedAllocationId) return;
     this.soundboxService.approveRequest(
       this.selectedSbRequest.id,
       this.adminName,
       this.sbApproveDeviceId,
       this.sbApproveMonthlyCharge,
-      this.sbApproveDeviceCharge
+      this.sbApproveDeviceCharge,
+      this.sbSelectedAllocationId
     ).subscribe({
       next: (res) => {
         if (res.success) {
@@ -1066,7 +1146,7 @@ export class CurrentAccounts implements OnInit {
           this.showAlertMessage(res.error || 'Approval failed', 'error');
         }
       },
-      error: (err) => this.showAlertMessage(err.error?.error || 'Failed to approve request', 'error')
+      error: (err) => this.showAlertMessage(err.error?.error || err.error?.message || 'Failed to approve request', 'error')
     });
   }
 

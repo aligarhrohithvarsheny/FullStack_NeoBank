@@ -370,6 +370,17 @@
           </div>
         </div>
 
+        <div class="form-group">
+          <label for="goldLoanAllocation">Disbursement allocation <span class="required">*</span></label>
+          <select id="goldLoanAllocation" class="form-input" [(ngModel)]="goldDetailsForm.allocationId" name="allocationId" required>
+            <option [ngValue]="null">Select verified allocation account</option>
+            <option *ngFor="let allocation of verifiedAllocations" [ngValue]="allocation.id">
+              {{ allocation.allocationId }} · {{ allocation.managerName }} · {{ allocation.branchName }} · {{ allocation.accountNumber }} · Balance ₹{{ allocation.currentBalance | number:'1.0-2' }}
+            </option>
+          </select>
+          <small class="form-hint" *ngIf="verifiedAllocations.length === 0">No active allocation has a verified linked account and enabled charge collection.</small>
+        </div>
+
         <!-- Auto-calculated Loan Details -->
         <div class="calculation-preview" *ngIf="goldDetailsForm.verifiedGoldGrams > 0 && currentGoldRate">
           <h4>💰 Auto-Calculated Loan Details</h4>
@@ -392,7 +403,7 @@
             </div>
           </div>
           <div class="calc-note">
-            <p><strong>Note:</strong> Loan amount will be automatically calculated as 75% of verified gold value and credited to user's account upon approval.</p>
+            <p><strong>Note:</strong> The approved amount is debited from the selected allocation, credited to the customer's account, and recorded with the allocation and customer ledgers.</p>
           </div>
         </div>
 
