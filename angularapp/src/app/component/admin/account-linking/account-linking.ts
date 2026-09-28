@@ -362,9 +362,10 @@ export class AccountLinkingComponent implements OnInit {
   verifyAccountNumber(): void {
     const accountNumber = String(this.accountForm.get('accountNumber')?.value || '').trim().toUpperCase();
     const ifscCode = String(this.accountForm.get('ifscCode')?.value || '').trim().toUpperCase();
+    this.accountVerified = false;
 
     if (!accountNumber || !ifscCode) {
-      this.errorMessage = 'Please enter both account number and IFSC code';
+      this.errorMessage = 'Enter an account number and IFSC, then select Verify account.';
       return;
     }
 

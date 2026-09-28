@@ -192,19 +192,25 @@
 
               <div class="col-md-6 mb-3">
                 <label class="form-label">Account Number *</label>
-                <input 
-                  type="text" 
-                  class="form-control"
-                  formControlName="accountNumber"
-                  placeholder="NEOBANK000001 or registered ExyVault account"
-                  autocomplete="off"
-                  (blur)="verifyAccountNumber()"
-                >
+                <div class="input-group">
+                  <input 
+                    type="text" 
+                    class="form-control"
+                    formControlName="accountNumber"
+                    placeholder="NeoBank internal or registered ExyVault account"
+                    autocomplete="off"
+                    (blur)="verifyAccountNumber()"
+                  >
+                  <button type="button" class="btn btn-outline-secondary" (click)="verifyAccountNumber()"
+                    [disabled]="!accountForm.get('accountNumber')?.valid || !ifscVerified || loading">
+                    {{ loading ? 'Checking...' : 'Verify account' }}
+                  </button>
+                </div>
                 <small class="text-danger" *ngIf="accountForm.get('accountNumber')?.invalid && accountForm.get('accountNumber')?.touched">
                   Enter a valid internal account number.
                 </small>
                 <small class="text-success" *ngIf="accountVerified">
-                  <i class="fas fa-check"></i> Verified
+                  <i class="fas fa-check"></i> Account and holder verified
                 </small>
               </div>
 

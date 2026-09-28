@@ -2,12 +2,14 @@ package com.neo.springapp.service;
 
 import com.neo.springapp.entity.AllocationAccount;
 import com.neo.springapp.model.Admin;
+import com.neo.springapp.model.BranchAccount;
 import com.neo.springapp.model.CurrentAccount;
 import com.neo.springapp.model.FundsAllocation;
 import com.neo.springapp.repository.AccountRepository;
 import com.neo.springapp.repository.AllocationAccountRepository;
 import com.neo.springapp.repository.AdminRepository;
 import com.neo.springapp.repository.CurrentAccountRepository;
+import com.neo.springapp.repository.BranchAccountRepository;
 import com.neo.springapp.repository.FundsAllocationRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -48,6 +50,9 @@ public class AllocationAccountLinkingService {
     @Autowired
     private CurrentAccountRepository currentAccountRepository;
 
+    @Autowired
+    private BranchAccountRepository branchAccountRepository;
+
     public Map<String, Object> verifyIfscCode(String ifscCode) {
         String normalizedIfsc = normalize(ifscCode);
         Map<String, Object> result = new HashMap<>();
@@ -75,10 +80,17 @@ public class AllocationAccountLinkingService {
 
         Map<String, Object> result = new HashMap<>();
         if (NEOBANK_IFSC.equals(normalizedIfsc)) {
-            if (!NEOBANK_ACCOUNT_NUMBER.equals(normalizedAccountNumber)) {
-                throw new IllegalArgumentException("Only NeoBank's registered internal account can be linked.");
+            BranchAccount configuredBranchAccount = branchAccountRepository.findAll().stream()
+                .filter(branch -> normalizedAccountNumber.equals(normalize(branch.getAccountNumber())))
+                .filter(branch -> normalizedIfsc.equals(normalize(branch.getIfscCode())))
+                .filter(branch -> branch.getAccountName() != null && branch.getAccountName().toLowerCase(java.util.Locale.ROOT).contains("neo"))
+                .findFirst()
+                .orElse(null);
+
+            if (!NEOBANK_ACCOUNT_NUMBER.equals(normalizedAccountNumber) && configuredBranchAccount == null) {
+                throw new IllegalArgumentException("Account is not NeoBank's registered internal or configured branch account.");
             }
-            var account = savingsAccountRepository.findByAccountNumber(NEOBANK_ACCOUNT_NUMBER);
+            var account = savingsAccountRepository.findByAccountNumber(normalizedAccountNumber);
             if (account == null || !"ACTIVE".equalsIgnoreCase(account.getStatus())) {
                 throw new IllegalArgumentException("NeoBank's internal account is unavailable or inactive.");
             }
