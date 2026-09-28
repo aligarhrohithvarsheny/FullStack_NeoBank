@@ -74,7 +74,7 @@ class AllocationAccountLinkingServiceTest {
     void rejectsAnyAccountNumberOtherThanRegisteredNeoBankAccount() {
         assertThatThrownBy(() -> service.verifyInternalAccount("OTHER12345", "NEOB0000001"))
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("Only NeoBank's registered internal account");
+            .hasMessageContaining("NeoBank's registered internal or configured branch account");
     }
 
     @Test
