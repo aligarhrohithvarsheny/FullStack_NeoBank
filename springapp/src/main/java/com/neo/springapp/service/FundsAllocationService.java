@@ -75,13 +75,7 @@ public class FundsAllocationService {
             return result;
         }
 
-        // Validate manager has account number
         String managerAccountNumber = branchManager.getSalaryAccountNumber();
-        if (managerAccountNumber == null || managerAccountNumber.trim().isEmpty()) {
-            result.put("success", false);
-            result.put("message", "Branch manager account not configured");
-            return result;
-        }
 
         // Create allocation record
         FundsAllocation allocation = new FundsAllocation();

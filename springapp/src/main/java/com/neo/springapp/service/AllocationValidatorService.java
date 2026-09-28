@@ -62,11 +62,6 @@ public class AllocationValidatorService {
             validationErrors.add("Branch manager not found");
         } else if (!"MANAGER".equals(branchManager.getRole())) {
             validationErrors.add("User is not branch manager");
-        } else {
-            // Check if manager has salary account
-            if (branchManager.getSalaryAccountNumber() == null || branchManager.getSalaryAccountNumber().trim().isEmpty()) {
-                validationErrors.add("Branch manager does not have salary account configured");
-            }
         }
 
         // Validate validity period
