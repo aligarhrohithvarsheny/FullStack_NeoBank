@@ -82,7 +82,8 @@ public class AllocationAccountLinkingService {
         if (NEOBANK_IFSC.equals(normalizedIfsc)) {
             BranchAccount configuredBranchAccount = branchAccountRepository.findAll().stream()
                 .filter(branch -> normalizedAccountNumber.equals(normalize(branch.getAccountNumber())))
-                .filter(branch -> normalizedIfsc.equals(normalize(branch.getIfscCode())))
+                .filter(branch -> branch.getIfscCode() == null || branch.getIfscCode().isBlank() ||
+                    normalizedIfsc.equals(normalize(branch.getIfscCode())))
                 .filter(branch -> branch.getAccountName() != null && branch.getAccountName().toLowerCase(java.util.Locale.ROOT).contains("neo"))
                 .findFirst()
                 .orElse(null);

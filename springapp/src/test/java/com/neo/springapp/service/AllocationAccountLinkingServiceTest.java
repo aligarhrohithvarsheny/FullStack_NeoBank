@@ -82,7 +82,6 @@ class AllocationAccountLinkingServiceTest {
         BranchAccount branchAccount = new BranchAccount();
         branchAccount.setAccountNumber("ACC1787636100964194");
         branchAccount.setAccountName("NeoBank Official Branch");
-        branchAccount.setIfscCode("NEOB0000001");
         when(branchAccountRepository.findAll()).thenReturn(java.util.List.of(branchAccount));
 
         Account internalAccount = new Account();
