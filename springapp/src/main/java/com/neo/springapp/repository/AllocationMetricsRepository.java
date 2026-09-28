@@ -25,7 +25,7 @@ public interface AllocationMetricsRepository extends JpaRepository<AllocationRea
     @Query("SELECT COALESCE(SUM(arm.currentBalance), 0) FROM AllocationRealTimeMetrics arm")
     Double getTotalAvailableBalance();
 
-    @Query("SELECT COALESCE(SUM(arm.totalUtilized), 0) FROM AllocationRealTimeMetrics arm")
+    @Query("SELECT COALESCE(SUM(arm.totalDebited - arm.totalCredited), 0) FROM AllocationRealTimeMetrics arm")
     Double getTotalUtilizedFunds();
 
     @Query("SELECT COALESCE(AVG(arm.utilizationPercentage), 0) FROM AllocationRealTimeMetrics arm WHERE arm.metricsDate = :date")
