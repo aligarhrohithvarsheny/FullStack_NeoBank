@@ -229,12 +229,13 @@
 
               <div class="col-md-6 mb-3">
                 <label class="form-label">Branch Name *</label>
-                <input 
-                  type="text" 
-                  class="form-control"
-                  formControlName="branchName"
-                  placeholder="Auto-filled from allocation; you may edit"
-                >
+                <select class="form-select" formControlName="branchName" [disabled]="!selectedAllocation">
+                  <option value="">Choose an allocation branch</option>
+                  <option *ngIf="selectedAllocation?.branchName" [value]="selectedAllocation.branchName">
+                    {{ selectedAllocation.branchName }}
+                  </option>
+                </select>
+                <small class="text-muted">Branch is fixed to the selected allocation; it cannot be bypassed.</small>
               </div>
 
               <div class="col-md-4 mb-3">

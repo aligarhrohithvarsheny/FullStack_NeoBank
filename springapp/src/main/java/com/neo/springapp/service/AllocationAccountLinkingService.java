@@ -135,6 +135,20 @@ public class AllocationAccountLinkingService {
             throw new IllegalArgumentException("Only a HOD can link an account to an allocation.");
         }
 
+        if (allocation.getBranchName() == null || allocation.getBranchName().isBlank()) {
+            throw new IllegalArgumentException("The selected allocation has no branch assigned.");
+        }
+        if (branchName == null || !allocation.getBranchName().trim().equalsIgnoreCase(branchName.trim())) {
+            throw new IllegalArgumentException("Branch must match the selected allocation.");
+        }
+        Admin branchManager = allocation.getManagerId() == null
+            ? null : adminRepository.findById(allocation.getManagerId()).orElse(null);
+        String allocationCity = branchManager != null ? branchManager.getAssignedCity() : null;
+        if (allocationCity != null && !allocationCity.isBlank() &&
+                (city == null || !allocationCity.trim().equalsIgnoreCase(city.trim()))) {
+            throw new IllegalArgumentException("City must match the selected allocation's branch.");
+        }
+
         Map<String, Object> verifiedAccount = verifyInternalAccount(accountNumber, ifscCode);
         String verifiedAccountNumber = (String) verifiedAccount.get("accountNumber");
         String verifiedIfscCode = (String) verifiedAccount.get("ifscCode");
@@ -167,7 +181,7 @@ public class AllocationAccountLinkingService {
         account.setAccountHolderName(verifiedHolderName);
         account.setBankName(verifiedBankName);
         account.setAccountType("CURRENT");
-        account.setBranchName(allocation.getBranchName() != null ? allocation.getBranchName() : branchName);
+        account.setBranchName(allocation.getBranchName());
         account.setCity(city);
         account.setLocation(location);
         account.setState(state);

@@ -76,6 +76,10 @@ export class AccountLinkingComponent implements OnInit {
       .filter(Boolean))].sort((a, b) => a.localeCompare(b));
   }
 
+  get selectedAllocation(): any | null {
+    return this.allocations.find(item => String(item.id) === String(this.accountForm.get('allocationId')?.value)) || null;
+  }
+
   loadAvailableCities(): void {
     this.accountService.getAvailableCities().subscribe({
       next: cities => {
