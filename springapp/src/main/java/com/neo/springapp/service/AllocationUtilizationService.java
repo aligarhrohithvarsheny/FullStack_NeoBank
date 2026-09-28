@@ -330,7 +330,7 @@ public class AllocationUtilizationService {
                     break;
             }
         } else if ("CREDIT".equals(transactionType)) {
-            metrics.setTotalCredited((metrics.getTotalCredited() != null ? metrics.getTotalCredited() != null ? metrics.getTotalCredited() : 0.0) + amount);
+            metrics.setTotalCredited((metrics.getTotalCredited() != null ? metrics.getTotalCredited() : 0.0) + amount);
             metrics.setCreditCount((metrics.getCreditCount() != null ? metrics.getCreditCount() : 0L) + 1);
         }
 

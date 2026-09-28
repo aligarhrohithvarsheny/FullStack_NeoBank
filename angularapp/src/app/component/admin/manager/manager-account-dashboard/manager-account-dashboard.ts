@@ -2,8 +2,8 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { HttpClientModule } from '@angular/common/http';
-import { AllocationAccountService } from '../../../service/allocation-account.service';
-import { ChargeManagementService } from '../../../service/charge-management.service';
+import { AllocationAccountService } from '../../../../service/allocation-account.service';
+import { ChargeManagementService } from '../../../../service/charge-management.service';
 
 @Component({
   selector: 'app-manager-account-dashboard',

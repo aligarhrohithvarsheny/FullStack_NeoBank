@@ -7,7 +7,7 @@ import { environment } from '../../environment/environment';
   providedIn: 'root'
 })
 export class AllocationAccountService {
-  private apiUrl = `${environment.apiUrl}/api`;
+  private apiUrl = `${environment.apiBaseUrl}/api`;
 
   constructor(private http: HttpClient) {}
 
