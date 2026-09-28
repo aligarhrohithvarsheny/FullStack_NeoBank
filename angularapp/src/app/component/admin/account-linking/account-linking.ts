@@ -132,10 +132,11 @@ export class AccountLinkingComponent implements OnInit {
   loadManagers(): void {
     this.accountService.getHodStaff().subscribe({
       next: staff => {
-        const hodCity = String(this.getHodSession()?.assignedCity || '').trim().toLowerCase();
         this.managers = (staff || []).filter(person =>
-          String(person.role || '').toUpperCase() === 'MANAGER' &&
-          (!hodCity || String(person.assignedCity || '').trim().toLowerCase() === hodCity)
+          String(person.role || '').toUpperCase() === 'MANAGER'
+        ).sort((left, right) =>
+          String(left.assignedCity || '').localeCompare(String(right.assignedCity || '')) ||
+          String(left.name || '').localeCompare(String(right.name || ''))
         );
       },
       error: error => {

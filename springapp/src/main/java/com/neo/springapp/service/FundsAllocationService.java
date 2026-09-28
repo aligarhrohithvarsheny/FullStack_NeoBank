@@ -81,7 +81,9 @@ public class FundsAllocationService {
         FundsAllocation allocation = new FundsAllocation();
         allocation.setManagerId(branchManagerId);
         allocation.setManagerName(branchManager.getName());
-        allocation.setBranchName(branchManager.getAddress() != null ? branchManager.getAddress() : "Branch");
+        allocation.setBranchName(branchManager.getAssignedCity() != null && !branchManager.getAssignedCity().isBlank()
+            ? branchManager.getAssignedCity().trim() + " Branch"
+            : "Branch " + branchManager.getId());
         allocation.setManagerAccountNumber(managerAccountNumber);
         allocation.setAllocatedAmount(amount);
         allocation.setAllocationType(allocationType != null ? allocationType : "GENERAL");

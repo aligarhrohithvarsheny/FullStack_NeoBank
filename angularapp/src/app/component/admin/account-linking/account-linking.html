@@ -143,7 +143,7 @@
                     {{ alloc.allocationId }} - {{ alloc.branchName }}{{ alloc.city ? ' · ' + alloc.city : '' }}
                   </option>
                 </select>
-                <small class="text-danger" *ngIf="accountForm.get('allocationId')?.invalid && accountForm.get('allocationId')?.touched">
+                <small class="text-danger" *ngIf="allocations.length > 0 && accountForm.get('allocationId')?.invalid && accountForm.get('allocationId')?.touched">
                   Allocation is required
                 </small>
                 <small class="text-muted" *ngIf="allocations.length === 0">No active, unlinked allocations are available. Create one here to continue.</small>
@@ -163,12 +163,12 @@
                     <div class="col-md-6 mb-3">
                       <label class="form-label" for="allocation-manager">Branch manager *</label>
                       <select id="allocation-manager" class="form-select" formControlName="branchManagerId">
-                        <option value="">Select manager in your city</option>
+                        <option value="">Select a branch manager</option>
                         <option *ngFor="let manager of managers" [value]="manager.id">
-                          {{ manager.name }}{{ manager.assignedCity ? ' · ' + manager.assignedCity : '' }}
+                          {{ manager.name }}{{ manager.assignedCity ? ' · ' + manager.assignedCity : ' · City not assigned' }}
                         </option>
                       </select>
-                      <small class="text-muted" *ngIf="managers.length === 0">No managers are assigned to your city, or their payout account is not configured.</small>
+                      <small class="text-muted" *ngIf="managers.length === 0">No branch managers were returned by the HOD staff directory.</small>
                     </div>
                     <div class="col-md-3 mb-3">
                       <label class="form-label" for="allocation-amount">Amount *</label>
