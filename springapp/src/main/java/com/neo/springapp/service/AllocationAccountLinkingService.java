@@ -3,7 +3,7 @@ package com.neo.springapp.service;
 import com.neo.springapp.entity.AllocationAccount;
 import com.neo.springapp.entity.FundsAllocation;
 import com.neo.springapp.repository.AllocationAccountRepository;
-import com.neo.springapp.repository.FundsAllocationRepository;
+import com.neo.springapp.repository.EnhancedFundsAllocationRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,7 +26,7 @@ public class AllocationAccountLinkingService {
     private AllocationAccountRepository accountRepository;
     
     @Autowired
-    private FundsAllocationRepository allocationRepository;
+    private EnhancedFundsAllocationRepository allocationRepository;
     
     /**
      * Step 1: Create and link account to allocation

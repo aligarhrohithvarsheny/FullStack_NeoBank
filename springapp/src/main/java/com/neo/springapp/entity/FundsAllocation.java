@@ -10,18 +10,18 @@ import java.math.BigDecimal;
  * NOW INCLUDES: Account Linking, Charge Management, Cheque Verification
  * All debit/credit operations are linked to the allocation account
  */
-@Entity
+@Entity(name = "AccountLinkedFundsAllocation")
 @Table(name = "funds_allocation", uniqueConstraints = {
     @UniqueConstraint(columnNames = {"allocationId"}),
     @UniqueConstraint(columnNames = {"allocationAccountId"})
 }, indexes = {
-    @Index(name = "idx_allocation_id", columnList = "allocationId"),
-    @Index(name = "idx_manager_id", columnList = "managerId"),
-    @Index(name = "idx_status", columnList = "status"),
-    @Index(name = "idx_manager_status", columnList = "managerId, status"),
-    @Index(name = "idx_valid_till", columnList = "validTill"),
-    @Index(name = "idx_branch_name", columnList = "branchName"),
-    @Index(name = "idx_account_status", columnList = "accountStatus")
+    @Index(name = "idx_enhanced_allocation_id", columnList = "allocationId"),
+    @Index(name = "idx_enhanced_manager_id", columnList = "managerId"),
+    @Index(name = "idx_enhanced_status", columnList = "status"),
+    @Index(name = "idx_enhanced_manager_status", columnList = "managerId, status"),
+    @Index(name = "idx_enhanced_valid_till", columnList = "validTill"),
+    @Index(name = "idx_enhanced_branch_name", columnList = "branchName"),
+    @Index(name = "idx_enhanced_account_status", columnList = "accountStatus")
 })
 public class FundsAllocation {
     

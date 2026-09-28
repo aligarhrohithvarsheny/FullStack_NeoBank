@@ -4,7 +4,7 @@ import com.neo.springapp.entity.ChargeTransaction;
 import com.neo.springapp.entity.FundsAllocation;
 import com.neo.springapp.entity.AllocationAccount;
 import com.neo.springapp.repository.ChargeTransactionRepository;
-import com.neo.springapp.repository.FundsAllocationRepository;
+import com.neo.springapp.repository.EnhancedFundsAllocationRepository;
 import com.neo.springapp.repository.AllocationAccountRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -28,7 +28,7 @@ public class ChargeManagementService {
     private ChargeTransactionRepository chargeRepository;
     
     @Autowired
-    private FundsAllocationRepository allocationRepository;
+    private EnhancedFundsAllocationRepository allocationRepository;
     
     @Autowired
     private AllocationAccountRepository accountRepository;

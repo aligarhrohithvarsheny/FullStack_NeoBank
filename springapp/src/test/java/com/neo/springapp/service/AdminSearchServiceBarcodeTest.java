@@ -120,12 +120,12 @@ class AdminSearchServiceBarcodeTest {
 
         assertThat(match.get("name")).isEqualTo("Asha Nair");
         assertThat(match.get("accountNumber")).isEqualTo("ACC-1020");
-        assertThat(((List<?>) match.get("loans")).size()).isEqualTo(1);
-        assertThat(((List<?>) match.get("goldLoans")).size()).isEqualTo(1);
-        assertThat(((List<?>) match.get("fixedDeposits")).size()).isEqualTo(1);
-        assertThat(((List<?>) match.get("demandDrafts")).size()).isEqualTo(1);
-        assertThat(((List<?>) match.get("cheques")).size()).isEqualTo(1);
-        assertThat(((List<?>) match.get("subsidyClaims")).size()).isEqualTo(1);
+        assertThat(match.get("loansCount")).isEqualTo(1L);
+        assertThat(match.get("goldLoansCount")).isEqualTo(1L);
+        assertThat(match.get("fixedDepositsCount")).isEqualTo(1L);
+        assertThat(match.get("demandDraftsCount")).isEqualTo(1L);
+        assertThat(match.get("chequesCount")).isEqualTo(1L);
+        assertThat(match.get("subsidyClaimsCount")).isEqualTo(1L);
         assertThat(match.get("passbookUrl")).isEqualTo("/api/passbook/generate/ACC-1020?accountType=savings");
     }
 }
