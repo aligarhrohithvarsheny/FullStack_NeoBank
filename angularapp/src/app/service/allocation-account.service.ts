@@ -27,6 +27,10 @@ export class AllocationAccountService {
     });
   }
 
+  getAvailableCities(): Observable<any[]> {
+    return this.http.get<any[]>(`${environment.apiBaseUrl}/api/admins/hod/cities`);
+  }
+
   /**
    * Add cheque details for verification - HOD Dashboard
    * Step 2: Submit cheque for verification

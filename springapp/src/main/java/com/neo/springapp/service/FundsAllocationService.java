@@ -378,6 +378,11 @@ public class FundsAllocationService {
         dto.put("allocationId", allocation.getAllocationId());
         dto.put("managerId", allocation.getManagerId());
         dto.put("managerName", allocation.getManagerName());
+        Admin manager = allocation.getManagerId() != null
+            ? adminRepository.findById(allocation.getManagerId()).orElse(null)
+            : null;
+        dto.put("city", manager != null ? manager.getAssignedCity() : null);
+        dto.put("state", null);
         dto.put("branchName", allocation.getBranchName());
         dto.put("managerAccountNumber", allocation.getManagerAccountNumber());
         dto.put("allocatedAmount", allocation.getAllocatedAmount());

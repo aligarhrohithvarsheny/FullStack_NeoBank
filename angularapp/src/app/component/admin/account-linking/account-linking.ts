@@ -26,6 +26,8 @@ export class AccountLinkingComponent implements OnInit {
   selectedCity = '';
   selectedBranch = '';
   allocations: any[] = [];
+  activeAllocations: any[] = [];
+  cityOptions: string[] = [];
   readonly bankOptions = [
     { name: 'NeoBank', ifscCode: 'NEOB0000001' },
     { name: 'ExyVault', ifscCode: 'EZYV000123' }
@@ -48,8 +50,8 @@ export class AccountLinkingComponent implements OnInit {
       accountType: ['CURRENT', [Validators.required]],
       branchName: ['', [Validators.required]],
       city: ['', [Validators.required]],
-      location: ['', [Validators.required]],
-      state: ['', [Validators.required]]
+      location: [''],
+      state: ['']
     });
 
     this.chequeForm = this.fb.group({
@@ -62,17 +64,43 @@ export class AccountLinkingComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    this.loadAvailableCities();
     this.loadAllocations();
-    this.loadAccountsByLocation();
+  }
+
+  get branchOptions(): string[] {
+    const city = this.selectedCity.trim().toLowerCase();
+    return [...new Set(this.activeAllocations
+      .filter(allocation => !city || String(allocation.city || '').toLowerCase() === city)
+      .map(allocation => String(allocation.branchName || '').trim())
+      .filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  }
+
+  loadAvailableCities(): void {
+    this.accountService.getAvailableCities().subscribe({
+      next: cities => {
+        const names = (cities || []).map(city => String(city.city || '').trim()).filter(Boolean);
+        const hodCity = String(this.getHodSession()?.assignedCity || '').trim();
+        this.cityOptions = [...new Set([...names, ...(hodCity ? [hodCity] : [])])]
+          .sort((a, b) => a.localeCompare(b));
+      },
+      error: () => {
+        const hodCity = String(this.getHodSession()?.assignedCity || '').trim();
+        this.cityOptions = hodCity ? [hodCity] : [];
+      }
+    });
   }
 
   loadAllocations(): void {
     this.accountService.getAllocations().subscribe({
       next: (response: any) => {
         const allocations = response.content || response.allocations || [];
-        this.allocations = allocations.filter((allocation: any) =>
+        this.activeAllocations = allocations.filter((allocation: any) => allocation.status === 'ACTIVE');
+        this.allocations = this.activeAllocations.filter((allocation: any) =>
           allocation.status === 'ACTIVE' && (!allocation.accountStatus || allocation.accountStatus === 'NOT_LINKED')
         );
+        const allocationCities = this.activeAllocations.map((allocation: any) => String(allocation.city || '').trim()).filter(Boolean);
+        this.cityOptions = [...new Set([...this.cityOptions, ...allocationCities])].sort((a, b) => a.localeCompare(b));
       },
       error: (error: any) => {
         this.errorMessage = error.error?.message || 'Failed to load active allocations.';
@@ -101,9 +129,19 @@ export class AccountLinkingComponent implements OnInit {
     this.accountForm.patchValue({
       branchName: allocation.branchName || '',
       city: allocation.city || hod?.assignedCity || this.accountForm.get('city')?.value || '',
-      location: allocation.branchName || '',
+      location: allocation.branchName || this.accountForm.get('location')?.value || '',
       state: allocation.state || this.accountForm.get('state')?.value || ''
     });
+  }
+
+  onAccountCityChanged(): void {
+    this.accountForm.get('city')?.markAsTouched();
+    this.applySelectedAllocation();
+  }
+
+  onFilterCityChanged(): void {
+    this.selectedBranch = '';
+    this.linkedAccounts = [];
   }
 
   /**

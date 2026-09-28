@@ -20,22 +20,18 @@
           <h5 class="card-title">Find linked accounts</h5>
           <div class="row">
             <div class="col-md-6">
-              <label>City</label>
-              <input 
-                type="text" 
-                class="form-control"
-                [(ngModel)]="selectedCity"
-                placeholder="Enter city"
-              >
+              <label for="account-filter-city">City</label>
+              <select id="account-filter-city" class="form-select" [(ngModel)]="selectedCity" (ngModelChange)="onFilterCityChanged()">
+                <option value="">Choose a HOD city</option>
+                <option *ngFor="let city of cityOptions" [value]="city">{{ city }}</option>
+              </select>
             </div>
             <div class="col-md-6">
-              <label>Branch</label>
-              <input 
-                type="text" 
-                class="form-control"
-                [(ngModel)]="selectedBranch"
-                placeholder="Enter branch"
-              >
+              <label for="account-filter-branch">Branch</label>
+              <select id="account-filter-branch" class="form-select" [(ngModel)]="selectedBranch" [disabled]="!selectedCity">
+                <option value="">Choose an allocation branch</option>
+                <option *ngFor="let branch of branchOptions" [value]="branch">{{ branch }}</option>
+              </select>
             </div>
           </div>
           <button 
@@ -46,6 +42,7 @@
             <span *ngIf="loading"><i class="fas fa-spinner fa-spin"></i> Loading...</span>
             <span *ngIf="!loading"><i class="fas fa-search"></i> Load Accounts</span>
           </button>
+          <small class="text-muted d-block mt-2" *ngIf="cityOptions.length === 0">No HOD cities are configured yet. Add a city in the HOD dashboard first.</small>
         </div>
       </div>
     </div>
@@ -148,12 +145,13 @@
                 >
                   <option value="">Select allocation</option>
                   <option *ngFor="let alloc of allocations" [value]="alloc.id">
-                    {{ alloc.allocationId }} - {{ alloc.branchName }}
+                    {{ alloc.allocationId }} - {{ alloc.branchName }}{{ alloc.city ? ' · ' + alloc.city : '' }}
                   </option>
                 </select>
                 <small class="text-danger" *ngIf="accountForm.get('allocationId')?.invalid && accountForm.get('allocationId')?.touched">
                   Allocation is required
                 </small>
+                <small class="text-muted" *ngIf="allocations.length === 0">No active, unlinked allocation is available for this HOD.</small>
               </div>
 
               <div class="col-md-6 mb-3">
@@ -208,8 +206,7 @@
                   type="text" 
                   class="form-control"
                   formControlName="accountHolderName"
-                  placeholder="Filled from verified account"
-                  readonly
+                  placeholder="Auto-filled after account verification; editable"
                 >
               </div>
 
@@ -236,8 +233,7 @@
                   type="text" 
                   class="form-control"
                   formControlName="branchName"
-                  placeholder="Branch name (auto-filled)"
-                  readonly
+                  placeholder="Auto-filled from allocation; you may edit"
                 >
               </div>
 
@@ -247,8 +243,14 @@
                   type="text" 
                   class="form-control"
                   formControlName="city"
-                  placeholder="City"
+                  list="hod-account-city-options"
+                  placeholder="Choose or type a city"
+                  (change)="onAccountCityChanged()"
                 >
+                <datalist id="hod-account-city-options">
+                  <option *ngFor="let city of cityOptions" [value]="city"></option>
+                </datalist>
+                <small class="text-muted">Choose a configured city or type another city.</small>
               </div>
 
               <div class="col-md-4 mb-3">
@@ -257,7 +259,7 @@
                   type="text" 
                   class="form-control"
                   formControlName="location"
-                  placeholder="Location"
+                  placeholder="Auto-filled from allocation; editable"
                 >
               </div>
 
@@ -416,4 +418,4 @@
       </div>
     </div>
   </div>
-</div>
+</main>

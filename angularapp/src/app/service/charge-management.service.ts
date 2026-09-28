@@ -44,3 +44,12 @@ export class ChargeManagementService {
     return this.http.get(`${this.apiUrl}/history/${allocationId}`);
   }
 
+  getChargesByType(allocationId: number, chargeType: string): Observable<any> {
+    return this.http.get(`${this.apiUrl}/${allocationId}/type/${encodeURIComponent(chargeType)}`);
+  }
+
+  getChargeSummary(allocationId: number): Observable<any> {
+    return this.http.get(`${this.apiUrl}/summary/${allocationId}`);
+  }
+}
+
