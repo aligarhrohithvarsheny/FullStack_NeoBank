@@ -27,9 +27,9 @@
               </select>
             </div>
             <div class="col-md-6">
-              <label for="account-filter-branch">Branch</label>
+              <label for="account-filter-branch">Branch <span class="text-muted">(optional)</span></label>
               <select id="account-filter-branch" class="form-select" [(ngModel)]="selectedBranch" [disabled]="!selectedCity">
-                <option value="">Choose an allocation branch</option>
+                <option value="">All branches in this city</option>
                 <option *ngFor="let branch of branchOptions" [value]="branch">{{ branch }}</option>
               </select>
             </div>
@@ -37,10 +37,10 @@
           <button 
             class="btn btn-primary mt-3 w-100"
             (click)="loadAccountsByLocation()"
-            [disabled]="loading || !selectedCity || !selectedBranch"
+            [disabled]="loading || !selectedCity"
           >
             <span *ngIf="loading"><i class="fas fa-spinner fa-spin"></i> Loading...</span>
-            <span *ngIf="!loading"><i class="fas fa-search"></i> Load Accounts</span>
+            <span *ngIf="!loading"><i class="fas fa-search"></i> {{ selectedBranch ? 'Load Branch Accounts' : 'Load All City Accounts' }}</span>
           </button>
           <small class="text-muted d-block mt-2" *ngIf="cityOptions.length === 0">No HOD cities are configured yet. Add a city in the HOD dashboard first.</small>
         </div>

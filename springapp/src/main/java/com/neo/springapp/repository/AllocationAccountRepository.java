@@ -41,7 +41,9 @@ public interface AllocationAccountRepository extends JpaRepository<AllocationAcc
     List<AllocationAccount> findPendingVerificationAccounts();
     
     // Find accounts by city and branch
-    @Query("SELECT a FROM AllocationAccount a WHERE a.city = :city AND a.branchName = :branch ORDER BY a.linkedAt DESC")
+        @Query("SELECT a FROM AllocationAccount a WHERE LOWER(a.city) = LOWER(:city) " +
+            "AND (:branch IS NULL OR :branch = '' OR LOWER(a.branchName) = LOWER(:branch)) " +
+            "ORDER BY a.linkedAt DESC")
     List<AllocationAccount> findByLocationAndBranch(
         @Param("city") String city, 
         @Param("branch") String branch

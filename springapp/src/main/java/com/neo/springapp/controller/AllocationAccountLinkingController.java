@@ -122,13 +122,13 @@ public class AllocationAccountLinkingController {
     }
     
     /**
-     * HOD: Get all accounts by city/branch for dashboard
-     * GET /api/hod/accounts?city=Mumbai&branch=Marine-Lines
+    * HOD: Get linked accounts by city, optionally narrowed to a branch
+    * GET /api/hod/accounts?city=Mumbai&branch=Marine-Lines
      */
     @GetMapping("/hod/accounts")
     public ResponseEntity<?> getAccountsByLocation(
             @RequestParam String city,
-            @RequestParam String branch) {
+            @RequestParam(required = false) String branch) {
         try {
             List<AllocationAccount> accounts = accountLinkingService.getAccountsByLocationAndBranch(city, branch);
             

@@ -42,9 +42,9 @@ export class AllocationAccountService {
   /**
    * Get accounts by city and branch - HOD Dashboard
    */
-  getAccountsByLocation(city: string, branch: string): Observable<any> {
+  getAccountsByLocation(city: string, branch?: string): Observable<any> {
     return this.http.get(`${this.apiUrl}/hod/accounts`, {
-      params: { city, branch }
+      params: branch ? { city, branch } : { city }
     });
   }
 

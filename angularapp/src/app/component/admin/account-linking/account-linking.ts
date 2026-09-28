@@ -152,10 +152,11 @@ export class AccountLinkingComponent implements OnInit {
    * Load accounts for HOD Dashboard by city and branch
    */
   loadAccountsByLocation(): void {
-    if (!this.selectedCity || !this.selectedBranch) return;
+    if (!this.selectedCity) return;
 
     this.loading = true;
-    this.accountService.getAccountsByLocation(this.selectedCity, this.selectedBranch).subscribe(
+    this.errorMessage = '';
+    this.accountService.getAccountsByLocation(this.selectedCity, this.selectedBranch || undefined).subscribe(
       (response: any) => {
         this.linkedAccounts = response.accounts || [];
         this.loading = false;
