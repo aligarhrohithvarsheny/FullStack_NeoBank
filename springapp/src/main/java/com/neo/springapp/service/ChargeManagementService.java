@@ -1,11 +1,23 @@
 package com.neo.springapp.service;
 
 import com.neo.springapp.entity.ChargeTransaction;
-import com.neo.springapp.entity.FundsAllocation;
 import com.neo.springapp.entity.AllocationAccount;
+import com.neo.springapp.model.Account;
+import com.neo.springapp.model.BusinessTransaction;
+import com.neo.springapp.model.CurrentAccount;
+import com.neo.springapp.model.FundsAllocation;
+import com.neo.springapp.model.SalaryAccount;
+import com.neo.springapp.model.SalaryNormalTransaction;
+import com.neo.springapp.model.Transaction;
+import com.neo.springapp.repository.AccountRepository;
+import com.neo.springapp.repository.BusinessTransactionRepository;
 import com.neo.springapp.repository.ChargeTransactionRepository;
-import com.neo.springapp.repository.EnhancedFundsAllocationRepository;
+import com.neo.springapp.repository.CurrentAccountRepository;
+import com.neo.springapp.repository.FundsAllocationRepository;
 import com.neo.springapp.repository.AllocationAccountRepository;
+import com.neo.springapp.repository.SalaryAccountRepository;
+import com.neo.springapp.repository.SalaryNormalTransactionRepository;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -13,6 +25,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -23,15 +37,40 @@ import java.util.UUID;
 @Service
 @Transactional
 public class ChargeManagementService {
+
+    private static final Set<String> SUPPORTED_CHARGE_TYPES = Set.of(
+        "INTEREST", "CIBIL", "SOUNDBOX", "UPI", "PAYMENT_GATEWAY", "OTHER"
+    );
     
     @Autowired
     private ChargeTransactionRepository chargeRepository;
     
     @Autowired
-    private EnhancedFundsAllocationRepository allocationRepository;
+    private FundsAllocationRepository allocationRepository;
     
     @Autowired
     private AllocationAccountRepository accountRepository;
+
+    @Autowired
+    private AccountService accountService;
+
+    @Autowired
+    private TransactionService transactionService;
+
+    @Autowired
+    private AccountRepository savingsAccountRepository;
+
+    @Autowired
+    private CurrentAccountRepository currentAccountRepository;
+
+    @Autowired
+    private SalaryAccountRepository salaryAccountRepository;
+
+    @Autowired
+    private BusinessTransactionRepository businessTransactionRepository;
+
+    @Autowired
+    private SalaryNormalTransactionRepository salaryTransactionRepository;
     
     /**
      * Process a charge - DEBIT from user, CREDIT to allocation account
@@ -52,17 +91,36 @@ public class ChargeManagementService {
         FundsAllocation allocation = allocationRepository.findById(allocationId)
             .orElseThrow(() -> new RuntimeException("Allocation not found"));
         
-        if (!allocation.getChargeManagementEnabled()) {
+        if (!Boolean.TRUE.equals(allocation.getChargeManagementEnabled())) {
             throw new RuntimeException("Charge management not enabled for this allocation");
         }
         
-        if (!allocation.getAccountStatus().equals("VERIFIED")) {
+        if (!"VERIFIED".equals(allocation.getAccountStatus())) {
             throw new RuntimeException("Allocation account not verified. Cannot process charges.");
+        }
+
+        if (chargeAmount == null || chargeAmount.signum() <= 0) {
+            throw new IllegalArgumentException("Charge amount must be greater than zero.");
+        }
+        chargeType = chargeType == null ? "" : chargeType.trim().toUpperCase(Locale.ROOT);
+        if (!SUPPORTED_CHARGE_TYPES.contains(chargeType)) {
+            throw new IllegalArgumentException("Unsupported charge type: " + chargeType);
+        }
+        if (userAccountNumber == null || userAccountNumber.isBlank()) {
+            throw new IllegalArgumentException("User account number is required.");
+        }
+        if (allocation.getAllocationAccountId() == null) {
+            throw new IllegalStateException("No linked allocation account is configured.");
         }
         
         // Get linked account
         AllocationAccount account = accountRepository.findById(allocation.getAllocationAccountId())
             .orElseThrow(() -> new RuntimeException("Linked account not found"));
+        if (!"VERIFIED".equals(account.getVerificationStatus()) || !"ACTIVE".equals(account.getAccountStatus())) {
+            throw new RuntimeException("Linked allocation account is not verified and active.");
+        }
+
+        debitUserAccount(userAccountNumber, userName, chargeType, chargeDescription, chargeAmount);
         
         // Create charge transaction record
         ChargeTransaction charge = new ChargeTransaction();
@@ -94,7 +152,7 @@ public class ChargeManagementService {
         String creditRefNum = "CR-" + System.currentTimeMillis();
         charge.setCreditReferenceNumber(creditRefNum);
         
-        charge.setReconciliationStatus("PENDING");
+        charge.setReconciliationStatus("MATCHED");
         charge.setCreatedAt(LocalDateTime.now());
         charge.setUpdatedAt(LocalDateTime.now());
         
@@ -114,6 +172,15 @@ public class ChargeManagementService {
      * Update account balance and charge tracking
      */
     private void updateAccountBalanceWithCharge(AllocationAccount account, String chargeType, BigDecimal chargeAmount) {
+        account.setCurrentBalance(
+            (account.getCurrentBalance() != null ? account.getCurrentBalance() : BigDecimal.ZERO).add(chargeAmount)
+        );
+        account.setAccountBalance(
+            (account.getAccountBalance() != null ? account.getAccountBalance() : BigDecimal.ZERO).add(chargeAmount)
+        );
+        account.setTotalCredited(
+            (account.getTotalCredited() != null ? account.getTotalCredited() : BigDecimal.ZERO).add(chargeAmount)
+        );
         // Update total charges collected
         account.setTotalChargesCollected(
             (account.getTotalChargesCollected() != null ? account.getTotalChargesCollected() : BigDecimal.ZERO)
@@ -162,6 +229,72 @@ public class ChargeManagementService {
         
         account.setUpdatedAt(LocalDateTime.now());
         accountRepository.save(account);
+    }
+
+    private void debitUserAccount(String accountNumber, String userName, String chargeType,
+                                  String description, BigDecimal amount) {
+        double debitAmount = amount.doubleValue();
+        Account savingsAccount = savingsAccountRepository.findByAccountNumber(accountNumber);
+        if (savingsAccount != null) {
+            Double balanceAfter = accountService.debitBalance(accountNumber, debitAmount);
+            if (balanceAfter == null) throw new IllegalArgumentException("Insufficient balance for charge.");
+            Transaction transaction = new Transaction();
+            transaction.setAccountNumber(accountNumber);
+            transaction.setUserName(userName != null ? userName : savingsAccount.getName());
+            transaction.setAmount(debitAmount);
+            transaction.setType("Debit");
+            transaction.setMerchant("NeoBank " + chargeType + " Charge");
+            transaction.setDescription(description);
+            transaction.setBalance(balanceAfter);
+            transaction.setDate(LocalDateTime.now());
+            transaction.setStatus("Completed");
+            transactionService.saveTransaction(transaction);
+            return;
+        }
+
+        CurrentAccount currentAccount = currentAccountRepository.findByAccountNumber(accountNumber).orElse(null);
+        if (currentAccount != null) {
+            if (!"ACTIVE".equalsIgnoreCase(currentAccount.getStatus()) || Boolean.TRUE.equals(currentAccount.getAccountFrozen())) {
+                throw new IllegalArgumentException("Cannot charge an inactive or frozen current account.");
+            }
+            double balance = currentAccount.getBalance() != null ? currentAccount.getBalance() : 0.0;
+            if (balance < debitAmount) throw new IllegalArgumentException("Insufficient balance for charge.");
+            currentAccount.setBalance(balance - debitAmount);
+            currentAccountRepository.save(currentAccount);
+            BusinessTransaction transaction = new BusinessTransaction();
+            transaction.setAccountNumber(accountNumber);
+            transaction.setTxnType("Debit");
+            transaction.setAmount(debitAmount);
+            transaction.setDescription(description);
+            transaction.setBalance(currentAccount.getBalance());
+            transaction.setStatus("Completed");
+            businessTransactionRepository.save(transaction);
+            return;
+        }
+
+        SalaryAccount salaryAccount = salaryAccountRepository.findByAccountNumber(accountNumber);
+        if (salaryAccount != null) {
+            if (!"ACTIVE".equalsIgnoreCase(salaryAccount.getStatus())) {
+                throw new IllegalArgumentException("Cannot charge an inactive salary account.");
+            }
+            double balance = salaryAccount.getBalance() != null ? salaryAccount.getBalance() : 0.0;
+            if (balance < debitAmount) throw new IllegalArgumentException("Insufficient balance for charge.");
+            salaryAccount.setBalance(balance - debitAmount);
+            salaryAccountRepository.save(salaryAccount);
+            SalaryNormalTransaction transaction = new SalaryNormalTransaction();
+            transaction.setSalaryAccountId(salaryAccount.getId());
+            transaction.setAccountNumber(accountNumber);
+            transaction.setType("Debit");
+            transaction.setAmount(debitAmount);
+            transaction.setRemark(description);
+            transaction.setPreviousBalance(balance);
+            transaction.setNewBalance(salaryAccount.getBalance());
+            transaction.setStatus("Success");
+            salaryTransactionRepository.save(transaction);
+            return;
+        }
+
+        throw new IllegalArgumentException("User account was not found in savings, current, or salary accounts.");
     }
     
     /**

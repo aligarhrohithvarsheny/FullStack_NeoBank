@@ -26,6 +26,10 @@ export class AccountLinkingComponent implements OnInit {
   selectedCity = '';
   selectedBranch = '';
   allocations: any[] = [];
+  readonly bankOptions = [
+    { name: 'NeoBank', ifscCode: 'NEOB0000001' },
+    { name: 'ExyVault', ifscCode: 'EZYV000123' }
+  ];
   
   // Verification
   ifscVerified = false;
@@ -37,10 +41,10 @@ export class AccountLinkingComponent implements OnInit {
   ) {
     this.accountForm = this.fb.group({
       allocationId: ['', [Validators.required]],
-      accountNumber: ['', [Validators.required, Validators.pattern(/^\d{9,18}$/)]],
-      ifscCode: ['', [Validators.required, Validators.pattern(/^[A-Z]{4}0[A-Z0-9]{6}$/)]],
+      accountNumber: ['', [Validators.required, Validators.pattern(/^[A-Z0-9]{6,20}$/i)]],
+      ifscCode: ['NEOB0000001', [Validators.required, Validators.pattern(/^(NEOB0000001|EZYV000123)$/i)]],
       accountHolderName: ['', [Validators.required, Validators.minLength(3)]],
-      bankName: ['', [Validators.required]],
+      bankName: ['NeoBank', [Validators.required]],
       accountType: ['CURRENT', [Validators.required]],
       branchName: ['', [Validators.required]],
       city: ['', [Validators.required]],
@@ -58,7 +62,48 @@ export class AccountLinkingComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    this.loadAllocations();
     this.loadAccountsByLocation();
+  }
+
+  loadAllocations(): void {
+    this.accountService.getAllocations().subscribe({
+      next: (response: any) => {
+        const allocations = response.content || response.allocations || [];
+        this.allocations = allocations.filter((allocation: any) =>
+          allocation.status === 'ACTIVE' && (!allocation.accountStatus || allocation.accountStatus === 'NOT_LINKED')
+        );
+      },
+      error: (error: any) => {
+        this.errorMessage = error.error?.message || 'Failed to load active allocations.';
+      }
+    });
+  }
+
+  onBankSelected(): void {
+    const selectedBank = this.bankOptions.find(option => option.name === this.accountForm.get('bankName')?.value);
+    this.ifscVerified = false;
+    this.accountVerified = false;
+    this.accountForm.patchValue({
+      ifscCode: selectedBank?.ifscCode || '',
+      accountNumber: '',
+      accountHolderName: ''
+    });
+    this.errorMessage = '';
+    this.successMessage = '';
+    if (selectedBank) this.verifyIfsc();
+  }
+
+  applySelectedAllocation(): void {
+    const allocation = this.allocations.find(item => String(item.id) === String(this.accountForm.get('allocationId')?.value));
+    if (!allocation) return;
+    const hod = this.getHodSession();
+    this.accountForm.patchValue({
+      branchName: allocation.branchName || '',
+      city: allocation.city || hod?.assignedCity || this.accountForm.get('city')?.value || '',
+      location: allocation.branchName || '',
+      state: allocation.state || this.accountForm.get('state')?.value || ''
+    });
   }
 
   /**
@@ -88,6 +133,16 @@ export class AccountLinkingComponent implements OnInit {
       this.errorMessage = 'Please fill all required fields correctly';
       return;
     }
+    if (!this.ifscVerified || !this.accountVerified) {
+      this.errorMessage = 'Verify the approved bank IFSC and account number before linking.';
+      return;
+    }
+
+    const hod = this.getHodSession();
+    if (!hod?.id || sessionStorage.getItem('userRole') !== 'HOD') {
+      this.errorMessage = 'Sign in with a HOD account to link allocation accounts.';
+      return;
+    }
 
     this.loading = true;
     this.successMessage = '';
@@ -95,8 +150,10 @@ export class AccountLinkingComponent implements OnInit {
 
     const payload = {
       ...this.accountForm.value,
-      adminId: 1,  // TODO: Get from session
-      adminName: 'Admin Name'  // TODO: Get from session
+      accountNumber: String(this.accountForm.value.accountNumber).trim().toUpperCase(),
+      ifscCode: String(this.accountForm.value.ifscCode).trim().toUpperCase(),
+      adminId: hod.id,
+      adminName: hod.name
     };
 
     this.accountService.linkAccountToAllocation(payload).subscribe(
@@ -155,22 +212,20 @@ export class AccountLinkingComponent implements OnInit {
    * Verify IFSC code
    */
   verifyIfsc(): void {
-    const ifscCode = this.accountForm.get('ifscCode')?.value;
+    const ifscCode = String(this.accountForm.get('ifscCode')?.value || '').trim().toUpperCase();
     if (!ifscCode) {
       this.errorMessage = 'Please enter IFSC code first';
       return;
     }
 
     this.loading = true;
+    this.errorMessage = '';
     this.accountService.verifyIfsc(ifscCode).subscribe(
       (response: any) => {
         if (response.success) {
           this.ifscVerified = true;
-          this.successMessage = 'IFSC code verified successfully!';
-          this.accountForm.get('bankName')?.patchValue(response.bankName);
-          this.accountForm.get('branchName')?.patchValue(response.branchName);
-          this.accountForm.get('city')?.patchValue(response.city);
-          this.accountForm.get('state')?.patchValue(response.state);
+          this.accountForm.patchValue({ bankName: response.bankName, ifscCode: response.ifscCode });
+          this.successMessage = `${response.bankName} IFSC verified.`;
         }
         this.loading = false;
       },
@@ -186,8 +241,8 @@ export class AccountLinkingComponent implements OnInit {
    * Verify account number with bank
    */
   verifyAccountNumber(): void {
-    const accountNumber = this.accountForm.get('accountNumber')?.value;
-    const ifscCode = this.accountForm.get('ifscCode')?.value;
+    const accountNumber = String(this.accountForm.get('accountNumber')?.value || '').trim().toUpperCase();
+    const ifscCode = String(this.accountForm.get('ifscCode')?.value || '').trim().toUpperCase();
 
     if (!accountNumber || !ifscCode) {
       this.errorMessage = 'Please enter both account number and IFSC code';
@@ -195,12 +250,22 @@ export class AccountLinkingComponent implements OnInit {
     }
 
     this.loading = true;
+    this.errorMessage = '';
     this.accountService.verifyAccountNumber(accountNumber, ifscCode).subscribe(
       (response: any) => {
         if (response.success) {
           this.accountVerified = true;
-          this.successMessage = 'Account verified successfully!';
-          this.accountForm.get('accountHolderName')?.patchValue(response.accountHolderName);
+          this.accountForm.patchValue({
+            accountNumber: response.accountNumber,
+            ifscCode: response.ifscCode,
+            bankName: response.bankName,
+            accountHolderName: response.accountHolderName,
+            accountType: response.accountType,
+            city: response.city || this.accountForm.get('city')?.value,
+            state: response.state || this.accountForm.get('state')?.value
+          });
+          this.applySelectedAllocation();
+          this.successMessage = `${response.bankName} account verified.`;
         }
         this.loading = false;
       },
@@ -233,7 +298,8 @@ export class AccountLinkingComponent implements OnInit {
    */
   resetForms(): void {
     this.step = 1;
-    this.accountForm.reset({ accountType: 'CURRENT' });
+    const bank = this.bankOptions[0];
+    this.accountForm.reset({ accountType: 'CURRENT', bankName: bank.name, ifscCode: bank.ifscCode });
     this.chequeForm.reset();
     this.ifscVerified = false;
     this.accountVerified = false;
@@ -247,6 +313,14 @@ export class AccountLinkingComponent implements OnInit {
   downloadChequeImage(account: any): void {
     if (account.chequeImageUrl) {
       window.open(account.chequeImageUrl, '_blank');
+    }
+  }
+
+  private getHodSession(): any | null {
+    try {
+      return JSON.parse(sessionStorage.getItem('admin') || 'null');
+    } catch {
+      return null;
     }
   }
 }

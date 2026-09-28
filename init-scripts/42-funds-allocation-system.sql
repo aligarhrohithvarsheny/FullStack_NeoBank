@@ -14,7 +14,7 @@
 -- Status: ACTIVE (in use) | PAUSED (temporarily halted) | COMPLETED (expired) | CANCELLED (user cancelled)
 -- ============================================================================
 
-CREATE TABLE IF NOT EXISTS funds_allocation (
+CREATE TABLE IF NOT EXISTS funds_allocations (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     allocation_id VARCHAR(50) NOT NULL UNIQUE,
     manager_id BIGINT NOT NULL,
@@ -26,6 +26,37 @@ CREATE TABLE IF NOT EXISTS funds_allocation (
     product_types TEXT COMMENT 'Comma-separated: GOLD_LOAN,DEPOSITS,WITHDRAWALS,LOANS,OVERDRAFT,SALARY_CREDITS',
     status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE' COMMENT 'ACTIVE, PAUSED, COMPLETED, CANCELLED',
     current_balance DECIMAL(19, 2) NOT NULL,
+    allocation_account_id BIGINT,
+    linked_account_number VARCHAR(50),
+    linked_ifsc_code VARCHAR(20),
+    linked_account_holder_name VARCHAR(100),
+    linked_bank_name VARCHAR(100),
+    linked_account_type VARCHAR(30),
+    account_status VARCHAR(30) NOT NULL DEFAULT 'NOT_LINKED',
+    account_verification_status VARCHAR(20) DEFAULT 'PENDING',
+    account_verified_at DATETIME,
+    linked_by_admin_id BIGINT,
+    linked_by_admin_name VARCHAR(100),
+    linked_at DATETIME,
+    cheque_verification_status VARCHAR(20) DEFAULT 'PENDING',
+    linked_cheque_number VARCHAR(50),
+    cheque_holder_name VARCHAR(100),
+    cheque_date DATE,
+    cheque_bank VARCHAR(100),
+    cheque_image_url LONGTEXT,
+    cheque_verification_notes VARCHAR(500),
+    verified_by_admin_id BIGINT,
+    verified_by_admin_name VARCHAR(100),
+    verified_at DATETIME,
+    charge_management_enabled BOOLEAN DEFAULT FALSE,
+    total_charges_collected DECIMAL(19, 2) DEFAULT 0,
+    interest_charges DECIMAL(19, 2) DEFAULT 0,
+    cibil_charges DECIMAL(19, 2) DEFAULT 0,
+    soundbox_charges DECIMAL(19, 2) DEFAULT 0,
+    upi_charges DECIMAL(19, 2) DEFAULT 0,
+    payment_gateway_charges DECIMAL(19, 2) DEFAULT 0,
+    other_charges DECIMAL(19, 2) DEFAULT 0,
+    charge_transaction_count INT DEFAULT 0,
     total_debited DECIMAL(19, 2) DEFAULT 0,
     total_credited DECIMAL(19, 2) DEFAULT 0,
     total_utilized DECIMAL(19, 2) DEFAULT 0,
@@ -93,7 +124,7 @@ CREATE TABLE IF NOT EXISTS allocation_utilization (
     
     -- Foreign key constraint
     CONSTRAINT fk_allocation_utilization FOREIGN KEY (allocation_id)
-        REFERENCES funds_allocation(id) ON DELETE CASCADE
+        REFERENCES funds_allocations(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 COMMENT='Ledger table tracking all debit/credit transactions against allocations';
 
@@ -140,7 +171,7 @@ CREATE TABLE IF NOT EXISTS allocation_metrics (
     
     -- Foreign key constraint
     CONSTRAINT fk_allocation_metrics FOREIGN KEY (allocation_id)
-        REFERENCES funds_allocation(id) ON DELETE CASCADE
+        REFERENCES funds_allocations(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 COMMENT='Real-time metrics and KPI aggregation for dashboard queries';
 
@@ -163,7 +194,7 @@ SELECT
     am.utilization_percentage,
     fa.valid_till,
     DATEDIFF(fa.valid_till, CURDATE()) as days_remaining
-FROM funds_allocation fa
+FROM funds_allocations fa
 LEFT JOIN allocation_metrics am ON fa.id = am.allocation_id
 WHERE fa.status = 'ACTIVE'
 AND fa.valid_till >= CURDATE()
@@ -179,7 +210,7 @@ SELECT
     SUM(am.total_debited) as total_debited,
     SUM(am.current_balance) as total_balance,
     ROUND(SUM(am.total_debited) / NULLIF(SUM(fa.allocated_amount), 0) * 100, 2) as overall_utilization
-FROM funds_allocation fa
+FROM funds_allocations fa
 LEFT JOIN allocation_metrics am ON fa.id = am.allocation_id
 WHERE fa.status IN ('ACTIVE', 'PAUSED')
 GROUP BY fa.manager_id, fa.manager_name;
@@ -194,7 +225,7 @@ SELECT
     SUM(am.current_balance) as available_balance,
     SUM(am.total_debited) as utilized_amount,
     ROUND(SUM(am.total_debited) / NULLIF(SUM(fa.allocated_amount), 0) * 100, 2) as utilization_percentage
-FROM funds_allocation fa
+FROM funds_allocations fa
 LEFT JOIN allocation_metrics am ON fa.id = am.allocation_id
 WHERE fa.status != 'CANCELLED'
 GROUP BY fa.branch_name
@@ -219,7 +250,7 @@ BEGIN
     DECLARE v_product_debited DECIMAL(19, 2);
     
     -- Get allocation amount
-    SELECT allocated_amount INTO v_allocated FROM funds_allocation WHERE id = p_allocation_id;
+    SELECT allocated_amount INTO v_allocated FROM funds_allocations WHERE id = p_allocation_id;
     
     -- Calculate totals
     SELECT COALESCE(SUM(amount), 0) INTO v_total_debited 
@@ -280,7 +311,7 @@ BEGIN
     END CASE;
     
     -- Update fund allocation totals
-    UPDATE funds_allocation 
+    UPDATE funds_allocations 
     SET total_debited = v_total_debited,
         total_credited = v_total_credited,
         total_utilized = v_total_debited - v_total_credited,
@@ -296,18 +327,18 @@ DELIMITER ;
 -- ============================================================================
 
 -- Check total allocations
--- SELECT COUNT(*) as total_allocations FROM funds_allocation;
+-- SELECT COUNT(*) as total_allocations FROM funds_allocations;
 
 -- Check manager allocations
 -- SELECT manager_id, manager_name, COUNT(*) as allocations, SUM(allocated_amount) as total 
--- FROM funds_allocation WHERE status = 'ACTIVE' GROUP BY manager_id;
+-- FROM funds_allocations WHERE status = 'ACTIVE' GROUP BY manager_id;
 
 -- Check transaction volume
 -- SELECT COUNT(*) as total_transactions FROM allocation_utilization;
 
 -- Check metrics consistency
 -- SELECT fa.id, fa.allocation_id, am.total_debited, am.current_balance, am.utilization_percentage
--- FROM funds_allocation fa 
+-- FROM funds_allocations fa 
 -- LEFT JOIN allocation_metrics am ON fa.id = am.allocation_id 
 -- WHERE fa.status = 'ACTIVE';
 
@@ -319,7 +350,7 @@ DELIMITER ;
 
 /*
 -- Insert sample allocation
-INSERT INTO funds_allocation (
+INSERT INTO funds_allocations (
     allocation_id, manager_id, manager_name, manager_account_number, branch_name,
     allocated_amount, allocation_type, product_types, status, current_balance,
     allocation_date, valid_from, valid_till, allocated_by_admin_id, allocated_by_name

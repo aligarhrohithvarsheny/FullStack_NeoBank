@@ -88,13 +88,19 @@ export class AccountVerificationComponent implements OnInit {
       return;
     }
 
+    const admin = this.getAdminSession();
+    if (!admin?.id || sessionStorage.getItem('userRole') !== 'ADMIN') {
+      this.errorMessage = 'Sign in with an admin account to verify this cheque.';
+      return;
+    }
+
     this.loading = true;
     const payload = {
       allocationId: this.selectedCheque.allocationId,
       approved: this.verificationForm.value.approved,
       verificationNotes: this.verificationForm.value.verificationNotes,
-      verifiedByAdminId: 1,  // TODO: Get from session
-      verifiedByAdminName: 'Admin Name'  // TODO: Get from session
+      verifiedByAdminId: admin.id,
+      verifiedByAdminName: admin.name
     };
 
     this.accountService.verifyChequeAndApprove(payload).subscribe(
@@ -130,12 +136,18 @@ export class AccountVerificationComponent implements OnInit {
       return;
     }
 
+    const admin = this.getAdminSession();
+    if (!admin?.id || sessionStorage.getItem('userRole') !== 'ADMIN') {
+      this.errorMessage = 'Sign in with an admin account to reject this cheque.';
+      return;
+    }
+
     this.loading = true;
     const payload = {
       allocationId: this.selectedCheque.allocationId,
       reason: reason,
-      rejectedByAdminId: 1,  // TODO: Get from session
-      rejectedByAdminName: 'Admin Name'  // TODO: Get from session
+      rejectedByAdminId: admin.id,
+      rejectedByAdminName: admin.name
     };
 
     this.accountService.rejectChequeVerification(payload).subscribe(
@@ -215,5 +227,13 @@ Cheque Details:
 - Account: ${cheque.accountNumber}
 - IFSC: ${cheque.ifscCode}
     `);
+  }
+
+  private getAdminSession(): any | null {
+    try {
+      return JSON.parse(sessionStorage.getItem('admin') || 'null');
+    } catch {
+      return null;
+    }
   }
 }

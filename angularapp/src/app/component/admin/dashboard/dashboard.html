@@ -19,6 +19,9 @@
         <button class="header-forms-tab positive-pay-header-button" (click)="navigateTo('positive-pay')" title="Open Positive Pay Requests">
           <i class="fa fa-shield-alt"></i> Positive Pay
         </button>
+        <button class="header-forms-tab" (click)="navigateTo('account-verification')" title="Review linked allocation accounts">
+          <i class="fa fa-university"></i> Account Verification
+        </button>
         <button *ngIf="activeSection !== 'home'" class="back-to-home-btn" (click)="setActiveSection('home')">
           <i class="fa fa-th-large"></i> Dashboard Home
         </button>

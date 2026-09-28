@@ -41,64 +41,6 @@ export class ChargeManagementService {
    * Get all charges for an allocation
    */
   getChargesByAllocation(allocationId: number, page: number = 0, size: number = 20): Observable<any> {
-    return this.http.get(`${this.apiUrl}/allocation/${allocationId}`, {
-      params: { page: page.toString(), size: size.toString() }
-    });
+    return this.http.get(`${this.apiUrl}/history/${allocationId}`);
   }
 
-  /**
-   * Get charges by type
-   */
-  getChargesByType(allocationId: number, chargeType: string): Observable<any> {
-    return this.http.get(`${this.apiUrl}/allocation/${allocationId}/type/${chargeType}`);
-  }
-
-  /**
-   * Get charge summary (totals by charge type)
-   */
-  getChargeSummary(allocationId: number): Observable<any> {
-    return this.http.get(`${this.apiUrl}/allocation/${allocationId}/summary`);
-  }
-
-  /**
-   * Get daily charge report
-   */
-  getDailyChargeReport(allocationId: number, startDate: string, endDate: string): Observable<any> {
-    return this.http.get(`${this.apiUrl}/allocation/${allocationId}/daily-report`, {
-      params: { startDate, endDate }
-    });
-  }
-
-  /**
-   * Get charges for specific user
-   */
-  getChargesForUser(userAccountNumber: string): Observable<any> {
-    return this.http.get(`${this.apiUrl}/user/${userAccountNumber}`);
-  }
-
-  /**
-   * Export charges report
-   */
-  exportChargesReport(allocationId: number, format: string = 'csv'): Observable<any> {
-    return this.http.get(`${this.apiUrl}/allocation/${allocationId}/export`, {
-      params: { format }
-    });
-  }
-
-  /**
-   * Get charge reconciliation status
-   */
-  getReconciliationStatus(allocationId: number): Observable<any> {
-    return this.http.get(`${this.apiUrl}/allocation/${allocationId}/reconciliation`);
-  }
-
-  /**
-   * Reverse a charge (if needed)
-   */
-  reverseCharge(chargeTransactionId: string, reason: string): Observable<any> {
-    return this.http.post(`${this.apiUrl}/reverse`, {
-      chargeTransactionId,
-      reason
-    });
-  }
-}

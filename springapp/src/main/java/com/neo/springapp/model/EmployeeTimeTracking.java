@@ -17,7 +17,7 @@ import java.time.LocalDate;
 @Entity
 @Table(name = "employee_time_tracking", indexes = {
     @Index(name = "idx_admin_date", columnList = "admin_id,tracking_date"),
-    @Index(name = "idx_status", columnList = "status"),
+    @Index(name = "idx_employee_time_status", columnList = "status"),
     @Index(name = "idx_tracking_date", columnList = "tracking_date")
 })
 @Data

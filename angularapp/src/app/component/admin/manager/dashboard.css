@@ -27,6 +27,18 @@
 }
 
 /* Manager Specific Styles */
+.manager-account-action {
+  border: 1px solid #0f766e;
+  border-radius: 6px;
+  padding: 9px 12px;
+  background: #0f766e;
+  color: #fff;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.manager-account-action:hover { background: #115e59; }
+
 .welcome-section {
   text-align: center;
   padding: 40px 20px;

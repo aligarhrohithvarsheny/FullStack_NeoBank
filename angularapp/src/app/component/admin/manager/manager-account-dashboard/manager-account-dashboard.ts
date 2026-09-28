@@ -66,7 +66,7 @@ export class ManagerAccountDashboardComponent implements OnInit {
 
     this.accountService.getAccountTransactions(this.allocationId, this.transactionPage, this.transactionSize).subscribe(
       (response: any) => {
-        this.accountTransactions = response.transactions || [];
+        this.accountTransactions = response.content || response.transactions || [];
       },
       (error: any) => {
         this.errorMessage = 'Failed to load transactions: ' + error.message;

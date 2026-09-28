@@ -1,7 +1,9 @@
 .hod-dashboard { min-height: 100vh; background: #f4f7f8; color: #12313a; font-family: 'Segoe UI', sans-serif; }
 .hod-topbar { padding: 28px clamp(20px, 5vw, 72px); background: #0d3b43; color: #fff; display: flex; justify-content: space-between; align-items: center; gap: 20px; }
+.hod-topbar-actions { display: flex; align-items: center; gap: 10px; }
 .hod-kicker, .panel-kicker { color: #70d6c5; font-size: 11px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; }
 .hod-topbar h1 { margin: 6px 0 0; font-size: clamp(1.45rem, 3vw, 2.2rem); }
+.account-linking-button { border: 1px solid rgba(255,255,255,.42); border-radius: 8px; padding: 10px 16px; background: #fff; color: #0d3b43; cursor: pointer; font-weight: 700; }
 .logout-button, .delete-button { border: 1px solid rgba(255,255,255,.35); border-radius: 8px; padding: 10px 16px; background: transparent; color: #fff; cursor: pointer; }
 .hod-content { max-width: 1280px; margin: 0 auto; padding: 32px clamp(20px, 5vw, 72px) 60px; }
 .metric-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
@@ -59,4 +61,4 @@
 .hod-error { color: #b42318; margin: 16px 0; }
 @media (max-width: 1100px) { .live-data-grid { grid-template-columns: repeat(3, 1fr); } }
 @media (max-width: 900px) { .metric-grid { grid-template-columns: repeat(2, 1fr); } .dashboard-grid { grid-template-columns: 1fr; } .add-city-form { grid-template-columns: 1fr 1fr; } .add-city-form input:first-child { grid-column: span 2; } .add-city-form button { min-height: 40px; } .edit-fields, .city-metrics { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 520px) { .hod-topbar { align-items: flex-start; flex-direction: column; } .metric-grid, .live-data-grid { grid-template-columns: 1fr; } .add-city-form, .edit-fields, .profile-grid, .city-metrics { grid-template-columns: 1fr; } .profile-wide { grid-column: auto; } .add-city-form input:first-child { grid-column: auto; } }
+@media (max-width: 520px) { .hod-topbar { align-items: flex-start; flex-direction: column; } .hod-topbar-actions { width: 100%; flex-wrap: wrap; } .metric-grid, .live-data-grid { grid-template-columns: 1fr; } .add-city-form, .edit-fields, .profile-grid, .city-metrics { grid-template-columns: 1fr; } .profile-wide { grid-column: auto; } .add-city-form input:first-child { grid-column: auto; } }

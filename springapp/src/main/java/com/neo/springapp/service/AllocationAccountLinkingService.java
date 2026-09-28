@@ -1,16 +1,23 @@
 package com.neo.springapp.service;
 
 import com.neo.springapp.entity.AllocationAccount;
-import com.neo.springapp.entity.FundsAllocation;
+import com.neo.springapp.model.Admin;
+import com.neo.springapp.model.CurrentAccount;
+import com.neo.springapp.model.FundsAllocation;
+import com.neo.springapp.repository.AccountRepository;
 import com.neo.springapp.repository.AllocationAccountRepository;
-import com.neo.springapp.repository.EnhancedFundsAllocationRepository;
+import com.neo.springapp.repository.AdminRepository;
+import com.neo.springapp.repository.CurrentAccountRepository;
+import com.neo.springapp.repository.FundsAllocationRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.math.BigDecimal;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -21,12 +28,84 @@ import java.util.Optional;
 @Service
 @Transactional
 public class AllocationAccountLinkingService {
+
+    private static final String NEOBANK_ACCOUNT_NUMBER = "NEOBANK000001";
+    private static final String NEOBANK_IFSC = "NEOB0000001";
+    private static final String EXYVAULT_IFSC = "EZYV000123";
     
     @Autowired
     private AllocationAccountRepository accountRepository;
     
     @Autowired
-    private EnhancedFundsAllocationRepository allocationRepository;
+    private FundsAllocationRepository allocationRepository;
+
+    @Autowired
+    private AdminRepository adminRepository;
+
+    @Autowired
+    private AccountRepository savingsAccountRepository;
+
+    @Autowired
+    private CurrentAccountRepository currentAccountRepository;
+
+    public Map<String, Object> verifyIfscCode(String ifscCode) {
+        String normalizedIfsc = normalize(ifscCode);
+        Map<String, Object> result = new HashMap<>();
+        if (NEOBANK_IFSC.equals(normalizedIfsc)) {
+            result.put("success", true);
+            result.put("bankName", "NeoBank");
+            result.put("branchName", "NeoBank Main Branch");
+            result.put("ifscCode", NEOBANK_IFSC);
+            return result;
+        }
+        if (EXYVAULT_IFSC.equals(normalizedIfsc)) {
+            result.put("success", true);
+            result.put("bankName", "ExyVault");
+            result.put("branchName", "ExyVault Main Branch");
+            result.put("ifscCode", EXYVAULT_IFSC);
+            return result;
+        }
+        throw new IllegalArgumentException("Only NeoBank or ExyVault IFSC codes are accepted.");
+    }
+
+    public Map<String, Object> verifyInternalAccount(String accountNumber, String ifscCode) {
+        String normalizedAccountNumber = normalize(accountNumber);
+        String normalizedIfsc = normalize(ifscCode);
+        verifyIfscCode(normalizedIfsc);
+
+        Map<String, Object> result = new HashMap<>();
+        if (NEOBANK_IFSC.equals(normalizedIfsc)) {
+            if (!NEOBANK_ACCOUNT_NUMBER.equals(normalizedAccountNumber)) {
+                throw new IllegalArgumentException("Only NeoBank's registered internal account can be linked.");
+            }
+            var account = savingsAccountRepository.findByAccountNumber(NEOBANK_ACCOUNT_NUMBER);
+            if (account == null || !"ACTIVE".equalsIgnoreCase(account.getStatus())) {
+                throw new IllegalArgumentException("NeoBank's internal account is unavailable or inactive.");
+            }
+            result.put("accountHolderName", account.getName());
+            result.put("bankName", "NeoBank");
+            result.put("branchName", "NeoBank Main Branch");
+            result.put("accountType", "CURRENT");
+        } else {
+            Optional<CurrentAccount> currentAccount = currentAccountRepository.findByAccountNumber(normalizedAccountNumber);
+            CurrentAccount account = currentAccount.orElseThrow(() ->
+                new IllegalArgumentException("The ExyVault account number was not found."));
+            if (!EXYVAULT_IFSC.equals(normalize(account.getIfscCode())) ||
+                    !("ACTIVE".equalsIgnoreCase(account.getStatus()) || "APPROVED".equalsIgnoreCase(account.getStatus()))) {
+                throw new IllegalArgumentException("Only an active ExyVault account can be linked.");
+            }
+            result.put("accountHolderName", account.getOwnerName());
+            result.put("bankName", "ExyVault");
+            result.put("branchName", account.getBranchName() != null ? account.getBranchName() : "ExyVault Main Branch");
+            result.put("city", account.getCity());
+            result.put("state", account.getState());
+            result.put("accountType", "CURRENT");
+        }
+        result.put("success", true);
+        result.put("accountNumber", normalizedAccountNumber);
+        result.put("ifscCode", normalizedIfsc);
+        return result;
+    }
     
     /**
      * Step 1: Create and link account to allocation
@@ -49,14 +128,33 @@ public class AllocationAccountLinkingService {
         // Fetch allocation
         FundsAllocation allocation = allocationRepository.findById(allocationId)
             .orElseThrow(() -> new RuntimeException("Allocation not found: " + allocationId));
+
+        Admin linkingAdmin = adminRepository.findById(linkedByAdminId)
+            .orElseThrow(() -> new IllegalArgumentException("HOD account was not found."));
+        if (!"HOD".equalsIgnoreCase(linkingAdmin.getRole())) {
+            throw new IllegalArgumentException("Only a HOD can link an account to an allocation.");
+        }
+
+        Map<String, Object> verifiedAccount = verifyInternalAccount(accountNumber, ifscCode);
+        String verifiedAccountNumber = (String) verifiedAccount.get("accountNumber");
+        String verifiedIfscCode = (String) verifiedAccount.get("ifscCode");
+        String verifiedBankName = (String) verifiedAccount.get("bankName");
+        String verifiedHolderName = (String) verifiedAccount.get("accountHolderName");
+        if (!verifiedBankName.equalsIgnoreCase(bankName == null ? "" : bankName.trim())) {
+            throw new IllegalArgumentException("Selected bank does not match the verified IFSC code.");
+        }
+        if (verifiedHolderName == null || accountHolderName == null ||
+            !verifiedHolderName.equalsIgnoreCase(accountHolderName.trim())) {
+            throw new IllegalArgumentException("Account holder name does not match the verified account.");
+        }
         
         // Check if account already linked
-        if (!allocation.getAccountStatus().equals("NOT_LINKED")) {
+        if (allocation.getAccountStatus() != null && !"NOT_LINKED".equals(allocation.getAccountStatus())) {
             throw new RuntimeException("Account already linked to this allocation");
         }
         
         // Validate account doesn't already exist
-        Optional<AllocationAccount> existing = accountRepository.findByAccountNumber(accountNumber);
+        Optional<AllocationAccount> existing = accountRepository.findByAccountNumber(verifiedAccountNumber);
         if (existing.isPresent()) {
             throw new RuntimeException("Account number already linked to another allocation");
         }
@@ -64,29 +162,29 @@ public class AllocationAccountLinkingService {
         // Create account entity
         AllocationAccount account = new AllocationAccount();
         account.setAllocationId(allocationId);
-        account.setAccountNumber(accountNumber);
-        account.setIfscCode(ifscCode);
-        account.setAccountHolderName(accountHolderName);
-        account.setBankName(bankName);
-        account.setAccountType(accountType);
-        account.setBranchName(branchName);
+        account.setAccountNumber(verifiedAccountNumber);
+        account.setIfscCode(verifiedIfscCode);
+        account.setAccountHolderName(verifiedHolderName);
+        account.setBankName(verifiedBankName);
+        account.setAccountType("CURRENT");
+        account.setBranchName(allocation.getBranchName() != null ? allocation.getBranchName() : branchName);
         account.setCity(city);
         account.setLocation(location);
         account.setState(state);
         account.setVerificationStatus("PENDING");
         account.setAccountStatus("ACTIVE");
         account.setLinkedByAdminId(linkedByAdminId);
-        account.setLinkedByAdminName(linkedByAdminName);
+        account.setLinkedByAdminName(linkingAdmin.getName());
         account.setLinkedAt(LocalDateTime.now());
         account.setCreatedAt(LocalDateTime.now());
         account.setUpdatedAt(LocalDateTime.now());
         
         // Initialize balance tracking
         account.setAccountBalance(BigDecimal.ZERO);
-        account.setTotalAllocated(allocation.getAllocatedAmount());
+        account.setTotalAllocated(BigDecimal.valueOf(allocation.getAllocatedAmount() == null ? 0.0 : allocation.getAllocatedAmount()));
         account.setTotalDebited(BigDecimal.ZERO);
         account.setTotalCredited(BigDecimal.ZERO);
-        account.setCurrentBalance(allocation.getAllocatedAmount());
+        account.setCurrentBalance(BigDecimal.valueOf(allocation.getAllocatedAmount() == null ? 0.0 : allocation.getAllocatedAmount()));
         account.setTotalChargesCollected(BigDecimal.ZERO);
         
         // Save account
@@ -94,14 +192,14 @@ public class AllocationAccountLinkingService {
         
         // Update allocation with account link
         allocation.setAllocationAccountId(savedAccount.getId());
-        allocation.setLinkedAccountNumber(accountNumber);
-        allocation.setLinkedIfscCode(ifscCode);
-        allocation.setLinkedAccountHolderName(accountHolderName);
-        allocation.setLinkedBankName(bankName);
-        allocation.setLinkedAccountType(accountType);
+        allocation.setLinkedAccountNumber(verifiedAccountNumber);
+        allocation.setLinkedIfscCode(verifiedIfscCode);
+        allocation.setLinkedAccountHolderName(verifiedHolderName);
+        allocation.setLinkedBankName(verifiedBankName);
+        allocation.setLinkedAccountType("CURRENT");
         allocation.setAccountStatus("LINKING_PENDING");  // Waiting for cheque verification
         allocation.setLinkedByAdminId(linkedByAdminId);
-        allocation.setLinkedByAdminName(linkedByAdminName);
+        allocation.setLinkedByAdminName(linkingAdmin.getName());
         allocation.setLinkedAt(LocalDateTime.now());
         allocationRepository.save(allocation);
         
@@ -154,6 +252,12 @@ public class AllocationAccountLinkingService {
             String verificationNotes,
             Long verifiedByAdminId,
             String verifiedByAdminName) {
+
+        Admin verifyingAdmin = adminRepository.findById(verifiedByAdminId)
+            .orElseThrow(() -> new IllegalArgumentException("Admin account was not found."));
+        if (!"ADMIN".equalsIgnoreCase(verifyingAdmin.getRole())) {
+            throw new IllegalArgumentException("Only an admin can verify an allocation account.");
+        }
         
         AllocationAccount account = accountRepository.findByAllocationId(allocationId)
             .orElseThrow(() -> new RuntimeException("No account linked to this allocation"));
@@ -170,9 +274,10 @@ public class AllocationAccountLinkingService {
             allocation.setAccountVerificationStatus("VERIFIED");
             allocation.setAccountVerifiedAt(LocalDateTime.now());
             allocation.setVerifiedByAdminId(verifiedByAdminId);
-            allocation.setVerifiedByAdminName(verifiedByAdminName);
+            allocation.setVerifiedByAdminName(verifyingAdmin.getName());
             allocation.setVerifiedAt(LocalDateTime.now());
             allocation.setAccountStatus("VERIFIED");  // NOW READY TO USE
+            allocation.setChargeManagementEnabled(true);
             
         } else {
             account.setVerificationStatus("REJECTED");
@@ -182,6 +287,7 @@ public class AllocationAccountLinkingService {
             allocation.setAccountVerificationStatus("REJECTED");
             allocation.setAccountStatus("REJECTED");
             allocation.setChequeVerificationNotes(verificationNotes);
+            allocation.setChargeManagementEnabled(false);
         }
         
         accountRepository.save(account);
@@ -240,8 +346,8 @@ public class AllocationAccountLinkingService {
         FundsAllocation allocation = allocationRepository.findById(allocationId)
             .orElseThrow(() -> new RuntimeException("Allocation not found"));
         
-        return allocation.getAccountStatus().equals("VERIFIED") && 
-               allocation.getStatus().equals("ACTIVE");
+         return "VERIFIED".equals(allocation.getAccountStatus()) &&
+             "ACTIVE".equals(allocation.getStatus());
     }
     
     /**
@@ -249,8 +355,15 @@ public class AllocationAccountLinkingService {
      * This would integrate with bank APIs to validate account
      */
     public boolean verifyAccountWithBank(String accountNumber, String ifscCode) {
-        // TODO: Integrate with bank API for account verification
-        // Return true if verified, false otherwise
-        return true;  // Placeholder
+        try {
+            verifyInternalAccount(accountNumber, ifscCode);
+            return true;
+        } catch (IllegalArgumentException exception) {
+            return false;
+        }
+    }
+
+    private String normalize(String value) {
+        return value == null ? "" : value.trim().toUpperCase(java.util.Locale.ROOT);
     }
 }

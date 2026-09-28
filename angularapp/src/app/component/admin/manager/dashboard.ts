@@ -1366,6 +1366,10 @@ export class ManagerDashboard implements OnInit, OnDestroy {
     this.router.navigate([route]);
   }
 
+  openAccountDashboard(): void {
+    this.router.navigate(['/manager/account-dashboard']);
+  }
+
   loadAllAdmins() {
     this.isLoadingAdmins = true;
     this.http.get(`${environment.apiBaseUrl}/api/admins/all`).subscribe({

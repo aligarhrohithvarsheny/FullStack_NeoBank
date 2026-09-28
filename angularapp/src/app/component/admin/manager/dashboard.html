@@ -60,6 +60,9 @@
         <h2>Manager Dashboard</h2>
       </div>
       <div class="header-right">
+          <button type="button" class="manager-account-action" (click)="openAccountDashboard()" title="View linked allocation account">
+            <i class="fa fa-university"></i> Allocation Account
+          </button>
           <span class="admin-name">{{ managerName }}<small class="assigned-city" *ngIf="managerAssignedCity">{{ managerAssignedCity }}</small></span>
           <div class="manager-session-info" *ngIf="managerLoginTimeIso">
             <small>Logged in at: {{ managerLoginTimeIso | date:'short' }}</small>

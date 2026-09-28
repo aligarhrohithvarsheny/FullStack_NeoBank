@@ -24,6 +24,26 @@ public class AllocationAccountLinkingController {
     
     @Autowired
     private AllocationAccountLinkingService accountLinkingService;
+
+    @GetMapping("/verify/ifsc/{ifscCode}")
+    public ResponseEntity<?> verifyInternalIfsc(@PathVariable String ifscCode) {
+        try {
+            return ResponseEntity.ok(accountLinkingService.verifyIfscCode(ifscCode));
+        } catch (IllegalArgumentException exception) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", exception.getMessage()));
+        }
+    }
+
+    @GetMapping("/verify/account")
+    public ResponseEntity<?> verifyInternalAccount(
+            @RequestParam String accountNumber,
+            @RequestParam String ifscCode) {
+        try {
+            return ResponseEntity.ok(accountLinkingService.verifyInternalAccount(accountNumber, ifscCode));
+        } catch (IllegalArgumentException exception) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", exception.getMessage()));
+        }
+    }
     
     // ==================== HOD DASHBOARD ENDPOINTS ====================
     
@@ -124,6 +144,15 @@ public class AllocationAccountLinkingController {
             ));
         }
     }
+
+    @GetMapping("/hod/account/{allocationId}")
+    public ResponseEntity<?> getHodAccountDetails(@PathVariable Long allocationId) {
+        try {
+            return ResponseEntity.ok(Map.of("success", true, "account", accountLinkingService.getAccountDetails(allocationId)));
+        } catch (Exception exception) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", exception.getMessage()));
+        }
+    }
     
     /**
      * HOD: Get pending verification accounts (for review)
@@ -146,7 +175,17 @@ public class AllocationAccountLinkingController {
             ));
         }
     }
-    
+
+    @GetMapping("/admin/pending-cheques")
+    public ResponseEntity<?> getPendingCheques() {
+        try {
+            List<AllocationAccount> accounts = accountLinkingService.getPendingVerificationAccounts();
+            return ResponseEntity.ok(Map.of("success", true, "count", accounts.size(), "cheques", accounts));
+        } catch (Exception exception) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", exception.getMessage()));
+        }
+    }
+
     // ==================== ADMIN DASHBOARD ENDPOINTS ====================
     
     /**
@@ -207,7 +246,7 @@ public class AllocationAccountLinkingController {
             ));
         }
     }
-    
+
     /**
      * ADMIN: Update account status (ACTIVE, BLOCKED, INACTIVE)
      * PUT /api/admin/account/{accountId}/status

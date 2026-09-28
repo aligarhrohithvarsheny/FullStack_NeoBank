@@ -392,6 +392,15 @@ public class FundsAllocationService {
         dto.put("totalDebited", allocation.getTotalDebited() != null ? allocation.getTotalDebited() : 0.0);
         dto.put("totalCredited", allocation.getTotalCredited() != null ? allocation.getTotalCredited() : 0.0);
         dto.put("currentBalance", allocation.getCurrentBalance() != null ? allocation.getCurrentBalance() : 0.0);
+        dto.put("allocationAccountId", allocation.getAllocationAccountId());
+        dto.put("accountNumber", allocation.getLinkedAccountNumber());
+        dto.put("ifscCode", allocation.getLinkedIfscCode());
+        dto.put("accountHolderName", allocation.getLinkedAccountHolderName());
+        dto.put("bankName", allocation.getLinkedBankName());
+        dto.put("accountStatus", allocation.getAccountStatus());
+        dto.put("accountVerificationStatus", allocation.getAccountVerificationStatus());
+        dto.put("chequeVerificationStatus", allocation.getChequeVerificationStatus());
+        dto.put("chargeManagementEnabled", allocation.getChargeManagementEnabled());
         dto.put("createdAt", allocation.getCreatedAt());
         dto.put("updatedAt", allocation.getUpdatedAt());
         return dto;

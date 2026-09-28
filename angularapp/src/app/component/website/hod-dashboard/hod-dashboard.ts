@@ -140,6 +140,8 @@ export class HodDashboard implements OnInit {
 
   showStaffProfile(person: any): void { this.selectedStaff = person; }
 
+  openAccountLinking(): void { this.router.navigate(['/hod/account-linking']); }
+
   removeCity(city: CityOperation): void {
     if (!city.id) return;
     this.http.delete(`${environment.apiBaseUrl}/api/admins/hod/cities/${city.id}`).subscribe({

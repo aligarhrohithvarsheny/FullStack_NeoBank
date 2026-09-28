@@ -319,7 +319,7 @@ export class AdminService {
 
   // ─── Account Verification ─────────────────────────────────
   verifyUserAccount(accountNumber: string): Observable<any> {
-    return this.http.get<any>(`${this.apiUrl}/verify/account/${accountNumber}`);
+    return this.http.get<any>(`${environment.apiBaseUrl}/api/accounts/verify-account/${encodeURIComponent(accountNumber)}`);
   }
 
   verifyKYC(userId: number): Observable<any> {

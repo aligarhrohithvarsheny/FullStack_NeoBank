@@ -1,9 +1,14 @@
-<div class="container-fluid p-4">
+<main class="account-linking-page container-fluid p-4">
   <div class="row">
     <div class="col-12">
-      <h2 class="mb-4">
-        <i class="fas fa-link"></i> Account Linking for Fund Allocation
-      </h2>
+      <header class="account-linking-hero">
+        <div>
+          <span class="account-linking-eyebrow">HOD · Funds control</span>
+          <h1>Allocation account</h1>
+          <p>Link a verified NeoBank or ExyVault current account to an active allocation.</p>
+        </div>
+        <span class="internal-bank-pill"><i class="fas fa-shield-alt"></i> Internal banks only</span>
+      </header>
     </div>
   </div>
 
@@ -12,7 +17,7 @@
     <div class="col-md-6">
       <div class="card">
         <div class="card-body">
-          <h5 class="card-title">Filter Accounts by Location</h5>
+          <h5 class="card-title">Find linked accounts</h5>
           <div class="row">
             <div class="col-md-6">
               <label>City</label>
@@ -138,6 +143,7 @@
                 <select 
                   class="form-select"
                   formControlName="allocationId"
+                  (change)="applySelectedAllocation()"
                   required
                 >
                   <option value="">Select allocation</option>
@@ -156,11 +162,12 @@
                   type="text" 
                   class="form-control"
                   formControlName="accountNumber"
-                  placeholder="9-18 digit account number"
+                  placeholder="NEOBANK000001 or registered ExyVault account"
+                  autocomplete="off"
                   (blur)="verifyAccountNumber()"
                 >
                 <small class="text-danger" *ngIf="accountForm.get('accountNumber')?.invalid && accountForm.get('accountNumber')?.touched">
-                  Invalid account number format
+                  Enter a valid internal account number.
                 </small>
                 <small class="text-success" *ngIf="accountVerified">
                   <i class="fas fa-check"></i> Verified
@@ -174,20 +181,21 @@
                     type="text" 
                     class="form-control"
                     formControlName="ifscCode"
-                    placeholder="e.g., SBIN0001234"
+                    placeholder="NEOB0000001 or EZYV000123"
+                    autocomplete="off"
                     (blur)="verifyIfsc()"
                   >
                   <button 
                     class="btn btn-outline-secondary"
                     type="button"
                     (click)="verifyIfsc()"
-                    [disabled]="!accountForm.get('ifscCode')?.valid"
+                    [disabled]="!accountForm.get('ifscCode')?.valid || loading"
                   >
                     Verify
                   </button>
                 </div>
                 <small class="text-danger" *ngIf="accountForm.get('ifscCode')?.invalid && accountForm.get('ifscCode')?.touched">
-                  Invalid IFSC format
+                  Only the registered NeoBank or ExyVault IFSC is accepted.
                 </small>
                 <small class="text-success" *ngIf="ifscVerified">
                   <i class="fas fa-check"></i> Verified
@@ -200,19 +208,18 @@
                   type="text" 
                   class="form-control"
                   formControlName="accountHolderName"
-                  placeholder="Name as per bank account"
+                  placeholder="Filled from verified account"
+                  readonly
                 >
               </div>
 
               <div class="col-md-6 mb-3">
-                <label class="form-label">Bank Name *</label>
-                <input 
-                  type="text" 
-                  class="form-control"
-                  formControlName="bankName"
-                  placeholder="Bank name (auto-filled)"
-                  readonly
-                >
+                <label class="form-label">Bank *</label>
+                <select class="form-select" formControlName="bankName" (change)="onBankSelected()">
+                  <option value="NeoBank">NeoBank</option>
+                  <option value="ExyVault">ExyVault</option>
+                </select>
+                <small class="text-muted">External bank accounts are not eligible for allocation linking.</small>
               </div>
 
               <div class="col-md-6 mb-3">
@@ -270,7 +277,7 @@
                 <button 
                   class="btn btn-primary"
                   (click)="linkAccount()"
-                  [disabled]="!accountForm.valid || loading"
+                  [disabled]="!accountForm.valid || loading || !ifscVerified || !accountVerified"
                 >
                   <span *ngIf="loading"><i class="fas fa-spinner fa-spin"></i> Linking...</span>
                   <span *ngIf="!loading"><i class="fas fa-check"></i> Link Account & Continue</span>

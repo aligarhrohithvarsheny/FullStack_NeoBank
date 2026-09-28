@@ -84,9 +84,12 @@ export const routes: Routes = [
   { path: 'admin/login', component: Login },
   { path: 'hod/login', component: HodLogin },
   { path: 'hod/dashboard', component: HodDashboard, canActivate: [hodAuthGuard] },
+  { path: 'hod/account-linking', loadComponent: () => import('./component/admin/account-linking/account-linking').then(m => m.AccountLinkingComponent), canActivate: [hodAuthGuard] },
   { path: 'admin/dashboard', component: Dashboard, canActivate: [adminAuthGuard] },
+  { path: 'admin/account-verification', loadComponent: () => import('./component/admin/account-verification/account-verification').then(m => m.AccountVerificationComponent), canActivate: [adminAuthGuard] },
   // ------------------ MANAGER ------------------
   { path: 'manager/dashboard', component: ManagerDashboard, canActivate: [managerAuthGuard] },
+  { path: 'manager/account-dashboard', loadComponent: () => import('./component/admin/manager/manager-account-dashboard/manager-account-dashboard').then(m => m.ManagerAccountDashboardComponent), canActivate: [managerAuthGuard] },
   { path: 'admin/users', component: Users, canActivate: [adminAuthGuard] },
   { path: 'admin/loans', component: Loans, canActivate: [adminAuthGuard] },
   { path: 'admin/cards', component: Cards, canActivate: [adminAuthGuard] },

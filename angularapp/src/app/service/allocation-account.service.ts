@@ -21,6 +21,12 @@ export class AllocationAccountService {
     return this.http.post(`${this.apiUrl}/hod/link-account`, payload);
   }
 
+  getAllocations(): Observable<any> {
+    return this.http.get(`${this.apiUrl}/hod/allocations`, {
+      params: { status: 'ACTIVE', page: '0', size: '100' }
+    });
+  }
+
   /**
    * Add cheque details for verification - HOD Dashboard
    * Step 2: Submit cheque for verification
@@ -59,14 +65,20 @@ export class AllocationAccountService {
    * Final step: Admin verifies and approves the account for use
    */
   verifyChequeAndApprove(payload: any): Observable<any> {
-    return this.http.post(`${this.apiUrl}/admin/verify-cheque`, payload);
+    return this.http.post(`${this.apiUrl}/admin/verify-account`, payload);
   }
 
   /**
    * Reject cheque verification - Admin Dashboard
    */
   rejectChequeVerification(payload: any): Observable<any> {
-    return this.http.post(`${this.apiUrl}/admin/reject-cheque`, payload);
+    return this.http.post(`${this.apiUrl}/admin/verify-account`, {
+      allocationId: payload.allocationId,
+      approved: false,
+      verificationNotes: payload.reason,
+      verifiedByAdminId: payload.rejectedByAdminId,
+      verifiedByAdminName: payload.rejectedByAdminName
+    });
   }
 
   /**
@@ -87,8 +99,7 @@ export class AllocationAccountService {
    * Block/Unblock account - Admin Dashboard
    */
   updateAccountStatus(accountId: number, status: string, reason: string): Observable<any> {
-    return this.http.put(`${this.apiUrl}/admin/account-status`, {
-      accountId,
+    return this.http.put(`${this.apiUrl}/admin/account/${accountId}/status`, {
       status,
       reason
     });
@@ -100,14 +111,14 @@ export class AllocationAccountService {
    * Get account details for Manager Dashboard
    */
   getLinkedAccountForAllocation(allocationId: number): Observable<any> {
-    return this.http.get(`${this.apiUrl}/manager/allocation/${allocationId}/account`);
+    return this.http.get(`${this.apiUrl}/manager/account/${allocationId}`);
   }
 
   /**
    * Get account transactions for Manager Dashboard
    */
   getAccountTransactions(allocationId: number, page: number = 0, size: number = 10): Observable<any> {
-    return this.http.get(`${this.apiUrl}/manager/allocation/${allocationId}/transactions`, {
+    return this.http.get(`${this.apiUrl}/manager/utilization/${allocationId}/history`, {
       params: { page, size }
     });
   }
@@ -116,7 +127,7 @@ export class AllocationAccountService {
    * Get account balance for Manager Dashboard
    */
   getAccountBalance(allocationId: number): Observable<any> {
-    return this.http.get(`${this.apiUrl}/manager/allocation/${allocationId}/balance`);
+    return this.http.get(`${this.apiUrl}/manager/account/${allocationId}`);
   }
 
   // ==================== CHARGE MANAGEMENT ====================
@@ -139,21 +150,21 @@ export class AllocationAccountService {
    * Get charges by allocation ID
    */
   getChargesByAllocation(allocationId: number): Observable<any> {
-    return this.http.get(`${this.apiUrl}/charges/allocation/${allocationId}`);
+    return this.http.get(`${this.apiUrl}/charges/history/${allocationId}`);
   }
 
   /**
    * Get charges by type and allocation
    */
   getChargesByType(allocationId: number, chargeType: string): Observable<any> {
-    return this.http.get(`${this.apiUrl}/charges/allocation/${allocationId}/type/${chargeType}`);
+    return this.http.get(`${this.apiUrl}/charges/${allocationId}/type/${chargeType}`);
   }
 
   /**
    * Get charge summary for account
    */
   getChargeSummary(allocationId: number): Observable<any> {
-    return this.http.get(`${this.apiUrl}/charges/allocation/${allocationId}/summary`);
+    return this.http.get(`${this.apiUrl}/charges/summary/${allocationId}`);
   }
 
   /**

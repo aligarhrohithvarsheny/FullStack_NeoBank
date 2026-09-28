@@ -1,7 +1,10 @@
 <div class="hod-dashboard">
   <header class="hod-topbar">
     <div><span class="hod-kicker">NeoBank Headquarters</span><h1>HOD Operations Dashboard</h1></div>
-    <button type="button" class="logout-button" (click)="logout()">Sign out</button>
+    <div class="hod-topbar-actions">
+      <button type="button" class="account-linking-button" (click)="openAccountLinking()">Link allocation account</button>
+      <button type="button" class="logout-button" (click)="logout()">Sign out</button>
+    </div>
   </header>
 
   <main class="hod-content">

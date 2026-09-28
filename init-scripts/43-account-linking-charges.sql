@@ -48,10 +48,10 @@ CREATE TABLE IF NOT EXISTS allocation_account (
   blocked_by_admin_id BIGINT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  FOREIGN KEY (allocation_id) REFERENCES funds_allocation(id),
-  FOREIGN KEY (linked_by_admin_id) REFERENCES admin(id),
-  FOREIGN KEY (verified_by_admin_id) REFERENCES admin(id),
-  FOREIGN KEY (blocked_by_admin_id) REFERENCES admin(id)
+  FOREIGN KEY (allocation_id) REFERENCES funds_allocations(id),
+  FOREIGN KEY (linked_by_admin_id) REFERENCES admins(id),
+  FOREIGN KEY (verified_by_admin_id) REFERENCES admins(id),
+  FOREIGN KEY (blocked_by_admin_id) REFERENCES admins(id)
 );
 
 -- Create charge_transaction table
@@ -82,10 +82,10 @@ CREATE TABLE IF NOT EXISTS charge_transaction (
   net_charge DECIMAL(15, 2),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  FOREIGN KEY (allocation_id) REFERENCES funds_allocation(id),
+  FOREIGN KEY (allocation_id) REFERENCES funds_allocations(id),
   FOREIGN KEY (allocation_account_id) REFERENCES allocation_account(id),
-  FOREIGN KEY (user_id) REFERENCES user_master(id),
-  FOREIGN KEY (reversed_by_admin_id) REFERENCES admin(id)
+  FOREIGN KEY (user_id) REFERENCES users(id),
+  FOREIGN KEY (reversed_by_admin_id) REFERENCES admins(id)
 );
 
 -- Create charge_config table for charge rates
@@ -99,7 +99,7 @@ CREATE TABLE IF NOT EXISTS charge_config (
   max_charge DECIMAL(15, 2),
   is_active BOOLEAN DEFAULT TRUE,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE UPDATE CURRENT_TIMESTAMP
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
 -- Create charge_summary_daily view for daily reporting
@@ -298,7 +298,7 @@ CREATE TABLE IF NOT EXISTS allocation_account_audit (
   changed_by_admin_name VARCHAR(100),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (allocation_account_id) REFERENCES allocation_account(id),
-  FOREIGN KEY (changed_by_admin_id) REFERENCES admin(id)
+  FOREIGN KEY (changed_by_admin_id) REFERENCES admins(id)
 );
 
 CREATE INDEX idx_allocation_account_audit_account_id ON allocation_account_audit(allocation_account_id);

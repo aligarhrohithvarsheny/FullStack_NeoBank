@@ -1,7 +1,7 @@
 package com.neo.springapp.controller;
 
 import com.neo.springapp.entity.ChargeTransaction;
-import com.neo.springapp.entity.FundsAllocation;
+import com.neo.springapp.model.FundsAllocation;
 import com.neo.springapp.service.ChargeManagementService;
 import com.neo.springapp.service.ChargeManagementService.ChargesSummary;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -50,9 +50,9 @@ public class ChargeManagementController {
                 request.get("userAccountNumber").toString(),
                 request.get("userName").toString(),
                 request.get("userProductType").toString(),
-                request.get("linkedTransactionId").toString(),
-                request.getOrDefault("linkedLoanId", "").toString(),
-                request.getOrDefault("linkedDepositId", "").toString()
+                valueOrEmpty(request, "linkedTransactionId"),
+                valueOrEmpty(request, "linkedLoanId"),
+                valueOrEmpty(request, "linkedDepositId")
             );
             
             return ResponseEntity.ok(Map.of(
@@ -98,9 +98,9 @@ public class ChargeManagementController {
                         chargeRequest.get("userAccountNumber").toString(),
                         chargeRequest.get("userName").toString(),
                         chargeRequest.get("userProductType").toString(),
-                        chargeRequest.get("linkedTransactionId").toString(),
-                        chargeRequest.getOrDefault("linkedLoanId", "").toString(),
-                        chargeRequest.getOrDefault("linkedDepositId", "").toString()
+                        valueOrEmpty(chargeRequest, "linkedTransactionId"),
+                        valueOrEmpty(chargeRequest, "linkedLoanId"),
+                        valueOrEmpty(chargeRequest, "linkedDepositId")
                     );
                     processedCharges.add(charge);
                     successCount++;
@@ -332,5 +332,10 @@ public class ChargeManagementController {
                 "message", e.getMessage()
             ));
         }
+    }
+
+    private String valueOrEmpty(Map<String, Object> values, String key) {
+        Object value = values.get(key);
+        return value == null ? "" : value.toString();
     }
 }

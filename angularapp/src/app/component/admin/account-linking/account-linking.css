@@ -2,6 +2,30 @@
   background-color: #f8f9fa;
 }
 
+.account-linking-page {
+  min-height: 100%;
+  padding: clamp(18px, 3vw, 36px) !important;
+  color: #18343a;
+  background: #f2f6f5;
+}
+
+.account-linking-hero {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  padding: 26px 30px;
+  margin-bottom: 24px;
+  border-radius: 8px;
+  background: #123d43;
+  color: #fff;
+}
+
+.account-linking-hero h1 { margin: 5px 0 7px; font-size: 28px; font-weight: 700; }
+.account-linking-hero p { margin: 0; color: #d0e4e2; }
+.account-linking-eyebrow { color: #7de0c4; font-size: 11px; font-weight: 700; text-transform: uppercase; }
+.internal-bank-pill { display: inline-flex; align-items: center; gap: 8px; padding: 9px 12px; border: 1px solid #5c938c; border-radius: 99px; color: #dff9ef; white-space: nowrap; }
+
 .card {
   border: none;
   box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
@@ -113,13 +137,13 @@
 }
 
 .btn-primary {
-  background-color: #007bff;
-  border-color: #007bff;
+  background-color: #0f766e;
+  border-color: #0f766e;
 }
 
 .btn-primary:hover {
-  background-color: #0056b3;
-  border-color: #0056b3;
+  background-color: #115e59;
+  border-color: #115e59;
 }
 
 .btn-primary:disabled {
@@ -234,6 +258,8 @@ small {
 }
 
 @media (max-width: 768px) {
+  .account-linking-hero { align-items: flex-start; flex-direction: column; padding: 22px; }
+  .account-linking-hero h1 { font-size: 23px; }
   .col-lg-4,
   .col-lg-8 {
     margin-bottom: 2rem;
