@@ -1,0 +1,412 @@
+<div class="container-fluid p-4">
+  <div class="row">
+    <div class="col-12">
+      <h2 class="mb-4">
+        <i class="fas fa-link"></i> Account Linking for Fund Allocation
+      </h2>
+    </div>
+  </div>
+
+  <!-- Filter Section -->
+  <div class="row mb-4">
+    <div class="col-md-6">
+      <div class="card">
+        <div class="card-body">
+          <h5 class="card-title">Filter Accounts by Location</h5>
+          <div class="row">
+            <div class="col-md-6">
+              <label>City</label>
+              <input 
+                type="text" 
+                class="form-control"
+                [(ngModel)]="selectedCity"
+                placeholder="Enter city"
+              >
+            </div>
+            <div class="col-md-6">
+              <label>Branch</label>
+              <input 
+                type="text" 
+                class="form-control"
+                [(ngModel)]="selectedBranch"
+                placeholder="Enter branch"
+              >
+            </div>
+          </div>
+          <button 
+            class="btn btn-primary mt-3 w-100"
+            (click)="loadAccountsByLocation()"
+            [disabled]="loading || !selectedCity || !selectedBranch"
+          >
+            <span *ngIf="loading"><i class="fas fa-spinner fa-spin"></i> Loading...</span>
+            <span *ngIf="!loading"><i class="fas fa-search"></i> Load Accounts</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Alert Messages -->
+  <div *ngIf="successMessage" class="alert alert-success alert-dismissible fade show">
+    <i class="fas fa-check-circle"></i> {{ successMessage }}
+  </div>
+  <div *ngIf="errorMessage" class="alert alert-danger alert-dismissible fade show">
+    <i class="fas fa-exclamation-circle"></i> {{ errorMessage }}
+  </div>
+
+  <!-- Linked Accounts Table -->
+  <div class="row">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header">
+          <h5 class="mb-0">Linked Accounts</h5>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Allocation ID</th>
+                <th>Account Number</th>
+                <th>Account Holder</th>
+                <th>IFSC Code</th>
+                <th>City/Branch</th>
+                <th>Verification Status</th>
+                <th>Cheque Status</th>
+                <th>Linked Date</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let account of linkedAccounts">
+                <td>{{ account.allocationId }}</td>
+                <td><strong>{{ account.accountNumber }}</strong></td>
+                <td>{{ account.accountHolderName }}</td>
+                <td>{{ account.ifscCode }}</td>
+                <td>{{ account.city }} / {{ account.branchName }}</td>
+                <td>
+                  <span [ngClass]="getStatusBadgeClass(account.verificationStatus)" class="badge">
+                    {{ account.verificationStatus }}
+                  </span>
+                </td>
+                <td>
+                  <span [ngClass]="getStatusBadgeClass(account.chequeStatus)" class="badge">
+                    {{ account.chequeStatus }}
+                  </span>
+                </td>
+                <td>{{ account.linkedAt | date: 'short' }}</td>
+                <td>
+                  <button 
+                    class="btn btn-sm btn-info"
+                    (click)="downloadChequeImage(account)"
+                    *ngIf="account.chequeImageUrl"
+                    title="Download cheque image"
+                  >
+                    <i class="fas fa-file-download"></i>
+                  </button>
+                </td>
+              </tr>
+              <tr *ngIf="linkedAccounts.length === 0">
+                <td colspan="9" class="text-center text-muted py-4">
+                  <i class="fas fa-inbox"></i> No accounts found for this location
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <hr class="my-5">
+
+  <!-- Account Linking Form -->
+  <div class="row">
+    <div class="col-lg-8">
+      <div class="card">
+        <div class="card-header">
+          <h5 class="mb-0">
+            <span class="badge" [style.background]="step === 1 ? '#007bff' : '#28a745'">Step {{ step }}</span>
+            {{ step === 1 ? 'Link New Account' : 'Add Cheque Details' }}
+          </h5>
+        </div>
+        <div class="card-body">
+          <!-- Step 1: Account Details -->
+          <form *ngIf="step === 1" [formGroup]="accountForm">
+            <div class="row">
+              <div class="col-md-6 mb-3">
+                <label class="form-label">Select Allocation *</label>
+                <select 
+                  class="form-select"
+                  formControlName="allocationId"
+                  required
+                >
+                  <option value="">Select allocation</option>
+                  <option *ngFor="let alloc of allocations" [value]="alloc.id">
+                    {{ alloc.allocationId }} - {{ alloc.branchName }}
+                  </option>
+                </select>
+                <small class="text-danger" *ngIf="accountForm.get('allocationId')?.invalid && accountForm.get('allocationId')?.touched">
+                  Allocation is required
+                </small>
+              </div>
+
+              <div class="col-md-6 mb-3">
+                <label class="form-label">Account Number *</label>
+                <input 
+                  type="text" 
+                  class="form-control"
+                  formControlName="accountNumber"
+                  placeholder="9-18 digit account number"
+                  (blur)="verifyAccountNumber()"
+                >
+                <small class="text-danger" *ngIf="accountForm.get('accountNumber')?.invalid && accountForm.get('accountNumber')?.touched">
+                  Invalid account number format
+                </small>
+                <small class="text-success" *ngIf="accountVerified">
+                  <i class="fas fa-check"></i> Verified
+                </small>
+              </div>
+
+              <div class="col-md-6 mb-3">
+                <label class="form-label">IFSC Code *</label>
+                <div class="input-group">
+                  <input 
+                    type="text" 
+                    class="form-control"
+                    formControlName="ifscCode"
+                    placeholder="e.g., SBIN0001234"
+                    (blur)="verifyIfsc()"
+                  >
+                  <button 
+                    class="btn btn-outline-secondary"
+                    type="button"
+                    (click)="verifyIfsc()"
+                    [disabled]="!accountForm.get('ifscCode')?.valid"
+                  >
+                    Verify
+                  </button>
+                </div>
+                <small class="text-danger" *ngIf="accountForm.get('ifscCode')?.invalid && accountForm.get('ifscCode')?.touched">
+                  Invalid IFSC format
+                </small>
+                <small class="text-success" *ngIf="ifscVerified">
+                  <i class="fas fa-check"></i> Verified
+                </small>
+              </div>
+
+              <div class="col-md-6 mb-3">
+                <label class="form-label">Account Holder Name *</label>
+                <input 
+                  type="text" 
+                  class="form-control"
+                  formControlName="accountHolderName"
+                  placeholder="Name as per bank account"
+                >
+              </div>
+
+              <div class="col-md-6 mb-3">
+                <label class="form-label">Bank Name *</label>
+                <input 
+                  type="text" 
+                  class="form-control"
+                  formControlName="bankName"
+                  placeholder="Bank name (auto-filled)"
+                  readonly
+                >
+              </div>
+
+              <div class="col-md-6 mb-3">
+                <label class="form-label">Account Type *</label>
+                <select class="form-select" formControlName="accountType">
+                  <option value="CURRENT">Current Account</option>
+                  <option value="SAVINGS">Savings Account</option>
+                </select>
+              </div>
+
+              <div class="col-md-6 mb-3">
+                <label class="form-label">Branch Name *</label>
+                <input 
+                  type="text" 
+                  class="form-control"
+                  formControlName="branchName"
+                  placeholder="Branch name (auto-filled)"
+                  readonly
+                >
+              </div>
+
+              <div class="col-md-4 mb-3">
+                <label class="form-label">City *</label>
+                <input 
+                  type="text" 
+                  class="form-control"
+                  formControlName="city"
+                  placeholder="City"
+                >
+              </div>
+
+              <div class="col-md-4 mb-3">
+                <label class="form-label">Location *</label>
+                <input 
+                  type="text" 
+                  class="form-control"
+                  formControlName="location"
+                  placeholder="Location"
+                >
+              </div>
+
+              <div class="col-md-4 mb-3">
+                <label class="form-label">State *</label>
+                <input 
+                  type="text" 
+                  class="form-control"
+                  formControlName="state"
+                  placeholder="State"
+                >
+              </div>
+            </div>
+
+            <div class="row mt-4">
+              <div class="col-12">
+                <button 
+                  class="btn btn-primary"
+                  (click)="linkAccount()"
+                  [disabled]="!accountForm.valid || loading"
+                >
+                  <span *ngIf="loading"><i class="fas fa-spinner fa-spin"></i> Linking...</span>
+                  <span *ngIf="!loading"><i class="fas fa-check"></i> Link Account & Continue</span>
+                </button>
+              </div>
+            </div>
+          </form>
+
+          <!-- Step 2: Cheque Details -->
+          <form *ngIf="step === 2" [formGroup]="chequeForm">
+            <div class="alert alert-info">
+              <i class="fas fa-info-circle"></i>
+              Account linked successfully! Now provide cheque details for verification.
+            </div>
+
+            <div class="row">
+              <div class="col-md-6 mb-3">
+                <label class="form-label">Cheque Number *</label>
+                <input 
+                  type="text" 
+                  class="form-control"
+                  formControlName="chequeNumber"
+                  placeholder="6-10 digit cheque number"
+                >
+                <small class="text-danger" *ngIf="chequeForm.get('chequeNumber')?.invalid && chequeForm.get('chequeNumber')?.touched">
+                  Invalid cheque number
+                </small>
+              </div>
+
+              <div class="col-md-6 mb-3">
+                <label class="form-label">Cheque Holder Name *</label>
+                <input 
+                  type="text" 
+                  class="form-control"
+                  formControlName="chequeHolderName"
+                  placeholder="Name on cheque"
+                >
+              </div>
+
+              <div class="col-md-6 mb-3">
+                <label class="form-label">Cheque Date *</label>
+                <input 
+                  type="date" 
+                  class="form-control"
+                  formControlName="chequeDate"
+                >
+              </div>
+
+              <div class="col-md-6 mb-3">
+                <label class="form-label">Cheque Bank *</label>
+                <input 
+                  type="text" 
+                  class="form-control"
+                  formControlName="chequeBank"
+                  placeholder="Bank name on cheque"
+                >
+              </div>
+
+              <div class="col-12 mb-3">
+                <label class="form-label">Cheque Image URL</label>
+                <input 
+                  type="text" 
+                  class="form-control"
+                  formControlName="chequeImageUrl"
+                  placeholder="S3 URL or base64 encoded image"
+                >
+              </div>
+            </div>
+
+            <div class="row mt-4">
+              <div class="col-12">
+                <button 
+                  class="btn btn-secondary me-2"
+                  (click)="resetForms()"
+                >
+                  <i class="fas fa-arrow-left"></i> Back
+                </button>
+                <button 
+                  class="btn btn-success"
+                  (click)="addChequeDetails()"
+                  [disabled]="!chequeForm.valid || loading"
+                >
+                  <span *ngIf="loading"><i class="fas fa-spinner fa-spin"></i> Submitting...</span>
+                  <span *ngIf="!loading"><i class="fas fa-check"></i> Submit for Verification</span>
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Info Sidebar -->
+    <div class="col-lg-4">
+      <div class="card bg-light">
+        <div class="card-header">
+          <h6 class="mb-0"><i class="fas fa-question-circle"></i> Account Linking Process</h6>
+        </div>
+        <div class="card-body">
+          <div class="d-flex mb-3">
+            <div class="badge bg-primary me-2">1</div>
+            <div>
+              <strong>Add Account Details</strong>
+              <p class="text-muted small mb-0">Enter account number, IFSC, and holder information</p>
+            </div>
+          </div>
+
+          <div class="d-flex mb-3">
+            <div class="badge bg-primary me-2">2</div>
+            <div>
+              <strong>Provide Cheque Details</strong>
+              <p class="text-muted small mb-0">Submit cheque for bank verification</p>
+            </div>
+          </div>
+
+          <div class="d-flex">
+            <div class="badge bg-primary me-2">3</div>
+            <div>
+              <strong>Admin Approval</strong>
+              <p class="text-muted small mb-0">Admin verifies cheque and activates account</p>
+            </div>
+          </div>
+
+          <hr class="my-3">
+
+          <div class="alert alert-warning">
+            <i class="fas fa-exclamation-triangle"></i>
+            <strong>Important:</strong> Only one account can be linked per allocation. All debit/credit transactions will use this account only.
+          </div>
+
+          <div class="alert alert-info">
+            <i class="fas fa-info-circle"></i>
+            <strong>Charges:</strong> Interest, CIBIL, Soundbox, UPI, and Payment Gateway charges will automatically be credited to this account.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

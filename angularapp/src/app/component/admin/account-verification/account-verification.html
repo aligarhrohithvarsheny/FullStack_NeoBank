@@ -1,0 +1,269 @@
+<div class="container-fluid p-4">
+  <div class="row">
+    <div class="col-12">
+      <h2 class="mb-4">
+        <i class="fas fa-check-circle"></i> Account Verification & Approval
+      </h2>
+    </div>
+  </div>
+
+  <!-- Alert Messages -->
+  <div *ngIf="successMessage" class="alert alert-success alert-dismissible fade show">
+    <i class="fas fa-check-circle"></i> {{ successMessage }}
+  </div>
+  <div *ngIf="errorMessage" class="alert alert-danger alert-dismissible fade show">
+    <i class="fas fa-exclamation-circle"></i> {{ errorMessage }}
+  </div>
+
+  <div class="row">
+    <!-- Pending Cheques Section -->
+    <div class="col-lg-8">
+      <div class="card">
+        <div class="card-header">
+          <h5 class="mb-0">
+            <i class="fas fa-clock"></i> Pending Cheque Verification
+            <span class="badge bg-warning float-end">{{ pendingCheques.length }}</span>
+          </h5>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Allocation ID</th>
+                <th>Account Number</th>
+                <th>Account Holder</th>
+                <th>Cheque #</th>
+                <th>City/Branch</th>
+                <th>Linked Date</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let cheque of pendingCheques" [class.table-active]="selectedCheque?.id === cheque.id">
+                <td><strong>{{ cheque.allocationId }}</strong></td>
+                <td>{{ cheque.accountNumber }}</td>
+                <td>{{ cheque.accountHolderName }}</td>
+                <td>{{ cheque.chequeNumber }}</td>
+                <td>{{ cheque.city }} / {{ cheque.branchName }}</td>
+                <td>{{ cheque.linkedAt | date: 'short' }}</td>
+                <td>
+                  <button 
+                    class="btn btn-sm btn-primary"
+                    (click)="selectCheque(cheque)"
+                  >
+                    <i class="fas fa-eye"></i> Review
+                  </button>
+                </td>
+              </tr>
+              <tr *ngIf="pendingCheques.length === 0">
+                <td colspan="7" class="text-center text-muted py-4">
+                  <i class="fas fa-inbox"></i> No pending cheques
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Verified Accounts -->
+      <div class="card mt-4">
+        <div class="card-header">
+          <h5 class="mb-0">
+            <i class="fas fa-check"></i> Verified Accounts
+            <span class="badge bg-success float-end">{{ verifiedAccounts.length }}</span>
+          </h5>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Allocation ID</th>
+                <th>Account Number</th>
+                <th>Account Holder</th>
+                <th>Verification Date</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let account of verifiedAccounts">
+                <td><strong>{{ account.allocationId }}</strong></td>
+                <td>{{ account.accountNumber }}</td>
+                <td>{{ account.accountHolderName }}</td>
+                <td>{{ account.verifiedAt | date: 'short' }}</td>
+                <td>
+                  <span [ngClass]="getStatusBadgeClass(account.accountStatus)" class="badge">
+                    {{ account.accountStatus }}
+                  </span>
+                </td>
+                <td>
+                  <button 
+                    class="btn btn-sm btn-warning"
+                    (click)="updateAccountStatus(account, 'BLOCKED')"
+                    *ngIf="account.accountStatus !== 'BLOCKED'"
+                  >
+                    <i class="fas fa-ban"></i> Block
+                  </button>
+                  <button 
+                    class="btn btn-sm btn-success"
+                    (click)="updateAccountStatus(account, 'ACTIVE')"
+                    *ngIf="account.accountStatus === 'BLOCKED'"
+                  >
+                    <i class="fas fa-check"></i> Unblock
+                  </button>
+                </td>
+              </tr>
+              <tr *ngIf="verifiedAccounts.length === 0">
+                <td colspan="6" class="text-center text-muted py-4">
+                  <i class="fas fa-inbox"></i> No verified accounts
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Cheque Details & Verification Panel -->
+    <div class="col-lg-4">
+      <div class="card sticky-top" style="top: 20px;">
+        <div class="card-header">
+          <h5 class="mb-0">
+            <i class="fas fa-file-alt"></i> Verification Details
+          </h5>
+        </div>
+        <div class="card-body">
+          <div *ngIf="!selectedCheque" class="text-center text-muted">
+            <i class="fas fa-arrow-left fa-3x mb-3"></i>
+            <p>Select a cheque from the list to review and verify</p>
+          </div>
+
+          <div *ngIf="selectedCheque" [formGroup]="verificationForm">
+            <!-- Cheque Info -->
+            <div class="mb-3">
+              <h6 class="card-title"><i class="fas fa-info-circle"></i> Cheque Information</h6>
+              <div class="info-item">
+                <strong>Allocation ID:</strong> {{ selectedCheque.allocationId }}
+              </div>
+              <div class="info-item">
+                <strong>Cheque Number:</strong> {{ selectedCheque.chequeNumber }}
+              </div>
+              <div class="info-item">
+                <strong>Cheque Holder:</strong> {{ selectedCheque.chequeHolderName }}
+              </div>
+              <div class="info-item">
+                <strong>Cheque Date:</strong> {{ selectedCheque.chequeDate }}
+              </div>
+              <div class="info-item">
+                <strong>Cheque Bank:</strong> {{ selectedCheque.chequeBank }}
+              </div>
+            </div>
+
+            <!-- Account Info -->
+            <div class="mb-3">
+              <h6 class="card-title"><i class="fas fa-bank"></i> Account Information</h6>
+              <div class="info-item">
+                <strong>Account Number:</strong> {{ selectedCheque.accountNumber }}
+              </div>
+              <div class="info-item">
+                <strong>Account Holder:</strong> {{ selectedCheque.accountHolderName }}
+              </div>
+              <div class="info-item">
+                <strong>IFSC Code:</strong> {{ selectedCheque.ifscCode }}
+              </div>
+              <div class="info-item">
+                <strong>Bank Name:</strong> {{ selectedCheque.bankName }}
+              </div>
+              <div class="info-item">
+                <strong>City/Branch:</strong> {{ selectedCheque.city }} / {{ selectedCheque.branchName }}
+              </div>
+            </div>
+
+            <!-- Cheque Image -->
+            <div class="mb-3" *ngIf="selectedCheque.chequeImageUrl">
+              <h6 class="card-title"><i class="fas fa-image"></i> Cheque Image</h6>
+              <img [src]="selectedCheque.chequeImageUrl" class="img-fluid border rounded" alt="Cheque Image">
+              <button 
+                class="btn btn-sm btn-link w-100 mt-2"
+                (click)="downloadCheque(selectedCheque)"
+              >
+                <i class="fas fa-download"></i> Download Image
+              </button>
+            </div>
+
+            <!-- Verification Form -->
+            <div class="mb-3">
+              <h6 class="card-title"><i class="fas fa-clipboard-check"></i> Verification</h6>
+              
+              <div class="mb-2">
+                <label class="form-label">Decision</label>
+                <div class="form-check">
+                  <input 
+                    class="form-check-input" 
+                    type="radio" 
+                    name="approved"
+                    [value]="true"
+                    formControlName="approved"
+                    id="approve"
+                  >
+                  <label class="form-check-label" for="approve">
+                    <strong class="text-success">✓ Approve</strong> - Cheque verified, account ready to use
+                  </label>
+                </div>
+                <div class="form-check">
+                  <input 
+                    class="form-check-input" 
+                    type="radio" 
+                    [value]="false"
+                    formControlName="approved"
+                    id="reject"
+                  >
+                  <label class="form-check-label" for="reject">
+                    <strong class="text-danger">✗ Reject</strong> - Cheque verification failed
+                  </label>
+                </div>
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label">Notes/Reason</label>
+                <textarea 
+                  class="form-control"
+                  formControlName="verificationNotes"
+                  rows="3"
+                  placeholder="Enter verification notes or reason for rejection"
+                ></textarea>
+              </div>
+
+              <div class="d-grid gap-2">
+                <button 
+                  class="btn btn-success"
+                  (click)="verifyCheque()"
+                  [disabled]="loading"
+                  *ngIf="verificationForm.value.approved"
+                >
+                  <span *ngIf="loading"><i class="fas fa-spinner fa-spin"></i> Approving...</span>
+                  <span *ngIf="!loading"><i class="fas fa-check-circle"></i> Approve & Activate</span>
+                </button>
+
+                <button 
+                  class="btn btn-danger"
+                  (click)="rejectCheque()"
+                  [disabled]="loading"
+                  *ngIf="!verificationForm.value.approved"
+                >
+                  <span *ngIf="loading"><i class="fas fa-spinner fa-spin"></i> Rejecting...</span>
+                  <span *ngIf="!loading"><i class="fas fa-times-circle"></i> Reject</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="alert alert-info">
+              <i class="fas fa-lightbulb"></i>
+              <strong>Tip:</strong> Verify cheque authenticity and account details before approval.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

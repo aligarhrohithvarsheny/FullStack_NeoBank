@@ -1,0 +1,393 @@
+<div class="container-fluid p-4">
+  <div class="row">
+    <div class="col-12">
+      <h2 class="mb-4">
+        <i class="fas fa-wallet"></i> Linked Account Dashboard
+      </h2>
+    </div>
+  </div>
+
+  <!-- Select Allocation -->
+  <div class="row mb-4">
+    <div class="col-md-6">
+      <div class="card">
+        <div class="card-body">
+          <label class="form-label">Select Allocation</label>
+          <div class="input-group">
+            <input 
+              type="number" 
+              class="form-control"
+              [(ngModel)]="allocationId"
+              placeholder="Enter allocation ID"
+            >
+            <button 
+              class="btn btn-primary"
+              (click)="loadAccountData()"
+              [disabled]="loading || !allocationId"
+            >
+              <span *ngIf="loading"><i class="fas fa-spinner fa-spin"></i></span>
+              <span *ngIf="!loading"><i class="fas fa-search"></i> Load</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Error Message -->
+  <div *ngIf="errorMessage" class="alert alert-danger">
+    <i class="fas fa-exclamation-circle"></i> {{ errorMessage }}
+  </div>
+
+  <!-- Account Overview -->
+  <div *ngIf="linkedAccount">
+    <!-- Account Header -->
+    <div class="row mb-4">
+      <div class="col-12">
+        <div class="card border-left-primary">
+          <div class="card-body">
+            <div class="row">
+              <div class="col-md-8">
+                <h5 class="card-title mb-3">Account Details</h5>
+                <div class="row">
+                  <div class="col-md-6">
+                    <div class="detail-item">
+                      <strong>Account Number:</strong>
+                      <span class="account-number">{{ linkedAccount.accountNumber }}</span>
+                    </div>
+                    <div class="detail-item">
+                      <strong>IFSC Code:</strong>
+                      <span>{{ linkedAccount.ifscCode }}</span>
+                    </div>
+                    <div class="detail-item">
+                      <strong>Account Holder:</strong>
+                      <span>{{ linkedAccount.accountHolderName }}</span>
+                    </div>
+                  </div>
+                  <div class="col-md-6">
+                    <div class="detail-item">
+                      <strong>Bank:</strong>
+                      <span>{{ linkedAccount.bankName }}</span>
+                    </div>
+                    <div class="detail-item">
+                      <strong>Branch:</strong>
+                      <span>{{ linkedAccount.branchName }}, {{ linkedAccount.city }}</span>
+                    </div>
+                    <div class="detail-item">
+                      <strong>Status:</strong>
+                      <span [ngClass]="getStatusBadge(linkedAccount.verificationStatus)" class="badge">
+                        {{ linkedAccount.verificationStatus }}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="col-md-4">
+                <div class="btn-group" role="group">
+                  <button 
+                    class="btn btn-sm btn-outline-primary"
+                    (click)="exportStatement()"
+                  >
+                    <i class="fas fa-download"></i> Export
+                  </button>
+                  <button 
+                    class="btn btn-sm btn-outline-secondary"
+                    (click)="printAccount()"
+                  >
+                    <i class="fas fa-print"></i> Print
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Balance Overview Cards -->
+    <div class="row mb-4">
+      <div class="col-md-3">
+        <div class="card stat-card">
+          <div class="card-body">
+            <div class="stat-icon bg-primary">
+              <i class="fas fa-coins"></i>
+            </div>
+            <div class="stat-info">
+              <h6 class="stat-label">Total Allocated</h6>
+              <h4 class="stat-value">{{ formatCurrency(linkedAccount.totalAllocated) }}</h4>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-3">
+        <div class="card stat-card">
+          <div class="card-body">
+            <div class="stat-icon bg-success">
+              <i class="fas fa-arrow-down"></i>
+            </div>
+            <div class="stat-info">
+              <h6 class="stat-label">Total Debited</h6>
+              <h4 class="stat-value">{{ formatCurrency(linkedAccount.totalDebited) }}</h4>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-3">
+        <div class="card stat-card">
+          <div class="card-body">
+            <div class="stat-icon bg-info">
+              <i class="fas fa-arrow-up"></i>
+            </div>
+            <div class="stat-info">
+              <h6 class="stat-label">Total Credited</h6>
+              <h4 class="stat-value">{{ formatCurrency(linkedAccount.totalCredited) }}</h4>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-3">
+        <div class="card stat-card">
+          <div class="card-body">
+            <div class="stat-icon bg-warning">
+              <i class="fas fa-wallet"></i>
+            </div>
+            <div class="stat-info">
+              <h6 class="stat-label">Current Balance</h6>
+              <h4 class="stat-value">{{ formatCurrency(linkedAccount.currentBalance) }}</h4>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="row">
+      <div class="col-12">
+        <div class="card">
+          <div class="card-header">
+            <ul class="nav nav-tabs card-header-tabs" role="tablist">
+              <li class="nav-item">
+                <a 
+                  class="nav-link" 
+                  [ngClass]="{'active': activeTab === 'overview'}"
+                  (click)="switchTab('overview')"
+                >
+                  <i class="fas fa-chart-pie"></i> Overview
+                </a>
+              </li>
+              <li class="nav-item">
+                <a 
+                  class="nav-link"
+                  [ngClass]="{'active': activeTab === 'transactions'}"
+                  (click)="switchTab('transactions')"
+                >
+                  <i class="fas fa-exchange-alt"></i> Transactions
+                </a>
+              </li>
+              <li class="nav-item">
+                <a 
+                  class="nav-link"
+                  [ngClass]="{'active': activeTab === 'charges'}"
+                  (click)="switchTab('charges')"
+                >
+                  <i class="fas fa-receipt"></i> Charges
+                </a>
+              </li>
+            </ul>
+          </div>
+
+          <div class="card-body">
+            <!-- Overview Tab -->
+            <div *ngIf="activeTab === 'overview'">
+              <div class="row">
+                <div class="col-md-6">
+                  <h6 class="card-title">Charge Breakdown</h6>
+                  <div class="charge-item">
+                    <strong>Interest Charges:</strong>
+                    <span class="ms-auto">{{ formatCurrency(linkedAccount.interestCharges) }}</span>
+                  </div>
+                  <div class="charge-item">
+                    <strong>CIBIL Charges:</strong>
+                    <span class="ms-auto">{{ formatCurrency(linkedAccount.cibilCharges) }}</span>
+                  </div>
+                  <div class="charge-item">
+                    <strong>Soundbox Charges:</strong>
+                    <span class="ms-auto">{{ formatCurrency(linkedAccount.soundboxCharges) }}</span>
+                  </div>
+                  <div class="charge-item">
+                    <strong>UPI Charges:</strong>
+                    <span class="ms-auto">{{ formatCurrency(linkedAccount.upiCharges) }}</span>
+                  </div>
+                  <div class="charge-item">
+                    <strong>Payment Gateway Charges:</strong>
+                    <span class="ms-auto">{{ formatCurrency(linkedAccount.paymentGatewayCharges) }}</span>
+                  </div>
+                  <div class="charge-item border-top-thick pt-2">
+                    <strong>Total Charges Collected:</strong>
+                    <span class="ms-auto fw-bold text-primary">{{ formatCurrency(linkedAccount.totalChargesCollected) }}</span>
+                  </div>
+                </div>
+
+                <div class="col-md-6">
+                  <h6 class="card-title">Account Summary</h6>
+                  <div class="info-item">
+                    <strong>Linked Date:</strong>
+                    <span>{{ linkedAccount.linkedAt | date: 'medium' }}</span>
+                  </div>
+                  <div class="info-item">
+                    <strong>Verified Date:</strong>
+                    <span>{{ linkedAccount.verifiedAt | date: 'medium' }}</span>
+                  </div>
+                  <div class="info-item">
+                    <strong>Linked By:</strong>
+                    <span>{{ linkedAccount.linkedByAdminName }}</span>
+                  </div>
+                  <div class="info-item">
+                    <strong>Verified By:</strong>
+                    <span>{{ linkedAccount.verifiedByAdminName || 'Pending' }}</span>
+                  </div>
+                  <div class="info-item">
+                    <strong>Account Status:</strong>
+                    <span [ngClass]="getStatusBadge(linkedAccount.accountStatus)" class="badge">
+                      {{ linkedAccount.accountStatus }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Transactions Tab -->
+            <div *ngIf="activeTab === 'transactions'">
+              <div class="table-responsive">
+                <table class="table table-hover">
+                  <thead class="table-light">
+                    <tr>
+                      <th>Transaction ID</th>
+                      <th>Type</th>
+                      <th>Amount</th>
+                      <th>Product</th>
+                      <th>Balance</th>
+                      <th>Date</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr *ngFor="let txn of accountTransactions">
+                      <td><strong>{{ txn.transactionId }}</strong></td>
+                      <td>
+                        <span [ngClass]="txn.type === 'DEBIT' ? 'badge-danger' : 'badge-success'" class="badge">
+                          {{ txn.type }}
+                        </span>
+                      </td>
+                      <td>{{ formatCurrency(txn.amount) }}</td>
+                      <td>{{ txn.productType }}</td>
+                      <td>{{ formatCurrency(txn.balance) }}</td>
+                      <td>{{ txn.date | date: 'short' }}</td>
+                    </tr>
+                    <tr *ngIf="accountTransactions.length === 0">
+                      <td colspan="6" class="text-center text-muted">No transactions found</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <!-- Pagination -->
+              <nav class="mt-3" *ngIf="accountTransactions.length > 0">
+                <ul class="pagination justify-content-center">
+                  <li class="page-item" [ngClass]="{'disabled': transactionPage === 0}">
+                    <a class="page-link" (click)="previousPage()">Previous</a>
+                  </li>
+                  <li class="page-item active">
+                    <span class="page-link">Page {{ transactionPage + 1 }}</span>
+                  </li>
+                  <li class="page-item">
+                    <a class="page-link" (click)="nextPage()">Next</a>
+                  </li>
+                </ul>
+              </nav>
+            </div>
+
+            <!-- Charges Tab -->
+            <div *ngIf="activeTab === 'charges'">
+              <div class="alert alert-info">
+                <i class="fas fa-info-circle"></i>
+                <strong>Charge Summary:</strong> All charges are automatically debited from users and credited to this account.
+              </div>
+
+              <div class="row">
+                <div class="col-md-4">
+                  <div class="charge-card">
+                    <div class="charge-icon"><i class="fas fa-percent"></i></div>
+                    <div class="charge-info">
+                      <h6>Interest Charges</h6>
+                      <p class="charge-amount">{{ formatCurrency(chargesSummary.interest || 0) }}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="col-md-4">
+                  <div class="charge-card">
+                    <div class="charge-icon"><i class="fas fa-file"></i></div>
+                    <div class="charge-info">
+                      <h6>CIBIL Charges</h6>
+                      <p class="charge-amount">{{ formatCurrency(chargesSummary.cibil || 0) }}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="col-md-4">
+                  <div class="charge-card">
+                    <div class="charge-icon"><i class="fas fa-speaker"></i></div>
+                    <div class="charge-info">
+                      <h6>Soundbox Charges</h6>
+                      <p class="charge-amount">{{ formatCurrency(chargesSummary.soundbox || 0) }}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="col-md-4">
+                  <div class="charge-card">
+                    <div class="charge-icon"><i class="fas fa-mobile-alt"></i></div>
+                    <div class="charge-info">
+                      <h6>UPI Charges</h6>
+                      <p class="charge-amount">{{ formatCurrency(chargesSummary.upi || 0) }}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="col-md-4">
+                  <div class="charge-card">
+                    <div class="charge-icon"><i class="fas fa-credit-card"></i></div>
+                    <div class="charge-info">
+                      <h6>Payment Gateway Charges</h6>
+                      <p class="charge-amount">{{ formatCurrency(chargesSummary.paymentGateway || 0) }}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="col-md-4">
+                  <div class="charge-card total">
+                    <div class="charge-icon"><i class="fas fa-chart-line"></i></div>
+                    <div class="charge-info">
+                      <h6>Total Charges</h6>
+                      <p class="charge-amount">{{ formatCurrency(chargesSummary.totalCharges || 0) }}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Empty State -->
+  <div *ngIf="!linkedAccount && !loading" class="alert alert-info text-center">
+    <i class="fas fa-info-circle fa-3x mb-3"></i>
+    <p>Select an allocation to view linked account details</p>
+  </div>
+</div>
