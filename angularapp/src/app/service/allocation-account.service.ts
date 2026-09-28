@@ -27,6 +27,14 @@ export class AllocationAccountService {
     });
   }
 
+  getHodStaff(): Observable<any[]> {
+    return this.http.get<any[]>(`${environment.apiBaseUrl}/api/admins/staff`);
+  }
+
+  createAllocation(payload: any): Observable<any> {
+    return this.http.post(`${this.apiUrl}/hod/allocate-funds`, payload);
+  }
+
   getAvailableCities(): Observable<any[]> {
     return this.http.get<any[]>(`${environment.apiBaseUrl}/api/admins/hod/cities`);
   }

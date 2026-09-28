@@ -14,6 +14,7 @@ import { AllocationAccountService } from '../../../service/allocation-account.se
 export class AccountLinkingComponent implements OnInit {
   accountForm!: FormGroup;
   chequeForm!: FormGroup;
+  allocationForm!: FormGroup;
   
   // UI State
   step = 1;  // Step 1: Account Details, Step 2: Cheque Details
@@ -28,6 +29,9 @@ export class AccountLinkingComponent implements OnInit {
   allocations: any[] = [];
   activeAllocations: any[] = [];
   cityOptions: string[] = [];
+  managers: any[] = [];
+  showCreateAllocation = false;
+  creatingAllocation = false;
   readonly bankOptions = [
     { name: 'NeoBank', ifscCode: 'NEOB0000001' },
     { name: 'ExyVault', ifscCode: 'EZYV000123' }
@@ -61,11 +65,19 @@ export class AccountLinkingComponent implements OnInit {
       chequeBank: ['', [Validators.required]],
       chequeImageUrl: ['']
     });
+
+    this.allocationForm = this.fb.group({
+      branchManagerId: ['', Validators.required],
+      amount: ['', [Validators.required, Validators.min(1)]],
+      validTill: ['', Validators.required],
+      description: ['']
+    });
   }
 
   ngOnInit(): void {
     this.loadAvailableCities();
     this.loadAllocations();
+    this.loadManagers();
   }
 
   get branchOptions(): string[] {
@@ -95,7 +107,7 @@ export class AccountLinkingComponent implements OnInit {
     });
   }
 
-  loadAllocations(): void {
+  loadAllocations(selectAllocationId?: number): void {
     this.accountService.getAllocations().subscribe({
       next: (response: any) => {
         const allocations = response.content || response.allocations || [];
@@ -103,11 +115,74 @@ export class AccountLinkingComponent implements OnInit {
         this.allocations = this.activeAllocations.filter((allocation: any) =>
           allocation.status === 'ACTIVE' && (!allocation.accountStatus || allocation.accountStatus === 'NOT_LINKED')
         );
+        if (this.allocations.length === 0) this.showCreateAllocation = true;
         const allocationCities = this.activeAllocations.map((allocation: any) => String(allocation.city || '').trim()).filter(Boolean);
         this.cityOptions = [...new Set([...this.cityOptions, ...allocationCities])].sort((a, b) => a.localeCompare(b));
+        if (selectAllocationId && this.allocations.some(item => Number(item.id) === selectAllocationId)) {
+          this.accountForm.patchValue({ allocationId: String(selectAllocationId) });
+          this.applySelectedAllocation();
+        }
       },
       error: (error: any) => {
         this.errorMessage = error.error?.message || 'Failed to load active allocations.';
+      }
+    });
+  }
+
+  loadManagers(): void {
+    this.accountService.getHodStaff().subscribe({
+      next: staff => {
+        const hodCity = String(this.getHodSession()?.assignedCity || '').trim().toLowerCase();
+        this.managers = (staff || []).filter(person =>
+          String(person.role || '').toUpperCase() === 'MANAGER' &&
+          (!hodCity || String(person.assignedCity || '').trim().toLowerCase() === hodCity)
+        );
+      },
+      error: error => {
+        this.errorMessage = error.error?.message || 'Failed to load branch managers.';
+      }
+    });
+  }
+
+  createAllocation(): void {
+    if (this.allocationForm.invalid) {
+      this.allocationForm.markAllAsTouched();
+      return;
+    }
+    const hod = this.getHodSession();
+    if (!hod?.id || sessionStorage.getItem('userRole') !== 'HOD') {
+      this.errorMessage = 'Sign in with a HOD account to create an allocation.';
+      return;
+    }
+
+    this.creatingAllocation = true;
+    this.errorMessage = '';
+    this.successMessage = '';
+    const form = this.allocationForm.getRawValue();
+    this.accountService.createAllocation({
+      hodAdminId: hod.id,
+      branchManagerId: Number(form.branchManagerId),
+      amount: Number(form.amount),
+      allocationType: 'GENERAL',
+      productTypes: 'GOLD_LOAN,DEPOSITS,WITHDRAWALS,LOANS,OVERDRAFT,SALARY_CREDITS',
+      validTill: form.validTill,
+      description: form.description
+    }).subscribe({
+      next: (response: any) => {
+        if (!response?.success || !response.allocation?.id) {
+          this.errorMessage = response?.message || 'Allocation was not created.';
+          this.creatingAllocation = false;
+          return;
+        }
+        this.successMessage = 'Allocation created. Select its internal bank account to continue.';
+        this.showCreateAllocation = false;
+        this.allocationForm.reset();
+        this.loadAllocations(response.allocation.id);
+        this.creatingAllocation = false;
+      },
+      error: (error: any) => {
+        this.errorMessage = error.error?.message || 'Failed to create allocation.';
+        this.creatingAllocation = false;
       }
     });
   }

@@ -26,6 +26,16 @@
 .account-linking-eyebrow { color: #7de0c4; font-size: 11px; font-weight: 700; text-transform: uppercase; }
 .internal-bank-pill { display: inline-flex; align-items: center; gap: 8px; padding: 9px 12px; border: 1px solid #5c938c; border-radius: 99px; color: #dff9ef; white-space: nowrap; }
 
+.create-allocation-panel {
+  padding: 18px;
+  border: 1px solid #b9d8d1;
+  border-left: 4px solid #0f766e;
+  border-radius: 7px;
+  background: #f2fbf7;
+}
+
+.create-allocation-panel h6 { margin: 0 0 14px; color: #174b46; font-weight: 700; }
+
 .card {
   border: none;
   box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);

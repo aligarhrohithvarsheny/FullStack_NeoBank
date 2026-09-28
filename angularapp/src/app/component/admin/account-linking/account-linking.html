@@ -137,12 +137,7 @@
             <div class="row">
               <div class="col-md-6 mb-3">
                 <label class="form-label">Select Allocation *</label>
-                <select 
-                  class="form-select"
-                  formControlName="allocationId"
-                  (change)="applySelectedAllocation()"
-                  required
-                >
+                <select class="form-select" formControlName="allocationId" (change)="applySelectedAllocation()" required>
                   <option value="">Select allocation</option>
                   <option *ngFor="let alloc of allocations" [value]="alloc.id">
                     {{ alloc.allocationId }} - {{ alloc.branchName }}{{ alloc.city ? ' · ' + alloc.city : '' }}
@@ -151,7 +146,48 @@
                 <small class="text-danger" *ngIf="accountForm.get('allocationId')?.invalid && accountForm.get('allocationId')?.touched">
                   Allocation is required
                 </small>
-                <small class="text-muted" *ngIf="allocations.length === 0">No active, unlinked allocation is available for this HOD.</small>
+                <small class="text-muted" *ngIf="allocations.length === 0">No active, unlinked allocations are available. Create one here to continue.</small>
+              </div>
+
+              <div class="col-12 mb-3" *ngIf="allocations.length === 0 || showCreateAllocation">
+                <button type="button" class="btn btn-outline-primary" (click)="showCreateAllocation = !showCreateAllocation">
+                  <i class="fas" [ngClass]="showCreateAllocation ? 'fa-minus' : 'fa-plus'"></i>
+                  {{ showCreateAllocation ? 'Close allocation form' : 'Create allocation here' }}
+                </button>
+              </div>
+
+              <div class="col-12 mb-3" *ngIf="showCreateAllocation">
+                <section class="create-allocation-panel" [formGroup]="allocationForm">
+                  <h6>Create an allocation</h6>
+                  <div class="row">
+                    <div class="col-md-6 mb-3">
+                      <label class="form-label" for="allocation-manager">Branch manager *</label>
+                      <select id="allocation-manager" class="form-select" formControlName="branchManagerId">
+                        <option value="">Select manager in your city</option>
+                        <option *ngFor="let manager of managers" [value]="manager.id">
+                          {{ manager.name }}{{ manager.assignedCity ? ' · ' + manager.assignedCity : '' }}
+                        </option>
+                      </select>
+                      <small class="text-muted" *ngIf="managers.length === 0">No managers are assigned to your city, or their payout account is not configured.</small>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                      <label class="form-label" for="allocation-amount">Amount *</label>
+                      <input id="allocation-amount" type="number" min="1" class="form-control" formControlName="amount" placeholder="Amount">
+                    </div>
+                    <div class="col-md-3 mb-3">
+                      <label class="form-label" for="allocation-valid-till">Valid until *</label>
+                      <input id="allocation-valid-till" type="date" class="form-control" formControlName="validTill">
+                    </div>
+                    <div class="col-12 mb-3">
+                      <label class="form-label" for="allocation-description">Description</label>
+                      <input id="allocation-description" type="text" class="form-control" formControlName="description" placeholder="Purpose (optional)">
+                    </div>
+                  </div>
+                  <button type="button" class="btn btn-primary" (click)="createAllocation()" [disabled]="creatingAllocation || allocationForm.invalid || managers.length === 0">
+                    <i class="fas" [ngClass]="creatingAllocation ? 'fa-spinner fa-spin' : 'fa-plus'"></i>
+                    {{ creatingAllocation ? 'Creating...' : 'Create and select allocation' }}
+                  </button>
+                </section>
               </div>
 
               <div class="col-md-6 mb-3">
