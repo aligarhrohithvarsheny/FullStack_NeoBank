@@ -1,9 +1,11 @@
 package com.neo.springapp.service;
 
 import com.neo.springapp.model.Account;
+import com.neo.springapp.model.BranchAccount;
 import com.neo.springapp.model.CurrentAccount;
 import com.neo.springapp.repository.AccountRepository;
 import com.neo.springapp.repository.AdminRepository;
+import com.neo.springapp.repository.BranchAccountRepository;
 import com.neo.springapp.repository.CurrentAccountRepository;
 import com.neo.springapp.repository.AllocationAccountRepository;
 import com.neo.springapp.repository.FundsAllocationRepository;
@@ -29,6 +31,7 @@ class AllocationAccountLinkingServiceTest {
     @Mock private AdminRepository adminRepository;
     @Mock private AccountRepository savingsAccountRepository;
     @Mock private CurrentAccountRepository currentAccountRepository;
+    @Mock private BranchAccountRepository branchAccountRepository;
 
     private AllocationAccountLinkingService service;
 
@@ -40,6 +43,7 @@ class AllocationAccountLinkingServiceTest {
         ReflectionTestUtils.setField(service, "adminRepository", adminRepository);
         ReflectionTestUtils.setField(service, "savingsAccountRepository", savingsAccountRepository);
         ReflectionTestUtils.setField(service, "currentAccountRepository", currentAccountRepository);
+        ReflectionTestUtils.setField(service, "branchAccountRepository", branchAccountRepository);
     }
 
     @Test
@@ -71,6 +75,26 @@ class AllocationAccountLinkingServiceTest {
         assertThatThrownBy(() -> service.verifyInternalAccount("OTHER12345", "NEOB0000001"))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("Only NeoBank's registered internal account");
+    }
+
+    @Test
+    void verifiesConfiguredNeoBankBranchAccount() {
+        BranchAccount branchAccount = new BranchAccount();
+        branchAccount.setAccountNumber("ACC1787636100964194");
+        branchAccount.setAccountName("NeoBank Official Branch");
+        branchAccount.setIfscCode("NEOB0000001");
+        when(branchAccountRepository.findAll()).thenReturn(java.util.List.of(branchAccount));
+
+        Account internalAccount = new Account();
+        internalAccount.setAccountNumber("ACC1787636100964194");
+        internalAccount.setName("NeoBank Official Branch");
+        internalAccount.setStatus("ACTIVE");
+        when(savingsAccountRepository.findByAccountNumber("ACC1787636100964194")).thenReturn(internalAccount);
+
+        Map<String, Object> result = service.verifyInternalAccount("ACC1787636100964194", "NEOB0000001");
+
+        assertThat(result).containsEntry("success", true);
+        assertThat(result).containsEntry("accountHolderName", "NeoBank Official Branch");
     }
 
     @Test
