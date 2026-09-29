@@ -63,6 +63,8 @@ export class FasttagUser implements OnInit {
   rechargeDebitAccount = '';
   rechargeAvailableBalance: number = 0;
   rechargeVerifiedName = '';
+  rechargeTagBalance: number | null = null;
+  rechargeTagFound = false;
 
   // My FASTags list
   myTags: FasttagApplication[] = [];
@@ -142,13 +144,19 @@ export class FasttagUser implements OnInit {
   loadMyTags() {
     if (this.fastagGmailId) {
       this.http.get<any>(`${environment.apiBaseUrl}/api/fastag/user-details/${encodeURIComponent(this.fastagGmailId)}`).subscribe({
-        next: (res) => { this.myTags = (res?.fasttags || []) as FasttagApplication[]; },
+        next: (res) => {
+          this.myTags = (res?.fasttags || []) as FasttagApplication[];
+          this.updateRechargeTagBalance();
+        },
         error: (err) => { console.error('Failed to load FASTags by Gmail', err); this.myTags = []; }
       });
       return;
     }
     this.fasttagService.listForUser(this.currentUserId).subscribe({
-      next: (res) => { this.myTags = res || []; },
+      next: (res) => {
+        this.myTags = res || [];
+        this.updateRechargeTagBalance();
+      },
       error: (err) => { console.error('Failed to load FASTags', err); }
     });
   }
@@ -164,6 +172,7 @@ export class FasttagUser implements OnInit {
             name: acc.accountHolderName || 'Linked Account',
             balance: acc.availableBalance != null ? acc.availableBalance : 0
           }));
+          this.onRechargeDebitAccountChange();
         },
         error: () => { this.userAccounts = []; }
       });
@@ -180,6 +189,7 @@ export class FasttagUser implements OnInit {
           this.accountService.getAccountByNumber(accNo).subscribe({
             next: (acc: any) => {
               this.userAccounts = acc ? [acc] : [];
+              this.onRechargeDebitAccountChange();
             },
             error: () => { this.userAccounts = []; }
           });
@@ -199,6 +209,19 @@ export class FasttagUser implements OnInit {
     const acc = this.userAccounts.find((a: any) => String(a.accountNumber) === this.rechargeDebitAccount || String(a.id) === this.rechargeDebitAccount);
     this.rechargeAvailableBalance = acc ? acc.balance : 0;
     this.rechargeVerifiedName = acc ? (acc.name || acc.accountHolderName || '') : '';
+  }
+
+  onRechargeVehicleNumberChange() {
+    this.updateRechargeTagBalance();
+  }
+
+  private updateRechargeTagBalance() {
+    const vehicleNumber = (this.rechargeVehicleNumber || '').trim().toUpperCase();
+    const tag = vehicleNumber
+      ? this.myTags.find(item => (item.vehicleNumber || '').trim().toUpperCase() === vehicleNumber && item.status === 'Approved')
+      : undefined;
+    this.rechargeTagFound = !!tag;
+    this.rechargeTagBalance = tag?.balance ?? null;
   }
 
   onRcFrontSelected(event: Event) {
@@ -325,6 +348,10 @@ export class FasttagUser implements OnInit {
       this.alertService.error('Validation Error', 'Recharge amount must be between ₹500 and ₹10000');
       return;
     }
+    if (!this.rechargeDebitAccount) {
+      this.alertService.error('Validation Error', 'Please select a debit account');
+      return;
+    }
 
     this.isSubmitting = true;
     this.fasttagService.rechargeByUser({
@@ -336,9 +363,14 @@ export class FasttagUser implements OnInit {
       next: (updated) => {
         this.isSubmitting = false;
         this.alertService.success('Recharge Successful', `₹${amt} has been added to your FASTag`);
-        this.rechargeVehicleNumber = '';
+        this.rechargeTagBalance = updated.balance ?? this.rechargeTagBalance;
         this.rechargeAmount = null;
         this.loadMyTags();
+        this.loadUserAccounts();
+        if (this.selectedTag?.id === updated.id) {
+          this.selectedTag = updated;
+          this.loadTransactions(updated.id);
+        }
       },
       error: (err) => {
         this.isSubmitting = false;

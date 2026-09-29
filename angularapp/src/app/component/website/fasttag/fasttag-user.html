@@ -225,7 +225,11 @@
         <div class="ft-form-grid-2">
           <div class="ft-form-group">
             <label>Vehicle Registration Number</label>
-            <input type="text" [(ngModel)]="rechargeVehicleNumber" placeholder="Enter vehicle number" />
+            <input type="text" [(ngModel)]="rechargeVehicleNumber" (ngModelChange)="onRechargeVehicleNumberChange()" placeholder="Enter vehicle number" />
+            <div class="ft-balance-value" *ngIf="rechargeVehicleNumber.trim()">
+              <span *ngIf="rechargeTagFound">Available FASTag Balance: ₹{{ rechargeTagBalance | number:'1.2-2' }}</span>
+              <span *ngIf="!rechargeTagFound">No approved FASTag found for this vehicle.</span>
+            </div>
           </div>
           <div class="ft-form-group">
             <label>Enter Recharge Amount</label>

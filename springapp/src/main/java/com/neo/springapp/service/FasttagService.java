@@ -2,6 +2,7 @@ package com.neo.springapp.service;
 
 import com.neo.springapp.model.Fasttag;
 import com.neo.springapp.model.FasttagTransaction;
+import com.neo.springapp.model.Transaction;
 import com.neo.springapp.repository.FasttagRepository;
 import com.neo.springapp.repository.FasttagTransactionRepository;
 import com.neo.springapp.repository.FasttagEditHistoryRepository;
@@ -9,6 +10,7 @@ import com.neo.springapp.model.FasttagEditHistory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Arrays;
@@ -25,6 +27,9 @@ public class FasttagService {
 
     @Autowired
     private FasttagTransactionRepository transactionRepository;
+
+    @Autowired
+    private TransactionService transactionService;
 
     @Autowired
     private AccountService accountService;
@@ -365,12 +370,30 @@ public class FasttagService {
         return fasttagRepository.save(fasttag);
     }
 
-    public Fasttag rechargeByVehicleNumber(String vehicleNumber, Double amount, String userId) {
-        var tags = fasttagRepository.findByVehicleNumberAndStatusIn(vehicleNumber, Arrays.asList("Approved"));
+    @Transactional
+    public Fasttag rechargeByVehicleNumber(String vehicleNumber, Double amount, String userId, String debitAccountNumber) {
+        if (amount == null || amount <= 0) {
+            throw new RuntimeException("Recharge amount must be greater than zero");
+        }
+        if (debitAccountNumber == null || debitAccountNumber.isBlank()) {
+            throw new RuntimeException("A debit account is required");
+        }
+
+        var tags = fasttagRepository.findByVehicleNumberAndStatusIn(vehicleNumber.trim(), Arrays.asList("Approved"));
         if (tags == null || tags.isEmpty()) return null;
         Fasttag t = tags.get(0);
+        var account = accountService.getAccountByNumber(debitAccountNumber.trim());
+        if (account == null) {
+            throw new RuntimeException("Debit account not found");
+        }
+
+        Double accountBalance = accountService.debitBalance(debitAccountNumber.trim(), amount);
+        if (accountBalance == null) {
+            throw new RuntimeException("Insufficient funds in the debit account");
+        }
+
         double prev = t.getBalance() == null ? 0.0 : t.getBalance();
-        t.setBalance(prev + (amount == null ? 0.0 : amount));
+        t.setBalance(prev + amount);
         Fasttag saved = fasttagRepository.save(t);
 
         FasttagTransaction tx = new FasttagTransaction();
@@ -382,7 +405,20 @@ public class FasttagService {
         tx.setInitiatedById(userId);
         tx.setPreviousBalance(prev);
         tx.setNewBalance(saved.getBalance());
+        tx.setAccountDebited(account.getAccountNumber());
         transactionRepository.save(tx);
+
+        Transaction accountTransaction = new Transaction();
+        accountTransaction.setAccountNumber(account.getAccountNumber());
+        accountTransaction.setUserName(account.getName());
+        accountTransaction.setAmount(amount);
+        accountTransaction.setType("Debit");
+        accountTransaction.setMerchant("FASTag Recharge");
+        accountTransaction.setDescription("FASTag recharge for vehicle " + saved.getVehicleNumber());
+        accountTransaction.setBalance(accountBalance);
+        accountTransaction.setStatus("Completed");
+        accountTransaction.setDate(LocalDateTime.now());
+        transactionService.saveTransaction(accountTransaction);
 
         return saved;
     }

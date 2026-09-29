@@ -264,7 +264,7 @@ public class FasttagController {
             if (fasttagNumber != null && !fasttagNumber.isEmpty()) {
                 updated = fasttagService.rechargeByTag(fasttagNumber, amount, "USER", userId);
             } else if (vehicleNumber != null && !vehicleNumber.isEmpty()) {
-                updated = fasttagService.rechargeByVehicleNumber(vehicleNumber, amount, userId);
+                updated = fasttagService.rechargeByVehicleNumber(vehicleNumber, amount, userId, debitAccountNumber);
             } else {
                 return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Vehicle number or FASTag number is required"));
             }
