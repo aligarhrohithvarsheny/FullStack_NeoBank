@@ -1,5 +1,6 @@
 package com.neo.springapp.exception;
 
+import org.apache.catalina.connector.ClientAbortException;
 import org.hibernate.LazyInitializationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,6 +16,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.NoHandlerFoundException;
 
@@ -211,6 +213,21 @@ public class GlobalExceptionHandler {
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(response);
+    }
+
+    /**
+     * Client disconnected while the server was writing the response.
+     * This is typically a browser/tab close, network reset, or broken pipe,
+     * and should not be treated as an application failure.
+     */
+    @ExceptionHandler({
+            AsyncRequestNotUsableException.class,
+            ClientAbortException.class
+    })
+    public ResponseEntity<Void> handleClientDisconnect(Exception e) {
+        String message = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
+        log.warn("Client disconnected before response completed: {}", message);
+        return ResponseEntity.noContent().build();
     }
 
     /**
