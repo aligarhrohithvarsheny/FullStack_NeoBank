@@ -49,7 +49,8 @@ public class OtpService {
 
         boolean sent = emailService.sendOtpEmail(normalizedEmail, otp);
         if (!sent) {
-            System.err.println("⚠️ OTP email dispatch returned false for [" + purpose + "] — OTP still stored for " + normalizedEmail);
+            removeOtp(normalizedEmail);
+            throw new IllegalStateException("Unable to deliver OTP email. Check the backend mail configuration.");
         }
 
         System.out.println("✅ OTP ready for [" + purpose + "] to " + normalizedEmail);
@@ -76,7 +77,8 @@ public class OtpService {
 
         boolean sent = emailService.sendOtpEmailWithReason(normalizedEmail, otp, purpose);
         if (!sent) {
-            System.err.println("⚠️ OTP email dispatch returned false for [" + purpose + "] — OTP still stored for key " + key);
+            otpKeyStore.remove(key);
+            throw new IllegalStateException("Unable to deliver OTP email. Check the backend mail configuration.");
         }
 
         System.out.println("✅ OTP ready for [" + purpose + "] to " + normalizedEmail);

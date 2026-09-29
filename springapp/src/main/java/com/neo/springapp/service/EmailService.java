@@ -111,10 +111,7 @@ public class EmailService {
         }
     }
 
-    /**
-     * Deliver OTP: Gmail API → SMTP → console fallback.
-     * Always returns true so OTP generation/storage is never blocked by mail misconfiguration.
-     */
+    /** Deliver OTP using Gmail API first, then SMTP. */
     private boolean dispatchOtpEmail(String toEmail, String subject, String body) {
         if (toEmail == null || toEmail.isBlank()) {
             return false;
@@ -129,8 +126,8 @@ public class EmailService {
             return true;
         }
 
-        logOtpConsoleFallback(to, subject, body);
-        return true;
+        logOtpDeliveryFailure(to);
+        return false;
     }
 
     private boolean sendOtpViaSmtp(String toEmail, String subject, String body) {
@@ -159,14 +156,8 @@ public class EmailService {
         return false;
     }
 
-    private void logOtpConsoleFallback(String toEmail, String subject, String body) {
-        System.out.println("==========================================");
-        System.out.println("OTP EMAIL (console fallback — configure Gmail API or SMTP to deliver)");
-        System.out.println("To: " + toEmail);
-        System.out.println("Subject: " + subject);
-        System.out.println(body);
-        System.out.println("Set GMAIL_* env vars or SPRING_MAIL_USERNAME/PASSWORD on the server.");
-        System.out.println("==========================================");
+    private void logOtpDeliveryFailure(String toEmail) {
+        System.err.println("OTP email delivery failed for " + toEmail + ". Check Gmail API or SMTP configuration and provider logs.");
     }
     
     /**
