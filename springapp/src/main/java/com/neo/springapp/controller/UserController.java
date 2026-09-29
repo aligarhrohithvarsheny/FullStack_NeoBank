@@ -29,6 +29,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.UUID;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Arrays;
 
@@ -36,6 +38,31 @@ import java.util.Arrays;
 @RequestMapping("/api/users")
 @SuppressWarnings("null")
 public class UserController {
+
+    private final Map<String, LoginOtpChallenge> loginOtpChallenges = new ConcurrentHashMap<>();
+
+    private static class LoginOtpChallenge {
+        private final String email;
+        private final String clientIp;
+        private final String deviceInfo;
+        private final String location;
+        private final String loginMethod;
+        private final String qrToken;
+        private long expiresAt;
+        private long lastSentAt;
+        private int attempts;
+
+        private LoginOtpChallenge(String email, String clientIp, String deviceInfo, String location, String loginMethod, String qrToken) {
+            this.email = email;
+            this.clientIp = clientIp;
+            this.deviceInfo = deviceInfo;
+            this.location = location;
+            this.loginMethod = loginMethod;
+            this.qrToken = qrToken;
+            this.expiresAt = System.currentTimeMillis() + 2 * 60 * 1000;
+            this.lastSentAt = System.currentTimeMillis();
+        }
+    }
 
     @Autowired
     private UserService userService;
@@ -280,7 +307,6 @@ public class UserController {
             Optional<User> userOpt = resolveUserForLogin(email);
             if (userOpt.isPresent()) {
                 User user = userOpt.get();
-                String otpEmail = user.getEmail() != null ? user.getEmail().toLowerCase().trim() : email.toLowerCase().trim();
                 System.out.println("User found: " + user.getUsername() + ", Status: " + user.getStatus());
                 System.out.println("Account locked: " + user.isAccountLocked());
                 System.out.println("Failed login attempts: " + user.getFailedLoginAttempts());
@@ -371,7 +397,7 @@ public class UserController {
                         System.err.println("Error checking per-customer net banking status: " + e.getMessage());
                     }
 
-                    return completeUserLogin(user, "PASSWORD", clientIp, deviceInfo, location);
+                    return ResponseEntity.ok(beginLoginOtp(user, clientIp, deviceInfo, location, "PASSWORD_OTP", null));
                 } else {
                     // Increment failed login attempts
                     user.setFailedLoginAttempts(user.getFailedLoginAttempts() + 1);
@@ -513,135 +539,79 @@ public class UserController {
         }
     }
 
-    // OTP Verification endpoint - Step 2: Verify OTP and complete login
+    // Verify the short-lived challenge created after a valid password login.
     @PostMapping("/verify-otp")
     public ResponseEntity<Map<String, Object>> verifyOtp(@RequestBody Map<String, String> request, 
                                                           @RequestHeader(value = "X-Forwarded-For", required = false) String forwardedFor,
                                                           @RequestHeader(value = "User-Agent", required = false) String userAgent) {
         try {
-            String email = request.get("email");
+            String challengeId = request.get("challengeId");
             String otp = request.get("otp");
-            String loginMethod = request.get("loginMethod"); // PASSWORD, GRAPHICAL_PASSWORD
-            
-            // Normalize email to lowercase and trim
-            if (email != null) {
-                email = email.toLowerCase().trim();
+            LoginOtpChallenge challenge = challengeId == null ? null : loginOtpChallenges.get(challengeId);
+            if (challenge == null || otp == null || !otp.matches("\\d{6}") || System.currentTimeMillis() > challenge.expiresAt) {
+                if (challengeId != null) loginOtpChallenges.remove(challengeId);
+                return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Invalid or expired login challenge. Please sign in again."));
             }
-            
-            // Trim OTP to remove any whitespace
-            if (otp != null) {
-                otp = otp.trim();
-            }
-            
-            System.out.println("🔐 OTP verification attempt for email: " + email);
-            System.out.println("   OTP received (length: " + (otp != null ? otp.length() : 0) + "): " + (otp != null ? "***" + otp.substring(Math.max(0, otp.length() - 2)) : "null"));
-            
-            if (email == null || email.isEmpty() || otp == null || otp.isEmpty()) {
-                Map<String, Object> response = new HashMap<>();
-                response.put("success", false);
-                response.put("message", "Email and OTP are required");
-                System.out.println("❌ OTP verification failed: Missing email or OTP");
-                return ResponseEntity.badRequest().body(response);
-            }
-            
-            // Validate OTP format (should be 6 digits)
-            if (!otp.matches("\\d{6}")) {
-                Map<String, Object> response = new HashMap<>();
-                response.put("success", false);
-                response.put("message", "Invalid OTP format. OTP must be 6 digits.");
-                System.out.println("❌ OTP verification failed: Invalid format - " + otp);
-                return ResponseEntity.badRequest().body(response);
-            }
-            
-            // Get client IP address
-            String clientIp = forwardedFor != null ? forwardedFor.split(",")[0].trim() : 
-                             request.get("ipAddress") != null ? request.get("ipAddress") : "Unknown";
-            
-            // Get device info from User-Agent header or request body
-            String deviceInfo = request.get("deviceInfo") != null ? request.get("deviceInfo") :
-                               userAgent != null ? userAgent : "Unknown";
-            
-            // Get location (can be enhanced with IP geolocation service)
-            String location = request.get("location") != null ? request.get("location") : 
-                             "IP: " + clientIp;
-            
-            // Verify OTP (email and otp are already normalized/trimmed)
-            boolean otpValid = otpService.verifyOtp(email, otp);
-            
-            if (!otpValid) {
-                // Get stored OTP for debugging (if exists)
-                String storedOtp = otpService.getStoredOtp(email);
-                Map<String, Object> response = new HashMap<>();
-                response.put("success", false);
-                if (storedOtp == null) {
-                    response.put("message", "Invalid or expired OTP. Please request a new OTP.");
-                } else {
-                    response.put("message", "Invalid OTP. Please check and try again.");
+
+            synchronized (challenge) {
+                if (challenge.attempts >= 5 || !otpService.verifyOtpByKey("SAVINGS_LOGIN:" + challengeId, otp)) {
+                    challenge.attempts++;
+                    if (challenge.attempts >= 5) loginOtpChallenges.remove(challengeId, challenge);
+                    return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Invalid OTP. Check the code and try again."));
                 }
-                System.out.println("❌ OTP verification failed for email: " + email);
-                return ResponseEntity.badRequest().body(response);
+                loginOtpChallenges.remove(challengeId, challenge);
             }
-            
-            // OTP is valid - proceed with login
-            {
-                // OTP is valid - complete login
-                Optional<User> userOpt = userService.findByEmail(email);
-                if (userOpt.isPresent()) {
-                    User user = userOpt.get();
-                    
-                    // Reset failed login attempts on successful login
-                    user.setFailedLoginAttempts(0);
-                    user.setAccountLocked(false);
-                    user.setLastFailedLoginTime(null);
-                    userService.saveUser(user);
-                    
-                    // Record login history
-                    try {
-                        System.out.println("📝 Recording login history for user: " + user.getEmail());
-                        com.neo.springapp.model.UserLoginHistory history = loginHistoryService.recordLogin(user, location, clientIp, deviceInfo, 
-                                                       loginMethod != null ? loginMethod : "PASSWORD");
-                        System.out.println("✅ Login history recorded successfully. ID: " + (history != null ? history.getId() : "null"));
-                        
-                        // Also record in SessionHistory
-                        sessionHistoryService.recordUserLogin(user, location, clientIp, deviceInfo, 
-                            loginMethod != null ? loginMethod : "PASSWORD");
-                    } catch (Exception e) {
-                        System.err.println("❌ Error recording login history: " + e.getMessage());
-                        e.printStackTrace();
-                        // Don't fail login if history recording fails
-                    }
-                    
-                    // Send login notification email for security purposes
-                    LocalDateTime loginTime = LocalDateTime.now();
-                    DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-                    String formattedTimestamp = loginTime.format(formatter);
-                    emailService.sendLoginNotificationEmail(user.getEmail(), user.getUsername(), formattedTimestamp);
-                    
-                    // Create a safe user response object (avoid circular references and large byte arrays)
-                    Map<String, Object> userResponse = createUserResponse(user);
-                    
-                    Map<String, Object> response = new HashMap<>();
-                    response.put("success", true);
-                    response.put("user", userResponse);
-                    response.put("role", "USER");
-                    response.put("message", "Login successful");
-                    System.out.println("OTP verified and login successful for user: " + user.getUsername());
-                    return ResponseEntity.ok(response);
-                } else {
-                    Map<String, Object> response = new HashMap<>();
-                    response.put("success", false);
-                    response.put("message", "Account not found. Please try logging in again.");
-                    System.out.println("User not found after OTP verification: " + email);
-                    return ResponseEntity.badRequest().body(response);
-                }
+
+            Optional<User> userOpt = userService.findByEmail(challenge.email);
+            if (userOpt.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Account not found. Please sign in again."));
             }
+            String clientIp = forwardedFor != null ? forwardedFor.split(",")[0].trim() : challenge.clientIp;
+            String deviceInfo = userAgent != null ? userAgent : challenge.deviceInfo;
+            ResponseEntity<Map<String, Object>> loginResponse = completeUserLogin(userOpt.get(), challenge.loginMethod, clientIp, deviceInfo, challenge.location);
+            if (challenge.qrToken != null) qrCodeService.updateQrSession(challenge.qrToken, "LOGGED_IN", userOpt.get());
+            return loginResponse;
         } catch (Exception e) {
             Map<String, Object> response = new HashMap<>();
             response.put("success", false);
-            response.put("message", "OTP verification failed: " + e.getMessage());
-            System.out.println("OTP verification error: " + e.getMessage());
+            response.put("message", "OTP verification failed. Please try again.");
             return ResponseEntity.internalServerError().body(response);
         }
+    }
+
+    @PostMapping("/login/resend-otp")
+    public ResponseEntity<Map<String, Object>> resendLoginOtp(@RequestBody Map<String, String> request) {
+        String challengeId = request.get("challengeId");
+        LoginOtpChallenge challenge = challengeId == null ? null : loginOtpChallenges.get(challengeId);
+        if (challenge == null || System.currentTimeMillis() > challenge.expiresAt) {
+            if (challengeId != null) loginOtpChallenges.remove(challengeId);
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Login challenge expired. Please sign in again."));
+        }
+        synchronized (challenge) {
+            long now = System.currentTimeMillis();
+            if (now - challenge.lastSentAt < 30_000) {
+                return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Please wait before requesting another OTP."));
+            }
+            otpService.sendOtpForKey(challenge.email, "SAVINGS_LOGIN:" + challengeId, "Savings account login");
+            challenge.lastSentAt = now;
+            challenge.expiresAt = now + 2 * 60 * 1000;
+        }
+        return ResponseEntity.ok(Map.of("success", true, "message", "A new OTP was sent to your registered email."));
+    }
+
+    private String maskEmail(String email) {
+        int at = email.indexOf('@');
+        if (at <= 1) return "your registered email";
+        return email.charAt(0) + "***" + email.substring(at);
+    }
+
+    private Map<String, Object> beginLoginOtp(User user, String clientIp, String deviceInfo, String location, String loginMethod, String qrToken) {
+        String email = user.getEmail().toLowerCase().trim();
+        String challengeId = UUID.randomUUID().toString();
+        loginOtpChallenges.put(challengeId, new LoginOtpChallenge(email, clientIp, deviceInfo, location, loginMethod, qrToken));
+        otpService.sendOtpForKey(email, "SAVINGS_LOGIN:" + challengeId, "Savings account login");
+        return Map.of("success", true, "requiresOtp", true, "challengeId", challengeId,
+                "maskedEmail", maskEmail(email), "message", "Enter the OTP sent to your registered email address.");
     }
 
     // Graphical Password Authentication endpoint
@@ -750,7 +720,7 @@ public class UserController {
             boolean passwordMatches = storedPassword.equals(graphicalPassword);
             
             if (passwordMatches) {
-                return completeUserLogin(user, "GRAPHICAL_PASSWORD", clientIp, deviceInfo, location);
+                return ResponseEntity.ok(beginLoginOtp(user, clientIp, deviceInfo, location, "GRAPHICAL_PASSWORD_OTP", null));
             } else {
                 // Increment failed login attempts
                 user.setFailedLoginAttempts(user.getFailedLoginAttempts() + 1);
@@ -2017,7 +1987,6 @@ public class UserController {
             String qrToken = request.get("qrToken");
             String email = request.get("email");
             String password = request.get("password");
-            String otp = request.get("otp");
             
             System.out.println("QR login attempt - Token: " + qrToken + ", Email: " + email);
             
@@ -2076,40 +2045,10 @@ public class UserController {
                 return ResponseEntity.badRequest().body(response);
             }
             
-            // Login successful - update QR session
-            user.setFailedLoginAttempts(0);
-            user.setAccountLocked(false);
-            user.setLastFailedLoginTime(null);
-            userService.saveUser(user);
-            
-            // Record login history
-            try {
-                String clientIp = request.get("ipAddress") != null ? request.get("ipAddress") : "Unknown";
-                String deviceInfo = request.get("deviceInfo") != null ? request.get("deviceInfo") : "QR Code Login";
-                String location = request.get("location") != null ? request.get("location") : "IP: " + clientIp;
-                loginHistoryService.recordLogin(user, location, clientIp, deviceInfo, "QR_CODE");
-            } catch (Exception e) {
-                System.err.println("Error recording QR login history: " + e.getMessage());
-            }
-            
-            // Send login notification email
-            LocalDateTime loginTime = LocalDateTime.now();
-            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-            String formattedTimestamp = loginTime.format(formatter);
-            emailService.sendLoginNotificationEmail(user.getEmail(), user.getUsername(), formattedTimestamp);
-            
-            // Update QR session with user data
-            qrCodeService.updateQrSession(qrToken, "LOGGED_IN", user);
-            
-            // Create a safe user response object (avoid circular references and large byte arrays)
-            Map<String, Object> userResponse = createUserResponse(user);
-            
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", true);
-            response.put("user", userResponse);
-            response.put("message", "Login successful via QR code");
-            System.out.println("✅ QR login successful for user: " + user.getUsername());
-            return ResponseEntity.ok(response);
+            String clientIp = request.get("ipAddress") != null ? request.get("ipAddress") : "Unknown";
+            String deviceInfo = request.get("deviceInfo") != null ? request.get("deviceInfo") : "QR Code Login";
+            String location = request.get("location") != null ? request.get("location") : "IP: " + clientIp;
+            return ResponseEntity.ok(beginLoginOtp(user, clientIp, deviceInfo, location, "QR_CODE", qrToken));
         } catch (Exception e) {
             Map<String, Object> response = new HashMap<>();
             response.put("success", false);

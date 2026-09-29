@@ -92,6 +92,10 @@ export class User implements OnInit, OnDestroy {
   unifiedAccountNumber: string = '';
   unifiedPassword: string = '';
   isUnifiedLoggingIn: boolean = false;
+  loginOtpChallengeId: string | null = null;
+  loginOtp: string = '';
+  isVerifyingLoginOtp: boolean = false;
+  isResendingLoginOtp: boolean = false;
 
   // Messages
   errorMessage: string = '';
@@ -210,6 +214,13 @@ export class User implements OnInit, OnDestroy {
       this.router.navigate(['/website/userdashboard']);
     }
   }
+
+  private showSavingsLoginOtp(response: any) {
+    this.loginOtpChallengeId = response.challengeId;
+    this.loginOtp = '';
+    this.successMessage = `OTP sent to ${response.maskedEmail || 'your registered email'}.`;
+    this.errorMessage = '';
+  }
   
   authenticateWithGraphicalPassword() {
     // Normalize email to lowercase and trim
@@ -230,8 +241,10 @@ export class User implements OnInit, OnDestroy {
     }).subscribe({
       next: (authResponse: any) => {
         console.log('Graphical password authentication response:', authResponse);
-        
-        if (authResponse.requiresPasswordSetup) {
+
+        if (authResponse.requiresOtp && authResponse.challengeId) {
+          this.showSavingsLoginOtp(authResponse);
+        } else if (authResponse.requiresPasswordSetup) {
           // New password setup required for newly approved accounts
           this.successMessage = authResponse.message || 'Your account has been approved. Please set up your password to proceed.';
           this.errorMessage = '';
@@ -574,8 +587,10 @@ export class User implements OnInit, OnDestroy {
       next: (authResponse: any) => {
         this.isUnifiedLoggingIn = false;
         console.log('Authentication response:', authResponse);
-        
-        if (authResponse.requiresPasswordSetup) {
+
+        if (authResponse.requiresOtp && authResponse.challengeId) {
+          this.showSavingsLoginOtp(authResponse);
+        } else if (authResponse.requiresPasswordSetup) {
           // New password setup required for newly approved accounts
           this.successMessage = authResponse.message || 'Your account has been approved. Please set up your password to proceed.';
           this.errorMessage = '';
@@ -688,6 +703,70 @@ export class User implements OnInit, OnDestroy {
         this.alertService.userError('Login Failed', this.errorMessage);
       }
     });
+  }
+
+  verifySavingsLoginOtp() {
+    if (!this.loginOtpChallengeId || !/^\d{6}$/.test(this.loginOtp.trim())) {
+      this.errorMessage = 'Enter the 6-digit OTP sent to your email.';
+      return;
+    }
+    this.isVerifyingLoginOtp = true;
+    this.http.post(`${environment.apiBaseUrl}/api/users/verify-otp`, {
+      challengeId: this.loginOtpChallengeId,
+      otp: this.loginOtp.trim()
+    }).subscribe({
+      next: (response: any) => {
+        this.isVerifyingLoginOtp = false;
+        if (!response.success || !response.user) {
+          this.errorMessage = response.message || 'OTP verification failed.';
+          return;
+        }
+        const user = response.user;
+        sessionStorage.setItem('currentUser', JSON.stringify({
+          id: user.id,
+          name: user.account?.name || user.username,
+          email: user.email,
+          accountNumber: user.accountNumber,
+          status: user.status,
+          passwordSet: user.passwordSet === true,
+          authToken: response.token,
+          loginTime: new Date().toISOString()
+        }));
+        this.loginOtpChallengeId = null;
+        this.loginOtp = '';
+        this.alertService.userSuccess('Login Successful', `Welcome ${user.account?.name || user.username}!`);
+        this.navigateAfterUserLogin();
+      },
+      error: (err: any) => {
+        this.isVerifyingLoginOtp = false;
+        this.errorMessage = err.error?.message || 'OTP verification failed.';
+      }
+    });
+  }
+
+  resendSavingsLoginOtp() {
+    if (!this.loginOtpChallengeId || this.isResendingLoginOtp) return;
+    this.isResendingLoginOtp = true;
+    this.http.post(`${environment.apiBaseUrl}/api/users/login/resend-otp`, {
+      challengeId: this.loginOtpChallengeId
+    }).subscribe({
+      next: (response: any) => {
+        this.isResendingLoginOtp = false;
+        this.successMessage = response.message || 'A new OTP was sent.';
+        this.errorMessage = '';
+      },
+      error: (err: any) => {
+        this.isResendingLoginOtp = false;
+        this.errorMessage = err.error?.message || 'Could not resend OTP.';
+      }
+    });
+  }
+
+  cancelSavingsLoginOtp() {
+    this.loginOtpChallengeId = null;
+    this.loginOtp = '';
+    this.successMessage = '';
+    this.errorMessage = '';
   }
 
   proceedToPasswordSetup() {
@@ -1713,7 +1792,9 @@ export class User implements OnInit, OnDestroy {
     
     this.http.post(`${environment.apiBaseUrl}/api/users/complete-qr-login`, loginData).subscribe({
       next: (response: any) => {
-        if (response.success && response.user) {
+        if (response.requiresOtp && response.challengeId) {
+          this.showSavingsLoginOtp(response);
+        } else if (response.success && response.user) {
           // Login successful
           const userData = response.user;
           

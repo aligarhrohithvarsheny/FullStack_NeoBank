@@ -22,6 +22,34 @@
 }
 .transfer-container h3 { color: #0f766e; margin-bottom: 14px; font-weight: 600; }
 
+.otp-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.58);
+}
+
+.otp-modal {
+  position: relative;
+  width: min(100%, 420px);
+  padding: 28px;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.24);
+}
+
+.otp-modal h3 { margin: 0 32px 8px 0; }
+.otp-modal p { color: #475569; line-height: 1.5; }
+.otp-modal label { display: block; margin: 18px 0 6px; font-weight: 600; }
+.otp-modal input { width: 100%; box-sizing: border-box; padding: 12px; border: 1px solid #94a3b8; border-radius: 6px; font-size: 20px; text-align: center; letter-spacing: 4px; }
+.otp-modal .otp-countdown { margin: 8px 0 0; font-size: 13px; }
+.otp-modal-close { position: absolute; top: 12px; right: 14px; border: 0; background: transparent; color: #475569; font-size: 24px; cursor: pointer; }
+.otp-modal-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
+.otp-modal-actions button { flex: 1 1 150px; }
+
 /* Balance Card */
 .balance-card {
   display: flex; align-items: center; justify-content: space-between;

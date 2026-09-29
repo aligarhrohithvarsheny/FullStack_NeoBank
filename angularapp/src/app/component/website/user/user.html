@@ -31,6 +31,7 @@
           Savings, Current or Salary — sign in with your Account Number / Email
         </p>
 
+        <ng-container *ngIf="!loginOtpChallengeId; else savingsLoginOtp">
         <div class="jpm-field">
           <label class="jpm-label">Username</label>
           <input
@@ -74,6 +75,21 @@
         >
           {{ isUnifiedLoggingIn ? 'Signing in...' : 'Sign in' }}
         </button>
+        </ng-container>
+        <ng-template #savingsLoginOtp>
+          <div class="jpm-field">
+            <label class="jpm-label" for="savings-login-otp">Email OTP</label>
+            <input id="savings-login-otp" type="text" class="jpm-input" [(ngModel)]="loginOtp" name="loginOtp" inputmode="numeric" autocomplete="one-time-code" maxlength="6" (keyup.enter)="verifySavingsLoginOtp()" />
+          </div>
+          <button type="button" class="jpm-signin-btn" (click)="verifySavingsLoginOtp()" [disabled]="isVerifyingLoginOtp">
+            {{ isVerifyingLoginOtp ? 'Verifying...' : 'Verify OTP' }}
+          </button>
+          <div class="jpm-more-options">
+            <a href="javascript:void(0)" (click)="resendSavingsLoginOtp()" class="jpm-link">{{ isResendingLoginOtp ? 'Sending...' : 'Resend OTP' }}</a>
+            <span class="jpm-separator">|</span>
+            <a href="javascript:void(0)" (click)="cancelSavingsLoginOtp()" class="jpm-link">Back to sign in</a>
+          </div>
+        </ng-template>
         <div class="jpm-qr-login-actions">
           <button type="button" class="jpm-link-small" (click)="generateQrCode()">Show QR Login Code</button>
           <label class="jpm-link-small">Scan Login QR<input type="file" accept="image/*" (change)="scanLoginQr($event)" hidden /></label>

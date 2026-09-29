@@ -100,6 +100,8 @@ export class Transferfunds implements OnInit {
   otpSending: boolean = false;
   verifyingOtp: boolean = false;
   resendCount: number = 0;
+  pendingTransferData: any = null;
+  otpResendAvailableAt: number = 0;
 
   constructor(
     private router: Router, 
@@ -534,7 +536,7 @@ export class Transferfunds implements OnInit {
 
     // Show loading state
     this.transactionSuccess = false;
-    this.successMessage = 'Processing transfer...';
+    this.successMessage = 'Sending verification code...';
 
     // Create transfer data for backend (deviceInfo for fraud detection)
     const transferData = {
@@ -548,56 +550,37 @@ export class Transferfunds implements OnInit {
       description: `${this.transferType} Transfer to ${this.recipientName}`,
       deviceInfo: isPlatformBrowser(this.platformId) ? (navigator.userAgent || 'Unknown') : undefined
     };
-    // NOTE: OTP-based transfer flow is not yet implemented on the backend.
-    // For now, send transfer request directly to the backend.
-    this.http.post(`${environment.apiBaseUrl}/api/transfers`, transferData).subscribe({
-      next: (response: any) => {
-        console.log('Transfer successful:', response);
-        
-        // Create transfer record for local history (must use backend id for cancel/receipt)
-        const now = new Date().toISOString();
-        const backendId = response.id ?? response.transfer?.id;
-        const newTransfer: TransferRecord = {
-          id: (backendId != null && Number.isFinite(Number(backendId))) ? Number(backendId) : Date.now(),
-          transferId: response.transfer?.transferId || 'TRF' + Date.now() + Math.floor(Math.random() * 1000),
-          senderAccountNumber: this.userProfile.accountNumber,
-          senderName: this.userProfile.name,
-          recipientAccountNumber: this.recipientAccountNumber,
-          recipientName: this.recipientName,
-          phone: this.phone,
-          ifsc: this.ifsc,
-          amount: this.amount,
-          transferType: this.transferType,
-          status: 'Completed',
-          date: now,
-          createdAt: now,
-          updatedAt: now,
-          isCancellable: true
-        };
+    this.pendingTransferData = transferData;
+    this.sendOtpForTransfer(transferData);
+  }
 
-        // Add to transfer history
-        this.transfers.unshift(newTransfer);
-        this.saveTransferHistory();
-
-        // Update balance from response
-        if (response.newBalance !== undefined) {
-          this.currentBalance = response.newBalance;
-        }
-
-        // Show success message with timestamp
-        this.alertService.transferSuccess(newTransfer.amount, newTransfer.recipientName);
-        this.showSuccessMessage(newTransfer);
-
-        // Reset form
-        this.resetForm();
-      },
-      error: (err: any) => {
-        console.error('Transfer failed:', err);
-        this.alertService.transferError(err.error?.message || 'Unknown error');
-        this.transactionSuccess = false;
-        this.successMessage = '';
-      }
-    });
+  private handleTransferSuccess(response: any) {
+    const now = new Date().toISOString();
+    const backendId = response.id ?? response.transfer?.id;
+    const newTransfer: TransferRecord = {
+      id: (backendId != null && Number.isFinite(Number(backendId))) ? Number(backendId) : Date.now(),
+      transferId: response.transfer?.transferId || 'TRF' + Date.now() + Math.floor(Math.random() * 1000),
+      senderAccountNumber: this.userProfile.accountNumber,
+      senderName: this.userProfile.name,
+      recipientAccountNumber: this.recipientAccountNumber,
+      recipientName: this.recipientName,
+      phone: this.phone,
+      ifsc: this.ifsc,
+      amount: this.amount,
+      transferType: this.transferType,
+      status: response.transfer?.status === 'Pending' ? 'Pending' : 'Completed',
+      date: now,
+      createdAt: now,
+      updatedAt: now,
+      isCancellable: true
+    };
+    this.transfers.unshift(newTransfer);
+    this.saveTransferHistory();
+    if (response.newBalance !== undefined) this.currentBalance = response.newBalance;
+    this.alertService.transferSuccess(newTransfer.amount, newTransfer.recipientName);
+    this.showSuccessMessage(newTransfer);
+    this.pendingTransferData = null;
+    this.resetForm();
   }
 
   // OTP helpers
@@ -616,6 +599,7 @@ export class Transferfunds implements OnInit {
           this.showOtpModal = true;
           this.startOtpTimer(120); // 2 minutes
           this.resendCount = 0;
+          this.otpResendAvailableAt = Date.now() + 30_000;
         } else {
           this.alertService.transferError(res.message || 'Failed to send OTP');
         }
@@ -640,8 +624,7 @@ export class Transferfunds implements OnInit {
   }
 
   resendOtp(transferData?: any) {
-    if (this.otpTimer > 0 && this.resendCount >= 1) {
-      // prevent frequent resends
+    if (Date.now() < this.otpResendAvailableAt) {
       this.alertService.transferValidationError('Please wait before resending OTP');
       return;
     }
@@ -655,6 +638,7 @@ export class Transferfunds implements OnInit {
         if (res && (res.success || res.otpTxnId)) {
           this.otpSent = true;
           this.startOtpTimer(120);
+          this.otpResendAvailableAt = Date.now() + 30_000;
         } else {
           this.alertService.transferError(res.message || 'Failed to resend OTP');
         }
@@ -683,63 +667,24 @@ export class Transferfunds implements OnInit {
       next: (res: any) => {
         this.verifyingOtp = false;
         if (res && res.success) {
-          // Proceed to perform actual transfer with confirmation reference
-          const confirmedTransfer = transferData || (res.transferData || {});
-          if (!confirmedTransfer || Object.keys(confirmedTransfer).length === 0) {
-            // If transferData not supplied, ask backend to complete with txnId
-            this.http.post(`${environment.apiBaseUrl}/api/transfers/complete`, { txnId: this.otpTxnId }).subscribe({
-              next: (resp: any) => {
-                this.showOtpModal = false;
-                this.otpSent = false;
-                this.otpTxnId = null;
-                this.alertService.transferSuccess(resp.amount || 0, resp.recipientName || '');
-                this.loadCurrentBalance();
-              },
-              error: (err: any) => {
-                console.error('Error completing transfer:', err);
-                this.alertService.transferError(err.error?.message || 'Transfer failed after OTP');
-              }
-            });
-          } else {
-            // Call regular transfer endpoint with otpTxnId reference
-            confirmedTransfer.otpTxnId = this.otpTxnId;
-            this.http.post(`${environment.apiBaseUrl}/api/transfers`, confirmedTransfer).subscribe({
-              next: (response: any) => {
-                this.showOtpModal = false;
-                this.otpSent = false;
-                this.otpTxnId = null;
-                const now = new Date().toISOString();
-                const backendId = response.id ?? response.transfer?.id;
-                const newTransfer: TransferRecord = {
-                  id: (backendId != null && Number.isFinite(Number(backendId))) ? Number(backendId) : Date.now(),
-                  transferId: response.transfer?.transferId || 'TRF' + Date.now() + Math.floor(Math.random() * 1000),
-                  senderAccountNumber: this.userProfile.accountNumber,
-                  senderName: this.userProfile.name,
-                  recipientAccountNumber: this.recipientAccountNumber,
-                  recipientName: this.recipientName,
-                  phone: this.phone,
-                  ifsc: this.ifsc,
-                  amount: this.amount,
-                  transferType: this.transferType,
-                  status: 'Completed',
-                  date: now,
-                  createdAt: now,
-                  updatedAt: now,
-                  isCancellable: true
-                };
-                this.transfers.unshift(newTransfer);
-                this.saveTransferHistory();
-                if (response.newBalance !== undefined) this.currentBalance = response.newBalance;
-                this.alertService.transferSuccess(newTransfer.amount, newTransfer.recipientName);
-                this.showSuccessMessage(newTransfer);
-                this.resetForm();
-              },
-              error: (err: any) => {
-                console.error('Transfer failed after OTP:', err);
-                this.alertService.transferError(err.error?.message || 'Transfer failed');
-              }
-            });
+          const confirmedTransfer = transferData || this.pendingTransferData;
+          if (!confirmedTransfer) {
+            this.alertService.transferError('Transfer details are missing. Please start again.');
+            return;
           }
+          confirmedTransfer.otpTxnId = this.otpTxnId;
+          this.http.post(`${environment.apiBaseUrl}/api/transfers`, confirmedTransfer).subscribe({
+            next: (response: any) => {
+              this.showOtpModal = false;
+              this.otpSent = false;
+              this.otpTxnId = null;
+              this.handleTransferSuccess(response);
+            },
+            error: (err: any) => {
+              console.error('Transfer failed after OTP:', err);
+              this.alertService.transferError(err.error?.message || 'Transfer failed');
+            }
+          });
         } else {
           this.alertService.transferError(res.message || 'OTP verification failed');
         }
@@ -750,6 +695,16 @@ export class Transferfunds implements OnInit {
         this.alertService.transferError(err.error?.message || 'OTP verification failed');
       }
     });
+  }
+
+  cancelTransferOtp() {
+    this.showOtpModal = false;
+    this.otpSent = false;
+    this.otpTxnId = null;
+    this.otpCode = '';
+    this.pendingTransferData = null;
+    this.otpResendAvailableAt = 0;
+    this.successMessage = '';
   }
 
   createTransferTransaction(transfer: TransferRecord) {

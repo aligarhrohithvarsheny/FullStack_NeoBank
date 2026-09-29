@@ -289,4 +289,23 @@
     <h4>No Transfer History</h4>
     <p>You haven't made any transfers yet. Use the form above to send money.</p>
   </div>
+
+  <div class="otp-modal-backdrop" *ngIf="showOtpModal" (click)="cancelTransferOtp()">
+    <section class="otp-modal" role="dialog" aria-modal="true" aria-labelledby="transfer-otp-title" (click)="$event.stopPropagation()">
+      <button type="button" class="otp-modal-close" aria-label="Close" (click)="cancelTransferOtp()">&times;</button>
+      <h3 id="transfer-otp-title">Confirm transfer</h3>
+      <p>Enter the 6-digit OTP sent to your registered email to authorize this transfer.</p>
+      <label for="transfer-otp-code">Email OTP</label>
+      <input id="transfer-otp-code" type="text" [(ngModel)]="otpCode" name="transferOtp" inputmode="numeric" autocomplete="one-time-code" maxlength="6" />
+      <p class="otp-countdown" *ngIf="otpTimer > 0">Code expires in {{ otpTimer }} seconds</p>
+      <div class="otp-modal-actions">
+        <button type="button" class="transfer-btn" (click)="verifyOtpAndTransfer()" [disabled]="verifyingOtp || otpCode.length !== 6">
+          {{ verifyingOtp ? 'Verifying...' : 'Verify and transfer' }}
+        </button>
+        <button type="button" class="reset-btn" (click)="resendOtp()" [disabled]="otpSending || otpTimer > 90">
+          {{ otpSending ? 'Sending...' : 'Resend OTP' }}
+        </button>
+      </div>
+    </section>
+  </div>
 </div>

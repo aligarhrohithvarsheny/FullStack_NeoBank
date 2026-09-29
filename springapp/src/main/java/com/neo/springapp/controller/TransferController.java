@@ -7,6 +7,8 @@ import com.neo.springapp.service.TransactionService;
 import com.neo.springapp.service.PdfService;
 import com.neo.springapp.service.FraudDetectionService;
 import com.neo.springapp.service.AiSecurityService;
+import com.neo.springapp.service.OtpService;
+import com.neo.springapp.service.UserService;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -18,6 +20,9 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
+import java.util.Objects;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -32,14 +37,123 @@ public class TransferController {
     private final PdfService pdfService;
     private final FraudDetectionService fraudDetectionService;
     private final AiSecurityService aiSecurityService;
+    private final OtpService otpService;
+    private final UserService userService;
+    private final Map<String, PendingTransferOtp> pendingTransferOtps = new ConcurrentHashMap<>();
 
-    public TransferController(TransferService transferService, AccountService accountService, TransactionService transactionService, PdfService pdfService, FraudDetectionService fraudDetectionService, AiSecurityService aiSecurityService) {
+    private static class PendingTransferOtp {
+        private final Map<String, Object> transferData;
+        private long expiresAt;
+        private long lastSentAt;
+        private int resendCount;
+        private volatile boolean verified;
+        private int attempts;
+
+        private PendingTransferOtp(Map<String, Object> transferData) {
+            this.transferData = new HashMap<>(transferData);
+            this.lastSentAt = System.currentTimeMillis();
+            this.expiresAt = this.lastSentAt + 2 * 60 * 1000;
+        }
+    }
+
+    public TransferController(TransferService transferService, AccountService accountService, TransactionService transactionService, PdfService pdfService, FraudDetectionService fraudDetectionService, AiSecurityService aiSecurityService, OtpService otpService, UserService userService) {
         this.transferService = transferService;
         this.accountService = accountService;
         this.transactionService = transactionService;
         this.pdfService = pdfService;
         this.fraudDetectionService = fraudDetectionService;
         this.aiSecurityService = aiSecurityService;
+        this.otpService = otpService;
+        this.userService = userService;
+    }
+
+    @PostMapping("/send-otp")
+    public ResponseEntity<Map<String, Object>> sendTransferOtp(@RequestBody Map<String, Object> transferData) {
+        String senderAccountNumber = Objects.toString(transferData.get("senderAccountNumber"), "").trim();
+        String recipientAccountNumber = Objects.toString(transferData.get("recipientAccountNumber"), "").trim();
+        Object amountValue = transferData.get("amount");
+        if (senderAccountNumber.isEmpty() || recipientAccountNumber.isEmpty() || amountValue == null) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Sender, recipient, and amount are required."));
+        }
+
+        try {
+            double amount = Double.parseDouble(amountValue.toString());
+            if (!Double.isFinite(amount) || amount <= 0) {
+                return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Enter a valid transfer amount."));
+            }
+        } catch (NumberFormatException e) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Enter a valid transfer amount."));
+        }
+
+        var user = userService.getUserByAccountNumber(senderAccountNumber).orElse(null);
+        if (user == null || user.getEmail() == null || user.getEmail().isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Registered email not found for this savings account."));
+        }
+        var account = accountService.getAccountByNumber(senderAccountNumber);
+        if (account == null || "CLOSED".equalsIgnoreCase(account.getStatus())) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "This sender account cannot make transfers."));
+        }
+
+        String txnId = UUID.randomUUID().toString();
+        try {
+            otpService.sendOtpForKey(user.getEmail(), "TRANSFER:" + txnId, "Fund transfer confirmation");
+            pendingTransferOtps.put(txnId, new PendingTransferOtp(transferData));
+            return ResponseEntity.ok(Map.of("success", true, "otpTxnId", txnId, "message", "A transfer verification code was sent to your registered email."));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("success", false, "message", "Unable to send transfer OTP. Please try again."));
+        }
+    }
+
+    @PostMapping("/resend-otp")
+    public ResponseEntity<Map<String, Object>> resendTransferOtp(@RequestBody Map<String, String> request) {
+        String txnId = request.get("txnId");
+        PendingTransferOtp pending = txnId == null ? null : pendingTransferOtps.get(txnId);
+        if (pending == null || System.currentTimeMillis() > pending.expiresAt) {
+            if (txnId != null) pendingTransferOtps.remove(txnId);
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Transfer OTP expired. Please start the transfer again."));
+        }
+        String senderAccountNumber = Objects.toString(pending.transferData.get("senderAccountNumber"), "");
+        var user = userService.getUserByAccountNumber(senderAccountNumber).orElse(null);
+        if (user == null || user.getEmail() == null) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Registered email not found for this account."));
+        }
+        synchronized (pending) {
+            long now = System.currentTimeMillis();
+            if (pending.resendCount >= 3 || now - pending.lastSentAt < 30_000) {
+                return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Please wait before requesting another OTP."));
+            }
+            try {
+                otpService.sendOtpForKey(user.getEmail(), "TRANSFER:" + txnId, "Fund transfer confirmation");
+                pending.verified = false;
+                pending.attempts = 0;
+                pending.lastSentAt = now;
+                pending.expiresAt = now + 2 * 60 * 1000;
+                pending.resendCount++;
+                return ResponseEntity.ok(Map.of("success", true, "otpTxnId", txnId, "message", "A new transfer OTP was sent."));
+            } catch (Exception e) {
+                return ResponseEntity.internalServerError().body(Map.of("success", false, "message", "Unable to resend transfer OTP."));
+            }
+        }
+    }
+
+    @PostMapping("/confirm-otp")
+    public ResponseEntity<Map<String, Object>> confirmTransferOtp(@RequestBody Map<String, String> request) {
+        String txnId = request.get("txnId");
+        String otp = request.get("otp");
+        PendingTransferOtp pending = txnId == null ? null : pendingTransferOtps.get(txnId);
+        if (pending == null || System.currentTimeMillis() > pending.expiresAt) {
+            if (txnId != null) pendingTransferOtps.remove(txnId);
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Transfer OTP expired. Please start the transfer again."));
+        }
+        synchronized (pending) {
+            if (pending.attempts >= 5 || otp == null || !otp.matches("\\d{6}") || !otpService.verifyOtpByKey("TRANSFER:" + txnId, otp)) {
+                pending.attempts++;
+                if (pending.attempts >= 5) pendingTransferOtps.remove(txnId, pending);
+                return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Invalid or expired transfer OTP."));
+            }
+            pending.verified = true;
+        }
+        return ResponseEntity.ok(Map.of("success", true, "message", "Transfer OTP verified."));
     }
 
     // Create new transfer
@@ -48,6 +162,12 @@ public class TransferController {
             @RequestBody Map<String, Object> transferData,
             @RequestHeader(value = "X-Forwarded-For", required = false) String forwardedFor) {
         try {
+            String otpTxnId = Objects.toString(transferData.get("otpTxnId"), "");
+            PendingTransferOtp pendingOtp = pendingTransferOtps.get(otpTxnId);
+            if (pendingOtp == null || !pendingOtp.verified || System.currentTimeMillis() > pendingOtp.expiresAt || !matchesTransfer(pendingOtp.transferData, transferData)) {
+                return ResponseEntity.badRequest().body(Map.of("error", "A valid OTP confirmation is required for this transfer."));
+            }
+
             // Extract transfer data
             String senderAccountNumber = (String) transferData.get("senderAccountNumber");
             String recipientAccountNumber = (String) transferData.get("recipientAccountNumber");
@@ -120,6 +240,10 @@ public class TransferController {
                 }
             } catch (Exception aiEx) {
                 System.err.println("AI Security transaction analysis error: " + aiEx.getMessage());
+            }
+
+            if (!pendingTransferOtps.remove(otpTxnId, pendingOtp)) {
+                return ResponseEntity.badRequest().body(Map.of("error", "This OTP confirmation has already been used."));
             }
 
             // Create transfer record
@@ -273,6 +397,20 @@ public class TransferController {
             Map<String, Object> errorResponse = new HashMap<>();
             errorResponse.put("error", "Transfer failed: " + e.getMessage());
             return ResponseEntity.internalServerError().body(errorResponse);
+        }
+    }
+
+    private boolean matchesTransfer(Map<String, Object> expected, Map<String, Object> submitted) {
+        String[] fields = {"senderAccountNumber", "recipientAccountNumber", "recipientName", "phone", "ifsc", "transferType"};
+        for (String field : fields) {
+            if (!Objects.equals(Objects.toString(expected.get(field), ""), Objects.toString(submitted.get(field), ""))) {
+                return false;
+            }
+        }
+        try {
+            return Double.compare(Double.parseDouble(expected.get("amount").toString()), Double.parseDouble(submitted.get("amount").toString())) == 0;
+        } catch (Exception e) {
+            return false;
         }
     }
 
