@@ -415,6 +415,48 @@ public class SalaryAccountService {
 
     // ─── Salary Credit (simulate monthly salary) ──────────────
 
+    @org.springframework.transaction.annotation.Transactional
+    public SalaryTransaction processAdminCashTransaction(Long accountId, String operationType, Double amount, String description) {
+        if (amount == null || amount <= 0) {
+            throw new IllegalArgumentException("Amount must be greater than zero");
+        }
+        if (operationType == null || !("DEPOSIT".equalsIgnoreCase(operationType) || "WITHDRAWAL".equalsIgnoreCase(operationType))) {
+            throw new IllegalArgumentException("Operation type must be DEPOSIT or WITHDRAWAL");
+        }
+
+        SalaryAccount account = salaryAccountRepository.findById(accountId)
+                .orElseThrow(() -> new IllegalArgumentException("Salary account not found"));
+        if (!"Active".equalsIgnoreCase(account.getStatus())) {
+            throw new IllegalStateException("Salary account is not active");
+        }
+
+        double previousBalance = account.getBalance() != null ? account.getBalance() : 0.0;
+        boolean deposit = "DEPOSIT".equalsIgnoreCase(operationType);
+        if (!deposit && previousBalance < amount) {
+            throw new IllegalStateException("Insufficient balance for withdrawal");
+        }
+        double newBalance = deposit ? previousBalance + amount : previousBalance - amount;
+
+        account.setBalance(newBalance);
+        account.setUpdatedAt(LocalDateTime.now());
+        salaryAccountRepository.save(account);
+
+        SalaryTransaction transaction = new SalaryTransaction();
+        transaction.setSalaryAccountId(account.getId());
+        transaction.setAccountNumber(account.getAccountNumber());
+        transaction.setSalaryAmount(amount);
+        transaction.setCreditDate(LocalDateTime.now());
+        transaction.setCompanyName(account.getCompanyName());
+        transaction.setDescription(description == null || description.isBlank()
+                ? "Admin " + (deposit ? "Deposit" : "Withdrawal") : description);
+        transaction.setType(deposit ? "Credit" : "Debit");
+        transaction.setPreviousBalance(previousBalance);
+        transaction.setNewBalance(newBalance);
+        transaction.setStatus("Success");
+        transaction.setCreatedAt(LocalDateTime.now());
+        return salaryTransactionRepository.save(transaction);
+    }
+
     public SalaryTransaction creditSalary(Long accountId) {
         Optional<SalaryAccount> opt = salaryAccountRepository.findById(accountId);
         if (opt.isEmpty()) return null;

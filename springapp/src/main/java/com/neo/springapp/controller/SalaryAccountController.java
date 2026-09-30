@@ -209,6 +209,28 @@ public class SalaryAccountController {
 
     // ─── Salary Credit ──────────────────────────────────────
 
+    @PostMapping("/admin-cash-transaction/{id}")
+    public ResponseEntity<Map<String, Object>> processAdminCashTransaction(
+            @PathVariable Long id,
+            @RequestBody Map<String, Object> body) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            String operationType = body.get("operationType") != null ? body.get("operationType").toString() : null;
+            Double amount = body.get("amount") != null ? Double.valueOf(body.get("amount").toString()) : null;
+            String description = body.get("description") != null ? body.get("description").toString() : null;
+            SalaryTransaction transaction = salaryAccountService.processAdminCashTransaction(id, operationType, amount, description);
+            response.put("success", true);
+            response.put("message", "Salary account balance updated");
+            response.put("balance", transaction.getNewBalance());
+            response.put("transaction", transaction);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
+
     @PostMapping("/credit-salary/{id}")
     public ResponseEntity<Map<String, Object>> creditSalary(@PathVariable Long id) {
         Map<String, Object> response = new HashMap<>();

@@ -3002,30 +3002,31 @@ export class Dashboard implements OnInit, OnDestroy {
   }
 
   processSalaryAccountTransaction(accountNumber: string, userName: string, currentBalance: number) {
-    const newBalance = this.operationType === 'deposit'
-      ? currentBalance + this.amount
-      : currentBalance - this.amount;
-
-    if (this.operationType === 'withdrawal' && newBalance < 0) {
-      this.errorMessage = 'Insufficient balance for withdrawal';
+    const accountId = this.verifiedAccountDetails?.accountId;
+    if (!accountId) {
+      this.errorMessage = 'Could not identify the salary account. Verify the account and try again.';
       this.successMessage = '';
       return;
     }
 
-    const accountId = this.verifiedAccountDetails?.accountId;
-    if (accountId) {
-      // Update balance via the update endpoint
-      this.http.put(`${environment.apiBaseUrl}/api/salary-accounts/update/${accountId}`, { balance: newBalance }).subscribe({
-        next: () => {
-          this.completeTransaction(accountNumber, userName, newBalance, 'salary');
-        },
-        error: () => {
-          this.completeTransaction(accountNumber, userName, newBalance, 'salary');
+    this.http.post<any>(`${environment.apiBaseUrl}/api/salary-accounts/admin-cash-transaction/${accountId}`, {
+      operationType: this.operationType === 'deposit' ? 'DEPOSIT' : 'WITHDRAWAL',
+      amount: this.amount,
+      description: this.description
+    }).subscribe({
+      next: (response) => {
+        if (response?.success !== true || typeof response.balance !== 'number') {
+          this.errorMessage = response?.message || 'Failed to update salary account balance';
+          this.successMessage = '';
+          return;
         }
-      });
-    } else {
-      this.completeTransaction(accountNumber, userName, newBalance, 'salary');
-    }
+        this.completeTransaction(accountNumber, userName, response.balance, 'salary');
+      },
+      error: (err: any) => {
+        this.errorMessage = err.error?.message || err.error?.details || 'Failed to update salary account balance';
+        this.successMessage = '';
+      }
+    });
   }
 
   processCurrentAccountTransaction(accountNumber: string, userName: string, currentBalance: number) {
