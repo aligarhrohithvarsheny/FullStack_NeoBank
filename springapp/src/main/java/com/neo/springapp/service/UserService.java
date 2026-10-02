@@ -7,12 +7,14 @@ import com.neo.springapp.model.GoldLoan;
 import com.neo.springapp.model.Loan;
 import com.neo.springapp.model.Card;
 import com.neo.springapp.model.EducationLoanSubsidyClaim;
+import com.neo.springapp.model.UserEmailHistory;
 import com.neo.springapp.repository.CreditCardRepository;
 import com.neo.springapp.repository.GoldLoanRepository;
 import com.neo.springapp.repository.LoanRepository;
 import com.neo.springapp.repository.ChequeRepository;
 import com.neo.springapp.repository.CardRepository;
 import com.neo.springapp.repository.EducationLoanSubsidyClaimRepository;
+import com.neo.springapp.repository.UserEmailHistoryRepository;
 import com.neo.springapp.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -54,6 +56,9 @@ public class UserService {
 
     @Autowired
     private EducationLoanSubsidyClaimRepository educationLoanSubsidyClaimRepository;
+
+    @Autowired
+    private UserEmailHistoryRepository userEmailHistoryRepository;
 
     @Autowired
     private EmailService emailService;
@@ -444,6 +449,7 @@ public class UserService {
                     if (!isEmailUnique(userDetails.getEmail(), user.getId())) {
                         throw new RuntimeException("Email already exists. Please use a different email.");
                     }
+                    retireEmail(user.getId(), currentNorm);
                     user.setEmail(newNorm);
                 }
             }
@@ -481,18 +487,26 @@ public class UserService {
     }
 
     /**
-     * True if no other user holds this email (case-insensitive).
+     * True if no other user holds this email (case-insensitive) AND it was never
+     * previously used (and then changed away from) by anyone.
      */
     public boolean isEmailUnique(String email) {
         String normalized = normalizeEmail(email);
         if (normalized == null) {
             return false;
         }
-        return userRepository.findByEmailIgnoreCase(normalized).isEmpty();
+        if (userRepository.findByEmailIgnoreCase(normalized).isPresent()) {
+            return false;
+        }
+        // Block reuse of a retired email - once an account has used an email and
+        // changed away from it, nobody else may claim it for a new account.
+        return !userEmailHistoryRepository.existsByEmailIgnoreCase(normalized);
     }
 
     /**
      * True if the email is free for this user to use (ignores row belonging to {@code excludeUserId}).
+     * A retired email is only available again to the same user it was originally retired from
+     * (e.g. switching back to a previous email); it remains blocked for everyone else.
      */
     public boolean isEmailUnique(String email, Long excludeUserId) {
         String normalized = normalizeEmail(email);
@@ -500,7 +514,31 @@ public class UserService {
             return false;
         }
         Optional<User> found = userRepository.findByEmailIgnoreCase(normalized);
-        return found.isEmpty() || found.get().getId().equals(excludeUserId);
+        if (found.isPresent()) {
+            return found.get().getId().equals(excludeUserId);
+        }
+        Optional<UserEmailHistory> retired = userEmailHistoryRepository.findByEmailIgnoreCase(normalized);
+        return retired.isEmpty() || retired.get().getUserId().equals(excludeUserId);
+    }
+
+    /**
+     * Archives {@code oldEmail} as permanently retired/owned by {@code userId} so that it
+     * can never be claimed by a different account, even after the user changes away from it.
+     * No-op if the email was already recorded (e.g. retired previously, then reclaimed by
+     * the same user and changed away from again).
+     */
+    public void retireEmail(Long userId, String oldEmail) {
+        String normalized = normalizeEmail(oldEmail);
+        if (userId == null || normalized == null) {
+            return;
+        }
+        if (userEmailHistoryRepository.existsByEmailIgnoreCase(normalized)) {
+            return;
+        }
+        UserEmailHistory history = new UserEmailHistory();
+        history.setUserId(userId);
+        history.setEmail(normalized);
+        userEmailHistoryRepository.save(history);
     }
 
     public boolean isPanUnique(String pan) {

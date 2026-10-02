@@ -125,8 +125,14 @@ export class UserService {
   }
 
   // Validation operations
-  validateEmail(email: string): Observable<{isUnique: boolean}> {
-    return this.http.get<{isUnique: boolean}>(`${this.apiUrl}/validate/email/${email}`);
+  // Pass excludeUserId when checking the CURRENT user's own email (e.g. unchanged value,
+  // or switching back to an email they previously had) so it isn't reported as taken.
+  validateEmail(email: string, excludeUserId?: number): Observable<{isUnique: boolean}> {
+    let params = new HttpParams();
+    if (excludeUserId != null) {
+      params = params.set('excludeUserId', excludeUserId.toString());
+    }
+    return this.http.get<{isUnique: boolean}>(`${this.apiUrl}/validate/email/${email}`, { params });
   }
 
   validatePan(pan: string): Observable<{isUnique: boolean}> {

@@ -1299,6 +1299,7 @@ public class UserController {
                 return ResponseEntity.badRequest().body(response);
             }
             
+            userService.retireEmail(user.getId(), normalizedCurrent);
             user.setEmail(normalizedNew);
             User updatedUser = userService.saveUser(user);
             
@@ -1531,10 +1532,18 @@ public class UserController {
     }
 
     // Validation endpoints
+    // Optional excludeUserId lets a logged-in user check their OWN email (e.g. re-submitting it
+    // unchanged, or switching back to a previously retired email of theirs) without being wrongly
+    // reported as taken. Omit it for anonymous/new-registration checks.
     @GetMapping("/validate/email/{email}")
-    public ResponseEntity<Map<String, Boolean>> validateEmail(@PathVariable String email) {
+    public ResponseEntity<Map<String, Boolean>> validateEmail(
+            @PathVariable String email,
+            @RequestParam(required = false) Long excludeUserId) {
         Map<String, Boolean> response = new HashMap<>();
-        response.put("isUnique", userService.isEmailUnique(email));
+        boolean isUnique = excludeUserId != null
+                ? userService.isEmailUnique(email, excludeUserId)
+                : userService.isEmailUnique(email);
+        response.put("isUnique", isUnique);
         return ResponseEntity.ok(response);
     }
 
@@ -2387,10 +2396,14 @@ public class UserController {
                     return ResponseEntity.badRequest().body(response);
                 }
                 String normalizedCurrent = UserService.normalizeEmail(user.getEmail());
-                if (!normalizedNew.equals(normalizedCurrent) && !userService.isEmailUnique(normalizedNew, user.getId())) {
+                boolean emailChanged = !normalizedNew.equals(normalizedCurrent);
+                if (emailChanged && !userService.isEmailUnique(normalizedNew, user.getId())) {
                     response.put("success", false);
                     response.put("message", "Email already exists");
                     return ResponseEntity.badRequest().body(response);
+                }
+                if (emailChanged) {
+                    userService.retireEmail(user.getId(), normalizedCurrent);
                 }
                 user.setEmail(normalizedNew);
             }
@@ -2716,6 +2729,7 @@ public class UserController {
                         response.put("message", "Email already in use by another account");
                         return ResponseEntity.badRequest().body(response);
                     }
+                    userService.retireEmail(user.getId(), currentNorm);
                     user.setEmail(newEmail);
                     changedFields.add("email");
                 }
