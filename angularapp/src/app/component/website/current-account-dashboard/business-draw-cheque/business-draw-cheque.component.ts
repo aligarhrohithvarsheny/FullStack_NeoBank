@@ -58,6 +58,7 @@ export class BusinessDrawChequeComponent implements OnInit {
 
   // Status colors
   statusColors: { [key in BusinessChequeStatus]: string } = {
+    'AWAITING_POSITIVE_PAY': '#f97316',
     'PENDING': '#f59e0b',
     'APPROVED': '#3b82f6',
     'COMPLETED': '#10b981',
@@ -586,6 +587,7 @@ export class BusinessDrawChequeComponent implements OnInit {
 
   getStatusText(status: BusinessChequeStatus): string {
     const statusMap: { [key in BusinessChequeStatus]: string } = {
+      'AWAITING_POSITIVE_PAY': 'Awaiting Positive Pay',
       'PENDING': 'Awaiting Approval',
       'APPROVED': 'Approved',
       'COMPLETED': 'Processed',

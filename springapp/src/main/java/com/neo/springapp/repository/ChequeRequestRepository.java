@@ -17,6 +17,11 @@ public interface ChequeRequestRepository extends JpaRepository<ChequeRequest, Lo
     
     // Find by status
     Page<ChequeRequest> findByStatusOrderByCreatedAtDesc(String status, Pageable pageable);
+
+        Page<ChequeRequest> findByStatusNotOrderByCreatedAtDesc(String status, Pageable pageable);
+
+        Page<ChequeRequest> findByStatusNotAndChequeNumberContainingIgnoreCaseOrderByCreatedAtDesc(
+            String status, String chequeNumber, Pageable pageable);
     
     // Find by status and cheque number
     Page<ChequeRequest> findByStatusAndChequeNumberContainingIgnoreCaseOrderByCreatedAtDesc(

@@ -327,8 +327,9 @@
                     </span>
                   </td>
                   <td class="actions">
-                    <ng-container *ngIf="cheque.status === 'PENDING' && editingChequeId !== cheque.id">
+                    <ng-container *ngIf="(cheque.status === 'PENDING' || cheque.status === 'AWAITING_POSITIVE_PAY') && editingChequeId !== cheque.id">
                       <button
+                        *ngIf="cheque.status === 'PENDING'"
                         class="btn-icon btn-edit"
                         title="Edit Cheque Details"
                         (click)="startEditCheque(cheque)">

@@ -1,6 +1,6 @@
 // Cheque Draw System Models - Following Salary Dashboard Pattern
 
-export type ChequeStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'COMPLETED' | 'CANCELLED' | 'CLEARED';
+export type ChequeStatus = 'AWAITING_POSITIVE_PAY' | 'PENDING' | 'APPROVED' | 'REJECTED' | 'COMPLETED' | 'CANCELLED' | 'CLEARED';
 export type ChequeAction = 'VIEWED' | 'APPROVED' | 'REJECTED' | 'PICKED_UP' | 'CLEARED';
 
 // User-facing ChequeRequest (for Salary Dashboard)

@@ -63,17 +63,20 @@ public class AdminAccountApplicationController {
         Map<String, Object> response = new HashMap<>();
         try {
             // Validate uniqueness
-            if (!applicationService.isAadharAvailable(application.getAadharNumber())) {
+            if (!applicationService.isAadharAvailableForAccountType(
+                    application.getAadharNumber(), application.getAccountType())) {
                 response.put("success", false);
                 response.put("error", "Aadhaar number is already registered or has a pending application.");
                 return ResponseEntity.badRequest().body(response);
             }
-            if (!applicationService.isPanAvailable(application.getPanNumber())) {
+            boolean hasAnotherAccountType = applicationService.hasExistingAccountOfAnotherType(
+                    application.getAadharNumber(), application.getAccountType());
+            if (!hasAnotherAccountType && !applicationService.isPanAvailable(application.getPanNumber())) {
                 response.put("success", false);
                 response.put("error", "PAN number is already registered or has a pending application.");
                 return ResponseEntity.badRequest().body(response);
             }
-            if (!applicationService.isPhoneAvailable(application.getPhone())) {
+            if (!hasAnotherAccountType && !applicationService.isPhoneAvailable(application.getPhone())) {
                 response.put("success", false);
                 response.put("error", "Phone number is already registered or has a pending application.");
                 return ResponseEntity.badRequest().body(response);

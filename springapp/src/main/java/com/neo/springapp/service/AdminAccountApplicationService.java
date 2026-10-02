@@ -181,6 +181,20 @@ public class AdminAccountApplicationService {
                 && accountService.isAadharUnique(aadharNumber);
     }
 
+    public boolean isAadharAvailableForAccountType(String aadharNumber, String accountType) {
+        if (aadharNumber == null || accountType == null) return false;
+        Map<String, Object> existingAccounts = findExistingAccountsByAadhar(aadharNumber);
+        List<?> blockedTypes = (List<?>) existingAccounts.get("blockedTypes");
+        return !blockedTypes.contains(accountType);
+    }
+
+    public boolean hasExistingAccountOfAnotherType(String aadharNumber, String accountType) {
+        if (aadharNumber == null || accountType == null) return false;
+        Map<String, Object> existingAccounts = findExistingAccountsByAadhar(aadharNumber);
+        List<?> blockedTypes = (List<?>) existingAccounts.get("blockedTypes");
+        return blockedTypes.stream().anyMatch(type -> !accountType.equals(type));
+    }
+
     public boolean isPanAvailable(String panNumber) {
         return !applicationRepository.existsByPanNumberAndStatusNot(panNumber, "MANAGER_REJECTED")
                 && accountService.isPanUnique(panNumber);

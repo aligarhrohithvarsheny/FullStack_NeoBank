@@ -85,6 +85,10 @@ public class CurrentAccountService {
     // ==================== Account CRUD ====================
 
     public CurrentAccount createAccount(CurrentAccount account) {
+        if (account.getAadharNumber() != null && !account.getAadharNumber().isBlank()
+                && accountRepository.findByAadharNumber(account.getAadharNumber()) != null) {
+            throw new IllegalArgumentException("A current account already exists for this Aadhaar number. A new current account cannot be opened.");
+        }
         return accountRepository.save(account);
     }
 

@@ -104,10 +104,17 @@ export class Createaccount implements OnInit, OnDestroy {
   // Validation status for uniqueness checks
   aadharChecking = false;
   aadharExists = false;
+  aadharLookupMessage = '';
   panChecking = false;
   panExists = false;
   mobileChecking = false;
   mobileExists = false;
+  private aadharLookupTimer: ReturnType<typeof setTimeout> | null = null;
+  private blockedAccountTypes: string[] = [];
+  private existingAadharAccounts: any[] = [];
+  private uploadedCustomerMessage = '';
+  private lastAutofilledAadhar = '';
+  private autofilledValues: Record<string, any> = {};
 
   // PAN regex: 5 letters, 4 digits, 1 letter
   private panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]$/;
@@ -369,6 +376,7 @@ export class Createaccount implements OnInit, OnDestroy {
     this.form.get('accountType')?.valueChanges.subscribe(type => {
       this.selectedAccountType = type;
       this.updateAccountTypeValidators(type);
+      this.refreshAadharStatus();
     });
 
     // Listen for state changes to update cities
@@ -381,7 +389,14 @@ export class Createaccount implements OnInit, OnDestroy {
       if (aadhar && this.form.get('aadhar')?.valid && !this.form.get('aadhar')?.hasError('invalidAadhar') && !this.form.get('aadhar')?.hasError('invalidAadharChecksum')) {
         this.checkAadharUniqueness(aadhar);
       } else {
+        if (this.aadharLookupTimer) clearTimeout(this.aadharLookupTimer);
+        this.clearPreviousAutofill(aadhar || '');
         this.aadharExists = false;
+        this.blockedAccountTypes = [];
+        this.existingAadharAccounts = [];
+        this.uploadedCustomerMessage = '';
+        this.aadharChecking = false;
+        this.aadharLookupMessage = '';
       }
     });
 
@@ -647,31 +662,120 @@ export class Createaccount implements OnInit, OnDestroy {
 
   // Check Aadhar uniqueness
   checkAadharUniqueness(aadhar: string) {
-    if (!aadhar || aadhar.length !== 12) {
-      this.aadharExists = false;
-      return;
-    }
-
+    this.clearPreviousAutofill(aadhar);
+    if (this.aadharLookupTimer) clearTimeout(this.aadharLookupTimer);
     this.aadharChecking = true;
     this.aadharExists = false;
+    this.blockedAccountTypes = [];
+    this.existingAadharAccounts = [];
+    this.uploadedCustomerMessage = '';
+    this.aadharLookupMessage = 'Checking Aadhaar and looking up uploaded customer data...';
 
-    // Debounce: wait 500ms before making API call
-    setTimeout(() => {
-      if (this.form.get('aadhar')?.value === aadhar) {
-        this.http.get<{isUnique: boolean}>(`${environment.apiBaseUrl}/api/accounts/validate/aadhar/${aadhar}`).subscribe({
-          next: (response) => {
-            this.aadharExists = !response.isUnique;
-            this.aadharChecking = false;
-          },
-          error: (err) => {
-            console.error('Error checking Aadhar uniqueness:', err);
+    this.aadharLookupTimer = setTimeout(() => {
+      const encodedAadhar = encodeURIComponent(aadhar);
+      this.http.get<any>(`${environment.apiBaseUrl}/api/preloaded-customer-data/lookup/aadhar/${encodedAadhar}`).subscribe({
+        next: (data) => {
+          if (this.form.get('aadhar')?.value !== aadhar) return;
+          if (data && data.found !== false && data.aadharNumber) {
+            this.fillFromUploadedCustomerData(data, aadhar);
+            this.uploadedCustomerMessage = 'Customer details filled from manager-uploaded records.';
+          } else {
+            this.uploadedCustomerMessage = 'No uploaded customer record found. Enter your details manually.';
+          }
+          this.refreshAadharStatus();
+        },
+        error: () => {
+          if (this.form.get('aadhar')?.value === aadhar) {
+            this.uploadedCustomerMessage = 'No uploaded customer record found. Enter your details manually.';
+            this.refreshAadharStatus();
+          }
+        }
+      });
+
+      this.http.get<any>(`${environment.apiBaseUrl}/api/admin-account-applications/check-existing-accounts/${encodedAadhar}`).subscribe({
+        next: (result) => {
+          if (this.form.get('aadhar')?.value !== aadhar) return;
+          this.blockedAccountTypes = result?.blockedTypes || [];
+          this.existingAadharAccounts = result?.existingAccounts || [];
+          this.refreshAadharStatus();
+          this.aadharChecking = false;
+        },
+        error: () => {
+          if (this.form.get('aadhar')?.value === aadhar) {
             this.aadharChecking = false;
           }
-        });
-      } else {
-        this.aadharChecking = false;
-      }
+        }
+      });
     }, 500);
+  }
+
+  private refreshAadharStatus(): void {
+    this.aadharExists = this.blockedAccountTypes.includes(this.selectedAccountType);
+    const existing = this.existingAadharAccounts.find((account: any) => account.type === this.selectedAccountType);
+    this.aadharLookupMessage = this.aadharExists
+      ? `${this.selectedAccountType} account already exists or has a pending application for this Aadhaar${existing?.accountNumber ? ` (${existing.accountNumber})` : ''}.`
+      : this.uploadedCustomerMessage;
+  }
+
+  private fillFromUploadedCustomerData(data: any, aadhar: string): void {
+    const values: Record<string, any> = {
+      name: data.fullName,
+      email: data.email,
+      dob: this.normalizeDateForInput(data.dateOfBirth),
+      income: data.income,
+      occupation: data.occupation,
+      pan: data.panNumber,
+      mobile: data.phone,
+      state: data.state,
+      city: data.city,
+      pincode: data.pincode,
+      businessName: data.businessName,
+      businessType: data.businessType,
+      businessRegistrationNumber: data.businessRegistrationNumber,
+      gstNumber: data.gstNumber,
+      shopAddress: data.shopAddress,
+      companyName: data.companyName,
+      companyId: data.companyId,
+      employerAddress: data.employerAddress,
+      hrContactNumber: data.hrContactNumber,
+      monthlySalary: data.monthlySalary,
+      salaryCreditDate: data.salaryCreditDate,
+      designation: data.designation,
+      branchName: data.branchName,
+      ifscCode: data.ifscCode,
+      salaryBranchName: data.branchName,
+      salaryIfscCode: data.ifscCode
+    };
+    const populatedValues = Object.fromEntries(
+      Object.entries(values).filter(([, value]) => value !== null && value !== undefined && value !== '')
+    );
+
+    this.form.patchValue(populatedValues);
+    this.autofilledValues = populatedValues;
+    this.lastAutofilledAadhar = aadhar;
+  }
+
+  private clearPreviousAutofill(currentAadhar: string): void {
+    if (!this.lastAutofilledAadhar || this.lastAutofilledAadhar === currentAadhar) return;
+
+    const valuesToClear: Record<string, string> = {};
+    for (const [field, value] of Object.entries(this.autofilledValues)) {
+      if (this.form.get(field)?.value === value) valuesToClear[field] = '';
+    }
+    this.form.patchValue(valuesToClear);
+    this.autofilledValues = {};
+    this.lastAutofilledAadhar = '';
+  }
+
+  private normalizeDateForInput(value: string | null | undefined): string {
+    if (!value) return '';
+    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+    const dayFirst = value.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
+    if (dayFirst) {
+      return `${dayFirst[3]}-${dayFirst[2].padStart(2, '0')}-${dayFirst[1].padStart(2, '0')}`;
+    }
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? '' : parsed.toISOString().slice(0, 10);
   }
 
   // Check PAN uniqueness
@@ -785,12 +889,20 @@ export class Createaccount implements OnInit, OnDestroy {
     this.loading = true;
     this.loadingMessage = 'Registering your application...';
     
-    this.aadharExists = false;
-    this.panExists = false;
-    this.mobileExists = false;
-
     if (!this.form.get('termsAccepted')?.value) {
       this.submitError = 'Please accept the Terms and Conditions to proceed.';
+      this.loading = false;
+      return;
+    }
+
+    if (this.aadharChecking) {
+      this.submitError = 'Please wait for Aadhaar verification to finish.';
+      this.loading = false;
+      return;
+    }
+
+    if (this.aadharExists) {
+      this.submitError = this.aadharLookupMessage || `A ${this.selectedAccountType} account already exists for this Aadhaar.`;
       this.loading = false;
       return;
     }
@@ -883,8 +995,8 @@ export class Createaccount implements OnInit, OnDestroy {
         this.applicationNumber = saved?.applicationNumber || '';
         this.submitUserToBackend(val);
       },
-      error: () => {
-        this.submitUserToBackend(val);
+      error: (err: any) => {
+        this.submitError = err.error?.error || 'Unable to create your account application. Please try again.';
       }
     });
   }

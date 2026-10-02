@@ -3,6 +3,7 @@ package com.neo.springapp.service;
 import com.neo.springapp.model.*;
 import com.neo.springapp.repository.*;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
@@ -39,6 +40,9 @@ public class ChequeDrawService {
     private SalaryAccountRepository salaryAccountRepository;
 
     @Autowired
+    private PositivePayRequestRepository positivePayRequestRepository;
+
+    @Autowired
     private UserRepository userRepository;
 
     @Autowired
@@ -57,6 +61,9 @@ public class ChequeDrawService {
     private ChequeLeafRepository chequeLeafRepository;
 
     private static final int MAX_CHEQUE_LEAVES = 30;
+
+    @Value("${positivepay.minimum.amount:10000}")
+    private BigDecimal positivePayMinimumAmount;
 
     // ==================== USER OPERATIONS ====================
 
@@ -103,7 +110,8 @@ public class ChequeDrawService {
         request.setAvailableBalance(availableBalance);
         request.setPayeeName(payeeName);
         request.setRemarks(remarks);
-        request.setStatus("PENDING");
+        boolean positivePayRequired = BigDecimal.valueOf(amount).compareTo(positivePayMinimumAmount) >= 0;
+        request.setStatus(positivePayRequired ? "AWAITING_POSITIVE_PAY" : "PENDING");
         request.setCreatedAt(LocalDateTime.now());
         request.setUpdatedAt(LocalDateTime.now());
 
@@ -120,8 +128,8 @@ public class ChequeDrawService {
         response.put("message", "Cheque draw request submitted successfully");
         response.put("chequeNumber", chequeNumber);
         response.put("requestId", saved.getId());
-        response.put("status", "PENDING");
-        if (amount >= 10000.0) {
+        response.put("status", request.getStatus());
+        if (positivePayRequired) {
             response.put("positivePayRequired", true);
             response.put("positivePayMessage", "This cheque is ₹10,000 or above. Register it in Positive Pay before admin draw verification.");
             response.put("positivePayAccountNumber", account.getAccountNumber());
@@ -171,8 +179,8 @@ public class ChequeDrawService {
         ChequeRequest request = chequeRequestRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Cheque request not found"));
 
-        if (!request.getStatus().equals("PENDING")) {
-            throw new RuntimeException("Only PENDING cheques can be cancelled");
+        if (!request.getStatus().equals("PENDING") && !request.getStatus().equals("AWAITING_POSITIVE_PAY")) {
+            throw new RuntimeException("Only pending cheques can be cancelled");
         }
 
         request.setStatus("CANCELLED");
@@ -241,18 +249,19 @@ public class ChequeDrawService {
         Pageable pageable = PageRequest.of(page, size);
         Page<ChequeRequest> requests;
 
-        if (status != null && !status.isEmpty() && search != null && !search.isEmpty()) {
+        if ("AWAITING_POSITIVE_PAY".equalsIgnoreCase(status)) {
+            requests = Page.empty(pageable);
+        } else if (status != null && !status.isEmpty() && search != null && !search.isEmpty()) {
             requests = chequeRequestRepository.findByStatusAndChequeNumberContainingIgnoreCaseOrderByCreatedAtDesc(
                     status, search, pageable
             );
         } else if (status != null && !status.isEmpty()) {
             requests = chequeRequestRepository.findByStatusOrderByCreatedAtDesc(status, pageable);
         } else if (search != null && !search.isEmpty()) {
-            requests = chequeRequestRepository.findByChequeNumberContainingIgnoreCaseOrderByCreatedAtDesc(
-                    search, pageable
-            );
+            requests = chequeRequestRepository.findByStatusNotAndChequeNumberContainingIgnoreCaseOrderByCreatedAtDesc(
+                    "AWAITING_POSITIVE_PAY", search, pageable);
         } else {
-            requests = chequeRequestRepository.findAllByOrderByCreatedAtDesc(pageable);
+            requests = chequeRequestRepository.findByStatusNotOrderByCreatedAtDesc("AWAITING_POSITIVE_PAY", pageable);
         }
 
         List<Map<String, Object>> items = new ArrayList<>();
@@ -343,9 +352,20 @@ public class ChequeDrawService {
         return result;
     }
 
-    /**
-     * Admin approves a pending cheque draw request with payee verification
-     */
+        private void requirePositivePayApproval(String accountNumber, String chequeNumber, BigDecimal amount) {
+        if (amount.compareTo(positivePayMinimumAmount) < 0) return;
+        boolean approved = positivePayRequestRepository
+            .findFirstByAccountNumberAndChequeNumberAndStatusIn(accountNumber, chequeNumber,
+                List.of(PositivePayStatus.PENDING_ADMIN_APPROVAL, PositivePayStatus.APPROVED,
+                    PositivePayStatus.MATCHED, PositivePayStatus.MISMATCH))
+            .map(request -> request.getStatus() == PositivePayStatus.APPROVED)
+            .orElse(false);
+        if (!approved) throw new RuntimeException("Positive Pay must be approved before cheque approval");
+        }
+
+        /**
+         * Admin approves a pending cheque draw request with payee verification
+         */
     @Transactional
     public Map<String, Object> approveChequeDrawRequest(Long id, String adminEmail, String remarks,
                                                          String payeeAccountNumber) {
@@ -373,6 +393,7 @@ public class ChequeDrawService {
                 .orElseThrow(() -> new RuntimeException("Salary account not found"));
 
         BigDecimal amount = request.getAmount();
+        requirePositivePayApproval(senderAccount.getAccountNumber(), request.getChequeNumber(), amount);
         BigDecimal senderBalance = BigDecimal.valueOf(senderAccount.getBalance() != null ? senderAccount.getBalance() : 0.0);
 
         if (senderBalance.compareTo(amount) < 0) {

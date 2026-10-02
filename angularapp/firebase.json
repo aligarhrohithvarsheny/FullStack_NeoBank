@@ -1,5 +1,8 @@
 {
   "hosting": {
+    "predeploy": [
+      "npm run build:prod"
+    ],
     "public": "dist/angularapp/browser",
     "ignore": [
       "firebase.json",

@@ -1,6 +1,6 @@
 // Business Account Cheque Draw System Models - Following Salary Cheque Pattern
 
-export type BusinessChequeStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'COMPLETED' | 'CANCELLED' | 'CLEARED';
+export type BusinessChequeStatus = 'AWAITING_POSITIVE_PAY' | 'PENDING' | 'APPROVED' | 'REJECTED' | 'COMPLETED' | 'CANCELLED' | 'CLEARED';
 export type BusinessChequeAction = 'VIEWED' | 'APPROVED' | 'REJECTED' | 'PICKED_UP' | 'CLEARED';
 
 // User-facing BusinessChequeRequest (for Current Account Dashboard)

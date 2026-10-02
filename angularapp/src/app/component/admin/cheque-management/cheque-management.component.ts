@@ -55,6 +55,7 @@ export class ChequeManagementComponent implements OnInit, OnDestroy {
 
   // Status colors
   statusColors: { [key in ChequeStatus]: string } = {
+    'AWAITING_POSITIVE_PAY': '#f97316',
     'PENDING': '#f59e0b',
     'APPROVED': '#3b82f6',
     'COMPLETED': '#10b981',
@@ -545,6 +546,7 @@ export class ChequeManagementComponent implements OnInit, OnDestroy {
    */
   getStatusText(status: ChequeStatus): string {
     const statusMap: { [key in ChequeStatus]: string } = {
+      'AWAITING_POSITIVE_PAY': 'Awaiting Positive Pay',
       'PENDING': 'Pending',
       'APPROVED': 'Approved',
       'COMPLETED': 'Completed',
