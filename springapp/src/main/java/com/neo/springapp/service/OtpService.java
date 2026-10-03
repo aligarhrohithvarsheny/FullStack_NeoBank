@@ -1,6 +1,9 @@
 package com.neo.springapp.service;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.stereotype.Service;
 
 import java.util.Map;
@@ -11,6 +14,15 @@ import java.util.Random;
 public class OtpService {
     @Autowired
     private EmailService emailService;
+
+    @Autowired
+    private Environment environment;
+
+    @Value("${app.otp.test-mode:false}")
+    private boolean testModeEnabled;
+
+    @Value("${app.otp.test-code:}")
+    private String testOtpCode;
     
     // Store OTPs temporarily in memory (email -> OTP)
     // In production, consider using Redis or database with expiration
@@ -41,6 +53,12 @@ public class OtpService {
             throw new RuntimeException("Email is required for OTP sending");
         }
 
+        if (isLocalTestMode()) {
+            storeOtp(normalizedEmail, testOtpCode);
+            System.out.println("Local test OTP prepared for [" + purpose + "] without email delivery");
+            return testOtpCode;
+        }
+
         String otp = generateOtp();
         storeOtp(normalizedEmail, otp);
 
@@ -69,6 +87,12 @@ public class OtpService {
             throw new RuntimeException("OTP key is required");
         }
 
+        if (isLocalTestMode()) {
+            storeOtpForKey(key, testOtpCode);
+            System.out.println("Local test OTP prepared for [" + purpose + "] without email delivery");
+            return testOtpCode;
+        }
+
         String otp = generateOtp();
         storeOtpForKey(key, otp);
 
@@ -83,6 +107,16 @@ public class OtpService {
 
         System.out.println("✅ OTP ready for [" + purpose + "] to " + normalizedEmail);
         return otp;
+    }
+
+    private boolean isLocalTestMode() {
+        return testModeEnabled
+                && testOtpCode != null
+                && testOtpCode.matches("\\d{6}")
+                && environment.acceptsProfiles(Profiles.of("local"))
+                && !environment.acceptsProfiles(Profiles.of("production"))
+                && !environment.containsProperty("RENDER")
+                && !environment.containsProperty("RENDER_SERVICE_ID");
     }
     
     /**

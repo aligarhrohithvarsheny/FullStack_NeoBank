@@ -296,6 +296,11 @@
           </div>
         </div>
 
+        <div class="terms-action" *ngIf="loan.status !== 'Pending' && loan.status !== 'Rejected'">
+          <button type="button" class="accept-terms-btn" (click)="downloadLoanDoc('receipt', loan)">🧾 Gold Loan Receipt</button>
+          <button type="button" class="accept-terms-btn" *ngIf="isClosed(loan)" (click)="downloadLoanDoc('noc', loan)">📜 Download NOC</button>
+        </div>
+
         <!-- Gold Details (if approved) -->
         <div class="gold-details-section" *ngIf="isApproved(loan) && loan.goldItems">
           <h5>📦 Verified Gold Details</h5>

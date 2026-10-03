@@ -2083,7 +2083,7 @@
                   <span *ngIf="isSalaryAadharLoading" style="color:#0ea5e9; font-size:11px; margin-left:6px;"><i class="fa fa-spinner fa-spin"></i> Auto-fetching...</span>
                   <span *ngIf="salaryAadharSuccess" style="color:#10b981; font-size:11px; margin-left:6px;"><i class="fa fa-check-circle"></i> Auto-filled</span>
                 </label>
-                <input type="text" [(ngModel)]="newSalaryAccount.aadharNumber" (input)="onSalaryAadharInput()" (blur)="onSalaryAadharInput()" placeholder="12-digit Aadhaar" maxlength="12" />
+                <input type="text" [(ngModel)]="newSalaryAccount.aadharNumber" (input)="onSalaryAadharInput()" (blur)="onSalaryAadharInput()" placeholder="Enter Aadhaar number" />
                 <div *ngIf="salaryAadharMessage" style="font-size:11px; margin-top:3px;" [style.color]="salaryAadharSuccess ? '#10b981' : '#f59e0b'">
                   {{ salaryAadharMessage }}
                 </div>

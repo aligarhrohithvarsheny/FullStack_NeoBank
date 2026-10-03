@@ -680,6 +680,20 @@
                📄 Foreclosure PDF
             </button>
             <button 
+              *ngIf="loan.status === 'Approved' || loan.status === 'Paid' || loan.status === 'Foreclosed'" 
+              class="download-foreclosure-btn" 
+              (click)="downloadLoanDoc('receipt', loan)" 
+              title="Download Loan Receipt">
+               🧾 Receipt
+            </button>
+            <button 
+              *ngIf="isClosed(loan)" 
+              class="download-foreclosure-btn" 
+              (click)="downloadLoanDoc('noc', loan)" 
+              title="Download NOC">
+               📜 NOC
+            </button>
+            <button 
               *ngIf="loan.status === 'Approved' || loan.status === 'Paid'" 
               class="view-emi-btn" 
               (click)="showEmiDetails(loan)" 

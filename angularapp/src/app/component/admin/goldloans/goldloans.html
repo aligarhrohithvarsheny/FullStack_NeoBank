@@ -165,6 +165,22 @@
           </div>
           <div>
             <button
+              *ngIf="loan.status !== 'Pending' && loan.status !== 'Rejected'"
+              type="button"
+              class="action-btn history-btn"
+              (click)="downloadLoanDoc('receipt', loan)"
+            >
+              🧾 Receipt
+            </button>
+            <button
+              *ngIf="isClosed(loan)"
+              type="button"
+              class="action-btn history-btn"
+              (click)="downloadLoanDoc('noc', loan)"
+            >
+              📜 NOC
+            </button>
+            <button
               type="button"
               class="action-btn history-btn"
               (click)="viewHistory(loan)"

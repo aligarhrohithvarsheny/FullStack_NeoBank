@@ -2,8 +2,8 @@ import { Component, OnInit, OnDestroy, Inject, PLATFORM_ID, ViewChild, ElementRe
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import { HttpClient } from '@angular/common/http';
-import { environment } from '../../../../environment/environment';
+import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
+import { Observable } from 'rxjs';
 import { VideoKycService } from '../../../service/video-kyc.service';
 
 @Component({
@@ -50,7 +50,10 @@ export class VideoKycDashboard implements OnInit, OnDestroy {
   // Document viewer
   showDocViewer = false;
   docViewerUrl = '';
+  docViewerFrameUrl: SafeResourceUrl | null = null;
   docViewerTitle = '';
+  docViewerIsPdf = false;
+  sessionDetailLoading = false;
 
   // Slot Management
   allSlots: any[] = [];
@@ -78,7 +81,7 @@ export class VideoKycDashboard implements OnInit, OnDestroy {
   constructor(
     @Inject(PLATFORM_ID) private platformId: Object,
     private router: Router,
-    private http: HttpClient,
+    private sanitizer: DomSanitizer,
     private videoKycService: VideoKycService
   ) {}
 
@@ -102,12 +105,14 @@ export class VideoKycDashboard implements OnInit, OnDestroy {
       clearInterval(this.refreshInterval);
     }
     this.stopAdminVideo();
+    this.closeDocViewer();
   }
 
   // Tab management
   switchTab(tab: string) {
     this.activeTab = tab;
     this.selectedSession = null;
+    this.sessionDetailLoading = false;
     this.error = '';
     this.successMsg = '';
     if (tab === 'queue') this.loadQueue();
@@ -181,8 +186,23 @@ export class VideoKycDashboard implements OnInit, OnDestroy {
     this.selectedSession = session;
     this.error = '';
     this.successMsg = '';
+    this.sessionDetailLoading = true;
     this.loadAuditLogs(session.id);
     this.queueSlotId = session.bookedSlotId || null;
+    this.videoKycService.getSessionDetail(session.id).subscribe({
+      next: (detail: any) => {
+        if (this.selectedSession?.id === session.id) {
+          this.selectedSession = { ...session, ...detail };
+          this.sessionDetailLoading = false;
+        }
+      },
+      error: (err: any) => {
+        if (this.selectedSession?.id === session.id) {
+          this.sessionDetailLoading = false;
+          this.error = err.error?.message || 'Failed to load account documents.';
+        }
+      }
+    });
   }
 
   cancelCustomerSlot() {
@@ -218,7 +238,7 @@ export class VideoKycDashboard implements OnInit, OnDestroy {
 
       this.videoKycService.adminJoinSession(this.selectedSession.id, Number(adminId), adminName).subscribe({
         next: (response: any) => {
-          this.selectedSession = response;
+          this.selectedSession = { ...this.selectedSession, ...response.session };
           this.videoActive = true;
           this.connectionStatus = 'connected';
           this.actionLoading = false;
@@ -260,7 +280,7 @@ export class VideoKycDashboard implements OnInit, OnDestroy {
     this.actionLoading = true;
     this.videoKycService.approveKyc(this.selectedSession.id, Number(adminId), adminName).subscribe({
       next: (response: any) => {
-        this.selectedSession = response;
+        this.selectedSession = { ...this.selectedSession, ...response };
         this.successMsg = `KYC Approved! Account Number: ${response.finalAccountNumber}`;
         this.actionLoading = false;
         this.stopAdminVideo();
@@ -293,7 +313,7 @@ export class VideoKycDashboard implements OnInit, OnDestroy {
     this.actionLoading = true;
     this.videoKycService.rejectKyc(this.selectedSession.id, Number(adminId), adminName, this.rejectionReason).subscribe({
       next: (response: any) => {
-        this.selectedSession = response;
+        this.selectedSession = { ...this.selectedSession, ...response };
         this.successMsg = 'KYC Rejected.';
         this.showRejectModal = false;
         this.actionLoading = false;
@@ -317,7 +337,7 @@ export class VideoKycDashboard implements OnInit, OnDestroy {
     this.actionLoading = true;
     this.videoKycService.reopenSession(this.selectedSession.id, Number(adminId), adminName).subscribe({
       next: (response: any) => {
-        this.selectedSession = response;
+        this.selectedSession = { ...this.selectedSession, ...response };
         this.successMsg = 'Session reopened for re-verification.';
         this.actionLoading = false;
         this.loadStats();
@@ -353,36 +373,58 @@ export class VideoKycDashboard implements OnInit, OnDestroy {
 
   // Document viewer
   viewDocument(type: 'aadhar' | 'pan' | 'face' | 'id') {
-    if (!this.selectedSession) return;
-    
-    let url = '';
+    if (!this.selectedSession || this.sessionDetailLoading) return;
+
     let title = '';
+    let documentRequest: Observable<Blob>;
     switch (type) {
       case 'aadhar':
-        url = `${environment.apiBaseUrl}/api/video-kyc/document/aadhar/${this.selectedSession.id}`;
+        documentRequest = this.videoKycService.getAadharDocument(this.selectedSession.id);
         title = 'Aadhaar Document';
         break;
       case 'pan':
-        url = `${environment.apiBaseUrl}/api/video-kyc/document/pan/${this.selectedSession.id}`;
+        documentRequest = this.videoKycService.getPanDocument(this.selectedSession.id);
         title = 'PAN Document';
         break;
       case 'face':
-        url = `${environment.apiBaseUrl}/api/video-kyc/snapshot/face/${this.selectedSession.id}`;
+        documentRequest = this.videoKycService.getFaceSnapshot(this.selectedSession.id);
         title = 'Face Snapshot';
         break;
       case 'id':
-        url = `${environment.apiBaseUrl}/api/video-kyc/snapshot/id-proof/${this.selectedSession.id}`;
+        documentRequest = this.videoKycService.getIdSnapshot(this.selectedSession.id);
         title = 'ID Proof Snapshot';
         break;
+      default:
+        return;
     }
-    this.docViewerUrl = url;
-    this.docViewerTitle = title;
-    this.showDocViewer = true;
+
+    documentRequest.subscribe({
+      next: (blob: Blob) => {
+        if (!blob.type.startsWith('image/') && blob.type !== 'application/pdf') {
+          this.error = `The ${title.toLowerCase()} has an unsupported file type.`;
+          return;
+        }
+        this.closeDocViewer();
+        this.docViewerUrl = URL.createObjectURL(blob);
+        this.docViewerFrameUrl = this.sanitizer.bypassSecurityTrustResourceUrl(this.docViewerUrl);
+        this.docViewerTitle = title;
+        this.docViewerIsPdf = blob.type === 'application/pdf';
+        this.showDocViewer = true;
+      },
+      error: (err: any) => {
+        this.error = err.error?.message || `Failed to load ${title.toLowerCase()}.`;
+      }
+    });
   }
 
   closeDocViewer() {
+    if (this.docViewerUrl.startsWith('blob:')) {
+      URL.revokeObjectURL(this.docViewerUrl);
+    }
     this.showDocViewer = false;
     this.docViewerUrl = '';
+    this.docViewerFrameUrl = null;
+    this.docViewerIsPdf = false;
   }
 
   // Pagination

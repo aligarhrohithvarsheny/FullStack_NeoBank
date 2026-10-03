@@ -180,12 +180,12 @@
               <i class="fa" [ngClass]="selectedSession.otpVerified ? 'fa-check-circle' : 'fa-circle'"></i>
               OTP Verified
             </div>
-            <div class="check-item" [class.done]="selectedSession.faceSnapshot">
-              <i class="fa" [ngClass]="selectedSession.faceSnapshot ? 'fa-check-circle' : 'fa-circle'"></i>
+            <div class="check-item" [class.done]="selectedSession.hasFaceSnapshot">
+              <i class="fa" [ngClass]="selectedSession.hasFaceSnapshot ? 'fa-check-circle' : 'fa-circle'"></i>
               Face Snapshot
             </div>
-            <div class="check-item" [class.done]="selectedSession.idSnapshot">
-              <i class="fa" [ngClass]="selectedSession.idSnapshot ? 'fa-check-circle' : 'fa-circle'"></i>
+              <div class="check-item" [class.done]="selectedSession.hasIdSnapshot">
+                <i class="fa" [ngClass]="selectedSession.hasIdSnapshot ? 'fa-check-circle' : 'fa-circle'"></i>
               ID Snapshot
             </div>
             <div class="check-item" [class.done]="selectedSession.livenessCheckPassed">
@@ -198,17 +198,18 @@
         <!-- Documents -->
         <div class="detail-section">
           <h4><i class="fa fa-file-alt"></i> Documents</h4>
+          <p *ngIf="sessionDetailLoading" class="documents-loading">Loading saved proof documents...</p>
           <div class="doc-buttons">
-            <button class="doc-btn" (click)="viewDocument('aadhar')" [disabled]="!selectedSession.aadharDocument">
+            <button class="doc-btn" (click)="viewDocument('aadhar')" [disabled]="sessionDetailLoading || !selectedSession.hasAadharDocument">
               <i class="fa fa-id-card"></i> View Aadhaar
             </button>
-            <button class="doc-btn" (click)="viewDocument('pan')" [disabled]="!selectedSession.panDocument">
+            <button class="doc-btn" (click)="viewDocument('pan')" [disabled]="sessionDetailLoading || !selectedSession.hasPanDocument">
               <i class="fa fa-address-card"></i> View PAN
             </button>
-            <button class="doc-btn" (click)="viewDocument('face')" [disabled]="!selectedSession.faceSnapshot">
+            <button class="doc-btn" (click)="viewDocument('face')" [disabled]="sessionDetailLoading || !selectedSession.hasFaceSnapshot">
               <i class="fa fa-camera"></i> Face Snapshot
             </button>
-            <button class="doc-btn" (click)="viewDocument('id')" [disabled]="!selectedSession.idSnapshot">
+            <button class="doc-btn" (click)="viewDocument('id')" [disabled]="sessionDetailLoading || !selectedSession.hasIdSnapshot">
               <i class="fa fa-image"></i> ID Snapshot
             </button>
           </div>
@@ -294,7 +295,7 @@
           </tr>
         </thead>
         <tbody>
-          <tr *ngFor="let session of filteredSessions" (click)="selectSession(session); switchTab('queue')">
+          <tr *ngFor="let session of filteredSessions" (click)="switchTab('queue'); selectSession(session)">
             <td class="mono">{{ session.customerId }}</td>
             <td>{{ session.fullName }}</td>
             <td>{{ session.mobileNumber }}</td>
@@ -307,7 +308,7 @@
               <button class="view-btn" (click)="startReVideoKyc(session, $event)" [disabled]="actionLoading">
                 <i class="fa fa-video"></i> Re-video KYC
               </button>
-              <button class="view-btn" (click)="selectSession(session); switchTab('queue'); $event.stopPropagation()">
+              <button class="view-btn" (click)="switchTab('queue'); selectSession(session); $event.stopPropagation()">
                 <i class="fa fa-eye"></i> View
               </button>
             </td>
@@ -529,7 +530,7 @@
           </div>
         </div>
         <div class="verify-action">
-          <button class="action-btn join" (click)="selectSession(verificationResult); switchTab('queue')">
+          <button class="action-btn join" (click)="switchTab('queue'); selectSession(verificationResult)">
             <i class="fa fa-eye"></i> View Full Details
           </button>
         </div>
@@ -566,7 +567,8 @@
         <button (click)="closeDocViewer()"><i class="fa fa-times"></i></button>
       </div>
       <div class="doc-viewer-body">
-        <img [src]="docViewerUrl" [alt]="docViewerTitle" />
+        <iframe *ngIf="docViewerIsPdf" [src]="docViewerFrameUrl" [title]="docViewerTitle"></iframe>
+        <img *ngIf="!docViewerIsPdf" [src]="docViewerUrl" [alt]="docViewerTitle" />
       </div>
     </div>
   </div>

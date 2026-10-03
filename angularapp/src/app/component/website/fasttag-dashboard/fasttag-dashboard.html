@@ -529,16 +529,36 @@
           <p>No transactions found for this FASTag.</p>
         </div>
 
-        <div class="txn-list" *ngIf="!transactionsLoading && transactions.length > 0">
-          <div class="txn-item" *ngFor="let txn of transactions" [class.credit]="txn.type === 'CREDIT' || txn.type === 'RECHARGE'" [class.debit]="txn.type === 'DEBIT' || txn.type === 'TOLL'">
+        <div class="txn-filters" style="display:flex;flex-wrap:wrap;gap:8px;margin:10px 0;align-items:flex-end">
+          <label style="font-size:12px">Type<br>
+            <select [(ngModel)]="txnFilterType" class="form-input">
+              <option value="ALL">All</option><option value="CREDIT">Credits</option><option value="DEBIT">Debits</option>
+              <option value="RECHARGE">Recharge</option><option value="REFUND">Refund</option>
+            </select></label>
+          <label style="font-size:12px">From<br><input type="date" [(ngModel)]="txnFromDate" class="form-input"></label>
+          <label style="font-size:12px">To<br><input type="date" [(ngModel)]="txnToDate" class="form-input"></label>
+          <label style="font-size:12px">Min ₹<br><input type="number" [(ngModel)]="txnMinAmount" class="form-input" style="width:90px"></label>
+          <label style="font-size:12px">Max ₹<br><input type="number" [(ngModel)]="txnMaxAmount" class="form-input" style="width:90px"></label>
+          <button class="mini-txn-btn" (click)="resetTxnFilters()">Reset</button>
+          <button class="mini-txn-btn" (click)="generateStatement()" [disabled]="transactionsLoading || filteredTransactions.length === 0">📄 Generate Statement</button>
+        </div>
+
+        <div class="txn-empty" *ngIf="!transactionsLoading && transactions.length > 0 && filteredTransactions.length === 0">
+          <p>No transactions match the selected filters.</p>
+        </div>
+
+        <div class="txn-list" *ngIf="!transactionsLoading && filteredTransactions.length > 0">
+          <div class="txn-item" *ngFor="let txn of filteredTransactions" [class.credit]="isCreditTxn(txn)" [class.debit]="!isCreditTxn(txn)">
             <div class="txn-left">
               <span class="txn-type">{{ txn.type || txn.transactionType }}</span>
-              <span class="txn-date">{{ formatDateTime(txn.createdAt || txn.transactionDate) }}</span>
+              <span class="txn-date">{{ formatTxnDate(txn.createdAt || txn.transactionDate) }} · {{ formatTxnTime(txn.createdAt || txn.transactionDate) }}</span>
+              <span class="txn-desc">Ref: {{ getTxnReference(txn) }}</span>
+              <span class="txn-desc">Previous Balance: ₹{{ txn.previousBalance ?? 0 | number:'1.2-2' }} → Balance: ₹{{ txn.newBalance ?? 0 | number:'1.2-2' }}</span>
               <span class="txn-desc" *ngIf="txn.description">{{ txn.description }}</span>
             </div>
             <div class="txn-right">
-              <span class="txn-amount" [class.positive]="txn.type === 'CREDIT' || txn.type === 'RECHARGE'" [class.negative]="txn.type === 'DEBIT' || txn.type === 'TOLL'">
-                {{ (txn.type === 'CREDIT' || txn.type === 'RECHARGE') ? '+' : '-' }}₹{{ txn.amount?.toFixed(2) }}
+              <span class="txn-amount" [class.positive]="isCreditTxn(txn)" [class.negative]="!isCreditTxn(txn)">
+                {{ isCreditTxn(txn) ? '+' : '-' }}₹{{ txn.amount?.toFixed(2) }}
               </span>
             </div>
           </div>

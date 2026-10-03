@@ -3248,7 +3248,9 @@ export class ManagerDashboard implements OnInit, OnDestroy {
 
   onSalaryAadharInput(): void {
     const aadhar = (this.newSalaryAccount.aadharNumber || '').trim();
-    if (aadhar.length === 12 && aadhar !== this.lastLookedUpSalaryAadhar && /^\d{12}$/.test(aadhar)) {
+    const canLookupAadhar = aadhar.length === 12 && /^\d{12}$/.test(aadhar);
+    if (canLookupAadhar && aadhar !== this.lastLookedUpSalaryAadhar) {
+      this.lastLookedUpSalaryAadhar = aadhar;
       this.isSalaryAadharLoading = true;
       this.salaryAadharBlocked = false;
       this.salaryExistingAccountMessage = '';
@@ -3259,7 +3261,6 @@ export class ManagerDashboard implements OnInit, OnDestroy {
           this.isSalaryAadharLoading = false;
           const data = res?.data || res;
           if (data && (data.fullName || data.employeeName || data.name || data.panNumber)) {
-            this.lastLookedUpSalaryAadhar = aadhar;
             this.salaryAadharSuccess = true;
             this.salaryAadharMessage = 'Customer details auto-filled from Aadhaar!';
             if (data.fullName || data.employeeName || data.name) {
@@ -3292,6 +3293,7 @@ export class ManagerDashboard implements OnInit, OnDestroy {
       });
       this.http.get<any>(`${environment.apiBaseUrl}/api/admin-account-applications/check-existing-accounts/${aadhar}`).subscribe({
         next: (res) => {
+          if ((this.newSalaryAccount.aadharNumber || '').trim() !== aadhar) return;
           const salaryAccount = (res?.existingAccounts || []).find((account: any) => account.type === 'Salary');
           this.salaryAadharBlocked = !!salaryAccount || (res?.blockedTypes || []).includes('Salary');
           if (this.salaryAadharBlocked) {
@@ -3305,12 +3307,13 @@ export class ManagerDashboard implements OnInit, OnDestroy {
           this.salaryExistingAccountMessage = '';
         }
       });
-    } else if (aadhar.length < 12) {
+    } else if (!canLookupAadhar) {
       this.salaryAadharSuccess = false;
       this.salaryAadharMessage = '';
       this.lastLookedUpSalaryAadhar = '';
       this.salaryAadharBlocked = false;
       this.salaryExistingAccountMessage = '';
+      this.isSalaryAadharLoading = false;
     }
   }
 

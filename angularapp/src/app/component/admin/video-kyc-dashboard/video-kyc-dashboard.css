@@ -838,6 +838,17 @@
   border-radius: 8px;
 }
 
+.doc-viewer-body iframe {
+  width: 100%;
+  height: 70vh;
+  border: 0;
+}
+
+.documents-loading {
+  color: #666;
+  font-size: 0.9rem;
+}
+
 /* ====== Stats Card Scheduled ====== */
 .stats-card.scheduled {
   background: linear-gradient(135deg, #e8def8, #d0bcfe);

@@ -5,6 +5,7 @@ import { Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../../environment/environment';
 import { AlertService } from '../../../service/alert.service';
+import { openLoanDocument, isLoanClosed } from '../../../service/loan-documents';
 import { timeout, catchError, finalize } from 'rxjs/operators';
 import { of } from 'rxjs';
 
@@ -410,6 +411,16 @@ export class Goldloan implements OnInit, OnDestroy {
         return 'status-rejected';
       default:
         return '';
+    }
+  }
+
+  isClosed(loan: any): boolean {
+    return isLoanClosed(loan);
+  }
+
+  downloadLoanDoc(kind: 'noc' | 'receipt', loan: any) {
+    if (!openLoanDocument(kind, loan, 'gold', 'user', this.userName)) {
+      this.alertService.error('Error', 'Please allow popups to download the document');
     }
   }
 

@@ -361,6 +361,121 @@ export class FasttagDashboard implements OnInit, OnDestroy {
     this.showTransactions = false;
     this.transactionTag = null;
     this.transactions = [];
+    this.resetTxnFilters();
+  }
+
+  // Statement filters
+  txnFilterType: string = 'ALL';
+  txnFromDate: string = '';
+  txnToDate: string = '';
+  txnMinAmount: number | null = null;
+  txnMaxAmount: number | null = null;
+
+  resetTxnFilters() {
+    this.txnFilterType = 'ALL';
+    this.txnFromDate = '';
+    this.txnToDate = '';
+    this.txnMinAmount = null;
+    this.txnMaxAmount = null;
+  }
+
+  isCreditTxn(txn: any): boolean {
+    const t = String(txn.type || txn.transactionType || '').toUpperCase();
+    return t === 'CREDIT' || t === 'RECHARGE' || t === 'REFUND';
+  }
+
+  getTxnReference(txn: any): string {
+    const seq = txn.globalTransactionSequence ?? txn.id;
+    const d = txn.createdAt || txn.transactionDate;
+    const dt = d ? new Date(d) : null;
+    const stamp = dt && !isNaN(dt.getTime())
+      ? `${dt.getFullYear()}${String(dt.getMonth() + 1).padStart(2, '0')}${String(dt.getDate()).padStart(2, '0')}`
+      : '00000000';
+    return `FTX${stamp}${String(seq ?? 0).padStart(6, '0')}`;
+  }
+
+  get filteredTransactions(): any[] {
+    const from = this.txnFromDate ? new Date(this.txnFromDate + 'T00:00:00') : null;
+    const to = this.txnToDate ? new Date(this.txnToDate + 'T23:59:59.999') : null;
+    return this.transactions.filter(txn => {
+      const type = String(txn.type || txn.transactionType || '').toUpperCase();
+      if (this.txnFilterType === 'CREDIT' && !this.isCreditTxn(txn)) return false;
+      if (this.txnFilterType === 'DEBIT' && this.isCreditTxn(txn)) return false;
+      if (this.txnFilterType !== 'ALL' && this.txnFilterType !== 'CREDIT' && this.txnFilterType !== 'DEBIT' && type !== this.txnFilterType) return false;
+      const d = new Date(txn.createdAt || txn.transactionDate);
+      if (from && d < from) return false;
+      if (to && d > to) return false;
+      const amt = Number(txn.amount) || 0;
+      if (this.txnMinAmount !== null && this.txnMinAmount !== undefined && amt < this.txnMinAmount) return false;
+      if (this.txnMaxAmount !== null && this.txnMaxAmount !== undefined && amt > this.txnMaxAmount) return false;
+      return true;
+    });
+  }
+
+  formatTxnDate(date: any): string {
+    if (!date) return 'N/A';
+    return new Date(date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+  }
+
+  formatTxnTime(date: any): string {
+    if (!date) return 'N/A';
+    return new Date(date).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  }
+
+  generateStatement() {
+    const tag = this.transactionTag;
+    const rows = this.filteredTransactions;
+    if (!tag) return;
+    if (rows.length === 0) {
+      this.showGlobalAlert('No transactions match the selected filters.', 'error');
+      return;
+    }
+    const w = window.open('', '_blank', 'width=900,height=900');
+    if (!w) {
+      this.showGlobalAlert('Please allow popups to generate the statement.', 'error');
+      return;
+    }
+    const esc = (v: any) => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const m = (v: any) => (Number(v) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const credits = rows.filter(t => this.isCreditTxn(t)).reduce((s, t) => s + (Number(t.amount) || 0), 0);
+    const debits = rows.filter(t => !this.isCreditTxn(t)).reduce((s, t) => s + (Number(t.amount) || 0), 0);
+    const period = (this.txnFromDate || this.txnToDate)
+      ? `${this.txnFromDate || 'Beginning'} to ${this.txnToDate || 'Today'}` : 'All transactions';
+    const body = rows.map(t => {
+      const c = this.isCreditTxn(t);
+      const d = t.createdAt || t.transactionDate;
+      return `<tr><td>${esc(this.formatTxnDate(d))}</td><td>${esc(this.formatTxnTime(d))}</td><td>${esc(this.getTxnReference(t))}</td>
+        <td>${esc(t.type || t.transactionType)}</td><td class="r">₹${m(t.previousBalance)}</td>
+        <td class="r ${c ? 'cr' : 'dr'}">${c ? '+' : '-'}₹${m(t.amount)}</td><td class="r">₹${m(t.newBalance)}</td></tr>`;
+    }).join('');
+
+    w.document.write(`<!DOCTYPE html><html><head><title>NeoBank FASTag Statement - ${esc(tag.fasttagNumber)}</title><style>
+      * { margin:0; padding:0; box-sizing:border-box; }
+      body { font-family:'Segoe UI',Arial,sans-serif; padding:30px; color:#1a1a2e; }
+      .hdr { display:flex; justify-content:space-between; align-items:center; border-bottom:3px solid #e63946; padding-bottom:12px; margin-bottom:16px; }
+      .hdr h2 { color:#0056b3; } .hdr p { font-size:12px; color:#666; }
+      h3 { text-align:center; color:#e63946; margin:12px 0; }
+      .info { display:grid; grid-template-columns:1fr 1fr; gap:6px 20px; font-size:13px; margin-bottom:14px; }
+      table { width:100%; border-collapse:collapse; font-size:12px; }
+      th,td { border:1px solid #ccc; padding:7px 8px; text-align:left; }
+      th { background:#f0f4f8; } .r { text-align:right; } .cr { color:#16a34a; font-weight:600; } .dr { color:#e63946; font-weight:600; }
+      .sum { margin-top:14px; font-size:13px; display:flex; gap:24px; justify-content:flex-end; }
+      .foot { margin-top:20px; font-size:11px; color:#777; border-top:2px solid #e63946; padding-top:8px; }
+      @media print { body { padding:12px; } }
+    </style></head><body>
+      <div class="hdr"><div><h2>NeoBank</h2><p>Digital Banking Solutions</p></div><p>...the digital bank you can trust!</p></div>
+      <h3>FASTag Account Statement</h3>
+      <div class="info">
+        <div><strong>FASTag No:</strong> ${esc(tag.fasttagNumber)}</div><div><strong>Vehicle No:</strong> ${esc(tag.vehicleNumber)}</div>
+        <div><strong>Customer:</strong> ${esc(tag.userName || this.user?.name || '')}</div><div><strong>Period:</strong> ${esc(period)}</div>
+        <div><strong>Type Filter:</strong> ${esc(this.txnFilterType)}</div><div><strong>Generated:</strong> ${new Date().toLocaleString('en-IN')}</div>
+      </div>
+      <table><thead><tr><th>Date</th><th>Time</th><th>Reference No</th><th>Type</th><th class="r">Previous Balance</th><th class="r">Amount</th><th class="r">Closing Balance</th></tr></thead>
+      <tbody>${body}</tbody></table>
+      <div class="sum"><span>Total Credits: <strong class="cr">₹${m(credits)}</strong></span><span>Total Debits: <strong class="dr">₹${m(debits)}</strong></span><span>Transactions: <strong>${rows.length}</strong></span></div>
+      <p class="foot">This is a computer generated statement from NeoBank Digital Banking and does not require a signature.</p>
+      <script>window.onload=function(){window.print();}</script></body></html>`);
+    w.document.close();
   }
 
   // Helpers

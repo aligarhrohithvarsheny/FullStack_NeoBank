@@ -4,6 +4,7 @@ import { Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { environment } from '../../../../environment/environment';
+import { openLoanDocument, isLoanClosed } from '../../../service/loan-documents';
 
 interface LoanRequest {
   id: number;
@@ -453,6 +454,16 @@ export class Loans implements OnInit {
   }
 
   // Format date/time with proper timezone handling
+  isClosed(loan: any): boolean {
+    return isLoanClosed(loan);
+  }
+
+  downloadLoanDoc(kind: 'noc' | 'receipt', loan: any) {
+    if (!openLoanDocument(kind, loan, 'personal', 'admin')) {
+      alert('Please allow popups to download the document');
+    }
+  }
+
   formatDateTime(dateTimeString: string): string {
     if (!dateTimeString) return '-';
     try {

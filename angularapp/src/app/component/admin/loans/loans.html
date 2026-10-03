@@ -93,6 +93,13 @@
                 </ng-template>
               </ng-template>
 
+              <button class="view-form-btn" (click)="downloadLoanDoc('receipt', loan)" title="Download Loan Receipt" [disabled]="loan.status === 'Pending' || loan.status === 'Rejected'">
+                🧾 Receipt
+              </button>
+              <button *ngIf="isClosed(loan)" class="view-form-btn" (click)="downloadLoanDoc('noc', loan)" title="Download NOC">
+                📜 NOC
+              </button>
+
               <!-- View Personal Loan Form (only for Personal Loans) -->
               <button 
                 *ngIf="loan.type === 'Personal Loan' && loan.personalLoanFormPath"

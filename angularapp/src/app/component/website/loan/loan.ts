@@ -5,6 +5,7 @@ import { Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../../environment/environment';
 import { AlertService } from '../../../service/alert.service';
+import { openLoanDocument, isLoanClosed } from '../../../service/loan-documents';
 import { 
   College, 
   INDIAN_STATES, 
@@ -1425,6 +1426,16 @@ export class Loan implements OnInit {
   }
 
   // Download loan details as PDF
+  isClosed(loan: any): boolean {
+    return isLoanClosed(loan);
+  }
+
+  downloadLoanDoc(kind: 'noc' | 'receipt', loan: any) {
+    if (!openLoanDocument(kind, loan, 'personal', 'user', this.userName)) {
+      this.alertService.error('Error', 'Please allow popups to download the document');
+    }
+  }
+
   downloadForeclosurePDF(loan: LoanRequest) {
     if (!loan.loanAccountNumber) {
       this.alertService.error('Error', 'Loan account number not found');

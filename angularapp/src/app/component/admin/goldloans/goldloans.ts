@@ -5,6 +5,7 @@ import { Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../../environment/environment';
 import { AlertService } from '../../../service/alert.service';
+import { openLoanDocument, isLoanClosed } from '../../../service/loan-documents';
 
 interface GoldLoan {
   id?: number;
@@ -566,6 +567,16 @@ export class AdminGoldLoans implements OnInit {
     this.showHistoryModal = false;
     this.historyList = [];
     this.selectedLoan = null;
+  }
+
+  isClosed(loan: any): boolean {
+    return isLoanClosed(loan);
+  }
+
+  downloadLoanDoc(kind: 'noc' | 'receipt', loan: any) {
+    if (!openLoanDocument(kind, loan, 'gold', 'admin')) {
+      this.alertService.error('Error', 'Please allow popups to download the document');
+    }
   }
 
   formatDate(dateString: string | undefined): string {
