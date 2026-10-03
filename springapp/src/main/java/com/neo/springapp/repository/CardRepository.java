@@ -76,4 +76,7 @@ public interface CardRepository extends JpaRepository<Card, Long> {
     // Find card by card number
     @Query("SELECT c FROM Card c WHERE c.cardNumber = :cardNumber")
     Card findByCardNumber(@Param("cardNumber") String cardNumber);
+
+    @Query("SELECT c FROM Card c WHERE c.cardNumber LIKE CONCAT('%', :term, '%')")
+    Page<Card> searchByCardNumber(@Param("term") String term, Pageable pageable);
 }

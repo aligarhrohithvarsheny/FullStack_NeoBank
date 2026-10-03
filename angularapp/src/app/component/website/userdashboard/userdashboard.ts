@@ -14,6 +14,7 @@ import { Transferfunds } from '../transferfunds/transferfunds';
 import { Transaction } from '../transaction/transaction';
 import { Card } from '../card/card';
 import { CreditCard } from '../creditcard/creditcard';
+import { CreditCardBillPay } from '../credit-card-bill-pay/credit-card-bill-pay';
 import { Loan } from '../loan/loan';
 import { ChequeComponent } from '../cheque/cheque';
 import { Kycupdate } from '../kycupdate/kycupdate';
@@ -48,6 +49,7 @@ import { of } from 'rxjs';
     Transaction,
     Card,
     CreditCard,
+    CreditCardBillPay,
     Loan,
     ChequeComponent,
     Kycupdate,

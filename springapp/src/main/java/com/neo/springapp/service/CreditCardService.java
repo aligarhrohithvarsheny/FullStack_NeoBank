@@ -522,6 +522,151 @@ public class CreditCardService {
         return result;
     }
 
+    // ---------- User-side credit card bill pay (last 4 digits + linked mobile) ----------
+
+    private static String lastDigits(String value, int n) {
+        String digits = value == null ? "" : value.replaceAll("\\D", "");
+        return digits.length() <= n ? digits : digits.substring(digits.length() - n);
+    }
+
+    private String getLinkedMobile(String accountNumber) {
+        if (accountNumber == null) return null;
+        Account savings = accountService.getAccountByNumber(accountNumber);
+        if (savings != null) return savings.getPhone();
+        CurrentAccount cur = currentAccountRepository.findByAccountNumber(accountNumber).orElse(null);
+        if (cur != null) return cur.getMobile();
+        SalaryAccount sal = salaryAccountRepository.findByAccountNumber(accountNumber);
+        return sal != null ? sal.getMobileNumber() : null;
+    }
+
+    private CreditCard findCardForBillPay(String last4, String mobile) {
+        String l4 = lastDigits(last4, 4);
+        String mob = lastDigits(mobile, 10);
+        if (l4.length() != 4 || mob.length() != 10) {
+            throw new IllegalArgumentException("Enter the last 4 digits of the card and a valid 10-digit mobile number");
+        }
+        for (CreditCard card : creditCardRepository.findAll()) {
+            if (card.getCardNumber() == null || !"Active".equalsIgnoreCase(card.getStatus())) continue;
+            if (!lastDigits(card.getCardNumber(), 4).equals(l4)) continue;
+            if (mob.equals(lastDigits(getLinkedMobile(card.getAccountNumber()), 10))) {
+                return card;
+            }
+        }
+        throw new IllegalArgumentException("No active credit card found for these details");
+    }
+
+    public Map<String, Object> lookupCardForBillPay(String last4, String mobile, String payerAccountNumber) {
+        CreditCard card = findCardForBillPay(last4, mobile);
+        double outstanding = card.getCurrentBalance() == null ? 0.0 : card.getCurrentBalance();
+        double minimumDue = outstanding <= 0 ? 0.0
+                : Math.min(outstanding, Math.max(100.0, Math.round(outstanding * 5.0) / 100.0));
+        Optional<CreditCardBill> latest = billRepository
+                .findFirstByCreditCardIdOrderByBillGenerationDateDesc(card.getId());
+        if (latest.isPresent() && latest.get().getMinimumDue() != null && outstanding > 0
+                && !"Paid".equalsIgnoreCase(latest.get().getStatus())) {
+            double billMin = latest.get().getMinimumDue() - (latest.get().getPaidAmount() == null ? 0.0 : latest.get().getPaidAmount());
+            minimumDue = Math.min(outstanding, Math.max(0.0, billMin));
+        }
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("cardId", card.getId());
+        result.put("cardHolderName", card.getUserName());
+        result.put("maskedCardNumber", card.getMaskedCardNumber());
+        result.put("outstandingBalance", outstanding);
+        result.put("minimumDue", Math.round(minimumDue * 100.0) / 100.0);
+        result.put("approvedLimit", card.getApprovedLimit());
+        result.put("availableLimit", card.getAvailableLimit());
+        result.put("dueDate", latest.map(CreditCardBill::getDueDate).orElse(card.getNextBillingDate()));
+        result.put("payerAccountNumber", payerAccountNumber);
+        result.put("payerAvailableBalance", getAccountBalance(payerAccountNumber));
+        return result;
+    }
+
+    @Transactional
+    public Map<String, Object> payBillFromAccount(String last4, String mobile, String payerAccountNumber, Double amount) {
+        if (amount == null || amount <= 0) {
+            throw new IllegalArgumentException("Payment amount must be greater than zero");
+        }
+        if (payerAccountNumber == null || payerAccountNumber.isBlank()) {
+            throw new IllegalArgumentException("Paying account is required");
+        }
+        CreditCard card = findCardForBillPay(last4, mobile);
+        double outstanding = card.getCurrentBalance() == null ? 0.0 : card.getCurrentBalance();
+        if (outstanding <= 0) {
+            throw new IllegalArgumentException("No outstanding balance on this card");
+        }
+        if (amount > outstanding + 0.01) {
+            throw new IllegalArgumentException("Payment cannot exceed the outstanding balance of ₹"
+                    + String.format("%.2f", outstanding));
+        }
+
+        Double accountBalanceAfter = debitAnyAccount(payerAccountNumber, amount);
+        if (accountBalanceAfter == null) {
+            throw new IllegalArgumentException("Insufficient balance or account unavailable");
+        }
+
+        double cardBalanceAfter = Math.max(0.0, outstanding - amount);
+        card.setCurrentBalance(cardBalanceAfter);
+        card.setLastPaidDate(LocalDateTime.now());
+        if (cardBalanceAfter <= 0) {
+            card.setOverdueAmount(0.0);
+            card.setFine(0.0);
+            card.setPenalty(0.0);
+        }
+        card.calculateAvailableLimit();
+        card.calculateUsageLimit();
+        creditCardRepository.save(card);
+
+        billRepository.findFirstByCreditCardIdOrderByBillGenerationDateDesc(card.getId()).ifPresent(bill -> {
+            if (!"Paid".equalsIgnoreCase(bill.getStatus())) {
+                double paid = (bill.getPaidAmount() == null ? 0.0 : bill.getPaidAmount()) + amount;
+                bill.setPaidAmount(paid);
+                bill.setPaidDate(LocalDateTime.now());
+                bill.setStatus(paid >= (bill.getTotalAmount() == null ? 0.0 : bill.getTotalAmount()) ? "Paid" : "Partial");
+                billRepository.save(bill);
+            }
+        });
+
+        String description = "Credit card bill payment (" + card.getMaskedCardNumber() + ") from account " + payerAccountNumber;
+        Long globalSequence = transactionIdGenerator.getNextTransactionId();
+
+        CreditCardTransaction cardTx = new CreditCardTransaction();
+        cardTx.setGlobalTransactionSequence(globalSequence);
+        cardTx.setCreditCardId(card.getId());
+        cardTx.setCardNumber(card.getCardNumber());
+        cardTx.setAccountNumber(card.getAccountNumber());
+        cardTx.setUserName(card.getUserName());
+        cardTx.setTransactionType("Payment");
+        cardTx.setPaymentMethod("ACCOUNT");
+        cardTx.setDebitAccountNumber(payerAccountNumber);
+        cardTx.setProcessedBy("USER");
+        cardTx.setAmount(amount);
+        cardTx.setDescription(description);
+        cardTx.setBalanceAfter(cardBalanceAfter);
+        transactionRepository.save(cardTx);
+
+        Transaction accountTx = new Transaction();
+        accountTx.setGlobalTransactionSequence(globalSequence);
+        accountTx.setAccountNumber(payerAccountNumber);
+        accountTx.setUserName(card.getUserName());
+        accountTx.setAmount(amount);
+        accountTx.setType("Debit");
+        accountTx.setMerchant("Credit Card Bill");
+        accountTx.setDescription(description);
+        accountTx.setBalance(accountBalanceAfter);
+        accountTx.setStatus("Completed");
+        transactionService.saveTransaction(accountTx);
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("success", true);
+        result.put("paidAmount", amount);
+        result.put("remainingOutstanding", cardBalanceAfter);
+        result.put("accountBalanceAfter", accountBalanceAfter);
+        result.put("transactionId", globalSequence);
+        result.put("cardHolderName", card.getUserName());
+        return result;
+    }
+
     public Double getAccountBalance(String accountNumber) {
         if (accountNumber == null) return null;
         Account savingsAcc = accountService.getAccountByNumber(accountNumber);

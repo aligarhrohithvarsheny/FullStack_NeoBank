@@ -22,6 +22,7 @@ interface GoldLoan {
   customerId?: string; // Mapped from account for admin display
   currentBalance: number;
   loanAccountNumber?: string;
+  mobile?: string;
   applicationDate?: string;
   approvalDate?: string;
   approvedBy?: string;
@@ -63,6 +64,9 @@ export class AdminGoldLoans implements OnInit {
   
   // Filter
   filterStatus: string = 'Pending';
+  searchTerm: string = '';
+  fromDate: string = '';
+  toDate: string = '';
   
   // Selected loan for approval
   selectedLoan: GoldLoan | null = null;
@@ -187,11 +191,45 @@ export class AdminGoldLoans implements OnInit {
   }
 
   filterLoans() {
-    if (this.filterStatus === 'All') {
-      this.filteredLoans = this.goldLoans;
-    } else {
-      this.filteredLoans = this.goldLoans.filter(loan => loan.status === this.filterStatus);
-    }
+    const term = this.searchTerm.trim().toLowerCase();
+    const digits = term.replace(/[,\s₹]/g, '');
+    this.filteredLoans = this.goldLoans.filter(loan => {
+      if (this.filterStatus !== 'All' && loan.status !== this.filterStatus) {
+        return false;
+      }
+      if (term) {
+        const textFields = [loan.accountNumber, loan.loanAccountNumber, loan.userName, loan.mobile]
+          .map(v => (v ?? '').toString().toLowerCase());
+        const amounts = [loan.loanAmount, loan.goldValue]
+          .filter(v => v !== null && v !== undefined)
+          .map(v => String(v));
+        const matches = textFields.some(v => v.includes(term)) ||
+          (digits !== '' && amounts.some(v => v.includes(digits)));
+        if (!matches) {
+          return false;
+        }
+      }
+      if (this.fromDate || this.toDate) {
+        if (!loan.applicationDate) {
+          return false;
+        }
+        const day = loan.applicationDate.substring(0, 10);
+        if (this.fromDate && day < this.fromDate) {
+          return false;
+        }
+        if (this.toDate && day > this.toDate) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }
+
+  clearSearch() {
+    this.searchTerm = '';
+    this.fromDate = '';
+    this.toDate = '';
+    this.filterLoans();
   }
 
   onFilterChange() {

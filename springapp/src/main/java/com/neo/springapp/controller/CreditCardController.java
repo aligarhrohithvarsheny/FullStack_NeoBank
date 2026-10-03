@@ -22,6 +22,37 @@ public class CreditCardController {
     @Autowired
     private CreditCardService creditCardService;
 
+    @GetMapping("/bill-pay/balance/{accountNumber}")
+    public ResponseEntity<?> getPayerBalance(@PathVariable String accountNumber) {
+        Double balance = creditCardService.getAccountBalance(accountNumber);
+        Map<String, Object> body = new HashMap<>();
+        body.put("balance", balance);
+        return ResponseEntity.ok(body);
+    }
+
+    @PostMapping("/bill-pay/lookup")
+    public ResponseEntity<?> lookupBillPay(@RequestBody Map<String, String> request) {
+        try {
+            return ResponseEntity.ok(creditCardService.lookupCardForBillPay(
+                    request.get("last4"), request.get("mobile"), request.get("payerAccountNumber")));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/bill-pay/pay")
+    public ResponseEntity<?> payBillFromAccount(@RequestBody Map<String, Object> request) {
+        try {
+            Object amt = request.get("amount");
+            Double amount = amt == null ? null : Double.valueOf(amt.toString());
+            return ResponseEntity.ok(creditCardService.payBillFromAccount(
+                    String.valueOf(request.get("last4")), String.valueOf(request.get("mobile")),
+                    String.valueOf(request.get("payerAccountNumber")), amount));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
+    }
+
     // Admin: Get all credit cards
     @GetMapping("/all")
     public ResponseEntity<List<CreditCard>> getAllCreditCards() {

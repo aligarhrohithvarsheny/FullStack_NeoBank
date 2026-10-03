@@ -43,6 +43,9 @@ public class GoldLoan {
     @Transient
     private String customerId; // Mapped from Account - not persisted, enriched for admin display
 
+    @Transient
+    private String mobile; // Mapped from Account phone - not persisted
+
     // Loan account information
     private String loanAccountNumber;
     private LocalDateTime applicationDate;

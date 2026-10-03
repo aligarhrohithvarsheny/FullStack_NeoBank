@@ -153,6 +153,9 @@ public class GoldLoanService {
                 if (account != null && account.getCustomerId() != null) {
                     loan.setCustomerId(account.getCustomerId());
                 }
+                if (account != null && account.getPhone() != null) {
+                    loan.setMobile(account.getPhone());
+                }
             }
         }
         return loans;

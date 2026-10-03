@@ -16,12 +16,13 @@ import {
 import { SoundboxDevice, SoundboxRequest, SoundboxTransaction, SoundboxStats } from '../../../model/soundbox/soundbox.model';
 import { UpiPayment, UpiStats, QrCodeResponse } from '../../../model/upi/upi.model';
 import { BusinessDrawChequeComponent } from './business-draw-cheque/business-draw-cheque.component';
+import { CreditCardBillPay } from '../credit-card-bill-pay/credit-card-bill-pay';
 import { PaymentGatewayService } from '../../../service/payment-gateway.service';
 
 @Component({
   selector: 'app-current-account-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule, BusinessDrawChequeComponent],
+  imports: [CommonModule, FormsModule, BusinessDrawChequeComponent, CreditCardBillPay],
   templateUrl: './current-account-dashboard.html',
   styleUrls: ['./current-account-dashboard.css']
 })
@@ -42,6 +43,7 @@ export class CurrentAccountDashboard implements OnInit, OnDestroy {
     { section: 'overdraft', icon: '', label: 'Overdraft Usage' },
     { section: 'cheque', icon: '', label: 'Cheque Book Request' },
     { section: 'draw-cheque', icon: '', label: 'Draw Cheque' },
+    { section: 'cc-bill-pay', icon: '', label: 'Credit Card Bill Pay' },
     { section: 'positive-pay', icon: '', label: 'Positive Pay - Register Cheque' },
     { section: 'statement', icon: '', label: 'Account Statement' },
     { section: 'profile', icon: '', label: 'Profile Settings' },

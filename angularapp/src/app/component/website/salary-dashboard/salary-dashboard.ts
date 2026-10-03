@@ -10,11 +10,12 @@ import { SalaryAccount, SalaryTransaction, SalaryNormalTransaction, SalaryLoginA
 import { SubscriptionPaymentComponent } from '../subscription-payment/subscription-payment';
 import { DrawChequeComponent } from './draw-cheque/draw-cheque.component';
 import { environment } from '../../../../environment/environment';
+import { CreditCardBillPay } from '../credit-card-bill-pay/credit-card-bill-pay';
 
 @Component({
   selector: 'app-salary-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule, SubscriptionPaymentComponent, DrawChequeComponent],
+  imports: [CommonModule, FormsModule, SubscriptionPaymentComponent, DrawChequeComponent, CreditCardBillPay],
   templateUrl: './salary-dashboard.html',
   styleUrls: ['./salary-dashboard.css']
 })

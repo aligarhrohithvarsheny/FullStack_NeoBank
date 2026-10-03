@@ -82,6 +82,10 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/><line x1="6" y1="16" x2="10" y2="16"/></svg>
         <span *ngIf="!sidebarCollapsed">Credit Card</span>
       </a>
+      <a class="sdash-nav-item" [class.active]="activeSection === 'cc-bill-pay'" (click)="setActiveSection('cc-bill-pay')" [hidden]="!matchesSidebarSearch('Credit Card Bill Pay')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/><line x1="6" y1="16" x2="12" y2="16"/></svg>
+        <span *ngIf="!sidebarCollapsed">Card Bill Pay</span>
+      </a>
       <a class="sdash-nav-item" [class.active]="activeSection === 'passbook'" (click)="setActiveSection('passbook')" [hidden]="!matchesSidebarSearch('Passbook')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h13a3 3 0 0 1 3 3v13H7a3 3 0 0 1-3-3V4z"/><path d="M4 17h16M8 8h8M8 12h6"/></svg>
         <span *ngIf="!sidebarCollapsed">Passbook</span>
@@ -150,6 +154,7 @@
            activeSection === 'upi' ? 'UPI Payments' :
            activeSection === 'debit-card' ? 'Debit Card Management' :
            activeSection === 'credit-card' ? 'Credit Card Application' :
+           activeSection === 'cc-bill-pay' ? 'Credit Card Bill Pay' :
            activeSection === 'passbook' ? 'Salary Passbook' :
            activeSection === 'loan-eligibility' ? 'Loan Eligibility' :
            activeSection === 'auto-savings' ? 'Auto Savings' :
@@ -1488,6 +1493,10 @@
       </div>
 
       <!-- ─── LOAN ELIGIBILITY ──────────────────────────── -->
+      <div *ngIf="activeSection === 'cc-bill-pay' && account" class="sdash-section">
+        <app-credit-card-bill-pay [accountNumber]="account.accountNumber || ''" (paid)="loadAccount()"></app-credit-card-bill-pay>
+      </div>
+
       <div *ngIf="activeSection === 'credit-card'" class="sdash-section">
 
         <!-- Issued credit card(s) -->

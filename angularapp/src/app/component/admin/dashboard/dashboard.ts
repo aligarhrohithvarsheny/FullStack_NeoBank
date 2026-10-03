@@ -4454,18 +4454,23 @@ export class Dashboard implements OnInit, OnDestroy {
   }
 
   // Universal Search Methods
+  private universalSearchSub: any = null;
+
   performUniversalSearch() {
     if (!this.universalSearchQuery || !this.universalSearchQuery.trim()) {
+      this.universalSearchSub?.unsubscribe();
+      this.isUniversalSearching = false;
       this.universalSearchResults = null;
       return;
     }
 
     this.isUniversalSearching = true;
     const query = this.universalSearchQuery.trim();
+    this.universalSearchSub?.unsubscribe();
 
-    this.http.get(`${environment.apiBaseUrl}/api/admin/search?q=${encodeURIComponent(query)}`)
+    this.universalSearchSub = this.http.get(`${environment.apiBaseUrl}/api/admin/search?q=${encodeURIComponent(query)}`)
       .pipe(
-        timeout(30000),
+        timeout(60000),
         catchError(err => {
           console.error('Error performing universal search:', err);
           let errorMessage = 'Failed to perform search. ';
@@ -4486,10 +4491,9 @@ export class Dashboard implements OnInit, OnDestroy {
       )
       .subscribe({
         next: (results: any) => {
-          if (!results) return; // Error occurred
+          if (!results) { this.isUniversalSearching = false; return; }
           this.universalSearchResults = results;
           this.isUniversalSearching = false;
-          console.log('Universal search results:', results);
         }
       });
   }
@@ -4497,11 +4501,15 @@ export class Dashboard implements OnInit, OnDestroy {
   onSearchInputChange() {
     // Clear results when input changes
     if (!this.universalSearchQuery || this.universalSearchQuery.trim().length < 2) {
+      this.universalSearchSub?.unsubscribe();
+      this.isUniversalSearching = false;
       this.universalSearchResults = null;
     }
   }
 
   clearUniversalSearch() {
+    this.universalSearchSub?.unsubscribe();
+    this.isUniversalSearching = false;
     this.universalSearchQuery = '';
     this.universalSearchResults = null;
   }

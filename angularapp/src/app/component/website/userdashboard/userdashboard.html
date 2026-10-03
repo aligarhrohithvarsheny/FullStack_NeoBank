@@ -573,6 +573,10 @@
           <div class="cb-svc-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg></div>
           <span>Credit Card</span>
         </div>
+        <div class="cb-service-card" (click)="selectFeature('credit-card-bill')">
+          <div class="cb-svc-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/><line x1="6" y1="16" x2="12" y2="16"/></svg></div>
+          <span>Card Bill Pay</span>
+        </div>
         <div class="cb-service-card" (click)="selectFeature('goldloan')">
           <div class="cb-svc-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></div>
           <span>Gold Loan</span>
@@ -863,6 +867,7 @@
       <div *ngIf="selectedFeature === 'transaction'" class="ud-embedded"><app-transaction></app-transaction></div>
       <div *ngIf="selectedFeature === 'card'" class="ud-embedded"><app-card></app-card></div>
       <div *ngIf="selectedFeature === 'credit-card'" class="ud-embedded"><app-creditcard></app-creditcard></div>
+      <div *ngIf="selectedFeature === 'credit-card-bill'" class="ud-embedded"><app-credit-card-bill-pay [accountNumber]="userAccountNumber" (paid)="currentBalance = $event.accountBalanceAfter"></app-credit-card-bill-pay></div>
       <div *ngIf="selectedFeature === 'loan'" class="ud-embedded"><app-loan></app-loan></div>
       <div *ngIf="selectedFeature === 'cheque'" class="ud-embedded"><app-cheque></app-cheque></div>
       <div *ngIf="selectedFeature === 'kycupdate'" class="ud-embedded"><app-kycupdate></app-kycupdate></div>

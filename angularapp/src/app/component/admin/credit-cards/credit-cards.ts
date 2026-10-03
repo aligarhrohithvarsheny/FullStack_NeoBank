@@ -1,4 +1,4 @@
-import { Component, OnInit, Inject, PLATFORM_ID } from '@angular/core';
+import { Component, OnInit, OnDestroy, Inject, PLATFORM_ID } from '@angular/core';
 import { Router } from '@angular/router';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -13,7 +13,8 @@ import { AlertService } from '../../../service/alert.service';
   templateUrl: './credit-cards.html',
   styleUrls: ['./credit-cards.css']
 })
-export class CreditCards implements OnInit {
+export class CreditCards implements OnInit, OnDestroy {
+  private refreshTimer: any = null;
   creditCards: any[] = [];
   filteredCreditCards: any[] = [];
   isLoadingCreditCards: boolean = false;
@@ -91,7 +92,28 @@ export class CreditCards implements OnInit {
       }
       this.loadCreditCards();
       this.loadTransferFeePercent();
+      this.refreshTimer = setInterval(() => this.silentRefresh(), 10000);
     }
+  }
+
+  ngOnDestroy() {
+    if (this.refreshTimer) clearInterval(this.refreshTimer);
+  }
+
+  // Keeps card list, balances, bills and transactions live (e.g. user-side bill payments)
+  private silentRefresh() {
+    this.http.get(`${environment.apiBaseUrl}/api/credit-cards/all`).subscribe({
+      next: (response: any) => {
+        this.creditCards = Array.isArray(response) ? response : (response.content || []);
+        this.filterCreditCards();
+        if (this.selectedCreditCard?.id) {
+          const fresh = this.creditCards.find(c => c.id === this.selectedCreditCard.id);
+          if (fresh) this.selectedCreditCard = fresh;
+          this.loadCreditCardDetails(this.selectedCreditCard.id);
+        }
+      },
+      error: () => {}
+    });
   }
 
   goBack() {

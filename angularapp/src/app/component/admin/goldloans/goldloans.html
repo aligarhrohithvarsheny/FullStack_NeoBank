@@ -83,6 +83,18 @@
         All
       </button>
     </div>
+    <div class="search-bar" style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:12px;">
+      <input
+        type="text"
+        [(ngModel)]="searchTerm"
+        (ngModelChange)="onFilterChange()"
+        placeholder="Search by account no, gold loan no, mobile, name, amount"
+        style="flex:1;min-width:260px;padding:8px 12px;border:1px solid #ccc;border-radius:6px;"
+      />
+      <label>From <input type="date" [(ngModel)]="fromDate" (ngModelChange)="onFilterChange()" style="padding:7px;border:1px solid #ccc;border-radius:6px;" /></label>
+      <label>To <input type="date" [(ngModel)]="toDate" (ngModelChange)="onFilterChange()" style="padding:7px;border:1px solid #ccc;border-radius:6px;" /></label>
+      <button type="button" class="filter-btn" (click)="clearSearch()">Clear</button>
+    </div>
   </div>
 
   <!-- Loading State -->
@@ -99,7 +111,7 @@
   <!-- Gold Loans List -->
   <div *ngIf="!loading && !error" class="gold-loans-list">
     <div *ngIf="filteredLoans.length === 0" class="no-loans">
-      <p>No gold loans found with status: {{ filterStatus }}</p>
+      <p>No gold loans found{{ filterStatus !== 'All' ? ' with status: ' + filterStatus : '' }}{{ searchTerm || fromDate || toDate ? ' matching your search' : '' }}</p>
     </div>
 
     <div *ngFor="let loan of filteredLoans" class="loan-card">

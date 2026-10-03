@@ -571,7 +571,7 @@ public class AdminSearchService {
 
         // Search by partial matches
         if (term.length() >= 3) {
-            List<Account> allAccounts = accountRepository.findAll();
+            List<Account> allAccounts = java.util.Collections.emptyList(); // covered by searchAccounts query above
             for (Account account : allAccounts) {
                 if (results.stream().anyMatch(r -> r.get("accountNumber").equals(account.getAccountNumber()))) {
                     continue;
@@ -728,7 +728,7 @@ public class AdminSearchService {
 
         // Partial search on loan account number
         if (term.length() >= 4) {
-            List<Loan> allLoans = loanRepository.findAll();
+            List<Loan> allLoans = loanRepository.searchLoans(term, PageRequest.of(0, 100)).getContent();
             for (Loan loan : allLoans) {
                 if (results.stream().anyMatch(r -> r.get("loanId").equals(loan.getId()))) {
                     continue;
@@ -816,13 +816,15 @@ public class AdminSearchService {
         List<Map<String, Object>> results = new ArrayList<>();
         if (demandDraftRepository == null) return results;
         try {
-            demandDraftRepository.findAll().stream()
-                    .filter(d -> containsIgnoreCase(d.getDdNumber(), term)
-                            || containsIgnoreCase(d.getChequeNumber(), term)
-                            || containsIgnoreCase(d.getAccountNumber(), term)
-                            || (d.getId() != null && String.valueOf(d.getId()).equals(term)))
-                    .limit(50)
+            demandDraftRepository.searchByTerm(term, PageRequest.of(0, 50))
                     .forEach(d -> results.add(createDemandDraftResult(d, matchTypeForDraft(d, term))));
+            if (term.matches("\\d{1,18}")) {
+                demandDraftRepository.findById(Long.valueOf(term)).ifPresent(d -> {
+                    if (results.stream().noneMatch(r -> d.getId().equals(r.get("id")))) {
+                        results.add(createDemandDraftResult(d, matchTypeForDraft(d, term)));
+                    }
+                });
+            }
         } catch (Exception e) { /* keep other universal search groups available */ }
         return results;
     }
@@ -954,15 +956,9 @@ public class AdminSearchService {
             if (seenCardIds.add(card.getId())) results.add(createCardResult(card, "Account Number"));
         }
 
-        Pageable cardPage = PageRequest.of(0, 50);
-        Page<Card> cardPageResult = cardRepository.findAll(cardPage);
+        Page<Card> cardPageResult = cardRepository.searchByCardNumber(term, PageRequest.of(0, 50));
         for (Card card : cardPageResult.getContent()) {
-            if (card.getCardNumber() != null) {
-                String cardNumber = card.getCardNumber();
-                if (cardNumber.contains(term) || cardNumber.endsWith(term)) {
-                    if (seenCardIds.add(card.getId())) results.add(createCardResult(card, "Card Number"));
-                }
-            }
+            if (seenCardIds.add(card.getId())) results.add(createCardResult(card, "Card Number"));
         }
 
         if (salaryAccountRepository != null) {
