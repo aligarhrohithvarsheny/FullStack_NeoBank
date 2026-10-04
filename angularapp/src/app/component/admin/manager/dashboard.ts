@@ -21,6 +21,7 @@ interface AdminFeature {
   category: string;
   enabled: boolean;
   icon: string;
+  accessStatus?: 'enabled' | 'disabled' | 'denied';
 }
 
 @Component({
@@ -137,6 +138,37 @@ export class ManagerDashboard implements OnInit, OnDestroy {
 
   // Feature Access Control
   adminFeatures: AdminFeature[] = [
+    { id: 'profile', name: 'Admin Profile', description: 'View and manage the admin profile', category: 'Management', enabled: true, icon: 'fa-user-shield' },
+    { id: 'account-conversion', name: 'Account Conversion', description: 'Convert account types and review conversion history', category: 'Accounts', enabled: true, icon: 'fa-exchange-alt' },
+    { id: 'agent-management', name: 'Agent Management', description: 'Manage field agents', category: 'Management', enabled: true, icon: 'fa-user-tie' },
+    { id: 'ai-security', name: 'AI Security Center', description: 'Monitor security alerts and activity', category: 'Security', enabled: true, icon: 'fa-shield-alt' },
+    { id: 'atm-management', name: 'ATM Management', description: 'Manage ATMs, cash loads, and incidents', category: 'Operations', enabled: true, icon: 'fa-university' },
+    { id: 'aadhar-verification', name: 'Aadhaar Verification', description: 'Verify Aadhaar for new accounts', category: 'Management', enabled: true, icon: 'fa-id-card' },
+    { id: 'bank-forms', name: 'Bank Forms', description: 'Download and manage banking forms', category: 'Services', enabled: true, icon: 'fa-file-alt' },
+    { id: 'beneficiaries', name: 'Beneficiaries', description: 'Manage registered beneficiaries', category: 'Accounts', enabled: true, icon: 'fa-users' },
+    { id: 'biometric', name: 'Biometric Authentication', description: 'Manage biometric authentication', category: 'Security', enabled: true, icon: 'fa-camera' },
+    { id: 'bill-payments', name: 'Bill Payments', description: 'View bill payment history', category: 'Transactions', enabled: true, icon: 'fa-file-invoice-dollar' },
+    { id: 'branch-operations', name: 'Branch Operations', description: 'Manage branch balances, charges, loans, and reports', category: 'Operations', enabled: true, icon: 'fa-university' },
+    { id: 'business-cheque-draw', name: 'Business Cheque Draw', description: 'Manage business cheque draw requests', category: 'Transactions', enabled: true, icon: 'fa-building' },
+    { id: 'account-verification', name: 'Account Verification', description: 'Review linked allocation accounts', category: 'Accounts', enabled: true, icon: 'fa-university' },
+    { id: 'cheque-draw', name: 'Cheque Draw Requests', description: 'Manage salary cheque draw requests', category: 'Transactions', enabled: true, icon: 'fa-receipt' },
+    { id: 'current-accounts', name: 'Current Accounts', description: 'Manage business current accounts', category: 'Accounts', enabled: true, icon: 'fa-building' },
+    { id: 'demand-drafts', name: 'Demand Drafts', description: 'Review and approve demand drafts', category: 'Transactions', enabled: true, icon: 'fa-file-invoice-dollar' },
+    { id: 'family-banking', name: 'Family Banking', description: 'Review joint and minor account workflows', category: 'Accounts', enabled: true, icon: 'fa-people-roof' },
+    { id: 'fasttags', name: 'FASTag Management', description: 'Manage FASTag registrations', category: 'Services', enabled: true, icon: 'fa-tag' },
+    { id: 'insurance', name: 'Insurance', description: 'Manage insurance applications and claims', category: 'Services', enabled: true, icon: 'fa-file-medical' },
+    { id: 'merchant-onboarding', name: 'Merchant Onboarding', description: 'Review merchant applications', category: 'Management', enabled: true, icon: 'fa-store' },
+    { id: 'net-banking-control', name: 'Net Banking Control', description: 'Enable or disable net banking services', category: 'Security', enabled: true, icon: 'fa-power-off' },
+    { id: 'open-account', name: 'Open Account', description: 'Review account opening applications', category: 'Accounts', enabled: true, icon: 'fa-user-plus' },
+    { id: 'passbook', name: 'Passbook Generation', description: 'Generate customer passbooks', category: 'Accounts', enabled: true, icon: 'fa-book' },
+    { id: 'payment-gateway', name: 'Payment Gateway', description: 'Manage payment gateway merchants and access', category: 'Services', enabled: true, icon: 'fa-bolt' },
+    { id: 'positive-pay', name: 'Positive Pay Requests', description: 'Verify customer cheque registrations', category: 'Transactions', enabled: true, icon: 'fa-shield-alt' },
+    { id: 'profile-updates', name: 'Profile Updates', description: 'Approve profile change requests', category: 'Management', enabled: true, icon: 'fa-user-edit' },
+    { id: 'signature-management', name: 'Signature Management', description: 'Upload and verify customer signatures', category: 'Services', enabled: true, icon: 'fa-signature' },
+    { id: 'support-tickets', name: 'Customer Support', description: 'Respond to customer support tickets', category: 'Services', enabled: true, icon: 'fa-comments' },
+    { id: 'transfers', name: 'Fund Transfers', description: 'Review NEFT, RTGS, and IMPS transfers', category: 'Transactions', enabled: true, icon: 'fa-exchange-alt' },
+    { id: 'upi-management', name: 'UPI Management', description: 'Manage UPI accounts and transactions', category: 'Services', enabled: true, icon: 'fa-mobile-alt' },
+    { id: 'video-kyc', name: 'Video KYC', description: 'Conduct video KYC sessions', category: 'Services', enabled: true, icon: 'fa-video' },
     { id: 'manage-users', name: 'Manage Users', description: 'Create, view, and update users', category: 'Main Menu', enabled: true, icon: 'fa-users' },
     { id: 'user-control', name: 'Full User Control', description: 'Edit all user details & accounts', category: 'Main Menu', enabled: true, icon: 'fa-user-cog' },
     { id: 'deposit-withdraw', name: 'Deposit/Withdraw', description: 'Deposit or withdraw money for users', category: 'Financial Operations', enabled: true, icon: 'fa-exchange-alt' },
@@ -163,6 +195,13 @@ export class ManagerDashboard implements OnInit, OnDestroy {
   filteredFeatures: AdminFeature[] = [];
   featureFilter: string = 'ALL';
   featureSearchQuery: string = '';
+  featureAccessTab: 'ALL' | 'ENABLED' | 'DISABLED' | 'DENIED' = 'ALL';
+  featureAccessTabs: { id: 'ALL' | 'ENABLED' | 'DISABLED' | 'DENIED'; label: string }[] = [
+    { id: 'ALL', label: 'All Features' },
+    { id: 'ENABLED', label: 'Enabled' },
+    { id: 'DISABLED', label: 'Disabled' },
+    { id: 'DENIED', label: 'Denied' }
+  ];
 
   // Admin List and Selection
   allAdmins: any[] = [];
@@ -1405,6 +1444,7 @@ export class ManagerDashboard implements OnInit, OnDestroy {
   }
 
   loadAdminFeatureAccess(adminEmail: string) {
+    this.adminFeatures.forEach(feature => this.setFeatureStatus(feature, 'enabled'));
     // Load saved feature access for this admin
     const savedKey = `adminFeatureAccess_${adminEmail}`;
     const savedFeatures = localStorage.getItem(savedKey);
@@ -1416,14 +1456,14 @@ export class ManagerDashboard implements OnInit, OnDestroy {
         features.forEach((savedFeature: any) => {
           const feature = this.adminFeatures.find(f => f.id === savedFeature.id);
           if (feature) {
-            feature.enabled = savedFeature.enabled;
+            this.setFeatureStatus(feature, this.parseFeatureStatus(savedFeature));
           }
         });
         
         // Store in map
         const featureMap = new Map<string, boolean>();
-        features.forEach((f: any) => {
-          featureMap.set(f.id, f.enabled);
+        this.adminFeatures.forEach(feature => {
+          featureMap.set(feature.id, feature.enabled);
         });
         this.adminFeatureAccess.set(adminEmail, featureMap);
       } catch (e) {
@@ -1437,6 +1477,7 @@ export class ManagerDashboard implements OnInit, OnDestroy {
       });
       this.adminFeatureAccess.set(adminEmail, featureMap);
     }
+    this.filterFeatures();
     
     // Also try to load from backend
     this.http.get(`${environment.apiBaseUrl}/api/admins/feature-access/${adminEmail}`).subscribe({
@@ -1444,12 +1485,14 @@ export class ManagerDashboard implements OnInit, OnDestroy {
         if (response && response.success && response.features && response.features.length > 0) {
           response.features.forEach((feature: any) => {
             const f = this.adminFeatures.find(af => af.id === feature.id);
-            if (f) {
-              f.enabled = feature.enabled;
-            }
+            if (f) this.setFeatureStatus(f, this.parseFeatureStatus(feature));
           });
+          const featureMap = new Map<string, boolean>();
+          this.adminFeatures.forEach(feature => featureMap.set(feature.id, feature.enabled));
+          this.adminFeatureAccess.set(adminEmail, featureMap);
           // Update localStorage
-          localStorage.setItem(savedKey, JSON.stringify(response.features));
+          localStorage.setItem(savedKey, JSON.stringify(this.serializeFeatureAccess()));
+          this.filterFeatures();
         }
       },
       error: (err) => {
@@ -1506,9 +1549,7 @@ export class ManagerDashboard implements OnInit, OnDestroy {
         // Update enabled status from saved data
         features.forEach((savedFeature: any) => {
           const feature = this.adminFeatures.find(f => f.id === savedFeature.id);
-          if (feature) {
-            feature.enabled = savedFeature.enabled;
-          }
+          if (feature) this.setFeatureStatus(feature, this.parseFeatureStatus(savedFeature));
         });
       } catch (e) {
         console.error('Error loading feature access:', e);
@@ -1525,10 +1566,7 @@ export class ManagerDashboard implements OnInit, OnDestroy {
     }
     
     // Save ALL features with their current enabled/disabled status for selected admin
-    const featuresToSave = this.adminFeatures.map(f => ({
-      id: f.id,
-      enabled: f.enabled
-    }));
+    const featuresToSave = this.serializeFeatureAccess();
     
     const adminEmail = this.selectedAdmin.email;
     const savedKey = `adminFeatureAccess_${adminEmail}`;
@@ -1576,19 +1614,68 @@ export class ManagerDashboard implements OnInit, OnDestroy {
   }
 
   toggleFeature(feature: AdminFeature) {
-    feature.enabled = !feature.enabled;
-    this.saveFeatureAccess();
+    this.setFeatureAccess(feature, feature.enabled ? 'disabled' : 'enabled');
   }
 
   toggleAllFeatures(enabled: boolean) {
-    this.adminFeatures.forEach(feature => {
-      feature.enabled = enabled;
-    });
+    this.adminFeatures.forEach(feature => this.setFeatureStatus(feature, enabled ? 'enabled' : 'disabled'));
+    this.filterFeatures();
     this.saveFeatureAccess();
+  }
+
+  denyAllFeatures() {
+    this.adminFeatures.forEach(feature => this.setFeatureStatus(feature, 'denied'));
+    this.filterFeatures();
+    this.saveFeatureAccess();
+  }
+
+  setFeatureAccessTab(tab: 'ALL' | 'ENABLED' | 'DISABLED' | 'DENIED') {
+    this.featureAccessTab = tab;
+    this.filterFeatures();
+  }
+
+  getFeatureAccessTabCount(tab: 'ALL' | 'ENABLED' | 'DISABLED' | 'DENIED'): number {
+    if (tab === 'ALL') return this.adminFeatures.length;
+    const status = tab.toLowerCase();
+    return this.adminFeatures.filter(feature => this.getFeatureStatus(feature) === status).length;
+  }
+
+  setFeatureAccess(feature: AdminFeature, status: 'enabled' | 'disabled' | 'denied') {
+    this.setFeatureStatus(feature, status);
+    this.filterFeatures();
+    this.saveFeatureAccess();
+  }
+
+  private setFeatureStatus(feature: AdminFeature, status: 'enabled' | 'disabled' | 'denied') {
+    feature.accessStatus = status;
+    feature.enabled = status === 'enabled';
+  }
+
+  private getFeatureStatus(feature: AdminFeature): 'enabled' | 'disabled' | 'denied' {
+    return feature.accessStatus || (feature.enabled ? 'enabled' : 'disabled');
+  }
+
+  private parseFeatureStatus(feature: any): 'enabled' | 'disabled' | 'denied' {
+    if (feature?.accessStatus === 'denied' || feature?.status === 'denied') return 'denied';
+    if (feature?.accessStatus === 'disabled' || feature?.status === 'disabled') return 'disabled';
+    return feature?.enabled === false ? 'disabled' : 'enabled';
+  }
+
+  private serializeFeatureAccess() {
+    return this.adminFeatures.map(feature => ({
+      id: feature.id,
+      enabled: feature.enabled,
+      accessStatus: this.getFeatureStatus(feature)
+    }));
   }
 
   filterFeatures() {
     let filtered = [...this.adminFeatures];
+
+    if (this.featureAccessTab !== 'ALL') {
+      const status = this.featureAccessTab.toLowerCase();
+      filtered = filtered.filter(feature => this.getFeatureStatus(feature) === status);
+    }
 
     if (this.featureFilter !== 'ALL') {
       filtered = filtered.filter(f => f.category === this.featureFilter);
@@ -1603,7 +1690,7 @@ export class ManagerDashboard implements OnInit, OnDestroy {
       );
     }
 
-    this.filteredFeatures = filtered;
+    this.filteredFeatures = filtered.sort((first, second) => first.name.localeCompare(second.name));
   }
 
   getCategories(): string[] {

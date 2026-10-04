@@ -13,13 +13,13 @@
         <button *ngIf="isFromManager" class="back-to-manager-btn" (click)="goBackToManager()" title="Back to Manager Dashboard">
           <i class="fa fa-arrow-left"></i> Back to Manager
         </button>
-        <button class="header-forms-tab" [class.active]="activeSection === 'bank-forms'" (click)="setActiveSection('bank-forms')" title="Bank Forms">
+        <button *ngIf="hasFeatureAccess('bank-forms')" class="header-forms-tab" [class.active]="activeSection === 'bank-forms'" (click)="setActiveSection('bank-forms')" title="Bank Forms">
           <i class="fa fa-file-alt"></i> Forms
         </button>
-        <button class="header-forms-tab positive-pay-header-button" (click)="navigateTo('positive-pay')" title="Open Positive Pay Requests">
+        <button *ngIf="hasFeatureAccess('positive-pay')" class="header-forms-tab positive-pay-header-button" (click)="navigateTo('positive-pay')" title="Open Positive Pay Requests">
           <i class="fa fa-shield-alt"></i> Positive Pay
         </button>
-        <button class="header-forms-tab" (click)="navigateTo('account-verification')" title="Review linked allocation accounts">
+        <button *ngIf="hasFeatureAccess('account-verification')" class="header-forms-tab" (click)="navigateTo('account-verification')" title="Review linked allocation accounts">
           <i class="fa fa-university"></i> Account Verification
         </button>
         <button *ngIf="activeSection !== 'home'" class="back-to-home-btn" (click)="setActiveSection('home')">
@@ -38,7 +38,7 @@
           </div>
         </div>
         <span class="admin-name"><i class="fa fa-user-shield"></i> {{ adminName }}<small class="assigned-city" *ngIf="assignedCity">{{ assignedCity }}</small></span>
-        <button class="header-forms-tab" (click)="navigateTo('profile')" title="Open Admin Profile">
+        <button *ngIf="hasFeatureAccess('profile')" class="header-forms-tab" (click)="navigateTo('profile')" title="Open Admin Profile">
           <i class="fa fa-user-cog"></i> Profile
         </button>
         <button class="logout-btn-header" (click)="logout()" title="Logout">
@@ -815,7 +815,7 @@
       </div>
       <div class="feature-grid">
         <ng-container *ngFor="let feature of getFilteredFeatures()">
-          <div class="feature-box" (click)="onFeatureClick(feature)" [class.disabled]="feature.featureKey && !hasFeatureAccess(feature.featureKey)">
+          <div class="feature-box" (click)="onFeatureClick(feature)" [class.disabled]="!hasFeatureAccess(feature.featureKey || feature.section)">
             <div class="feature-icon-wrapper" [style.background]="feature.gradient">
               <i class="fa" [ngClass]="feature.icon"></i>
             </div>

@@ -1012,6 +1012,11 @@ export class Dashboard implements OnInit, OnDestroy {
       console.log(`No saved feature access found for ${adminEmail} in localStorage`);
     }
 
+    this.featureBoxes.forEach(feature => {
+      const featureKey = feature.featureKey || feature.section;
+      if (!this.featureAccess.has(featureKey)) this.featureAccess.set(featureKey, true);
+    });
+
     // Also try to load from backend (this will override localStorage if backend has data)
     // Encode the email to prevent URL injection issues
     const encodedEmail = encodeURIComponent(adminEmail);
@@ -1075,6 +1080,10 @@ export class Dashboard implements OnInit, OnDestroy {
             this.featureAccess.clear();
             response.features.forEach((feature: any) => {
               this.featureAccess.set(feature.id, feature.enabled === true); // Ensure boolean
+            });
+            this.featureBoxes.forEach(feature => {
+              const featureKey = feature.featureKey || feature.section;
+              if (!this.featureAccess.has(featureKey)) this.featureAccess.set(featureKey, true);
             });
             // Update localStorage with backend data
             localStorage.setItem(savedKey, JSON.stringify(response.features));
@@ -1552,10 +1561,10 @@ export class Dashboard implements OnInit, OnDestroy {
     const query = (this.featureSearchQuery || '').toLowerCase().trim();
     return this.featureBoxes.filter(f => {
       const matchesSearch = !query || f.label.toLowerCase().includes(query) || f.description.toLowerCase().includes(query) || f.section.toLowerCase().includes(query);
-      const featureKey = f.featureKey;
-      const hasAccess = !featureKey || this.hasFeatureAccess(featureKey);
+      const featureKey = f.featureKey || f.section;
+      const hasAccess = this.hasFeatureAccess(featureKey);
       return matchesSearch && hasAccess;
-    });
+    }).sort((first, second) => first.label.localeCompare(second.label));
   }
 
   onFeatureClick(feature: any) {

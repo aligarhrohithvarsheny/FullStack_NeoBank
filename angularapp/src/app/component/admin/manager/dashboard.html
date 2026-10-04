@@ -283,6 +283,9 @@
         <button class="btn-secondary" (click)="toggleAllFeatures(false)">
           <i class="fa fa-ban"></i> Disable All
         </button>
+        <button class="btn-secondary" (click)="denyAllFeatures()">
+          <i class="fa fa-shield-alt"></i> Deny All
+        </button>
         <button class="btn-success" (click)="saveFeatureAccess()">
           <i class="fa fa-save"></i> Save Changes for {{ selectedAdmin.name }}
         </button>
@@ -292,6 +295,19 @@
       <div class="warning-message" *ngIf="!selectedAdmin && !isLoadingAdmins && allAdmins.length > 0">
         <i class="fa fa-exclamation-triangle"></i>
         <p>Please select an admin from the list above to manage their feature access.</p>
+      </div>
+
+      <div class="feature-access-tabs" *ngIf="selectedAdmin" role="tablist" aria-label="Filter features by access status">
+        <button
+          *ngFor="let tab of featureAccessTabs"
+          type="button"
+          class="feature-access-tab"
+          [class.active]="featureAccessTab === tab.id"
+          (click)="setFeatureAccessTab(tab.id)"
+          role="tab"
+          [attr.aria-selected]="featureAccessTab === tab.id">
+          {{ tab.label }} <span>{{ getFeatureAccessTabCount(tab.id) }}</span>
+        </button>
       </div>
 
       <!-- Filters -->
@@ -320,6 +336,7 @@
           class="feature-card"
           [class.enabled]="feature.enabled"
           [class.disabled]="!feature.enabled"
+          [class.denied]="feature.accessStatus === 'denied'"
         >
           <div class="feature-header">
             <div class="feature-icon">
@@ -329,30 +346,25 @@
               <h4>{{ feature.name }}</h4>
               <p class="feature-category">{{ feature.category }}</p>
             </div>
-            <div class="feature-toggle">
-              <label class="toggle-switch">
-                <input 
-                  type="checkbox" 
-                  [checked]="feature.enabled"
-                  (change)="toggleFeature(feature)"
-                >
-                <span class="slider"></span>
-              </label>
+            <div class="feature-access-actions" role="group" [attr.aria-label]="'Access for ' + feature.name">
+              <button type="button" [class.active]="(feature.accessStatus || (feature.enabled ? 'enabled' : 'disabled')) === 'enabled'" (click)="setFeatureAccess(feature, 'enabled')" title="Allow this admin to use the feature">Allow</button>
+              <button type="button" [class.active]="(feature.accessStatus || (feature.enabled ? 'enabled' : 'disabled')) === 'disabled'" (click)="setFeatureAccess(feature, 'disabled')" title="Disable this feature for the admin">Disable</button>
+              <button type="button" [class.active]="feature.accessStatus === 'denied'" (click)="setFeatureAccess(feature, 'denied')" title="Deny this feature for the admin">Deny</button>
             </div>
           </div>
           <div class="feature-description">
             <p>{{ feature.description }}</p>
           </div>
           <div class="feature-status">
-            <span class="status-badge" [ngClass]="feature.enabled ? 'enabled' : 'disabled'">
-              <i class="fa" [ngClass]="feature.enabled ? 'fa-check' : 'fa-times'"></i>
-              {{ feature.enabled ? 'Enabled' : 'Disabled' }}
+            <span class="status-badge" [ngClass]="feature.enabled ? 'enabled' : (feature.accessStatus === 'denied' ? 'denied' : 'disabled')">
+              <i class="fa" [ngClass]="feature.enabled ? 'fa-check' : (feature.accessStatus === 'denied' ? 'fa-ban' : 'fa-times')"></i>
+              {{ feature.accessStatus || (feature.enabled ? 'enabled' : 'disabled') | titlecase }}
             </span>
           </div>
         </div>
       </div>
 
-      <div class="no-features" *ngIf="filteredFeatures.length === 0">
+      <div class="no-features" *ngIf="selectedAdmin && filteredFeatures.length === 0">
         <i class="fa fa-search"></i>
         <p>No features found matching your search criteria.</p>
       </div>
