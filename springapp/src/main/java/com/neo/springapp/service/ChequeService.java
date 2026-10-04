@@ -557,7 +557,12 @@ public class ChequeService {
     }
 
     public Map<String, Object> verifyForDeposit(String chequeNumber) {
-        Cheque cheque = chequeRepository.findByChequeNumber(chequeNumber == null ? "" : chequeNumber.trim())
+        String num = chequeNumber == null ? "" : chequeNumber.trim();
+        if (chequeRepository.findByChequeNumber(num).isEmpty()) {
+            Map<String, Object> other = verifyNonSavingsChequeForDeposit(num);
+            if (other != null) return other;
+        }
+        Cheque cheque = chequeRepository.findByChequeNumber(num)
                 .orElseThrow(() -> new IllegalArgumentException("Cheque number not found"));
         Map<String, Object> result = new java.util.LinkedHashMap<>();
         result.put("valid", cheque.isAvailable());
@@ -586,9 +591,57 @@ public class ChequeService {
         return result;
     }
 
+    private static final List<String> OPEN_REQUEST_STATUSES = List.of("PENDING", "SELF_CASH");
+
+    private Map<String, Object> verifyNonSavingsChequeForDeposit(String number) {
+        ChequeRequest salary = chequeRequestRepository.findByChequeNumber(number).orElse(null);
+        BusinessChequeRequest biz = salary == null ? businessChequeRequestRepository.findByChequeNumber(number).orElse(null) : null;
+        if (salary == null && biz == null) return null;
+        String accNum; String status; java.math.BigDecimal amt; String type;
+        if (salary != null) {
+            SalaryAccount a = salaryAccountRepository.findById(salary.getSalaryAccountId()).orElse(null);
+            accNum = a != null ? a.getAccountNumber() : null; status = salary.getStatus(); amt = salary.getAmount(); type = "Salary";
+        } else {
+            CurrentAccount a = currentAccountRepository.findById(biz.getCurrentAccountId()).orElse(null);
+            accNum = a != null ? a.getAccountNumber() : null; status = biz.getStatus(); amt = biz.getAmount(); type = "Business";
+        }
+        AccountHolderInfo info = resolveAccountInfo(accNum);
+        boolean valid = OPEN_REQUEST_STATUSES.contains(status);
+        Map<String, Object> result = new java.util.LinkedHashMap<>();
+        result.put("valid", valid);
+        result.put("chequeNumber", number);
+        result.put("accountNumber", accNum);
+        result.put("accountHolderName", info != null ? info.name : null);
+        result.put("accountType", type);
+        result.put("amount", amt != null ? amt.doubleValue() : null);
+        result.put("status", status);
+        result.put("availableBalance", info != null && info.balance != null ? info.balance : 0.0);
+        result.put("message", valid ? "Cheque is valid and unused" : "Cheque is already used or unavailable");
+        return result;
+    }
+
     @Transactional
     public Cheque markDeposited(String chequeNumber, String depositReference) {
-        Cheque cheque = chequeRepository.findByChequeNumber(chequeNumber == null ? "" : chequeNumber.trim())
+        String num = chequeNumber == null ? "" : chequeNumber.trim();
+        if (chequeRepository.findByChequeNumber(num).isEmpty()) {
+            ChequeRequest s = chequeRequestRepository.findByChequeNumber(num).orElse(null);
+            if (s != null) {
+                if (!OPEN_REQUEST_STATUSES.contains(s.getStatus())) throw new IllegalArgumentException("Cheque is already used or unavailable");
+                s.setStatus("DEPOSITED");
+                s.setUpdatedAt(LocalDateTime.now());
+                chequeRequestRepository.save(s);
+                return null;
+            }
+            BusinessChequeRequest b = businessChequeRequestRepository.findByChequeNumber(num).orElse(null);
+            if (b != null) {
+                if (!OPEN_REQUEST_STATUSES.contains(b.getStatus())) throw new IllegalArgumentException("Cheque is already used or unavailable");
+                b.setStatus("DEPOSITED");
+                b.setUpdatedAt(LocalDateTime.now());
+                businessChequeRequestRepository.save(b);
+                return null;
+            }
+        }
+        Cheque cheque = chequeRepository.findByChequeNumber(num)
                 .orElseThrow(() -> new IllegalArgumentException("Cheque number not found"));
         if (!cheque.isAvailable()) throw new IllegalArgumentException("Cheque is already used or unavailable");
         cheque.markUsed("CASH_DEPOSIT", depositReference);
@@ -642,6 +695,190 @@ public class ChequeService {
     }
 
     // Request cheque drawing - User. If otp is provided, verifies and sets drawRequestOtpVerified.
+    @Transactional
+    public Cheque requestChequeDraw(Long chequeId, String requestedBy, String otp, String payeeName) {
+        boolean self = payeeName != null && payeeName.trim().equalsIgnoreCase("SELF");
+        if (!self) {
+            Cheque c = requestChequeDraw(chequeId, requestedBy, otp);
+            if (payeeName != null && !payeeName.isBlank()) {
+                c.setPayeeName(payeeName.trim());
+                return chequeRepository.save(c);
+            }
+            return c;
+        }
+        Cheque cheque = chequeRepository.findById(chequeId)
+                .orElseThrow(() -> new RuntimeException("Cheque not found"));
+        if (!cheque.canBeRequested()) {
+            throw new RuntimeException("Cheque cannot be requested. Status: " + cheque.getStatus() + ", Request Status: " + cheque.getRequestStatus());
+        }
+        if (cheque.getAmount() == null || cheque.getAmount() <= 0) {
+            throw new RuntimeException("Cheque amount is invalid or not set. Please set amount before requesting.");
+        }
+        cheque.requestSelfCash(requestedBy);
+        return chequeRepository.save(cheque);
+    }
+
+    private boolean isSelfPayee(String payee) {
+        return payee != null && payee.trim().equalsIgnoreCase("SELF");
+    }
+
+    // Admin: verify a cheque (savings / salary / current) for cash withdrawal at the counter
+    public Map<String, Object> verifyForCashWithdrawal(String chequeNumber) {
+        if (chequeNumber == null || chequeNumber.isBlank()) throw new IllegalArgumentException("Cheque number is required");
+        String number = chequeNumber.trim();
+        Map<String, Object> result = new java.util.LinkedHashMap<>();
+        result.put("chequeNumber", number);
+
+        Optional<Cheque> savings = chequeRepository.findByChequeNumber(number);
+        if (savings.isPresent()) {
+            Cheque c = savings.get();
+            AccountHolderInfo info = resolveAccountInfo(c.getAccountNumber());
+            boolean self = "SELF_CASH".equals(c.getRequestStatus()) || isSelfPayee(c.getPayeeName());
+            boolean ok = self && "ACTIVE".equals(c.getStatus()) && c.getAmount() != null && c.getAmount() > 0;
+            result.put("bookType", "SAVINGS");
+            result.put("accountNumber", c.getAccountNumber());
+            result.put("accountHolderName", c.getAccountHolderName());
+            result.put("accountType", c.getAccountType());
+            result.put("amount", c.getAmount());
+            result.put("status", c.getStatus());
+            result.put("payeeName", c.getPayeeName());
+            result.put("availableBalance", info != null ? info.balance : 0.0);
+            result.put("valid", ok);
+            result.put("message", ok ? "SELF cheque verified. Cash withdrawal allowed."
+                    : !"ACTIVE".equals(c.getStatus()) ? "Cheque is already used/drawn/cancelled"
+                    : "Cheque payee is not SELF. Cash withdrawal not allowed; it must go through cheque draw approval.");
+            return result;
+        }
+
+        ChequeRequest salary = chequeRequestRepository.findByChequeNumber(number).orElse(null);
+        if (salary == null) {
+            salary = chequeLeafRepository.findByLeafNumber(number)
+                    .filter(l -> l.getUsedChequeRequestId() != null)
+                    .flatMap(l -> chequeRequestRepository.findById(l.getUsedChequeRequestId())).orElse(null);
+        }
+        if (salary != null) {
+            SalaryAccount acc = salaryAccountRepository.findById(salary.getSalaryAccountId()).orElse(null);
+            boolean ok = isSelfPayee(salary.getPayeeName()) && "SELF_CASH".equals(salary.getStatus());
+            result.put("chequeNumber", salary.getChequeNumber());
+            result.put("bookType", "SALARY");
+            result.put("accountNumber", acc != null ? acc.getAccountNumber() : null);
+            result.put("accountHolderName", acc != null ? acc.getEmployeeName() : null);
+            result.put("accountType", "Salary");
+            result.put("amount", salary.getAmount() != null ? salary.getAmount().doubleValue() : null);
+            result.put("status", salary.getStatus());
+            result.put("payeeName", salary.getPayeeName());
+            result.put("availableBalance", acc != null && acc.getBalance() != null ? acc.getBalance() : 0.0);
+            result.put("valid", ok);
+            result.put("message", ok ? "SELF cheque verified. Cash withdrawal allowed."
+                    : !isSelfPayee(salary.getPayeeName()) ? "Cheque payee is not SELF. Cash withdrawal not allowed."
+                    : "Cheque is not available for cash withdrawal. Status: " + salary.getStatus());
+            return result;
+        }
+
+        BusinessChequeRequest biz = businessChequeRequestRepository.findByChequeNumber(number).orElse(null);
+        if (biz == null) {
+            biz = businessChequeLeafRepository.findByLeafNumber(number)
+                    .filter(l -> l.getUsedChequeRequestId() != null)
+                    .flatMap(l -> businessChequeRequestRepository.findById(l.getUsedChequeRequestId())).orElse(null);
+        }
+        if (biz != null) {
+            CurrentAccount acc = currentAccountRepository.findById(biz.getCurrentAccountId()).orElse(null);
+            boolean ok = isSelfPayee(biz.getPayeeName()) && "SELF_CASH".equals(biz.getStatus());
+            result.put("chequeNumber", biz.getChequeNumber());
+            result.put("bookType", "CURRENT");
+            result.put("accountNumber", acc != null ? acc.getAccountNumber() : null);
+            result.put("accountHolderName", acc != null ? acc.getOwnerName() : null);
+            result.put("accountType", "Current");
+            result.put("amount", biz.getAmount() != null ? biz.getAmount().doubleValue() : null);
+            result.put("status", biz.getStatus());
+            result.put("payeeName", biz.getPayeeName());
+            result.put("availableBalance", acc != null && acc.getBalance() != null ? acc.getBalance() : 0.0);
+            result.put("valid", ok);
+            result.put("message", ok ? "SELF cheque verified. Cash withdrawal allowed."
+                    : !isSelfPayee(biz.getPayeeName()) ? "Cheque payee is not SELF. Cash withdrawal not allowed."
+                    : "Cheque is not available for cash withdrawal. Status: " + biz.getStatus());
+            return result;
+        }
+
+        throw new IllegalArgumentException("Cheque number not found");
+    }
+
+    // Admin: cash withdrawal against a SELF cheque - no approval workflow
+    @Transactional
+    public Map<String, Object> cashWithdrawSelfCheque(String chequeNumber, String adminName) {
+        Map<String, Object> info = verifyForCashWithdrawal(chequeNumber);
+        if (!Boolean.TRUE.equals(info.get("valid"))) {
+            throw new RuntimeException(String.valueOf(info.get("message")));
+        }
+        String bookType = String.valueOf(info.get("bookType"));
+        String accNum = String.valueOf(info.get("accountNumber"));
+        String number = String.valueOf(info.get("chequeNumber"));
+        Double amount = ((Number) info.get("amount")).doubleValue();
+
+        AccountHolderInfo accInfo = resolveAccountInfo(accNum);
+        if (accInfo == null) throw new RuntimeException("Account not found for account number: " + accNum);
+        if (accInfo.balance == null || accInfo.balance < amount) {
+            throw new RuntimeException("Insufficient balance. Available: ₹" + accInfo.balance + ", Required: ₹" + amount);
+        }
+        Double newBalance = accInfo.balance - amount;
+
+        if (accInfo.accountObject instanceof Account) {
+            Double debited = accountService.debitBalance(((Account) accInfo.accountObject).getAccountNumber(), amount);
+            newBalance = debited != null ? debited : newBalance;
+        } else if (accInfo.accountObject instanceof SalaryAccount) {
+            SalaryAccount sal = (SalaryAccount) accInfo.accountObject;
+            sal.setBalance(newBalance);
+            sal.setUpdatedAt(LocalDateTime.now());
+            salaryAccountRepository.save(sal);
+        } else if (accInfo.accountObject instanceof CurrentAccount) {
+            CurrentAccount ca = (CurrentAccount) accInfo.accountObject;
+            ca.setBalance(newBalance);
+            ca.setLastUpdated(LocalDateTime.now());
+            currentAccountRepository.save(ca);
+        }
+
+        try {
+            transactionService.createTransferTransaction(accNum,
+                    "Cheque SELF cash withdrawal - " + number, amount, "Debit", newBalance);
+        } catch (Exception ignored) {}
+
+        if ("SAVINGS".equals(bookType)) {
+            Cheque c = chequeRepository.findByChequeNumber(number).orElseThrow();
+            c.setRequestStatus("APPROVED");
+            c.setApprovedBy(adminName);
+            c.setApprovedDate(LocalDateTime.now());
+            c.draw(adminName);
+            chequeRepository.save(c);
+        } else if ("SALARY".equals(bookType)) {
+            ChequeRequest r = chequeRequestRepository.findByChequeNumber(number).orElseThrow();
+            r.setStatus("CASH_WITHDRAWN");
+            r.setApprovedBy(adminName);
+            r.setApprovedAt(LocalDateTime.now());
+            r.setDebitedFromAccount(accNum);
+            r.setUpdatedAt(LocalDateTime.now());
+            chequeRequestRepository.save(r);
+        } else {
+            BusinessChequeRequest r = businessChequeRequestRepository.findByChequeNumber(number).orElseThrow();
+            r.setStatus("CASH_WITHDRAWN");
+            r.setApprovedBy(adminName);
+            r.setApprovedAt(LocalDateTime.now());
+            r.setDebitedFromAccount(accNum);
+            r.setUpdatedAt(LocalDateTime.now());
+            businessChequeRequestRepository.save(r);
+        }
+
+        Map<String, Object> res = new java.util.LinkedHashMap<>();
+        res.put("success", true);
+        res.put("message", "Cash withdrawal of ₹" + amount + " completed against SELF cheque " + number);
+        res.put("chequeNumber", number);
+        res.put("accountNumber", accNum);
+        res.put("amount", amount);
+        res.put("newBalance", newBalance);
+        res.put("accountHolderName", info.get("accountHolderName"));
+        res.put("accountType", info.get("accountType"));
+        return res;
+    }
+
     @Transactional
     public Cheque requestChequeDraw(Long chequeId, String requestedBy, String otp) {
         Cheque cheque = chequeRepository.findById(chequeId)

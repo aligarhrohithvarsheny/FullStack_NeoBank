@@ -1082,6 +1082,22 @@
         </div>
       </div>
 
+      <div class="form-row" *ngIf="operationType === 'withdrawal'">
+        <div class="form-group">
+          <label for="quickChequeNumber">Cheque Number (optional - SELF cheque cash withdrawal; Savings/Current/Salary)</label>
+          <div class="account-verify-container">
+            <input id="quickChequeNumber" type="text" [(ngModel)]="quickChequeNumber" (ngModelChange)="quickChequeDetails = null" name="quickChequeNumber" placeholder="Enter cheque number" class="form-input">
+            <button type="button" class="verify-btn" (click)="verifyChequeForWithdrawal()" [disabled]="!quickChequeNumber || isVerifyingQuickCheque">
+              {{ isVerifyingQuickCheque ? '⏳ Verifying...' : '✓ Verify Cheque' }}
+            </button>
+          </div>
+          <div *ngIf="quickChequeDetails" [style.color]="quickChequeDetails.valid ? '#198754' : '#dc3545'" style="margin-top:6px;">
+            {{ quickChequeDetails.message }}
+            <span *ngIf="quickChequeDetails.valid"> — {{ quickChequeDetails.bookType }} | {{ quickChequeDetails.accountNumber }} | {{ quickChequeDetails.accountHolderName }} | ₹{{ quickChequeDetails.amount | number:'1.2-2' }}</span>
+          </div>
+        </div>
+      </div>
+
       <!-- Verified Account Info -->
       <div class="selected-user-display" *ngIf="isAccountVerified && verifiedAccountDetails">
         <h4><i class="fa fa-user"></i> Verified Account Details</h4>

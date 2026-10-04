@@ -183,9 +183,13 @@ public class ChequeController {
                 errorResponse.put("error", "RequestedBy is required");
                 return ResponseEntity.badRequest().body(errorResponse);
             }
-            Cheque requestedCheque = chequeService.requestChequeDraw(id, requestedBy, otp);
+            String payeeName = requestBody.get("payeeName") != null ? requestBody.get("payeeName").toString() : null;
+            Cheque requestedCheque = chequeService.requestChequeDraw(id, requestedBy, otp, payeeName);
             Map<String, Object> response = new HashMap<>();
-            response.put("message", "Cheque draw request submitted successfully. Waiting for admin approval.");
+            boolean selfCash = "SELF_CASH".equals(requestedCheque.getRequestStatus());
+            response.put("message", selfCash
+                    ? "SELF cheque registered. Cash can be withdrawn directly at the bank counter without approval."
+                    : "Cheque draw request submitted successfully. Waiting for admin approval.");
             response.put("cheque", requestedCheque);
             return ResponseEntity.ok(response);
         } catch (Exception e) {
@@ -453,6 +457,23 @@ public class ChequeController {
     public ResponseEntity<?> verifyChequeForDeposit(@RequestParam String chequeNumber) {
         try { return ResponseEntity.ok(chequeService.verifyForDeposit(chequeNumber)); }
         catch (IllegalArgumentException e) { return ResponseEntity.badRequest().body(Map.of("valid", false, "message", e.getMessage())); }
+    }
+
+    @GetMapping("/admin/withdraw-verify")
+    public ResponseEntity<?> verifyChequeForWithdrawal(@RequestParam String chequeNumber) {
+        try { return ResponseEntity.ok(chequeService.verifyForCashWithdrawal(chequeNumber)); }
+        catch (IllegalArgumentException e) { return ResponseEntity.badRequest().body(Map.of("valid", false, "message", e.getMessage())); }
+    }
+
+    @PostMapping("/admin/cash-withdraw")
+    public ResponseEntity<?> cashWithdrawSelfCheque(@RequestBody Map<String, Object> body) {
+        try {
+            String chequeNumber = body.get("chequeNumber") != null ? body.get("chequeNumber").toString() : null;
+            String admin = body.get("processedBy") != null ? body.get("processedBy").toString() : "Admin";
+            return ResponseEntity.ok(chequeService.cashWithdrawSelfCheque(chequeNumber, admin));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "error", e.getMessage() != null ? e.getMessage() : "Cash withdrawal failed"));
+        }
     }
 
     // Get all drawn cheques - Admin only

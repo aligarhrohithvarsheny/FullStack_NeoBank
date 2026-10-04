@@ -145,6 +145,20 @@ public class Cheque {
     private String revertedBy;
     private String revertReason;
     private Double revertedAmount;
+    private String payeeName;
+
+    public String getPayeeName() { return payeeName; }
+    public void setPayeeName(String payeeName) { this.payeeName = payeeName; }
+
+    // SELF cheque: cash withdrawal by admin without approval workflow
+    public void requestSelfCash(String requestedBy) {
+        if (canBeRequested()) {
+            this.requestStatus = "SELF_CASH";
+            this.payeeName = "SELF";
+            this.requestDate = LocalDateTime.now();
+            this.requestedBy = requestedBy;
+        }
+    }
 
     // Check if cheque can be bounced
     public boolean canBeBounced() {

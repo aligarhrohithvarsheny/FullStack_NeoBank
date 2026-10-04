@@ -64,6 +64,7 @@ export interface BounceChequeRequest {
 export interface RequestChequeDraw {
   requestedBy: string;
   otp?: string;
+  payeeName?: string;
 }
 
 // Approve cheque request (Admin)

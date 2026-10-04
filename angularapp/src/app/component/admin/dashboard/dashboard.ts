@@ -76,6 +76,9 @@ export class Dashboard implements OnInit, OnDestroy {
   isLookingUpDepositSlip: boolean = false;
   chequeDepositNumber: string = '';
   chequeDepositDetails: any = null;
+  quickChequeNumber = '';
+  quickChequeDetails: any = null;
+  isVerifyingQuickCheque = false;
   isVerifyingChequeDeposit: boolean = false;
 
   // Receipt fields
@@ -2929,6 +2932,11 @@ export class Dashboard implements OnInit, OnDestroy {
       return;
     }
 
+    if (this.operationType === 'withdrawal' && this.quickChequeNumber.trim()) {
+      this.withdrawBySelfCheque();
+      return;
+    }
+
     // Disable form during processing
     const processingMessage = this.operationType === 'deposit' ? 'Processing deposit...' : 'Processing withdrawal...';
     this.successMessage = processingMessage;
@@ -2952,6 +2960,55 @@ export class Dashboard implements OnInit, OnDestroy {
     } else if (this.accountType === 'current') {
       this.processCurrentAccountTransaction(accountNumber, userName, currentBalance);
     }
+  }
+
+  verifyChequeForWithdrawal() {
+    const chequeNumber = this.quickChequeNumber.trim();
+    if (!chequeNumber) return;
+    this.isVerifyingQuickCheque = true;
+    this.quickChequeDetails = null;
+    this.http.get(`${environment.apiBaseUrl}/api/cheques/admin/withdraw-verify?chequeNumber=${encodeURIComponent(chequeNumber)}`).subscribe({
+      next: (details: any) => {
+        this.quickChequeDetails = details;
+        this.isVerifyingQuickCheque = false;
+        if (details?.valid && details.amount) {
+          this.amount = Number(details.amount);
+          if (!this.description.trim()) this.description = `Cash withdrawal by SELF cheque ${chequeNumber}`;
+        }
+      },
+      error: err => { this.isVerifyingQuickCheque = false; this.quickChequeDetails = err.error || { valid: false, message: 'Cheque number not found' }; }
+    });
+  }
+
+  withdrawBySelfCheque() {
+    const chequeNumber = this.quickChequeNumber.trim();
+    if (!this.quickChequeDetails?.valid) {
+      this.errorMessage = 'Verify the cheque first. Only valid SELF cheques can be withdrawn in cash.';
+      this.successMessage = '';
+      return;
+    }
+    if (this.quickChequeDetails.accountNumber !== this.verifiedAccountDetails?.accountNumber) {
+      this.errorMessage = 'Cheque belongs to a different account than the verified account';
+      this.successMessage = '';
+      return;
+    }
+    this.errorMessage = '';
+    this.successMessage = 'Processing cheque cash withdrawal...';
+    const admin = this.adminName || 'Admin';
+    this.http.post(`${environment.apiBaseUrl}/api/cheques/admin/cash-withdraw`, { chequeNumber, processedBy: admin }).subscribe({
+      next: (res: any) => {
+        this.successMessage = res?.message || 'Cheque cash withdrawal completed';
+        this.quickChequeNumber = '';
+        this.quickChequeDetails = null;
+        this.amount = 0;
+        this.description = '';
+        this.verifyAccountNumber();
+      },
+      error: err => {
+        this.successMessage = '';
+        this.errorMessage = err.error?.error || err.error?.message || 'Cheque cash withdrawal failed';
+      }
+    });
   }
 
   processRegularAccountTransaction(accountNumber: string, userName: string, currentBalance: number) {

@@ -3,6 +3,7 @@ package com.neo.springapp.service;
 import com.neo.springapp.model.VideoKycSession;
 import com.neo.springapp.model.VideoKycAuditLog;
 import com.neo.springapp.model.VideoKycSlot;
+import com.neo.springapp.model.AdminAccountApplication;
 import com.neo.springapp.model.User;
 import com.neo.springapp.model.Account;
 import com.neo.springapp.model.CurrentAccount;
@@ -10,10 +11,13 @@ import com.neo.springapp.model.SalaryAccount;
 import com.neo.springapp.repository.VideoKycSessionRepository;
 import com.neo.springapp.repository.VideoKycAuditLogRepository;
 import com.neo.springapp.repository.VideoKycSlotRepository;
+import com.neo.springapp.repository.AccountRepository;
+import com.neo.springapp.repository.AdminAccountApplicationRepository;
 import com.neo.springapp.repository.UserRepository;
 import com.neo.springapp.repository.CurrentAccountRepository;
 import com.neo.springapp.repository.SalaryAccountRepository;
 import com.neo.springapp.service.AccountService;
+import com.neo.springapp.service.SalaryAccountService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
@@ -45,6 +49,12 @@ public class VideoKycService {
     private VideoKycSlotRepository slotRepository;
 
     @Autowired
+    private AccountRepository accountRepository;
+
+    @Autowired
+    private AdminAccountApplicationRepository accountApplicationRepository;
+
+    @Autowired
     private UserRepository userRepository;
 
     @Autowired
@@ -52,6 +62,9 @@ public class VideoKycService {
 
     @Autowired
     private SalaryAccountRepository salaryAccountRepository;
+
+    @Autowired
+    private SalaryAccountService salaryAccountService;
 
     @Autowired
     private AccountService accountService;
@@ -246,6 +259,8 @@ public class VideoKycService {
         VideoKycSession session = sessionRepository.findById(sessionId)
                 .orElseThrow(() -> new RuntimeException("Session not found"));
 
+        hydrateSessionFromAccountApplication(session);
+
         session.setKycStatus("Approved");
         session.setApprovedAt(LocalDateTime.now());
         session.setSessionActive(false);
@@ -257,14 +272,17 @@ public class VideoKycService {
         }
 
         String accountType = session.getAccountType() != null ? session.getAccountType() : "Savings";
-        String finalAccountNumber = null;
+        String finalAccountNumber;
 
-        try {
-            finalAccountNumber = activateAccountInNewTransaction(session, accountType, adminName);
-        } catch (Exception e) {
-            System.out.println("⚠️ Failed to activate " + accountType + " account: " + e.getMessage());
-            // Generate a session-level account number as fallback
-            finalAccountNumber = generateFinalAccountNumber();
+        if (isUnmaterializedFallbackAccount(session, accountType)) {
+            finalAccountNumber = persistFallbackAccount(session, accountType, adminName, session.getFinalAccountNumber());
+        } else {
+            try {
+                finalAccountNumber = activateAccountInNewTransaction(session, accountType, adminName);
+            } catch (Exception e) {
+                System.out.println("⚠️ Failed to activate " + accountType + " account: " + e.getMessage());
+                finalAccountNumber = persistFallbackAccount(session, accountType, adminName, generateUniqueFinalAccountNumber(session));
+            }
         }
 
         session.setFinalAccountNumber(finalAccountNumber);
@@ -290,6 +308,206 @@ public class VideoKycService {
                     return approveSavingsAccount(session, adminName);
             }
         });
+    }
+
+    private void hydrateSessionFromAccountApplication(VideoKycSession session) {
+        if (session.getEmail() == null || session.getEmail().isBlank()) return;
+        accountApplicationRepository.findByEmailIgnoreCaseOrderByCreatedAtDesc(session.getEmail()).stream()
+                .filter(application -> session.getAccountType() == null
+                        || session.getAccountType().equalsIgnoreCase(application.getAccountType()))
+                .findFirst()
+                .ifPresent(application -> {
+                    if (isBlank(session.getFullName())) session.setFullName(application.getFullName());
+                    if (isBlank(session.getMobileNumber())) session.setMobileNumber(application.getPhone());
+                    if (isBlank(session.getAadharNumber())) session.setAadharNumber(application.getAadharNumber());
+                    if (isBlank(session.getPanNumber())) session.setPanNumber(application.getPanNumber());
+                    if (isBlank(session.getAddressCity())) session.setAddressCity(application.getCity());
+                    if (isBlank(session.getAddressState())) session.setAddressState(application.getState());
+                });
+    }
+
+    private String persistFallbackAccount(VideoKycSession session, String accountType, String adminName, String accountNumber) {
+        TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
+        transactionTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        return transactionTemplate.execute(status -> {
+            switch (accountType) {
+                case "Current":
+                    return persistFallbackCurrentAccount(session, adminName, accountNumber);
+                case "Salary":
+                    return persistFallbackSalaryAccount(session, adminName, accountNumber);
+                default:
+                    return persistFallbackSavingsAccount(session, adminName, accountNumber);
+            }
+        });
+    }
+
+    private String persistFallbackSavingsAccount(VideoKycSession session, String adminName, String accountNumber) {
+        Account account = accountRepository.findByAccountNumber(accountNumber);
+        if (account == null) {
+            String aadhar = session.getAadharNumber();
+            String pan = session.getPanNumber();
+            String phone = session.getMobileNumber();
+            if (isBlank(aadhar) || isBlank(pan) || isBlank(phone) || isBlank(session.getEmail())) {
+                throw new IllegalStateException("Aadhaar, PAN, mobile, and email are required to activate this Savings account.");
+            }
+
+            AdminAccountApplication application = findAccountApplication(session);
+            account = new Account();
+            account.setName(firstNonBlank(session.getFullName(), application == null ? null : application.getFullName()));
+            account.setAadharNumber(aadhar);
+            account.setPan(pan);
+            account.setPhone(phone);
+            account.setAccountNumber(accountNumber);
+            account.setAccountType("Savings");
+            account.setDob(application != null && !isBlank(application.getDateOfBirth()) ? application.getDateOfBirth() : "1990-01-01");
+            account.setAge(application != null && application.getAge() != null ? application.getAge() : 25);
+            account.setOccupation(application != null && !isBlank(application.getOccupation()) ? application.getOccupation() : "Employee");
+            account.setIncome(application != null && application.getIncome() != null ? application.getIncome() : 0.0);
+            account.setAddress(buildAddress(session, application));
+            account.setBalance(0.0);
+            account.setStatus("ACTIVE");
+            account.setKycVerified(true);
+            account.setCreatedAt(LocalDateTime.now());
+            account.setLastUpdated(LocalDateTime.now());
+        }
+
+        User user = userRepository.findByEmail(session.getEmail())
+                .orElseGet(() -> {
+                    User created = new User();
+                    created.setEmail(session.getEmail());
+                    created.setUsername(firstNonBlank(session.getFullName(), session.getEmail().split("@")[0]));
+                    created.setJoinDate(LocalDateTime.now());
+                    created.setPassword(passwordService.encryptPassword(generateTemporaryPassword()));
+                    return created;
+                });
+        if (user.getAccount() != null && !accountNumber.equals(user.getAccount().getAccountNumber())) {
+            return user.getAccount().getAccountNumber();
+        }
+        user.setAccount(account);
+        user.setAccountNumber(account.getAccountNumber());
+        user.setStatus("APPROVED");
+        user.setPasswordSet(false);
+        User savedUser = userRepository.save(user);
+        session.setUserId(savedUser.getId());
+        session.setAccountId(savedUser.getAccount().getId());
+        System.out.println("✅ Persisted fallback Savings account for " + adminName + ": " + accountNumber);
+        return accountNumber;
+    }
+
+    private String persistFallbackCurrentAccount(VideoKycSession session, String adminName, String accountNumber) {
+        Optional<CurrentAccount> existing = currentAccountRepository.findByEmail(session.getEmail());
+        if (existing.isPresent()) return existing.get().getAccountNumber();
+
+        AdminAccountApplication application = findAccountApplication(session);
+        if (application == null || isBlank(application.getBusinessName()) || isBlank(application.getBusinessType())
+                || isBlank(session.getAadharNumber()) || isBlank(session.getPanNumber()) || isBlank(session.getMobileNumber())) {
+            throw new IllegalStateException("Verified business and identity details are required to activate this Current account.");
+        }
+
+        CurrentAccount account = new CurrentAccount();
+        account.setAccountNumber(accountNumber);
+        account.setBusinessName(application.getBusinessName());
+        account.setBusinessType(application.getBusinessType());
+        account.setBusinessRegistrationNumber(application.getBusinessRegistrationNumber());
+        account.setGstNumber(application.getGstNumber());
+        account.setOwnerName(firstNonBlank(session.getFullName(), application.getFullName()));
+        account.setMobile(session.getMobileNumber());
+        account.setEmail(session.getEmail());
+        account.setAadharNumber(session.getAadharNumber());
+        account.setPanNumber(session.getPanNumber());
+        account.setShopAddress(application.getShopAddress());
+        account.setCity(application.getCity());
+        account.setState(application.getState());
+        account.setPincode(application.getPincode());
+        account.setBranchName(application.getBranchName());
+        account.setIfscCode(application.getIfscCode());
+        account.setBalance(0.0);
+        account.setStatus("ACTIVE");
+        account.setKycVerified(true);
+        account.setKycVerifiedBy(adminName);
+        account.setKycVerifiedDate(LocalDateTime.now());
+        account.setApprovedBy(adminName);
+        account.setApprovedAt(LocalDateTime.now());
+        currentAccountRepository.save(account);
+        return accountNumber;
+    }
+
+    private String persistFallbackSalaryAccount(VideoKycSession session, String adminName, String accountNumber) {
+        SalaryAccount existing = salaryAccountRepository.findByEmail(session.getEmail());
+        if (existing != null) return existing.getAccountNumber();
+
+        if (isBlank(session.getAadharNumber()) || isBlank(session.getPanNumber()) || isBlank(session.getMobileNumber())) {
+            throw new IllegalStateException("Verified identity details are required to activate this Salary account.");
+        }
+        AdminAccountApplication application = findAccountApplication(session);
+        SalaryAccount account = new SalaryAccount();
+        account.setEmployeeName(firstNonBlank(session.getFullName(), application == null ? null : application.getFullName()));
+        account.setDob(application == null ? null : application.getDateOfBirth());
+        account.setMobileNumber(session.getMobileNumber());
+        account.setEmail(session.getEmail());
+        account.setAadharNumber(session.getAadharNumber());
+        account.setPanNumber(session.getPanNumber());
+        account.setCompanyName(application == null ? null : application.getCompanyName());
+        account.setCompanyId(application == null ? null : application.getCompanyId());
+        account.setEmployerAddress(application == null ? null : application.getEmployerAddress());
+        account.setHrContactNumber(application == null ? null : application.getHrContactNumber());
+        account.setMonthlySalary(application == null ? 0.0 : application.getMonthlySalary());
+        account.setSalaryCreditDate(application == null || application.getSalaryCreditDate() == null ? 1 : application.getSalaryCreditDate());
+        account.setDesignation(application == null ? null : application.getDesignation());
+        account.setAccountNumber(accountNumber);
+        account.setBranchName(application == null ? "NeoBank Main Branch" : application.getBranchName());
+        account.setIfscCode(application == null ? "EZYV000123" : application.getIfscCode());
+        account.setAddress(buildAddress(session, application));
+        account.setStatus("Active");
+        salaryAccountService.createAccount(account, adminName);
+        return accountNumber;
+    }
+
+    private AdminAccountApplication findAccountApplication(VideoKycSession session) {
+        if (isBlank(session.getEmail())) return null;
+        List<AdminAccountApplication> applications = accountApplicationRepository
+                .findByEmailIgnoreCaseOrderByCreatedAtDesc(session.getEmail());
+        return applications.stream()
+                .filter(application -> session.getAccountType() == null
+                        || session.getAccountType().equalsIgnoreCase(application.getAccountType()))
+                .findFirst()
+                .orElse(applications.isEmpty() ? null : applications.get(0));
+    }
+
+    private boolean isUnmaterializedFallbackAccount(VideoKycSession session, String accountType) {
+        String accountNumber = session.getFinalAccountNumber();
+        if (accountNumber == null || !accountNumber.matches("NEOB\\d{10}")) return false;
+        return switch (accountType) {
+            case "Current" -> currentAccountRepository.findByAccountNumber(accountNumber).isEmpty();
+            case "Salary" -> salaryAccountRepository.findByAccountNumber(accountNumber) == null;
+            default -> accountRepository.findByAccountNumber(accountNumber) == null;
+        };
+    }
+
+    private String generateUniqueFinalAccountNumber(VideoKycSession session) {
+        for (int attempt = 0; attempt < 50; attempt++) {
+            String candidate = generateFinalAccountNumber();
+            boolean used = accountRepository.findByAccountNumber(candidate) != null
+                    || currentAccountRepository.findByAccountNumber(candidate).isPresent()
+                    || salaryAccountRepository.findByAccountNumber(candidate) != null
+                    || sessionRepository.findByFinalAccountNumber(candidate)
+                            .filter(existing -> !existing.getId().equals(session.getId())).isPresent();
+            if (!used) return candidate;
+        }
+        throw new IllegalStateException("Unable to generate a unique fallback account number.");
+    }
+
+    private String buildAddress(VideoKycSession session, AdminAccountApplication application) {
+        if (application != null && !isBlank(application.getAddress())) return application.getAddress();
+        return firstNonBlank(session.getAddressCity(), "") + ", " + firstNonBlank(session.getAddressState(), "");
+    }
+
+    private String firstNonBlank(String first, String fallback) {
+        return isBlank(first) ? fallback : first;
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 
     private String approveSavingsAccount(VideoKycSession session, String adminName) {
@@ -361,21 +579,13 @@ public class VideoKycService {
             account.setAccountNumber(accNumber);
             account.setKycVerified(true);
 
-            session.setUserId(user.getId());
-            session.setAccountId(account.getId());
-            
-            try {
-                User savedUser = userRepository.save(user);
-                System.out.println("✅ Savings account approved/created for: " + email + " | Account: " + accNumber + " | passwordSet: " + savedUser.isPasswordSet());
-                return accNumber;
-            } catch (Exception e) {
-                System.out.println("❌ Error creating/approving user: " + e.getMessage());
-                e.printStackTrace();
-                return generateFinalAccountNumber();
-            }
+            User savedUser = userRepository.save(user);
+            session.setUserId(savedUser.getId());
+            session.setAccountId(savedUser.getAccount().getId());
+            System.out.println("✅ Savings account approved/created for: " + email + " | Account: " + accNumber + " | passwordSet: " + savedUser.isPasswordSet());
+            return accNumber;
         }
-        System.out.println("⚠️ No email provided - generating session account number");
-        return generateFinalAccountNumber();
+        throw new IllegalStateException("An email is required to activate a Savings account.");
     }
     
     // Helper method to generate temporary password
@@ -456,8 +666,7 @@ public class VideoKycService {
                 return currentAccount.getAccountNumber();
             }
         }
-        System.out.println("⚠️ No Current Account found with email: " + email + " - generating session account number");
-        return generateFinalAccountNumber();
+        throw new IllegalStateException("No Current account record was found for Video KYC approval.");
     }
 
     private String approveSalaryAccount(VideoKycSession session, String adminName) {
@@ -495,8 +704,7 @@ public class VideoKycService {
                 return salaryAccount.getAccountNumber();
             }
         }
-        System.out.println("⚠️ No Salary Account found with email: " + email + " - generating session account number");
-        return generateFinalAccountNumber();
+        throw new IllegalStateException("No Salary account record was found for Video KYC approval.");
     }
 
     @Transactional

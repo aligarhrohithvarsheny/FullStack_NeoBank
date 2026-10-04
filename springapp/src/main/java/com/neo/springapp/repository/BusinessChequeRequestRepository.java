@@ -18,6 +18,11 @@ public interface BusinessChequeRequestRepository extends JpaRepository<BusinessC
 
         Page<BusinessChequeRequest> findByStatusNotOrderByCreatedAtDesc(String status, Pageable pageable);
 
+        Page<BusinessChequeRequest> findByStatusNotInOrderByCreatedAtDesc(java.util.Collection<String> statuses, Pageable pageable);
+
+        Page<BusinessChequeRequest> findByStatusNotInAndChequeNumberContainingIgnoreCaseOrderByCreatedAtDesc(
+            java.util.Collection<String> statuses, String chequeNumber, Pageable pageable);
+
         Page<BusinessChequeRequest> findByStatusNotAndChequeNumberContainingIgnoreCaseOrderByCreatedAtDesc(
             String status, String chequeNumber, Pageable pageable);
 

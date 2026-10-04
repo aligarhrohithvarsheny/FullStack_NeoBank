@@ -24,6 +24,8 @@ public interface AdminAccountApplicationRepository extends JpaRepository<AdminAc
 
     List<AdminAccountApplication> findByStatusAndAccountType(String status, String accountType);
 
+    List<AdminAccountApplication> findByEmailIgnoreCaseOrderByCreatedAtDesc(String email);
+
     List<AdminAccountApplication> findByAadharNumber(String aadharNumber);
 
     List<AdminAccountApplication> findByPanNumber(String panNumber);

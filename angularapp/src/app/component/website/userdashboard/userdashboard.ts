@@ -485,6 +485,12 @@ export class Userdashboard implements OnInit, OnDestroy {
       this.loadAiAnalysis();
       this.loadUserSessions();
       this.sessionPollInterval = setInterval(() => this.loadUserSessions(), 15000);
+      this.liveDataInterval = setInterval(() => {
+        if (this.userAccountNumber) {
+          this.loadCurrentBalanceFromMySQL();
+          this.loadRecentTransactions();
+        }
+      }, 5000);
       this.startSessionTimer();
       this.checkLinkedAccount();
     }
@@ -1621,6 +1627,8 @@ export class Userdashboard implements OnInit, OnDestroy {
     w.print();
   }
 
+  liveDataInterval: any = null;
+
   pollUpiTransactions() {
     if (!this.userAccountNumber) return;
     const after = this.upiLastPollMs;
@@ -1648,6 +1656,7 @@ export class Userdashboard implements OnInit, OnDestroy {
   }
 
   ngOnDestroy() {
+    if (this.liveDataInterval) { clearInterval(this.liveDataInterval); this.liveDataInterval = null; }
     this.stopQrScanner();
     this.stopUpiPolling();
     if (this.linkPollInterval) {

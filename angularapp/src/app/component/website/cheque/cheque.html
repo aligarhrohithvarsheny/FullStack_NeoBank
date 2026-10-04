@@ -263,6 +263,9 @@
         Cheque #{{ selectedChequeForDraw.chequeNumber }} – Amount: ₹{{ selectedChequeForDraw.amount || 0 | number:'1.2-2' }}
       </p>
       <p class="draw-direct-note">Your cheque details and account balance have been verified. Submit the draw request directly for admin approval.</p>
+      <label for="drawPayee" style="display:block;margin-top:10px;font-weight:600;">Pay to (type SELF for cash withdrawal)</label>
+      <input id="drawPayee" type="text" [(ngModel)]="drawPayeeName" placeholder="Payee name or SELF" style="width:100%;padding:8px;border:1px solid #ced4da;border-radius:6px;">
+      <p class="draw-direct-note">Cheques drawn to SELF skip admin approval and are paid in cash directly at the bank counter.</p>
     </div>
     <div class="modal-footer">
       <button type="button" (click)="closeDrawModal()" class="btn-cancel" [disabled]="requesting">Cancel</button>

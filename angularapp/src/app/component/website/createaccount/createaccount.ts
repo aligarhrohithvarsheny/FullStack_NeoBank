@@ -857,6 +857,8 @@ export class Createaccount implements OnInit, OnDestroy {
       fullName: val.name,
       mobileNumber: val.mobile,
       email: val.email.toLowerCase(),
+      aadharNumber: val.aadhar,
+      panNumber: val.pan.toUpperCase(),
       addressCity: val.city,
       addressState: val.state,
       accountType: val.accountType || 'Savings'

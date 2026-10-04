@@ -64,6 +64,7 @@ export class ChequeComponent implements OnInit, OnDestroy {
 
   // Draw request modal
   selectedChequeForDraw: ChequeModel | null = null;
+  drawPayeeName = '';
 
   constructor(
     private router: Router,
@@ -78,10 +79,19 @@ export class ChequeComponent implements OnInit, OnDestroy {
       this.loadUserProfile();
       this.loadCheques();
       this.loadStatistics();
+      this.loadCurrentBalance();
+      this.livePollInterval = setInterval(() => {
+        this.loadCheques();
+        this.loadStatistics();
+        this.loadCurrentBalance();
+      }, 5000);
     }
   }
 
+  private livePollInterval: any;
+
   ngOnDestroy() {
+    if (this.livePollInterval) clearInterval(this.livePollInterval);
   }
 
   openDrawModal(cheque: ChequeModel) {
@@ -100,11 +110,12 @@ export class ChequeComponent implements OnInit, OnDestroy {
       return;
     }
     this.requesting = true;
-    const request: RequestChequeDraw = { requestedBy: this.userName };
+    const request: RequestChequeDraw = { requestedBy: this.userName, payeeName: this.drawPayeeName.trim() || undefined };
     const chequeId = c.id;
     this.chequeService.requestChequeDraw(chequeId, request).subscribe({
       next: (response: any) => {
         this.alertService.success('Request Submitted', response.message || 'Cheque draw request submitted successfully. Waiting for admin approval.');
+        this.drawPayeeName = '';
         this.requesting = false;
         this.closeDrawModal();
         this.loadCheques();
@@ -360,7 +371,8 @@ export class ChequeComponent implements OnInit, OnDestroy {
     this.requesting = true;
 
     const request: RequestChequeDraw = {
-      requestedBy: this.userName
+      requestedBy: this.userName,
+      payeeName: this.drawPayeeName.trim() || undefined
     };
 
     this.chequeService.requestChequeDraw(cheque.id, request).subscribe({

@@ -105,8 +105,10 @@ public class BusinessChequeDrawService {
         request.setAvailableBalance(availableBalance);
         request.setPayeeName(payeeName);
         request.setRemarks(remarks);
-        boolean positivePayRequired = BigDecimal.valueOf(amount).compareTo(positivePayMinimumAmount) >= 0;
-        request.setStatus(positivePayRequired ? "AWAITING_POSITIVE_PAY" : "PENDING");
+        boolean selfPayee = payeeName != null && payeeName.trim().equalsIgnoreCase("SELF");
+        boolean positivePayRequired = !selfPayee && BigDecimal.valueOf(amount).compareTo(positivePayMinimumAmount) >= 0;
+        request.setStatus(selfPayee ? "SELF_CASH" : (positivePayRequired ? "AWAITING_POSITIVE_PAY" : "PENDING"));
+        if (selfPayee) request.setPayeeName("SELF");
         request.setCreatedAt(LocalDateTime.now());
         request.setUpdatedAt(LocalDateTime.now());
 
@@ -275,7 +277,7 @@ public class BusinessChequeDrawService {
         Pageable pageable = PageRequest.of(page, size);
         Page<BusinessChequeRequest> requests;
 
-        if ("AWAITING_POSITIVE_PAY".equalsIgnoreCase(status)) {
+        if ("AWAITING_POSITIVE_PAY".equalsIgnoreCase(status) || "SELF_CASH".equalsIgnoreCase(status)) {
             requests = Page.empty(pageable);
         } else if (status != null && !status.isEmpty() && search != null && !search.isEmpty()) {
             requests = chequeRequestRepository.findByStatusAndChequeNumberContainingIgnoreCaseOrderByCreatedAtDesc(
@@ -283,10 +285,11 @@ public class BusinessChequeDrawService {
         } else if (status != null && !status.isEmpty()) {
             requests = chequeRequestRepository.findByStatusOrderByCreatedAtDesc(status, pageable);
         } else if (search != null && !search.isEmpty()) {
-            requests = chequeRequestRepository.findByStatusNotAndChequeNumberContainingIgnoreCaseOrderByCreatedAtDesc(
-                    "AWAITING_POSITIVE_PAY", search, pageable);
+            requests = chequeRequestRepository.findByStatusNotInAndChequeNumberContainingIgnoreCaseOrderByCreatedAtDesc(
+                    List.of("AWAITING_POSITIVE_PAY", "SELF_CASH"), search, pageable);
         } else {
-            requests = chequeRequestRepository.findByStatusNotOrderByCreatedAtDesc("AWAITING_POSITIVE_PAY", pageable);
+            requests = chequeRequestRepository.findByStatusNotInOrderByCreatedAtDesc(
+                    List.of("AWAITING_POSITIVE_PAY", "SELF_CASH"), pageable);
         }
 
         List<Map<String, Object>> items = new ArrayList<>();

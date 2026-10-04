@@ -24,6 +24,8 @@ public interface VideoKycSessionRepository extends JpaRepository<VideoKycSession
 
     Optional<VideoKycSession> findByVerificationNumber(String verificationNumber);
 
+    Optional<VideoKycSession> findByFinalAccountNumber(String finalAccountNumber);
+
     List<VideoKycSession> findByKycStatus(String kycStatus);
 
     Page<VideoKycSession> findByKycStatus(String kycStatus, Pageable pageable);
