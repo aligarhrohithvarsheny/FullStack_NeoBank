@@ -2826,6 +2826,38 @@ export class Dashboard implements OnInit, OnDestroy {
   }
 
   verifyChequeAccount(accountNumber: string) {
+    const fail = () => {
+      this.isAccountVerified = false;
+      this.isVerifyingAccount = false;
+      this.accountVerificationError = 'Cheque account not found. Please check the account/cheque number.';
+      this.verifiedAccountDetails = null;
+    };
+    // Falls back to treating the input as a cheque number (savings, salary or current)
+    const verifyAsChequeNumber = () => {
+      const endpoint = this.operationType === 'withdrawal' ? 'withdraw-verify' : 'deposit-verify';
+      this.http.get(`${environment.apiBaseUrl}/api/cheques/admin/${endpoint}?chequeNumber=${encodeURIComponent(accountNumber)}`).subscribe({
+        next: (d: any) => {
+          if (!d || !d.accountNumber) { fail(); return; }
+          this.quickChequeNumber = accountNumber;
+          this.quickChequeDetails = d;
+          this.verifiedAccountDetails = {
+            accountNumber: d.accountNumber,
+            accountHolderName: d.accountHolderName,
+            balance: d.availableBalance || 0,
+            accountType: `${d.bookType || ''} Cheque`.trim(),
+            type: 'cheque'
+          };
+          if (d.valid && d.amount) {
+            this.amount = Number(d.amount);
+            if (!this.description.trim()) this.description = `Cheque ${accountNumber} ${this.operationType}`;
+          }
+          this.isAccountVerified = true;
+          this.isVerifyingAccount = false;
+          this.accountVerificationError = d.valid ? '' : (d.message || '');
+        },
+        error: () => fail()
+      });
+    };
     this.http.get(`${environment.apiBaseUrl}/api/cheques/account/${accountNumber}`).subscribe({
       next: (cheques: any) => {
         const chequeList = Array.isArray(cheques) ? cheques : [];
@@ -2843,18 +2875,10 @@ export class Dashboard implements OnInit, OnDestroy {
           this.isVerifyingAccount = false;
           this.accountVerificationError = '';
         } else {
-          this.isAccountVerified = false;
-          this.isVerifyingAccount = false;
-          this.accountVerificationError = 'Cheque account not found. Please check the account number.';
-          this.verifiedAccountDetails = null;
+          verifyAsChequeNumber();
         }
       },
-      error: () => {
-        this.isAccountVerified = false;
-        this.isVerifyingAccount = false;
-        this.accountVerificationError = 'Cheque account not found. Please check the account number.';
-        this.verifiedAccountDetails = null;
-      }
+      error: () => verifyAsChequeNumber()
     });
   }
 
@@ -2863,6 +2887,8 @@ export class Dashboard implements OnInit, OnDestroy {
     this.isAccountVerified = false;
     this.accountVerificationError = '';
     this.verifiedAccountDetails = null;
+    this.quickChequeDetails = null;
+    this.quickChequeNumber = '';
   }
 
   verifySalaryAccount(accountNumber: string) {
