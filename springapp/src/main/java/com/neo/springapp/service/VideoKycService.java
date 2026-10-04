@@ -15,6 +15,9 @@ import com.neo.springapp.repository.CurrentAccountRepository;
 import com.neo.springapp.repository.SalaryAccountRepository;
 import com.neo.springapp.service.AccountService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -55,6 +58,9 @@ public class VideoKycService {
 
     @Autowired
     private PasswordService passwordService;
+
+    @Autowired
+    private PlatformTransactionManager transactionManager;
 
     // ======================== Registration ========================
 
@@ -254,17 +260,7 @@ public class VideoKycService {
         String finalAccountNumber = null;
 
         try {
-            switch (accountType) {
-                case "Current":
-                    finalAccountNumber = approveCurrentAccount(session, adminName);
-                    break;
-                case "Salary":
-                    finalAccountNumber = approveSalaryAccount(session, adminName);
-                    break;
-                default:
-                    finalAccountNumber = approveSavingsAccount(session, adminName);
-                    break;
-            }
+            finalAccountNumber = activateAccountInNewTransaction(session, accountType, adminName);
         } catch (Exception e) {
             System.out.println("⚠️ Failed to activate " + accountType + " account: " + e.getMessage());
             // Generate a session-level account number as fallback
@@ -279,6 +275,21 @@ public class VideoKycService {
                         " (" + accountType + "). Account Number: " + finalAccountNumber);
 
         return saved;
+    }
+
+    private String activateAccountInNewTransaction(VideoKycSession session, String accountType, String adminName) {
+        TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
+        transactionTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        return transactionTemplate.execute(status -> {
+            switch (accountType) {
+                case "Current":
+                    return approveCurrentAccount(session, adminName);
+                case "Salary":
+                    return approveSalaryAccount(session, adminName);
+                default:
+                    return approveSavingsAccount(session, adminName);
+            }
+        });
     }
 
     private String approveSavingsAccount(VideoKycSession session, String adminName) {

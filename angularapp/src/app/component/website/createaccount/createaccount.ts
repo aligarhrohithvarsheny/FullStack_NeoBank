@@ -118,8 +118,6 @@ export class Createaccount implements OnInit, OnDestroy {
 
   // PAN regex: 5 letters, 4 digits, 1 letter
   private panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]$/;
-  // Aadhar: 12 digits, cannot start with 0 or 1
-  private aadharRegex = /^[2-9]\d{11}$/;
   // Mobile: 10 digits starting 6-9
   private mobileRegex = /^[6-9]\d{9}$/;
 
@@ -329,7 +327,7 @@ export class Createaccount implements OnInit, OnDestroy {
       income: ['', [Validators.required, Validators.min(0)]],
       occupation: ['', [Validators.required]],
       pan: ['', [Validators.required, this.panValidator.bind(this)]],
-      aadhar: ['', [Validators.required, this.aadharValidator.bind(this)]],
+      aadhar: ['', [Validators.required]],
       mobile: ['', [Validators.required, this.mobileValidator.bind(this)]],
       state: ['', [Validators.required]],
       city: [{value: '', disabled: true}, [Validators.required]], // Initially disabled
@@ -386,11 +384,12 @@ export class Createaccount implements OnInit, OnDestroy {
 
     // Listen for Aadhar changes to check uniqueness
     this.form.get('aadhar')?.valueChanges.subscribe(aadhar => {
-      if (aadhar && this.form.get('aadhar')?.valid && !this.form.get('aadhar')?.hasError('invalidAadhar') && !this.form.get('aadhar')?.hasError('invalidAadharChecksum')) {
-        this.checkAadharUniqueness(aadhar);
+      const normalizedAadhar = (aadhar || '').trim();
+      if (/^\d{12}$/.test(normalizedAadhar)) {
+        this.checkAadharUniqueness(normalizedAadhar);
       } else {
         if (this.aadharLookupTimer) clearTimeout(this.aadharLookupTimer);
-        this.clearPreviousAutofill(aadhar || '');
+        this.clearPreviousAutofill(normalizedAadhar);
         this.aadharExists = false;
         this.blockedAccountTypes = [];
         this.existingAadharAccounts = [];
@@ -489,73 +488,6 @@ export class Createaccount implements OnInit, OnDestroy {
     const val = (control.value || '').toUpperCase();
     if (!val) return null;
     return this.panRegex.test(val) ? null : { invalidPan: true };
-  }
-
-  aadharValidator(control: AbstractControl): ValidationErrors | null {
-    const val = control.value || '';
-    if (!val) return null;
-    
-    // Basic format check
-    if (!this.aadharRegex.test(val)) {
-      console.log('Aadhaar format check failed for:', val);
-      return { invalidAadhar: true };
-    }
-    
-    // Mathematical validation using Verhoeff algorithm
-    const isValid = this.isValidAadhaarNumber(val);
-    console.log('Aadhaar checksum validation for', val, ':', isValid);
-    
-    if (!isValid) {
-      return { invalidAadharChecksum: true };
-    }
-    
-    return null;
-  }
-
-  // Verhoeff algorithm for Aadhaar validation
-  private isValidAadhaarNumber(aadhaar: string): boolean {
-    // Remove any spaces or special characters
-    const cleanAadhaar = aadhaar.replace(/\D/g, '');
-    
-    // Check if it's exactly 12 digits
-    if (cleanAadhaar.length !== 12) {
-      return false;
-    }
-    
-    // Verhoeff algorithm implementation
-    const multiplication = [
-      [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
-      [1, 2, 3, 4, 0, 6, 7, 8, 9, 5],
-      [2, 3, 4, 0, 1, 7, 8, 9, 5, 6],
-      [3, 4, 0, 1, 2, 8, 9, 5, 6, 7],
-      [4, 0, 1, 2, 3, 9, 5, 6, 7, 8],
-      [5, 9, 8, 7, 6, 0, 4, 3, 2, 1],
-      [6, 5, 9, 8, 7, 1, 0, 4, 3, 2],
-      [7, 6, 5, 9, 8, 2, 1, 0, 4, 3],
-      [8, 7, 6, 5, 9, 3, 2, 1, 0, 4],
-      [9, 8, 7, 6, 5, 4, 3, 2, 1, 0]
-    ];
-    
-    const permutation = [
-      [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
-      [1, 5, 7, 6, 2, 8, 3, 0, 9, 4],
-      [5, 8, 0, 3, 7, 9, 6, 1, 4, 2],
-      [8, 9, 1, 6, 0, 4, 3, 5, 2, 7],
-      [9, 4, 5, 3, 1, 2, 6, 8, 7, 0],
-      [4, 2, 8, 6, 5, 7, 3, 9, 0, 1],
-      [2, 7, 9, 3, 8, 0, 6, 4, 1, 5],
-      [7, 0, 4, 6, 9, 1, 3, 2, 5, 8]
-    ];
-    
-    let checksum = 0;
-    const digits = cleanAadhaar.split('').map(Number);
-    
-    // Process digits from right to left
-    for (let i = 0; i < digits.length; i++) {
-      checksum = multiplication[checksum][permutation[i % 8][digits[digits.length - 1 - i]]];
-    }
-    
-    return checksum === 0;
   }
 
   mobileValidator(control: AbstractControl): ValidationErrors | null {

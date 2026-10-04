@@ -227,7 +227,7 @@
         <div class="form-group">
           <label>Aadhar</label>
           <div class="aadhar-input-container">
-            <input type="text" formControlName="aadhar" placeholder="12-digit Aadhar" maxlength="12" class="aadhar-input"
+            <input type="text" formControlName="aadhar" placeholder="Enter Aadhaar number" class="aadhar-input"
               [class.valid]="f['aadhar'].valid && f['aadhar'].touched && !aadharExists"
               [class.invalid]="f['aadhar'].invalid && f['aadhar'].touched || aadharExists" />
             <div class="validation-indicator">
@@ -239,8 +239,6 @@
           <div *ngIf="aadharLookupMessage" [ngClass]="aadharExists ? 'error' : 'success'"><small>{{ aadharLookupMessage }}</small></div>
           <div *ngIf="submitted && f['aadhar'].errors" class="error">
             <small *ngIf="f['aadhar'].errors['required']">Aadhar is required.</small>
-            <small *ngIf="f['aadhar'].errors['invalidAadhar']">Invalid Aadhar format. Must be 12 digits starting with 2-9.</small>
-            <small *ngIf="f['aadhar'].errors['invalidAadharChecksum']">Invalid Aadhar number. Please check the digits.</small>
           </div>
         </div>
 
@@ -352,7 +350,7 @@
           <div class="form-group">
             <label>Aadhaar Number *</label>
             <div class="aadhar-input-container">
-              <input type="text" formControlName="aadhar" placeholder="12-digit Aadhaar number" maxlength="12" class="aadhar-input"
+              <input type="text" formControlName="aadhar" placeholder="Enter Aadhaar number" class="aadhar-input"
                 [class.valid]="f['aadhar'].valid && f['aadhar'].touched && !aadharExists"
                 [class.invalid]="f['aadhar'].invalid && f['aadhar'].touched || aadharExists" />
               <div class="validation-indicator">
@@ -364,8 +362,6 @@
             <div *ngIf="aadharLookupMessage" [ngClass]="aadharExists ? 'error' : 'success'"><small>{{ aadharLookupMessage }}</small></div>
             <div *ngIf="submitted && f['aadhar'].errors" class="error">
               <small *ngIf="f['aadhar'].errors['required']">Aadhar is required.</small>
-              <small *ngIf="f['aadhar'].errors['invalidAadhar']">Invalid Aadhar format.</small>
-              <small *ngIf="f['aadhar'].errors['invalidAadharChecksum']">Invalid Aadhar number.</small>
             </div>
           </div>
 
@@ -483,7 +479,7 @@
           <div class="form-group">
             <label>Aadhaar Number *</label>
             <div class="aadhar-input-container">
-              <input type="text" formControlName="aadhar" placeholder="12-digit Aadhaar" maxlength="12" class="aadhar-input"
+              <input type="text" formControlName="aadhar" placeholder="Enter Aadhaar number" class="aadhar-input"
                 [class.valid]="f['aadhar'].valid && f['aadhar'].touched && !aadharExists"
                 [class.invalid]="f['aadhar'].invalid && f['aadhar'].touched || aadharExists" />
               <div class="validation-indicator">
@@ -495,8 +491,6 @@
             <div *ngIf="aadharLookupMessage" [ngClass]="aadharExists ? 'error' : 'success'"><small>{{ aadharLookupMessage }}</small></div>
             <div *ngIf="submitted && f['aadhar'].errors" class="error">
               <small *ngIf="f['aadhar'].errors['required']">Aadhar is required.</small>
-              <small *ngIf="f['aadhar'].errors['invalidAadhar']">Invalid Aadhar format.</small>
-              <small *ngIf="f['aadhar'].errors['invalidAadharChecksum']">Invalid Aadhar number.</small>
             </div>
           </div>
 
