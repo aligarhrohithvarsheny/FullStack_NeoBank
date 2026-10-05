@@ -70,6 +70,9 @@ public class UserController {
     @Autowired
     private AdminAuditService adminAuditService;
 
+    @Value("${app.login.otp-required:true}")
+    private boolean loginOtpRequired;
+
     @Value("${spring.web.cors.allowed-origins:}")
     private String allowedOrigins;
     
@@ -606,6 +609,11 @@ public class UserController {
     }
 
     private Map<String, Object> beginLoginOtp(User user, String clientIp, String deviceInfo, String location, String loginMethod, String qrToken) {
+        if (!loginOtpRequired) {
+            ResponseEntity<Map<String, Object>> direct = completeUserLogin(user, loginMethod, clientIp, deviceInfo, location);
+            if (qrToken != null) qrCodeService.updateQrSession(qrToken, "LOGGED_IN", user);
+            return direct.getBody();
+        }
         String email = user.getEmail().toLowerCase().trim();
         String challengeId = UUID.randomUUID().toString();
         loginOtpChallenges.put(challengeId, new LoginOtpChallenge(email, clientIp, deviceInfo, location, loginMethod, qrToken));
