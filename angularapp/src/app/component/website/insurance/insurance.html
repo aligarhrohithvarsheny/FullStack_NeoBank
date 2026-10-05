@@ -157,7 +157,7 @@
           <th>Payment</th>
           <th>Auto Debit</th>
           <th>Applied At</th>
-          <th>Certificate</th>
+          <th>Receipt</th>
         </tr>
       </thead>
       <tbody>
@@ -175,11 +175,62 @@
           </td>
           <td>{{ app.appliedAt | date:'short' }}</td>
           <td>
-            <button type="button" (click)="downloadCertificate(app.id)">Download PDF</button>
+            <button type="button" *ngIf="canGenerateReceipt(app)" (click)="downloadInsuranceReceipt(app)">Download Receipt</button>
+            <span *ngIf="!canGenerateReceipt(app)">Available after approval</span>
           </td>
         </tr>
       </tbody>
     </table>
+    </div>
+
+    <div class="insurance-receipt-list" *ngIf="hasApprovedApplications">
+      <article class="insurance-receipt" *ngFor="let app of applications">
+        <ng-container *ngIf="canGenerateReceipt(app)">
+          <div class="receipt-header">
+            <div>
+              <span class="receipt-kicker">NEOBANK · INSURANCE RECEIPT</span>
+              <h3>{{ app.policy?.name }} <span>({{ app.policy?.type }})</span></h3>
+              <p>Application {{ app.applicationNumber }} · Policy {{ app.policy?.policyNumber }}</p>
+            </div>
+            <span class="receipt-status">{{ app.status }}</span>
+          </div>
+
+          <div class="receipt-amounts">
+            <div><span>Coverage amount</span><strong>₹{{ app.policy?.coverageAmount | number:'1.0-2' }}</strong></div>
+            <div><span>Premium amount</span><strong>₹{{ (app.premiumAmountCalculated ?? app.policy?.premiumAmount) | number:'1.0-2' }}</strong></div>
+            <div><span>Premium frequency</span><strong>{{ app.premiumType || app.policy?.premiumType }}</strong></div>
+          </div>
+
+          <div class="receipt-details">
+            <div><span>Account number</span><strong>{{ app.accountNumber }}</strong></div>
+            <div><span>Approved on</span><strong>{{ app.approvedAt | date:'mediumDate' }}</strong></div>
+            <div><span>Policy period</span><strong>{{ app.policyStartDate ? (app.policyStartDate | date:'mediumDate') : 'Not started' }} – {{ app.policyEndDate ? (app.policyEndDate | date:'mediumDate') : 'Not set' }}</strong></div>
+            <div><span>Duration</span><strong>{{ app.policy?.durationMonths }} months</strong></div>
+            <div><span>Nominee</span><strong>{{ app.nomineeName || 'Not specified' }}{{ app.nomineeRelation ? ' (' + app.nomineeRelation + ')' : '' }}</strong></div>
+            <div><span>Payment status</span><strong>{{ app.paymentStatus || 'Not available' }}</strong></div>
+            <div *ngIf="app.vehicleNumber"><span>Vehicle</span><strong>{{ app.vehicleNumber }}{{ app.makeModel ? ' · ' + app.makeModel : '' }}</strong></div>
+            <div *ngIf="app.chassisNumber"><span>Chassis number</span><strong>{{ app.chassisNumber }}</strong></div>
+            <div *ngIf="app.engineNumber"><span>Engine number</span><strong>{{ app.engineNumber }}</strong></div>
+            <div *ngIf="app.registrationDate"><span>Registration date</span><strong>{{ app.registrationDate }}</strong></div>
+          </div>
+
+          <div class="receipt-policy-details">
+            <h4>Policy details &amp; terms</h4>
+            <p *ngIf="app.policy?.description"><strong>Description:</strong> {{ app.policy.description }}</p>
+            <p *ngIf="app.policy?.benefits"><strong>Benefits:</strong> {{ app.policy.benefits }}</p>
+            <p *ngIf="app.policy?.eligibility"><strong>Eligibility:</strong> {{ app.policy.eligibility }}</p>
+            <p *ngIf="app.policy?.termsAndConditions"><strong>Terms &amp; Conditions:</strong> {{ app.policy.termsAndConditions }}</p>
+            <p *ngIf="!app.policy?.termsAndConditions" class="receipt-terms-note">
+              No additional policy-specific terms and conditions were provided. Contact NeoBank for clarification.
+            </p>
+          </div>
+
+          <div class="receipt-footer">
+            <span>Receipt generated from NeoBank policy records.</span>
+            <button type="button" (click)="downloadInsuranceReceipt(app)">Download receipt PDF</button>
+          </div>
+        </ng-container>
+      </article>
     </div>
   </section>
 
@@ -301,4 +352,3 @@
     </div>
   </section>
 </div>
-

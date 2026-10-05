@@ -70,9 +70,6 @@ public class UserController {
     @Autowired
     private AdminAuditService adminAuditService;
 
-    @Value("${app.login.otp-required:true}")
-    private boolean loginOtpRequired;
-
     @Value("${spring.web.cors.allowed-origins:}")
     private String allowedOrigins;
     
@@ -608,18 +605,11 @@ public class UserController {
         return email.charAt(0) + "***" + email.substring(at);
     }
 
+    // Password/graphical/QR login completes directly; no email OTP is sent.
     private Map<String, Object> beginLoginOtp(User user, String clientIp, String deviceInfo, String location, String loginMethod, String qrToken) {
-        if (!loginOtpRequired) {
-            ResponseEntity<Map<String, Object>> direct = completeUserLogin(user, loginMethod, clientIp, deviceInfo, location);
-            if (qrToken != null) qrCodeService.updateQrSession(qrToken, "LOGGED_IN", user);
-            return direct.getBody();
-        }
-        String email = user.getEmail().toLowerCase().trim();
-        String challengeId = UUID.randomUUID().toString();
-        loginOtpChallenges.put(challengeId, new LoginOtpChallenge(email, clientIp, deviceInfo, location, loginMethod, qrToken));
-        otpService.sendOtpForKey(email, "SAVINGS_LOGIN:" + challengeId, "Savings account login");
-        return Map.of("success", true, "requiresOtp", true, "challengeId", challengeId,
-                "maskedEmail", maskEmail(email), "message", "Enter the OTP sent to your registered email address.");
+        ResponseEntity<Map<String, Object>> direct = completeUserLogin(user, loginMethod, clientIp, deviceInfo, location);
+        if (qrToken != null) qrCodeService.updateQrSession(qrToken, "LOGGED_IN", user);
+        return direct.getBody();
     }
 
     // Graphical Password Authentication endpoint

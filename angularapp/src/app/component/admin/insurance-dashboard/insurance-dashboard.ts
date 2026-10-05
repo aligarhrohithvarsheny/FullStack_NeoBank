@@ -56,6 +56,7 @@ export class AdminInsuranceDashboard implements OnInit {
     description: '',
     benefits: '',
     eligibility: '',
+    termsAndConditions: '',
     status: 'ACTIVE'
   };
 
@@ -290,6 +291,7 @@ export class AdminInsuranceDashboard implements OnInit {
             description: '',
             benefits: '',
             eligibility: '',
+            termsAndConditions: '',
             status: 'ACTIVE'
           };
         } else {
@@ -420,4 +422,3 @@ export class AdminInsuranceDashboard implements OnInit {
     });
   }
 }
-

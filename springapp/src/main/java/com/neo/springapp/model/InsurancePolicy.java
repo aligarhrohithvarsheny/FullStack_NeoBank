@@ -46,6 +46,9 @@ public class InsurancePolicy {
     @Column(columnDefinition = "TEXT")
     private String eligibility;
 
+    @Column(columnDefinition = "TEXT")
+    private String termsAndConditions;
+
     private String status = "ACTIVE"; // ACTIVE / INACTIVE
 
     private LocalDateTime createdAt;
@@ -59,4 +62,3 @@ public class InsurancePolicy {
         }
     }
 }
-

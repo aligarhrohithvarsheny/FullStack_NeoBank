@@ -2066,10 +2066,63 @@
         </div>
         <select class="sal-filter-select" [(ngModel)]="salaryStatusFilter" (change)="filterSalaryAccounts()">
           <option value="ALL">All Status</option>
+          <option value="Pending">Pending Manager Approval</option>
           <option value="Active">Active</option>
           <option value="Frozen">Frozen</option>
           <option value="Closed">Closed</option>
         </select>
+      </div>
+
+      <!-- Video KYC-approved salary applications awaiting manager approval -->
+      <div class="sal-form-card">
+        <h4><i class="fa fa-video"></i> Salary Accounts Awaiting Approval</h4>
+        <p>These applications have completed Video KYC and are waiting for manager approval before account activation.</p>
+        <div *ngIf="salaryKycApprovalsError" class="sal-empty">{{ salaryKycApprovalsError }}</div>
+        <div *ngIf="isLoadingSalaryKycApprovals" class="sal-loading">
+          <i class="fa fa-spinner fa-spin"></i> Loading Video KYC-approved applications...
+        </div>
+        <div class="sal-table-wrap" *ngIf="!isLoadingSalaryKycApprovals && salaryKycApprovals.length > 0">
+          <table class="sal-table">
+            <thead>
+              <tr>
+                <th>Applicant</th>
+                <th>Mobile / Email</th>
+                <th>Company</th>
+                <th>Designation</th>
+                <th>Monthly Salary</th>
+                <th>Video KYC Approved</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let approval of salaryKycApprovals">
+                <td>
+                  <strong>{{ approval.fullName }}</strong>
+                  <div class="sal-cell-mono">{{ approval.customerId || approval.applicationNumber || '-' }}</div>
+                </td>
+                <td>{{ approval.mobileNumber || '-' }}<br>{{ approval.email || '-' }}</td>
+                <td>{{ approval.companyName || '-' }}</td>
+                <td>{{ approval.designation || '-' }}</td>
+                <td>₹{{ approval.monthlySalary | number:'1.0-0' }}</td>
+                <td>{{ approval.kycApprovedAt | date:'medium' }}</td>
+                <td>
+                  <button class="sal-btn sal-btn-primary"
+                          (click)="approveSalaryKyc(approval)"
+                          [disabled]="approvingSalaryKycId === approval.id">
+                    <i class="fa" [class.fa-check]="approvingSalaryKycId !== approval.id"
+                       [class.fa-spinner]="approvingSalaryKycId === approval.id"
+                       [class.fa-spin]="approvingSalaryKycId === approval.id"></i>
+                    {{ approvingSalaryKycId === approval.id ? 'Approving...' : 'Approve & Open' }}
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div *ngIf="!isLoadingSalaryKycApprovals && !salaryKycApprovalsError && salaryKycApprovals.length === 0" class="sal-empty">
+          <i class="fa fa-check-circle"></i>
+          <p>No salary applications are waiting for manager approval.</p>
+        </div>
       </div>
 
       <!-- Create Salary Account Form -->
@@ -2208,7 +2261,7 @@
               <td>₹{{ acc.monthlySalary | number:'1.0-0' }}</td>
               <td>₹{{ acc.balance | number:'1.2-2' }}</td>
               <td>
-                <span class="sal-badge" [ngClass]="{'sal-badge-green': acc.status==='Active', 'sal-badge-blue': acc.status==='Frozen', 'sal-badge-red': acc.status==='Closed'}">
+                <span class="sal-badge" [ngClass]="{'sal-badge-green': acc.status==='Active', 'sal-badge-blue': acc.status==='Frozen', 'sal-badge-red': acc.status==='Closed', 'sal-badge-pending': acc.status==='Pending'}">
                   {{ acc.status }}
                 </span>
               </td>
@@ -3401,4 +3454,3 @@
     </div>
 
 </div>
-

@@ -68,6 +68,7 @@ export class Insurance implements OnInit {
   premiumAmount: number = 0;
   enableAutoDebit: boolean = false;
   isPayingPremium: boolean = false;
+  private readonly approvedStatuses = new Set(['APPROVED', 'ACTIVE']);
 
   // EMI calculator
   premiumCalculator = {
@@ -84,6 +85,10 @@ export class Insurance implements OnInit {
 
   get visiblePolicies(): any[] {
     return (this.availablePolicies || []).filter(p => !p.unavailable);
+  }
+
+  get hasApprovedApplications(): boolean {
+    return (this.applications || []).some(application => this.canGenerateReceipt(application));
   }
 
   constructor(
@@ -425,6 +430,110 @@ export class Insurance implements OnInit {
       });
   }
 
+  canGenerateReceipt(application: any): boolean {
+    return this.approvedStatuses.has((application?.status || '').toString().toUpperCase());
+  }
+
+  async downloadInsuranceReceipt(application: any) {
+    if (!application || !this.canGenerateReceipt(application)) {
+      return;
+    }
+
+    let PdfDocument: typeof import('jspdf').jsPDF;
+    try {
+      PdfDocument = (await import('jspdf')).jsPDF;
+    } catch {
+      this.alertService.userError('Receipt Failed', 'Unable to load the receipt generator. Please try again.');
+      return;
+    }
+
+    const policy = application.policy || {};
+    const pdf = new PdfDocument({ unit: 'mm', format: 'a4' });
+    const margin = 18;
+    const contentWidth = 174;
+    let y = 20;
+
+    const write = (text: string, size = 10, bold = false, color: [number, number, number] = [51, 65, 85]) => {
+      pdf.setFont('helvetica', bold ? 'bold' : 'normal');
+      pdf.setFontSize(size);
+      pdf.setTextColor(...color);
+      const lines = pdf.splitTextToSize(text, contentWidth);
+      const lineHeight = size * 0.45;
+      for (const line of lines) {
+        if (y + lineHeight > 278) {
+          pdf.addPage();
+          y = 20;
+        }
+        pdf.text(line, margin, y);
+        y += lineHeight;
+      }
+      y += 2;
+    };
+
+    const section = (title: string) => {
+      y += 3;
+      write(title.toUpperCase(), 11, true, [15, 118, 110]);
+      pdf.setDrawColor(204, 224, 221);
+      pdf.line(margin, y - 1, 192, y - 1);
+      y += 3;
+    };
+
+    const field = (label: string, value: unknown) => {
+      if (value !== null && value !== undefined && String(value).trim() !== '') {
+        write(`${label}: ${String(value)}`);
+      }
+    };
+    const money = (amount: unknown) => {
+      const value = Number(amount);
+      return Number.isFinite(value)
+        ? `INR ${new Intl.NumberFormat('en-IN', { maximumFractionDigits: 2 }).format(value)}`
+        : 'Not available';
+    };
+
+    write('NeoBank Insurance Receipt', 19, true, [15, 118, 110]);
+    write(`Application ${application.applicationNumber || application.id || ''}  |  ${application.status}`, 10, true);
+    write(`Generated: ${new Date().toLocaleString('en-IN')}`, 9, false, [100, 116, 139]);
+    section('Policy and account');
+    field('Policy holder account', application.accountNumber || this.userAccountNumber);
+    field('Insurance type', policy.type);
+    field('Policy name', policy.name);
+    field('Policy number', policy.policyNumber);
+    field('Application number', application.applicationNumber);
+    field('Policy status', application.status);
+    field('Approved on', application.approvedAt ? new Date(application.approvedAt).toLocaleDateString('en-IN') : null);
+    field('Policy start date', application.policyStartDate);
+    field('Policy end date', application.policyEndDate);
+    field('Policy duration', policy.durationMonths ? `${policy.durationMonths} months` : null);
+    section('Coverage and premium');
+    field('Coverage amount', money(policy.coverageAmount));
+    field('Premium amount', money(application.premiumAmountCalculated ?? policy.premiumAmount));
+    field('Premium frequency', application.premiumType || policy.premiumType);
+    field('Payment status', application.paymentStatus);
+    field('Premium paid on', application.paidAt ? new Date(application.paidAt).toLocaleDateString('en-IN') : null);
+    section('Application details');
+    field('Nominee', application.nomineeName);
+    field('Nominee relationship', application.nomineeRelation);
+    field('Vehicle number', application.vehicleNumber);
+    field('Make / model', application.makeModel);
+    field('Chassis number', application.chassisNumber);
+    field('Engine number', application.engineNumber);
+    field('Description', policy.description);
+    field('Benefits', policy.benefits);
+    field('Eligibility', policy.eligibility);
+    section('Terms and conditions');
+    write(
+      policy.termsAndConditions?.trim()
+        || 'No additional policy-specific terms and conditions were provided by the insurer for this policy. Please contact NeoBank for clarification.',
+      10
+    );
+    write('This receipt summarizes the policy information currently recorded by NeoBank.', 8, false, [100, 116, 139]);
+
+    const filename = (application.applicationNumber || `application-${application.id}`)
+      .toString()
+      .replace(/[^a-zA-Z0-9-]/g, '-');
+    pdf.save(`insurance-receipt-${filename}.pdf`);
+  }
+
   calculatePremium() {
     const P = this.premiumCalculator.coverageAmount;
     const n = this.premiumCalculator.durationMonths;
@@ -438,4 +547,3 @@ export class Insurance implements OnInit {
     this.calculatedMonthlyPremium = Math.round(emi);
   }
 }
-

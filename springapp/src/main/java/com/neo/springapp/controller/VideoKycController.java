@@ -321,6 +321,32 @@ public class VideoKycController {
         }
     }
 
+    @GetMapping("/manager/salary-approvals")
+    public ResponseEntity<?> getSalaryKycApprovalsPending() {
+        try {
+            return ResponseEntity.ok(videoKycService.getSalaryKycApprovalsPending());
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/manager/salary-approvals/{sessionId}/approve")
+    public ResponseEntity<?> managerApproveSalaryKyc(
+            @PathVariable Long sessionId,
+            @RequestParam String managerName) {
+        try {
+            VideoKycSession session = videoKycService.managerApproveSalaryKyc(sessionId, managerName);
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", "Salary account approved and opened.",
+                    "accountNumber", session.getFinalAccountNumber(),
+                    "managerApprovalStatus", session.getManagerApprovalStatus()
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", e.getMessage()));
+        }
+    }
+
     @PostMapping("/admin/join/{sessionId}")
     public ResponseEntity<?> adminJoinSession(
             @PathVariable Long sessionId,
@@ -353,6 +379,7 @@ public class VideoKycController {
             response.put("ifscCode", session.getIfscCode());
             response.put("kycStatus", session.getKycStatus());
             response.put("accountType", session.getAccountType());
+            response.put("managerApprovalStatus", session.getManagerApprovalStatus());
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("success", false, "message", e.getMessage()));

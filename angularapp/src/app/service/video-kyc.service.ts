@@ -100,6 +100,18 @@ export class VideoKycService {
     return this.http.get(`${this.apiUrl}/admin/stats`);
   }
 
+  getSalaryKycApprovalsPending(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiUrl}/manager/salary-approvals`);
+  }
+
+  managerApproveSalaryKyc(sessionId: number, managerName: string): Observable<any> {
+    return this.http.post(
+      `${this.apiUrl}/manager/salary-approvals/${sessionId}/approve`,
+      {},
+      { params: { managerName } }
+    );
+  }
+
   adminJoinSession(sessionId: number, adminId: number, adminName: string): Observable<any> {
     return this.http.post(`${this.apiUrl}/admin/join/${sessionId}?adminId=${adminId}&adminName=${encodeURIComponent(adminName)}`, {});
   }

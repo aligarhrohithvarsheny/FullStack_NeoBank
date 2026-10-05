@@ -2701,6 +2701,7 @@
 .sal-badge-green  { background: #dcfce7; color: #16a34a; }
 .sal-badge-blue   { background: #dbeafe; color: #2563eb; }
 .sal-badge-red    { background: #fee2e2; color: #dc2626; }
+.sal-badge-pending { background: #fef3c7; color: #b45309; }
 
 /* Action buttons in table */
 .sal-act-btn {

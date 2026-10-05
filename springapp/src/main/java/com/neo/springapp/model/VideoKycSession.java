@@ -96,6 +96,9 @@ public class VideoKycSession {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private LocalDateTime approvedAt;
+    private String managerApprovalStatus = "NOT_REQUIRED";
+    private String managerApprovedBy;
+    private LocalDateTime managerApprovedAt;
 
     // Link to main user account
     private Long userId;

@@ -94,6 +94,7 @@ public class InsuranceService {
                     existing.setDescription(updated.getDescription());
                     existing.setBenefits(updated.getBenefits());
                     existing.setEligibility(updated.getEligibility());
+                    existing.setTermsAndConditions(updated.getTermsAndConditions());
                     existing.setStatus(updated.getStatus());
                     existing.setUpdatedAt(LocalDateTime.now());
                     return policyRepository.save(existing);
@@ -781,4 +782,3 @@ public class InsuranceService {
         return String.valueOf(value == null ? "-" : value).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
     }
 }
-

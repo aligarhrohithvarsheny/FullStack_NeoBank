@@ -28,6 +28,11 @@ public interface VideoKycSessionRepository extends JpaRepository<VideoKycSession
 
     List<VideoKycSession> findByKycStatus(String kycStatus);
 
+    @Query("SELECT v FROM VideoKycSession v WHERE LOWER(v.kycStatus) = 'approved' " +
+           "AND LOWER(v.accountType) = 'salary' AND v.managerApprovalStatus = 'PENDING' " +
+           "ORDER BY v.approvedAt DESC")
+    List<VideoKycSession> findSalarySessionsPendingManagerApproval();
+
     Page<VideoKycSession> findByKycStatus(String kycStatus, Pageable pageable);
 
     Page<VideoKycSession> findAll(Pageable pageable);

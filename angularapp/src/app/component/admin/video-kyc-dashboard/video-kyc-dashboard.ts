@@ -281,7 +281,9 @@ export class VideoKycDashboard implements OnInit, OnDestroy {
     this.videoKycService.approveKyc(this.selectedSession.id, Number(adminId), adminName).subscribe({
       next: (response: any) => {
         this.selectedSession = { ...this.selectedSession, ...response };
-        this.successMsg = `KYC Approved! Account Number: ${response.finalAccountNumber}`;
+        this.successMsg = response.managerApprovalStatus === 'PENDING'
+          ? 'Video KYC approved. Salary account details were sent to the manager for approval.'
+          : `KYC Approved! Account Number: ${response.finalAccountNumber}`;
         this.actionLoading = false;
         this.stopAdminVideo();
         this.loadStats();

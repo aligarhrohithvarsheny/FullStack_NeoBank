@@ -274,7 +274,22 @@ public class VideoKycService {
         String accountType = session.getAccountType() != null ? session.getAccountType() : "Savings";
         String finalAccountNumber;
 
-        if (isUnmaterializedFallbackAccount(session, accountType)) {
+        if ("Salary".equalsIgnoreCase(accountType)) {
+            if ("APPROVED".equalsIgnoreCase(session.getManagerApprovalStatus())) {
+                finalAccountNumber = session.getFinalAccountNumber();
+            } else {
+                SalaryAccount salaryAccount = isBlank(session.getEmail())
+                        ? null
+                        : salaryAccountRepository.findByEmail(session.getEmail());
+                if (salaryAccount != null && !"Closed".equalsIgnoreCase(salaryAccount.getStatus())
+                        && !"Frozen".equalsIgnoreCase(salaryAccount.getStatus())) {
+                    salaryAccount.setStatus("Pending");
+                    salaryAccountRepository.save(salaryAccount);
+                }
+                session.setManagerApprovalStatus("PENDING");
+                finalAccountNumber = null;
+            }
+        } else if (isUnmaterializedFallbackAccount(session, accountType)) {
             finalAccountNumber = persistFallbackAccount(session, accountType, adminName, session.getFinalAccountNumber());
         } else {
             try {
@@ -293,6 +308,142 @@ public class VideoKycService {
                         " (" + accountType + "). Account Number: " + finalAccountNumber);
 
         return saved;
+    }
+
+    public List<Map<String, Object>> getSalaryKycApprovalsPending() {
+        List<Map<String, Object>> approvals = new ArrayList<>();
+        for (VideoKycSession session : sessionRepository.findSalarySessionsPendingManagerApproval()) {
+            AdminAccountApplication application = findAccountApplication(session);
+            SalaryAccount account = isBlank(session.getEmail())
+                    ? null
+                    : salaryAccountRepository.findByEmail(session.getEmail());
+
+            Map<String, Object> approval = new HashMap<>();
+            approval.put("id", session.getId());
+            approval.put("customerId", session.getCustomerId());
+            approval.put("fullName", firstNonBlank(session.getFullName(), application == null ? null : application.getFullName()));
+            approval.put("mobileNumber", firstNonBlank(session.getMobileNumber(), application == null ? null : application.getPhone()));
+            approval.put("email", firstNonBlank(session.getEmail(), application == null ? null : application.getEmail()));
+            approval.put("companyName", application != null ? application.getCompanyName() : account == null ? null : account.getCompanyName());
+            approval.put("designation", application != null ? application.getDesignation() : account == null ? null : account.getDesignation());
+            approval.put("monthlySalary", application != null ? application.getMonthlySalary() : account == null ? null : account.getMonthlySalary());
+            approval.put("salaryCreditDate", application != null ? application.getSalaryCreditDate() : account == null ? null : account.getSalaryCreditDate());
+            approval.put("branchName", application != null ? application.getBranchName() : account == null ? null : account.getBranchName());
+            approval.put("accountNumber", account == null ? null : account.getAccountNumber());
+            approval.put("applicationNumber", application == null ? null : application.getApplicationNumber());
+            approval.put("kycApprovedAt", session.getApprovedAt());
+            approval.put("managerApprovalStatus", session.getManagerApprovalStatus());
+            approvals.add(approval);
+        }
+        return approvals;
+    }
+
+    @Transactional
+    public VideoKycSession managerApproveSalaryKyc(Long sessionId, String managerName) {
+        VideoKycSession session = sessionRepository.findById(sessionId)
+                .orElseThrow(() -> new RuntimeException("Video KYC session not found"));
+
+        if (!"Approved".equalsIgnoreCase(session.getKycStatus())
+                || !"Salary".equalsIgnoreCase(session.getAccountType())) {
+            throw new IllegalStateException("Only admin-approved Salary account Video KYC sessions can be approved here.");
+        }
+        if (!"PENDING".equalsIgnoreCase(session.getManagerApprovalStatus())) {
+            throw new IllegalStateException("This Salary account is no longer awaiting manager approval.");
+        }
+
+        AdminAccountApplication application = findAccountApplication(session);
+        SalaryAccount account = isBlank(session.getEmail())
+                ? null
+                : salaryAccountRepository.findByEmail(session.getEmail());
+
+        if (account == null) {
+            if (application == null) {
+                throw new IllegalStateException("Salary account details could not be found for this Video KYC session.");
+            }
+            account = createSalaryAccountFromApplication(session, application, managerName);
+        } else {
+            if ("Closed".equalsIgnoreCase(account.getStatus()) || "Frozen".equalsIgnoreCase(account.getStatus())) {
+                throw new IllegalStateException("A closed or frozen Salary account cannot be activated.");
+            }
+            account.setStatus("Active");
+            account = salaryAccountRepository.save(account);
+        }
+
+        ensureApprovedSalaryUser(session, account);
+        if (application != null) {
+            LocalDateTime approvedAt = LocalDateTime.now();
+            application.setAdminVerified(true);
+            application.setAdminVerifiedBy(firstNonBlank(session.getAssignedAdminName(), "Video KYC Admin"));
+            if (application.getAdminVerifiedDate() == null) {
+                application.setAdminVerifiedDate(session.getApprovedAt() != null ? session.getApprovedAt() : approvedAt);
+            }
+            application.setManagerApproved(true);
+            application.setManagerApprovedBy(managerName);
+            application.setManagerApprovedDate(approvedAt);
+            application.setManagerRemarks("Approved after successful Video KYC.");
+            application.setStatus("ACTIVE");
+            application.setAccountNumber(account.getAccountNumber());
+            application.setCustomerId(account.getCustomerId());
+            application.setUpdatedAt(approvedAt);
+            accountApplicationRepository.save(application);
+        }
+
+        session.setFinalAccountNumber(account.getAccountNumber());
+        session.setManagerApprovalStatus("APPROVED");
+        session.setManagerApprovedBy(managerName);
+        session.setManagerApprovedAt(LocalDateTime.now());
+        VideoKycSession saved = sessionRepository.save(session);
+        createAuditLog(sessionId, null, managerName, "SALARY_ACCOUNT_MANAGER_APPROVED",
+                "Manager " + managerName + " approved Salary account opening for " +
+                        session.getFullName() + ". Account Number: " + account.getAccountNumber());
+        return saved;
+    }
+
+    private SalaryAccount createSalaryAccountFromApplication(
+            VideoKycSession session, AdminAccountApplication application, String managerName) {
+        if (isBlank(session.getEmail()) || isBlank(session.getAadharNumber())
+                || isBlank(session.getPanNumber()) || isBlank(session.getMobileNumber())) {
+            throw new IllegalStateException("Verified email, Aadhaar, PAN, and mobile are required to open this Salary account.");
+        }
+
+        SalaryAccount account = new SalaryAccount();
+        account.setEmployeeName(firstNonBlank(session.getFullName(), application.getFullName()));
+        account.setDob(application.getDateOfBirth());
+        account.setMobileNumber(session.getMobileNumber());
+        account.setEmail(session.getEmail());
+        account.setAadharNumber(session.getAadharNumber());
+        account.setPanNumber(session.getPanNumber());
+        account.setCompanyName(application.getCompanyName());
+        account.setCompanyId(application.getCompanyId());
+        account.setEmployerAddress(application.getEmployerAddress());
+        account.setHrContactNumber(application.getHrContactNumber());
+        account.setMonthlySalary(application.getMonthlySalary() == null ? 0.0 : application.getMonthlySalary());
+        account.setSalaryCreditDate(application.getSalaryCreditDate() == null ? 1 : application.getSalaryCreditDate());
+        account.setDesignation(application.getDesignation());
+        account.setBranchName(application.getBranchName() == null ? "NeoBank Main Branch" : application.getBranchName());
+        account.setIfscCode(application.getIfscCode() == null ? "EZYV000123" : application.getIfscCode());
+        account.setAddress(buildAddress(session, application));
+        account.setStatus("Active");
+        account.setPassword(passwordService.encryptPassword(generateTemporaryPassword()));
+        return salaryAccountService.createAccount(account, managerName);
+    }
+
+    private void ensureApprovedSalaryUser(VideoKycSession session, SalaryAccount account) {
+        if (isBlank(session.getEmail())) return;
+
+        User user = userRepository.findByEmail(session.getEmail())
+                .orElseGet(() -> {
+                    User created = new User();
+                    created.setEmail(session.getEmail());
+                    created.setUsername(firstNonBlank(session.getFullName(), session.getEmail().split("@")[0]));
+                    created.setPassword(passwordService.encryptPassword(generateTemporaryPassword()));
+                    created.setPasswordSet(false);
+                    return created;
+                });
+        user.setStatus("APPROVED");
+        user.setPasswordSet(false);
+        user.setJoinDate(LocalDateTime.now());
+        userRepository.save(user);
     }
 
     private String activateAccountInNewTransaction(VideoKycSession session, String accountType, String adminName) {

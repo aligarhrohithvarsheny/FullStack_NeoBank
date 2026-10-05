@@ -1049,7 +1049,7 @@ export class Createaccount implements OnInit, OnDestroy {
       ifscCode: val.salaryIfscCode || 'EZYV000123',
       address: `${val.city || ''}, ${val.state || ''}`,
       password: val.password,
-      status: 'Active'
+      status: 'Pending'
     };
 
     this.salaryAccountService.createAccount(salaryAccountData).subscribe({

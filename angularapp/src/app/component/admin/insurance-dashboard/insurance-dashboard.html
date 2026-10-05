@@ -151,6 +151,10 @@
             <label class="ins-label">Eligibility</label>
             <input class="ins-input" type="text" [(ngModel)]="newPolicy.eligibility" placeholder="Age 18-65, etc.">
           </div>
+          <div class="ins-field ins-field-full">
+            <label class="ins-label">Terms &amp; Conditions</label>
+            <textarea class="ins-input ins-textarea" [(ngModel)]="newPolicy.termsAndConditions" rows="4" placeholder="Enter the policy-specific terms and conditions..."></textarea>
+          </div>
         </div>
       </div>
       <div class="ins-modal-footer">
@@ -560,4 +564,3 @@
     </div>
   </div>
 </div>
-

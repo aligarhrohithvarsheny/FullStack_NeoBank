@@ -6,6 +6,7 @@ import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { AlertService } from '../../../service/alert.service';
 import { SalaryAccountService } from '../../../service/salary-account.service';
+import { VideoKycService } from '../../../service/video-kyc.service';
 import { SalaryAccount, SalaryTransaction, SalaryAccountStats } from '../../../model/salary-account/salary-account.model';
 import { environment } from '../../../../environment/environment';
 import { DocumentVerificationComponent } from '../document-verification/document-verification';
@@ -369,6 +370,10 @@ export class ManagerDashboard implements OnInit, OnDestroy {
   salaryAccounts: SalaryAccount[] = [];
   filteredSalaryAccounts: SalaryAccount[] = [];
   salaryStats: SalaryAccountStats = { totalAccounts: 0, activeAccounts: 0, frozenAccounts: 0, closedAccounts: 0, totalMonthlySalary: 0, companiesLinked: {}, totalCompanies: 0 };
+  salaryKycApprovals: any[] = [];
+  isLoadingSalaryKycApprovals: boolean = false;
+  salaryKycApprovalsError: string = '';
+  approvingSalaryKycId: number | null = null;
   salarySearchQuery: string = '';
   salaryStatusFilter: string = 'ALL';
   showSalaryForm: boolean = false;
@@ -426,7 +431,8 @@ export class ManagerDashboard implements OnInit, OnDestroy {
     @Inject(PLATFORM_ID) private platformId: Object,
     private http: HttpClient,
     private alertService: AlertService,
-    private salaryAccountService: SalaryAccountService
+    private salaryAccountService: SalaryAccountService,
+    private videoKycService: VideoKycService
   ) {}
 
   private sessionTimerHandle: any = null;
@@ -1737,6 +1743,7 @@ export class ManagerDashboard implements OnInit, OnDestroy {
       this.loadAdminProfileUpdateRequests();
     } else if (section === 'salary-accounts' && isPlatformBrowser(this.platformId)) {
       this.loadSalaryAccounts();
+      this.loadSalaryKycApprovals();
     } else if (section === 'manager-permissions' && isPlatformBrowser(this.platformId)) {
       this.mpSelectedAdmin = null;
       this.mpAdminSalaryAccount = null;
@@ -3300,6 +3307,39 @@ export class ManagerDashboard implements OnInit, OnDestroy {
     });
   }
 
+  loadSalaryKycApprovals(): void {
+    this.isLoadingSalaryKycApprovals = true;
+    this.salaryKycApprovalsError = '';
+    this.videoKycService.getSalaryKycApprovalsPending().subscribe({
+      next: (approvals) => {
+        this.salaryKycApprovals = approvals || [];
+        this.isLoadingSalaryKycApprovals = false;
+      },
+      error: (err) => {
+        this.salaryKycApprovalsError = err?.error?.message || 'Unable to load Salary Video KYC approvals.';
+        this.isLoadingSalaryKycApprovals = false;
+      }
+    });
+  }
+
+  approveSalaryKyc(approval: any): void {
+    if (!confirm(`Approve Salary account opening for ${approval.fullName}?`)) return;
+
+    this.approvingSalaryKycId = approval.id;
+    this.videoKycService.managerApproveSalaryKyc(approval.id, this.managerName).subscribe({
+      next: (response) => {
+        this.approvingSalaryKycId = null;
+        this.alertService.success('Salary Account Approved', `Account ${response.accountNumber} is now active.`);
+        this.loadSalaryKycApprovals();
+        this.loadSalaryAccounts();
+      },
+      error: (err) => {
+        this.approvingSalaryKycId = null;
+        this.alertService.error('Approval Failed', err?.error?.message || 'Unable to approve this Salary account.');
+      }
+    });
+  }
+
   filterSalaryAccounts(): void {
     let list = this.salaryAccounts;
     if (this.salaryStatusFilter && this.salaryStatusFilter !== 'ALL') {
@@ -4266,4 +4306,3 @@ export class ManagerDashboard implements OnInit, OnDestroy {
     }
   }
 }
-
