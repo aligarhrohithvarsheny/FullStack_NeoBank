@@ -64,6 +64,9 @@ public class SavingsChequeDrawService {
     private SalaryAccountRepository salaryAccountRepository;
 
     @Autowired
+    private GoldLoanRepository goldLoanRepository;
+
+    @Autowired
     private TransactionRepository transactionRepository;
 
     @Autowired
@@ -76,15 +79,44 @@ public class SavingsChequeDrawService {
 
     // ==================== USER OPERATIONS ====================
 
-    @Transactional
     public Map<String, Object> applyChequeDrawRequest(Long accountId, String serialNumber,
                                                        String chequeDate, Double amount, String payeeName,
                                                        String remarks) {
+        return applyChequeDrawRequest(accountId, serialNumber, chequeDate, amount, payeeName,
+                remarks, "GENERAL", null);
+    }
+
+    @Transactional
+    public Map<String, Object> applyChequeDrawRequest(Long accountId, String serialNumber,
+                                                       String chequeDate, Double amount, String payeeName,
+                                                       String remarks, String chequePurpose,
+                                                       String goldLoanAccountNumber) {
         if (amount <= 0) throw new RuntimeException("Amount must be greater than 0");
         if (amount >= 50_00_000) throw new RuntimeException("Amount cannot exceed ₹50,00,000");
 
         Account account = accountRepository.findById(accountId)
                 .orElseThrow(() -> new RuntimeException("Savings account not found"));
+
+        String purpose = chequePurpose == null || chequePurpose.isBlank()
+                ? "GENERAL" : chequePurpose.trim().toUpperCase();
+        String linkedGoldLoanNumber = null;
+        if ("GOLD_LOAN_PREPAYMENT".equals(purpose)) {
+            linkedGoldLoanNumber = goldLoanAccountNumber == null ? "" : goldLoanAccountNumber.trim();
+            if (linkedGoldLoanNumber.isBlank()) {
+                throw new IllegalArgumentException("Gold loan account number is required for a prepayment cheque");
+            }
+            GoldLoan goldLoan = goldLoanRepository.findByLoanAccountNumber(linkedGoldLoanNumber)
+                    .orElseThrow(() -> new IllegalArgumentException("Gold loan account not found"));
+            if (!account.getAccountNumber().equalsIgnoreCase(String.valueOf(goldLoan.getAccountNumber()))) {
+                throw new IllegalArgumentException("The selected Gold Loan does not belong to this savings account");
+            }
+            if (!"Approved".equalsIgnoreCase(goldLoan.getStatus())) {
+                throw new IllegalArgumentException("A Gold Loan prepayment cheque requires an approved Gold Loan");
+            }
+            payeeName = "NeoBank Gold Loan Prepayment";
+        } else if (!"GENERAL".equals(purpose)) {
+            throw new IllegalArgumentException("Unsupported cheque purpose");
+        }
 
         if (account.getStatus() != null && !"ACTIVE".equalsIgnoreCase(account.getStatus())) {
             throw new RuntimeException("Account is " + account.getStatus().toLowerCase() + ". Cannot process cheque requests.");
@@ -113,6 +145,8 @@ public class SavingsChequeDrawService {
         request.setAmount(BigDecimal.valueOf(amount));
         request.setAvailableBalance(availableBalance);
         request.setPayeeName(payeeName);
+        request.setChequePurpose(purpose);
+        request.setGoldLoanAccountNumber(linkedGoldLoanNumber);
         request.setRemarks(remarks);
         boolean selfPayee = payeeName != null && payeeName.trim().equalsIgnoreCase("SELF");
         boolean positivePayRequired = !selfPayee && BigDecimal.valueOf(amount).compareTo(positivePayMinimumAmount) >= 0;
@@ -134,6 +168,8 @@ public class SavingsChequeDrawService {
         response.put("chequeNumber", chequeNumber);
         response.put("requestId", saved.getId());
         response.put("status", request.getStatus());
+        response.put("chequePurpose", purpose);
+        response.put("goldLoanAccountNumber", linkedGoldLoanNumber);
         if (positivePayRequired) {
             response.put("positivePayRequired", true);
             response.put("positivePayMessage", "This cheque is ₹10,000 or above. Register it in Positive Pay before admin draw verification.");
@@ -197,6 +233,10 @@ public class SavingsChequeDrawService {
         SavingsChequeRequest request = chequeRequestRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Savings cheque request not found"));
 
+        if (isGoldLoanPrepaymentCheque(request)) {
+            throw new IllegalArgumentException("Gold Loan prepayment cheque details cannot be edited; cancel and submit a new request");
+        }
+
         if (!request.getStatus().equals("PENDING")) {
             throw new RuntimeException("Only PENDING cheques can be edited");
         }
@@ -238,6 +278,10 @@ public class SavingsChequeDrawService {
     public Map<String, Object> revertChequeDrawRequest(Long id, String adminEmail, String reason) {
         SavingsChequeRequest request = chequeRequestRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Savings cheque request not found"));
+
+        if (isGoldLoanPrepaymentCheque(request)) {
+            throw new IllegalArgumentException("Gold Loan prepayment cheques are managed through Admin Funds Transfer and cannot be reverted from cheque management");
+        }
 
         if (!"APPROVED".equals(request.getStatus()) && !"COMPLETED".equals(request.getStatus()) && !"CLEARED".equals(request.getStatus())) {
             throw new RuntimeException("Only approved or drawn cheques can be reverted. Current status: " + request.getStatus());
@@ -420,6 +464,10 @@ public class SavingsChequeDrawService {
         SavingsChequeRequest request = chequeRequestRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Savings cheque request not found"));
 
+        if (isGoldLoanPrepaymentCheque(request)) {
+            throw new IllegalArgumentException("Gold Loan prepayment cheques must be used from Admin Funds Transfer, not approved as ordinary cheques");
+        }
+
         if (!request.getStatus().equals("PENDING")) {
             throw new RuntimeException("Only PENDING cheques can be approved");
         }
@@ -594,6 +642,10 @@ public class SavingsChequeDrawService {
         SavingsChequeRequest request = chequeRequestRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Savings cheque request not found"));
 
+        if (isGoldLoanPrepaymentCheque(request)) {
+            throw new IllegalArgumentException("Gold Loan prepayment cheques are used only through Admin Funds Transfer");
+        }
+
         if (!request.getStatus().equals("APPROVED")) {
             throw new RuntimeException("Only APPROVED cheques can be marked as picked up");
         }
@@ -616,6 +668,10 @@ public class SavingsChequeDrawService {
     public Map<String, Object> clearChequeDrawRequest(Long id, String adminEmail, String clearedDate) {
         SavingsChequeRequest request = chequeRequestRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Savings cheque request not found"));
+
+        if (isGoldLoanPrepaymentCheque(request)) {
+            throw new IllegalArgumentException("Gold Loan prepayment cheques are used only through Admin Funds Transfer");
+        }
 
         if (!request.getStatus().equals("COMPLETED") && !request.getStatus().equals("APPROVED")) {
             throw new RuntimeException("Only APPROVED or COMPLETED cheques can be cleared");
@@ -714,6 +770,10 @@ public class SavingsChequeDrawService {
     public Map<String, Object> markChequeDownloaded(Long id) {
         SavingsChequeRequest request = chequeRequestRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Savings cheque request not found"));
+
+        if (isGoldLoanPrepaymentCheque(request)) {
+            throw new IllegalArgumentException("Gold Loan prepayment cheques cannot be downloaded or used as ordinary cheques");
+        }
 
         if (!"APPROVED".equals(request.getStatus()) && !"COMPLETED".equals(request.getStatus())) {
             throw new RuntimeException("Cheque must be approved before downloading");
@@ -836,6 +896,10 @@ public class SavingsChequeDrawService {
                 || legacyChequeRepository.findByChequeNumber(chequeNumber).isPresent();
     }
 
+    private boolean isGoldLoanPrepaymentCheque(SavingsChequeRequest request) {
+        return "GOLD_LOAN_PREPAYMENT".equalsIgnoreCase(request.getChequePurpose());
+    }
+
     private void logAuditAction(Long chequeRequestId, String adminEmail, String action, String remarks) {
         SavingsChequeAuditLog log = new SavingsChequeAuditLog();
         log.setChequeRequestId(chequeRequestId);
@@ -852,6 +916,8 @@ public class SavingsChequeDrawService {
         map.put("chequeNumber", req.getChequeNumber());
         map.put("chequeDate", req.getChequeDate());
         map.put("payeeName", req.getPayeeName());
+        map.put("chequePurpose", req.getChequePurpose());
+        map.put("goldLoanAccountNumber", req.getGoldLoanAccountNumber());
         map.put("amount", req.getAmount().doubleValue());
         map.put("status", req.getStatus());
         map.put("createdAt", req.getCreatedAt());
@@ -874,6 +940,8 @@ public class SavingsChequeDrawService {
         map.put("serialNumber", req.getSerialNumber());
         map.put("chequeDate", req.getChequeDate());
         map.put("payeeName", req.getPayeeName());
+        map.put("chequePurpose", req.getChequePurpose());
+        map.put("goldLoanAccountNumber", req.getGoldLoanAccountNumber());
         map.put("amount", req.getAmount().doubleValue());
         map.put("remarks", req.getRemarks());
         map.put("status", req.getStatus());
@@ -898,6 +966,8 @@ public class SavingsChequeDrawService {
         map.put("accountId", req.getAccountId());
         map.put("chequeDate", req.getChequeDate());
         map.put("payeeName", req.getPayeeName());
+        map.put("chequePurpose", req.getChequePurpose());
+        map.put("goldLoanAccountNumber", req.getGoldLoanAccountNumber());
         map.put("amount", req.getAmount().doubleValue());
         map.put("availableBalance", req.getAvailableBalance() != null ? req.getAvailableBalance().doubleValue() : 0.0);
         map.put("remarks", req.getRemarks());

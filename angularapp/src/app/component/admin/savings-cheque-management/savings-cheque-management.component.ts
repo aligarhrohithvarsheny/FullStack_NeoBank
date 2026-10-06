@@ -214,6 +214,11 @@ export class SavingsChequeManagementComponent implements OnInit, OnDestroy {
       return;
     }
 
+    if (this.selectedCheque.chequePurpose === 'GOLD_LOAN_PREPAYMENT') {
+      this.alertService.error('Restricted Cheque', 'Use this cheque only from Admin Funds Transfer for its linked Gold Loan prepayment.');
+      return;
+    }
+
     if (!this.payeeVerified) {
       this.alertService.error('Error', 'Please verify payee account before approving');
       return;

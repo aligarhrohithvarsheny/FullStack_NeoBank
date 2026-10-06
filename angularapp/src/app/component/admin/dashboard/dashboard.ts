@@ -3320,6 +3320,14 @@ export class Dashboard implements OnInit, OnDestroy {
     this.http.get(`${environment.apiBaseUrl}/api/admin-fund-transfers/verify-sender-cheque`, { params }).subscribe({
       next: (res: any) => {
         this.aftSenderVerification = res;
+        if (res.chequePurpose === 'GOLD_LOAN_PREPAYMENT') {
+          this.aftTransferCategory = 'GOLD_LOAN';
+          this.aftLoanPaymentType = 'PREPAYMENT';
+          this.aftReceiverAccountNumber = res.goldLoanAccountNumber || '';
+          this.aftReceiverVerification = null;
+          this.aftLoanVerification = null;
+          if (this.aftReceiverAccountNumber) this.verifyAftLoan();
+        }
         this.aftVerifyingSender = false;
       },
       error: (err: any) => {
@@ -3447,6 +3455,8 @@ export class Dashboard implements OnInit, OnDestroy {
     } else if (this.aftLoanPaymentType === 'FORECLOSURE') {
       const calculation = this.aftLoanVerification?.foreclosure;
       this.aftAmount = calculation?.success ? Number(calculation.totalForeclosureAmount) : null;
+    } else if (this.aftSenderVerification?.chequePurpose === 'GOLD_LOAN_PREPAYMENT') {
+      this.aftAmount = Number(this.aftSenderVerification.chequeAmount);
     } else {
       this.aftAmount = null;
     }
@@ -3464,6 +3474,19 @@ export class Dashboard implements OnInit, OnDestroy {
     if (!this.aftAmount || this.aftAmount <= 0) {
       this.alertService.error('Invalid Amount', 'Enter a valid transfer amount');
       return;
+    }
+    if (this.aftSenderVerification?.chequePurpose === 'GOLD_LOAN_PREPAYMENT') {
+      if (this.aftTransferCategory !== 'GOLD_LOAN'
+          || this.aftLoanPaymentType !== 'PREPAYMENT'
+          || this.aftReceiverAccountNumber.trim().toLowerCase()
+            !== String(this.aftSenderVerification.goldLoanAccountNumber || '').trim().toLowerCase()) {
+        this.alertService.error('Cheque Restricted', 'This cheque can only prepay its linked Gold Loan account.');
+        return;
+      }
+      if (Math.round(Number(this.aftAmount) * 100) !== Math.round(Number(this.aftSenderVerification.chequeAmount) * 100)) {
+        this.alertService.error('Cheque Amount Mismatch', 'Prepayment amount must match the amount written on this cheque.');
+        return;
+      }
     }
     if (this.aftTransferCategory !== 'ACCOUNT_TO_ACCOUNT') {
       if (!this.aftLoanVerification?.found) {

@@ -30,6 +30,8 @@ export class ChequeComponent implements OnInit {
   amount: number | null = null;
   payeeName: string = '';
   remarks: string = '';
+  chequePurpose: 'GENERAL' | 'GOLD_LOAN_PREPAYMENT' = 'GENERAL';
+  goldLoanAccountNumber: string = '';
 
   // Cheque leaves
   availableLeaves: SavingsChequeLeaf[] = [];
@@ -174,6 +176,11 @@ export class ChequeComponent implements OnInit {
       return false;
     }
 
+    if (this.chequePurpose === 'GOLD_LOAN_PREPAYMENT' && !this.goldLoanAccountNumber.trim()) {
+      this.errorMessage = 'Gold Loan account number is required';
+      return false;
+    }
+
     if (this.amount > 5000000) {
       this.errorMessage = 'Amount cannot exceed ₹50,00,000';
       return false;
@@ -198,7 +205,13 @@ export class ChequeComponent implements OnInit {
       serialNumber: this.serialNumber.trim(),
       chequeDate: this.chequeDate,
       amount: this.amount!,
-      payeeName: this.payeeName.trim(),
+      payeeName: this.chequePurpose === 'GOLD_LOAN_PREPAYMENT'
+        ? 'NeoBank Gold Loan Prepayment'
+        : this.payeeName.trim(),
+      chequePurpose: this.chequePurpose,
+      goldLoanAccountNumber: this.chequePurpose === 'GOLD_LOAN_PREPAYMENT'
+        ? this.goldLoanAccountNumber.trim()
+        : undefined,
       remarks: this.remarks.trim() || undefined
     };
 
@@ -234,6 +247,8 @@ export class ChequeComponent implements OnInit {
     this.chequeDate = this.getTodayDate();
     this.amount = null;
     this.payeeName = '';
+    this.chequePurpose = 'GENERAL';
+    this.goldLoanAccountNumber = '';
     this.remarks = '';
     this.errorMessage = '';
     this.successMessage = '';
@@ -241,12 +256,22 @@ export class ChequeComponent implements OnInit {
   }
 
   onFormChange() {
+    if (this.chequePurpose === 'GOLD_LOAN_PREPAYMENT') {
+      this.payeeName = 'NeoBank Gold Loan Prepayment';
+    } else if (this.payeeName === 'NeoBank Gold Loan Prepayment') {
+      this.payeeName = '';
+    }
     this.formValid = this.serialNumber.trim() !== '' &&
                      this.chequeDate !== '' &&
                      this.amount !== null &&
                      this.amount > 0 &&
                      this.amount <= this.availableBalance &&
-                     this.payeeName.trim() !== '';
+                     this.payeeName.trim() !== '' &&
+                     (this.chequePurpose !== 'GOLD_LOAN_PREPAYMENT' || this.goldLoanAccountNumber.trim() !== '');
+  }
+
+  onChequePurposeChange() {
+    this.onFormChange();
   }
 
   switchTab(tab: 'form' | 'history') {

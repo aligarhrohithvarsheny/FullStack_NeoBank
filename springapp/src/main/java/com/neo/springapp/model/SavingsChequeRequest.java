@@ -47,6 +47,12 @@ public class SavingsChequeRequest {
     @Column(name = "payee_name", nullable = false, length = 255)
     private String payeeName;
 
+    @Column(name = "cheque_purpose", length = 40)
+    private String chequePurpose = "GENERAL";
+
+    @Column(name = "gold_loan_account_number", length = 50)
+    private String goldLoanAccountNumber;
+
     @Column(name = "remarks", columnDefinition = "TEXT")
     private String remarks;
 
@@ -152,6 +158,12 @@ public class SavingsChequeRequest {
 
     public String getPayeeName() { return payeeName; }
     public void setPayeeName(String payeeName) { this.payeeName = payeeName; }
+
+    public String getChequePurpose() { return chequePurpose; }
+    public void setChequePurpose(String chequePurpose) { this.chequePurpose = chequePurpose; }
+
+    public String getGoldLoanAccountNumber() { return goldLoanAccountNumber; }
+    public void setGoldLoanAccountNumber(String goldLoanAccountNumber) { this.goldLoanAccountNumber = goldLoanAccountNumber; }
 
     public String getRemarks() { return remarks; }
     public void setRemarks(String remarks) { this.remarks = remarks; }

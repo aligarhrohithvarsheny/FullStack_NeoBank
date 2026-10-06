@@ -100,6 +100,7 @@
             <th>Serial #</th>
             <th>Amount</th>
             <th>Payee</th>
+            <th>Purpose / Linked Loan</th>
             <th>Date</th>
             <th>Status</th>
             <th>Actions</th>
@@ -118,6 +119,13 @@
             <td class="serial-number">{{ cheque.serialNumber }}</td>
             <td class="amount">{{ formatAmount(cheque.amount) }}</td>
             <td class="payee">{{ cheque.payeeName }}</td>
+            <td class="payee">
+              <span *ngIf="cheque.chequePurpose === 'GOLD_LOAN_PREPAYMENT'">
+                Gold Loan prepayment only<br />
+                <small>{{ cheque.goldLoanAccountNumber }}</small>
+              </span>
+              <span *ngIf="cheque.chequePurpose !== 'GOLD_LOAN_PREPAYMENT'">General</span>
+            </td>
             <td class="date">{{ formatDate(cheque.chequeDate) }}</td>
             <td class="status">
               <span
@@ -140,13 +148,18 @@
                   <i class="fas fa-eye"></i>
                 </button>
                 <button
-                  *ngIf="cheque.status === 'PENDING'"
+                  *ngIf="cheque.status === 'PENDING' && cheque.chequePurpose !== 'GOLD_LOAN_PREPAYMENT'"
                   class="btn-action approve"
                   title="Approve"
                   (click)="showApprovalDialog(cheque)"
                 >
                   <i class="fas fa-check"></i>
                 </button>
+                <span
+                  *ngIf="cheque.status === 'PENDING' && cheque.chequePurpose === 'GOLD_LOAN_PREPAYMENT'"
+                  title="Use this reserved cheque only from Admin Funds Transfer for the linked Gold Loan prepayment">
+                  Use Funds Transfer
+                </span>
                 <button
                   *ngIf="cheque.status === 'PENDING'"
                   class="btn-action reject"
@@ -156,7 +169,7 @@
                   <i class="fas fa-ban"></i>
                 </button>
                 <button
-                  *ngIf="cheque.status === 'APPROVED'"
+                  *ngIf="cheque.status === 'APPROVED' && cheque.chequePurpose !== 'GOLD_LOAN_PREPAYMENT'"
                   class="btn-action pickup"
                   title="Mark Picked Up"
                   (click)="markPickedUp(cheque)"
@@ -164,7 +177,7 @@
                   <i class="fas fa-box"></i>
                 </button>
                 <button
-                  *ngIf="cheque.status === 'APPROVED' || cheque.status === 'COMPLETED'"
+                  *ngIf="(cheque.status === 'APPROVED' || cheque.status === 'COMPLETED') && cheque.chequePurpose !== 'GOLD_LOAN_PREPAYMENT'"
                   class="btn-action clear"
                   title="Clear Cheque"
                   (click)="clearCheque(cheque)"
@@ -172,7 +185,7 @@
                   <i class="fas fa-check-double"></i>
                 </button>
                 <button
-                  *ngIf="canRevertItem(cheque)"
+                  *ngIf="canRevertItem(cheque) && cheque.chequePurpose !== 'GOLD_LOAN_PREPAYMENT'"
                   class="btn-action revert"
                   title="Revert Cheque Draw (24h)"
                   (click)="revertChequeDraw(cheque)"
@@ -295,6 +308,16 @@
             <div class="detail-item">
               <span class="detail-label">Payee Name</span>
               <span class="detail-value">{{ selectedCheque.payeeName }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">Cheque Purpose</span>
+              <span class="detail-value">
+                {{ selectedCheque.chequePurpose === 'GOLD_LOAN_PREPAYMENT' ? 'Gold Loan prepayment only' : 'General' }}
+              </span>
+            </div>
+            <div class="detail-item" *ngIf="selectedCheque.chequePurpose === 'GOLD_LOAN_PREPAYMENT'">
+              <span class="detail-label">Linked Gold Loan Account</span>
+              <span class="detail-value">{{ selectedCheque.goldLoanAccountNumber }}</span>
             </div>
             <div class="detail-item">
               <span class="detail-label">Remarks</span>

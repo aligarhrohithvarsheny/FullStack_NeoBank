@@ -2875,7 +2875,7 @@
         <h4 style="margin-bottom:12px;"><i class="fa fa-random"></i> Transfer Type</h4>
         <div class="form-group" style="max-width:480px;">
           <label>Choose transfer destination *</label>
-          <select [(ngModel)]="aftTransferCategory" (ngModelChange)="onAftTransferCategoryChange()" class="form-input">
+          <select [(ngModel)]="aftTransferCategory" (ngModelChange)="onAftTransferCategoryChange()" [disabled]="aftSenderVerification?.chequePurpose === 'GOLD_LOAN_PREPAYMENT'" class="form-input">
             <option value="ACCOUNT_TO_ACCOUNT">Account to Account</option>
             <option value="PERSONAL_LOAN">Personal Loan</option>
             <option value="GOLD_LOAN">Gold Loan</option>
@@ -2914,6 +2914,12 @@
             </div>
             <div *ngIf="!aftSenderVerification.nameMatches" style="margin-top:8px;padding:8px;background:#fef08a;border-radius:4px;border-left:3px solid #eab308;color:#78350f;font-size:13px;">
               ⚠️ <strong>Name Mismatch!</strong> Cheque name does not match account holder name. Proceed with caution.
+            </div>
+            <div *ngIf="aftSenderVerification.chequePurpose === 'GOLD_LOAN_PREPAYMENT'" style="margin-top:8px;padding:10px;background:#fff7ed;border:1px solid #fdba74;border-radius:4px;color:#9a3412;font-size:13px;">
+              This cheque is reserved for <strong>Gold Loan prepayment only</strong> · Gold Loan Account:
+              <strong>{{ aftSenderVerification.goldLoanAccountNumber }}</strong> · Cheque amount:
+              <strong>₹{{ aftSenderVerification.chequeAmount | number:'1.2-2' }}</strong>.
+              It cannot be used for account transfers, EMIs, foreclosure, or another loan.
             </div>
             <button class="btn-link" (click)="viewAftSenderSignature()" style="margin-top:8px;"><i class="fa fa-image"></i> View Sender's Signature</button>
           </div>
@@ -2954,7 +2960,7 @@
         <div *ngIf="aftTransferCategory !== 'ACCOUNT_TO_ACCOUNT'" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
           <div class="form-group">
             <label>Loan payment action *</label>
-            <select [(ngModel)]="aftLoanPaymentType" (ngModelChange)="setAftLoanPaymentType()" class="form-input">
+            <select [(ngModel)]="aftLoanPaymentType" (ngModelChange)="setAftLoanPaymentType()" [disabled]="aftSenderVerification?.chequePurpose === 'GOLD_LOAN_PREPAYMENT'" class="form-input">
               <option value="EMI">Pay an EMI</option>
               <option value="PREPAYMENT">Prepayment</option>
               <option value="FORECLOSURE">Foreclosure / Close Loan</option>
@@ -2986,7 +2992,7 @@
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
           <div class="form-group">
             <label>{{ aftTransferCategory === 'ACCOUNT_TO_ACCOUNT' ? 'Amount (₹)' : (aftLoanPaymentType === 'EMI' ? 'EMI Amount (₹)' : (aftLoanPaymentType === 'FORECLOSURE' ? 'Calculated Foreclosure Amount (₹)' : 'Prepayment Amount (₹)')) }} *</label>
-            <input type="number" [(ngModel)]="aftAmount" [readonly]="aftTransferCategory !== 'ACCOUNT_TO_ACCOUNT' && aftLoanPaymentType !== 'PREPAYMENT'" [placeholder]="aftLoanPaymentType === 'PREPAYMENT' ? 'Enter prepayment amount' : 'Verified amount'" class="form-input" />
+            <input type="number" [(ngModel)]="aftAmount" [readonly]="aftSenderVerification?.chequePurpose === 'GOLD_LOAN_PREPAYMENT' || (aftTransferCategory !== 'ACCOUNT_TO_ACCOUNT' && aftLoanPaymentType !== 'PREPAYMENT')" [placeholder]="aftLoanPaymentType === 'PREPAYMENT' ? 'Enter prepayment amount' : 'Verified amount'" class="form-input" />
           </div>
           <div class="form-group" *ngIf="aftTransferCategory === 'ACCOUNT_TO_ACCOUNT'">
             <label>Processing Charge (0.5%) <small style="color:#666;font-weight:normal;">Auto-calculated</small></label>

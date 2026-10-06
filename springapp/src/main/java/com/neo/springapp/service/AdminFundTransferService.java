@@ -11,6 +11,8 @@ import com.neo.springapp.model.GoldLoan;
 import com.neo.springapp.model.GoldLoanHistory;
 import com.neo.springapp.model.Loan;
 import com.neo.springapp.model.SalaryAccount;
+import com.neo.springapp.model.SavingsChequeRequest;
+import com.neo.springapp.model.SavingsChequeAuditLog;
 import com.neo.springapp.model.Transaction;
 import com.neo.springapp.repository.AccountRepository;
 import com.neo.springapp.repository.AdminFundTransferRepository;
@@ -23,11 +25,17 @@ import com.neo.springapp.repository.GoldLoanHistoryRepository;
 import com.neo.springapp.repository.GoldLoanRepository;
 import com.neo.springapp.repository.LoanRepository;
 import com.neo.springapp.repository.SalaryAccountRepository;
+import com.neo.springapp.repository.SavingsChequeRequestRepository;
+import com.neo.springapp.repository.SavingsChequeAuditLogRepository;
+import com.neo.springapp.repository.PositivePayRequestRepository;
+import com.neo.springapp.model.PositivePayStatus;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -87,11 +95,40 @@ public class AdminFundTransferService {
     @Autowired
     private BusinessChequeRequestRepository businessChequeRequestRepository;
 
+    @Autowired
+    private SavingsChequeRequestRepository savingsChequeRequestRepository;
+
+    @Autowired
+    private SavingsChequeAuditLogRepository savingsChequeAuditLogRepository;
+
+    @Autowired
+    private PositivePayRequestRepository positivePayRequestRepository;
+
+    @Value("${positivepay.minimum.amount:10000}")
+    private BigDecimal positivePayMinimumAmount;
+
     public List<AdminFundTransfer> getAll(String search) {
         if (search != null && !search.isBlank()) {
             return repository.search(search.trim());
         }
         return repository.findAllByOrderByPerformedAtDesc();
+    }
+
+    private boolean isGoldLoanPrepaymentCheque(SavingsChequeRequest cheque) {
+        return "GOLD_LOAN_PREPAYMENT".equalsIgnoreCase(cheque.getChequePurpose());
+    }
+
+    private void requirePositivePayApproval(String accountNumber, SavingsChequeRequest cheque) {
+        if (cheque.getAmount() == null || cheque.getAmount().compareTo(positivePayMinimumAmount) < 0) return;
+        boolean approved = positivePayRequestRepository
+                .findFirstByAccountNumberAndChequeNumberAndStatusIn(accountNumber, cheque.getChequeNumber(),
+                        List.of(PositivePayStatus.PENDING_ADMIN_APPROVAL, PositivePayStatus.APPROVED,
+                                PositivePayStatus.MATCHED, PositivePayStatus.MISMATCH))
+                .map(request -> request.getStatus() == PositivePayStatus.APPROVED)
+                .orElse(false);
+        if (!approved) {
+            throw new IllegalArgumentException("Positive Pay must be approved before this cheque can fund a Gold Loan prepayment");
+        }
     }
 
     // Verify sender's cheque number belongs to the given account and names match; also returns the balance
@@ -124,6 +161,11 @@ public class AdminFundTransferService {
             ? resolved.accountHolderName : holderName);
         result.put("chequeStatus", resolved.status);
         result.put("chequeSource", resolved.source);
+        if (resolved.value instanceof SavingsChequeRequest savingsCheque) {
+            result.put("chequePurpose", savingsCheque.getChequePurpose());
+            result.put("goldLoanAccountNumber", savingsCheque.getGoldLoanAccountNumber());
+            result.put("chequeAmount", savingsCheque.getAmount());
+        }
         result.put("accountHolderName", holderName);
         result.put("accountNumber", accountNumber);
         result.put("accountType", accInfo.get("accountType"));
@@ -249,6 +291,11 @@ public class AdminFundTransferService {
             if (resolved == null) {
                 throw new RuntimeException("Approved cheque number not found for sender account");
             }
+            if (resolved.value instanceof SavingsChequeRequest savingsCheque
+                    && isGoldLoanPrepaymentCheque(savingsCheque)) {
+                throw new IllegalArgumentException("This cheque is reserved for prepayment of Gold Loan "
+                        + savingsCheque.getGoldLoanAccountNumber());
+            }
         }
 
         double senderBalance = getBalance(senderAccountNumber, senderType);
@@ -326,6 +373,19 @@ public class AdminFundTransferService {
         ResolvedCheque resolved = resolveCheque(senderChequeNumber, normalizedSender);
         if (resolved == null) {
             throw new IllegalArgumentException("Approved cheque number not found for sender account");
+        }
+        if (resolved.value instanceof SavingsChequeRequest savingsCheque
+                && isGoldLoanPrepaymentCheque(savingsCheque)) {
+            if (!"GOLD_LOAN".equals(type) || !"PREPAYMENT".equals(action)
+                    || !normalizedLoanNumber.equalsIgnoreCase(savingsCheque.getGoldLoanAccountNumber())) {
+                throw new IllegalArgumentException("This cheque is reserved only for prepayment of Gold Loan "
+                        + savingsCheque.getGoldLoanAccountNumber());
+            }
+            if (requestedAmount == null
+                    || round2(requestedAmount) != round2(savingsCheque.getAmount().doubleValue())) {
+                throw new IllegalArgumentException("Payment amount must match the amount written on the Gold Loan prepayment cheque");
+            }
+            requirePositivePayApproval(normalizedSender, savingsCheque);
         }
 
         double amount;
@@ -630,6 +690,19 @@ public class AdminFundTransferService {
                 return new ResolvedCheque("BUSINESS_CHEQUE_REQUESTS", request.getChequeNumber(), null, request.getStatus(), request);
             }
         }
+
+        for (SavingsChequeRequest request : savingsChequeRequestRepository.findAllByChequeNumber(number)) {
+            if (!isGoldLoanPrepaymentCheque(request)
+                    || !("PENDING".equalsIgnoreCase(request.getStatus())
+                    || "AWAITING_POSITIVE_PAY".equalsIgnoreCase(request.getStatus()))) {
+                continue;
+            }
+            Account savingsAccount = accountRepository.findById(request.getAccountId()).orElse(null);
+            if (savingsAccount != null && account.equalsIgnoreCase(savingsAccount.getAccountNumber())) {
+                return new ResolvedCheque("SAVINGS_CHEQUE_REQUESTS", request.getChequeNumber(),
+                        savingsAccount.getName(), request.getStatus(), request);
+            }
+        }
         return null;
     }
 
@@ -644,6 +717,22 @@ public class AdminFundTransferService {
             request.setApprovedBy(performedBy != null && !performedBy.isBlank() ? performedBy : request.getApprovedBy());
             request.setUpdatedAt(LocalDateTime.now());
             chequeRequestRepository.save(request);
+        } else if (resolved.value instanceof SavingsChequeRequest request) {
+            request.setStatus("COMPLETED");
+            request.setTransactionReference(transferId);
+            request.setDebitedFromAccount(senderAccountNumber);
+            request.setCreditedToAccount(request.getGoldLoanAccountNumber());
+            request.setApprovedBy(performedBy != null && !performedBy.isBlank() ? performedBy : request.getApprovedBy());
+            request.setUpdatedAt(LocalDateTime.now());
+            SavingsChequeRequest saved = savingsChequeRequestRepository.save(request);
+            SavingsChequeAuditLog audit = new SavingsChequeAuditLog();
+            audit.setChequeRequestId(saved.getId());
+            audit.setAdminEmail(performedBy != null && !performedBy.isBlank() ? performedBy : "Admin");
+            audit.setAction("GOLD_LOAN_PREPAYMENT");
+            audit.setRemarks("Reserved cheque used for prepayment of Gold Loan "
+                    + saved.getGoldLoanAccountNumber() + " | Transfer: " + transferId);
+            audit.setTimestamp(LocalDateTime.now());
+            savingsChequeAuditLogRepository.save(audit);
         } else if (resolved.value instanceof BusinessChequeRequest request) {
             request.setStatus("COMPLETED");
             request.setTransactionReference(transferId);
