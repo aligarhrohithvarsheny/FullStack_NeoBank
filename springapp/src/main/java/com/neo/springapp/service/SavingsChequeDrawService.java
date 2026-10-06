@@ -43,6 +43,15 @@ public class SavingsChequeDrawService {
     private AccountRepository accountRepository;
 
     @Autowired
+    private ChequeRequestRepository salaryChequeRequestRepository;
+
+    @Autowired
+    private BusinessChequeRequestRepository businessChequeRequestRepository;
+
+    @Autowired
+    private ChequeRepository legacyChequeRepository;
+
+    @Autowired
     private PositivePayRequestRepository positivePayRequestRepository;
 
     @Autowired
@@ -807,16 +816,24 @@ public class SavingsChequeDrawService {
             sequence.setNextSequence(1000L);
         }
 
-        String chequeNumber = String.format("BCHQ-%d-%06d",
-                accountId,
-                sequence.getNextSequence()
-        );
+        String chequeNumber;
+        do {
+            chequeNumber = String.format("SCHQ-%d-%06d", accountId, sequence.getNextSequence());
+            sequence.setNextSequence(sequence.getNextSequence() + 1);
+        } while (isChequeNumberUsed(chequeNumber));
 
-        sequence.setNextSequence(sequence.getNextSequence() + 1);
         sequence.setUpdatedAt(LocalDateTime.now());
         sequenceRepository.save(sequence);
 
         return chequeNumber;
+    }
+
+    // Cheque numbers must be unique across every cheque system, not just savings draw requests
+    private boolean isChequeNumberUsed(String chequeNumber) {
+        return !chequeRequestRepository.findAllByChequeNumber(chequeNumber).isEmpty()
+                || !salaryChequeRequestRepository.findAllByChequeNumber(chequeNumber).isEmpty()
+                || !businessChequeRequestRepository.findAllByChequeNumber(chequeNumber).isEmpty()
+                || legacyChequeRepository.findByChequeNumber(chequeNumber).isPresent();
     }
 
     private void logAuditAction(Long chequeRequestId, String adminEmail, String action, String remarks) {

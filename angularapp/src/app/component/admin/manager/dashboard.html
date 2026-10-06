@@ -75,6 +75,67 @@
       </div>
     </header>
 
+    <div class="content-section manager-admin-profiles" *ngIf="activeSection === 'admin-profiles'">
+      <div class="section-header-inline">
+        <h3><i class="fa fa-address-card"></i> Admin Profiles</h3>
+        <p class="section-description">View each admin employee's profile and work details.</p>
+      </div>
+
+      <div class="loading-message" *ngIf="isLoadingAdmins">
+        <i class="fa fa-spinner fa-spin"></i> Loading admin profiles...
+      </div>
+
+      <div class="manager-admin-profile-list" *ngIf="!isLoadingAdmins && allAdmins.length > 0">
+        <article class="manager-admin-profile-card" *ngFor="let admin of allAdmins">
+          <div class="manager-admin-profile-heading">
+            <div class="manager-admin-profile-avatar">
+              <img *ngIf="admin.id && admin.profilePhotoPath"
+                   [src]="getAdminPhotoUrl(admin.id)"
+                   [alt]="(admin.name || 'Admin') + ' profile photo'" />
+              <i *ngIf="!admin.id || !admin.profilePhotoPath" class="fa fa-user"></i>
+            </div>
+            <div class="manager-admin-profile-identity">
+              <h4>{{ admin.name || 'Admin' }}</h4>
+              <p>{{ admin.email || 'Email not provided' }}</p>
+              <div class="manager-admin-profile-badges">
+                <span class="manager-admin-profile-badge">{{ admin.role || 'ADMIN' }}</span>
+                <span class="manager-admin-profile-badge"
+                      [class.complete]="admin.profileComplete"
+                      [class.incomplete]="!admin.profileComplete">
+                  {{ admin.profileComplete ? 'Profile complete' : 'Profile incomplete' }}
+                </span>
+                <span class="manager-admin-profile-badge locked" *ngIf="admin.accountLocked">Account locked</span>
+              </div>
+            </div>
+          </div>
+
+          <dl class="manager-admin-profile-details">
+            <div><dt>Employee ID</dt><dd>{{ admin.employeeId || 'Not provided' }}</dd></div>
+            <div><dt>Mobile</dt><dd>{{ admin.mobileNumber || 'Not provided' }}</dd></div>
+            <div><dt>Assigned city</dt><dd>{{ admin.assignedCity || 'Not assigned' }}</dd></div>
+            <div><dt>Date of joining</dt><dd>{{ (admin.dateOfJoining || admin.createdAt) ? ((admin.dateOfJoining || admin.createdAt) | date:'mediumDate') : 'Not provided' }}</dd></div>
+            <div><dt>Qualifications</dt><dd>{{ admin.qualifications || 'Not provided' }}</dd></div>
+            <div><dt>Address</dt><dd>{{ admin.address || 'Not provided' }}</dd></div>
+            <div><dt>PAN</dt><dd>{{ maskAdminSensitiveValue(admin.pan) }}</dd></div>
+            <div><dt>Aadhaar</dt><dd>{{ maskAdminSensitiveValue(admin.aadharNumber) }}</dd></div>
+            <div><dt>ID card number</dt><dd>{{ admin.idCardNumber || 'Not generated' }}</dd></div>
+            <div><dt>ID card designation</dt><dd>{{ admin.idCardDesignation || 'Not provided' }}</dd></div>
+            <div><dt>ID card department</dt><dd>{{ admin.idCardDepartment || 'Not provided' }}</dd></div>
+            <div><dt>ID card valid until</dt><dd>{{ admin.idCardValidTill ? (admin.idCardValidTill | date:'mediumDate') : 'Not provided' }}</dd></div>
+            <div><dt>Branch account name</dt><dd>{{ admin.branchAccountName || 'Not provided' }}</dd></div>
+            <div><dt>Branch account number</dt><dd>{{ admin.branchAccountNumber || 'Not provided' }}</dd></div>
+            <div><dt>Branch IFSC</dt><dd>{{ admin.branchAccountIfsc || 'Not provided' }}</dd></div>
+            <div><dt>Salary account number</dt><dd>{{ admin.salaryAccountNumber || 'Not linked' }}</dd></div>
+          </dl>
+        </article>
+      </div>
+
+      <div class="no-admins" *ngIf="!isLoadingAdmins && allAdmins.length === 0">
+        <i class="fa fa-user-slash"></i>
+        <p>No admin employees found.</p>
+      </div>
+    </div>
+
     <!-- Feature Access Control Section -->
     <div class="content-section" *ngIf="activeSection === 'feature-access'">
       <div class="section-header-inline">

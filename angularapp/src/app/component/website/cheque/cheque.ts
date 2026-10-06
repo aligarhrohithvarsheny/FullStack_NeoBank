@@ -62,10 +62,10 @@ export class ChequeComponent implements OnInit {
     'AWAITING_POSITIVE_PAY': '#f97316',
     'PENDING': '#f59e0b',
     'APPROVED': '#3b82f6',
-    'COMPLETED': '#10b981',
+    'COMPLETED': '#3b82f6',
     'REJECTED': '#ef4444',
     'CANCELLED': '#6b7280',
-    'CLEARED': '#059669'
+    'CLEARED': '#2563eb'
   };
 
   constructor(private savingsChequeService: SavingsChequeService, private router: Router, private http: HttpClient) {}
@@ -358,8 +358,8 @@ export class ChequeComponent implements OnInit {
           }
           .cheque-container {
             width: 8in; height: 3.5in;
-            background: linear-gradient(180deg, #f0fdf4 0%, #ecfdf5 40%, #d1fae5 100%);
-            border: 2px solid #065f46;
+            background: linear-gradient(180deg, #eff6ff 0%, #eff6ff 40%, #dbeafe 100%);
+            border: 2px solid #1e3a8a;
             border-radius: 8px;
             position: relative;
             padding: 15px 25px;
@@ -370,7 +370,7 @@ export class ChequeComponent implements OnInit {
             content: '';
             position: absolute; top: 0; left: 0; right: 0;
             height: 6px;
-            background: linear-gradient(90deg, #065f46 0%, #047857 50%, #065f46 100%);
+            background: linear-gradient(90deg, #1e3a8a 0%, #1d4ed8 50%, #1e3a8a 100%);
           }
           .cheque-watermark {
             position: absolute; top: 50%; left: 50%;
@@ -387,20 +387,20 @@ export class ChequeComponent implements OnInit {
           }
           .bank-info { display: flex; align-items: center; gap: 10px; }
           .bank-logo {
-            width: 42px; height: 42px; background: linear-gradient(135deg, #065f46, #047857);
+            width: 42px; height: 42px; background: linear-gradient(135deg, #1e3a8a, #1d4ed8);
             border-radius: 50%; display: flex; align-items: center; justify-content: center;
             color: white; font-weight: bold; font-size: 14px; font-family: Arial;
           }
-          .bank-name { font-size: 20px; font-weight: bold; color: #065f46; font-family: 'Georgia', serif; letter-spacing: 2px; }
+          .bank-name { font-size: 20px; font-weight: bold; color: #1e3a8a; font-family: 'Georgia', serif; letter-spacing: 2px; }
           .bank-branch { font-size: 9px; color: #555; margin-top: 2px; }
-          .business-label { font-size: 8px; color: #047857; font-weight: bold; letter-spacing: 2px; margin-top: 2px; }
+          .business-label { font-size: 8px; color: #1d4ed8; font-weight: bold; letter-spacing: 2px; margin-top: 2px; }
           .cheque-number-top { text-align: right; }
           .cheque-number-top .label { font-size: 8px; color: #888; }
-          .cheque-number-top .number { font-size: 14px; font-weight: bold; color: #065f46; letter-spacing: 2px; }
+          .cheque-number-top .number { font-size: 14px; font-weight: bold; color: #1e3a8a; letter-spacing: 2px; }
           .cheque-type {
             position: absolute; top: 15px; right: 25px;
-            font-size: 11px; font-weight: bold; color: #065f46;
-            border: 1.5px solid #065f46; padding: 2px 12px;
+            font-size: 11px; font-weight: bold; color: #1e3a8a;
+            border: 1.5px solid #1e3a8a; padding: 2px 12px;
             border-radius: 3px; letter-spacing: 3px; margin-top: 40px;
           }
           .date-section {
@@ -411,7 +411,7 @@ export class ChequeComponent implements OnInit {
           .date-box {
             width: 22px; height: 24px;
             border: 1px solid #999; text-align: center;
-            font-size: 14px; font-weight: bold; color: #065f46;
+            font-size: 14px; font-weight: bold; color: #1e3a8a;
             line-height: 24px; background: rgba(255,255,255,0.5);
           }
           .date-separator { line-height: 24px; color: #666; font-weight: bold; }
@@ -421,7 +421,7 @@ export class ChequeComponent implements OnInit {
             border-bottom: 1.5px solid #333; padding-bottom: 3px;
           }
           .pay-label { font-size: 10px; color: #666; white-space: nowrap; }
-          .pay-value { font-size: 15px; font-weight: bold; color: #065f46; flex: 1; text-transform: uppercase; }
+          .pay-value { font-size: 15px; font-weight: bold; color: #1e3a8a; flex: 1; text-transform: uppercase; }
           .bearer-text { font-size: 10px; color: #555; font-weight: bold; letter-spacing: 1px; }
           .amount-words-section { margin-bottom: 8px; position: relative; z-index: 1; }
           .amount-words-line {
@@ -430,18 +430,18 @@ export class ChequeComponent implements OnInit {
             min-height: 22px;
           }
           .amount-words-label { font-size: 10px; color: #666; white-space: nowrap; }
-          .amount-words-value { font-size: 12px; color: #065f46; flex: 1; text-transform: uppercase; font-weight: bold; }
+          .amount-words-value { font-size: 12px; color: #1e3a8a; flex: 1; text-transform: uppercase; font-weight: bold; }
           .amount-box-section {
             position: absolute; right: 25px; top: 140px;
             z-index: 1;
           }
           .amount-box {
-            border: 2px solid #065f46; padding: 5px 15px;
+            border: 2px solid #1e3a8a; padding: 5px 15px;
             background: rgba(255,255,255,0.7); border-radius: 4px;
             display: flex; align-items: center; gap: 5px;
           }
-          .rupee-symbol { font-size: 18px; font-weight: bold; color: #065f46; }
-          .amount-value { font-size: 20px; font-weight: bold; color: #065f46; letter-spacing: 1px; }
+          .rupee-symbol { font-size: 18px; font-weight: bold; color: #1e3a8a; }
+          .amount-value { font-size: 20px; font-weight: bold; color: #1e3a8a; letter-spacing: 1px; }
           .bottom-section {
             display: flex; justify-content: space-between; align-items: flex-end;
             margin-top: auto; position: absolute;
@@ -449,13 +449,13 @@ export class ChequeComponent implements OnInit {
           }
           .account-info { font-size: 9px; color: #666; }
           .account-info .acc-label { color: #888; }
-          .account-info .acc-value { color: #065f46; font-weight: bold; letter-spacing: 1px; }
+          .account-info .acc-value { color: #1e3a8a; font-weight: bold; letter-spacing: 1px; }
           .signature-section { text-align: center; }
           .signature-line {
             width: 160px; border-bottom: 1.5px solid #333;
             margin-bottom: 4px; height: 35px;
             display: flex; align-items: flex-end; justify-content: center;
-            font-size: 13px; color: #065f46; font-style: italic; padding-bottom: 3px;
+            font-size: 13px; color: #1e3a8a; font-style: italic; padding-bottom: 3px;
           }
           .signature-label { font-size: 8px; color: #888; }
           .micr-line {
@@ -466,7 +466,7 @@ export class ChequeComponent implements OnInit {
           }
           .print-btn {
             display: block; margin: 20px auto; padding: 12px 40px;
-            background: linear-gradient(135deg, #065f46, #047857); color: white;
+            background: linear-gradient(135deg, #1e3a8a, #1d4ed8); color: white;
             border: none; border-radius: 8px; font-size: 16px;
             cursor: pointer; font-weight: bold; letter-spacing: 1px;
           }

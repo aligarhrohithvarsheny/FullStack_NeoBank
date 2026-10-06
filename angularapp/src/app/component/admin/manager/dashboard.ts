@@ -48,6 +48,7 @@ export class ManagerDashboard implements OnInit, OnDestroy {
     {
       title: 'Manager Menu',
       items: [
+        { section: 'admin-profiles', icon: 'fa-address-card', label: 'Admin Profiles', badge: () => this.allAdmins.length },
         { section: 'feature-access', icon: 'fa-shield-alt', label: 'Feature Access Control' },
         { section: 'create-admin', icon: 'fa-user-plus', label: 'Create Admin Employee' },
         { section: 'manager-features', icon: 'fa-tools', label: 'Manager Features', badge: () => this.managerAccessibleFeatures.length },
@@ -1438,6 +1439,14 @@ export class ManagerDashboard implements OnInit, OnDestroy {
   /** URL for admin profile photo on ID card (manager dashboard). */
   getAdminPhotoUrl(adminId: number): string {
     return `${this.apiBaseUrl}/api/admins/profile-photo/${adminId}`;
+  }
+
+  maskAdminSensitiveValue(value?: string | null): string {
+    const normalized = value?.trim();
+    if (!normalized) return 'Not provided';
+    return normalized.length <= 4
+      ? '*'.repeat(normalized.length)
+      : `${'*'.repeat(normalized.length - 4)}${normalized.slice(-4)}`;
   }
 
   selectAdmin(admin: any) {
