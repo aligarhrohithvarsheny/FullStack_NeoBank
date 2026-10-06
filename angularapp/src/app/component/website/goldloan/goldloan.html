@@ -286,6 +286,22 @@
             <span class="detail-label">Interest Rate:</span>
             <span class="detail-value">{{ loan.interestRate }}% p.a.</span>
           </div>
+          <div class="detail-row" *ngIf="isApproved(loan)">
+            <span class="detail-label">Current EMI:</span>
+            <span class="detail-value">₹{{ loan.currentEmi || 0 | number:'1.2-2' }}</span>
+          </div>
+          <div class="detail-row" *ngIf="isApproved(loan)">
+            <span class="detail-label">Remaining Tenure:</span>
+            <span class="detail-value">{{ loan.remainingTenure ?? loan.tenure }} months</span>
+          </div>
+          <div class="detail-row" *ngIf="isApproved(loan)">
+            <span class="detail-label">Outstanding Principal:</span>
+            <span class="detail-value">₹{{ loan.remainingPrincipal || 0 | number:'1.2-2' }}</span>
+          </div>
+          <div class="detail-row" *ngIf="isApproved(loan)">
+            <span class="detail-label">Remaining Interest:</span>
+            <span class="detail-value">₹{{ loan.remainingInterest || 0 | number:'1.2-2' }}</span>
+          </div>
           <div class="detail-row">
             <span class="detail-label">Application Date:</span>
             <span class="detail-value">{{ formatDate(loan.applicationDate) }}</span>
@@ -295,6 +311,38 @@
             <span class="detail-value">{{ formatDate(loan.approvalDate) }}</span>
           </div>
         </div>
+
+        <section class="gold-payment-history" *ngIf="isApproved(loan) && loan.id">
+          <div class="gold-payment-history-header">
+            <h5>Gold Loan Payment History</h5>
+            <button type="button" (click)="loadGoldLoanPaymentHistory(loan, true)" [disabled]="loadingPaymentHistoryLoanIds.has(loan.id)">
+              {{ loadingPaymentHistoryLoanIds.has(loan.id) ? 'Refreshing...' : 'Refresh' }}
+            </button>
+          </div>
+          <p *ngIf="loadingPaymentHistoryLoanIds.has(loan.id)" class="gold-payment-empty">Loading payment history...</p>
+          <p *ngIf="paymentHistoryLoadFailedLoanIds.has(loan.id)" class="gold-payment-empty">Could not load payment history. Use Refresh to try again.</p>
+          <p *ngIf="!loadingPaymentHistoryLoanIds.has(loan.id) && !paymentHistoryLoadFailedLoanIds.has(loan.id) && (paymentHistoryByLoanId[loan.id] || []).length === 0" class="gold-payment-empty">
+            No loan payments recorded yet.
+          </p>
+          <div class="gold-payment-item" *ngFor="let payment of paymentHistoryByLoanId[loan.id] || []">
+            <div class="gold-payment-summary">
+              <strong>{{ payment.loanPaymentType }} · ₹{{ payment.amount | number:'1.2-2' }}</strong>
+              <span>{{ payment.performedAt | date:'dd/MM/yyyy, h:mm a' }}</span>
+            </div>
+            <p *ngIf="payment.prepaymentAdjustment">
+              {{ payment.prepaymentAdjustment === 'REDUCE_EMI' ? 'Reduced EMI' : 'Reduced tenure' }}
+              <span *ngIf="payment.emiAmountBefore != null"> · EMI ₹{{ payment.emiAmountBefore | number:'1.2-2' }} → ₹{{ payment.emiAmountAfter | number:'1.2-2' }}</span>
+              <span *ngIf="payment.remainingTenureBefore != null"> · Tenure {{ payment.remainingTenureBefore }} → {{ payment.remainingTenureAfter }} months</span>
+            </p>
+            <p *ngIf="payment.outstandingPrincipalBefore != null">
+              Principal ₹{{ payment.outstandingPrincipalBefore | number:'1.2-2' }} → ₹{{ payment.outstandingPrincipalAfter | number:'1.2-2' }}
+              <span *ngIf="payment.interestSaved"> · Estimated interest saved ₹{{ payment.interestSaved | number:'1.2-2' }}</span>
+            </p>
+            <button type="button" class="gold-payment-receipt" (click)="printGoldLoanPaymentReceipt(payment)">
+              <i class="fa fa-print"></i> Receipt / Save PDF
+            </button>
+          </div>
+        </section>
 
         <div class="terms-action" *ngIf="loan.status !== 'Pending' && loan.status !== 'Rejected'">
           <button type="button" class="accept-terms-btn" (click)="downloadLoanDoc('receipt', loan)">🧾 Gold Loan Receipt</button>
@@ -470,4 +518,3 @@
     </div>
   </div>
 </div>
-

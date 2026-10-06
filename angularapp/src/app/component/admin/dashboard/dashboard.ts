@@ -12,6 +12,7 @@ import { PaymentGatewayService } from '../../../service/payment-gateway.service'
 import { FasttagAdmin } from '../fasttag/fasttag-admin';
 import { BankFormsAdminComponent } from '../bank-forms-admin/bank-forms-admin';
 import { environment } from '../../../../environment/environment';
+import { FundTransferReceiptData, printFundTransferReceipt } from '../../../service/fund-transfer-receipt';
 import { forkJoin, of } from 'rxjs';
 import { catchError, timeout, finalize } from 'rxjs/operators';
 import {
@@ -3557,6 +3558,12 @@ export class Dashboard implements OnInit, OnDestroy {
         this.loadingAdminTransfers = false;
       }
     });
+  }
+
+  printAdminFundTransferReceipt(transfer: FundTransferReceiptData) {
+    if (!printFundTransferReceipt(transfer)) {
+      this.alertService.error('Receipt Unavailable', 'Please allow popups to print or save the receipt.');
+    }
   }
 
   getFilteredAdminTransfers(): any[] {

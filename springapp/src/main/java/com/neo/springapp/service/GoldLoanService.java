@@ -163,7 +163,26 @@ public class GoldLoanService {
 
     // Get gold loans by account number
     public List<GoldLoan> getGoldLoansByAccountNumber(String accountNumber) {
-        return goldLoanRepository.findByAccountNumber(accountNumber);
+        List<GoldLoan> loans = goldLoanRepository.findByAccountNumber(accountNumber);
+        for (GoldLoan loan : loans) {
+            boolean closed = "Foreclosed".equalsIgnoreCase(loan.getStatus())
+                    || "Paid".equalsIgnoreCase(loan.getStatus());
+            List<EmiPayment> activeEmis = closed || loan.getLoanAccountNumber() == null ? List.of()
+                    : emiPaymentRepository.findByLoanAccountNumberOrderByEmiNumberAsc(loan.getLoanAccountNumber())
+                            .stream()
+                            .filter(emi -> "Pending".equalsIgnoreCase(emi.getStatus())
+                                    || "Overdue".equalsIgnoreCase(emi.getStatus()))
+                            .toList();
+            loan.setRemainingTenure(activeEmis.size());
+            loan.setCurrentEmi(activeEmis.isEmpty() ? 0.0 : activeEmis.get(0).getTotalAmount());
+            loan.setRemainingPrincipal(Math.round(activeEmis.stream()
+                    .mapToDouble(emi -> emi.getPrincipalAmount() == null ? 0.0 : emi.getPrincipalAmount())
+                    .sum() * 100.0) / 100.0);
+            loan.setRemainingInterest(Math.round(activeEmis.stream()
+                    .mapToDouble(emi -> emi.getInterestAmount() == null ? 0.0 : emi.getInterestAmount())
+                    .sum() * 100.0) / 100.0);
+        }
+        return loans;
     }
 
     // Get gold loan by ID
@@ -273,6 +292,8 @@ public class GoldLoanService {
                 // Calculate EMI automatically based on recalculated loan amount, interest rate, and tenure
                 Double calculatedEMI = goldLoan.calculateEMI();
                 if (calculatedEMI > 0) {
+                    goldLoan.setCurrentEmi(calculatedEMI);
+                    goldLoan.setRemainingTenure(goldLoan.getTenure());
                     System.out.println("✅ Auto-calculated EMI: ₹" + calculatedEMI + 
                                      " (Loan Amount: ₹" + recalculatedLoanAmount + 
                                      ", Interest Rate: " + goldLoan.getInterestRate() + "% p.a., " +
@@ -802,6 +823,8 @@ public class GoldLoanService {
         goldLoan.setInterestPaid((Double) foreclosureCalc.get("interestPaid"));
         goldLoan.setRemainingPrincipal((Double) foreclosureCalc.get("remainingPrincipal"));
         goldLoan.setRemainingInterest((Double) foreclosureCalc.get("remainingInterest"));
+        goldLoan.setCurrentEmi(0.0);
+        goldLoan.setRemainingTenure(0);
         goldLoan.setForeclosedBy(foreclosedBy);
 
         GoldLoan saved = goldLoanRepository.save(goldLoan);
@@ -847,6 +870,8 @@ public class GoldLoanService {
         Double gst = (Double) foreclosureCalc.get("gst");
         Double calculatedInterest = foreclosureAmount - remainingPrincipal - charges - gst;
         goldLoan.setRemainingInterest(Math.max(0.0, calculatedInterest));
+        goldLoan.setCurrentEmi(0.0);
+        goldLoan.setRemainingTenure(0);
         goldLoan.setForeclosedBy(foreclosedBy);
 
         GoldLoan saved = goldLoanRepository.save(goldLoan);
@@ -991,4 +1016,3 @@ public class GoldLoanService {
         }
     }
 }
-

@@ -10,6 +10,8 @@ import java.util.List;
 public interface AdminFundTransferRepository extends JpaRepository<AdminFundTransfer, Long> {
 
     List<AdminFundTransfer> findAllByOrderByPerformedAtDesc();
+    List<AdminFundTransfer> findByLoanAccountNumberAndTransferCategoryOrderByPerformedAtDesc(
+            String loanAccountNumber, String transferCategory);
 
     @Query("SELECT t FROM AdminFundTransfer t WHERE " +
            "LOWER(t.transferId) LIKE LOWER(CONCAT('%', :term, '%')) OR " +

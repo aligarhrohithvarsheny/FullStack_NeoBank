@@ -6,6 +6,7 @@ import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../../environment/environment';
 import { AlertService } from '../../../service/alert.service';
 import { openLoanDocument, isLoanClosed } from '../../../service/loan-documents';
+import { FundTransferReceiptData, printFundTransferReceipt } from '../../../service/fund-transfer-receipt';
 import { timeout, catchError, finalize } from 'rxjs/operators';
 import { of } from 'rxjs';
 
@@ -38,6 +39,10 @@ interface GoldLoan {
   termsAcceptedDate?: string;
   termsAcceptedBy?: string;
   otpVerified?: boolean;
+  currentEmi?: number;
+  remainingTenure?: number;
+  remainingPrincipal?: number;
+  remainingInterest?: number;
 }
 
 interface GoldRate {
@@ -92,6 +97,10 @@ export class Goldloan implements OnInit, OnDestroy {
   goldLoanOtpTimerRef: any = null;
   isSendingGoldLoanOtp: boolean = false;
   downloadingReceiptLoanIds = new Set<number>();
+  paymentHistoryByLoanId: Record<number, FundTransferReceiptData[]> = {};
+  loadingPaymentHistoryLoanIds = new Set<number>();
+  paymentHistoryLoadFailedLoanIds = new Set<number>();
+  private paymentHistoryLoadedAt = new Map<number, number>();
 
   constructor(
     private router: Router,
@@ -379,9 +388,46 @@ export class Goldloan implements OnInit, OnDestroy {
       .subscribe({
         next: (loans: any) => {
           this.goldLoans = Array.isArray(loans) ? loans : [];
+          this.goldLoans.forEach(loan => {
+            if (loan.id && this.isApproved(loan)) this.loadGoldLoanPaymentHistory(loan);
+          });
           this.loadingLoans = false;
         }
       });
+  }
+
+  loadGoldLoanPaymentHistory(loan: GoldLoan, forceRefresh = false) {
+    if (!loan.id || !this.userAccountNumber || this.loadingPaymentHistoryLoanIds.has(loan.id)) return;
+    const lastLoadedAt = this.paymentHistoryLoadedAt.get(loan.id) || 0;
+    if (!forceRefresh && this.paymentHistoryLoadFailedLoanIds.has(loan.id)) return;
+    if (!forceRefresh && Date.now() - lastLoadedAt < 10000) return;
+    this.paymentHistoryLoadFailedLoanIds.delete(loan.id);
+    this.loadingPaymentHistoryLoanIds.add(loan.id);
+    this.http.get<any[]>(`${environment.apiBaseUrl}/api/gold-loans/${loan.id}/payments`, {
+      params: { accountNumber: this.userAccountNumber }
+    })
+      .pipe(
+        timeout(10000),
+        finalize(() => this.loadingPaymentHistoryLoanIds.delete(loan.id!)),
+        catchError(err => {
+          console.error('Error loading Gold Loan payment history:', err);
+          this.paymentHistoryLoadFailedLoanIds.add(loan.id!);
+          this.alertService.error('History Unavailable', err.error?.message || 'Could not load Gold Loan payment history.');
+          return of(null);
+        })
+      )
+      .subscribe(payments => {
+        if (payments) {
+          this.paymentHistoryByLoanId[loan.id!] = payments;
+          this.paymentHistoryLoadedAt.set(loan.id!, Date.now());
+        }
+      });
+  }
+
+  printGoldLoanPaymentReceipt(payment: FundTransferReceiptData) {
+    if (!printFundTransferReceipt(payment)) {
+      this.alertService.error('Receipt Unavailable', 'Please allow popups to print or save the receipt.');
+    }
   }
 
   resetForm() {

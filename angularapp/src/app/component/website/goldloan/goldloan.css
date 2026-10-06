@@ -25,8 +25,69 @@
   padding: 6px;
 }
 
+.gold-payment-history {
+  margin-top: 18px;
+  padding: 16px;
+  border: 1px solid #dbe4f0;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.gold-payment-history-header,
+.gold-payment-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.gold-payment-history-header h5 {
+  margin: 0;
+  color: #1e40af;
+}
+
+.gold-payment-history-header button,
+.gold-payment-receipt {
+  border: 1px solid #1e40af;
+  border-radius: 5px;
+  padding: 7px 10px;
+  color: #1e40af;
+  background: #fff;
+  cursor: pointer;
+}
+
+.gold-payment-history-header button:disabled {
+  cursor: wait;
+  opacity: .65;
+}
+
+.gold-payment-item {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.gold-payment-summary {
+  flex-wrap: wrap;
+}
+
+.gold-payment-summary span,
+.gold-payment-item p,
+.gold-payment-empty {
+  color: #64748b;
+  font-size: 13px;
+}
+
+.gold-payment-item p {
+  margin: 8px 0;
+  line-height: 1.5;
+}
+
 @media (max-width: 640px) {
   .gold-image-grid { grid-template-columns: 1fr; }
+  .gold-payment-summary { align-items: flex-start; }
 }
 .gold-loan-container {
   max-width: 1200px;
@@ -643,4 +704,3 @@
     padding: 15px;
   }
 }
-

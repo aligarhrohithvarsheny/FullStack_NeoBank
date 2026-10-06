@@ -533,6 +533,12 @@ public class EmiService {
         goldLoanRepository.findByLoanAccountNumber(paidEmi.getLoanAccountNumber()).ifPresent(loan -> {
             loan.setRemainingPrincipal(Math.round(remainingPrincipal * 100.0) / 100.0);
             loan.setRemainingInterest(Math.round(remainingInterest * 100.0) / 100.0);
+            List<EmiPayment> activeEmis = schedule.stream()
+                    .filter(emi -> "Pending".equalsIgnoreCase(emi.getStatus())
+                            || "Overdue".equalsIgnoreCase(emi.getStatus()))
+                    .toList();
+            loan.setRemainingTenure(activeEmis.size());
+            loan.setCurrentEmi(activeEmis.isEmpty() ? 0.0 : activeEmis.get(0).getTotalAmount());
             loan.setPrincipalPaid(Math.round(((loan.getPrincipalPaid() == null ? 0.0 : loan.getPrincipalPaid())
                     + principalPaid) * 100.0) / 100.0);
             goldLoanRepository.save(loan);

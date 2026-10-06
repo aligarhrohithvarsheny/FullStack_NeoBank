@@ -8,6 +8,7 @@ import com.neo.springapp.model.SalaryAccount;
 import com.neo.springapp.model.SalaryNormalTransaction;
 import com.neo.springapp.repository.SalaryAccountRepository;
 import com.neo.springapp.repository.SalaryNormalTransactionRepository;
+import com.neo.springapp.repository.AdminFundTransferRepository;
 import com.neo.springapp.service.GoldLoanService;
 import com.neo.springapp.service.GoldRateService;
 import com.neo.springapp.service.AccountService;
@@ -64,6 +65,9 @@ public class GoldLoanController {
 
     @Autowired
     private SalaryNormalTransactionRepository salaryNormalTransactionRepository;
+
+    @Autowired
+    private AdminFundTransferRepository adminFundTransferRepository;
 
     // Apply for gold loan.
     @PostMapping
@@ -542,6 +546,22 @@ public class GoldLoanController {
         return ResponseEntity.ok(goldLoanService.getGoldLoanHistory(id));
     }
 
+    @GetMapping("/{id}/payments")
+    public ResponseEntity<?> getGoldLoanPayments(
+            @PathVariable Long id,
+            @RequestParam String accountNumber) {
+        GoldLoan loan = goldLoanService.getGoldLoanById(id);
+        if (loan == null) {
+            return ResponseEntity.notFound().build();
+        }
+        if (loan.getAccountNumber() == null || !loan.getAccountNumber().trim().equalsIgnoreCase(accountNumber.trim())) {
+            return ResponseEntity.status(403).body(Map.of("success", false, "message", "You are not allowed to view these loan payments."));
+        }
+        return ResponseEntity.ok(adminFundTransferRepository
+                .findByLoanAccountNumberAndTransferCategoryOrderByPerformedAtDesc(
+                        loan.getLoanAccountNumber(), "GOLD_LOAN"));
+    }
+
     // Download receipt for approved gold loan
     @GetMapping("/{id}/receipt")
     public ResponseEntity<?> downloadApprovedReceipt(
@@ -602,4 +622,3 @@ public class GoldLoanController {
         return "";
     }
 }
-

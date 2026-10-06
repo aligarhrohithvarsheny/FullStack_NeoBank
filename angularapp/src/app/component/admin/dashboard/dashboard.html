@@ -3078,6 +3078,14 @@
               <td style="padding:12px;">
                 <div>{{ t.transferCategory || 'ACCOUNT_TO_ACCOUNT' }}</div>
                 <small *ngIf="t.loanAccountNumber">{{ t.loanPaymentType }} · {{ t.loanAccountNumber }}<span *ngIf="t.prepaymentAdjustment"> · {{ t.prepaymentAdjustment === 'REDUCE_EMI' ? 'Reduce EMI' : 'Reduce tenure' }}</span></small>
+                <div *ngIf="t.loanAccountNumber && t.outstandingPrincipalBefore != null" style="margin-top:6px;color:#475569;font-size:11px;line-height:1.55;">
+                  Principal: ₹{{ t.outstandingPrincipalBefore | number:'1.2-2' }} → ₹{{ t.outstandingPrincipalAfter | number:'1.2-2' }}<br>
+                  Interest remaining: ₹{{ t.remainingInterestBefore | number:'1.2-2' }} → ₹{{ t.remainingInterestAfter | number:'1.2-2' }}<br>
+                  EMI: ₹{{ t.emiAmountBefore | number:'1.2-2' }} → ₹{{ t.emiAmountAfter | number:'1.2-2' }} ·
+                  Tenure: {{ t.remainingTenureBefore }} → {{ t.remainingTenureAfter }} months
+                  <span *ngIf="t.interestSaved > 0"><br>Estimated interest saved: ₹{{ t.interestSaved | number:'1.2-2' }}</span>
+                  <span *ngIf="t.principalPaid != null"><br>Principal paid: ₹{{ t.principalPaid | number:'1.2-2' }} · Interest paid: ₹{{ t.interestPaid | number:'1.2-2' }}</span>
+                </div>
               </td>
               <td style="padding:12px;">
                 <div><strong>{{ t.senderName }}</strong></div>
@@ -3097,6 +3105,7 @@
               <td style="padding:12px;">{{ t.performedAt | date:'dd/MM/yyyy, h:mm a' }}</td>
               <td style="padding:12px;text-align:center;">
                 <div style="display:flex;gap:4px;justify-content:center;flex-wrap:wrap;">
+                  <button class="btn-sm btn-secondary" (click)="printAdminFundTransferReceipt(t)"><i class="fa fa-receipt"></i> Receipt</button>
                   <button class="btn-sm btn-primary" *ngIf="aftEditingId !== t.id" (click)="startEditAftTransfer(t)">Edit</button>
                   <button class="btn-sm btn-danger" *ngIf="t.status === 'COMPLETED' && (t.transferCategory || 'ACCOUNT_TO_ACCOUNT') === 'ACCOUNT_TO_ACCOUNT'" (click)="revertAftTransfer(t)" [disabled]="aftRevertingId === t.id">
                     {{ aftRevertingId === t.id ? 'Reverting...' : 'Revert' }}

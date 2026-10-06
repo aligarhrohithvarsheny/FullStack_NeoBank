@@ -32,6 +32,19 @@ public class AdminFundTransfer {
     private Long emiPaymentId;
     private String prepaymentAdjustment;
 
+    private Double outstandingPrincipalBefore;
+    private Double outstandingPrincipalAfter;
+    private Double remainingInterestBefore;
+    private Double remainingInterestAfter;
+    private Double emiAmountBefore;
+    private Double emiAmountAfter;
+    private Integer remainingTenureBefore;
+    private Integer remainingTenureAfter;
+    private Double principalPaid;
+    private Double interestPaid;
+    private Double charges;
+    private Double interestSaved;
+
     private Double amount;
     private Double transferCharge; // 0.5% of amount, deducted from sender
     private Double revertCharge;   // 0.5% of amount, deducted on revert (set only when reverted)

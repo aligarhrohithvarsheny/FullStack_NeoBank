@@ -62,6 +62,8 @@ public class GoldLoan {
     private Double interestPaid;
     private Double remainingPrincipal;
     private Double remainingInterest;
+    private Double currentEmi;
+    private Integer remainingTenure;
     private String foreclosedBy;
 
     // Gold details (filled by admin during acceptance)
@@ -149,4 +151,3 @@ public class GoldLoan {
         }
     }
 }
-

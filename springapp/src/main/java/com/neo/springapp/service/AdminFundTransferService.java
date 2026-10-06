@@ -390,6 +390,7 @@ public class AdminFundTransferService {
 
         double amount;
         Map<String, Object> paymentResult = null;
+        Map<String, Object> paymentDetails = new HashMap<>();
         if ("EMI".equals(action)) {
             if (emiPaymentId == null) {
                 throw new IllegalArgumentException("Select a pending EMI to pay");
@@ -404,10 +405,14 @@ public class AdminFundTransferService {
             if (requestedAmount != null && round2(requestedAmount) != round2(amount)) {
                 throw new IllegalArgumentException("EMI amount must match the selected installment");
             }
+            appendSnapshotBefore(paymentDetails, snapshotLoan(normalizedLoanNumber));
+            paymentDetails.put("principalPaid", valueOrZero(emi.getPrincipalAmount()));
+            paymentDetails.put("interestPaid", valueOrZero(emi.getInterestAmount()));
             paymentResult = emiService.payEmi(emiPaymentId, normalizedSender);
             if (!Boolean.TRUE.equals(paymentResult.get("success"))) {
                 throw new IllegalArgumentException(String.valueOf(paymentResult.get("message")));
             }
+            appendSnapshot(paymentDetails, snapshotLoan(normalizedLoanNumber));
             updateLoanPaidStatus(type, normalizedLoanNumber);
         } else if ("FORECLOSURE".equals(action)) {
             Map<String, Object> calculation = loanDetails.get("foreclosure") instanceof Map<?, ?> map
@@ -415,6 +420,13 @@ public class AdminFundTransferService {
             if (!Boolean.TRUE.equals(calculation.get("success"))) {
                 throw new IllegalArgumentException(String.valueOf(calculation.getOrDefault("message", "Unable to calculate foreclosure")));
             }
+            appendSnapshotBefore(paymentDetails, snapshotLoan(normalizedLoanNumber));
+            paymentDetails.put("outstandingPrincipalBefore", numberValue(calculation.get("remainingPrincipal")));
+            paymentDetails.put("remainingInterestBefore", numberValue(calculation.get("remainingInterest")));
+            paymentDetails.put("principalPaid", numberValue(calculation.get("remainingPrincipal")));
+            paymentDetails.put("interestPaid", numberValue(calculation.get("remainingInterest")));
+            paymentDetails.put("charges", numberValue(calculation.get("foreclosureCharges"))
+                    + numberValue(calculation.get("gst")));
             amount = numberValue(calculation.get("totalForeclosureAmount"));
             requireSufficientBalance(normalizedSender, (String) senderInfo.get("accountType"), amount);
             adjustBalance((String) senderInfo.get("accountType"), normalizedSender, -amount);
@@ -429,6 +441,10 @@ public class AdminFundTransferService {
             if (loan == null) {
                 throw new IllegalArgumentException("Loan foreclosure could not be completed");
             }
+            paymentDetails.put("outstandingPrincipalAfter", 0.0);
+            paymentDetails.put("remainingInterestAfter", 0.0);
+            paymentDetails.put("emiAmountAfter", 0.0);
+            paymentDetails.put("remainingTenureAfter", 0);
             paymentResult = Map.of("success", true, "foreclosure", calculation);
             saveLedgerTransaction(normalizedSender, (String) senderInfo.get("name"), amount, "Debit",
                     getBalance(normalizedSender, (String) senderInfo.get("accountType")),
@@ -443,7 +459,7 @@ public class AdminFundTransferService {
             }
             amount = round2(requestedAmount);
             requireSufficientBalance(normalizedSender, (String) senderInfo.get("accountType"), amount);
-            applyPrepayment(type, normalizedLoanNumber, amount, adjustment);
+            paymentDetails.putAll(applyPrepayment(type, normalizedLoanNumber, amount, adjustment));
             adjustBalance((String) senderInfo.get("accountType"), normalizedSender, -amount);
             saveLedgerTransaction(normalizedSender, (String) senderInfo.get("name"), amount, "Debit",
                     getBalance(normalizedSender, (String) senderInfo.get("accountType")),
@@ -470,6 +486,7 @@ public class AdminFundTransferService {
         transfer.setLoanPaymentType(action);
         transfer.setEmiPaymentId(emiPaymentId);
         transfer.setPrepaymentAdjustment(prepaymentAdjustment);
+        setTransferPaymentDetails(transfer, paymentDetails);
         transfer.setDescription(description);
         transfer.setStatus("COMPLETED");
         transfer.setPerformedBy(performedBy != null && !performedBy.isBlank() ? performedBy : "Admin");
@@ -486,7 +503,7 @@ public class AdminFundTransferService {
         return result;
     }
 
-    private void applyPrepayment(String type, String loanAccountNumber, double amount, String adjustment) {
+    private Map<String, Object> applyPrepayment(String type, String loanAccountNumber, double amount, String adjustment) {
         List<EmiPayment> schedule = emiPaymentRepository.findByLoanAccountNumberOrderByEmiNumberAsc(loanAccountNumber);
         List<EmiPayment> pending = schedule.stream()
                 .filter(emi -> "Pending".equalsIgnoreCase(emi.getStatus()))
@@ -498,6 +515,11 @@ public class AdminFundTransferService {
         double outstandingPrincipal = round2(pending.stream()
                 .mapToDouble(emi -> emi.getPrincipalAmount() == null ? 0.0 : emi.getPrincipalAmount())
                 .sum());
+        double outstandingInterest = round2(pending.stream()
+                .mapToDouble(emi -> emi.getInterestAmount() == null ? 0.0 : emi.getInterestAmount())
+                .sum());
+        double emiBefore = pending.isEmpty() ? 0.0 : valueOrZero(pending.get(0).getTotalAmount());
+        int tenureBefore = pending.size();
         if (amount >= outstandingPrincipal) {
             throw new IllegalArgumentException("Prepayment must be less than the outstanding principal; use foreclosure to close the loan");
         }
@@ -513,14 +535,21 @@ public class AdminFundTransferService {
             recalculateWithReducedTenure(pending, principalRemaining, monthlyRate);
         }
         emiPaymentRepository.saveAll(schedule);
-        double remainingInterest = round2(pending.stream()
+        List<EmiPayment> remainingEmis = schedule.stream()
+                .filter(emi -> "Pending".equalsIgnoreCase(emi.getStatus()))
+                .toList();
+        double remainingInterest = round2(remainingEmis.stream()
                 .mapToDouble(emi -> emi.getInterestAmount() == null ? 0.0 : emi.getInterestAmount())
                 .sum());
+        double emiAfter = remainingEmis.isEmpty() ? 0.0 : valueOrZero(remainingEmis.get(0).getTotalAmount());
+        int tenureAfter = remainingEmis.size();
 
         if ("GOLD_LOAN".equals(type)) {
             GoldLoan loan = goldLoanRepository.findByLoanAccountNumber(loanAccountNumber).orElseThrow();
             loan.setRemainingPrincipal(principalRemaining);
             loan.setRemainingInterest(remainingInterest);
+            loan.setCurrentEmi(emiAfter);
+            loan.setRemainingTenure(tenureAfter);
             loan.setPrincipalPaid(round2(valueOrZero(loan.getPrincipalPaid()) + amount));
             goldLoanRepository.save(loan);
             GoldLoanHistory history = new GoldLoanHistory();
@@ -528,8 +557,11 @@ public class AdminFundTransferService {
             history.setLoanAccountNumber(loanAccountNumber);
             history.setAction("PREPAYMENT");
             history.setChangedBy("Admin Fund Transfer");
-            history.setDetails("Prepayment of " + amount + " applied; outstanding principal is now " + principalRemaining
-                    + "; future schedule " + adjustment + ".");
+            history.setDetails("Prepayment of " + amount + " applied to principal; outstanding principal "
+                    + outstandingPrincipal + " -> " + principalRemaining + "; remaining interest "
+                    + outstandingInterest + " -> " + remainingInterest + "; EMI " + emiBefore + " -> " + emiAfter
+                    + "; remaining tenure " + tenureBefore + " -> " + tenureAfter + " months; adjustment "
+                    + adjustment + "; estimated interest saved " + round2(outstandingInterest - remainingInterest) + ".");
             history.setOldAmount(outstandingPrincipal);
             history.setNewAmount(principalRemaining);
             goldLoanHistoryRepository.save(history);
@@ -540,6 +572,71 @@ public class AdminFundTransferService {
             loan.setPrincipalPaid(round2(valueOrZero(loan.getPrincipalPaid()) + amount));
             loanRepository.save(loan);
         }
+
+        Map<String, Object> details = new HashMap<>();
+        details.put("outstandingPrincipalBefore", outstandingPrincipal);
+        details.put("outstandingPrincipalAfter", principalRemaining);
+        details.put("remainingInterestBefore", outstandingInterest);
+        details.put("remainingInterestAfter", remainingInterest);
+        details.put("emiAmountBefore", emiBefore);
+        details.put("emiAmountAfter", emiAfter);
+        details.put("remainingTenureBefore", tenureBefore);
+        details.put("remainingTenureAfter", tenureAfter);
+        details.put("principalPaid", amount);
+        details.put("interestPaid", 0.0);
+        details.put("charges", 0.0);
+        details.put("interestSaved", round2(outstandingInterest - remainingInterest));
+        return details;
+    }
+
+    private Map<String, Object> snapshotLoan(String loanAccountNumber) {
+        List<EmiPayment> activeEmis = emiPaymentRepository.findByLoanAccountNumberOrderByEmiNumberAsc(loanAccountNumber)
+                .stream()
+                .filter(emi -> "Pending".equalsIgnoreCase(emi.getStatus())
+                        || "Overdue".equalsIgnoreCase(emi.getStatus()))
+                .toList();
+        Map<String, Object> snapshot = new HashMap<>();
+        snapshot.put("outstandingPrincipal", round2(activeEmis.stream()
+                .mapToDouble(emi -> valueOrZero(emi.getPrincipalAmount())).sum()));
+        snapshot.put("remainingInterest", round2(activeEmis.stream()
+                .mapToDouble(emi -> valueOrZero(emi.getInterestAmount())).sum()));
+        snapshot.put("emiAmount", activeEmis.isEmpty() ? 0.0 : valueOrZero(activeEmis.get(0).getTotalAmount()));
+        snapshot.put("remainingTenure", activeEmis.size());
+        return snapshot;
+    }
+
+    private void appendSnapshotBefore(Map<String, Object> details, Map<String, Object> snapshot) {
+        details.put("outstandingPrincipalBefore", snapshot.get("outstandingPrincipal"));
+        details.put("remainingInterestBefore", snapshot.get("remainingInterest"));
+        details.put("emiAmountBefore", snapshot.get("emiAmount"));
+        details.put("remainingTenureBefore", snapshot.get("remainingTenure"));
+    }
+
+    private void appendSnapshot(Map<String, Object> details, Map<String, Object> snapshot) {
+        details.put("outstandingPrincipalAfter", snapshot.get("outstandingPrincipal"));
+        details.put("remainingInterestAfter", snapshot.get("remainingInterest"));
+        details.put("emiAmountAfter", snapshot.get("emiAmount"));
+        details.put("remainingTenureAfter", snapshot.get("remainingTenure"));
+    }
+
+    private void setTransferPaymentDetails(AdminFundTransfer transfer, Map<String, Object> details) {
+        transfer.setOutstandingPrincipalBefore(numberValue(details.get("outstandingPrincipalBefore")));
+        transfer.setOutstandingPrincipalAfter(numberValue(details.get("outstandingPrincipalAfter")));
+        transfer.setRemainingInterestBefore(numberValue(details.get("remainingInterestBefore")));
+        transfer.setRemainingInterestAfter(numberValue(details.get("remainingInterestAfter")));
+        transfer.setEmiAmountBefore(numberValue(details.get("emiAmountBefore")));
+        transfer.setEmiAmountAfter(numberValue(details.get("emiAmountAfter")));
+        transfer.setRemainingTenureBefore(integerValue(details.get("remainingTenureBefore")));
+        transfer.setRemainingTenureAfter(integerValue(details.get("remainingTenureAfter")));
+        transfer.setPrincipalPaid(numberValue(details.get("principalPaid")));
+        transfer.setInterestPaid(numberValue(details.get("interestPaid")));
+        transfer.setCharges(numberValue(details.get("charges")));
+        transfer.setInterestSaved(numberValue(details.get("interestSaved")));
+    }
+
+    private Integer integerValue(Object value) {
+        if (value instanceof Number number) return number.intValue();
+        return value == null ? null : Integer.valueOf(value.toString());
     }
 
     private void recalculateWithReducedEmi(List<EmiPayment> pending, double principal, double monthlyRate) {
