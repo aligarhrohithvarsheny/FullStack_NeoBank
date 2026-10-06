@@ -202,6 +202,7 @@ export class Dashboard implements OnInit, OnDestroy {
     { section: 'cheques', icon: 'fa-file-invoice', label: 'Cheque Management', description: 'Process cheque requests', gradient: 'linear-gradient(135deg, #fddb92, #d1fdff)', featureKey: 'cheques', route: 'cheques' },
     { section: 'cheque-draw', icon: 'fa-receipt', label: 'Cheque Draw Requests', description: 'Manage salary cheque draws', gradient: 'linear-gradient(135deg, #c1dfc4, #deecdd)', route: 'cheque-draw-management' },
     { section: 'business-cheque-draw', icon: 'fa-building', label: 'Business Cheque Draw', description: 'Manage business cheque requests', gradient: 'linear-gradient(135deg, #e0c3fc, #8ec5fc)', route: 'business-cheque-management' },
+    { section: 'savings-cheque-draw', icon: 'fa-money-check', label: 'Savings Cheque Draw', description: 'Manage savings cheque requests', gradient: 'linear-gradient(135deg, #e0c3fc, #8ec5fc)', route: 'savings-cheque-management' },
     { section: 'cards', icon: 'fa-credit-card', label: 'Manage Cards', description: 'Manage debit cards', gradient: 'linear-gradient(135deg, #ff9a9e, #fecfef)', featureKey: 'cards', route: 'cards' },
     { section: 'credit-cards', icon: 'fa-credit-card', label: 'Credit Cards', description: 'Manage credit card applications', gradient: 'linear-gradient(135deg, #fbc2eb, #a18cd1)', featureKey: 'cards', route: 'credit-cards' },
     { section: 'current-accounts', icon: 'fa-building', label: 'Current Accounts', description: 'Manage business current accounts', gradient: 'linear-gradient(135deg, #84fab0, #8fd3f4)', route: 'current-accounts' },
@@ -390,7 +391,8 @@ export class Dashboard implements OnInit, OnDestroy {
         { section: 'cheques', icon: 'fa-file-invoice', label: 'Cheque Management', featureKey: 'cheques' },
         { section: 'positive-pay', icon: 'fa-shield-alt', label: 'Positive Pay Requests', action: () => this.navigateTo('positive-pay') },
         { section: 'cheque-draw', icon: 'fa-receipt', label: 'Cheque Draw Requests', action: () => this.navigateTo('cheque-draw-management') },
-        { section: 'business-cheque-draw', icon: 'fa-building', label: 'Business Cheque Draw', action: () => this.navigateTo('business-cheque-management') }
+        { section: 'business-cheque-draw', icon: 'fa-building', label: 'Business Cheque Draw', action: () => this.navigateTo('business-cheque-management') },
+        { section: 'savings-cheque-draw', icon: 'fa-money-check', label: 'Savings Cheque Draw', action: () => this.navigateTo('savings-cheque-management') }
       ]
     },
     {

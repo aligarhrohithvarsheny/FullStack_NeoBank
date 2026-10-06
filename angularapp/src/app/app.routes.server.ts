@@ -111,6 +111,10 @@ export const serverRoutes: ServerRoute[] = [
     renderMode: RenderMode.Client
   },
   {
+    path: 'admin/savings-cheque-management',
+    renderMode: RenderMode.Client
+  },
+  {
     path: 'admin/business-cheque-management',
     renderMode: RenderMode.Client
   },

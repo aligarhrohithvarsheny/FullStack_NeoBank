@@ -22,6 +22,9 @@
         <button *ngIf="hasFeatureAccess('account-verification')" class="header-forms-tab" (click)="navigateTo('account-verification')" title="Review linked allocation accounts">
           <i class="fa fa-university"></i> Account Verification
         </button>
+        <button class="header-forms-tab" (click)="navigateTo('multi-view')" title="Open 4 features on one screen">
+          <i class="fa fa-th-large"></i> 4-in-1 Multitasking
+        </button>
         <button *ngIf="activeSection !== 'home'" class="back-to-home-btn" (click)="setActiveSection('home')">
           <i class="fa fa-th-large"></i> Dashboard Home
         </button>

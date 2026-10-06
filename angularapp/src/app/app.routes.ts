@@ -57,6 +57,7 @@ import { CurrentAccountDashboard } from './component/website/current-account-das
 import { FasttagLogin } from './component/website/fasttag-login/fasttag-login';
 import { FasttagDashboard } from './component/website/fasttag-dashboard/fasttag-dashboard';
 import { ChequeManagementComponent } from './component/admin/cheque-management/cheque-management.component';
+import { SavingsChequeManagementComponent } from './component/admin/savings-cheque-management/savings-cheque-management.component';
 import { BusinessChequeManagementComponent } from './component/admin/business-cheque-management/business-cheque-management.component';
 import { AiSecurityDashboardComponent } from './component/admin/ai-security-dashboard/ai-security-dashboard';
 import { MerchantLogin } from './component/website/merchant-login/merchant-login';
@@ -86,6 +87,7 @@ export const routes: Routes = [
   { path: 'hod/dashboard', component: HodDashboard, canActivate: [hodAuthGuard] },
   { path: 'hod/account-linking', loadComponent: () => import('./component/admin/account-linking/account-linking').then(m => m.AccountLinkingComponent), canActivate: [hodAuthGuard] },
   { path: 'admin/dashboard', component: Dashboard, canActivate: [adminAuthGuard] },
+{ path: 'admin/multi-view', loadComponent: () => import('./component/admin/multi-view/multi-view').then(m => m.AdminMultiView), canActivate: [adminAuthGuard] },
   { path: 'admin/account-verification', loadComponent: () => import('./component/admin/account-verification/account-verification').then(m => m.AccountVerificationComponent), canActivate: [adminAuthGuard] },
   // ------------------ MANAGER ------------------
   { path: 'manager/dashboard', component: ManagerDashboard, canActivate: [managerAuthGuard] },
@@ -97,6 +99,7 @@ export const routes: Routes = [
   { path: 'admin/kyc', component: Kyc, canActivate: [adminAuthGuard] },
   { path: 'admin/cheques', component: AdminCheques, canActivate: [adminAuthGuard] },
   { path: 'admin/cheque-draw-management', component: ChequeManagementComponent, canActivate: [adminAuthGuard] },
+  { path: 'admin/savings-cheque-management', component: SavingsChequeManagementComponent, canActivate: [adminAuthGuard] },
   { path: 'admin/business-cheque-management', component: BusinessChequeManagementComponent, canActivate: [adminAuthGuard] },
   { path: 'admin/gold-loans', component: AdminGoldLoans, canActivate: [adminAuthGuard] },
   { path: 'admin/demand-drafts', component: AdminDemandDrafts, canActivate: [adminAuthGuard] },

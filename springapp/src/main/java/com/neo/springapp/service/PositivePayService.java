@@ -21,6 +21,7 @@ public class PositivePayService {
     private final PositivePayAuditLogRepository auditRepository;
     private final ChequeRepository chequeRepository;
     private final ChequeRequestRepository salaryChequeRepository;
+    private final com.neo.springapp.repository.SavingsChequeRequestRepository savingsChequeRepository;
     private final BusinessChequeRequestRepository businessChequeRepository;
     private final SalaryAccountRepository salaryAccountRepository;
     private final CurrentAccountRepository currentAccountRepository;
@@ -35,6 +36,7 @@ public class PositivePayService {
                               PositivePayAuditLogRepository auditRepository,
                               ChequeRepository chequeRepository,
                               ChequeRequestRepository salaryChequeRepository,
+            com.neo.springapp.repository.SavingsChequeRequestRepository savingsChequeRepository,
                               BusinessChequeRequestRepository businessChequeRepository,
                               SalaryAccountRepository salaryAccountRepository,
                               CurrentAccountRepository currentAccountRepository,
@@ -42,7 +44,7 @@ public class PositivePayService {
                               UserRepository userRepository,
                               AccountService accountService) {
         this.requestRepository = requestRepository; this.auditRepository = auditRepository;
-        this.chequeRepository = chequeRepository; this.salaryChequeRepository = salaryChequeRepository;
+        this.chequeRepository = chequeRepository; this.salaryChequeRepository = salaryChequeRepository; this.savingsChequeRepository = savingsChequeRepository;
         this.businessChequeRepository = businessChequeRepository; this.salaryAccountRepository = salaryAccountRepository;
         this.currentAccountRepository = currentAccountRepository; this.accountRepository = accountRepository;
         this.userRepository = userRepository; this.accountService = accountService;
@@ -57,6 +59,8 @@ public class PositivePayService {
         List<Map<String, Object>> result = new ArrayList<>();
         if (owner.type.equals("SAVINGS")) {
             for (Cheque cheque : chequeRepository.findByAccountNumberAndStatus(accountNumber, "ACTIVE")) result.add(chequeMap(cheque.getId(), "CHEQUES", cheque.getChequeNumber(), accountNumber, owner.type, owner.name, cheque.getAmount(), cheque.getStatus(), null, cheque.getAmount() != null && BigDecimal.valueOf(cheque.getAmount()).compareTo(minimumAmount) >= 0));
+            Account savingsAcc = accountRepository.findByAccountNumber(accountNumber);
+            if (savingsAcc != null) for (com.neo.springapp.model.SavingsChequeRequest cheque : savingsChequeRepository.findByAccountIdOrderByCreatedAtDesc(savingsAcc.getId(), org.springframework.data.domain.PageRequest.of(0, 200)).getContent()) if ("APPROVED".equalsIgnoreCase(cheque.getStatus()) || "PENDING".equalsIgnoreCase(cheque.getStatus()) || "AWAITING_POSITIVE_PAY".equalsIgnoreCase(cheque.getStatus())) result.add(chequeMap(cheque.getId(), "SAVINGS_CHEQUE_REQUESTS", cheque.getChequeNumber(), accountNumber, owner.type, owner.name, cheque.getAmount() == null ? null : cheque.getAmount().doubleValue(), cheque.getStatus(), cheque.getSerialNumber(), cheque.getAmount() != null && cheque.getAmount().compareTo(minimumAmount) >= 0));
         } else if (owner.type.equals("SALARY")) {
             SalaryAccount salary = salaryAccountRepository.findByAccountNumber(accountNumber);
             if (salary != null) for (ChequeRequest cheque : salaryChequeRepository.findBySalaryAccountIdOrderByCreatedAtDesc(salary.getId(), org.springframework.data.domain.PageRequest.of(0, 200)).getContent()) if ("APPROVED".equalsIgnoreCase(cheque.getStatus()) || "PENDING".equalsIgnoreCase(cheque.getStatus()) || "AWAITING_POSITIVE_PAY".equalsIgnoreCase(cheque.getStatus())) result.add(chequeMap(cheque.getId(), "SALARY_CHEQUE_REQUESTS", cheque.getChequeNumber(), accountNumber, owner.type, owner.name, cheque.getAmount() == null ? null : cheque.getAmount().doubleValue(), cheque.getStatus(), cheque.getSerialNumber(), cheque.getAmount() != null && cheque.getAmount().compareTo(minimumAmount) >= 0));
@@ -111,6 +115,16 @@ public class PositivePayService {
                 }
                 salaryChequeRepository.save(draw);
             });
+        } else if ("SAVINGS_CHEQUE_REQUESTS".equals(request.getChequeSource())) {
+            savingsChequeRepository.findById(request.getChequeId()).ifPresent(draw -> {
+                if ("AWAITING_POSITIVE_PAY".equalsIgnoreCase(draw.getStatus())) draw.setStatus("PENDING");
+                if (request.getPayeeAccountNumber() != null && !request.getPayeeAccountNumber().isBlank()) {
+                    draw.setPayeeAccountNumber(request.getPayeeAccountNumber());
+                    draw.setPayeeAccountVerified(true);
+                    draw.setPayeeAccountType(request.getPayeeBankName());
+                }
+                savingsChequeRepository.save(draw);
+            });
         } else if ("BUSINESS_CHEQUE_REQUESTS".equals(request.getChequeSource())) {
             businessChequeRepository.findById(request.getChequeId()).ifPresent(draw -> {
                 if ("AWAITING_POSITIVE_PAY".equalsIgnoreCase(draw.getStatus())) draw.setStatus("PENDING");
@@ -131,7 +145,7 @@ public class PositivePayService {
     private List<PositivePayStatus> activeRegistrationStatuses() { return List.of(PositivePayStatus.PENDING_ADMIN_APPROVAL, PositivePayStatus.APPROVED, PositivePayStatus.MATCHED, PositivePayStatus.MISMATCH); }
     private void audit(PositivePayRequest r,String action,String by,String role,String ip,String remarks){ PositivePayAuditLog l=new PositivePayAuditLog(); l.setReferenceNumber(r.getReferenceNumber()); l.setAction(action); l.setPerformedBy(by); l.setPerformedByRole(role); l.setIpAddress(ip); l.setRemarks(remarks); auditRepository.save(l); }
     private Map<String,Object> chequeMap(Long id,String source,String number,String account,String type,String holder,Double amount,String status,String book,boolean eligible){ Map<String,Object> m=new LinkedHashMap<>(); m.put("chequeId",id);m.put("chequeSource",source);m.put("chequeNumber",number);m.put("accountNumber",account);m.put("accountType",type);m.put("accountHolderName",holder);m.put("amount",amount);m.put("chequeStatus",status);m.put("chequeBookNumber",book);m.put("eligible",eligible);m.put("minimumAmount",minimumAmount);return m; }
-    private ResolvedCheque resolveCheque(Owner owner,String number){ if(owner==null)return null; if(owner.type.equals("SAVINGS")){return chequeRepository.findByChequeNumber(number).filter(c->owner.number.equalsIgnoreCase(c.getAccountNumber())).map(c->new ResolvedCheque(c.getId(),"CHEQUES",c.getChequeNumber(),c.getStatus(),"ACTIVE".equalsIgnoreCase(c.getStatus()),null)).orElse(null);} if(owner.type.equals("SALARY")){SalaryAccount sa=salaryAccountRepository.findByAccountNumber(owner.number); if(sa==null)return null; return salaryChequeRepository.findAllByChequeNumber(number).stream().filter(c->Objects.equals(c.getSalaryAccountId(),sa.getId())).findFirst().map(c->new ResolvedCheque(c.getId(),"SALARY_CHEQUE_REQUESTS",c.getChequeNumber(),c.getStatus(),"APPROVED".equalsIgnoreCase(c.getStatus()) || "PENDING".equalsIgnoreCase(c.getStatus()) || "AWAITING_POSITIVE_PAY".equalsIgnoreCase(c.getStatus()),c.getSerialNumber())).orElse(null);} CurrentAccount ca=currentAccountRepository.findByAccountNumber(owner.number).orElse(null); if(ca==null)return null; return businessChequeRepository.findAllByChequeNumber(number).stream().filter(c->Objects.equals(c.getCurrentAccountId(),ca.getId())).findFirst().map(c->new ResolvedCheque(c.getId(),"BUSINESS_CHEQUE_REQUESTS",c.getChequeNumber(),c.getStatus(),"APPROVED".equalsIgnoreCase(c.getStatus()) || "PENDING".equalsIgnoreCase(c.getStatus()) || "AWAITING_POSITIVE_PAY".equalsIgnoreCase(c.getStatus()),c.getSerialNumber())).orElse(null); }
+    private ResolvedCheque resolveCheque(Owner owner,String number){ if(owner==null)return null; if(owner.type.equals("SAVINGS")){Account sav=accountRepository.findByAccountNumber(owner.number); if(sav!=null){ResolvedCheque draw=savingsChequeRepository.findAllByChequeNumber(number).stream().filter(c->Objects.equals(c.getAccountId(),sav.getId())).findFirst().map(c->new ResolvedCheque(c.getId(),"SAVINGS_CHEQUE_REQUESTS",c.getChequeNumber(),c.getStatus(),"APPROVED".equalsIgnoreCase(c.getStatus()) || "PENDING".equalsIgnoreCase(c.getStatus()) || "AWAITING_POSITIVE_PAY".equalsIgnoreCase(c.getStatus()),c.getSerialNumber())).orElse(null); if(draw!=null)return draw;} return chequeRepository.findByChequeNumber(number).filter(c->owner.number.equalsIgnoreCase(c.getAccountNumber())).map(c->new ResolvedCheque(c.getId(),"CHEQUES",c.getChequeNumber(),c.getStatus(),"ACTIVE".equalsIgnoreCase(c.getStatus()),null)).orElse(null);} if(owner.type.equals("SALARY")){SalaryAccount sa=salaryAccountRepository.findByAccountNumber(owner.number); if(sa==null)return null; return salaryChequeRepository.findAllByChequeNumber(number).stream().filter(c->Objects.equals(c.getSalaryAccountId(),sa.getId())).findFirst().map(c->new ResolvedCheque(c.getId(),"SALARY_CHEQUE_REQUESTS",c.getChequeNumber(),c.getStatus(),"APPROVED".equalsIgnoreCase(c.getStatus()) || "PENDING".equalsIgnoreCase(c.getStatus()) || "AWAITING_POSITIVE_PAY".equalsIgnoreCase(c.getStatus()),c.getSerialNumber())).orElse(null);} CurrentAccount ca=currentAccountRepository.findByAccountNumber(owner.number).orElse(null); if(ca==null)return null; return businessChequeRepository.findAllByChequeNumber(number).stream().filter(c->Objects.equals(c.getCurrentAccountId(),ca.getId())).findFirst().map(c->new ResolvedCheque(c.getId(),"BUSINESS_CHEQUE_REQUESTS",c.getChequeNumber(),c.getStatus(),"APPROVED".equalsIgnoreCase(c.getStatus()) || "PENDING".equalsIgnoreCase(c.getStatus()) || "AWAITING_POSITIVE_PAY".equalsIgnoreCase(c.getStatus()),c.getSerialNumber())).orElse(null); }
     private Owner resolveOwner(String number){ if(number==null)return null; User user=userRepository.findByAccountNumber(number).orElse(null); Account a=accountRepository.findByAccountNumber(number); if(a!=null)return new Owner(number,"SAVINGS",a.getName(),a.getStatus(),a.getId(),user==null?a.getId():user.getId(),user==null?null:user.getEmail(),null); SalaryAccount sa=salaryAccountRepository.findByAccountNumber(number); if(sa!=null)return new Owner(number,"SALARY",sa.getEmployeeName(),sa.getStatus(),sa.getId(),user==null?sa.getId():user.getId(),sa.getEmail(),sa.getMobileNumber()); CurrentAccount ca=currentAccountRepository.findByAccountNumber(number).orElse(null); if(ca!=null)return new Owner(number,"CURRENT",ca.getOwnerName(),ca.getStatus(),ca.getId(),user==null?ca.getId():user.getId(),ca.getEmail(),ca.getMobile()); return null; }
     private record Owner(String number,String type,String name,String status,Long accountId,Long userId,String email,String phone){}
     private record ResolvedCheque(Long id,String source,String number,String status,boolean available,String bookNumber){}

@@ -1,11 +1,15 @@
-import { Component, OnInit, OnDestroy, Inject, PLATFORM_ID } from '@angular/core';
-import { FormsModule } from '@angular/forms';
-import { CommonModule, isPlatformBrowser } from '@angular/common';
+import { Component, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
+import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { SavingsChequeService } from '../../../service/savings-cheque.service';
+import {
+  SavingsChequeDrawRequest,
+  SavingsChequeHistoryEntry,
+  SavingsChequeStatus,
+  SavingsChequeLeaf
+} from '../../../model/cheque/savings-cheque.model';
 import { HttpClient } from '@angular/common/http';
-import { AlertService } from '../../../service/alert.service';
-import { ChequeService } from '../../../service/cheque';
-import { Cheque as ChequeModel, CreateChequeRequest, CancelChequeRequest, RequestChequeDraw } from '../../../model/cheque/cheque-module';
 import { environment } from '../../../../environment/environment';
 
 @Component({
@@ -15,422 +19,619 @@ import { environment } from '../../../../environment/environment';
   templateUrl: './cheque.html',
   styleUrls: ['./cheque.css']
 })
+export class ChequeComponent implements OnInit {
+  // Account Info
+  account: any = null;
+  availableBalance: number = 0;
 
-export class ChequeComponent implements OnInit, OnDestroy {
-  // User data
-  userAccountNumber: string = '';
-  userName: string = '';
-  currentBalance: number = 0;
+  // Form fields
+  serialNumber: string = '';
+  chequeDate: string = this.getTodayDate();
+  amount: number | null = null;
+  payeeName: string = '';
+  remarks: string = '';
 
-  // Cheque leaves creation - a cheque book is always issued as a fixed batch of leaves
-  readonly CHEQUE_BOOK_SIZE = 30;
-  numberOfLeaves: number = 30;
-  chequeAmount: number = 0; // Amount for each cheque
-  creatingCheques: boolean = false;
-  createError: string = '';
+  // Cheque leaves
+  availableLeaves: SavingsChequeLeaf[] = [];
+  isLoadingLeaves: boolean = false;
+  totalAllocated: number = 0;
+  totalUsed: number = 0;
 
-  // Cheque list
-  cheques: ChequeModel[] = [];
-  activeCheques: ChequeModel[] = [];
-  cancelledCheques: ChequeModel[] = [];
-  usedCheques: ChequeModel[] = [];
-  loading: boolean = false;
-  error: string = '';
+  // Form states
+  isSubmitting: boolean = false;
+  formValid: boolean = false;
+  successMessage: string = '';
+  errorMessage: string = '';
 
-  // Statistics
-  statistics: any = {
-    totalCheques: 0,
-    activeCheques: 0,
-    usedCheques: 0,
-    cancelledCheques: 0
+  // Cheque history
+  chequeHistory: SavingsChequeHistoryEntry[] = [];
+  isLoadingHistory: boolean = false;
+  historyFilter: SavingsChequeStatus | 'ALL' = 'ALL';
+
+  // Tab state
+  activeTab: 'form' | 'history' = 'form';
+
+  // Edit state
+  editingChequeId: number | null = null;
+  editPayeeName: string = '';
+  editAmount: number | null = null;
+  isEditing: boolean = false;
+
+  // Status colors
+  statusColors: { [key in SavingsChequeStatus]: string } = {
+    'AWAITING_POSITIVE_PAY': '#f97316',
+    'PENDING': '#f59e0b',
+    'APPROVED': '#3b82f6',
+    'COMPLETED': '#10b981',
+    'REJECTED': '#ef4444',
+    'CANCELLED': '#6b7280',
+    'CLEARED': '#059669'
   };
 
-  // Pagination
-  currentPage: number = 0;
-  pageSize: number = 10;
-  totalPages: number = 0;
-  totalElements: number = 0;
-
-  // Filter
-  filterStatus: string = 'ALL'; // ALL, ACTIVE, USED, CANCELLED
-
-  // Cancel cheque
-  selectedCheque: ChequeModel | null = null;
-  cancelReason: string = '';
-  cancelling: boolean = false;
-
-  // Request cheque draw
-  requesting: boolean = false;
-
-  // Draw request modal
-  selectedChequeForDraw: ChequeModel | null = null;
-  drawPayeeName = '';
-
-  constructor(
-    private router: Router,
-    @Inject(PLATFORM_ID) private platformId: Object,
-    private http: HttpClient,
-    private alertService: AlertService,
-    private chequeService: ChequeService
-  ) {}
+  constructor(private savingsChequeService: SavingsChequeService, private router: Router, private http: HttpClient) {}
 
   ngOnInit() {
-    if (isPlatformBrowser(this.platformId)) {
-      this.loadUserProfile();
-      this.loadCheques();
-      this.loadStatistics();
-      this.loadCurrentBalance();
-      this.livePollInterval = setInterval(() => {
-        this.loadCheques();
-        this.loadStatistics();
-        this.loadCurrentBalance();
-      }, 5000);
-    }
+    this.loadAccountData();
   }
 
-  private livePollInterval: any;
-
-  ngOnDestroy() {
-    if (this.livePollInterval) clearInterval(this.livePollInterval);
-  }
-
-  openDrawModal(cheque: ChequeModel) {
-    if (!this.canRequestCheque(cheque)) return;
-    this.selectedChequeForDraw = cheque;
-  }
-
-  closeDrawModal() {
-    this.selectedChequeForDraw = null;
-  }
-
-  requestChequeDrawDirect() {
-    const c = this.selectedChequeForDraw;
-    if (!c?.id) {
-      this.alertService.error('Request Error', 'Please select a valid cheque');
+  loadAccountData() {
+    const sessionStr = sessionStorage.getItem('currentUser');
+    if (!sessionStr) {
+      this.errorMessage = 'Session expired. Please log in again.';
       return;
     }
-    this.requesting = true;
-    const request: RequestChequeDraw = { requestedBy: this.userName, payeeName: this.drawPayeeName.trim() || undefined };
-    const chequeId = c.id;
-    this.chequeService.requestChequeDraw(chequeId, request).subscribe({
-      next: (response: any) => {
-        this.alertService.success('Request Submitted', response.message || 'Cheque draw request submitted successfully. Waiting for admin approval.');
-        this.drawPayeeName = '';
-        this.requesting = false;
-        this.closeDrawModal();
-        this.loadCheques();
-        this.loadStatistics();
-        this.loadCurrentBalance();
-      },
-      error: (err: any) => {
-        this.requesting = false;
-        this.alertService.error('Request Failed', err.error?.error || err.error?.message || 'Failed to submit cheque draw request.');
-      }
-    });
-  }
-  
-  loadUserProfile() {
-    const currentUser = sessionStorage.getItem('currentUser');
-    if (currentUser) {
-      const user = JSON.parse(currentUser);
-      this.userAccountNumber = user.accountNumber;
-      this.userName = user.name || user.username;
-    } else {
-      this.alertService.error('Login Required', 'Please login to continue');
-      this.router.navigate(['/website/user']);
+    const user = JSON.parse(sessionStr);
+    if (!user?.accountNumber) {
+      this.errorMessage = 'No savings account found for this user.';
+      return;
     }
+    this.http.get<any>(`${environment.apiBaseUrl}/api/accounts/number/${user.accountNumber}`).subscribe({
+      next: (acc) => {
+        this.account = acc;
+        if (acc?.id) {
+          this.availableBalance = acc.balance || 0;
+          this.loadChequeHistory();
+          this.loadAvailableLeaves();
+        }
+      },
+      error: () => { this.errorMessage = 'Unable to load account details.'; }
+    });
   }
 
-  loadCurrentBalance() {
-    if (!this.userAccountNumber) return;
-
-    this.http.get(`${environment.apiBaseUrl}/api/accounts/balance/${this.userAccountNumber}`).subscribe({
-      next: (balanceData: any) => {
-        this.currentBalance = balanceData.balance || 0;
+  loadAvailableLeaves() {
+    if (!this.account?.id) return;
+    this.isLoadingLeaves = true;
+    this.savingsChequeService.getAvailableLeaves(this.account.id).subscribe({
+      next: (response) => {
+        this.availableLeaves = response.leaves || [];
+        this.totalAllocated = response.totalAllocated || 0;
+        this.totalUsed = response.totalUsed || 0;
+        this.isLoadingLeaves = false;
       },
-      error: (err: any) => {
-        console.error('Error loading balance:', err);
+      error: () => {
+        this.availableLeaves = [];
+        this.isLoadingLeaves = false;
       }
     });
   }
 
-  loadCheques() {
-    if (!this.userAccountNumber) return;
-
-    this.loading = true;
-    this.error = '';
-
-    this.chequeService.getChequesByAccountNumberPaged(this.userAccountNumber, this.currentPage, this.pageSize).subscribe({
+  loadChequeHistory() {
+    if (!this.account?.id) return;
+    this.isLoadingHistory = true;
+    this.savingsChequeService.getUserCheques(this.account.id).subscribe({
       next: (response: any) => {
-        this.cheques = response.content || response;
-        this.totalPages = response.totalPages || 0;
-        this.totalElements = response.totalElements || response.length || 0;
-        this.currentPage = response.number || 0;
-
-        // Filter cheques by status
-        this.activeCheques = this.cheques.filter(c => c.status === 'ACTIVE');
-        this.cancelledCheques = this.cheques.filter(c => c.status === 'CANCELLED');
-        this.usedCheques = this.cheques.filter(c => c.status === 'USED');
-
-        this.loading = false;
+        this.chequeHistory = response.items || response.data || [];
+        this.isLoadingHistory = false;
       },
-      error: (err: any) => {
-        console.error('Error loading cheques:', err);
-        this.error = 'Failed to load cheques. Please try again.';
-        this.loading = false;
+      error: () => {
+        this.isLoadingHistory = false;
+        this.chequeHistory = [];
       }
     });
   }
 
-  loadStatistics() {
-    if (!this.userAccountNumber) return;
-
-    this.chequeService.getChequeStatistics(this.userAccountNumber).subscribe({
-      next: (stats: any) => {
-        this.statistics = stats;
-      },
-      error: (err: any) => {
-        console.error('Error loading statistics:', err);
-      }
-    });
+  getFilteredHistory(): SavingsChequeHistoryEntry[] {
+    if (this.historyFilter === 'ALL') {
+      return this.chequeHistory;
+    }
+    return this.chequeHistory.filter(c => c.status === this.historyFilter);
   }
 
-  createChequeLeaves() {
-    if (!this.userAccountNumber) {
-      this.alertService.error('Login Required', 'Please login to continue');
+  validateForm(): boolean {
+    this.errorMessage = '';
+
+    if (!this.serialNumber || this.serialNumber.trim() === '') {
+      this.errorMessage = 'Serial number is required';
+      return false;
+    }
+
+    if (!this.chequeDate) {
+      this.errorMessage = 'Cheque date is required';
+      return false;
+    }
+
+    const chequeDate = new Date(this.chequeDate);
+    const today = new Date();
+    const daysDifference = Math.floor((today.getTime() - chequeDate.getTime()) / (1000 * 60 * 60 * 24));
+
+    if (daysDifference > 6 * 30) {
+      this.errorMessage = 'Cheque date cannot be older than 6 months';
+      return false;
+    }
+
+    if (!this.amount || this.amount <= 0) {
+      this.errorMessage = 'Amount must be greater than 0';
+      return false;
+    }
+
+    if (this.amount > this.availableBalance) {
+      this.errorMessage = `Amount cannot exceed available balance (${this.formatAmount(this.availableBalance)})`;
+      return false;
+    }
+
+    if (!this.payeeName || this.payeeName.trim() === '') {
+      this.errorMessage = 'Payee name is required';
+      return false;
+    }
+
+    if (this.amount > 5000000) {
+      this.errorMessage = 'Amount cannot exceed ₹50,00,000';
+      return false;
+    }
+
+    return true;
+  }
+
+  submitChequeRequest() {
+    if (!this.validateForm()) return;
+
+    if (!this.account?.id) {
+      this.errorMessage = 'Account information not loaded';
       return;
     }
 
-    this.creatingCheques = true;
-    this.createError = '';
+    this.isSubmitting = true;
+    this.successMessage = '';
+    this.errorMessage = '';
 
-    const request: CreateChequeRequest = {
-      accountNumber: this.userAccountNumber,
-      numberOfLeaves: this.CHEQUE_BOOK_SIZE,
-      amount: this.chequeAmount > 0 ? this.chequeAmount : undefined
+    const request: SavingsChequeDrawRequest = {
+      serialNumber: this.serialNumber.trim(),
+      chequeDate: this.chequeDate,
+      amount: this.amount!,
+      payeeName: this.payeeName.trim(),
+      remarks: this.remarks.trim() || undefined
     };
 
-    this.chequeService.createChequeLeaves(request).subscribe({
-      next: (response: any) => {
-        this.alertService.success('Cheque Book Created', `Successfully created a cheque book of ${response.count || this.CHEQUE_BOOK_SIZE} cheque leaves`);
-        this.creatingCheques = false;
-        this.numberOfLeaves = this.CHEQUE_BOOK_SIZE;
-        this.chequeAmount = 0;
-        this.loadCheques();
-        this.loadStatistics();
+    this.savingsChequeService.applyCheque(this.account.id, request).subscribe({
+      next: (response) => {
+        this.isSubmitting = false;
+        if (response.success) {
+          if (response.positivePayRequired) {
+            sessionStorage.setItem('positivePayDraft', JSON.stringify({ accountNumber: this.account?.accountNumber, accountType: 'Savings', chequeNumber: response.chequeNumber, amount: this.amount, payeeName: this.payeeName.trim() }));
+            this.router.navigate(['/website/accounts', this.account?.accountNumber, 'positive-pay']);
+            return;
+          }
+          this.successMessage = `Cheque request submitted successfully! Cheque Number: ${response.chequeNumber}. Waiting for admin approval.`;
+          setTimeout(() => {
+            this.resetForm();
+            this.loadChequeHistory();
+            this.loadAvailableLeaves();
+            this.activeTab = 'history';
+          }, 1500);
+        } else {
+          this.errorMessage = response.message || 'Failed to submit cheque request';
+        }
       },
-      error: (err: any) => {
-        console.error('Error creating cheque leaves:', err);
-        this.createError = err.error?.error || 'Failed to create cheque leaves. Please try again.';
-        this.creatingCheques = false;
-        this.alertService.error('Creation Failed', this.createError);
+      error: (err) => {
+        this.isSubmitting = false;
+        this.errorMessage = err.error?.message || 'Failed to submit cheque request. Please try again.';
       }
     });
   }
 
-  downloadCheque(cheque: ChequeModel) {
-    if (!cheque.id) return;
+  resetForm() {
+    this.serialNumber = '';
+    this.chequeDate = this.getTodayDate();
+    this.amount = null;
+    this.payeeName = '';
+    this.remarks = '';
+    this.errorMessage = '';
+    this.successMessage = '';
+    this.formValid = false;
+  }
 
-    this.chequeService.downloadCheque(cheque.id).subscribe({
-      next: (blob: Blob) => {
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `cheque_${cheque.chequeNumber}.pdf`;
-        link.click();
-        window.URL.revokeObjectURL(url);
-        this.alertService.success('Download Successful', 'Cheque downloaded successfully');
+  onFormChange() {
+    this.formValid = this.serialNumber.trim() !== '' &&
+                     this.chequeDate !== '' &&
+                     this.amount !== null &&
+                     this.amount > 0 &&
+                     this.amount <= this.availableBalance &&
+                     this.payeeName.trim() !== '';
+  }
+
+  switchTab(tab: 'form' | 'history') {
+    this.activeTab = tab;
+    if (tab === 'history') {
+      this.loadChequeHistory();
+    }
+  }
+
+  cancelCheque(chequeId: number) {
+    if (!confirm('Are you sure you want to cancel this cheque request?')) return;
+
+    this.savingsChequeService.cancelCheque(chequeId, 'Cancelled by user').subscribe({
+      next: (response) => {
+        if (response.success) {
+          this.successMessage = 'Cheque request cancelled';
+          this.loadChequeHistory();
+          this.loadAvailableLeaves();
+        } else {
+          this.errorMessage = response.message || 'Failed to cancel cheque request';
+        }
       },
-      error: (err: any) => {
-        console.error('Error downloading cheque:', err);
-        this.alertService.error('Download Failed', 'Failed to download cheque. Please try again.');
+      error: () => {
+        this.errorMessage = 'Failed to cancel cheque request';
       }
     });
   }
 
-  viewCheque(cheque: ChequeModel) {
-    if (!cheque.id) return;
-
-    this.chequeService.viewCheque(cheque.id).subscribe({
-      next: (blob: Blob) => {
-        const url = window.URL.createObjectURL(blob);
-        window.open(url, '_blank');
-        this.alertService.success('View Successful', 'Cheque opened in new tab');
-      },
-      error: (err: any) => {
-        console.error('Error viewing cheque:', err);
-        this.alertService.error('View Failed', 'Failed to view cheque. Please try again.');
-      }
-    });
+  /**
+   * Start editing a pending cheque
+   */
+  startEditCheque(cheque: SavingsChequeHistoryEntry) {
+    this.editingChequeId = cheque.id;
+    this.editPayeeName = cheque.payeeName;
+    this.editAmount = cheque.amount;
   }
 
-  openCancelModal(cheque: ChequeModel) {
-    if (cheque.status !== 'ACTIVE') {
-      this.alertService.error('Cancellation Error', 'Only active cheques can be cancelled');
+  /**
+   * Cancel editing
+   */
+  cancelEditCheque() {
+    this.editingChequeId = null;
+    this.editPayeeName = '';
+    this.editAmount = null;
+  }
+
+  /**
+   * Save edited cheque details
+   */
+  saveEditCheque() {
+    if (!this.editingChequeId) return;
+    if (!this.editPayeeName || this.editPayeeName.trim() === '') {
+      this.errorMessage = 'Payee name is required';
+      return;
+    }
+    if (!this.editAmount || this.editAmount <= 0) {
+      this.errorMessage = 'Amount must be greater than 0';
+      return;
+    }
+    if (this.editAmount > this.availableBalance) {
+      this.errorMessage = 'Amount cannot exceed available balance';
       return;
     }
 
-    this.selectedCheque = cheque;
-    this.cancelReason = '';
+    this.isEditing = true;
+    this.savingsChequeService.editPendingCheque(this.editingChequeId, this.editPayeeName.trim(), this.editAmount).subscribe({
+      next: (response) => {
+        this.isEditing = false;
+        if (response.success) {
+          this.successMessage = 'Cheque details updated successfully';
+          this.editingChequeId = null;
+          this.editPayeeName = '';
+          this.editAmount = null;
+          this.loadChequeHistory();
+        } else {
+          this.errorMessage = response.message || 'Failed to update cheque';
+        }
+      },
+      error: (err) => {
+        this.isEditing = false;
+        this.errorMessage = err.error?.message || 'Failed to update cheque details';
+      }
+    });
   }
 
-  closeCancelModal() {
-    this.selectedCheque = null;
-    this.cancelReason = '';
-  }
+  downloadCheque(cheque: SavingsChequeHistoryEntry) {
+    const accountNumber = this.account?.accountNumber || '';
+    const accountHolder = this.account?.ownerName || this.account?.businessName || '';
+    const businessName = this.account?.businessName || '';
+    const ifscCode = 'NEOB0001234';
+    const micrCode = '110002' + String(cheque.id).padStart(6, '0');
+    const chequeDate = new Date(cheque.chequeDate);
+    const formattedDate = `${String(chequeDate.getDate()).padStart(2, '0')}-${String(chequeDate.getMonth() + 1).padStart(2, '0')}-${chequeDate.getFullYear()}`;
+    const amountInWords = this.convertAmountToWords(cheque.amount);
 
-  cancelCheque() {
-    if (!this.selectedCheque || !this.selectedCheque.id) return;
+    const chequeHTML = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>NeoBank Savings Cheque - ${cheque.chequeNumber}</title>
+        <style>
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          @page { size: 8.5in 3.75in landscape; margin: 0; }
+          body {
+            font-family: 'Courier New', monospace;
+            background: #f5f5f5;
+            display: flex; justify-content: center; align-items: center;
+            min-height: 100vh; padding: 20px;
+          }
+          .cheque-container {
+            width: 8in; height: 3.5in;
+            background: linear-gradient(180deg, #f0fdf4 0%, #ecfdf5 40%, #d1fae5 100%);
+            border: 2px solid #065f46;
+            border-radius: 8px;
+            position: relative;
+            padding: 15px 25px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            overflow: hidden;
+          }
+          .cheque-container::before {
+            content: '';
+            position: absolute; top: 0; left: 0; right: 0;
+            height: 6px;
+            background: linear-gradient(90deg, #065f46 0%, #047857 50%, #065f46 100%);
+          }
+          .cheque-watermark {
+            position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -50%) rotate(-30deg);
+            font-size: 70px; font-weight: bold;
+            color: rgba(6, 95, 70, 0.04);
+            letter-spacing: 10px;
+            white-space: nowrap;
+            pointer-events: none;
+          }
+          .cheque-top {
+            display: flex; justify-content: space-between; align-items: flex-start;
+            margin-bottom: 12px; position: relative; z-index: 1;
+          }
+          .bank-info { display: flex; align-items: center; gap: 10px; }
+          .bank-logo {
+            width: 42px; height: 42px; background: linear-gradient(135deg, #065f46, #047857);
+            border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            color: white; font-weight: bold; font-size: 14px; font-family: Arial;
+          }
+          .bank-name { font-size: 20px; font-weight: bold; color: #065f46; font-family: 'Georgia', serif; letter-spacing: 2px; }
+          .bank-branch { font-size: 9px; color: #555; margin-top: 2px; }
+          .business-label { font-size: 8px; color: #047857; font-weight: bold; letter-spacing: 2px; margin-top: 2px; }
+          .cheque-number-top { text-align: right; }
+          .cheque-number-top .label { font-size: 8px; color: #888; }
+          .cheque-number-top .number { font-size: 14px; font-weight: bold; color: #065f46; letter-spacing: 2px; }
+          .cheque-type {
+            position: absolute; top: 15px; right: 25px;
+            font-size: 11px; font-weight: bold; color: #065f46;
+            border: 1.5px solid #065f46; padding: 2px 12px;
+            border-radius: 3px; letter-spacing: 3px; margin-top: 40px;
+          }
+          .date-section {
+            text-align: right; margin-bottom: 8px; position: relative; z-index: 1;
+          }
+          .date-label { font-size: 9px; color: #666; }
+          .date-boxes { display: inline-flex; gap: 3px; margin-left: 5px; }
+          .date-box {
+            width: 22px; height: 24px;
+            border: 1px solid #999; text-align: center;
+            font-size: 14px; font-weight: bold; color: #065f46;
+            line-height: 24px; background: rgba(255,255,255,0.5);
+          }
+          .date-separator { line-height: 24px; color: #666; font-weight: bold; }
+          .pay-section { margin-bottom: 6px; position: relative; z-index: 1; }
+          .pay-line {
+            display: flex; align-items: baseline; gap: 8px;
+            border-bottom: 1.5px solid #333; padding-bottom: 3px;
+          }
+          .pay-label { font-size: 10px; color: #666; white-space: nowrap; }
+          .pay-value { font-size: 15px; font-weight: bold; color: #065f46; flex: 1; text-transform: uppercase; }
+          .bearer-text { font-size: 10px; color: #555; font-weight: bold; letter-spacing: 1px; }
+          .amount-words-section { margin-bottom: 8px; position: relative; z-index: 1; }
+          .amount-words-line {
+            display: flex; align-items: baseline; gap: 8px;
+            border-bottom: 1.5px solid #333; padding-bottom: 3px;
+            min-height: 22px;
+          }
+          .amount-words-label { font-size: 10px; color: #666; white-space: nowrap; }
+          .amount-words-value { font-size: 12px; color: #065f46; flex: 1; text-transform: uppercase; font-weight: bold; }
+          .amount-box-section {
+            position: absolute; right: 25px; top: 140px;
+            z-index: 1;
+          }
+          .amount-box {
+            border: 2px solid #065f46; padding: 5px 15px;
+            background: rgba(255,255,255,0.7); border-radius: 4px;
+            display: flex; align-items: center; gap: 5px;
+          }
+          .rupee-symbol { font-size: 18px; font-weight: bold; color: #065f46; }
+          .amount-value { font-size: 20px; font-weight: bold; color: #065f46; letter-spacing: 1px; }
+          .bottom-section {
+            display: flex; justify-content: space-between; align-items: flex-end;
+            margin-top: auto; position: absolute;
+            bottom: 30px; left: 25px; right: 25px; z-index: 1;
+          }
+          .account-info { font-size: 9px; color: #666; }
+          .account-info .acc-label { color: #888; }
+          .account-info .acc-value { color: #065f46; font-weight: bold; letter-spacing: 1px; }
+          .signature-section { text-align: center; }
+          .signature-line {
+            width: 160px; border-bottom: 1.5px solid #333;
+            margin-bottom: 4px; height: 35px;
+            display: flex; align-items: flex-end; justify-content: center;
+            font-size: 13px; color: #065f46; font-style: italic; padding-bottom: 3px;
+          }
+          .signature-label { font-size: 8px; color: #888; }
+          .micr-line {
+            position: absolute; bottom: 8px; left: 25px; right: 25px;
+            font-family: 'MICR', 'Courier New', monospace;
+            font-size: 12px; letter-spacing: 4px; color: #333;
+            border-top: 1px dashed #ccc; padding-top: 4px;
+          }
+          .print-btn {
+            display: block; margin: 20px auto; padding: 12px 40px;
+            background: linear-gradient(135deg, #065f46, #047857); color: white;
+            border: none; border-radius: 8px; font-size: 16px;
+            cursor: pointer; font-weight: bold; letter-spacing: 1px;
+          }
+          .print-btn:hover { opacity: 0.9; }
+          @media print {
+            body { background: white; padding: 0; min-height: auto; }
+            .print-btn { display: none; }
+            .cheque-container { box-shadow: none; border-radius: 0; }
+          }
+        </style>
+      </head>
+      <body>
+        <div>
+          <div class="cheque-container">
+            <div class="cheque-watermark">NEOBANK BUSINESS</div>
+            <div class="cheque-top">
+              <div class="bank-info">
+                <div class="bank-logo">NB</div>
+                <div>
+                  <div class="bank-name">NEOBANK</div>
+                  <div class="bank-branch">Business Banking Division &bull; IFSC: ${ifscCode}</div>
+                  <div class="business-label">CURRENT ACCOUNT</div>
+                </div>
+              </div>
+              <div class="cheque-number-top">
+                <div class="label">CHEQUE NO.</div>
+                <div class="number">${cheque.chequeNumber}</div>
+              </div>
+            </div>
+            <div class="cheque-type">BEARER</div>
+            <div class="date-section">
+              <span class="date-label">Date:</span>
+              <span class="date-boxes">
+                ${formattedDate.split('').map((c: string) => c === '-' ? '<span class="date-separator">/</span>' : `<span class="date-box">${c}</span>`).join('')}
+              </span>
+            </div>
+            <div class="pay-section">
+              <div class="pay-line">
+                <span class="pay-label">Pay</span>
+                <span class="pay-value">${cheque.payeeName}</span>
+                <span class="bearer-text">OR BEARER</span>
+              </div>
+            </div>
+            <div class="amount-words-section">
+              <div class="amount-words-line">
+                <span class="amount-words-label">Rupees</span>
+                <span class="amount-words-value">${amountInWords} Only</span>
+              </div>
+            </div>
+            <div class="amount-box-section">
+              <div class="amount-box">
+                <span class="rupee-symbol">&#8377;</span>
+                <span class="amount-value">${cheque.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+              </div>
+            </div>
+            <div class="bottom-section">
+              <div class="account-info">
+                <div><span class="acc-label">A/C No: </span><span class="acc-value">${accountNumber}</span></div>
+                <div><span class="acc-label">Business: </span><span class="acc-value">${businessName}</span></div>
+                <div><span class="acc-label">IFSC: </span><span class="acc-value">${ifscCode}</span></div>
+              </div>
+              <div class="signature-section">
+                <div class="signature-line">${accountHolder}</div>
+                <div class="signature-label">Authorised Signatory</div>
+              </div>
+            </div>
+            <div class="micr-line">
+              &#9286;${micrCode}&#9286; &nbsp; &#9288;${accountNumber}&#9288; &nbsp; &#9287;${cheque.chequeNumber.replace('BCHQ', '')}&#9287;
+            </div>
+          </div>
+          <button class="print-btn" onclick="window.print()">Print / Save as PDF</button>
+        </div>
+      </body>
+      </html>
+    `;
 
-    if (!this.cancelReason || this.cancelReason.trim().length === 0) {
-      this.alertService.error('Validation Error', 'Please provide a cancellation reason');
-      return;
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(chequeHTML);
+      printWindow.document.close();
     }
 
-    this.cancelling = true;
+    this.savingsChequeService.markChequeDownloaded(cheque.id).subscribe({
+      next: () => {
+        cheque.chequeDownloaded = true;
+        this.loadChequeHistory();
+      },
+      error: () => {}
+    });
+  }
 
-    const request: CancelChequeRequest = {
-      cancelledBy: this.userName,
-      reason: this.cancelReason
+  convertAmountToWords(amount: number): string {
+    const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine',
+      'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen',
+      'Seventeen', 'Eighteen', 'Nineteen'];
+    const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+
+    if (amount === 0) return 'Zero';
+
+    const crore = Math.floor(amount / 10000000);
+    const lakh = Math.floor((amount % 10000000) / 100000);
+    const thousand = Math.floor((amount % 100000) / 1000);
+    const hundred = Math.floor((amount % 1000) / 100);
+    const remainder = Math.floor(amount % 100);
+
+    const twoDigitWords = (n: number): string => {
+      if (n < 20) return ones[n];
+      return tens[Math.floor(n / 10)] + (n % 10 ? ' ' + ones[n % 10] : '');
     };
 
-    this.chequeService.cancelCheque(this.selectedCheque.id, request).subscribe({
-      next: (response: any) => {
-        this.alertService.success('Cheque Cancelled', 'Cheque cancelled successfully');
-        this.cancelling = false;
-        this.closeCancelModal();
-        this.loadCheques();
-        this.loadStatistics();
-      },
-      error: (err: any) => {
-        console.error('Error cancelling cheque:', err);
-        this.cancelling = false;
-        this.alertService.error('Cancellation Failed', err.error?.error || 'Failed to cancel cheque. Please try again.');
-      }
-    });
+    let words = '';
+    if (crore) words += twoDigitWords(crore) + ' Crore ';
+    if (lakh) words += twoDigitWords(lakh) + ' Lakh ';
+    if (thousand) words += twoDigitWords(thousand) + ' Thousand ';
+    if (hundred) words += ones[hundred] + ' Hundred ';
+    if (remainder) words += (words ? 'and ' : '') + twoDigitWords(remainder);
+
+    const paise = Math.round((amount % 1) * 100);
+    let result = 'Rupees ' + words.trim();
+    if (paise > 0) result += ' and ' + twoDigitWords(paise) + ' Paise';
+
+    return result;
   }
 
-  filterCheques(status: string) {
-    this.filterStatus = status;
-    this.currentPage = 0;
-    this.loadCheques();
+  getStatusColor(status: SavingsChequeStatus): string {
+    return this.statusColors[status] || '#6b7280';
   }
 
-  getFilteredCheques(): ChequeModel[] {
-    if (this.filterStatus === 'ALL') {
-      return this.cheques;
-    } else if (this.filterStatus === 'ACTIVE') {
-      return this.activeCheques;
-    } else if (this.filterStatus === 'USED') {
-      return this.usedCheques;
-    } else {
-      return this.cancelledCheques;
-    }
-  }
-
-  goToPage(page: number) {
-    if (page >= 0 && page < this.totalPages) {
-      this.currentPage = page;
-      this.loadCheques();
-    }
-  }
-
-  formatDate(dateString: string | undefined): string {
-    if (!dateString) return 'N/A';
-    try {
-      const date = new Date(dateString);
-      return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
-    } catch (e) {
-      return 'N/A';
-    }
-  }
-
-  requestChequeDraw(cheque: ChequeModel) {
-    if (!cheque.id) return;
-
-    if (cheque.status !== 'ACTIVE') {
-      this.alertService.error('Invalid Status', 'Only active cheques can be requested for drawing');
-      return;
-    }
-
-    if (!cheque.amount || cheque.amount <= 0) {
-      this.alertService.error('Invalid Amount', 'Please set an amount for the cheque before requesting');
-      return;
-    }
-
-    if (cheque.requestStatus === 'PENDING') {
-      this.alertService.error('Already Requested', 'This cheque is already pending approval');
-      return;
-    }
-
-    if (cheque.requestStatus === 'APPROVED') {
-      this.alertService.error('Already Approved', 'This cheque request has already been approved');
-      return;
-    }
-
-    this.requesting = true;
-
-    const request: RequestChequeDraw = {
-      requestedBy: this.userName,
-      payeeName: this.drawPayeeName.trim() || undefined
+  getStatusText(status: SavingsChequeStatus): string {
+    const statusMap: { [key in SavingsChequeStatus]: string } = {
+      'AWAITING_POSITIVE_PAY': 'Awaiting Positive Pay',
+      'PENDING': 'Awaiting Approval',
+      'APPROVED': 'Approved',
+      'COMPLETED': 'Processed',
+      'REJECTED': 'Rejected',
+      'CANCELLED': 'Cancelled',
+      'CLEARED': 'Cleared'
     };
+    return statusMap[status] || status;
+  }
 
-    this.chequeService.requestChequeDraw(cheque.id, request).subscribe({
-      next: (response: any) => {
-        this.alertService.success('Request Submitted', response.message || 'Cheque draw request submitted successfully. Waiting for admin approval.');
-        this.requesting = false;
-        this.loadCheques();
-        this.loadStatistics();
-        this.loadCurrentBalance(); // Refresh balance
-      },
-      error: (err: any) => {
-        console.error('Error requesting cheque draw:', err);
-        this.requesting = false;
-        this.alertService.error('Request Failed', err.error?.error || 'Failed to submit cheque draw request. Please try again.');
-      }
+  formatDate(dateString: string): string {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-IN', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
     });
   }
 
-  canRequestCheque(cheque: ChequeModel): boolean {
-    return cheque.status === 'ACTIVE' 
-      && (cheque.requestStatus === 'NONE' || cheque.requestStatus === 'REJECTED' || !cheque.requestStatus)
-      && cheque.amount != null 
-      && cheque.amount > 0;
+  getTodayDate(): string {
+    const today = new Date();
+    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
   }
 
-  getRequestStatusClass(requestStatus: string | undefined): string {
-    if (!requestStatus) return '';
-    switch (requestStatus) {
-      case 'PENDING':
-        return 'request-pending';
-      case 'APPROVED':
-        return 'request-approved';
-      case 'REJECTED':
-        return 'request-rejected';
-      default:
-        return '';
-    }
+  getMaxDate(): string {
+    return this.getTodayDate();
   }
 
-  getStatusClass(status: string): string {
-    switch (status) {
-      case 'ACTIVE':
-        return 'status-active';
-      case 'USED':
-        return 'status-used';
-      case 'DRAWN':
-        return 'status-drawn';
-      case 'BOUNCED':
-        return 'status-bounced';
-      case 'CANCELLED':
-        return 'status-cancelled';
-      default:
-        return '';
-    }
-  }
-
-  goBack() {
-    this.router.navigate(['/website/userdashboard']);
+  formatAmount(amount: number): string {
+    return amount.toLocaleString('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
   }
 }
-
