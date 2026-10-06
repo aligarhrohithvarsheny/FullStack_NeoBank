@@ -122,18 +122,31 @@ export class TimeTrackingService {
   /**
    * Create or update time management policy
    */
-  saveTimePolicy(policy: TimeManagementPolicy): Observable<TimeManagementPolicy> {
+  saveTimePolicy(policy: TimeManagementPolicy): Observable<any> {
+    const payload: any = {
+      adminId: policy.adminId || 'ALL',
+      policyName: policy.policyName,
+      workingHoursPerDay: Number(policy.workingHoursPerDay),
+      checkInTime: (policy.checkInTime || '').substring(0, 5),
+      checkOutTime: (policy.checkOutTime || '').substring(0, 5),
+      gracePeriodMinutes: Number(policy.gracePeriodMinutes ?? 0),
+      maxWorkingHours: Number(policy.maxWorkingHours),
+      overtimeMultiplier: Number(policy.overtimeMultiplier ?? 1),
+      isActive: policy.isActive !== false
+    };
     if (policy.id) {
-      return this.http.put<TimeManagementPolicy>(
-        `${this.apiUrl}/policy/${policy.id}`,
-        policy
-      );
+      return this.http.put<any>(`${this.apiUrl}/policy/${policy.id}`, payload);
     }
-    return this.http.post<TimeManagementPolicy>(
-      `${this.apiUrl}/policy`,
-      policy
-    );
+    return this.http.post<any>(`${this.apiUrl}/policy`, payload);
   }
+
+  /**
+   * Live login/logout timings for admins, HODs and managers
+   */
+  getStaffLive(): Observable<any> {
+    return this.http.get<any>(`${this.apiUrl}/staff-live`);
+  }
+
 
   /**
    * Get admin's time management policy

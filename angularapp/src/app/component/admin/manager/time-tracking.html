@@ -145,6 +145,65 @@
     <!-- EMPLOYEE HOURS TAB -->
     <div class="tab-pane" *ngIf="activeTab === 'employees'">
       <div class="section-header">
+        <h3>Live Staff Login Tracking (Admins, HODs &amp; Managers)</h3>
+        <div class="search-filters">
+          <input type="text" placeholder="Search name, email, employee ID..." [(ngModel)]="staffSearch" class="search-input">
+          <select [(ngModel)]="staffRoleFilter" class="filter-select">
+            <option value="ALL">All Roles</option>
+            <option value="ADMIN">Admins</option>
+            <option value="HOD">HODs</option>
+            <option value="MANAGER">Managers</option>
+          </select>
+        </div>
+      </div>
+      <div class="table-responsive">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Employee ID</th>
+              <th>Name</th>
+              <th>Role</th>
+              <th>NeoBank Link</th>
+              <th>Live Status</th>
+              <th>First Login Today</th>
+              <th>Last Login</th>
+              <th>Last Logout</th>
+              <th>Today (live)</th>
+              <th>This Week</th>
+              <th>This Month</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let s of filteredStaffLive" class="table-row">
+              <td>{{ s.employeeId || '-' }}</td>
+              <td class="emp-name">{{ s.name }}<br><small>{{ s.email }}</small></td>
+              <td>{{ s.role }}</td>
+              <td>
+                <span class="status-badge" [ngClass]="s.verified ? 'badge-success' : (s.neoBankLinked ? 'badge-warning' : 'badge-secondary')">
+                  {{ s.verified ? 'Verified' : (s.neoBankLinked ? 'Linked (profile pending)' : 'Not linked') }}
+                </span>
+                <br><small>{{ s.idCardNumber || '' }}</small>
+              </td>
+              <td>
+                <span class="status-badge" [ngClass]="s.online ? 'badge-success' : 'badge-secondary'">
+                  {{ s.online ? 'Online' : 'Offline' }}
+                </span>
+              </td>
+              <td>{{ formatDateTime(s.firstLoginToday) }}</td>
+              <td>{{ formatDateTime(s.lastLogin) }}</td>
+              <td>{{ s.online ? '-' : formatDateTime(s.lastLogout) }}</td>
+              <td class="highlight">{{ formatSeconds(liveTodaySeconds(s)) }}</td>
+              <td>{{ formatSeconds(s.weekSeconds) }}</td>
+              <td>{{ formatSeconds(s.monthSeconds) }}</td>
+            </tr>
+            <tr *ngIf="!staffLoading && filteredStaffLive.length === 0">
+              <td colspan="11" style="text-align:center">No staff found.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="section-header" style="margin-top:24px">
         <h3>Employee Working Hours</h3>
         <div class="search-filters">
           <input 

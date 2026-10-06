@@ -37,6 +37,8 @@ import { of } from 'rxjs';
 // import { AccountService } from '../../service/account';
 // import { TransactionService } from '../../service/transaction';
 
+type SidebarCategory = 'savings' | 'cards' | 'transfer' | 'withdrawal' | 'deposits' | 'loans' | 'government' | 'emi' | 'investments' | 'bills' | 'fx' | 'family' | 'fasttag' | 'upi' | 'other';
+
 @Component({
   selector: 'app-userdashboard',
   standalone: true,
@@ -74,6 +76,7 @@ export class Userdashboard implements OnInit, OnDestroy {
   username: string = 'User'; // default
   selectedFeature: string | null = null;
   isSidebarOpen = false;
+  expandedSidebarCategory: SidebarCategory | null = null;
   currentBalance: number = 0;
   userAccountNumber: string = '';
   loading: boolean = false;
@@ -619,6 +622,10 @@ export class Userdashboard implements OnInit, OnDestroy {
   
   toggleSidebar() {
     this.isSidebarOpen = !this.isSidebarOpen;
+  }
+
+  toggleSidebarCategory(category: SidebarCategory) {
+    this.expandedSidebarCategory = this.expandedSidebarCategory === category ? null : category;
   }
 
   selectFeature(feature: string | null) {

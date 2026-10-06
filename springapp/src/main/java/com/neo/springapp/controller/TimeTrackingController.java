@@ -361,6 +361,88 @@ public class TimeTrackingController {
         }
     }
 
+    // ==================== STAFF LIVE LOGIN TRACKING ====================
+
+    @Autowired
+    private com.neo.springapp.repository.AdminRepository adminRepository;
+
+    @Autowired
+    private com.neo.springapp.repository.SessionHistoryRepository sessionHistoryRepository;
+
+    /**
+     * Live login/logout timings and worked hours for all admins, HODs and managers,
+     * keyed by employee ID and linked to the NeoBank ID card.
+     */
+    @GetMapping("/staff-live")
+    public ResponseEntity<Map<String, Object>> getStaffLive() {
+        try {
+            LocalDateTime now = LocalDateTime.now();
+            LocalDateTime todayStart = now.toLocalDate().atStartOfDay();
+            LocalDateTime weekStart = todayStart.minusDays(6);
+            LocalDateTime monthStart = now.toLocalDate().withDayOfMonth(1).atStartOfDay();
+
+            Map<String, List<com.neo.springapp.model.SessionHistory>> byEmail = new HashMap<>();
+            for (com.neo.springapp.model.SessionHistory s : sessionHistoryRepository.findAllByOrderByLoginTimeDesc()) {
+                if (s.getEmail() == null || s.getLoginTime() == null) continue;
+                String type = s.getUserType() == null ? "" : s.getUserType().toUpperCase();
+                if ("USER".equals(type)) continue;
+                byEmail.computeIfAbsent(s.getEmail().toLowerCase(), k -> new ArrayList<>()).add(s);
+            }
+
+            List<Map<String, Object>> result = new ArrayList<>();
+            for (com.neo.springapp.model.Admin a : adminRepository.findAll()) {
+                List<com.neo.springapp.model.SessionHistory> sessions =
+                    byEmail.getOrDefault(a.getEmail() == null ? "" : a.getEmail().toLowerCase(), List.of());
+
+                long todaySec = 0, weekSec = 0, monthSec = 0;
+                com.neo.springapp.model.SessionHistory latest = sessions.isEmpty() ? null : sessions.get(0);
+                com.neo.springapp.model.SessionHistory firstToday = null;
+                for (com.neo.springapp.model.SessionHistory s : sessions) {
+                    boolean active = s.getLogoutTime() == null && "ACTIVE".equalsIgnoreCase(s.getStatus());
+                    LocalDateTime end = s.getLogoutTime() != null ? s.getLogoutTime() : (active ? now : s.getLoginTime());
+                    long sec = Math.max(0, java.time.Duration.between(s.getLoginTime(), end).getSeconds());
+                    if (!s.getLoginTime().isBefore(todayStart)) { todaySec += sec; firstToday = s; }
+                    if (!s.getLoginTime().isBefore(weekStart)) weekSec += sec;
+                    if (!s.getLoginTime().isBefore(monthStart)) monthSec += sec;
+                }
+
+                boolean online = latest != null && latest.getLogoutTime() == null
+                    && "ACTIVE".equalsIgnoreCase(latest.getStatus());
+
+                Map<String, Object> m = new LinkedHashMap<>();
+                m.put("id", a.getId());
+                m.put("employeeId", a.getEmployeeId());
+                m.put("name", a.getName());
+                m.put("email", a.getEmail());
+                m.put("role", a.getRole());
+                m.put("idCardNumber", a.getIdCardNumber());
+                m.put("designation", a.getIdCardDesignation());
+                m.put("department", a.getIdCardDepartment());
+                m.put("neoBankLinked", a.getIdCardNumber() != null && !a.getIdCardNumber().isBlank());
+                m.put("verified", a.getIdCardNumber() != null && !a.getIdCardNumber().isBlank()
+                    && Boolean.TRUE.equals(a.getProfileComplete()));
+                m.put("online", online);
+                m.put("firstLoginToday", firstToday == null ? null : firstToday.getLoginTime().toString());
+                m.put("lastLogin", latest == null ? null : latest.getLoginTime().toString());
+                m.put("lastLogout", latest == null || latest.getLogoutTime() == null ? null : latest.getLogoutTime().toString());
+                m.put("todaySeconds", todaySec);
+                m.put("weekSeconds", weekSec);
+                m.put("monthSeconds", monthSec);
+                result.add(m);
+            }
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("serverTime", now.toString());
+            response.put("content", result);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("Error fetching staff live status", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(Map.of("success", false, "message", String.valueOf(e.getMessage())));
+        }
+    }
+
     // ==================== TIME MANAGEMENT POLICIES ====================
 
     /**
@@ -371,7 +453,7 @@ public class TimeTrackingController {
         try {
             if (!policyService.validatePolicy(policy)) {
                 return ResponseEntity.badRequest()
-                    .body(Map.of("success", false, "message", "Invalid policy settings"));
+                    .body(Map.of("success", false, "message", "Invalid policy settings: check name, hours, check-in before check-out, and max hours >= working hours"));
             }
             
             TimeManagementPolicy created = policyService.createPolicy(policy);

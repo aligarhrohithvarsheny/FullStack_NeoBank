@@ -95,87 +95,181 @@
         </div>
         <span>Accounts &amp;<br>Services</span>
       </div>
-      <div class="cb-strip-item" [class.active]="selectedFeature === 'transferfunds'" (click)="selectFeature('transferfunds')">
+      <div class="cb-strip-group">
+        <button type="button" class="cb-strip-item cb-strip-parent"
+          [class.active]="['accounts', 'transaction', 'cheque', 'positive-pay'].includes(selectedFeature || '')"
+          [attr.aria-expanded]="expandedSidebarCategory === 'savings'"
+          aria-controls="savings-account-submenu"
+          (click)="toggleSidebarCategory('savings')">
+          <div class="cb-strip-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 10h18M5 10V6l7-3 7 3v4"/><path d="M5 10v10m4-10v10m6-10v10m4-10v10M3 21h18"/></svg>
+          </div>
+          <span class="cb-strip-label">Savings Account</span>
+          <span class="cb-strip-chevron" [class.expanded]="expandedSidebarCategory === 'savings'" aria-hidden="true">›</span>
+        </button>
+        <div id="savings-account-submenu" class="cb-strip-submenu" *ngIf="expandedSidebarCategory === 'savings'">
+          <button type="button" class="cb-strip-subitem" [class.active]="selectedFeature === 'accounts'" (click)="selectFeature('accounts')">Account Overview</button>
+          <button type="button" class="cb-strip-subitem" [class.active]="selectedFeature === 'transaction'" (click)="selectFeature('transaction')">Transactions</button>
+          <button type="button" class="cb-strip-subitem" [class.active]="selectedFeature === 'cheque'" (click)="selectFeature('cheque')">Cheque Management</button>
+          <button type="button" class="cb-strip-subitem" [class.active]="selectedFeature === 'positive-pay'" (click)="selectFeature('positive-pay')">Positive Pay</button>
+        </div>
+      </div>
+      <div class="cb-strip-item" [class.active]="['transferfunds', 'scheduled-payments', 'demand-draft'].includes(selectedFeature || '')" role="button" tabindex="0" [attr.aria-expanded]="expandedSidebarCategory === 'transfer'" (click)="toggleSidebarCategory('transfer')" (keydown.enter)="toggleSidebarCategory('transfer')" (keydown.space)="toggleSidebarCategory('transfer')">
         <div class="cb-strip-icon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
         </div>
         <span>Pay &amp;<br>Transfer</span>
+        <span class="cb-strip-chevron" [class.expanded]="expandedSidebarCategory === 'transfer'" aria-hidden="true">›</span>
       </div>
-      <div class="cb-strip-item" [class.active]="selectedFeature === 'atm-simulator'" (click)="selectFeature('atm-simulator')">
+      <div class="cb-strip-submenu" *ngIf="expandedSidebarCategory === 'transfer'">
+        <button type="button" class="cb-strip-subitem" [class.active]="selectedFeature === 'transferfunds'" (click)="selectFeature('transferfunds')">Transfer Funds</button>
+        <button type="button" class="cb-strip-subitem" [class.active]="selectedFeature === 'scheduled-payments'" (click)="selectFeature('scheduled-payments')">Scheduled Payments</button>
+        <button type="button" class="cb-strip-subitem" [class.active]="selectedFeature === 'demand-draft'" (click)="selectFeature('demand-draft')">Demand Draft</button>
+      </div>
+      <div class="cb-strip-item" [class.active]="selectedFeature === 'atm-simulator'" role="button" tabindex="0" [attr.aria-expanded]="expandedSidebarCategory === 'withdrawal'" (click)="toggleSidebarCategory('withdrawal')" (keydown.enter)="toggleSidebarCategory('withdrawal')" (keydown.space)="toggleSidebarCategory('withdrawal')">
         <div class="cb-strip-icon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="3" width="20" height="18" rx="3"/><rect x="5" y="6" width="14" height="8" rx="1"/><circle cx="8" cy="18" r="1"/><circle cx="12" cy="18" r="1"/><circle cx="16" cy="18" r="1"/></svg>
         </div>
         <span>Withdraw<br>Money</span>
+        <span class="cb-strip-chevron" [class.expanded]="expandedSidebarCategory === 'withdrawal'" aria-hidden="true">›</span>
       </div>
-      <div class="cb-strip-item" [class.active]="selectedFeature === 'fixed-deposits' || selectedFeature === 'deposit-request'" (click)="selectFeature('fixed-deposits')">
+      <div class="cb-strip-submenu" *ngIf="expandedSidebarCategory === 'withdrawal'">
+        <button type="button" class="cb-strip-subitem" [class.active]="selectedFeature === 'atm-simulator'" (click)="selectFeature('atm-simulator')">ATM Withdrawal</button>
+      </div>
+      <div class="cb-strip-item" [class.active]="['fixed-deposits', 'deposit-request'].includes(selectedFeature || '')" role="button" tabindex="0" [attr.aria-expanded]="expandedSidebarCategory === 'deposits'" (click)="toggleSidebarCategory('deposits')" (keydown.enter)="toggleSidebarCategory('deposits')" (keydown.space)="toggleSidebarCategory('deposits')">
         <div class="cb-strip-icon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><rect x="2" y="7" width="20" height="5" rx="2"/><line x1="12" y1="12" x2="12" y2="17"/></svg>
         </div>
         <span>Deposits</span>
+        <span class="cb-strip-chevron" [class.expanded]="expandedSidebarCategory === 'deposits'" aria-hidden="true">›</span>
       </div>
-      <div class="cb-strip-item" [class.active]="selectedFeature === 'loan' || selectedFeature === 'goldloan'" (click)="selectFeature('loan')">
+      <div class="cb-strip-submenu" *ngIf="expandedSidebarCategory === 'deposits'">
+        <button type="button" class="cb-strip-subitem" [class.active]="selectedFeature === 'fixed-deposits'" (click)="selectFeature('fixed-deposits')">Fixed Deposits</button>
+        <button type="button" class="cb-strip-subitem" [class.active]="selectedFeature === 'deposit-request'" (click)="selectFeature('deposit-request')">Cash Deposit Slip</button>
+      </div>
+      <div class="cb-strip-item" [class.active]="['loan', 'goldloan', 'ml-loan-prediction'].includes(selectedFeature || '')" role="button" tabindex="0" [attr.aria-expanded]="expandedSidebarCategory === 'loans'" (click)="toggleSidebarCategory('loans')" (keydown.enter)="toggleSidebarCategory('loans')" (keydown.space)="toggleSidebarCategory('loans')">
         <div class="cb-strip-icon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
         </div>
         <span>Loans</span>
+        <span class="cb-strip-chevron" [class.expanded]="expandedSidebarCategory === 'loans'" aria-hidden="true">›</span>
       </div>
-      <div class="cb-strip-item" [class.active]="selectedFeature === 'card' || selectedFeature === 'credit-card' || selectedFeature === 'virtual-card'" (click)="selectFeature('card')">
-        <div class="cb-strip-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+      <div class="cb-strip-submenu" *ngIf="expandedSidebarCategory === 'loans'">
+        <button type="button" class="cb-strip-subitem" [class.active]="selectedFeature === 'loan'" (click)="selectFeature('loan')">Personal Loans</button>
+        <button type="button" class="cb-strip-subitem" [class.active]="selectedFeature === 'goldloan'" (click)="selectFeature('goldloan')">Gold Loans</button>
+        <button type="button" class="cb-strip-subitem" [class.active]="selectedFeature === 'ml-loan-prediction'" (click)="selectFeature('ml-loan-prediction')">Loan Eligibility</button>
+      </div>
+      <div class="cb-strip-group">
+        <button type="button" class="cb-strip-item cb-strip-parent"
+          [class.active]="['card', 'credit-card', 'credit-card-bill', 'virtual-card'].includes(selectedFeature || '')"
+          [attr.aria-expanded]="expandedSidebarCategory === 'cards'"
+          aria-controls="cards-submenu"
+          (click)="toggleSidebarCategory('cards')">
+          <div class="cb-strip-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+          </div>
+          <span class="cb-strip-label">Cards</span>
+          <span class="cb-strip-chevron" [class.expanded]="expandedSidebarCategory === 'cards'" aria-hidden="true">›</span>
+        </button>
+        <div id="cards-submenu" class="cb-strip-submenu" *ngIf="expandedSidebarCategory === 'cards'">
+          <button type="button" class="cb-strip-subitem" [class.active]="selectedFeature === 'card'" (click)="selectFeature('card')">Debit Card</button>
+          <button type="button" class="cb-strip-subitem" [class.active]="selectedFeature === 'credit-card'" (click)="selectFeature('credit-card')">Credit Card</button>
+          <button type="button" class="cb-strip-subitem" [class.active]="selectedFeature === 'credit-card-bill'" (click)="selectFeature('credit-card-bill')">Card Bill Pay</button>
+          <button type="button" class="cb-strip-subitem" [class.active]="selectedFeature === 'virtual-card'" (click)="selectFeature('virtual-card')">Virtual Card</button>
         </div>
-        <span>Cards</span>
       </div>
-      <div class="cb-strip-item" [class.active]="selectedFeature === 'subsidy-claim'" (click)="selectFeature('subsidy-claim')">
+      <div class="cb-strip-item" [class.active]="selectedFeature === 'subsidy-claim'" role="button" tabindex="0" [attr.aria-expanded]="expandedSidebarCategory === 'government'" (click)="toggleSidebarCategory('government')" (keydown.enter)="toggleSidebarCategory('government')" (keydown.space)="toggleSidebarCategory('government')">
         <div class="cb-strip-icon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
         </div>
         <span>Government<br>Schemes</span>
+        <span class="cb-strip-chevron" [class.expanded]="expandedSidebarCategory === 'government'" aria-hidden="true">›</span>
       </div>
-      <div class="cb-strip-item" [class.active]="selectedFeature === 'emi-monitoring'" (click)="selectFeature('emi-monitoring')">
+      <div class="cb-strip-submenu" *ngIf="expandedSidebarCategory === 'government'">
+        <button type="button" class="cb-strip-subitem" [class.active]="selectedFeature === 'subsidy-claim'" (click)="selectFeature('subsidy-claim')">Education Subsidy</button>
+      </div>
+      <div class="cb-strip-item" [class.active]="selectedFeature === 'emi-monitoring'" role="button" tabindex="0" [attr.aria-expanded]="expandedSidebarCategory === 'emi'" (click)="toggleSidebarCategory('emi')" (keydown.enter)="toggleSidebarCategory('emi')" (keydown.space)="toggleSidebarCategory('emi')">
         <div class="cb-strip-icon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>
         </div>
         <span>Tax Center</span>
+        <span class="cb-strip-chevron" [class.expanded]="expandedSidebarCategory === 'emi'" aria-hidden="true">›</span>
       </div>
-      <div class="cb-strip-item" [class.active]="selectedFeature === 'investments'" (click)="selectFeature('investments')">
+      <div class="cb-strip-submenu" *ngIf="expandedSidebarCategory === 'emi'">
+        <button type="button" class="cb-strip-subitem" [class.active]="selectedFeature === 'emi-monitoring'" (click)="selectFeature('emi-monitoring')">EMI Monitoring</button>
+      </div>
+      <div class="cb-strip-item" [class.active]="selectedFeature === 'investments'" role="button" tabindex="0" [attr.aria-expanded]="expandedSidebarCategory === 'investments'" (click)="toggleSidebarCategory('investments')" (keydown.enter)="toggleSidebarCategory('investments')" (keydown.space)="toggleSidebarCategory('investments')">
         <div class="cb-strip-icon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
         </div>
         <span>Invest &amp;<br>Insure</span>
+        <span class="cb-strip-chevron" [class.expanded]="expandedSidebarCategory === 'investments'" aria-hidden="true">›</span>
       </div>
-      <div class="cb-strip-item" [class.active]="selectedFeature === 'bill-payment'" (click)="selectFeature('bill-payment')">
+      <div class="cb-strip-submenu" *ngIf="expandedSidebarCategory === 'investments'">
+        <button type="button" class="cb-strip-subitem" [class.active]="selectedFeature === 'investments'" (click)="selectFeature('investments')">Investments</button>
+        <button type="button" class="cb-strip-subitem" (click)="goToInsurance()">Insurance</button>
+      </div>
+      <div class="cb-strip-item" [class.active]="selectedFeature === 'bill-payment'" role="button" tabindex="0" [attr.aria-expanded]="expandedSidebarCategory === 'bills'" (click)="toggleSidebarCategory('bills')" (keydown.enter)="toggleSidebarCategory('bills')" (keydown.space)="toggleSidebarCategory('bills')">
         <div class="cb-strip-icon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
         </div>
         <span>Bills &amp;<br>Utilities</span>
+        <span class="cb-strip-chevron" [class.expanded]="expandedSidebarCategory === 'bills'" aria-hidden="true">›</span>
       </div>
-      <div class="cb-strip-item" [class.active]="selectedFeature === 'beneficiary-management'" (click)="selectFeature('beneficiary-management')">
+      <div class="cb-strip-submenu" *ngIf="expandedSidebarCategory === 'bills'">
+        <button type="button" class="cb-strip-subitem" [class.active]="selectedFeature === 'bill-payment'" (click)="selectFeature('bill-payment')">Bill Payments</button>
+        <button type="button" class="cb-strip-subitem" [class.active]="selectedFeature === 'credit-card-bill'" (click)="selectFeature('credit-card-bill')">Card Bill Pay</button>
+      </div>
+      <div class="cb-strip-item" [class.active]="selectedFeature === 'beneficiary-management'" role="button" tabindex="0" [attr.aria-expanded]="expandedSidebarCategory === 'fx'" (click)="toggleSidebarCategory('fx')" (keydown.enter)="toggleSidebarCategory('fx')" (keydown.space)="toggleSidebarCategory('fx')">
         <div class="cb-strip-icon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2a10 10 0 1 0 10 10H12V2z"/></svg>
         </div>
         <span>FX 4 U</span>
+        <span class="cb-strip-chevron" [class.expanded]="expandedSidebarCategory === 'fx'" aria-hidden="true">›</span>
       </div>
-      <div class="cb-strip-item" [class.active]="selectedFeature === 'family-banking'" (click)="selectFeature('family-banking')">
+      <div class="cb-strip-submenu" *ngIf="expandedSidebarCategory === 'fx'">
+        <button type="button" class="cb-strip-subitem" [class.active]="selectedFeature === 'beneficiary-management'" (click)="selectFeature('beneficiary-management')">Beneficiary Management</button>
+      </div>
+      <div class="cb-strip-item" [class.active]="selectedFeature === 'family-banking'" role="button" tabindex="0" [attr.aria-expanded]="expandedSidebarCategory === 'family'" (click)="toggleSidebarCategory('family')" (keydown.enter)="toggleSidebarCategory('family')" (keydown.space)="toggleSidebarCategory('family')">
         <div class="cb-strip-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M3 20v-1a6 6 0 0 1 12 0v1M15 15a5 5 0 0 1 6 4v1"/></svg></div>
         <span>Family<br>Banking</span>
+        <span class="cb-strip-chevron" [class.expanded]="expandedSidebarCategory === 'family'" aria-hidden="true">›</span>
       </div>
-      <div class="cb-strip-item" [class.active]="selectedFeature === 'fasttag'" (click)="selectFeature('fasttag')">
+      <div class="cb-strip-submenu" *ngIf="expandedSidebarCategory === 'family'">
+        <button type="button" class="cb-strip-subitem" [class.active]="selectedFeature === 'family-banking'" (click)="selectFeature('family-banking')">Family Accounts</button>
+      </div>
+      <div class="cb-strip-item" [class.active]="selectedFeature === 'fasttag'" role="button" tabindex="0" [attr.aria-expanded]="expandedSidebarCategory === 'fasttag'" (click)="toggleSidebarCategory('fasttag')" (keydown.enter)="toggleSidebarCategory('fasttag')" (keydown.space)="toggleSidebarCategory('fasttag')">
         <div class="cb-strip-icon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 12h2"/><path d="M12 10v4"/><path d="M16 12h2"/><circle cx="12" cy="12" r="1"/></svg>
         </div>
         <span>FASTag</span>
+        <span class="cb-strip-chevron" [class.expanded]="expandedSidebarCategory === 'fasttag'" aria-hidden="true">›</span>
       </div>
-      <div class="cb-strip-item" [class.active]="selectedFeature === 'upi-pay'" (click)="selectFeature('upi-pay')">
+      <div class="cb-strip-submenu" *ngIf="expandedSidebarCategory === 'fasttag'">
+        <button type="button" class="cb-strip-subitem" [class.active]="selectedFeature === 'fasttag'" (click)="selectFeature('fasttag')">FASTag Services</button>
+      </div>
+      <div class="cb-strip-item" [class.active]="selectedFeature === 'upi-pay'" role="button" tabindex="0" [attr.aria-expanded]="expandedSidebarCategory === 'upi'" (click)="toggleSidebarCategory('upi')" (keydown.enter)="toggleSidebarCategory('upi')" (keydown.space)="toggleSidebarCategory('upi')">
         <div class="cb-strip-icon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/><path d="M9 7h6"/><path d="M9 11h6"/></svg>
         </div>
         <span>UPI<br>Pay</span>
+        <span class="cb-strip-chevron" [class.expanded]="expandedSidebarCategory === 'upi'" aria-hidden="true">›</span>
       </div>
-      <div class="cb-strip-item" [class.active]="selectedFeature === 'support-tickets' || selectedFeature === 'kycupdate'" (click)="selectFeature('support-tickets')">
+      <div class="cb-strip-submenu" *ngIf="expandedSidebarCategory === 'upi'">
+        <button type="button" class="cb-strip-subitem" [class.active]="selectedFeature === 'upi-pay'" (click)="selectFeature('upi-pay')">UPI Payments</button>
+      </div>
+      <div class="cb-strip-item" [class.active]="['support-tickets', 'kycupdate', 'bank-messages', 'ai-assistant'].includes(selectedFeature || '')" role="button" tabindex="0" [attr.aria-expanded]="expandedSidebarCategory === 'other'" (click)="toggleSidebarCategory('other')" (keydown.enter)="toggleSidebarCategory('other')" (keydown.space)="toggleSidebarCategory('other')">
         <div class="cb-strip-icon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
         </div>
         <span>Other<br>Services</span>
+        <span class="cb-strip-chevron" [class.expanded]="expandedSidebarCategory === 'other'" aria-hidden="true">›</span>
+      </div>
+      <div class="cb-strip-submenu" *ngIf="expandedSidebarCategory === 'other'">
+        <button type="button" class="cb-strip-subitem" [class.active]="selectedFeature === 'support-tickets'" (click)="selectFeature('support-tickets')">Support Tickets</button>
+        <button type="button" class="cb-strip-subitem" [class.active]="selectedFeature === 'kycupdate'" (click)="selectFeature('kycupdate')">KYC Update</button>
+        <button type="button" class="cb-strip-subitem" [class.active]="selectedFeature === 'bank-messages'" (click)="selectFeature('bank-messages')">Bank Messages</button>
+        <button type="button" class="cb-strip-subitem" [class.active]="selectedFeature === 'ai-assistant'" (click)="selectFeature('ai-assistant')">AI Assistant</button>
       </div>
     </div>
   </div>

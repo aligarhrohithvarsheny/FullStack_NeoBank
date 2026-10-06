@@ -88,7 +88,10 @@ export class TimeTrackingComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     if (isPlatformBrowser(this.platformId)) {
       this.loadDashboardData();
-      
+      this.loadStaffLive();
+      interval(1000).pipe(takeUntil(this.destroy$)).subscribe(() => this.nowTick = Date.now());
+      interval(10000).pipe(takeUntil(this.destroy$)).subscribe(() => this.loadStaffLive());
+
       // Refresh stats every 30 seconds
       interval(30000)
         .pipe(
@@ -289,10 +292,63 @@ export class TimeTrackingComponent implements OnInit, OnDestroy {
         this.closePolicyForm();
       },
       error => {
-        this.alertService.error('Error', 'Failed to save time policy');
+        const msg = error?.error?.message || 'Failed to save time policy';
+        this.alertService.error('Error', msg);
         this.policyLoading = false;
       }
     );
+  }
+
+  // ==================== STAFF LIVE TRACKING ====================
+
+  staffLive: any[] = [];
+  staffRoleFilter: string = 'ALL';
+  staffSearch: string = '';
+  staffLoading = false;
+  nowTick: number = Date.now();
+  private serverOffsetMs = 0;
+  private liveFetchedAt = 0;
+
+  loadStaffLive(): void {
+    this.staffLoading = this.staffLive.length === 0;
+    this.timeTrackingService.getStaffLive().subscribe(
+      res => {
+        this.staffLive = res.content || [];
+        this.liveFetchedAt = Date.now();
+        this.staffLoading = false;
+      },
+      () => {
+        this.staffLoading = false;
+      }
+    );
+  }
+
+  get filteredStaffLive(): any[] {
+    const q = this.staffSearch.trim().toLowerCase();
+    return this.staffLive.filter(s =>
+      (this.staffRoleFilter === 'ALL' || (s.role || '').toUpperCase() === this.staffRoleFilter) &&
+      (!q || [s.name, s.email, s.employeeId, s.idCardNumber].some((v: any) => (v || '').toString().toLowerCase().includes(q)))
+    );
+  }
+
+  // Seconds worked today, ticking live while the staff member is online
+  liveTodaySeconds(s: any): number {
+    const extra = s.online ? Math.floor((this.nowTick - this.liveFetchedAt) / 1000) : 0;
+    return (s.todaySeconds || 0) + Math.max(0, extra);
+  }
+
+  formatSeconds(sec: number): string {
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    const s = sec % 60;
+    return `${h}h ${String(m).padStart(2, '0')}m ${String(s).padStart(2, '0')}s`;
+  }
+
+  formatDateTime(value: string | null): string {
+    if (!value) return '-';
+    return new Date(value).toLocaleString('en-US', {
+      month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true
+    });
   }
 
   activatePolicy(policy: TimeManagementPolicy): void {

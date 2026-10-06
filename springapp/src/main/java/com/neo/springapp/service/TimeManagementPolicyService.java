@@ -24,7 +24,16 @@ public class TimeManagementPolicyService {
      * Create a new time management policy
      */
     public TimeManagementPolicy createPolicy(TimeManagementPolicy policy) {
-        // Check for duplicate policies
+        if (policy.getAdminId() == null || policy.getAdminId().isBlank()) {
+            policy.setAdminId("ALL");
+        }
+        if (policy.getMaxWorkingHours() == null) {
+            policy.setMaxWorkingHours(Math.max(10, policy.getWorkingHoursPerDay() == null ? 10 : policy.getWorkingHoursPerDay()));
+        }
+        policy.setId(null);
+        if (policy.getIsActive() == null) {
+            policy.setIsActive(true);
+        }
         if (policyRepository.existsByAdminIdAndPolicyName(policy.getAdminId(), policy.getPolicyName())) {
             throw new RuntimeException("Policy with this name already exists for the admin");
         }
