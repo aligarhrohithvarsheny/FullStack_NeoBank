@@ -102,9 +102,14 @@ export class Dashboard implements OnInit, OnDestroy {
   aftSenderChequeNumber: string = '';
   aftSenderVerification: any = null;
   aftVerifyingSender: boolean = false;
+  aftTransferCategory: 'ACCOUNT_TO_ACCOUNT' | 'GOLD_LOAN' | 'PERSONAL_LOAN' = 'ACCOUNT_TO_ACCOUNT';
   aftReceiverAccountNumber: string = '';
   aftReceiverVerification: any = null;
   aftVerifyingReceiver: boolean = false;
+  aftLoanVerification: any = null;
+  aftLoanPaymentType: 'EMI' | 'PREPAYMENT' | 'FORECLOSURE' = 'EMI';
+  aftEmiPaymentId: number | null = null;
+  aftPrepaymentAdjustment: 'REDUCE_EMI' | 'REDUCE_TENURE' = 'REDUCE_EMI';
   aftAmount: number | null = null;
   aftDescription: string = '';
   aftProcessing: boolean = false;
@@ -620,6 +625,7 @@ export class Dashboard implements OnInit, OnDestroy {
   showPassbookHistoryModal: boolean = false;
   passbookDownloadHistory: any[] = [];
   private passbookRefreshInterval: any = null;
+  private adminTransferPollingInterval: any = null;
 
   // Account Action Management
   showAccountActionModal: boolean = false;
@@ -1619,6 +1625,10 @@ export class Dashboard implements OnInit, OnDestroy {
 
   goToHome() {
     this.activeSection = 'home';
+    if (this.adminTransferPollingInterval) {
+      clearInterval(this.adminTransferPollingInterval);
+      this.adminTransferPollingInterval = null;
+    }
   }
 
   setActiveSection(section: string) {
@@ -1652,6 +1662,15 @@ export class Dashboard implements OnInit, OnDestroy {
     if (featureId && !this.hasFeatureAccess(featureId)) {
       this.alertService.error('Access Denied', 'This feature has been disabled by the manager.');
       return;
+    }
+
+    if (section === 'transfers' && !this.adminTransferPollingInterval) {
+      this.adminTransferPollingInterval = setInterval(() => {
+        if (this.activeSection === 'transfers' && !this.loadingAdminTransfers) this.loadAdminTransfers();
+      }, 5000);
+    } else if (section !== 'transfers' && this.adminTransferPollingInterval) {
+      clearInterval(this.adminTransferPollingInterval);
+      this.adminTransferPollingInterval = null;
     }
 
     if (section === 'branch-operations') {
@@ -3337,6 +3356,10 @@ export class Dashboard implements OnInit, OnDestroy {
   }
 
   verifyAftReceiver() {
+    if (this.aftTransferCategory !== 'ACCOUNT_TO_ACCOUNT') {
+      this.verifyAftLoan();
+      return;
+    }
     if (!this.aftReceiverAccountNumber?.trim()) {
       this.alertService.error('Missing Info', 'Enter receiver account number');
       return;
@@ -3357,7 +3380,76 @@ export class Dashboard implements OnInit, OnDestroy {
   }
 
   getAftCharge(): number {
-    return this.aftAmount ? Math.round(this.aftAmount * 0.005 * 100) / 100 : 0;
+    return this.aftTransferCategory === 'ACCOUNT_TO_ACCOUNT' && this.aftAmount
+      ? Math.round(this.aftAmount * 0.005 * 100) / 100 : 0;
+  }
+
+  onAftTransferCategoryChange() {
+    this.aftReceiverAccountNumber = '';
+    this.aftReceiverVerification = null;
+    this.aftLoanVerification = null;
+    this.aftLoanPaymentType = 'EMI';
+    this.aftPrepaymentAdjustment = 'REDUCE_EMI';
+    this.aftAmount = null;
+    this.aftEmiPaymentId = null;
+  }
+
+  onAftSenderDetailsChange() {
+    this.aftSenderVerification = null;
+  }
+
+  onAftReceiverDetailsChange() {
+    this.aftReceiverVerification = null;
+    this.aftLoanVerification = null;
+    this.aftAmount = null;
+    this.aftEmiPaymentId = null;
+  }
+
+  verifyAftLoan() {
+    if (!this.aftReceiverAccountNumber.trim()) {
+      this.alertService.error('Missing Info', 'Enter the loan account number');
+      return;
+    }
+    this.aftVerifyingReceiver = true;
+    this.aftReceiverVerification = null;
+    this.aftLoanVerification = null;
+    const params = new HttpParams()
+      .set('loanType', this.aftTransferCategory)
+      .set('loanAccountNumber', this.aftReceiverAccountNumber.trim());
+    this.http.get<any>(`${environment.apiBaseUrl}/api/admin-fund-transfers/verify-loan`, { params }).subscribe({
+      next: (res) => {
+        this.aftLoanVerification = res;
+        this.aftReceiverVerification = {
+          found: !!res.found,
+          name: res.borrowerName,
+          accountNumber: res.loanAccountNumber,
+          accountType: this.aftTransferCategory === 'GOLD_LOAN' ? 'Gold Loan' : 'Personal Loan',
+          message: res.message
+        };
+        if (res.found) {
+          const nextEmi = res.nextEmi;
+          this.aftEmiPaymentId = nextEmi?.id ?? null;
+          this.setAftLoanPaymentType();
+        }
+        this.aftVerifyingReceiver = false;
+      },
+      error: (err) => {
+        this.aftReceiverVerification = { found: false, message: err.error?.message || 'Loan account not found' };
+        this.aftVerifyingReceiver = false;
+      }
+    });
+  }
+
+  setAftLoanPaymentType() {
+    if (this.aftLoanPaymentType === 'EMI') {
+      const selected = this.aftLoanVerification?.pendingEmis?.find((emi: any) => Number(emi.id) === Number(this.aftEmiPaymentId));
+      this.aftAmount = selected?.totalAmount ?? null;
+    } else if (this.aftLoanPaymentType === 'FORECLOSURE') {
+      const calculation = this.aftLoanVerification?.foreclosure;
+      this.aftAmount = calculation?.success ? Number(calculation.totalForeclosureAmount) : null;
+    } else {
+      this.aftAmount = null;
+    }
   }
 
   sendAftTransfer() {
@@ -3373,14 +3465,34 @@ export class Dashboard implements OnInit, OnDestroy {
       this.alertService.error('Invalid Amount', 'Enter a valid transfer amount');
       return;
     }
+    if (this.aftTransferCategory !== 'ACCOUNT_TO_ACCOUNT') {
+      if (!this.aftLoanVerification?.found) {
+        this.alertService.error('Loan Not Verified', 'Verify the loan account first');
+        return;
+      }
+      if (this.aftLoanPaymentType === 'EMI' && !this.aftEmiPaymentId) {
+        this.alertService.error('EMI Not Selected', 'Select a pending EMI to pay');
+        return;
+      }
+      if (this.aftLoanPaymentType === 'PREPAYMENT' && !this.aftPrepaymentAdjustment) {
+        this.alertService.error('Prepayment Option Required', 'Choose how the prepayment changes the schedule');
+        return;
+      }
+    }
     this.aftProcessing = true;
     this.http.post(`${environment.apiBaseUrl}/api/admin-fund-transfers/process`, {
       senderAccountNumber: this.aftSenderAccountNumber.trim(),
       senderChequeNumber: this.aftSenderChequeNumber.trim(),
-      receiverAccountNumber: this.aftReceiverAccountNumber.trim(),
+      receiverAccountNumber: this.aftTransferCategory === 'ACCOUNT_TO_ACCOUNT'
+        ? this.aftReceiverAccountNumber.trim() : this.aftLoanVerification?.loanAccountNumber,
       amount: this.aftAmount,
       description: this.aftDescription,
-      performedBy: this.adminName
+      performedBy: this.adminName,
+      transferCategory: this.aftTransferCategory,
+      loanPaymentType: this.aftLoanPaymentType,
+      loanAccountNumber: this.aftTransferCategory === 'ACCOUNT_TO_ACCOUNT' ? null : this.aftLoanVerification?.loanAccountNumber,
+      emiPaymentId: this.aftLoanPaymentType === 'EMI' ? this.aftEmiPaymentId : null,
+      prepaymentAdjustment: this.aftLoanPaymentType === 'PREPAYMENT' ? this.aftPrepaymentAdjustment : null
     }).subscribe({
       next: (res: any) => {
         this.aftProcessing = false;
@@ -3400,8 +3512,13 @@ export class Dashboard implements OnInit, OnDestroy {
     this.aftSenderAccountNumber = '';
     this.aftSenderChequeNumber = '';
     this.aftSenderVerification = null;
+    this.aftTransferCategory = 'ACCOUNT_TO_ACCOUNT';
     this.aftReceiverAccountNumber = '';
     this.aftReceiverVerification = null;
+    this.aftLoanVerification = null;
+    this.aftLoanPaymentType = 'EMI';
+    this.aftEmiPaymentId = null;
+    this.aftPrepaymentAdjustment = 'REDUCE_EMI';
     this.aftAmount = null;
     this.aftDescription = '';
   }
@@ -7298,6 +7415,10 @@ export class Dashboard implements OnInit, OnDestroy {
   }
 
   ngOnDestroy() {
+    if (this.adminTransferPollingInterval) {
+      clearInterval(this.adminTransferPollingInterval);
+      this.adminTransferPollingInterval = null;
+    }
     if (this.passbookRefreshInterval) {
       clearInterval(this.passbookRefreshInterval);
       this.passbookRefreshInterval = null;

@@ -1,4 +1,4 @@
-import { Component, OnInit, Inject, PLATFORM_ID } from '@angular/core';
+import { Component, OnInit, OnDestroy, Inject, PLATFORM_ID } from '@angular/core';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -67,7 +67,9 @@ interface EmiPayment {
   templateUrl: './loan.html',
   styleUrls: ['./loan.css']
 })
-export class Loan implements OnInit {
+export class Loan implements OnInit, OnDestroy {
+  private loanRefreshInterval: ReturnType<typeof setInterval> | null = null;
+
   constructor(
     private router: Router, 
     @Inject(PLATFORM_ID) private platformId: Object, 
@@ -318,6 +320,16 @@ export class Loan implements OnInit {
     if (isPlatformBrowser(this.platformId)) {
       this.loadUserData();
       this.loadUserProfileData();
+      this.loanRefreshInterval = setInterval(() => {
+        if (this.userAccountNumber && !this.loading) this.loadUserLoans(false);
+      }, 5000);
+    }
+  }
+
+  ngOnDestroy() {
+    if (this.loanRefreshInterval) {
+      clearInterval(this.loanRefreshInterval);
+      this.loanRefreshInterval = null;
     }
   }
 
@@ -457,10 +469,10 @@ export class Loan implements OnInit {
     });
   }
 
-  loadUserLoans() {
+  loadUserLoans(showLoading = true) {
     if (!isPlatformBrowser(this.platformId)) return;
     
-    this.loading = true;
+    if (showLoading) this.loading = true;
     
     // Load user's loans from MySQL database (includes both applicant and child loans)
     this.http.get(`${environment.apiBaseUrl}/api/loans/account/${this.userAccountNumber}`).subscribe({

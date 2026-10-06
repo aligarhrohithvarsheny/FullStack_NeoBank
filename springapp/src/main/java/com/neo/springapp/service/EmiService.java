@@ -7,8 +7,10 @@ import com.neo.springapp.model.Transaction;
 import com.neo.springapp.model.SalaryAccount;
 import com.neo.springapp.model.SalaryNormalTransaction;
 import com.neo.springapp.model.GoldLoan;
+import com.neo.springapp.model.CurrentAccount;
 import com.neo.springapp.repository.EmiPaymentRepository;
 import com.neo.springapp.repository.GoldLoanRepository;
+import com.neo.springapp.repository.CurrentAccountRepository;
 import com.neo.springapp.repository.LoanRepository;
 import com.neo.springapp.repository.SalaryAccountRepository;
 import com.neo.springapp.repository.SalaryNormalTransactionRepository;
@@ -35,6 +37,9 @@ public class EmiService {
 
     @Autowired
     private GoldLoanRepository goldLoanRepository;
+
+    @Autowired
+    private CurrentAccountRepository currentAccountRepository;
 
     @Autowired
     private AccountService accountService;
@@ -173,13 +178,22 @@ public class EmiService {
         // Check account balance - try regular accounts first, then salary accounts
         Double currentBalance = accountService.getBalanceByAccountNumber(accountNumber);
         boolean isSalaryAccount = false;
+        boolean isCurrentAccount = false;
         SalaryAccount salaryAccount = null;
+        CurrentAccount currentAccount = null;
         if (currentBalance == null) {
             // Fallback: check salary_accounts table
             salaryAccount = salaryAccountRepository.findByAccountNumber(accountNumber);
             if (salaryAccount != null && salaryAccount.getBalance() != null) {
                 currentBalance = salaryAccount.getBalance();
                 isSalaryAccount = true;
+            }
+        }
+        if (currentBalance == null) {
+            currentAccount = currentAccountRepository.findByAccountNumber(accountNumber).orElse(null);
+            if (currentAccount != null && currentAccount.getBalance() != null) {
+                currentBalance = currentAccount.getBalance();
+                isCurrentAccount = true;
             }
         }
         if (currentBalance == null || currentBalance < emi.getTotalAmount()) {
@@ -200,6 +214,10 @@ public class EmiService {
             salaryAccount.setUpdatedAt(LocalDateTime.now());
             salaryAccountRepository.save(salaryAccount);
             newBalance = updatedBal;
+        } else if (isCurrentAccount && currentAccount != null) {
+            newBalance = currentAccount.getBalance() - emi.getTotalAmount();
+            currentAccount.setBalance(newBalance);
+            currentAccountRepository.save(currentAccount);
         } else {
             newBalance = accountService.debitBalance(accountNumber, emi.getTotalAmount());
         }
@@ -270,7 +288,7 @@ public class EmiService {
         
         // Generate PDF receipt
         try {
-            pdfService.generateEmiReceipt(emi, getLoanByLoanId(emi.getLoanId()));
+            pdfService.generateEmiReceipt(emi, getLoanForEmi(emi));
             // PDF path can be stored if needed
             emi.setPdfPath("emi_receipt_" + emi.getId() + ".pdf");
         } catch (Exception e) {
@@ -278,9 +296,10 @@ public class EmiService {
         }
 
         EmiPayment savedEmi = emiPaymentRepository.save(emi);
+        updateLoanRepaymentSummary(emi);
 
         // Check if loan is fully paid
-        Loan loan = getLoanByLoanId(emi.getLoanId());
+        Loan loan = loanRepository.findByLoanAccountNumber(emi.getLoanAccountNumber()).orElse(null);
         if (loan != null) {
             Long paidCount = emiPaymentRepository.countPaidEmisByLoanId(loan.getId());
             Long totalCount = emiPaymentRepository.countTotalEmisByLoanId(loan.getId());
@@ -289,6 +308,16 @@ public class EmiService {
                 // Loan is fully paid
                 loan.setStatus("Paid");
                 loanRepository.save(loan);
+            }
+        } else {
+            GoldLoan goldLoan = goldLoanRepository.findByLoanAccountNumber(emi.getLoanAccountNumber()).orElse(null);
+            if (goldLoan != null) {
+                Long pendingCount = emiPaymentRepository.findByLoanAccountNumberOrderByEmiNumberAsc(emi.getLoanAccountNumber())
+                    .stream().filter(payment -> "Pending".equalsIgnoreCase(payment.getStatus())).count();
+                if (pendingCount == 0) {
+                    goldLoan.setStatus("Paid");
+                    goldLoanRepository.save(goldLoan);
+                }
             }
         }
 
@@ -393,13 +422,13 @@ public class EmiService {
         EmiPayment emi = emiPaymentRepository.findById(emiId)
             .orElseThrow(() -> new RuntimeException("EMI not found"));
         
-        Loan loan = getLoanByLoanId(emi.getLoanId());
+        Loan loan = getLoanForEmi(emi);
         
         response.put("emi", emi);
         response.put("loan", loan);
         
         // Calculate summary
-        List<EmiPayment> allEmis = getEmisByLoanId(emi.getLoanId());
+        List<EmiPayment> allEmis = getEmisByLoanAccountNumber(emi.getLoanAccountNumber());
         long paidCount = allEmis.stream().filter(e -> "Paid".equals(e.getStatus())).count();
         long pendingCount = allEmis.stream().filter(e -> "Pending".equals(e.getStatus())).count();
         
@@ -425,7 +454,7 @@ public class EmiService {
         List<EmiPayment> upcomingEmis = getUpcomingEmis();
         
         for (EmiPayment emi : upcomingEmis) {
-            Loan loan = getLoanByLoanId(emi.getLoanId());
+            Loan loan = getLoanForEmi(emi);
             if (loan != null && loan.getUserEmail() != null) {
                 try {
                     emailService.sendEmiReminderEmail(
@@ -462,8 +491,51 @@ public class EmiService {
     /**
      * Helper method to get loan by ID
      */
-    private Loan getLoanByLoanId(Long loanId) {
-        return loanRepository.findById(loanId).orElse(null);
+    private Loan getLoanForEmi(EmiPayment emi) {
+        if (emi.getLoanAccountNumber() == null) return null;
+
+        Loan personalLoan = loanRepository.findByLoanAccountNumber(emi.getLoanAccountNumber()).orElse(null);
+        if (personalLoan != null) return personalLoan;
+
+        GoldLoan goldLoan = goldLoanRepository.findByLoanAccountNumber(emi.getLoanAccountNumber()).orElse(null);
+        if (goldLoan == null) return null;
+
+        Loan receiptLoan = new Loan();
+        receiptLoan.setType("Gold Loan");
+        receiptLoan.setUserName(goldLoan.getUserName());
+        receiptLoan.setTenure(goldLoan.getTenure());
+        receiptLoan.setLoanAccountNumber(goldLoan.getLoanAccountNumber());
+        return receiptLoan;
+    }
+
+    private void updateLoanRepaymentSummary(EmiPayment paidEmi) {
+        List<EmiPayment> schedule = emiPaymentRepository
+                .findByLoanAccountNumberOrderByEmiNumberAsc(paidEmi.getLoanAccountNumber());
+        double remainingPrincipal = schedule.stream()
+                .filter(emi -> "Pending".equalsIgnoreCase(emi.getStatus())
+                        || "Overdue".equalsIgnoreCase(emi.getStatus()))
+                .mapToDouble(emi -> emi.getPrincipalAmount() == null ? 0.0 : emi.getPrincipalAmount())
+                .sum();
+        double remainingInterest = schedule.stream()
+                .filter(emi -> "Pending".equalsIgnoreCase(emi.getStatus())
+                        || "Overdue".equalsIgnoreCase(emi.getStatus()))
+                .mapToDouble(emi -> emi.getInterestAmount() == null ? 0.0 : emi.getInterestAmount())
+                .sum();
+        double principalPaid = paidEmi.getPrincipalAmount() == null ? 0.0 : paidEmi.getPrincipalAmount();
+
+        loanRepository.findByLoanAccountNumber(paidEmi.getLoanAccountNumber()).ifPresent(loan -> {
+            loan.setRemainingPrincipal(Math.round(remainingPrincipal * 100.0) / 100.0);
+            loan.setRemainingInterest(Math.round(remainingInterest * 100.0) / 100.0);
+            loan.setPrincipalPaid(Math.round(((loan.getPrincipalPaid() == null ? 0.0 : loan.getPrincipalPaid())
+                    + principalPaid) * 100.0) / 100.0);
+            loanRepository.save(loan);
+        });
+        goldLoanRepository.findByLoanAccountNumber(paidEmi.getLoanAccountNumber()).ifPresent(loan -> {
+            loan.setRemainingPrincipal(Math.round(remainingPrincipal * 100.0) / 100.0);
+            loan.setRemainingInterest(Math.round(remainingInterest * 100.0) / 100.0);
+            loan.setPrincipalPaid(Math.round(((loan.getPrincipalPaid() == null ? 0.0 : loan.getPrincipalPaid())
+                    + principalPaid) * 100.0) / 100.0);
+            goldLoanRepository.save(loan);
+        });
     }
 }
-

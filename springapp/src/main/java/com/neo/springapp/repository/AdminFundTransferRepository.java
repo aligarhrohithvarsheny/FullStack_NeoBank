@@ -17,7 +17,10 @@ public interface AdminFundTransferRepository extends JpaRepository<AdminFundTran
            "LOWER(t.receiverAccountNumber) LIKE LOWER(CONCAT('%', :term, '%')) OR " +
            "LOWER(t.senderName) LIKE LOWER(CONCAT('%', :term, '%')) OR " +
            "LOWER(t.receiverName) LIKE LOWER(CONCAT('%', :term, '%')) OR " +
-           "LOWER(t.senderChequeNumber) LIKE LOWER(CONCAT('%', :term, '%')) " +
+           "LOWER(t.senderChequeNumber) LIKE LOWER(CONCAT('%', :term, '%')) OR " +
+           "LOWER(t.loanAccountNumber) LIKE LOWER(CONCAT('%', :term, '%')) OR " +
+           "LOWER(t.transferCategory) LIKE LOWER(CONCAT('%', :term, '%')) OR " +
+           "LOWER(t.loanPaymentType) LIKE LOWER(CONCAT('%', :term, '%')) " +
            "ORDER BY t.performedAt DESC")
     List<AdminFundTransfer> search(@Param("term") String term);
 }

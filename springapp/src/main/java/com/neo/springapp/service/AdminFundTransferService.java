@@ -6,13 +6,22 @@ import com.neo.springapp.model.BusinessChequeRequest;
 import com.neo.springapp.model.Cheque;
 import com.neo.springapp.model.ChequeRequest;
 import com.neo.springapp.model.CurrentAccount;
+import com.neo.springapp.model.EmiPayment;
+import com.neo.springapp.model.GoldLoan;
+import com.neo.springapp.model.GoldLoanHistory;
+import com.neo.springapp.model.Loan;
 import com.neo.springapp.model.SalaryAccount;
+import com.neo.springapp.model.Transaction;
 import com.neo.springapp.repository.AccountRepository;
 import com.neo.springapp.repository.AdminFundTransferRepository;
 import com.neo.springapp.repository.BusinessChequeRequestRepository;
 import com.neo.springapp.repository.ChequeRepository;
 import com.neo.springapp.repository.ChequeRequestRepository;
 import com.neo.springapp.repository.CurrentAccountRepository;
+import com.neo.springapp.repository.EmiPaymentRepository;
+import com.neo.springapp.repository.GoldLoanHistoryRepository;
+import com.neo.springapp.repository.GoldLoanRepository;
+import com.neo.springapp.repository.LoanRepository;
 import com.neo.springapp.repository.SalaryAccountRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -23,6 +32,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 @Service
 public class AdminFundTransferService {
@@ -43,6 +53,30 @@ public class AdminFundTransferService {
 
     @Autowired
     private SalaryAccountRepository salaryAccountRepository;
+
+    @Autowired
+    private GoldLoanRepository goldLoanRepository;
+
+    @Autowired
+    private LoanRepository loanRepository;
+
+    @Autowired
+    private EmiPaymentRepository emiPaymentRepository;
+
+    @Autowired
+    private GoldLoanHistoryRepository goldLoanHistoryRepository;
+
+    @Autowired
+    private GoldLoanService goldLoanService;
+
+    @Autowired
+    private LoanService loanService;
+
+    @Autowired
+    private EmiService emiService;
+
+    @Autowired
+    private TransactionService transactionService;
 
     @Autowired
     private ChequeRepository chequeRepository;
@@ -115,6 +149,76 @@ public class AdminFundTransferService {
     @Transactional
     public Map<String, Object> processTransfer(String senderAccountNumber, String senderChequeNumber,
             String receiverAccountNumber, Double amount, String description, String performedBy) {
+        return processTransfer(senderAccountNumber, senderChequeNumber, receiverAccountNumber, amount,
+                description, performedBy, "ACCOUNT_TO_ACCOUNT", null, null, null, null);
+    }
+
+    public Map<String, Object> verifyLoan(String loanType, String loanAccountNumber) {
+        String type = normalizeLoanType(loanType);
+        String number = loanAccountNumber == null ? "" : loanAccountNumber.trim();
+        if (number.isBlank()) {
+            throw new IllegalArgumentException("Loan account number is required");
+        }
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("loanType", type);
+        result.put("loanAccountNumber", number);
+        if ("GOLD_LOAN".equals(type)) {
+            GoldLoan loan = goldLoanRepository.findByLoanAccountNumber(number).orElse(null);
+            if (loan == null) {
+                result.put("found", false);
+                result.put("message", "Gold loan account not found");
+                return result;
+            }
+            result.put("found", true);
+            result.put("borrowerAccountNumber", loan.getAccountNumber());
+            result.put("borrowerName", loan.getUserName());
+            result.put("status", loan.getStatus());
+            result.put("loan", loan);
+        } else {
+            Loan loan = loanRepository.findByLoanAccountNumber(number).orElse(null);
+            if (loan == null) {
+                result.put("found", false);
+                result.put("message", "Personal loan account not found");
+                return result;
+            }
+            result.put("found", true);
+            result.put("borrowerAccountNumber", loan.getAccountNumber());
+            result.put("borrowerName", loan.getUserName());
+            result.put("status", loan.getStatus());
+            result.put("loan", loan);
+        }
+
+        List<EmiPayment> pending = emiPaymentRepository.findByLoanAccountNumberOrderByEmiNumberAsc(number)
+                .stream().filter(emi -> "Pending".equalsIgnoreCase(emi.getStatus())).toList();
+        result.put("pendingEmis", pending);
+        result.put("nextEmi", pending.isEmpty() ? null : pending.get(0));
+        Map<String, Object> foreclosure = "GOLD_LOAN".equals(type)
+                ? goldLoanService.calculateForeclosure(number)
+                : loanService.calculateForeclosure(number);
+        result.put("foreclosure", foreclosure);
+        return result;
+    }
+
+    @Transactional
+    public Map<String, Object> processTransfer(String senderAccountNumber, String senderChequeNumber,
+            String receiverAccountNumber, Double amount, String description, String performedBy,
+            String transferCategory, String loanPaymentType, String loanAccountNumber,
+            Long emiPaymentId, String prepaymentAdjustment) {
+        String category = transferCategory == null ? "ACCOUNT_TO_ACCOUNT" : transferCategory.trim().toUpperCase();
+        if ("ACCOUNT_TO_ACCOUNT".equals(category)) {
+            return processAccountTransfer(senderAccountNumber, senderChequeNumber, receiverAccountNumber,
+                    amount, description, performedBy, category);
+        }
+        if (!"GOLD_LOAN".equals(category) && !"PERSONAL_LOAN".equals(category)) {
+            throw new IllegalArgumentException("Unsupported transfer category");
+        }
+        return processLoanPayment(senderAccountNumber, senderChequeNumber, amount, description, performedBy,
+                category, loanPaymentType, loanAccountNumber, emiPaymentId, prepaymentAdjustment);
+    }
+
+    private Map<String, Object> processAccountTransfer(String senderAccountNumber, String senderChequeNumber,
+            String receiverAccountNumber, Double amount, String description, String performedBy, String category) {
         Map<String, Object> result = new HashMap<>();
 
         if (amount == null || amount <= 0) {
@@ -156,6 +260,8 @@ public class AdminFundTransferService {
 
         adjustBalance(senderType, senderAccountNumber, -totalDebit);
         adjustBalance(receiverType, receiverAccountNumber, amount);
+        double senderBalanceAfter = getBalance(senderAccountNumber.trim(), senderType);
+        double receiverBalanceAfter = getBalance(receiverAccountNumber.trim(), receiverType);
 
         AdminFundTransfer transfer = new AdminFundTransfer();
         transfer.setTransferId("AFT" + System.currentTimeMillis());
@@ -168,6 +274,7 @@ public class AdminFundTransferService {
         transfer.setReceiverAccountType(receiverType);
         transfer.setAmount(amount);
         transfer.setTransferCharge(transferCharge);
+        transfer.setTransferCategory(category);
         transfer.setDescription(description);
         transfer.setStatus("COMPLETED");
         transfer.setPerformedBy(performedBy != null && !performedBy.isBlank() ? performedBy : "Admin");
@@ -178,10 +285,317 @@ public class AdminFundTransferService {
             markChequeUsed(resolved, saved.getTransferId(), senderAccountNumber, performedBy);
         }
 
+        saveLedgerTransaction(senderAccountNumber.trim(), (String) senderInfo.get("name"), amount,
+                "Debit", senderBalanceAfter, "Admin transfer to " + receiverAccountNumber.trim()
+                        + " | " + saved.getTransferId() + (description == null ? "" : " | " + description));
+        saveLedgerTransaction(receiverAccountNumber.trim(), (String) receiverInfo.get("name"), amount,
+                "Credit", receiverBalanceAfter, "Admin transfer from " + senderAccountNumber.trim()
+                        + " | " + saved.getTransferId() + (description == null ? "" : " | " + description));
+
         result.put("success", true);
         result.put("message", "Transfer completed. ₹" + transferCharge + " (0.5%) charged as processing fee.");
         result.put("transfer", saved);
         return result;
+    }
+
+    private Map<String, Object> processLoanPayment(String senderAccountNumber, String senderChequeNumber,
+            Double requestedAmount, String description, String performedBy, String category,
+            String loanPaymentType, String loanAccountNumber, Long emiPaymentId, String prepaymentAdjustment) {
+        if (senderAccountNumber == null || senderAccountNumber.isBlank() || loanAccountNumber == null || loanAccountNumber.isBlank()) {
+            throw new IllegalArgumentException("Sender and loan account numbers are required");
+        }
+        String normalizedSender = senderAccountNumber.trim();
+        String normalizedLoanNumber = loanAccountNumber.trim();
+        String type = normalizeLoanType(category);
+        String action = loanPaymentType == null ? "" : loanPaymentType.trim().toUpperCase();
+        Map<String, Object> loanDetails = verifyLoan(type, normalizedLoanNumber);
+        if (!Boolean.TRUE.equals(loanDetails.get("found"))) {
+            throw new IllegalArgumentException(String.valueOf(loanDetails.get("message")));
+        }
+        if (!"Approved".equalsIgnoreCase(String.valueOf(loanDetails.get("status")))) {
+            throw new IllegalArgumentException("Only approved loans can receive payments");
+        }
+        if (!normalizedSender.equalsIgnoreCase(String.valueOf(loanDetails.get("borrowerAccountNumber")))) {
+            throw new IllegalArgumentException("The source account must belong to the loan borrower");
+        }
+
+        Map<String, Object> senderInfo = accountService.verifyAccountByNumber(normalizedSender);
+        if (!Boolean.TRUE.equals(senderInfo.get("found"))) {
+            throw new IllegalArgumentException("Sender account not found");
+        }
+        ResolvedCheque resolved = resolveCheque(senderChequeNumber, normalizedSender);
+        if (resolved == null) {
+            throw new IllegalArgumentException("Approved cheque number not found for sender account");
+        }
+
+        double amount;
+        Map<String, Object> paymentResult = null;
+        if ("EMI".equals(action)) {
+            if (emiPaymentId == null) {
+                throw new IllegalArgumentException("Select a pending EMI to pay");
+            }
+            EmiPayment emi = emiPaymentRepository.findById(emiPaymentId)
+                    .orElseThrow(() -> new IllegalArgumentException("EMI not found"));
+            if (!normalizedLoanNumber.equalsIgnoreCase(emi.getLoanAccountNumber())
+                    || !"Pending".equalsIgnoreCase(emi.getStatus())) {
+                throw new IllegalArgumentException("Selected EMI is not pending for this loan");
+            }
+            amount = emi.getTotalAmount();
+            if (requestedAmount != null && round2(requestedAmount) != round2(amount)) {
+                throw new IllegalArgumentException("EMI amount must match the selected installment");
+            }
+            paymentResult = emiService.payEmi(emiPaymentId, normalizedSender);
+            if (!Boolean.TRUE.equals(paymentResult.get("success"))) {
+                throw new IllegalArgumentException(String.valueOf(paymentResult.get("message")));
+            }
+            updateLoanPaidStatus(type, normalizedLoanNumber);
+        } else if ("FORECLOSURE".equals(action)) {
+            Map<String, Object> calculation = loanDetails.get("foreclosure") instanceof Map<?, ?> map
+                    ? (Map<String, Object>) map : Map.of();
+            if (!Boolean.TRUE.equals(calculation.get("success"))) {
+                throw new IllegalArgumentException(String.valueOf(calculation.getOrDefault("message", "Unable to calculate foreclosure")));
+            }
+            amount = numberValue(calculation.get("totalForeclosureAmount"));
+            requireSufficientBalance(normalizedSender, (String) senderInfo.get("accountType"), amount);
+            adjustBalance((String) senderInfo.get("accountType"), normalizedSender, -amount);
+            Object loan;
+            if ("GOLD_LOAN".equals(type)) {
+                loan = goldLoanService.processForeclosureWithAmount(normalizedLoanNumber,
+                        performedBy == null ? "Admin" : performedBy, amount);
+            } else {
+                loan = loanService.processForeclosure(normalizedLoanNumber,
+                        performedBy == null ? "Admin" : performedBy);
+            }
+            if (loan == null) {
+                throw new IllegalArgumentException("Loan foreclosure could not be completed");
+            }
+            paymentResult = Map.of("success", true, "foreclosure", calculation);
+            saveLedgerTransaction(normalizedSender, (String) senderInfo.get("name"), amount, "Debit",
+                    getBalance(normalizedSender, (String) senderInfo.get("accountType")),
+                    type.replace('_', ' ') + " foreclosure " + normalizedLoanNumber);
+        } else if ("PREPAYMENT".equals(action)) {
+            if (requestedAmount == null || requestedAmount <= 0) {
+                throw new IllegalArgumentException("Prepayment amount must be greater than 0");
+            }
+            String adjustment = prepaymentAdjustment == null ? "" : prepaymentAdjustment.trim().toUpperCase();
+            if (!"REDUCE_EMI".equals(adjustment) && !"REDUCE_TENURE".equals(adjustment)) {
+                throw new IllegalArgumentException("Choose whether to reduce future EMI or reduce the loan tenure");
+            }
+            amount = round2(requestedAmount);
+            requireSufficientBalance(normalizedSender, (String) senderInfo.get("accountType"), amount);
+            applyPrepayment(type, normalizedLoanNumber, amount, adjustment);
+            adjustBalance((String) senderInfo.get("accountType"), normalizedSender, -amount);
+            saveLedgerTransaction(normalizedSender, (String) senderInfo.get("name"), amount, "Debit",
+                    getBalance(normalizedSender, (String) senderInfo.get("accountType")),
+                    type.replace('_', ' ') + " prepayment " + normalizedLoanNumber + " (" + adjustment + ")");
+            paymentResult = Map.of("success", true, "adjustment", adjustment);
+        } else {
+            throw new IllegalArgumentException("Choose EMI, prepayment, or foreclosure");
+        }
+
+        String receiverName = String.valueOf(loanDetails.get("borrowerName"));
+        AdminFundTransfer transfer = new AdminFundTransfer();
+        transfer.setTransferId("AFT" + System.currentTimeMillis());
+        transfer.setSenderAccountNumber(normalizedSender);
+        transfer.setSenderName((String) senderInfo.get("name"));
+        transfer.setSenderAccountType((String) senderInfo.get("accountType"));
+        transfer.setSenderChequeNumber(senderChequeNumber);
+        transfer.setReceiverAccountNumber(normalizedLoanNumber);
+        transfer.setReceiverName(receiverName);
+        transfer.setReceiverAccountType(type);
+        transfer.setAmount(amount);
+        transfer.setTransferCharge(0.0);
+        transfer.setTransferCategory(type);
+        transfer.setLoanAccountNumber(normalizedLoanNumber);
+        transfer.setLoanPaymentType(action);
+        transfer.setEmiPaymentId(emiPaymentId);
+        transfer.setPrepaymentAdjustment(prepaymentAdjustment);
+        transfer.setDescription(description);
+        transfer.setStatus("COMPLETED");
+        transfer.setPerformedBy(performedBy != null && !performedBy.isBlank() ? performedBy : "Admin");
+        transfer.setPerformedAt(LocalDateTime.now());
+        AdminFundTransfer saved = repository.save(transfer);
+        markChequeUsed(resolved, saved.getTransferId(), normalizedSender, performedBy);
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("success", true);
+        result.put("message", action + " applied successfully to " + type.replace('_', ' ') + " account.");
+        result.put("transfer", saved);
+        result.put("payment", paymentResult);
+        result.put("newBalance", getBalance(normalizedSender, (String) senderInfo.get("accountType")));
+        return result;
+    }
+
+    private void applyPrepayment(String type, String loanAccountNumber, double amount, String adjustment) {
+        List<EmiPayment> schedule = emiPaymentRepository.findByLoanAccountNumberOrderByEmiNumberAsc(loanAccountNumber);
+        List<EmiPayment> pending = schedule.stream()
+                .filter(emi -> "Pending".equalsIgnoreCase(emi.getStatus()))
+                .toList();
+        if (pending.isEmpty()) {
+            throw new IllegalArgumentException("No pending EMI schedule exists for this loan");
+        }
+
+        double outstandingPrincipal = round2(pending.stream()
+                .mapToDouble(emi -> emi.getPrincipalAmount() == null ? 0.0 : emi.getPrincipalAmount())
+                .sum());
+        if (amount >= outstandingPrincipal) {
+            throw new IllegalArgumentException("Prepayment must be less than the outstanding principal; use foreclosure to close the loan");
+        }
+
+        double principalRemaining = round2(outstandingPrincipal - amount);
+        double annualRate = "GOLD_LOAN".equals(type)
+                ? valueOrZero(goldLoanRepository.findByLoanAccountNumber(loanAccountNumber).orElseThrow().getInterestRate())
+                : valueOrZero(loanRepository.findByLoanAccountNumber(loanAccountNumber).orElseThrow().getInterestRate());
+        double monthlyRate = annualRate / 1200.0;
+        if ("REDUCE_EMI".equals(adjustment)) {
+            recalculateWithReducedEmi(pending, principalRemaining, monthlyRate);
+        } else {
+            recalculateWithReducedTenure(pending, principalRemaining, monthlyRate);
+        }
+        emiPaymentRepository.saveAll(schedule);
+        double remainingInterest = round2(pending.stream()
+                .mapToDouble(emi -> emi.getInterestAmount() == null ? 0.0 : emi.getInterestAmount())
+                .sum());
+
+        if ("GOLD_LOAN".equals(type)) {
+            GoldLoan loan = goldLoanRepository.findByLoanAccountNumber(loanAccountNumber).orElseThrow();
+            loan.setRemainingPrincipal(principalRemaining);
+            loan.setRemainingInterest(remainingInterest);
+            loan.setPrincipalPaid(round2(valueOrZero(loan.getPrincipalPaid()) + amount));
+            goldLoanRepository.save(loan);
+            GoldLoanHistory history = new GoldLoanHistory();
+            history.setGoldLoanId(loan.getId());
+            history.setLoanAccountNumber(loanAccountNumber);
+            history.setAction("PREPAYMENT");
+            history.setChangedBy("Admin Fund Transfer");
+            history.setDetails("Prepayment of " + amount + " applied; outstanding principal is now " + principalRemaining
+                    + "; future schedule " + adjustment + ".");
+            history.setOldAmount(outstandingPrincipal);
+            history.setNewAmount(principalRemaining);
+            goldLoanHistoryRepository.save(history);
+        } else {
+            Loan loan = loanRepository.findByLoanAccountNumber(loanAccountNumber).orElseThrow();
+            loan.setRemainingPrincipal(principalRemaining);
+            loan.setRemainingInterest(remainingInterest);
+            loan.setPrincipalPaid(round2(valueOrZero(loan.getPrincipalPaid()) + amount));
+            loanRepository.save(loan);
+        }
+    }
+
+    private void recalculateWithReducedEmi(List<EmiPayment> pending, double principal, double monthlyRate) {
+        int remainingMonths = pending.size();
+        double payment = monthlyPayment(principal, monthlyRate, remainingMonths);
+        double balance = principal;
+        for (int i = 0; i < pending.size(); i++) {
+            EmiPayment emi = pending.get(i);
+            double interest = round2(balance * monthlyRate);
+            double principalPart = i == pending.size() - 1 ? balance : round2(payment - interest);
+            if (principalPart <= 0) {
+                throw new IllegalArgumentException("The recalculated EMI does not cover monthly interest");
+            }
+            principalPart = Math.min(principalPart, balance);
+            balance = round2(Math.max(0.0, balance - principalPart));
+            emi.setPrincipalAmount(principalPart);
+            emi.setInterestAmount(interest);
+            emi.setTotalAmount(round2(principalPart + interest));
+            emi.setRemainingPrincipal(balance);
+            emi.setUpdatedAt(LocalDateTime.now());
+        }
+    }
+
+    private void recalculateWithReducedTenure(List<EmiPayment> pending, double principal, double monthlyRate) {
+        double installment = valueOrZero(pending.get(0).getTotalAmount());
+        double balance = principal;
+        int used = 0;
+        for (EmiPayment emi : pending) {
+            double interest = round2(balance * monthlyRate);
+            double principalPart = round2(installment - interest);
+            if (principalPart <= 0) {
+                throw new IllegalArgumentException("Existing EMI is too small to repay the outstanding principal at this interest rate");
+            }
+            principalPart = Math.min(principalPart, balance);
+            balance = round2(Math.max(0.0, balance - principalPart));
+            emi.setPrincipalAmount(principalPart);
+            emi.setInterestAmount(interest);
+            emi.setTotalAmount(round2(principalPart + interest));
+            emi.setRemainingPrincipal(balance);
+            emi.setUpdatedAt(LocalDateTime.now());
+            used++;
+            if (balance <= 0) {
+                break;
+            }
+        }
+        if (balance > 0) {
+            throw new IllegalArgumentException("Remaining tenure is insufficient for the current EMI amount");
+        }
+        for (int i = used; i < pending.size(); i++) {
+            pending.get(i).setStatus("Cancelled");
+            pending.get(i).setUpdatedAt(LocalDateTime.now());
+        }
+    }
+
+    private double monthlyPayment(double principal, double monthlyRate, int months) {
+        if (monthlyRate == 0.0) {
+            return round2(principal / months);
+        }
+        double factor = Math.pow(1.0 + monthlyRate, months);
+        return round2(principal * monthlyRate * factor / (factor - 1.0));
+    }
+
+    private void updateLoanPaidStatus(String type, String loanAccountNumber) {
+        boolean noPendingEmi = emiPaymentRepository.findByLoanAccountNumberOrderByEmiNumberAsc(loanAccountNumber)
+                .stream().noneMatch(emi -> "Pending".equalsIgnoreCase(emi.getStatus()));
+        if (!noPendingEmi) return;
+        if ("GOLD_LOAN".equals(type)) {
+            goldLoanRepository.findByLoanAccountNumber(loanAccountNumber).ifPresent(loan -> {
+                loan.setStatus("Paid");
+                goldLoanRepository.save(loan);
+            });
+        } else {
+            loanRepository.findByLoanAccountNumber(loanAccountNumber).ifPresent(loan -> {
+                loan.setStatus("Paid");
+                loanRepository.save(loan);
+            });
+        }
+    }
+
+    private void saveLedgerTransaction(String accountNumber, String userName, double amount, String type,
+            double balance, String description) {
+        Transaction transaction = new Transaction();
+        transaction.setTransactionId("TXN" + UUID.randomUUID().toString().replace("-", "").substring(0, 20));
+        transaction.setAccountNumber(accountNumber);
+        transaction.setUserName(userName);
+        transaction.setMerchant("Admin Fund Transfer");
+        transaction.setAmount(amount);
+        transaction.setType(type);
+        transaction.setDescription(description);
+        transaction.setDate(LocalDateTime.now());
+        transaction.setStatus("Completed");
+        transaction.setBalance(balance);
+        transactionService.saveTransaction(transaction);
+    }
+
+    private void requireSufficientBalance(String accountNumber, String accountType, double amount) {
+        double available = getBalance(accountNumber, accountType);
+        if (available < amount) {
+            throw new IllegalArgumentException("Insufficient sender balance. Required: ₹" + amount + ", available: ₹" + available);
+        }
+    }
+
+    private String normalizeLoanType(String loanType) {
+        String type = loanType == null ? "" : loanType.trim().toUpperCase();
+        if ("GOLD".equals(type) || "GOLD_LOAN".equals(type)) return "GOLD_LOAN";
+        if ("PERSONAL".equals(type) || "PERSONAL_LOAN".equals(type)) return "PERSONAL_LOAN";
+        throw new IllegalArgumentException("Loan type must be GOLD_LOAN or PERSONAL_LOAN");
+    }
+
+    private double numberValue(Object value) {
+        if (value instanceof Number number) return number.doubleValue();
+        return value == null ? 0.0 : Double.parseDouble(value.toString());
+    }
+
+    private double valueOrZero(Double value) {
+        return value == null ? 0.0 : value;
     }
 
     private ResolvedCheque resolveCheque(String chequeNumber, String accountNumber) {
@@ -279,6 +693,9 @@ public class AdminFundTransferService {
         AdminFundTransfer transfer = repository.findById(id).orElseThrow(() -> new RuntimeException("Transfer not found"));
         if ("REVERTED".equals(transfer.getStatus())) {
             throw new RuntimeException("This transfer has already been reverted");
+        }
+        if (!"ACCOUNT_TO_ACCOUNT".equalsIgnoreCase(transfer.getTransferCategory())) {
+            throw new RuntimeException("Loan repayments cannot be reverted as account-to-account transfers. Use the loan servicing workflow to correct a loan payment.");
         }
         if (transfer.getPerformedAt() != null && LocalDateTime.now().isAfter(transfer.getPerformedAt().plusHours(24))) {
             throw new RuntimeException("Transfer can only be reverted within 24 hours");

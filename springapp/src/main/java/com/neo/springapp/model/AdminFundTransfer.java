@@ -26,6 +26,12 @@ public class AdminFundTransfer {
     private String receiverName;
     private String receiverAccountType;
 
+    private String transferCategory = "ACCOUNT_TO_ACCOUNT";
+    private String loanAccountNumber;
+    private String loanPaymentType;
+    private Long emiPaymentId;
+    private String prepaymentAdjustment;
+
     private Double amount;
     private Double transferCharge; // 0.5% of amount, deducted from sender
     private Double revertCharge;   // 0.5% of amount, deducted on revert (set only when reverted)

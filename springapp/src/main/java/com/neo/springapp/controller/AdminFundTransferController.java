@@ -33,6 +33,22 @@ public class AdminFundTransferController {
         return ResponseEntity.ok(service.verifyReceiver(accountNumber));
     }
 
+    @GetMapping("/verify-loan")
+    public ResponseEntity<Map<String, Object>> verifyLoan(
+            @RequestParam String loanType, @RequestParam String loanAccountNumber) {
+        try {
+            Map<String, Object> result = service.verifyLoan(loanType, loanAccountNumber);
+            return Boolean.TRUE.equals(result.get("found"))
+                    ? ResponseEntity.ok(result)
+                    : ResponseEntity.badRequest().body(result);
+        } catch (Exception e) {
+            Map<String, Object> error = new HashMap<>();
+            error.put("found", false);
+            error.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(error);
+        }
+    }
+
     @PostMapping("/process")
     public ResponseEntity<Map<String, Object>> process(@RequestBody Map<String, Object> body) {
         try {
@@ -42,9 +58,16 @@ public class AdminFundTransferController {
             Double amount = body.get("amount") != null ? Double.valueOf(body.get("amount").toString()) : null;
             String description = (String) body.get("description");
             String performedBy = (String) body.get("performedBy");
+            String transferCategory = (String) body.get("transferCategory");
+            String loanPaymentType = (String) body.get("loanPaymentType");
+            String loanAccountNumber = (String) body.get("loanAccountNumber");
+            Long emiPaymentId = body.get("emiPaymentId") != null
+                    ? Long.valueOf(body.get("emiPaymentId").toString()) : null;
+            String prepaymentAdjustment = (String) body.get("prepaymentAdjustment");
 
             return ResponseEntity.ok(service.processTransfer(
-                    senderAccountNumber, senderChequeNumber, receiverAccountNumber, amount, description, performedBy));
+                    senderAccountNumber, senderChequeNumber, receiverAccountNumber, amount, description, performedBy,
+                    transferCategory, loanPaymentType, loanAccountNumber, emiPaymentId, prepaymentAdjustment));
         } catch (Exception e) {
             Map<String, Object> error = new HashMap<>();
             error.put("success", false);

@@ -58,6 +58,8 @@ const OTP_VALID_SECONDS = 120;
 })
 
 export class Goldloan implements OnInit, OnDestroy {
+  private loanRefreshInterval: ReturnType<typeof setInterval> | null = null;
+
   readonly environment = environment;
   goldGrams: number = 0;
   currentGoldRate: GoldRate | null = null;
@@ -103,11 +105,18 @@ export class Goldloan implements OnInit, OnDestroy {
       this.loadUserInfo();
       this.loadCurrentGoldRate();
       this.loadGoldLoans();
+      this.loanRefreshInterval = setInterval(() => {
+        if (this.userAccountNumber && !this.loadingLoans) this.loadGoldLoans(false);
+      }, 5000);
     }
   }
 
   ngOnDestroy() {
     this.stopGoldLoanOtpTimer();
+    if (this.loanRefreshInterval) {
+      clearInterval(this.loanRefreshInterval);
+      this.loanRefreshInterval = null;
+    }
   }
 
   sendGoldLoanOtp() {
@@ -355,10 +364,10 @@ export class Goldloan implements OnInit, OnDestroy {
     submitLoan();
   }
 
-  loadGoldLoans() {
+  loadGoldLoans(showLoading = true) {
     if (!this.userAccountNumber) return;
     
-    this.loadingLoans = true;
+    if (showLoading) this.loadingLoans = true;
     this.http.get(`${environment.apiBaseUrl}/api/gold-loans/account/${this.userAccountNumber}`)
       .pipe(
         timeout(8000),
@@ -529,4 +538,3 @@ export class Goldloan implements OnInit, OnDestroy {
     this.selectedLoanForTerms = null;
   }
 }
-
