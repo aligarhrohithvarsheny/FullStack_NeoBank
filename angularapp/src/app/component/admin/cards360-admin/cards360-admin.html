@@ -5,7 +5,7 @@
     <h1>Cards360 access</h1>
     <p>Issue an account-specific passcode, disable customer sign-in, and review a customer-visible change history.</p>
     <label for="c360-account">Customer account number</label>
-    <input id="c360-account" name="accountNumber" [(ngModel)]="accountNumber" autocomplete="off" required>
+    <input id="c360-account" name="accountNumber" [(ngModel)]="accountNumber" (ngModelChange)="accountChanged()" autocomplete="off" required>
     <label for="c360-admin-email">Your admin email</label>
     <input id="c360-admin-email" name="adminEmail" [(ngModel)]="adminEmail" type="email" autocomplete="username" required>
     <label for="c360-admin-password">Confirm admin password</label>

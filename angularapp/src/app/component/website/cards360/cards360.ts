@@ -71,8 +71,13 @@ export class Cards360 implements OnInit {
     }).subscribe({
       next: response => {
         sessionStorage.setItem(this.tokenKey, response.token);
+        this.cardNumber = '';
+        this.email = '';
+        this.passcode = '';
         this.loading = false;
-        this.router.navigate(['/website/cards360/dashboard']);
+        void this.router.navigate(['/website/cards360/dashboard']).then(navigated => {
+          if (navigated) this.loadDashboard();
+        });
       },
       error: err => {
         this.loading = false;

@@ -69,6 +69,13 @@ export class Cards360Admin {
       });
   }
 
+  accountChanged(): void {
+    this.passcode = '';
+    this.history = [];
+    this.enabled = null;
+    this.notice = '';
+  }
+
   setEnabled(enabled: boolean): void {
     if (!this.validate()) return;
     this.loading = true;
