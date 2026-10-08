@@ -522,6 +522,25 @@ public class CreditCardService {
         return result;
     }
 
+    @Transactional
+    public Map<String, Object> payMinimumDueByEcs(Long billId, String debitAccountNumber, String actor) {
+        CreditCardBill bill = billRepository.findById(billId)
+                .orElseThrow(() -> new IllegalArgumentException("Credit card bill not found"));
+        double minimumDue = bill.getMinimumDue() == null ? 0.0 : bill.getMinimumDue();
+        double paidAmount = bill.getPaidAmount() == null ? 0.0 : bill.getPaidAmount();
+        double amount = Math.max(0.0, minimumDue - paidAmount);
+        if (amount <= 0.0) {
+            throw new IllegalArgumentException("Credit card minimum due is already paid");
+        }
+
+        AdminCreditCardPaymentRequest request = new AdminCreditCardPaymentRequest();
+        request.setAmount(amount);
+        request.setPaymentMethod("ACCOUNT");
+        request.setDebitAccountNumber(debitAccountNumber);
+        request.setAdminName(actor == null ? "ECS" : actor);
+        return payBillAsAdmin(billId, request);
+    }
+
     // ---------- User-side credit card bill pay (last 4 digits + linked mobile) ----------
 
     private static String lastDigits(String value, int n) {

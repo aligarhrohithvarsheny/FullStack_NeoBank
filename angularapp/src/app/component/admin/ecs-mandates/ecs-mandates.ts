@@ -15,7 +15,7 @@ import { environment } from '../../../../environment/environment';
   <div class="ecs-head">
     <div>
       <button class="btn" (click)="back()">← Back</button>
-      <h2>ECS Mandates (Auto-Debit EMI)</h2>
+      <h2>ECS Mandates (Auto-Debit)</h2>
     </div>
     <div class="live">● Live · refreshed {{ lastRefresh | date:'mediumTime' }}</div>
   </div>
@@ -30,7 +30,7 @@ import { environment } from '../../../../environment/environment';
   <div class="card">
     <h3>Link ECS Mandate</h3>
     <div class="grid">
-      <label>Loan Account No.<input [(ngModel)]="form.loanAccountNumber" list="eligible" placeholder="LOAN..." />
+      <label>Loan / Credit Card No.<input [(ngModel)]="form.loanAccountNumber" list="eligible" placeholder="Loan or card number" />
         <datalist id="eligible"><option *ngFor="let l of eligible" [value]="l.loanAccountNumber">{{ l.customerName }} - {{ l.loanType }}</option></datalist>
       </label>
       <label>Savings Account No.<input [(ngModel)]="form.savingsAccountNumber" placeholder="Blank = loan's account" /></label>
@@ -42,7 +42,7 @@ import { environment } from '../../../../environment/environment';
     <div *ngIf="fetched" class="fetched">
       <div><b>Customer:</b> {{ fetched.customerName }} ({{ fetched.customerId }})</div>
       <div><b>Savings A/c:</b> {{ fetched.savingsAccountNumber }} · Balance ₹{{ fetched.accountBalance }}</div>
-      <div><b>Loan:</b> {{ fetched.loan?.loanType }} · EMI ₹{{ fetched.emiAmount }} · Pending {{ fetched.pendingEmis }}/{{ fetched.totalEmis }} · Next due {{ fetched.nextDueDate }}</div>
+      <div><b>Product:</b> {{ fetched.loan?.loanType }} · Due ₹{{ fetched.emiAmount }} · Pending {{ fetched.pendingEmis }}/{{ fetched.totalEmis }} · Next due {{ fetched.nextDueDate }}</div>
       <div [style.color]="fetched.dobMatches ? 'green' : 'crimson'">DOB {{ fetched.dobMatches ? 'verified' : 'does not match' }}</div>
       <div *ngIf="fetched.existingMandate" style="color:crimson">A mandate is already linked to this loan.</div>
       <button class="btn primary" (click)="link()" [disabled]="busy || !fetched.dobMatches || fetched.existingMandate">Link Mandate</button>
@@ -55,7 +55,7 @@ import { environment } from '../../../../environment/environment';
       <input [(ngModel)]="search" placeholder="Search loan / savings account / name" />
     </div>
     <table>
-      <thead><tr><th>Mandate</th><th>Loan A/c</th><th>Savings A/c</th><th>Customer</th><th>Day</th><th>EMI</th><th>Limit</th><th>Status</th><th>Debits</th><th>Last debit</th><th>Actions</th></tr></thead>
+      <thead><tr><th>Mandate</th><th>Loan / Card No.</th><th>Savings A/c</th><th>Customer</th><th>Day</th><th>Due</th><th>Limit</th><th>Status</th><th>Debits</th><th>Last debit</th><th>Actions</th></tr></thead>
       <tbody>
         <tr *ngFor="let m of filtered()">
           <td>{{ m.mandateId }}</td><td>{{ m.loanAccountNumber }}</td><td>{{ m.savingsAccountNumber }}</td><td>{{ m.customerName }}</td>
@@ -80,7 +80,7 @@ import { environment } from '../../../../environment/environment';
   <div class="modal" *ngIf="sel" (click)="sel=null">
     <div class="box" (click)="$event.stopPropagation()">
       <h3>{{ sel.mandate.mandateId }} · {{ sel.mandate.status }}</h3>
-      <p>Loan {{ sel.mandate.loanAccountNumber }} → Savings {{ sel.mandate.savingsAccountNumber }} · Balance ₹{{ sel.accountBalance }}</p>
+      <p>{{ sel.loan?.loanType || 'Loan' }} {{ sel.mandate.loanAccountNumber }} → Savings {{ sel.mandate.savingsAccountNumber }} · Balance ₹{{ sel.accountBalance }}</p>
       <p *ngIf="sel.mandate.cancelRequested">Cancel requested: {{ sel.mandate.cancelReason }}</p>
       <div class="grid">
         <label>Change savings account<input [(ngModel)]="edit.account" /></label>
@@ -94,11 +94,12 @@ import { environment } from '../../../../environment/environment';
         <button (click)="changeLimit()">Update limit</button>
         <button (click)="sel=null">Close</button>
       </div>
-      <h4>EMI schedule</h4>
-      <div class="scroll"><table>
+      <h4 *ngIf="sel.emis?.length">EMI schedule</h4>
+      <div class="scroll" *ngIf="sel.emis?.length"><table>
         <thead><tr><th>#</th><th>Due</th><th>Amount</th><th>Status</th><th>Paid on</th><th>Balance after</th></tr></thead>
         <tbody><tr *ngFor="let e of sel.emis"><td>{{ e.emiNumber }}</td><td>{{ e.dueDate }}</td><td>₹{{ e.totalAmount }}</td><td>{{ e.status }}</td><td>{{ e.paymentDate | date:'short' }}</td><td>{{ e.balanceAfterPayment }}</td></tr></tbody>
       </table></div>
+      <p *ngIf="!sel.emis?.length">Repayment history is available under mandate activity.</p>
       <h4>Activity</h4>
       <div class="scroll"><table>
         <thead><tr><th>When</th><th>Event</th><th>Amount</th><th>Message</th><th>By</th></tr></thead>

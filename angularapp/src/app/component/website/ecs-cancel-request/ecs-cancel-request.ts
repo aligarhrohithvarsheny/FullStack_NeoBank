@@ -15,7 +15,7 @@ import { environment } from '../../../../environment/environment';
     <button class="link" (click)="home()">← Back to home</button>
     <h2>ECS Mandate – Cancel Request</h2>
     <p class="sub">Enter your loan details to find your auto-debit mandate, then raise a cancellation request for admin approval.</p>
-    <label>Loan Account Number<input [(ngModel)]="loanAccountNumber" [disabled]="!!mandate" /></label>
+    <label>Loan / Credit Card Number<input [(ngModel)]="loanAccountNumber" [disabled]="!!mandate" /></label>
     <label>Savings Account Number<input [(ngModel)]="savingsAccountNumber" [disabled]="!!mandate" /></label>
     <label>Date of Birth<input type="date" [(ngModel)]="dob" [disabled]="!!mandate" /></label>
     <button class="btn" *ngIf="!mandate" (click)="fetch()" [disabled]="busy">Fetch Details</button>
@@ -25,7 +25,7 @@ import { environment } from '../../../../environment/environment';
       <div><span>Customer</span><b>{{ mandate.customerName }}</b></div>
       <div><span>Loan</span><b>{{ mandate.loanType }} · {{ mandate.loanAccountNumber }}</b></div>
       <div><span>Debit account</span><b>{{ mandate.savingsAccountNumber }}</b></div>
-      <div><span>EMI / Day</span><b>₹{{ mandate.emiAmount }} · day {{ mandate.debitDay }}</b></div>
+      <div><span>{{ mandate.loanType === 'Credit Card' ? 'Minimum due / Day' : 'EMI / Day' }}</span><b>₹{{ mandate.emiAmount }} · day {{ mandate.debitDay }}</b></div>
       <div><span>Status</span><b>{{ mandate.status }}</b></div>
       <div *ngIf="mandate.cancelRejectionNote" class="note">Previous request rejected: {{ mandate.cancelRejectionNote }}</div>
       <div *ngIf="mandate.cancelRequested" class="ok">A cancel request is pending admin approval.</div>

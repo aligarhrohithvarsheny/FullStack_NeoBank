@@ -1,15 +1,21 @@
 package com.neo.springapp.service;
 
 import com.neo.springapp.model.Account;
+import com.neo.springapp.model.CreditCard;
+import com.neo.springapp.model.CreditCardBill;
 import com.neo.springapp.model.EcsMandate;
 import com.neo.springapp.model.EcsMandateEvent;
 import com.neo.springapp.model.EmiPayment;
 import com.neo.springapp.model.GoldLoan;
+import com.neo.springapp.model.HomeLoan;
 import com.neo.springapp.model.Loan;
+import com.neo.springapp.repository.CreditCardBillRepository;
+import com.neo.springapp.repository.CreditCardRepository;
 import com.neo.springapp.repository.EcsMandateEventRepository;
 import com.neo.springapp.repository.EcsMandateRepository;
 import com.neo.springapp.repository.EmiPaymentRepository;
 import com.neo.springapp.repository.GoldLoanRepository;
+import com.neo.springapp.repository.HomeLoanRepository;
 import com.neo.springapp.repository.LoanRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -23,8 +29,8 @@ import java.util.stream.Collectors;
 
 /**
  * ECS (auto-debit) mandates linking a loan to a savings account. EMIs are debited
- * through EmiService.payEmi so balances, transactions, EMI schedule and branch
- * interest credit are all updated exactly like a manual EMI payment.
+ * through the existing loan and card repayment services so balances and
+ * transactions are updated using the same accounting paths as manual payments.
  */
 @Service
 @SuppressWarnings("null")
@@ -37,8 +43,13 @@ public class EcsMandateService {
     @Autowired private EmiPaymentRepository emiPaymentRepository;
     @Autowired private LoanRepository loanRepository;
     @Autowired private GoldLoanRepository goldLoanRepository;
+    @Autowired private HomeLoanRepository homeLoanRepository;
+    @Autowired private CreditCardRepository creditCardRepository;
+    @Autowired private CreditCardBillRepository creditCardBillRepository;
     @Autowired private AccountService accountService;
     @Autowired private EmiService emiService;
+    @Autowired private HomeLoanService homeLoanService;
+    @Autowired private CreditCardService creditCardService;
 
     // ---------- Loan / account lookup ----------
 
@@ -46,6 +57,7 @@ public class EcsMandateService {
         Map<String, Object> info = new LinkedHashMap<>();
         Loan loan = loanRepository.findByLoanAccountNumber(loanAccountNumber).orElse(null);
         if (loan != null) {
+            info.put("productType", "LOAN");
             info.put("loanAccountNumber", loan.getLoanAccountNumber());
             info.put("loanType", loan.getType() != null ? loan.getType() + " Loan" : "Loan");
             info.put("status", loan.getStatus());
@@ -58,6 +70,7 @@ public class EcsMandateService {
         }
         GoldLoan gold = goldLoanRepository.findByLoanAccountNumber(loanAccountNumber).orElse(null);
         if (gold != null) {
+            info.put("productType", "GOLD_LOAN");
             info.put("loanAccountNumber", gold.getLoanAccountNumber());
             info.put("loanType", "Gold Loan");
             info.put("status", gold.getStatus());
@@ -68,6 +81,34 @@ public class EcsMandateService {
             info.put("userName", gold.getUserName());
             return info;
         }
+        HomeLoan homeLoan = homeLoanRepository.findByLoanAccountNumber(loanAccountNumber).orElse(null);
+        if (homeLoan != null) {
+            info.put("productType", "HOME_LOAN");
+            info.put("loanAccountNumber", homeLoan.getLoanAccountNumber());
+            info.put("loanType", "Home Loan");
+            info.put("status", homeLoan.getStatus());
+            info.put("amount", homeLoan.getAmount());
+            info.put("tenure", homeLoan.getRemainingTenure());
+            info.put("interestRate", homeLoan.getInterestRate());
+            info.put("accountNumber", homeLoan.getAccountNumber());
+            info.put("userName", homeLoan.getUserName());
+            info.put("homeLoanId", homeLoan.getId());
+            return info;
+        }
+        CreditCard card = creditCardRepository.findByCardNumber(loanAccountNumber).orElse(null);
+        if (card != null) {
+            info.put("productType", "CREDIT_CARD");
+            info.put("loanAccountNumber", card.getCardNumber());
+            info.put("loanType", "Credit Card");
+            info.put("status", card.getStatus());
+            info.put("amount", card.getApprovedLimit());
+            info.put("tenure", null);
+            info.put("interestRate", null);
+            info.put("accountNumber", card.getAccountNumber());
+            info.put("userName", card.getUserName());
+            info.put("creditCardId", card.getId());
+            return info;
+        }
         return null;
     }
 
@@ -76,10 +117,35 @@ public class EcsMandateService {
     }
 
     private Double currentEmiAmount(String loanAccountNumber) {
+        Map<String, Object> product = resolveLoan(loanAccountNumber);
+        if (product == null) return null;
+        if ("HOME_LOAN".equals(product.get("productType"))) {
+            return homeLoanRepository.findByLoanAccountNumber(loanAccountNumber)
+                    .map(HomeLoan::getEmi).orElse(null);
+        }
+        if ("CREDIT_CARD".equals(product.get("productType"))) {
+            CreditCard card = creditCardRepository.findByCardNumber(loanAccountNumber).orElse(null);
+            return card == null ? null : nextCardMinimumDue(card.getId());
+        }
         List<EmiPayment> emis = emisOf(loanAccountNumber);
         return emis.stream().filter(e -> "Pending".equals(e.getStatus())).findFirst()
                 .map(EmiPayment::getTotalAmount)
                 .orElse(emis.isEmpty() ? null : emis.get(emis.size() - 1).getTotalAmount());
+    }
+
+    private List<CreditCardBill> pendingMinimumDues(Long creditCardId) {
+        return creditCardBillRepository.findByCreditCardId(creditCardId).stream()
+                .filter(b -> b.getMinimumDue() != null && b.getMinimumDue() > 0)
+                .filter(b -> b.getMinimumDue() > (b.getPaidAmount() == null ? 0.0 : b.getPaidAmount()))
+                .sorted(Comparator.comparing(CreditCardBill::getDueDate,
+                        Comparator.nullsLast(Comparator.naturalOrder())))
+                .collect(Collectors.toList());
+    }
+
+    private Double nextCardMinimumDue(Long creditCardId) {
+        return pendingMinimumDues(creditCardId).stream().findFirst()
+                .map(b -> b.getMinimumDue() - (b.getPaidAmount() == null ? 0.0 : b.getPaidAmount()))
+                .orElse(null);
     }
 
     private static LocalDate parseDob(String dob) {
@@ -105,10 +171,10 @@ public class EcsMandateService {
     public Map<String, Object> fetchDetails(String loanAccountNumber, String savingsAccountNumber, String dob) {
         Map<String, Object> res = new LinkedHashMap<>();
         if (loanAccountNumber == null || loanAccountNumber.isBlank()) {
-            return fail("Loan account number is required");
+            return fail("Loan or credit-card number is required");
         }
         Map<String, Object> loan = resolveLoan(loanAccountNumber.trim());
-        if (loan == null) return fail("Loan account not found");
+        if (loan == null) return fail("Loan or credit card not found");
 
         String savings = (savingsAccountNumber == null || savingsAccountNumber.isBlank())
                 ? (String) loan.get("accountNumber") : savingsAccountNumber.trim();
@@ -117,14 +183,30 @@ public class EcsMandateService {
 
         List<EmiPayment> emis = emisOf(loanAccountNumber.trim());
         long pending = emis.stream().filter(e -> "Pending".equals(e.getStatus())).count();
+        long total = emis.size();
         EmiPayment next = emis.stream().filter(e -> "Pending".equals(e.getStatus())).findFirst().orElse(null);
+        LocalDate nextDueDate = next == null ? null : next.getDueDate();
+        Map<String, Object> product = loan;
+        if ("HOME_LOAN".equals(product.get("productType"))) {
+            HomeLoan homeLoan = homeLoanRepository.findByLoanAccountNumber(loanAccountNumber.trim()).orElse(null);
+            pending = homeLoan == null || homeLoan.getRemainingTenure() == null ? 0 : homeLoan.getRemainingTenure();
+            total = homeLoan == null || homeLoan.getTenure() == null ? pending : homeLoan.getTenure();
+            nextDueDate = homeLoan == null ? null : homeLoan.getNextEmiDate();
+        } else if ("CREDIT_CARD".equals(product.get("productType"))) {
+            CreditCard card = creditCardRepository.findByCardNumber(loanAccountNumber.trim()).orElse(null);
+            List<CreditCardBill> bills = card == null ? List.of() : pendingMinimumDues(card.getId());
+            pending = bills.size();
+            total = pending;
+            nextDueDate = bills.isEmpty() ? null : bills.get(0).getDueDate() == null
+                    ? null : bills.get(0).getDueDate().toLocalDate();
+        }
 
         res.put("success", true);
         res.put("loan", loan);
         res.put("emiAmount", currentEmiAmount(loanAccountNumber.trim()));
         res.put("pendingEmis", pending);
-        res.put("totalEmis", emis.size());
-        res.put("nextDueDate", next != null ? next.getDueDate().toString() : null);
+        res.put("totalEmis", total);
+        res.put("nextDueDate", nextDueDate == null ? null : nextDueDate.toString());
         res.put("savingsAccountNumber", account.getAccountNumber());
         res.put("customerName", account.getName());
         res.put("customerId", account.getCustomerId());
@@ -136,7 +218,7 @@ public class EcsMandateService {
         return res;
     }
 
-    /** Approved loans (personal/education/gold ...) that have no live mandate yet. */
+    /** Approved loans, home loans, and active credit cards without a live ECS mandate. */
     public List<Map<String, Object>> eligibleLoans() {
         List<Map<String, Object>> out = new ArrayList<>();
         for (Loan l : loanRepository.findByStatus("Approved")) {
@@ -144,6 +226,12 @@ public class EcsMandateService {
         }
         for (GoldLoan g : goldLoanRepository.findByStatus("Approved")) {
             addEligible(out, g.getLoanAccountNumber());
+        }
+        for (HomeLoan h : homeLoanRepository.findByStatus("Approved")) {
+            addEligible(out, h.getLoanAccountNumber());
+        }
+        for (CreditCard card : creditCardRepository.findByStatus("Active")) {
+            if (!card.isBlocked() && !card.isDeactivated()) addEligible(out, card.getCardNumber());
         }
         return out;
     }
@@ -177,8 +265,16 @@ public class EcsMandateService {
         if (day == null || day < 1 || day > 31) return fail("Debit date must be between 1 and 31");
 
         Map<String, Object> loan = resolveLoan(loanNo);
-        if (loan == null) return fail("Loan account not found");
-        if (!"Approved".equals(loan.get("status"))) return fail("Only approved loans can be linked to an ECS mandate");
+        if (loan == null) return fail("Loan or credit card not found");
+        boolean isCreditCard = "CREDIT_CARD".equals(loan.get("productType"));
+        if (isCreditCard) {
+            CreditCard card = creditCardRepository.findByCardNumber(loanNo).orElse(null);
+            if (card == null || !"Active".equalsIgnoreCase(card.getStatus()) || card.isBlocked() || card.isDeactivated()) {
+                return fail("Only active credit cards can be linked to an ECS mandate");
+            }
+        } else if (!"Approved".equalsIgnoreCase(String.valueOf(loan.get("status")))) {
+            return fail("Only approved loans can be linked to an ECS mandate");
+        }
         if (mandateRepository.existsByLoanAccountNumberAndStatusIn(loanNo, LIVE_STATUSES)) {
             return fail("An ECS mandate is already linked to this loan");
         }
@@ -187,9 +283,12 @@ public class EcsMandateService {
         if (!dobMatches(account.getDob(), dob)) return fail("Date of birth does not match the savings account holder");
 
         Double emi = currentEmiAmount(loanNo);
-        if (emi == null) return fail("EMI schedule not available for this loan");
         if (limit == null || limit <= 0) limit = emi;
-        if (limit < emi) return fail("Amount limit cannot be less than the EMI amount (₹" + emi + ")");
+        if (limit == null || limit <= 0) {
+            return fail(isCreditCard ? "Set an amount limit to authorize future minimum-due payments"
+                    : "EMI schedule not available for this loan");
+        }
+        if (emi != null && limit < emi) return fail("Amount limit cannot be less than the due amount (₹" + emi + ")");
 
         EcsMandate m = new EcsMandate();
         m.setMandateId("ECS" + System.currentTimeMillis());
@@ -254,7 +353,7 @@ public class EcsMandateService {
         if ("CANCELLED".equals(m.getStatus())) return fail("Mandate is cancelled");
         Double emi = currentEmiAmount(m.getLoanAccountNumber());
         if (limit == null || limit <= 0 || (emi != null && limit < emi)) {
-            return fail("Amount limit must be at least the EMI amount (₹" + emi + ")");
+            return fail("Amount limit must be positive and at least the current due amount (₹" + emi + ")");
         }
         m.setAmountLimit(limit);
         mandateRepository.save(m);
@@ -422,7 +521,7 @@ public class EcsMandateService {
         if (!"ACTIVE".equals(m.getStatus())) return fail("Mandate is not active");
         int debited = runDueDebits(m, true);
         m = mandateRepository.findById(id).orElse(m);
-        Map<String, Object> r = ok(m, debited > 0 ? debited + " EMI(s) debited" : "No EMI debited: " + m.getLastDebitMessage());
+        Map<String, Object> r = ok(m, debited > 0 ? debited + " payment(s) debited" : "No payment debited: " + m.getLastDebitMessage());
         r.put("success", debited > 0);
         return r;
     }
@@ -443,6 +542,16 @@ public class EcsMandateService {
     private int runDueDebits(EcsMandate m, boolean force) {
         LocalDate today = LocalDate.now();
         if (!force && today.equals(m.getLastAttemptDate())) return 0;
+
+        Map<String, Object> product = resolveLoan(m.getLoanAccountNumber());
+        if (product == null) {
+            recordFailure(m, null, "Loan or card account no longer exists");
+            m.setLastAttemptDate(today);
+            mandateRepository.save(m);
+            return 0;
+        }
+        if ("HOME_LOAN".equals(product.get("productType"))) return debitHomeLoan(m, today);
+        if ("CREDIT_CARD".equals(product.get("productType"))) return debitCreditCardMinimum(m, today);
 
         List<EmiPayment> pending = emisOf(m.getLoanAccountNumber()).stream()
                 .filter(e -> "Pending".equals(e.getStatus()))
@@ -496,11 +605,124 @@ public class EcsMandateService {
         return debited;
     }
 
+    private int debitHomeLoan(EcsMandate mandate, LocalDate today) {
+        HomeLoan homeLoan = homeLoanRepository.findByLoanAccountNumber(mandate.getLoanAccountNumber()).orElse(null);
+        if (homeLoan == null) return 0;
+        if ("Closed".equalsIgnoreCase(homeLoan.getStatus())
+                || (homeLoan.getRemainingTenure() != null && homeLoan.getRemainingTenure() <= 0)) {
+            mandate.setStatus("CANCELLED");
+            mandate.setCancelledBy("SYSTEM");
+            mandate.setCancelledAt(LocalDateTime.now());
+            mandate.setLastDebitMessage("Home loan is closed");
+            mandateRepository.save(mandate);
+            log(mandate, "CANCELLED", null, null, "Mandate closed automatically: home loan is closed", "SYSTEM");
+            return 0;
+        }
+        if (!"Approved".equalsIgnoreCase(homeLoan.getStatus()) || homeLoan.getNextEmiDate() == null
+                || homeLoan.getRemainingTenure() == null || homeLoan.getRemainingTenure() <= 0) return 0;
+
+        LocalDate dueDate = homeLoan.getNextEmiDate();
+        LocalDate debitDate = dueDate.withDayOfMonth(Math.min(mandate.getDebitDay(), dueDate.lengthOfMonth()));
+        if (debitDate.isAfter(today)) return 0;
+
+        boolean debited = false;
+        Double amount;
+        try {
+            amount = toDouble(homeLoanService.emiDue(homeLoan.getId()).get("totalAmount"));
+        } catch (Exception e) {
+            recordProductFailure(mandate, null, "Home loan EMI lookup failed: " + e.getMessage());
+            mandate.setLastAttemptDate(today);
+            mandateRepository.save(mandate);
+            return 0;
+        }
+        if (amount == null || amount <= 0) {
+            recordProductFailure(mandate, amount, "Home loan EMI amount is unavailable");
+        } else if (amount > mandate.getAmountLimit()) {
+            recordProductFailure(mandate, amount, "Home loan EMI ₹" + amount
+                    + " exceeds mandate limit ₹" + mandate.getAmountLimit());
+        } else {
+            try {
+                homeLoanService.payEmiFromAccount(homeLoan.getId(), mandate.getSavingsAccountNumber(), "ECS");
+                mandate.setSuccessfulDebits(mandate.getSuccessfulDebits() + 1);
+                mandate.setLastDebitAt(LocalDateTime.now());
+                mandate.setLastDebitStatus("SUCCESS");
+                mandate.setLastDebitMessage("Home Loan EMI #" + (homeLoan.getPaidEmis() + 1) + " debited");
+                mandate.setEmiAmount(currentEmiAmount(mandate.getLoanAccountNumber()));
+                log(mandate, "DEBIT_SUCCESS", homeLoan.getPaidEmis() + 1, amount,
+                        "Home Loan EMI auto-debited from " + mandate.getSavingsAccountNumber(), "SYSTEM");
+                debited = true;
+                HomeLoan updatedLoan = homeLoanRepository.findById(homeLoan.getId()).orElse(homeLoan);
+                if ("Closed".equalsIgnoreCase(updatedLoan.getStatus()) || updatedLoan.getRemainingTenure() <= 0) {
+                    mandate.setStatus("CANCELLED");
+                    mandate.setCancelledBy("SYSTEM");
+                    mandate.setCancelledAt(LocalDateTime.now());
+                    log(mandate, "CANCELLED", null, null, "Mandate closed automatically: home loan fully repaid", "SYSTEM");
+                }
+            } catch (Exception e) {
+                recordProductFailure(mandate, amount, "Home loan debit error: " + e.getMessage());
+            }
+        }
+        mandate.setLastAttemptDate(today);
+        mandateRepository.save(mandate);
+        return debited ? 1 : 0;
+    }
+
+    private int debitCreditCardMinimum(EcsMandate mandate, LocalDate today) {
+        CreditCard card = creditCardRepository.findByCardNumber(mandate.getLoanAccountNumber()).orElse(null);
+        List<CreditCardBill> pending = card == null ? List.of() : pendingMinimumDues(card.getId());
+        if (pending.isEmpty()) return 0;
+
+        CreditCardBill bill = pending.get(0);
+        if (bill.getDueDate() == null) {
+            recordProductFailure(mandate, null, "Credit card bill has no due date");
+        } else {
+            LocalDate dueDate = bill.getDueDate().toLocalDate();
+            LocalDate debitDate = dueDate.withDayOfMonth(Math.min(mandate.getDebitDay(), dueDate.lengthOfMonth()));
+            if (debitDate.isAfter(today)) return 0;
+
+            double amount = bill.getMinimumDue() - (bill.getPaidAmount() == null ? 0.0 : bill.getPaidAmount());
+            if (amount > mandate.getAmountLimit()) {
+                recordProductFailure(mandate, amount, "Credit card minimum due ₹" + amount
+                        + " exceeds mandate limit ₹" + mandate.getAmountLimit());
+            } else {
+                try {
+                    creditCardService.payMinimumDueByEcs(bill.getId(), mandate.getSavingsAccountNumber(), "ECS");
+                    mandate.setSuccessfulDebits(mandate.getSuccessfulDebits() + 1);
+                    mandate.setLastDebitAt(LocalDateTime.now());
+                    mandate.setLastDebitStatus("SUCCESS");
+                    mandate.setLastDebitMessage("Credit card minimum due debited");
+                    mandate.setEmiAmount(nextCardMinimumDue(card.getId()));
+                    log(mandate, "DEBIT_SUCCESS", null, amount,
+                            "Credit card minimum due auto-debited from " + mandate.getSavingsAccountNumber(), "SYSTEM");
+                    mandate.setLastAttemptDate(today);
+                    mandateRepository.save(mandate);
+                    return 1;
+                } catch (Exception e) {
+                    recordProductFailure(mandate, amount, "Credit card debit error: " + e.getMessage());
+                }
+            }
+        }
+        mandate.setLastAttemptDate(today);
+        mandateRepository.save(mandate);
+        return "SUCCESS".equals(mandate.getLastDebitStatus()) && mandate.getLastDebitAt() != null
+                && mandate.getLastDebitAt().toLocalDate().equals(today) ? 1 : 0;
+    }
+
+    private void recordProductFailure(EcsMandate mandate, Double amount, String message) {
+        mandate.setFailedDebits(mandate.getFailedDebits() + 1);
+        mandate.setLastDebitAt(LocalDateTime.now());
+        mandate.setLastDebitStatus("FAILED");
+        mandate.setLastDebitMessage(message);
+        log(mandate, "DEBIT_FAILED", null, amount, message, "SYSTEM");
+    }
+
     private void recordFailure(EcsMandate m, EmiPayment emi, String message) {
         m.setFailedDebits(m.getFailedDebits() + 1);
+        m.setLastDebitAt(LocalDateTime.now());
         m.setLastDebitStatus("FAILED");
         m.setLastDebitMessage(message);
-        log(m, "DEBIT_FAILED", emi.getEmiNumber(), emi.getTotalAmount(), message, "SYSTEM");
+        log(m, "DEBIT_FAILED", emi == null ? null : emi.getEmiNumber(),
+                emi == null ? null : emi.getTotalAmount(), message, "SYSTEM");
     }
 
     // ---------- helpers ----------

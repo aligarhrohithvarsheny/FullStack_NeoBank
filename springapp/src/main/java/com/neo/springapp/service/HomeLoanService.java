@@ -316,10 +316,20 @@ public class HomeLoanService {
     private double monthlyInterest(HomeLoan h) { return r2(n(h.getRemainingPrincipal()) * n(h.getInterestRate()) / 1200.0); }
 
     @Transactional
-    public HomeLoan payEmi(Long id, String actor) { return payEmi(id, actor, null); }
+    public HomeLoan payEmi(Long id, String actor) { return payEmi(id, actor, null, null); }
 
     @Transactional
-    public HomeLoan payEmi(Long id, String actor, String ref) {
+    public HomeLoan payEmi(Long id, String actor, String ref) { return payEmi(id, actor, ref, null); }
+
+    @Transactional
+    public HomeLoan payEmiFromAccount(Long id, String debitAccountNumber, String actor) {
+        if (debitAccountNumber == null || debitAccountNumber.isBlank()) {
+            throw new IllegalArgumentException("Debit account number is required");
+        }
+        return payEmi(id, actor, null, debitAccountNumber);
+    }
+
+    private HomeLoan payEmi(Long id, String actor, String ref, String debitAccountNumber) {
         HomeLoan h = activeLoan(id);
         double interest = monthlyInterest(h);
         double rp = n(h.getRemainingPrincipal());
@@ -329,7 +339,8 @@ public class HomeLoanService {
         double debit = r2(principal + interest);
         String emiDescription = "Home Loan EMI " + (h.getPaidEmis() + 1) + " - " + h.getLoanAccountNumber()
                 + " (principal " + principal + ", interest " + interest + ")";
-        if (ref == null) debitAccount(h, debit, "Home Loan EMI", emiDescription);
+        if (debitAccountNumber != null) debitAccount(h, debitAccountNumber, debit, "Home Loan EMI", emiDescription);
+        else if (ref == null) debitAccount(h, debit, "Home Loan EMI", emiDescription);
         else creditTreasury(h, debit, "Home Loan EMI", emiDescription + refNote(ref));
         h.setPrincipalPaid(r2(n(h.getPrincipalPaid()) + principal));
         h.setInterestPaid(r2(n(h.getInterestPaid()) + interest));
@@ -691,14 +702,18 @@ public class HomeLoanService {
     // ---------- helpers ----------
 
     private void debitAccount(HomeLoan h, double amount, String merchant, String desc) {
-        Account acc = accountRepository.findByAccountNumber(h.getAccountNumber());
+        debitAccount(h, h.getAccountNumber(), amount, merchant, desc);
+    }
+
+    private void debitAccount(HomeLoan h, String accountNumber, double amount, String merchant, String desc) {
+        Account acc = accountRepository.findByAccountNumber(accountNumber);
         if (acc == null) throw new RuntimeException("Account not found");
         if (n(acc.getBalance()) < amount) throw new RuntimeException("Insufficient balance. Required " + amount);
         double nb = r2(n(acc.getBalance()) - amount);
         acc.setBalance(nb);
         accountRepository.save(acc);
-        saveTxn(h, merchant, amount, "Debit", nb, desc);
-        creditTreasury(h, amount, merchant, desc);
+        saveTxn(h, accountNumber, merchant, amount, "Debit", nb, desc);
+        branchAccountService.recordTreasuryMovement(amount, true, merchant, desc, accountNumber);
     }
 
     private void creditTreasury(HomeLoan h, double amount, String merchant, String description) {
@@ -706,11 +721,15 @@ public class HomeLoanService {
     }
 
     private void saveTxn(HomeLoan h, String merchant, double amount, String type, double balance, String desc) {
+        saveTxn(h, h.getAccountNumber(), merchant, amount, type, balance, desc);
+    }
+
+    private void saveTxn(HomeLoan h, String accountNumber, String merchant, double amount, String type, double balance, String desc) {
         Transaction t = new Transaction();
         t.setMerchant(merchant);
         t.setAmount(amount);
         t.setType(type);
-        t.setAccountNumber(h.getAccountNumber());
+        t.setAccountNumber(accountNumber);
         t.setUserName(h.getUserName());
         t.setDescription(desc);
         t.setDate(LocalDateTime.now());

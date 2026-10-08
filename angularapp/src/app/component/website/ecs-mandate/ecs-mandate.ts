@@ -10,7 +10,7 @@ import { environment } from '../../../../environment/environment';
   imports: [CommonModule],
   template: `
 <div class="ecs">
-  <h2>ECS Mandates (Auto-Debit EMI)</h2>
+  <h2>ECS Mandates (Auto-Debit)</h2>
   <p class="live">● Live · refreshed {{ lastRefresh | date:'mediumTime' }}</p>
   <div *ngIf="!mandates.length" class="empty">No ECS mandates are linked to your account.</div>
 
@@ -20,7 +20,7 @@ import { environment } from '../../../../environment/environment';
       <span class="pill {{ m.status }}">{{ m.status }}</span>
     </div>
     <div class="row"><span>Linked savings account</span><b>{{ m.savingsAccountNumber }}</b></div>
-    <div class="row"><span>EMI / Limit</span><b>₹{{ m.emiAmount }} / ₹{{ m.amountLimit }}</b></div>
+    <div class="row"><span>{{ m.loanType === 'Credit Card' ? 'Minimum due / Limit' : 'EMI / Limit' }}</span><b>₹{{ m.emiAmount }} / ₹{{ m.amountLimit }}</b></div>
     <div class="row"><span>Debit date</span><b>Day {{ m.debitDay }} of every month</b></div>
     <div class="row"><span>EMIs debited</span><b>{{ m.successfulDebits || 0 }} successful, {{ m.failedDebits || 0 }} failed</b></div>
     <div class="row"><span>Last debit</span><b>{{ m.lastDebitStatus || '-' }} {{ m.lastDebitAt | date:'medium' }}</b></div>
@@ -35,9 +35,15 @@ import { environment } from '../../../../environment/environment';
     </div>
     <div *ngIf="expanded===m.id && detail">
       <p>Current balance: <b>₹{{ detail.accountBalance }}</b></p>
-      <table>
+      <table *ngIf="detail.emis?.length">
         <thead><tr><th>#</th><th>Due</th><th>Amount</th><th>Status</th><th>Debited on</th></tr></thead>
         <tbody><tr *ngFor="let e of detail.emis"><td>{{ e.emiNumber }}</td><td>{{ e.dueDate }}</td><td>₹{{ e.totalAmount }}</td><td>{{ e.status }}</td><td>{{ e.paymentDate | date:'short' }}</td></tr></tbody>
+      </table>
+      <p *ngIf="!detail.emis?.length">Payment history is available under mandate activity.</p>
+      <h4>Mandate activity</h4>
+      <table>
+        <thead><tr><th>When</th><th>Event</th><th>Amount</th><th>Details</th></tr></thead>
+        <tbody><tr *ngFor="let event of detail.events"><td>{{ event.createdAt | date:'short' }}</td><td>{{ event.eventType }}</td><td>{{ event.amount == null ? '-' : '₹' + event.amount }}</td><td>{{ event.message }}</td></tr></tbody>
       </table>
     </div>
   </div>
