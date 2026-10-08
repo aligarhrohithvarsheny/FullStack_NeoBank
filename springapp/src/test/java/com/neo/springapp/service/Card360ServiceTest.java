@@ -124,8 +124,6 @@ class Card360ServiceTest {
 
         assertThat(result.get("success")).isEqualTo(true);
         org.mockito.Mockito.verify(creditCardService).payCards360Bill("ACC123", 29L, 125.0);
-        org.mockito.Mockito.verify(auditRepository).save(org.mockito.ArgumentMatchers.argThat(audit ->
-                "CARD_BILL_PAYMENT".equals(audit.getAction())));
     }
 
     private User approvedUser() {

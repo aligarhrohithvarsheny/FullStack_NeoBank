@@ -635,6 +635,9 @@ public class CreditCardService {
         if (customerAccountNumber == null || customerAccountNumber.isBlank()) {
             throw new IllegalArgumentException("Customer account is required");
         }
+        if (creditCardId == null) {
+            throw new IllegalArgumentException("Credit card is required");
+        }
         CreditCard card = creditCardRepository.findById(creditCardId)
                 .filter(value -> customerAccountNumber.equals(value.getAccountNumber()))
                 .orElseThrow(() -> new IllegalArgumentException("Credit card does not belong to this customer"));
