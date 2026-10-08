@@ -147,7 +147,7 @@
         <button type="button" class="cb-strip-subitem" [class.active]="selectedFeature === 'fixed-deposits'" (click)="selectFeature('fixed-deposits')">Fixed Deposits</button>
         <button type="button" class="cb-strip-subitem" [class.active]="selectedFeature === 'deposit-request'" (click)="selectFeature('deposit-request')">Cash Deposit Slip</button>
       </div>
-      <div class="cb-strip-item" [class.active]="['loan', 'goldloan', 'homeloan', 'ml-loan-prediction'].includes(selectedFeature || '')" role="button" tabindex="0" [attr.aria-expanded]="expandedSidebarCategory === 'loans'" (click)="toggleSidebarCategory('loans')" (keydown.enter)="toggleSidebarCategory('loans')" (keydown.space)="toggleSidebarCategory('loans')">
+      <div class="cb-strip-item" [class.active]="['loan', 'goldloan', 'homeloan', 'ecs-mandate', 'ml-loan-prediction'].includes(selectedFeature || '')" role="button" tabindex="0" [attr.aria-expanded]="expandedSidebarCategory === 'loans'" (click)="toggleSidebarCategory('loans')" (keydown.enter)="toggleSidebarCategory('loans')" (keydown.space)="toggleSidebarCategory('loans')">
         <div class="cb-strip-icon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
         </div>
@@ -157,6 +157,7 @@
       <div class="cb-strip-submenu" *ngIf="expandedSidebarCategory === 'loans'">
         <button type="button" class="cb-strip-subitem" [class.active]="selectedFeature === 'loan'" (click)="selectFeature('loan')">Personal Loans</button>
         <button type="button" class="cb-strip-subitem" [class.active]="selectedFeature === 'goldloan'" (click)="selectFeature('goldloan')">Gold Loans</button>
+        <button type="button" class="cb-strip-subitem" [class.active]="selectedFeature === 'ecs-mandate'" (click)="selectFeature('ecs-mandate')">ECS Mandates</button>
 <button type="button" class="cb-strip-subitem" [class.active]="selectedFeature === 'homeloan'" (click)="selectFeature('homeloan')">Home Loans</button>
         <button type="button" class="cb-strip-subitem" [class.active]="selectedFeature === 'ml-loan-prediction'" (click)="selectFeature('ml-loan-prediction')">Loan Eligibility</button>
       </div>
@@ -967,6 +968,7 @@
       <div *ngIf="selectedFeature === 'cheque'" class="ud-embedded"><app-cheque></app-cheque></div>
       <div *ngIf="selectedFeature === 'kycupdate'" class="ud-embedded"><app-kycupdate></app-kycupdate></div>
       <div *ngIf="selectedFeature === 'goldloan'" class="ud-embedded"><app-goldloan></app-goldloan></div>
+      <div *ngIf="selectedFeature === 'ecs-mandate'" class="ud-embedded"><app-ecs-mandate></app-ecs-mandate></div>
 <div *ngIf="selectedFeature === 'homeloan'" class="ud-embedded"><app-homeloan></app-homeloan></div>
       <div *ngIf="selectedFeature === 'demand-draft'" class="ud-embedded"><app-demand-draft></app-demand-draft></div>
       <div *ngIf="selectedFeature === 'subsidy-claim'" class="ud-embedded"><app-subsidy-claim></app-subsidy-claim></div>

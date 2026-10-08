@@ -40,7 +40,8 @@
             <a href="#" class="dropdown-item" (click)="goTo('website/merchant-login', $event)">Merchant Login</a>
             <a href="#" class="dropdown-item" (click)="goTo('website/agent-login', $event)">Agent Login</a>
             <a href="#" class="dropdown-item" (click)="goTo('website/pg-login', $event)">Payment Gateway Login</a>
-          </div>
+                        <a href="#" class="dropdown-item" (click)="goTo('website/ecs-cancel-request', $event)">ECS Cancel Request</a>
+                      </div>
         </div>
         <div class="nav-item dropdown">
           <a href="#" class="nav-link" (click)="toggleInvestInsureDropdown($event)">Invest & Insure <span class="chevron">▾</span></a>
@@ -684,31 +685,31 @@
         <div class="footer-col">
           <h4 class="footer-heading">Services</h4>
           <ul class="footer-links">
-            <li><a href="#">Savings Account</a></li>
-            <li><a href="#">Current Account</a></li>
-            <li><a href="#">Personal Loan</a></li>
-            <li><a href="#">Credit Card</a></li>
-            <li><a href="#">FASTag</a></li>
+            <li><a href="#" (click)="openFooterInformation('Savings Account', $event)">Savings Account</a></li>
+            <li><a href="#" (click)="openFooterInformation('Current Account', $event)">Current Account</a></li>
+            <li><a href="#" (click)="openFooterInformation('Personal Loan', $event)">Personal Loan</a></li>
+            <li><a href="#" (click)="openFooterInformation('Credit Card', $event)">Credit Card</a></li>
+            <li><a href="#" (click)="openFooterInformation('FASTag', $event)">FASTag</a></li>
           </ul>
         </div>
         <div class="footer-col">
           <h4 class="footer-heading">Company</h4>
           <ul class="footer-links">
-            <li><a href="#">About Us</a></li>
-            <li><a href="#">Careers</a></li>
-            <li><a href="#">Press</a></li>
-            <li><a href="#">Blog</a></li>
-            <li><a href="#">Partners</a></li>
+            <li><a href="#" (click)="openFooterInformation('About Us', $event)">About Us</a></li>
+            <li><a href="#" (click)="openFooterInformation('Careers', $event)">Careers</a></li>
+            <li><a href="#" (click)="openFooterInformation('Press', $event)">Press</a></li>
+            <li><a href="#" (click)="openFooterInformation('Blog', $event)">Blog</a></li>
+            <li><a href="#" (click)="openFooterInformation('Partners', $event)">Partners</a></li>
           </ul>
         </div>
         <div class="footer-col">
           <h4 class="footer-heading">Help Center</h4>
           <ul class="footer-links">
-            <li><a href="#">FAQs</a></li>
-            <li><a href="#">Contact Support</a></li>
-            <li><a href="#">Privacy Policy</a></li>
-            <li><a href="#">Terms of Service</a></li>
-            <li><a href="#">Grievance Redressal</a></li>
+            <li><a href="#" (click)="openFooterInformation('FAQs', $event)">FAQs</a></li>
+            <li><a href="#" (click)="openFooterInformation('Contact Support', $event)">Contact Support</a></li>
+            <li><a href="#" (click)="openFooterInformation('Privacy Policy', $event)">Privacy Policy</a></li>
+            <li><a href="#" (click)="openFooterInformation('Terms of Service', $event)">Terms of Service</a></li>
+            <li><a href="#" (click)="openFooterInformation('Grievance Redressal', $event)">Grievance Redressal</a></li>
           </ul>
         </div>
         <div class="footer-col">
@@ -725,5 +726,39 @@
       </div>
     </div>
   </footer>
+
+  <div
+    class="footer-info-backdrop"
+    *ngIf="activeFooterInformation as information"
+    (click)="closeFooterInformation()"
+  >
+    <section
+      class="footer-info-dialog"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="footer-info-title"
+      (click)="$event.stopPropagation()"
+    >
+      <div class="footer-info-header">
+        <div>
+          <span class="footer-info-eyebrow">NEOBANK INFORMATION</span>
+          <h2 id="footer-info-title">{{ information.title }}</h2>
+        </div>
+        <button
+          type="button"
+          class="footer-info-close"
+          aria-label="Close information"
+          (click)="closeFooterInformation()"
+        >×</button>
+      </div>
+      <div class="footer-info-body">
+        <p class="footer-info-description">{{ information.description }}</p>
+        <p *ngFor="let detail of information.details">{{ detail }}</p>
+      </div>
+      <div class="footer-info-footer">
+        <button type="button" (click)="closeFooterInformation()">Close</button>
+      </div>
+    </section>
+  </div>
 
 </div>

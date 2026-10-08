@@ -19,6 +19,7 @@ import { Transferfunds } from './component/website/transferfunds/transferfunds';
 import { Createaccount } from './component/website/createaccount/createaccount';
 import { User } from './component/website/user/user';
 import { Landing } from './component/website/landing/landing';
+import { EcsCancelRequest } from './component/website/ecs-cancel-request/ecs-cancel-request';
 import { Loan } from './component/website/loan/loan';
 import { Card } from './component/website/card/card';
 import { Transaction } from './component/website/transaction/transaction';
@@ -45,6 +46,7 @@ import { CompleteProfile } from './component/admin/complete-profile/complete-pro
 import { Investments } from './component/admin/investments/investments';
 import { FixedDeposits } from './component/admin/fixed-deposits/fixed-deposits';
 import { EmiManagement } from './component/admin/emi-management/emi-management';
+import { EcsMandates } from './component/admin/ecs-mandates/ecs-mandates';
 import { CreditCards } from './component/admin/credit-cards/credit-cards';
 import { CurrentAccounts } from './component/admin/current-accounts/current-accounts';
 import { AdminInsuranceDashboard } from './component/admin/insurance-dashboard/insurance-dashboard';
@@ -115,6 +117,7 @@ export const routes: Routes = [
   { path: 'admin/investments', component: Investments, canActivate: [adminAuthGuard] },
   { path: 'admin/fixed-deposits', component: FixedDeposits, canActivate: [adminAuthGuard] },
   { path: 'admin/emi-management', component: EmiManagement, canActivate: [adminAuthGuard] },
+  { path: 'admin/ecs-mandates', component: EcsMandates, canActivate:[adminAuthGuard] },
   { path: 'admin/credit-cards', component: CreditCards, canActivate: [adminAuthGuard] },
   { path: 'admin/current-accounts', component: CurrentAccounts, canActivate: [adminAuthGuard] },
   { path: 'admin/insurance-dashboard', component: AdminInsuranceDashboard, canActivate: [adminAuthGuard] },
@@ -159,6 +162,7 @@ export const routes: Routes = [
       { path: 'fasttag-login', component: FasttagLogin },
       { path: 'fasttag-dashboard', component: FasttagDashboard },
       { path: 'merchant-login', component: MerchantLogin },
+      { path: 'ecs-cancel-request', component: EcsCancelRequest },
       { path: 'soundbox-payment', component: SoundboxPayment, canActivate: [merchantSoundboxAuthGuard] },
       { path: 'agent-login', component: AgentLogin },
       { path: 'agent-dashboard', component: AgentDashboard, canActivate: [agentAuthGuard] },

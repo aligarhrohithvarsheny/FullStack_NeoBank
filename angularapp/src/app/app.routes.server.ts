@@ -79,6 +79,10 @@ export const serverRoutes: ServerRoute[] = [
     renderMode: RenderMode.Client
   },
   {
+    path: 'admin/ecs-mandates',
+    renderMode: RenderMode.Client
+  },
+  {
     path: 'admin/credit-cards',
     renderMode: RenderMode.Client
   },
@@ -226,6 +230,10 @@ export const serverRoutes: ServerRoute[] = [
   {
     path: 'website/current-account-login',
     renderMode: RenderMode.Server
+  },
+  {
+    path: 'website/ecs-cancel-request',
+    renderMode: RenderMode.Client
   },
   {
     path: 'website/merchant-login',
