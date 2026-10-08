@@ -119,10 +119,15 @@ import { printFundTransferReceipt } from '../../../service/fund-transfer-receipt
         <div class="docs" *ngIf="!isLive(l) && l.status!=='Rejected'">
           <h4>Documents (upload PDF/image)</h4>
           <div class="doc" *ngFor="let d of docTypes">
-            <span>{{d.label}}: <b>{{l[d.status]||'Pending'}}</b> <i *ngIf="l[d.remark]">— {{l[d.remark]}}</i></span>
-            <input type="file" (change)="upload(l,d.key,$event)" [disabled]="l[d.status]==='Verified' || !['Documents Required','Documents Submitted','Under Review','Submitted'].includes(l.status)">
+            <span>{{d.label}}:
+              <b class="dstat" [attr.data-s]="l[d.path] ? (l[d.status]||'Pending') : 'None'">{{l[d.path] ? '? Uploaded ? ' + (l[d.status]||'Pending') : 'Not uploaded'}}</b>
+              <i *ngIf="l[d.remark]">? {{l[d.remark]}}</i></span>
+            <span *ngIf="canUpload(l) && l[d.status]!=='Verified'">
+              <input type="file" accept=".pdf,.png,.jpg,.jpeg" (change)="upload(l,d.key,$event)" [disabled]="uploading===d.key">
+              <small *ngIf="uploading===d.key"> Uploading...</small>
+            </span>
           </div>
-          <small>Documents unlock once the bank moves your application to "Documents Required".</small>
+          <small>Uploads open once the bank moves your application to "Documents Required". Allowed: PDF, PNG, JPG.</small>
         </div>
         <div *ngIf="l.status==='Rejected'" class="msg err">Rejected: {{l.rejectionReason}}</div>
 
@@ -238,6 +243,7 @@ input:focus,select:focus{outline:none;border-color:#2563eb;box-shadow:0 0 0 3px 
 .track .done{border-color:#16a34a}.track .done i{background:#16a34a;color:#fff}
 .track .cur{border-color:#2563eb}.track .cur i{background:#2563eb;color:#fff}.track .cur small{color:#1d4ed8;font-weight:600}
 .row{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.dstat{padding:2px 8px;border-radius:10px;font-size:12px;background:#fef3c7;color:#92400e}.dstat[data-s=None]{background:#f1f5f9;color:#64748b}.dstat[data-s=Verified]{background:#dcfce7;color:#166534}.dstat[data-s='Reupload Required']{background:#fee2e2;color:#991b1b}
 .badge{background:#e0e7ff;border-radius:10px;padding:2px 10px;font-size:12px;font-weight:600}
 .badge[data-s=Approved]{background:#dcfce7;color:#166534}.badge[data-s=Rejected],.badge[data-s=Cancelled]{background:#fee2e2;color:#991b1b}
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin:10px 0}
@@ -261,14 +267,15 @@ export class Homeloan implements OnInit, OnDestroy {
   prepayAmt: number | null = null; renewMonths: number | null = null; prepayPrev: any = null; closePrev: any = null;
   msg = ''; err = ''; busy = false;
   docTypes = [
-    { key: 'fdReceipt', label: 'FD Receipt', status: 'fdReceiptStatus', remark: 'fdReceiptRemark' },
-    { key: 'model', label: 'Home Loan Model', status: 'modelDocStatus', remark: 'modelDocRemark' },
-    { key: 'signature', label: 'Signature', status: 'signatureStatus', remark: 'signatureRemark' }
+    { key: 'fdReceipt', path: 'fdReceiptPath', label: 'FD Receipt', status: 'fdReceiptStatus', remark: 'fdReceiptRemark' },
+    { key: 'model', path: 'modelDocPath', label: 'Home Loan Model', status: 'modelDocStatus', remark: 'modelDocRemark' },
+    { key: 'signature', path: 'signaturePath', label: 'Signature', status: 'signatureStatus', remark: 'signatureRemark' }
   ];
   private t: any;
   private poll: any;
   adjustment = 'REDUCE_TENURE';
-  step = 1; agreed = false;
+  step = 1; agreed = false; uploading = '';
+  canUpload(l: any) { return ['Documents Required', 'Documents Submitted'].includes(l.status); }
   stages = ['Submitted', 'Under Review', 'Documents', 'Verified', 'Approved'];
   stageIdx(l: any) {
     switch (l.status) {
@@ -334,8 +341,14 @@ export class Homeloan implements OnInit, OnDestroy {
   toggle(l: any) { this.sel = this.sel?.id === l.id ? null : l; this.payments = []; if (this.sel) this.loadPayments(l); this.schedule = []; this.statement = null; this.prepayPrev = null; this.closePrev = null; }
   upload(l: any, type: string, ev: any) {
     const f = ev.target.files?.[0]; if (!f) return;
+    const input = ev.target;
+    if (f.size > 10 * 1024 * 1024) { this.flash('', 'File must be under 10 MB'); input.value = ''; return; }
     const fd = new FormData(); fd.append('file', f);
-    this.http.post(`${this.api}/${l.id}/documents/${type}`, fd).subscribe({ next: () => { this.flash('Document uploaded'); this.load(); }, error: e => this.fail(e) });
+    this.uploading = type;
+    this.http.post<any>(`${this.api}/${l.id}/documents/${type}`, fd).subscribe({
+      next: r => { this.uploading = ''; input.value = ''; this.flash('Document uploaded successfully'); if (this.sel?.id === r.id) this.sel = r; this.load(); },
+      error: e => { this.uploading = ''; input.value = ''; this.fail(e); }
+    });
   }
   act(l: any, what: string) {
     const q = `by=${encodeURIComponent(this.user.name || 'Customer')}`;
