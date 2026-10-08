@@ -129,6 +129,13 @@ export class Chat implements OnInit, OnDestroy {
     }
   }
 
+  connectToAgent() {
+    this.isOpen = true;
+    setTimeout(() => {
+      this.sendQuickMessage('Please connect me to a live support agent.');
+    }, 100);
+  }
+
   sendMessage() {
     if ((!this.newMessage.trim() && !this.selectedFile) || this.isLoading) {
       return;
@@ -288,4 +295,3 @@ export class Chat implements OnInit, OnDestroy {
     return `${environment.apiBaseUrl}${attachmentUrl}`;
   }
 }
-

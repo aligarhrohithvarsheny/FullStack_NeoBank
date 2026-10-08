@@ -97,6 +97,10 @@ public class ChatService {
      */
     private String generateBotResponse(String userId, String message) {
         String lowerMessage = message.toLowerCase().trim();
+
+        if (matchesPattern(lowerMessage, "connect me to an agent|connect me to a live agent|connect me to a live support agent|live agent|support agent|talk to a human|speak to a representative|customer representative")) {
+            return "ESCALATE_TO_ADMIN";
+        }
         
         // Check balance
         if (matchesPattern(lowerMessage, "balance|account balance|current balance|how much|money")) {
@@ -333,4 +337,3 @@ public class ChatService {
         return chatMessageRepository.findByAdminIdOrderByTimestampDesc(adminId);
     }
 }
-

@@ -54,6 +54,8 @@ export class ChequeComponent implements OnInit {
   chequeHistory: SavingsChequeHistoryEntry[] = [];
   isLoadingHistory: boolean = false;
   historyFilter: SavingsChequeStatus | 'ALL' = 'ALL';
+  historySearchInput: string = '';
+  historySearchTerm: string = '';
 
   // Tab state
   activeTab: 'form' | 'history' = 'form';
@@ -138,10 +140,40 @@ export class ChequeComponent implements OnInit {
   }
 
   getFilteredHistory(): SavingsChequeHistoryEntry[] {
-    if (this.historyFilter === 'ALL') {
-      return this.chequeHistory;
-    }
-    return this.chequeHistory.filter(c => c.status === this.historyFilter);
+    const query = this.historySearchTerm.trim().toLowerCase();
+    const normalizedQuery = query.replace(/[,\s₹]/g, '');
+
+    return this.chequeHistory.filter(cheque => {
+      const matchesStatus = this.historyFilter === 'ALL' || cheque.status === this.historyFilter;
+      if (!matchesStatus || !query) return matchesStatus;
+
+      const searchableValues = [
+        cheque.chequeNumber,
+        cheque.amount,
+        this.formatAmount(cheque.amount),
+        this.account?.accountNumber,
+        cheque.payeeAccountNumber,
+        cheque.debitedFromAccount,
+        cheque.creditedToAccount,
+        cheque.goldLoanAccountNumber,
+        cheque.homeLoanAccountNumber
+      ].filter(value => value !== undefined && value !== null);
+
+      return searchableValues.some(value => {
+        const text = String(value).toLowerCase();
+        return text.includes(query) ||
+          (normalizedQuery.length > 0 && text.replace(/[,\s₹]/g, '').includes(normalizedQuery));
+      });
+    });
+  }
+
+  searchChequeHistory(): void {
+    this.historySearchTerm = this.historySearchInput.trim();
+  }
+
+  clearChequeHistorySearch(): void {
+    this.historySearchInput = '';
+    this.historySearchTerm = '';
   }
 
   validateForm(): boolean {

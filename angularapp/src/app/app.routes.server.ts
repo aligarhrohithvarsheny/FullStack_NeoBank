@@ -27,6 +27,10 @@ export const serverRoutes: ServerRoute[] = [
     renderMode: RenderMode.Client
   },
   {
+    path: 'admin/cards360',
+    renderMode: RenderMode.Client
+  },
+  {
     path: 'admin/transactions',
     renderMode: RenderMode.Client
   },
@@ -144,6 +148,14 @@ export const serverRoutes: ServerRoute[] = [
   },
   {
     path: 'website/card',
+    renderMode: RenderMode.Client
+  },
+  {
+    path: 'website/cards360',
+    renderMode: RenderMode.Client
+  },
+  {
+    path: 'website/cards360/dashboard',
     renderMode: RenderMode.Client
   },
   {

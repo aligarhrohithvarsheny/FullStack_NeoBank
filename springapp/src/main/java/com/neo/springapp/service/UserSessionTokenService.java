@@ -24,8 +24,16 @@ public class UserSessionTokenService {
     }
 
     public String issue(Long userId, String accountNumber) {
+        return issue(userId, accountNumber, "USER");
+    }
+
+    public String issueCard360(Long userId, String accountNumber) {
+        return issue(userId, accountNumber, "CARD360");
+    }
+
+    private String issue(Long userId, String accountNumber, String scope) {
         long expiresAt = Instant.now().getEpochSecond() + TOKEN_LIFETIME_SECONDS;
-        String payload = userId + "|" + accountNumber + "|" + expiresAt;
+        String payload = userId + "|" + accountNumber + "|" + expiresAt + "|" + scope;
         String encodedPayload = encode(payload.getBytes(StandardCharsets.UTF_8));
         return encodedPayload + "." + encode(sign(encodedPayload));
     }
@@ -35,8 +43,11 @@ public class UserSessionTokenService {
             String[] parts = token.split("\\.", -1);
             if (parts.length != 2 || !MessageDigest.isEqual(sign(parts[0]), decode(parts[1]))) return null;
             String[] values = new String(decode(parts[0]), StandardCharsets.UTF_8).split("\\|", -1);
-            if (values.length != 3 || Long.parseLong(values[2]) < Instant.now().getEpochSecond()) return null;
-            return new SessionPrincipal(Long.parseLong(values[0]), values[1]);
+            if ((values.length != 3 && values.length != 4)
+                    || Long.parseLong(values[2]) < Instant.now().getEpochSecond()) return null;
+            String scope = values.length == 4 ? values[3] : "USER";
+            if (!"USER".equals(scope) && !"CARD360".equals(scope)) return null;
+            return new SessionPrincipal(Long.parseLong(values[0]), values[1], scope);
         } catch (RuntimeException exception) {
             return null;
         }
@@ -55,5 +66,5 @@ public class UserSessionTokenService {
     private String encode(byte[] value) { return Base64.getUrlEncoder().withoutPadding().encodeToString(value); }
     private byte[] decode(String value) { return Base64.getUrlDecoder().decode(value); }
 
-    public record SessionPrincipal(Long userId, String accountNumber) {}
+    public record SessionPrincipal(Long userId, String accountNumber, String scope) {}
 }

@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, Inject, PLATFORM_ID } from '@angular/core';
+import { Component, OnInit, OnDestroy, Inject, PLATFORM_ID, ViewChild } from '@angular/core';
 import { Router } from '@angular/router';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -77,6 +77,8 @@ type SidebarCategory = 'savings' | 'cards' | 'transfer' | 'withdrawal' | 'deposi
   styleUrls: ['./userdashboard.css']
 })
 export class Userdashboard implements OnInit, OnDestroy {
+  @ViewChild(Chat) private chatWidget?: Chat;
+
   username: string = 'User'; // default
   selectedFeature: string | null = null;
   isSidebarOpen = false;
@@ -634,10 +636,15 @@ export class Userdashboard implements OnInit, OnDestroy {
 
   selectFeature(feature: string | null) {
     this.isSidebarOpen = false;
+    if (feature === 'cards360') {
+      this.openCards360();
+      return;
+    }
     if (feature === 'positive-pay') {
       this.router.navigate(['/website/positive-pay']);
       return;
     }
+
     this.selectedFeature = feature;
     if (feature === 'deposit-request') {
       this.depositMessage = '';
@@ -646,6 +653,14 @@ export class Userdashboard implements OnInit, OnDestroy {
     if (feature) {
       this.loadFeatureData();
     }
+  }
+
+  openCards360(): void {
+    this.router.navigate(['/website/cards360']);
+  }
+
+  openSupportAgentChat() {
+    this.chatWidget?.connectToAgent();
   }
 
   getGreeting(): string {

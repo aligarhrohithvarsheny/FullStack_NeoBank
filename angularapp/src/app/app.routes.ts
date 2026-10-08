@@ -81,6 +81,8 @@ import { FamilyBankingComponent } from './component/website/family-banking/famil
 import { FamilyBankingAdminComponent } from './component/admin/family-banking/family-banking-admin';
 import { PositivePayComponent } from './component/website/positive-pay/positive-pay.component';
 import { AdminPositivePayComponent } from './component/admin/positive-pay/admin-positive-pay.component';
+import { Cards360 } from './component/website/cards360/cards360';
+import { Cards360Admin } from './component/admin/cards360-admin/cards360-admin';
 
 
 
@@ -99,6 +101,7 @@ export const routes: Routes = [
   { path: 'admin/users', component: Users, canActivate: [adminAuthGuard] },
   { path: 'admin/loans', component: Loans, canActivate: [adminAuthGuard] },
   { path: 'admin/cards', component: Cards, canActivate: [adminAuthGuard] },
+  { path: 'admin/cards360', component: Cards360Admin, canActivate: [adminAuthGuard] },
   { path: 'admin/transactions', component: Transactions, canActivate: [adminAuthGuard] },
   { path: 'admin/kyc', component: Kyc, canActivate: [adminAuthGuard] },
   { path: 'admin/cheques', component: AdminCheques, canActivate: [adminAuthGuard] },
@@ -137,6 +140,8 @@ export const routes: Routes = [
       { path: 'transferfunds', component: Transferfunds, canActivate: [userAuthGuard] },
       { path: 'createaccount', component: Createaccount },
       { path: 'user', component: User },
+      { path: 'cards360', component: Cards360 },
+      { path: 'cards360/dashboard', component: Cards360 },
       { path: 'insurance', component: Insurance, canActivate: [userAuthGuard] },
       { path: 'insurance-login', component: InsuranceLogin },
       { path: 'loan', component: Loan, canActivate: [userAuthGuard] },

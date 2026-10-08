@@ -166,7 +166,12 @@ export class User implements OnInit, OnDestroy {
         this.currentPage = 'login';
         this.alertService.userSuccess('QR Code Scanned', 'Please enter your credentials to complete login.');
       }
+
     });
+  }
+
+  openCards360(): void {
+    this.router.navigate(['/website/cards360']);
   }
   
   ngOnDestroy() {

@@ -16,6 +16,10 @@ public interface SupportTicketRepository extends JpaRepository<SupportTicket, Lo
 
     Optional<SupportTicket> findByTicketId(String ticketId);
 
+    Optional<SupportTicket> findByIdAndAccountNumber(Long id, String accountNumber);
+
+    Optional<SupportTicket> findByTicketIdAndAccountNumber(String ticketId, String accountNumber);
+
     List<SupportTicket> findByStatus(String status);
 
     List<SupportTicket> findByCategory(String category);

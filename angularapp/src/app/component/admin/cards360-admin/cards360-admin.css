@@ -1,0 +1,30 @@
+.c360-admin{min-height:100vh;background:#f4f7fb;color:#20344b;padding:0 5vw 50px;font-family:Arial,sans-serif}
+.c360-admin>header{height:68px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #dce4ee;color:#64768a;font-size:13px}
+.c360-admin>header button{border:0;background:none;color:#214c73;font:inherit;font-weight:700;cursor:pointer}
+.c360-admin-panel{max-width:1100px;margin:38px auto;background:#fff;border:1px solid #e1e8f0;border-radius:14px;padding:32px;box-shadow:0 12px 38px #18395710}
+.c360-label{font-size:11px;letter-spacing:1.4px;font-weight:800;color:#2875b7}
+.c360-admin h1{color:#183754;margin:9px 0;font-size:32px}
+.c360-admin-panel>p{color:#718297;line-height:1.6}
+.c360-admin label{display:block;font-weight:700;font-size:13px;margin:18px 0 7px}
+.c360-admin input{width:100%;box-sizing:border-box;border:1px solid #ccd7e2;border-radius:8px;padding:12px;font:inherit}
+.c360-admin-actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:20px}
+.c360-admin-actions button{border:0;border-radius:8px;padding:11px 14px;font-weight:700;cursor:pointer}
+.c360-admin-actions button:disabled{opacity:.6}
+.primary{background:#173f68;color:#fff}
+.secondary{background:#eaf2fa;color:#244968}
+.error,.notice{padding:11px 13px;border-radius:8px;font-size:13px}
+.error{color:#a12219;background:#fff1ef}
+.notice{color:#1b6546;background:#eef9f2}
+.passcode-box{margin-top:22px;background:#f2f8ff;border:1px solid #cfe2f5;border-radius:9px;padding:16px}
+.passcode-box code{display:block;overflow-wrap:anywhere;background:#fff;padding:13px;margin:10px 0;border-radius:6px;font-size:18px;color:#183754;user-select:all}
+.passcode-box p{margin:0;color:#687d91;font-size:12px}
+.history{margin-top:36px}
+.history-heading{display:flex;justify-content:space-between;align-items:center}
+.history h2{font-size:19px;color:#183754}
+.history-heading span{font-size:12px;color:#718297}
+.history-table{overflow:auto}
+.history table{width:100%;border-collapse:collapse;font-size:13px}
+.history th,.history td{padding:12px 9px;border-bottom:1px solid #edf1f5;text-align:left;white-space:nowrap}
+.history th{font-size:11px;letter-spacing:.4px;color:#63788d;text-transform:uppercase}
+.empty{text-align:center!important;color:#8998a8;padding:25px!important;white-space:normal!important}
+@media(max-width:640px){.c360-admin{padding:0 14px 28px}.c360-admin-panel{padding:20px;margin:22px auto}.history-heading{align-items:flex-start;flex-direction:column}.c360-admin h1{font-size:27px}}

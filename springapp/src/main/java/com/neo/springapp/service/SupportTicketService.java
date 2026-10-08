@@ -4,6 +4,9 @@ import com.neo.springapp.model.SupportTicket;
 import com.neo.springapp.repository.SupportTicketRepository;
 import com.neo.springapp.model.Transaction;
 import com.neo.springapp.repository.TransactionRepository;
+import com.neo.springapp.model.User;
+import com.neo.springapp.repository.UserRepository;
+import com.neo.springapp.service.UserSessionTokenService.SessionPrincipal;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -21,19 +24,45 @@ public class SupportTicketService {
     @Autowired
     private TransactionRepository transactionRepository;
 
-    public SupportTicket createTicket(SupportTicket ticket) {
+    @Autowired
+    private UserRepository userRepository;
+
+    public SupportTicket createTicket(SupportTicket ticket, SessionPrincipal principal) {
+        User user = userRepository.findById(principal.userId())
+                .orElseThrow(() -> new IllegalArgumentException("Signed-in user was not found"));
+        String accountNumber = principal.accountNumber();
+        if (accountNumber == null || accountNumber.isBlank()
+                || !accountNumber.equals(user.getAccountNumber())) {
+            throw new IllegalArgumentException("Signed-in account could not be verified");
+        }
+        ticket.setAccountNumber(accountNumber);
+        ticket.setUserName(user.getName() == null || user.getName().isBlank()
+                ? user.getUsername() : user.getName());
+        ticket.setUserEmail(user.getEmail());
+        ticket.setTicketId("TKT-" + System.currentTimeMillis());
+        ticket.setStatus("OPEN");
+        ticket.setAdminResponse(null);
+        ticket.setAssignedTo(null);
+        ticket.setCreatedAt(LocalDateTime.now());
+        ticket.setUpdatedAt(LocalDateTime.now());
+        ticket.setResolvedAt(null);
+        ticket.setClosedAt(null);
+        ticket.setTransactionAccountNumber(null);
+        ticket.setTransactionAmount(null);
+        ticket.setTransactionType(null);
+        ticket.setTransactionStatus(null);
+        ticket.setTransactionDate(null);
+        ticket.setTransactionDescription(null);
+
         if (ticket.getTransactionId() != null && !ticket.getTransactionId().isBlank()) {
             Transaction transaction = transactionRepository.findByTransactionId(ticket.getTransactionId().trim())
                     .orElseThrow(() -> new IllegalArgumentException("Transaction ID was not found for this account"));
-            if (!ticket.getAccountNumber().equals(transaction.getAccountNumber())) {
+            if (!accountNumber.equals(transaction.getAccountNumber())) {
                 throw new IllegalArgumentException("You can only raise a ticket for your own transaction");
             }
             copyTransactionDetails(ticket, transaction);
             ticket.setTransactionId(transaction.getTransactionId());
         }
-        ticket.setTicketId("TKT-" + System.currentTimeMillis());
-        ticket.setStatus("OPEN");
-        ticket.setCreatedAt(LocalDateTime.now());
         return supportTicketRepository.save(ticket);
     }
 
@@ -63,6 +92,14 @@ public class SupportTicketService {
 
     public Optional<SupportTicket> getTicketByTicketId(String ticketId) {
         return supportTicketRepository.findByTicketId(ticketId);
+    }
+
+    public Optional<SupportTicket> getTicketByIdAndAccountNumber(Long id, String accountNumber) {
+        return supportTicketRepository.findByIdAndAccountNumber(id, accountNumber);
+    }
+
+    public Optional<SupportTicket> getTicketByTicketIdAndAccountNumber(String ticketId, String accountNumber) {
+        return supportTicketRepository.findByTicketIdAndAccountNumber(ticketId, accountNumber);
     }
 
     public List<SupportTicket> getTicketsByStatus(String status) {

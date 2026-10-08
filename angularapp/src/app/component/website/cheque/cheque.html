@@ -312,6 +312,26 @@
             <option value="CANCELLED">Cancelled</option>
             <option value="CLEARED">Cleared</option>
           </select>
+          <label class="filter-label" for="cheque-history-search">Search Cheques:</label>
+          <div class="history-search">
+            <input
+              id="cheque-history-search"
+              type="search"
+              class="history-search-input"
+              [(ngModel)]="historySearchInput"
+              (keyup.enter)="searchChequeHistory()"
+              placeholder="Cheque number, amount, or account number"
+              aria-label="Search cheque number, amount, or account number"
+            />
+            <button type="button" class="history-search-button" (click)="searchChequeHistory()">Search</button>
+            <button
+              *ngIf="historySearchInput || historySearchTerm"
+              type="button"
+              class="history-search-clear"
+              (click)="clearChequeHistorySearch()">
+              Clear
+            </button>
+          </div>
         </div>
       </div>
 
@@ -473,9 +493,15 @@
             <rect x="1" y="3" width="22" height="5" rx="1"/>
           </svg>
         </div>
-        <h3>No Cheque Requests</h3>
-        <p>You haven't requested any savings cheques yet.</p>
-        <button class="btn btn-primary" (click)="switchTab('form')">Request a Cheque</button>
+        <ng-container *ngIf="chequeHistory.length === 0; else noChequeMatches">
+          <h3>No Cheque Requests</h3>
+          <p>You haven't requested any savings cheques yet.</p>
+          <button class="btn btn-primary" (click)="switchTab('form')">Request a Cheque</button>
+        </ng-container>
+        <ng-template #noChequeMatches>
+          <h3>No Matching Cheques</h3>
+          <p>Try another cheque number, amount, or account number, or adjust the status filter.</p>
+        </ng-template>
       </div>
     </div>
   </div>

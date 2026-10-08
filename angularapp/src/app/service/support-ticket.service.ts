@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../environment/environment';
 
@@ -9,43 +9,59 @@ export class SupportTicketService {
 
   constructor(private http: HttpClient) {}
 
-  create(ticket: any): Observable<any> {
-    return this.http.post<any>(this.apiUrl, ticket);
+  private getAuthOptions(): { headers: HttpHeaders } {
+    let authToken = '';
+    if (typeof sessionStorage !== 'undefined') {
+      try {
+        authToken = JSON.parse(sessionStorage.getItem('currentUser') || '{}').authToken || '';
+      } catch {
+        authToken = '';
+      }
+    }
+    return { headers: new HttpHeaders(authToken ? { Authorization: `Bearer ${authToken}` } : {}) };
   }
 
-  verifyTransaction(accountNumber: string, transactionId: string): Observable<any> {
-    return this.http.get<any>(`${this.apiUrl}/verify-transaction?accountNumber=${encodeURIComponent(accountNumber)}&transactionId=${encodeURIComponent(transactionId)}`);
+  create(ticket: any): Observable<any> {
+    return this.http.post<any>(this.apiUrl, ticket, this.getAuthOptions());
+  }
+
+  verifyTransaction(transactionId: string): Observable<any> {
+    return this.http.get<any>(`${this.apiUrl}/verify-transaction?transactionId=${encodeURIComponent(transactionId)}`, this.getAuthOptions());
+  }
+
+  getMine(): Observable<any> {
+    return this.http.get<any>(`${this.apiUrl}/mine`, this.getAuthOptions());
   }
 
   getByAccountNumber(accountNumber: string): Observable<any> {
-    return this.http.get<any>(`${this.apiUrl}/account/${accountNumber}`);
+    return this.http.get<any>(`${this.apiUrl}/account/${encodeURIComponent(accountNumber)}`, this.getAuthOptions());
   }
 
   getById(id: number): Observable<any> {
-    return this.http.get<any>(`${this.apiUrl}/${id}`);
+    return this.http.get<any>(`${this.apiUrl}/${id}`, this.getAuthOptions());
   }
 
   getByTicketId(ticketId: string): Observable<any> {
-    return this.http.get<any>(`${this.apiUrl}/ticket/${ticketId}`);
+    return this.http.get<any>(`${this.apiUrl}/ticket/${encodeURIComponent(ticketId)}`, this.getAuthOptions());
   }
 
   getByStatus(status: string): Observable<any> {
-    return this.http.get<any>(`${this.apiUrl}/status/${status}`);
+    return this.http.get<any>(`${this.apiUrl}/status/${encodeURIComponent(status)}`, this.getAuthOptions());
   }
 
   getAll(): Observable<any> {
-    return this.http.get<any>(`${this.apiUrl}/all`);
+    return this.http.get<any>(`${this.apiUrl}/all`, this.getAuthOptions());
   }
 
   updateStatus(id: number, status: string, adminResponse?: string): Observable<any> {
-    return this.http.put<any>(`${this.apiUrl}/${id}/status`, { status, adminResponse });
+    return this.http.put<any>(`${this.apiUrl}/${id}/status`, { status, adminResponse }, this.getAuthOptions());
   }
 
   assign(id: number, assignedTo: string): Observable<any> {
-    return this.http.put<any>(`${this.apiUrl}/${id}/assign`, { assignedTo });
+    return this.http.put<any>(`${this.apiUrl}/${id}/assign`, { assignedTo }, this.getAuthOptions());
   }
 
   getStats(): Observable<any> {
-    return this.http.get<any>(`${this.apiUrl}/stats`);
+    return this.http.get<any>(`${this.apiUrl}/stats`, this.getAuthOptions());
   }
 }

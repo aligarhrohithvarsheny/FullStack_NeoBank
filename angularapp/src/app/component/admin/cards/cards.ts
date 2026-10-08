@@ -497,6 +497,10 @@ export class Cards implements OnInit {
     this.selectedCard = null;
   }
 
+  openCards360Access(): void {
+    this.router.navigate(['/admin/cards360']);
+  }
+
   updateCardInBackend(card: CardDetails, newCardNumber: string) {
     const newCvv = Math.floor(100 + Math.random() * 900).toString();
     const expiryMonth = String(Math.floor(1 + Math.random() * 12)).padStart(2, '0');

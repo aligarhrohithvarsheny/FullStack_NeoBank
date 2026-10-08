@@ -1,0 +1,45 @@
+<main class="c360-admin">
+  <header><button type="button" (click)="back()">← Admin dashboard</button><span>NeoBank · Admin</span></header>
+  <section class="c360-admin-panel">
+    <span class="c360-label">CARD ACCESS MANAGEMENT</span>
+    <h1>Cards360 access</h1>
+    <p>Issue an account-specific passcode, disable customer sign-in, and review a customer-visible change history.</p>
+    <label for="c360-account">Customer account number</label>
+    <input id="c360-account" name="accountNumber" [(ngModel)]="accountNumber" autocomplete="off" required>
+    <label for="c360-admin-email">Your admin email</label>
+    <input id="c360-admin-email" name="adminEmail" [(ngModel)]="adminEmail" type="email" autocomplete="username" required>
+    <label for="c360-admin-password">Confirm admin password</label>
+    <input id="c360-admin-password" name="adminPassword" [(ngModel)]="adminPassword" type="password" autocomplete="current-password" required>
+    <div class="c360-admin-actions">
+      <button class="primary" type="button" [disabled]="loading" (click)="generatePasscode()">Generate passcode</button>
+      <button class="secondary" type="button" [disabled]="loading" (click)="setEnabled(false)">Disable sign-in</button>
+      <button class="secondary" type="button" [disabled]="loading" (click)="setEnabled(true)">Enable sign-in</button>
+      <button class="secondary" type="button" [disabled]="loading" (click)="loadHistory()">Refresh history</button>
+    </div>
+    <p *ngIf="error" class="error" role="alert">{{ error }}</p>
+    <p *ngIf="notice" class="notice" role="status">{{ notice }}</p>
+    <div *ngIf="passcode" class="passcode-box">
+      <strong>Customer passcode (shown once)</strong>
+      <code>{{ passcode }}</code>
+      <p>Deliver this securely to the verified customer. Generating another passcode invalidates this one.</p>
+    </div>
+    <section class="history">
+      <div class="history-heading"><h2>Cards360 activity</h2><span>{{ history.length }} recent changes</span></div>
+      <div class="history-table">
+        <table>
+          <thead><tr><th>Time</th><th>Action</th><th>Card</th><th>Change</th><th>Changed by</th></tr></thead>
+          <tbody>
+            <tr *ngFor="let entry of history">
+              <td>{{ entry.createdAt | date:'medium' }}</td>
+              <td>{{ entry.action }}</td>
+              <td>{{ entry.cardType || '—' }} {{ entry.cardId ? '#' + entry.cardId : '' }}</td>
+              <td>{{ entry.oldValue || '—' }} → {{ entry.newValue || '—' }}</td>
+              <td>{{ entry.changedBy || '—' }}</td>
+            </tr>
+            <tr *ngIf="!history.length"><td colspan="5" class="empty">No activity loaded. Enter an account number and verify your admin password to view history.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </section>
+</main>

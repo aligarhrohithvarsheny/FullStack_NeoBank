@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, EventEmitter, Output } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { SupportTicketService } from '../../../service/support-ticket.service';
@@ -12,11 +12,16 @@ import { AlertService } from '../../../service/alert.service';
   styleUrls: ['./support-tickets.css']
 })
 export class SupportTickets implements OnInit, OnDestroy {
+  @Output() connectToAgent = new EventEmitter<void>();
+
   accountNumber: string = '';
+  hasAuthToken = false;
   userName: string = '';
   userEmail: string = '';
   tickets: any[] = [];
   isLoading: boolean = false;
+  loadError: string = '';
+  searchQuery: string = '';
   showForm: boolean = false;
   activeTab: string = 'all';
   selectedTicket: any = null;
@@ -74,46 +79,80 @@ export class SupportTickets implements OnInit, OnDestroy {
   }
 
   refreshTickets() {
-    if (!this.accountNumber) return;
-    this.supportTicketService.getByAccountNumber(this.accountNumber).subscribe({
+    if (!this.accountNumber || !this.hasAuthToken) return;
+    this.supportTicketService.getMine().subscribe({
       next: (res: any) => {
-        this.tickets = res.tickets || [];
+        if (res.success) {
+          this.tickets = res.tickets || [];
+          this.loadError = '';
+        }
       },
-      error: () => {}
+      error: (err: any) => {
+        this.loadError = err.error?.message || 'Unable to refresh your support requests.';
+      }
     });
   }
 
   loadUserInfo() {
+    if (typeof sessionStorage === 'undefined') return;
     const currentUser = sessionStorage.getItem('currentUser');
     if (currentUser) {
       try {
         const user = JSON.parse(currentUser);
         this.accountNumber = user.accountNumber || '';
+        this.hasAuthToken = !!user.authToken;
         this.userName = user.name || user.username || '';
         this.userEmail = user.email || '';
-      } catch (e) {}
+        if (!this.hasAuthToken) {
+          this.loadError = 'Your secure session has expired. Please sign in again to use customer support.';
+        }
+      } catch {
+        this.loadError = 'Unable to read your signed-in account. Please sign in again.';
+      }
+    } else {
+      this.loadError = 'Please sign in to view your support requests.';
     }
   }
 
   loadTickets() {
-    if (!this.accountNumber) return;
+    if (!this.accountNumber || !this.hasAuthToken) return;
     this.isLoading = true;
-    this.supportTicketService.getByAccountNumber(this.accountNumber).subscribe({
+    this.loadError = '';
+    this.supportTicketService.getMine().subscribe({
       next: (res: any) => {
         this.tickets = res.tickets || [];
+        this.loadError = '';
         this.isLoading = false;
       },
-      error: () => { this.isLoading = false; }
+      error: (err: any) => {
+        this.loadError = err.error?.message || 'Unable to load your support requests. Please try again.';
+        this.isLoading = false;
+      }
     });
   }
 
   getFilteredTickets(): any[] {
-    if (this.activeTab === 'all') return this.tickets;
-    return this.tickets.filter((t: any) => t.status === this.activeTab.toUpperCase());
+    const term = this.searchQuery.trim().toLowerCase();
+    return this.tickets.filter((ticket: any) => {
+      const matchesTab = this.activeTab === 'all' || ticket.status === this.activeTab.toUpperCase();
+      const matchesSearch = !term || [
+        ticket.ticketId, ticket.subject, ticket.description, ticket.category, ticket.status
+      ].some(value => String(value || '').toLowerCase().includes(term));
+      return matchesTab && matchesSearch;
+    });
+  }
+
+  getTicketCount(status: string): number {
+    if (status === 'all') return this.tickets.length;
+    return this.tickets.filter((ticket: any) => ticket.status === status.toUpperCase()).length;
   }
 
   createTicket() {
-    if (!this.ticketForm.subject || !this.ticketForm.description) {
+    if (!this.accountNumber || !this.hasAuthToken) {
+      this.alertService.error('Sign-in Required', 'Please sign in again before submitting a support request.');
+      return;
+    }
+    if (!this.ticketForm.subject.trim() || !this.ticketForm.description.trim()) {
       this.alertService.error('Validation Error', 'Please fill subject and description');
       return;
     }
@@ -139,17 +178,23 @@ export class SupportTickets implements OnInit, OnDestroy {
           this.showForm = false;
           this.resetForm();
           this.loadTickets();
+        } else {
+          this.alertService.error('Error', res.message || 'Unable to create your support request.');
         }
         this.isSubmitting = false;
       },
-      error: () => {
-        this.alertService.error('Error', 'Error creating ticket');
+      error: (err: any) => {
+        this.alertService.error('Error', err.error?.message || 'Unable to create your support request.');
         this.isSubmitting = false;
       }
     });
   }
 
   verifyTransaction() {
+    if (!this.accountNumber || !this.hasAuthToken) {
+      this.transactionVerificationError = 'Please sign in again before verifying a transaction.';
+      return;
+    }
     const transactionId = this.ticketForm.transactionId.trim();
     if (!transactionId) {
       this.transactionVerificationError = 'Enter a transaction ID first';
@@ -158,7 +203,7 @@ export class SupportTickets implements OnInit, OnDestroy {
     this.isVerifyingTransaction = true;
     this.verifiedTransaction = null;
     this.transactionVerificationError = '';
-    this.supportTicketService.verifyTransaction(this.accountNumber, transactionId).subscribe({
+    this.supportTicketService.verifyTransaction(transactionId).subscribe({
       next: (res: any) => {
         this.isVerifyingTransaction = false;
         if (res.success) this.verifiedTransaction = res.transaction;
@@ -173,6 +218,10 @@ export class SupportTickets implements OnInit, OnDestroy {
 
   viewTicket(ticket: any) {
     this.selectedTicket = this.selectedTicket?.id === ticket.id ? null : ticket;
+  }
+
+  requestAgent() {
+    this.connectToAgent.emit();
   }
 
   resetForm() {

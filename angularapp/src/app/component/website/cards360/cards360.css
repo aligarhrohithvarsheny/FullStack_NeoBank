@@ -1,0 +1,51 @@
+.c360-page{min-height:100vh;background:linear-gradient(145deg,#edf5ff 0,#f8fbff 42%,#fff 100%);color:#12243a;font-family:Arial,sans-serif;padding:0 6vw 56px}
+.c360-header{height:76px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #dce6f1}
+.c360-brand{font-size:20px;font-weight:800;color:#102d4e;text-decoration:none;letter-spacing:-.4px}
+.c360-brand span{color:#df4b3f;margin-left:9px;font-size:16px}
+.c360-signout,.c360-text-button{border:0;background:none;color:#315d83;cursor:pointer;font-weight:700;text-decoration:none}
+.c360-login{max-width:1080px;margin:clamp(42px,9vh,100px) auto;display:grid;grid-template-columns:1fr 430px;gap:72px;align-items:center}
+.c360-intro h1,.c360-title h1{font-size:clamp(36px,5vw,58px);line-height:1.06;letter-spacing:-1.8px;margin:16px 0;color:#102d4e}
+.c360-intro p{font-size:17px;line-height:1.7;color:#5a6f86;max-width:480px}
+.c360-eyebrow{font-size:12px;letter-spacing:1.8px;font-weight:800;color:#2873b8}
+.c360-trust{margin-top:34px;color:#42715c;font-size:14px}
+.c360-panel,.c360-section{background:#fff;border:1px solid #e1eaf3;border-radius:18px;box-shadow:0 18px 48px #16365c12}
+.c360-panel{padding:32px}
+.c360-panel h2,.c360-section h2{margin:0 0 20px;color:#173655;font-size:21px}
+.c360-panel label{display:block;margin:17px 0 7px;font-size:13px;font-weight:700;color:#405b74}
+.c360-panel input,.c360-link-panel input,.c360-limit-edit input{box-sizing:border-box;width:100%;border:1px solid #ccd9e6;border-radius:9px;padding:13px 14px;font:inherit;color:#193652;outline-color:#4388c8}
+.c360-primary,.c360-secondary{border-radius:9px;padding:12px 17px;border:0;font:inherit;font-size:14px;font-weight:700;cursor:pointer}
+.c360-primary{background:#173f68;color:white}
+.c360-primary:disabled{opacity:.6;cursor:wait}
+.c360-secondary{background:#eaf2fa;color:#244968}
+.c360-panel>.c360-primary{width:100%;margin-top:21px}
+.c360-help,.c360-muted{color:#73859a;font-size:13px;line-height:1.6}
+.c360-error{color:#b42318;background:#fff3f1;border:1px solid #ffd4cf;border-radius:8px;padding:10px 12px;font-size:13px}
+.c360-notice{color:#196143;background:#edf9f1;border-radius:8px;padding:10px 12px;font-size:13px}
+.c360-dashboard{max-width:1200px;margin:44px auto}
+.c360-title{display:flex;justify-content:space-between;align-items:center;margin-bottom:28px}
+.c360-title h1{font-size:42px;margin:8px 0}
+.c360-section{padding:24px;margin:20px 0}
+.c360-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:16px}
+.c360-card{border-radius:16px;padding:22px;color:#fff;background:linear-gradient(130deg,#123453,#1d5a81 60%,#31859e);box-shadow:0 10px 28px #14395325}
+.c360-card-top,.c360-card-bottom,.c360-card-info{display:flex;align-items:center;justify-content:space-between}
+.c360-card-top{font-weight:800;font-size:12px;letter-spacing:1px}
+.c360-kind{margin:29px 0 10px;color:#d4e5f5;font-size:13px}
+.c360-number{font-size:21px;letter-spacing:1px;margin:0 0 18px}
+.c360-card-bottom{font-size:12px;color:#d4e5f5}
+.c360-card-info{margin-top:20px;gap:10px;font-size:12px;flex-wrap:wrap}
+.c360-card-info .c360-secondary{padding:9px 12px}
+.c360-limit{border-top:1px solid #ffffff33;margin-top:16px;padding-top:12px;font-size:13px;display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.c360-card .c360-text-button{color:#fff;text-decoration:underline}
+.c360-limit-edit{display:flex;gap:8px;width:100%;margin-top:6px}
+.c360-limit-edit input{max-width:160px;padding:9px}
+.c360-limit-edit .c360-primary{padding:9px 12px}
+.c360-link-panel{display:flex;justify-content:space-between;align-items:center;gap:28px}
+.c360-link-panel h2{margin-bottom:8px}
+.c360-link-panel p{color:#74869a;margin:0;font-size:13px}
+.c360-link-panel form{display:flex;gap:9px;min-width:45%}
+.c360-table-wrap{overflow-x:auto}
+.c360-table-wrap table{width:100%;border-collapse:collapse;font-size:13px}
+.c360-table-wrap th,.c360-table-wrap td{padding:13px 11px;border-bottom:1px solid #edf1f5;text-align:left;white-space:nowrap}
+.c360-table-wrap th{color:#5d7287;font-size:11px;text-transform:uppercase;letter-spacing:.5px}
+@media(max-width:800px){.c360-page{padding:0 18px 36px}.c360-login{grid-template-columns:1fr;gap:26px;margin:40px auto}.c360-intro h1{font-size:40px}.c360-panel{padding:24px}.c360-link-panel{align-items:stretch;flex-direction:column}.c360-link-panel form{min-width:0}.c360-title h1{font-size:34px}}
+@media(max-width:480px){.c360-link-panel form{flex-direction:column}.c360-section{padding:17px}.c360-card{padding:18px}}

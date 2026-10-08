@@ -178,6 +178,7 @@
           <button type="button" class="cb-strip-subitem" [class.active]="selectedFeature === 'credit-card'" (click)="selectFeature('credit-card')">Credit Card</button>
           <button type="button" class="cb-strip-subitem" [class.active]="selectedFeature === 'credit-card-bill'" (click)="selectFeature('credit-card-bill')">Card Bill Pay</button>
           <button type="button" class="cb-strip-subitem" [class.active]="selectedFeature === 'virtual-card'" (click)="selectFeature('virtual-card')">Virtual Card</button>
+          <button type="button" class="cb-strip-subitem" (click)="openCards360()">NeoBank Cards360</button>
         </div>
       </div>
       <div class="cb-strip-item" [class.active]="selectedFeature === 'subsidy-claim'" role="button" tabindex="0" [attr.aria-expanded]="expandedSidebarCategory === 'government'" (click)="toggleSidebarCategory('government')" (keydown.enter)="toggleSidebarCategory('government')" (keydown.space)="toggleSidebarCategory('government')">
@@ -974,7 +975,7 @@
       <div *ngIf="selectedFeature === 'subsidy-claim'" class="ud-embedded"><app-subsidy-claim></app-subsidy-claim></div>
       <div *ngIf="selectedFeature === 'bill-payment'" class="ud-embedded"><app-billpayment></app-billpayment></div>
       <div *ngIf="selectedFeature === 'scheduled-payments'" class="ud-embedded"><app-scheduled-payments></app-scheduled-payments></div>
-      <div *ngIf="selectedFeature === 'support-tickets'" class="ud-embedded"><app-support-tickets></app-support-tickets></div>
+      <div *ngIf="selectedFeature === 'support-tickets'" class="ud-embedded"><app-support-tickets (connectToAgent)="openSupportAgentChat()"></app-support-tickets></div>
       <div *ngIf="selectedFeature === 'bank-messages'" class="ud-embedded"><app-bank-messages></app-bank-messages></div>
       <div *ngIf="selectedFeature === 'virtual-card'" class="ud-embedded"><app-virtual-card></app-virtual-card></div>
       <div *ngIf="selectedFeature === 'beneficiary-management'" class="ud-embedded"><app-beneficiary-management></app-beneficiary-management></div>

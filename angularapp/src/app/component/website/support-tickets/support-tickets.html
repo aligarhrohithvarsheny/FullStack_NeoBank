@@ -1,14 +1,50 @@
 <div class="support-tickets-container">
   <div class="section-header">
-    <h2>🎫 Customer Support</h2>
-    <button class="btn-primary" (click)="showForm = !showForm">
-      {{ showForm ? '✕ Close' : '+ New Ticket' }}
+    <div class="support-heading">
+      <span class="support-heading-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 13v-1a8 8 0 0 1 16 0v1" />
+          <path d="M4 13h3v6H6a2 2 0 0 1-2-2v-4Zm16 0h-3v6h1a2 2 0 0 0 2-2v-4Z" />
+          <path d="M17 19a5 5 0 0 1-5 3" />
+        </svg>
+      </span>
+      <div>
+        <h2>Customer Support</h2>
+        <p>Track requests, review replies, or talk to our support team.</p>
+      </div>
+    </div>
+    <div class="header-actions">
+      <button type="button" class="btn-agent" (click)="requestAgent()">Connect to an Agent</button>
+      <button type="button" class="btn-primary" (click)="showForm = !showForm">
+        {{ showForm ? 'Close' : '+ New Request' }}
+      </button>
+    </div>
+  </div>
+
+  <div class="support-error" role="alert" *ngIf="loadError">{{ loadError }}</div>
+
+  <div class="support-overview">
+    <div class="overview-card">
+      <span class="overview-label">Your requests</span>
+      <strong>{{ tickets.length }}</strong>
+      <small>Only visible to your signed-in account</small>
+    </div>
+    <div class="overview-card">
+      <span class="overview-label">Awaiting support</span>
+      <strong>{{ getTicketCount('open') + getTicketCount('in_progress') }}</strong>
+      <small>Open or being reviewed</small>
+    </div>
+    <button type="button" class="agent-card" (click)="requestAgent()">
+      <span class="agent-status-dot"></span>
+      <span><strong>Need help now?</strong><small>Start a conversation with an agent</small></span>
+      <span aria-hidden="true">›</span>
     </button>
   </div>
 
   <!-- Create Form -->
   <div *ngIf="showForm" class="form-card">
     <h3>Raise Support Request</h3>
+    <p class="form-intro">Include the details that will help us resolve your issue. Your request is linked to your signed-in account.</p>
     <div class="form-grid">
       <div class="form-group">
         <label>Issue Category *</label>
@@ -31,7 +67,7 @@
         <textarea [(ngModel)]="ticketForm.description" rows="4" placeholder="Describe the issue in detail..."></textarea>
       </div>
       <div class="form-group full-width">
-        <label>Transaction ID</label>
+        <label>Related Transaction ID <span class="optional-label">{{ ticketForm.category === 'TRANSACTION_FAILED' ? 'Required for this issue' : 'Optional' }}</span></label>
         <div class="transaction-verify-row">
           <input type="text" [(ngModel)]="ticketForm.transactionId" (input)="verifiedTransaction = null; transactionVerificationError = ''" placeholder="Enter only a transaction from your account" />
           <button class="btn-secondary" type="button" (click)="verifyTransaction()" [disabled]="isVerifyingTransaction || !ticketForm.transactionId.trim()">
@@ -60,11 +96,17 @@
 
   <!-- Tabs -->
   <div class="tabs">
-    <button [class.active]="activeTab === 'all'" (click)="activeTab = 'all'">All ({{ tickets.length }})</button>
-    <button [class.active]="activeTab === 'open'" (click)="activeTab = 'open'">Open</button>
-    <button [class.active]="activeTab === 'in_progress'" (click)="activeTab = 'in_progress'">In Progress</button>
-    <button [class.active]="activeTab === 'resolved'" (click)="activeTab = 'resolved'">Resolved</button>
-    <button [class.active]="activeTab === 'closed'" (click)="activeTab = 'closed'">Closed</button>
+    <div class="tab-buttons" role="tablist" aria-label="Filter support requests">
+      <button type="button" role="tab" [attr.aria-selected]="activeTab === 'all'" [class.active]="activeTab === 'all'" (click)="activeTab = 'all'">All <span>{{ getTicketCount('all') }}</span></button>
+      <button type="button" role="tab" [attr.aria-selected]="activeTab === 'open'" [class.active]="activeTab === 'open'" (click)="activeTab = 'open'">Open <span>{{ getTicketCount('open') }}</span></button>
+      <button type="button" role="tab" [attr.aria-selected]="activeTab === 'in_progress'" [class.active]="activeTab === 'in_progress'" (click)="activeTab = 'in_progress'">In Progress <span>{{ getTicketCount('in_progress') }}</span></button>
+      <button type="button" role="tab" [attr.aria-selected]="activeTab === 'resolved'" [class.active]="activeTab === 'resolved'" (click)="activeTab = 'resolved'">Resolved <span>{{ getTicketCount('resolved') }}</span></button>
+      <button type="button" role="tab" [attr.aria-selected]="activeTab === 'closed'" [class.active]="activeTab === 'closed'" (click)="activeTab = 'closed'">Closed <span>{{ getTicketCount('closed') }}</span></button>
+    </div>
+    <label class="ticket-search">
+      <span aria-hidden="true">⌕</span>
+      <input type="search" [(ngModel)]="searchQuery" placeholder="Search your requests" aria-label="Search your support requests" />
+    </label>
   </div>
 
   <!-- Loading -->
@@ -72,17 +114,21 @@
     <div class="spinner"></div>
     <p>Loading tickets...</p>
   </div>
+  <div class="retry-row" *ngIf="loadError && hasAuthToken">
+    <button type="button" class="btn-secondary" (click)="loadTickets()">Try Again</button>
+  </div>
 
   <!-- Empty State -->
-  <div *ngIf="!isLoading && getFilteredTickets().length === 0" class="empty-state">
+  <div *ngIf="!isLoading && !loadError && getFilteredTickets().length === 0" class="empty-state">
     <span class="empty-icon">🎫</span>
-    <p>No support tickets found</p>
-    <button class="btn-primary" (click)="showForm = true">Raise a Ticket</button>
+    <p>{{ searchQuery ? 'No requests match your search.' : 'No support requests in this view yet.' }}</p>
+    <button type="button" class="btn-primary" *ngIf="!searchQuery" (click)="showForm = true">Raise a Request</button>
   </div>
 
   <!-- Tickets List -->
   <div class="tickets-list" *ngIf="!isLoading && getFilteredTickets().length > 0">
-    <div class="ticket-card" *ngFor="let ticket of getFilteredTickets()" (click)="viewTicket(ticket)">
+    <article class="ticket-card" *ngFor="let ticket of getFilteredTickets()" [class.expanded]="selectedTicket?.id === ticket.id">
+      <div class="ticket-summary" role="button" tabindex="0" (click)="viewTicket(ticket)" (keydown.enter)="viewTicket(ticket)" (keydown.space)="viewTicket(ticket); $event.preventDefault()" [attr.aria-expanded]="selectedTicket?.id === ticket.id">
       <div class="ticket-header">
         <span class="ticket-icon">{{ getCategoryIcon(ticket.category) }}</span>
         <div class="ticket-info">
@@ -94,10 +140,30 @@
       <div class="ticket-meta">
         <span class="priority-badge" [class]="'priority-' + ticket.priority?.toLowerCase()">{{ ticket.priority }}</span>
         <span class="date">{{ formatDate(ticket.createdAt) }}</span>
+        <span class="ticket-expand-label">{{ selectedTicket?.id === ticket.id ? 'Hide details' : 'View details' }}</span>
+      </div>
       </div>
 
       <!-- Expanded View -->
       <div class="ticket-details" *ngIf="selectedTicket?.id === ticket.id">
+        <div class="ticket-detail-grid">
+          <div class="detail-section">
+            <h5>Request details</h5>
+            <p><strong>Category:</strong> {{ ticket.category?.replace('_', ' ') }}</p>
+            <p><strong>Priority:</strong> {{ ticket.priority }}</p>
+            <p><strong>Submitted:</strong> {{ formatDate(ticket.createdAt) }}</p>
+            <p *ngIf="ticket.updatedAt"><strong>Last updated:</strong> {{ formatDate(ticket.updatedAt) }}</p>
+          </div>
+          <div class="detail-section" *ngIf="ticket.transactionId">
+            <h5>Related transaction</h5>
+            <p><strong>Transaction ID:</strong> {{ ticket.transactionId }}</p>
+            <p *ngIf="ticket.transactionAmount !== null && ticket.transactionAmount !== undefined"><strong>Amount:</strong> ₹{{ ticket.transactionAmount | number:'1.2-2' }}</p>
+            <p *ngIf="ticket.transactionType"><strong>Type:</strong> {{ ticket.transactionType }}</p>
+            <p *ngIf="ticket.transactionStatus"><strong>Transaction status:</strong> {{ ticket.transactionStatus }}</p>
+            <p *ngIf="ticket.transactionDate"><strong>Date:</strong> {{ ticket.transactionDate | date:'dd/MM/yyyy HH:mm' }}</p>
+            <p *ngIf="ticket.transactionDescription"><strong>Description:</strong> {{ ticket.transactionDescription }}</p>
+          </div>
+        </div>
         <div class="detail-section">
           <h5>Description</h5>
           <p>{{ ticket.description }}</p>
@@ -114,7 +180,12 @@
           <h5>Resolved At</h5>
           <p>{{ formatDate(ticket.resolvedAt) }}</p>
         </div>
+        <div class="detail-section" *ngIf="ticket.closedAt">
+          <h5>Closed At</h5>
+          <p>{{ formatDate(ticket.closedAt) }}</p>
+        </div>
+        <button type="button" class="btn-agent detail-agent-button" (click)="requestAgent()">Ask an agent about this request</button>
       </div>
-    </div>
+    </article>
   </div>
 </div>
