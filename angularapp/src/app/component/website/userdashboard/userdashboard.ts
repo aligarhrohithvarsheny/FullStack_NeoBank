@@ -19,6 +19,7 @@ import { Loan } from '../loan/loan';
 import { ChequeComponent } from '../cheque/cheque';
 import { Kycupdate } from '../kycupdate/kycupdate';
 import { Goldloan } from '../goldloan/goldloan';
+import { Homeloan } from '../homeloan/homeloan';
 import { DemandDraftComponent } from '../demand-draft/demand-draft';
 import { SubsidyClaim } from '../subsidy-claim/subsidy-claim';
 import { BillPayment } from '../billpayment/billpayment';
@@ -56,6 +57,7 @@ type SidebarCategory = 'savings' | 'cards' | 'transfer' | 'withdrawal' | 'deposi
     ChequeComponent,
     Kycupdate,
     Goldloan,
+    Homeloan,
     DemandDraftComponent,
     SubsidyClaim,
     BillPayment,
@@ -952,7 +954,7 @@ export class Userdashboard implements OnInit, OnDestroy {
       'kycupdate': 'KYC Update',
       'loan': 'Loans',
       'cheque': 'Cheque Management',
-      'goldloan': 'Gold Loan',
+      'goldloan': 'Gold Loan', 'homeloan': 'Home Loan',
       'subsidy-claim': 'Subsidy Claim',
       'ai-assistant': 'AI Financial Assistant',
       'investments': 'Investments (Mutual Funds)',
@@ -980,7 +982,7 @@ export class Userdashboard implements OnInit, OnDestroy {
       'kycupdate': 'Update your personal information and verify your identity.',
       'loan': 'Apply for personal loans, check eligibility, and manage existing loans.',
       'cheque': 'Create, view, download, and cancel cheque leaves for your account.',
-      'goldloan': 'Apply for gold loan against your gold. Get 75% of gold value as loan.',
+      'goldloan': 'Apply for gold loan against your gold. Get 75% of gold value as loan.', 'homeloan': 'Apply for a home loan, track approval, pay EMIs, prepay, renew or close.',
       'subsidy-claim': 'Claim 3 years of interest subsidy on your approved education loans.',
       'ai-assistant': 'Get AI-powered insights on your spending, loan suggestions, and charge alerts.',
       'ml-loan-prediction': 'Get instant AI-powered loan approval prediction based on your PAN card and financial profile.',
@@ -1011,7 +1013,7 @@ export class Userdashboard implements OnInit, OnDestroy {
       'kycupdate': '📑',
       'loan': '💰',
       'cheque': '📝',
-      'goldloan': '🥇',
+      'goldloan': '🥇', 'homeloan': '🏠',
       'subsidy-claim': '🎓',
       'ai-assistant': '🤖',
       'ml-loan-prediction': '🤖',
@@ -2923,7 +2925,7 @@ export class Userdashboard implements OnInit, OnDestroy {
       'loan': 'loan',
       'loans': 'loan',
       'gold loan': 'goldloan',
-      'goldloan': 'goldloan',
+      'goldloan': 'goldloan', 'home loan': 'homeloan', 'homeloan': 'homeloan',
       'deposit': 'deposit-request',
       'cheque': 'cheque',
       'check': 'cheque',

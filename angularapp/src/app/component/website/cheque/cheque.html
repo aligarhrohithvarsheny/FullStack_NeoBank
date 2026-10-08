@@ -116,6 +116,7 @@
                 (ngModelChange)="onChequePurposeChange()">
                 <option value="GENERAL">General cheque</option>
                 <option value="GOLD_LOAN_PREPAYMENT">Gold Loan prepayment only</option>
+                <option value="HOME_LOAN_PREPAYMENT">Home Loan payment (EMI / prepayment / closure)</option>
               </select>
               <small class="form-hint" *ngIf="chequePurpose === 'GOLD_LOAN_PREPAYMENT'">
                 This cheque can only be used for a prepayment on the Gold Loan account entered below, through Admin Funds Transfer.
@@ -136,6 +137,22 @@
                 maxlength="50"
                 (ngModelChange)="onFormChange()" />
               <small class="form-hint">The selected Gold Loan must belong to this savings account and be approved.</small>
+            </div>
+
+            <div class="form-group full-width" *ngIf="chequePurpose === 'HOME_LOAN_PREPAYMENT'">
+              <label for="homeLoanAccountNumber" class="form-label">
+                Home Loan Account Number <span class="required">*</span>
+              </label>
+              <input
+                type="text"
+                id="homeLoanAccountNumber"
+                class="form-input"
+                [(ngModel)]="homeLoanAccountNumber"
+                name="homeLoanAccountNumber"
+                placeholder="Enter your approved Home Loan account number (HLN...)"
+                maxlength="50"
+                (ngModelChange)="onFormChange()" />
+              <small class="form-hint">This cheque is not sent for admin approval; the bank pays your Home Loan EMI, prepayment or closure directly through Funds Transfer. The Home Loan must belong to this account.</small>
             </div>
 
             <!-- Serial Number Dropdown -->
@@ -216,7 +233,7 @@
                 class="form-input"
                 [(ngModel)]="payeeName"
                 name="payeeName"
-                [readonly]="chequePurpose === 'GOLD_LOAN_PREPAYMENT'"
+                [readonly]="chequePurpose === 'GOLD_LOAN_PREPAYMENT' || chequePurpose === 'HOME_LOAN_PREPAYMENT'"
                 [placeholder]="chequePurpose === 'GOLD_LOAN_PREPAYMENT' ? 'NeoBank Gold Loan Prepayment' : 'Name on cheque'"
                 maxlength="100"
                 (ngModelChange)="onFormChange()" />
@@ -337,6 +354,9 @@
                       placeholder="Payee Name"
                       maxlength="100"
                     />
+                    <small class="form-hint" *ngIf="cheque.chequePurpose === 'HOME_LOAN_PREPAYMENT'">
+                      Home Loan payment only · {{ cheque.homeLoanAccountNumber }}
+                    </small>
                     <small class="form-hint" *ngIf="cheque.chequePurpose === 'GOLD_LOAN_PREPAYMENT'">
                       Gold Loan prepayment only · {{ cheque.goldLoanAccountNumber }}
                     </small>
@@ -366,7 +386,7 @@
                   <td class="actions">
                     <ng-container *ngIf="(cheque.status === 'PENDING' || cheque.status === 'AWAITING_POSITIVE_PAY') && editingChequeId !== cheque.id">
                       <button
-                        *ngIf="cheque.status === 'PENDING' && cheque.chequePurpose !== 'GOLD_LOAN_PREPAYMENT'"
+                        *ngIf="cheque.status === 'PENDING' && !isLoanCheque(cheque)"
                         class="btn-icon btn-edit"
                         title="Edit Cheque Details"
                         (click)="startEditCheque(cheque)">
@@ -396,18 +416,18 @@
                       </button>
                     </ng-container>
                     <button
-                      *ngIf="cheque.chequePurpose !== 'GOLD_LOAN_PREPAYMENT' && (cheque.status === 'APPROVED' || cheque.status === 'COMPLETED' || cheque.status === 'CLEARED') && !cheque.chequeDownloaded"
+                      *ngIf="!isLoanCheque(cheque) && (cheque.status === 'APPROVED' || cheque.status === 'COMPLETED' || cheque.status === 'CLEARED') && !cheque.chequeDownloaded"
                       class="btn-icon btn-download"
                       title="Download Cheque"
                       (click)="downloadCheque(cheque)">
                       Download
                     </button>
                     <span
-                      *ngIf="cheque.chequePurpose !== 'GOLD_LOAN_PREPAYMENT' && (cheque.status === 'APPROVED' || cheque.status === 'COMPLETED' || cheque.status === 'CLEARED') && cheque.chequeDownloaded"
+                      *ngIf="!isLoanCheque(cheque) && (cheque.status === 'APPROVED' || cheque.status === 'COMPLETED' || cheque.status === 'CLEARED') && cheque.chequeDownloaded"
                       class="downloaded-badge">
                       Downloaded
                     </span>
-                    <span *ngIf="cheque.chequePurpose === 'GOLD_LOAN_PREPAYMENT' && cheque.status === 'COMPLETED'" class="downloaded-badge">
+                    <span *ngIf="isLoanCheque(cheque) && cheque.status === 'COMPLETED'" class="downloaded-badge">
                       Used for Gold Loan prepayment
                     </span>
                     <span *ngIf="cheque.status === 'REJECTED' || cheque.status === 'CANCELLED'" class="action-empty">-</span>

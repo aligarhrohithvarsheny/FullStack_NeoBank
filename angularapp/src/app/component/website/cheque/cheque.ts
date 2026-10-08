@@ -30,8 +30,13 @@ export class ChequeComponent implements OnInit {
   amount: number | null = null;
   payeeName: string = '';
   remarks: string = '';
-  chequePurpose: 'GENERAL' | 'GOLD_LOAN_PREPAYMENT' = 'GENERAL';
+  chequePurpose: 'GENERAL' | 'GOLD_LOAN_PREPAYMENT' | 'HOME_LOAN_PREPAYMENT' = 'GENERAL';
   goldLoanAccountNumber: string = '';
+  homeLoanAccountNumber: string = '';
+
+  isLoanCheque(c: any): boolean {
+    return c?.chequePurpose === 'GOLD_LOAN_PREPAYMENT' || c?.chequePurpose === 'HOME_LOAN_PREPAYMENT';
+  }
 
   // Cheque leaves
   availableLeaves: SavingsChequeLeaf[] = [];
@@ -181,6 +186,11 @@ export class ChequeComponent implements OnInit {
       return false;
     }
 
+    if (this.chequePurpose === 'HOME_LOAN_PREPAYMENT' && !this.homeLoanAccountNumber.trim()) {
+      this.errorMessage = 'Home Loan account number is required';
+      return false;
+    }
+
     if (this.amount > 5000000) {
       this.errorMessage = 'Amount cannot exceed ₹50,00,000';
       return false;
@@ -207,10 +217,15 @@ export class ChequeComponent implements OnInit {
       amount: this.amount!,
       payeeName: this.chequePurpose === 'GOLD_LOAN_PREPAYMENT'
         ? 'NeoBank Gold Loan Prepayment'
-        : this.payeeName.trim(),
+        : this.chequePurpose === 'HOME_LOAN_PREPAYMENT'
+          ? 'NeoBank Home Loan Payment'
+          : this.payeeName.trim(),
       chequePurpose: this.chequePurpose,
       goldLoanAccountNumber: this.chequePurpose === 'GOLD_LOAN_PREPAYMENT'
         ? this.goldLoanAccountNumber.trim()
+        : undefined,
+      homeLoanAccountNumber: this.chequePurpose === 'HOME_LOAN_PREPAYMENT'
+        ? this.homeLoanAccountNumber.trim()
         : undefined,
       remarks: this.remarks.trim() || undefined
     };
@@ -249,6 +264,7 @@ export class ChequeComponent implements OnInit {
     this.payeeName = '';
     this.chequePurpose = 'GENERAL';
     this.goldLoanAccountNumber = '';
+    this.homeLoanAccountNumber = '';
     this.remarks = '';
     this.errorMessage = '';
     this.successMessage = '';
@@ -258,7 +274,9 @@ export class ChequeComponent implements OnInit {
   onFormChange() {
     if (this.chequePurpose === 'GOLD_LOAN_PREPAYMENT') {
       this.payeeName = 'NeoBank Gold Loan Prepayment';
-    } else if (this.payeeName === 'NeoBank Gold Loan Prepayment') {
+    } else if (this.chequePurpose === 'HOME_LOAN_PREPAYMENT') {
+      this.payeeName = 'NeoBank Home Loan Payment';
+    } else if (this.payeeName === 'NeoBank Gold Loan Prepayment' || this.payeeName === 'NeoBank Home Loan Payment') {
       this.payeeName = '';
     }
     this.formValid = this.serialNumber.trim() !== '' &&
@@ -267,7 +285,8 @@ export class ChequeComponent implements OnInit {
                      this.amount > 0 &&
                      this.amount <= this.availableBalance &&
                      this.payeeName.trim() !== '' &&
-                     (this.chequePurpose !== 'GOLD_LOAN_PREPAYMENT' || this.goldLoanAccountNumber.trim() !== '');
+                     (this.chequePurpose !== 'GOLD_LOAN_PREPAYMENT' || this.goldLoanAccountNumber.trim() !== '') &&
+                     (this.chequePurpose !== 'HOME_LOAN_PREPAYMENT' || this.homeLoanAccountNumber.trim() !== '');
   }
 
   onChequePurposeChange() {

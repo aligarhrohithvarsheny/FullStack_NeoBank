@@ -53,6 +53,9 @@ public class SavingsChequeRequest {
     @Column(name = "gold_loan_account_number", length = 50)
     private String goldLoanAccountNumber;
 
+    @Column(length = 50)
+    private String homeLoanAccountNumber;
+
     @Column(name = "remarks", columnDefinition = "TEXT")
     private String remarks;
 
@@ -162,6 +165,8 @@ public class SavingsChequeRequest {
     public String getChequePurpose() { return chequePurpose; }
     public void setChequePurpose(String chequePurpose) { this.chequePurpose = chequePurpose; }
 
+    public String getHomeLoanAccountNumber() { return homeLoanAccountNumber; }
+    public void setHomeLoanAccountNumber(String homeLoanAccountNumber) { this.homeLoanAccountNumber = homeLoanAccountNumber; }
     public String getGoldLoanAccountNumber() { return goldLoanAccountNumber; }
     public void setGoldLoanAccountNumber(String goldLoanAccountNumber) { this.goldLoanAccountNumber = goldLoanAccountNumber; }
 

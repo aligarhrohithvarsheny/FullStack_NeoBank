@@ -13,8 +13,9 @@ export interface SavingsChequeRequest {
   amount: number;
   availableBalance: number;
   payeeName: string;
-  chequePurpose?: 'GENERAL' | 'GOLD_LOAN_PREPAYMENT';
+  chequePurpose?: 'GENERAL' | 'GOLD_LOAN_PREPAYMENT' | 'HOME_LOAN_PREPAYMENT';
   goldLoanAccountNumber?: string;
+  homeLoanAccountNumber?: string;
   remarks?: string;
   status: SavingsChequeStatus;
   createdAt?: string;
@@ -52,8 +53,9 @@ export interface SavingsChequeDrawRequest {
   chequeDate: string;
   amount: number;
   payeeName: string;
-  chequePurpose?: 'GENERAL' | 'GOLD_LOAN_PREPAYMENT';
+  chequePurpose?: 'GENERAL' | 'GOLD_LOAN_PREPAYMENT' | 'HOME_LOAN_PREPAYMENT';
   goldLoanAccountNumber?: string;
+  homeLoanAccountNumber?: string;
   remarks?: string;
 }
 
@@ -64,8 +66,9 @@ export interface SavingsChequeHistoryEntry {
   amount: number;
   chequeDate: string;
   payeeName: string;
-  chequePurpose?: 'GENERAL' | 'GOLD_LOAN_PREPAYMENT';
+  chequePurpose?: 'GENERAL' | 'GOLD_LOAN_PREPAYMENT' | 'HOME_LOAN_PREPAYMENT';
   goldLoanAccountNumber?: string;
+  homeLoanAccountNumber?: string;
   status: SavingsChequeStatus;
   requestedDate: string;
   approvedDate?: string;

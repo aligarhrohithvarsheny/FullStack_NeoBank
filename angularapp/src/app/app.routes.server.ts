@@ -43,6 +43,10 @@ export const serverRoutes: ServerRoute[] = [
     renderMode: RenderMode.Client
   },
   {
+    path: 'admin/home-loans',
+    renderMode: RenderMode.Client
+  },
+  {
     path: 'admin/user-control',
     renderMode: RenderMode.Client
   },
@@ -152,6 +156,10 @@ export const serverRoutes: ServerRoute[] = [
   },
   {
     path: 'website/cheque',
+    renderMode: RenderMode.Client
+  },
+  {
+    path: 'website/homeloan',
     renderMode: RenderMode.Client
   },
   {

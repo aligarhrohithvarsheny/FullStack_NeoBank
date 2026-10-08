@@ -67,6 +67,9 @@ public class SavingsChequeDrawService {
     private GoldLoanRepository goldLoanRepository;
 
     @Autowired
+    private HomeLoanRepository homeLoanRepository;
+
+    @Autowired
     private TransactionRepository transactionRepository;
 
     @Autowired
@@ -91,6 +94,15 @@ public class SavingsChequeDrawService {
                                                        String chequeDate, Double amount, String payeeName,
                                                        String remarks, String chequePurpose,
                                                        String goldLoanAccountNumber) {
+        return applyChequeDrawRequest(accountId, serialNumber, chequeDate, amount, payeeName,
+                remarks, chequePurpose, goldLoanAccountNumber, null);
+    }
+
+    @Transactional
+    public Map<String, Object> applyChequeDrawRequest(Long accountId, String serialNumber,
+                                                       String chequeDate, Double amount, String payeeName,
+                                                       String remarks, String chequePurpose,
+                                                       String goldLoanAccountNumber, String homeLoanAccountNumber) {
         if (amount <= 0) throw new RuntimeException("Amount must be greater than 0");
         if (amount >= 50_00_000) throw new RuntimeException("Amount cannot exceed ₹50,00,000");
 
@@ -100,6 +112,7 @@ public class SavingsChequeDrawService {
         String purpose = chequePurpose == null || chequePurpose.isBlank()
                 ? "GENERAL" : chequePurpose.trim().toUpperCase();
         String linkedGoldLoanNumber = null;
+        String linkedHomeLoanNumber = null;
         if ("GOLD_LOAN_PREPAYMENT".equals(purpose)) {
             linkedGoldLoanNumber = goldLoanAccountNumber == null ? "" : goldLoanAccountNumber.trim();
             if (linkedGoldLoanNumber.isBlank()) {
@@ -114,6 +127,20 @@ public class SavingsChequeDrawService {
                 throw new IllegalArgumentException("A Gold Loan prepayment cheque requires an approved Gold Loan");
             }
             payeeName = "NeoBank Gold Loan Prepayment";
+        } else if ("HOME_LOAN_PREPAYMENT".equals(purpose)) {
+            linkedHomeLoanNumber = homeLoanAccountNumber == null ? "" : homeLoanAccountNumber.trim();
+            if (linkedHomeLoanNumber.isBlank()) {
+                throw new IllegalArgumentException("Home loan account number is required for a prepayment cheque");
+            }
+            HomeLoan homeLoan = homeLoanRepository.findByLoanAccountNumber(linkedHomeLoanNumber)
+                    .orElseThrow(() -> new IllegalArgumentException("Home loan account not found"));
+            if (!account.getAccountNumber().equalsIgnoreCase(String.valueOf(homeLoan.getAccountNumber()))) {
+                throw new IllegalArgumentException("The selected Home Loan does not belong to this savings account");
+            }
+            if (!"Approved".equalsIgnoreCase(homeLoan.getStatus())) {
+                throw new IllegalArgumentException("A Home Loan cheque requires an approved Home Loan");
+            }
+            payeeName = "NeoBank Home Loan Payment";
         } else if (!"GENERAL".equals(purpose)) {
             throw new IllegalArgumentException("Unsupported cheque purpose");
         }
@@ -147,6 +174,7 @@ public class SavingsChequeDrawService {
         request.setPayeeName(payeeName);
         request.setChequePurpose(purpose);
         request.setGoldLoanAccountNumber(linkedGoldLoanNumber);
+        request.setHomeLoanAccountNumber(linkedHomeLoanNumber);
         request.setRemarks(remarks);
         boolean selfPayee = payeeName != null && payeeName.trim().equalsIgnoreCase("SELF");
         boolean positivePayRequired = !selfPayee && BigDecimal.valueOf(amount).compareTo(positivePayMinimumAmount) >= 0;
@@ -170,6 +198,7 @@ public class SavingsChequeDrawService {
         response.put("status", request.getStatus());
         response.put("chequePurpose", purpose);
         response.put("goldLoanAccountNumber", linkedGoldLoanNumber);
+        response.put("homeLoanAccountNumber", linkedHomeLoanNumber);
         if (positivePayRequired) {
             response.put("positivePayRequired", true);
             response.put("positivePayMessage", "This cheque is ₹10,000 or above. Register it in Positive Pay before admin draw verification.");
@@ -347,6 +376,9 @@ public class SavingsChequeDrawService {
 
         List<Map<String, Object>> items = new ArrayList<>();
         for (SavingsChequeRequest req : requests.getContent()) {
+            if ("HOME_LOAN_PREPAYMENT".equalsIgnoreCase(req.getChequePurpose())) {
+                continue;
+            }
             items.add(mapChequeRequestToAdminView(req));
         }
 
@@ -897,7 +929,8 @@ public class SavingsChequeDrawService {
     }
 
     private boolean isGoldLoanPrepaymentCheque(SavingsChequeRequest request) {
-        return "GOLD_LOAN_PREPAYMENT".equalsIgnoreCase(request.getChequePurpose());
+        return "GOLD_LOAN_PREPAYMENT".equalsIgnoreCase(request.getChequePurpose())
+                || "HOME_LOAN_PREPAYMENT".equalsIgnoreCase(request.getChequePurpose());
     }
 
     private void logAuditAction(Long chequeRequestId, String adminEmail, String action, String remarks) {
@@ -918,6 +951,7 @@ public class SavingsChequeDrawService {
         map.put("payeeName", req.getPayeeName());
         map.put("chequePurpose", req.getChequePurpose());
         map.put("goldLoanAccountNumber", req.getGoldLoanAccountNumber());
+        map.put("homeLoanAccountNumber", req.getHomeLoanAccountNumber());
         map.put("amount", req.getAmount().doubleValue());
         map.put("status", req.getStatus());
         map.put("createdAt", req.getCreatedAt());
@@ -942,6 +976,7 @@ public class SavingsChequeDrawService {
         map.put("payeeName", req.getPayeeName());
         map.put("chequePurpose", req.getChequePurpose());
         map.put("goldLoanAccountNumber", req.getGoldLoanAccountNumber());
+        map.put("homeLoanAccountNumber", req.getHomeLoanAccountNumber());
         map.put("amount", req.getAmount().doubleValue());
         map.put("remarks", req.getRemarks());
         map.put("status", req.getStatus());
@@ -968,6 +1003,7 @@ public class SavingsChequeDrawService {
         map.put("payeeName", req.getPayeeName());
         map.put("chequePurpose", req.getChequePurpose());
         map.put("goldLoanAccountNumber", req.getGoldLoanAccountNumber());
+        map.put("homeLoanAccountNumber", req.getHomeLoanAccountNumber());
         map.put("amount", req.getAmount().doubleValue());
         map.put("availableBalance", req.getAvailableBalance() != null ? req.getAvailableBalance().doubleValue() : 0.0);
         map.put("remarks", req.getRemarks());

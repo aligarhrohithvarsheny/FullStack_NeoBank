@@ -32,10 +32,11 @@ public class SavingsChequeController {
             String remarks = (String) request.get("remarks");
             String chequePurpose = (String) request.get("chequePurpose");
             String goldLoanAccountNumber = (String) request.get("goldLoanAccountNumber");
+            String homeLoanAccountNumber = (String) request.get("homeLoanAccountNumber");
 
             return ResponseEntity.ok(savingsChequeDrawService.applyChequeDrawRequest(
                     accountId, serialNumber, chequeDate, amount, payeeName, remarks,
-                    chequePurpose, goldLoanAccountNumber
+                    chequePurpose, goldLoanAccountNumber, homeLoanAccountNumber
             ));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(

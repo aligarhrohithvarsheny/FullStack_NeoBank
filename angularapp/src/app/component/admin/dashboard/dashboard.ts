@@ -103,7 +103,7 @@ export class Dashboard implements OnInit, OnDestroy {
   aftSenderChequeNumber: string = '';
   aftSenderVerification: any = null;
   aftVerifyingSender: boolean = false;
-  aftTransferCategory: 'ACCOUNT_TO_ACCOUNT' | 'GOLD_LOAN' | 'PERSONAL_LOAN' = 'ACCOUNT_TO_ACCOUNT';
+  aftTransferCategory: 'ACCOUNT_TO_ACCOUNT' | 'GOLD_LOAN' | 'PERSONAL_LOAN' | 'HOME_LOAN' = 'ACCOUNT_TO_ACCOUNT';
   aftReceiverAccountNumber: string = '';
   aftReceiverVerification: any = null;
   aftVerifyingReceiver: boolean = false;
@@ -199,6 +199,7 @@ export class Dashboard implements OnInit, OnDestroy {
     { section: 'transfers', icon: 'fa-exchange-alt', label: 'Fund Transfers', description: 'NEFT, RTGS, IMPS transfers overview', gradient: 'linear-gradient(135deg, #fbc2eb, #a6c1ee)' },
     { section: 'beneficiaries', icon: 'fa-users', label: 'Beneficiaries', description: 'Manage registered beneficiaries', gradient: 'linear-gradient(135deg, #d4fc79, #96e6a1)' },
     { section: 'loans', icon: 'fa-coins', label: 'Loan Requests', description: 'Review and approve loan applications', gradient: 'linear-gradient(135deg, #f6d365, #fda085)', featureKey: 'loans', route: 'loans' },
+    { section: 'home-loans', icon: 'fa-house', label: 'Home Loans', description: 'Home loan applications, AI analysis and repayments', gradient: 'linear-gradient(135deg, #a1c4fd, #c2e9fb)', featureKey: 'home-loans', route: 'home-loans' },
     { section: 'gold-loans', icon: 'fa-gem', label: 'Gold Loans', description: 'Manage gold loan applications', gradient: 'linear-gradient(135deg, #ffecd2, #fcb69f)', featureKey: 'gold-loans', route: 'gold-loans' },
     { section: 'family-banking', icon: 'fa-people-roof', label: 'Family Banking', description: 'Review joint and minor account workflows', gradient: 'linear-gradient(135deg, #0f766e, #38bdf8)', route: 'family-banking' },
     { section: 'investments', icon: 'fa-chart-line', label: 'Investments', description: 'Review investment portfolios', gradient: 'linear-gradient(135deg, #a1c4fd, #c2e9fb)', route: 'investments' },
@@ -390,7 +391,8 @@ export class Dashboard implements OnInit, OnDestroy {
         { section: 'transfers', icon: 'fa-exchange-alt', label: 'Fund Transfers' },
         { section: 'beneficiaries', icon: 'fa-users', label: 'Beneficiaries' },
         { section: 'loans', icon: 'fa-coins', label: 'Loan Requests', featureKey: 'loans' },
-        { section: 'gold-loans', icon: 'fa-gem', label: 'Gold Loans', featureKey: 'gold-loans' },
+        { section: 'home-loans', icon: 'fa-house', label: 'Home Loans', featureKey: 'home-loans' },
+    { section: 'gold-loans', icon: 'fa-gem', label: 'Gold Loans', featureKey: 'gold-loans' },
         { section: 'investments', icon: 'fa-chart-line', label: 'Investments' },
         { section: 'fixed-deposits', icon: 'fa-piggy-bank', label: 'Fixed Deposits' },
         { section: 'emi-management', icon: 'fa-calendar-check', label: 'EMI Management' },
@@ -1648,6 +1650,7 @@ export class Dashboard implements OnInit, OnDestroy {
       'education-loans': 'education-loans',
       'support-tickets': 'chat',
       'gold-loans': 'gold-loans',
+      'home-loans': 'home-loans',
       'family-banking': 'family-banking',
       'deposit-withdraw': 'deposit-withdraw',
       'tracking': 'tracking',
@@ -1754,6 +1757,9 @@ export class Dashboard implements OnInit, OnDestroy {
       return;
     } else if (section === 'gold-loans') {
       this.navigateToGoldLoans();
+      return;
+    } else if (section === 'home-loans') {
+      this.router.navigate(['/admin/home-loans']);
       return;
     }
 
@@ -3328,6 +3334,13 @@ export class Dashboard implements OnInit, OnDestroy {
           this.aftReceiverVerification = null;
           this.aftLoanVerification = null;
           if (this.aftReceiverAccountNumber) this.verifyAftLoan();
+        } else if (res.chequePurpose === 'HOME_LOAN_PREPAYMENT') {
+          this.aftTransferCategory = 'HOME_LOAN';
+          this.aftLoanPaymentType = 'PREPAYMENT';
+          this.aftReceiverAccountNumber = res.homeLoanAccountNumber || '';
+          this.aftReceiverVerification = null;
+          this.aftLoanVerification = null;
+          if (this.aftReceiverAccountNumber) this.verifyAftLoan();
         }
         this.aftVerifyingSender = false;
       },
@@ -3432,7 +3445,7 @@ export class Dashboard implements OnInit, OnDestroy {
           found: !!res.found,
           name: res.borrowerName,
           accountNumber: res.loanAccountNumber,
-          accountType: this.aftTransferCategory === 'GOLD_LOAN' ? 'Gold Loan' : 'Personal Loan',
+          accountType: this.aftTransferCategory === 'GOLD_LOAN' ? 'Gold Loan' : (this.aftTransferCategory === 'HOME_LOAN' ? 'Home Loan' : 'Personal Loan'),
           message: res.message
         };
         if (res.found) {
@@ -3456,7 +3469,8 @@ export class Dashboard implements OnInit, OnDestroy {
     } else if (this.aftLoanPaymentType === 'FORECLOSURE') {
       const calculation = this.aftLoanVerification?.foreclosure;
       this.aftAmount = calculation?.success ? Number(calculation.totalForeclosureAmount) : null;
-    } else if (this.aftSenderVerification?.chequePurpose === 'GOLD_LOAN_PREPAYMENT') {
+    } else if (this.aftSenderVerification?.chequePurpose === 'GOLD_LOAN_PREPAYMENT'
+        || this.aftSenderVerification?.chequePurpose === 'HOME_LOAN_PREPAYMENT') {
       this.aftAmount = Number(this.aftSenderVerification.chequeAmount);
     } else {
       this.aftAmount = null;
@@ -3488,6 +3502,13 @@ export class Dashboard implements OnInit, OnDestroy {
         this.alertService.error('Cheque Amount Mismatch', 'Prepayment amount must match the amount written on this cheque.');
         return;
       }
+    }
+    if (this.aftSenderVerification?.chequePurpose === 'HOME_LOAN_PREPAYMENT'
+        && (this.aftTransferCategory !== 'HOME_LOAN'
+          || this.aftReceiverAccountNumber.trim().toLowerCase()
+            !== String(this.aftSenderVerification.homeLoanAccountNumber || '').trim().toLowerCase())) {
+      this.alertService.error('Cheque Restricted', 'This cheque can only be used for its linked Home Loan account.');
+      return;
     }
     if (this.aftTransferCategory !== 'ACCOUNT_TO_ACCOUNT') {
       if (!this.aftLoanVerification?.found) {

@@ -76,7 +76,8 @@ export function printFundTransferReceipt(transfer: FundTransferReceiptData): boo
       ].join('')
     : '';
   const now = new Date().toLocaleString('en-IN');
-  const title = isLoanPayment ? 'Gold Loan Payment Receipt' : 'Fund Transfer Receipt';
+  const loanLabel = transfer.transferCategory === 'HOME_LOAN' ? 'Home Loan' : transfer.transferCategory === 'PERSONAL_LOAN' ? 'Personal Loan' : 'Gold Loan';
+  const title = isLoanPayment ? loanLabel + ' Payment Receipt' : 'Fund Transfer Receipt';
   const date = transfer.performedAt ? new Date(transfer.performedAt).toLocaleString('en-IN') : 'N/A';
 
   printWindow.document.write(`<!DOCTYPE html>

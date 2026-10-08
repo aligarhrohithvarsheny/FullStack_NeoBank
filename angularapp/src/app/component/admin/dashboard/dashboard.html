@@ -2875,10 +2875,11 @@
         <h4 style="margin-bottom:12px;"><i class="fa fa-random"></i> Transfer Type</h4>
         <div class="form-group" style="max-width:480px;">
           <label>Choose transfer destination *</label>
-          <select [(ngModel)]="aftTransferCategory" (ngModelChange)="onAftTransferCategoryChange()" [disabled]="aftSenderVerification?.chequePurpose === 'GOLD_LOAN_PREPAYMENT'" class="form-input">
+          <select [(ngModel)]="aftTransferCategory" (ngModelChange)="onAftTransferCategoryChange()" [disabled]="aftSenderVerification?.chequePurpose === 'GOLD_LOAN_PREPAYMENT' || aftSenderVerification?.chequePurpose === 'HOME_LOAN_PREPAYMENT'" class="form-input">
             <option value="ACCOUNT_TO_ACCOUNT">Account to Account</option>
             <option value="PERSONAL_LOAN">Personal Loan</option>
             <option value="GOLD_LOAN">Gold Loan</option>
+            <option value="HOME_LOAN">Home Loan</option>
           </select>
           <small style="color:#64748b;">Account transfers include the 0.5% fee. Loan repayments use the existing loan rules with no transfer fee.</small>
         </div>
@@ -2921,6 +2922,11 @@
               <strong>₹{{ aftSenderVerification.chequeAmount | number:'1.2-2' }}</strong>.
               It cannot be used for account transfers, EMIs, foreclosure, or another loan.
             </div>
+            <div *ngIf="aftSenderVerification.chequePurpose === 'HOME_LOAN_PREPAYMENT'" style="margin-top:8px;padding:10px;background:#eff6ff;border:1px solid #93c5fd;border-radius:4px;color:#1e3a8a;font-size:13px;">
+              This cheque is reserved for <strong>Home Loan payment</strong> (EMI, prepayment or closure) · Home Loan Account:
+              <strong>{{ aftSenderVerification.homeLoanAccountNumber }}</strong> · Cheque amount:
+              <strong>₹{{ aftSenderVerification.chequeAmount | number:'1.2-2' }}</strong>. The payment amount must equal the cheque amount.
+            </div>
             <button class="btn-link" (click)="viewAftSenderSignature()" style="margin-top:8px;"><i class="fa fa-image"></i> View Sender's Signature</button>
           </div>
         </div>
@@ -2930,7 +2936,7 @@
         <h4 style="margin-bottom:16px;"><i class="fa fa-user-plus"></i> 2. Verify {{ aftTransferCategory === 'ACCOUNT_TO_ACCOUNT' ? 'Receiver Account' : 'Loan Account' }}</h4>
         <div style="display:grid;grid-template-columns:1fr auto;gap:12px;align-items:flex-start;">
           <div class="form-group">
-            <label>{{ aftTransferCategory === 'ACCOUNT_TO_ACCOUNT' ? 'Receiver Account Number' : (aftTransferCategory === 'GOLD_LOAN' ? 'Gold Loan Account Number' : 'Personal Loan Account Number') }} *</label>
+            <label>{{ aftTransferCategory === 'ACCOUNT_TO_ACCOUNT' ? 'Receiver Account Number' : (aftTransferCategory === 'GOLD_LOAN' ? 'Gold Loan Account Number' : (aftTransferCategory === 'HOME_LOAN' ? 'Home Loan Account Number' : 'Personal Loan Account Number')) }} *</label>
             <input type="text" [(ngModel)]="aftReceiverAccountNumber" (ngModelChange)="onAftReceiverDetailsChange()" [placeholder]="aftTransferCategory === 'ACCOUNT_TO_ACCOUNT' ? 'Enter receiver account number' : 'Enter loan account number'" class="form-input" />
           </div>
           <div class="form-group" style="padding-top:24px;">

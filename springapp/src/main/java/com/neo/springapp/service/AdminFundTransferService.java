@@ -9,6 +9,8 @@ import com.neo.springapp.model.CurrentAccount;
 import com.neo.springapp.model.EmiPayment;
 import com.neo.springapp.model.GoldLoan;
 import com.neo.springapp.model.GoldLoanHistory;
+import com.neo.springapp.model.HomeLoan;
+import com.neo.springapp.repository.HomeLoanRepository;
 import com.neo.springapp.model.Loan;
 import com.neo.springapp.model.SalaryAccount;
 import com.neo.springapp.model.SavingsChequeRequest;
@@ -78,6 +80,12 @@ public class AdminFundTransferService {
     private GoldLoanService goldLoanService;
 
     @Autowired
+    private HomeLoanRepository homeLoanRepository;
+
+    @Autowired
+    private HomeLoanService homeLoanService;
+
+    @Autowired
     private LoanService loanService;
 
     @Autowired
@@ -116,6 +124,14 @@ public class AdminFundTransferService {
 
     private boolean isGoldLoanPrepaymentCheque(SavingsChequeRequest cheque) {
         return "GOLD_LOAN_PREPAYMENT".equalsIgnoreCase(cheque.getChequePurpose());
+    }
+
+    private boolean isHomeLoanCheque(SavingsChequeRequest cheque) {
+        return "HOME_LOAN_PREPAYMENT".equalsIgnoreCase(cheque.getChequePurpose());
+    }
+
+    private boolean isLoanReservedCheque(SavingsChequeRequest cheque) {
+        return isGoldLoanPrepaymentCheque(cheque) || isHomeLoanCheque(cheque);
     }
 
     private void requirePositivePayApproval(String accountNumber, SavingsChequeRequest cheque) {
@@ -164,6 +180,7 @@ public class AdminFundTransferService {
         if (resolved.value instanceof SavingsChequeRequest savingsCheque) {
             result.put("chequePurpose", savingsCheque.getChequePurpose());
             result.put("goldLoanAccountNumber", savingsCheque.getGoldLoanAccountNumber());
+            result.put("homeLoanAccountNumber", savingsCheque.getHomeLoanAccountNumber());
             result.put("chequeAmount", savingsCheque.getAmount());
         }
         result.put("accountHolderName", holderName);
@@ -205,6 +222,9 @@ public class AdminFundTransferService {
         Map<String, Object> result = new HashMap<>();
         result.put("loanType", type);
         result.put("loanAccountNumber", number);
+        if ("HOME_LOAN".equals(type)) {
+            return verifyHomeLoan(number, result);
+        }
         if ("GOLD_LOAN".equals(type)) {
             GoldLoan loan = goldLoanRepository.findByLoanAccountNumber(number).orElse(null);
             if (loan == null) {
@@ -252,7 +272,7 @@ public class AdminFundTransferService {
             return processAccountTransfer(senderAccountNumber, senderChequeNumber, receiverAccountNumber,
                     amount, description, performedBy, category);
         }
-        if (!"GOLD_LOAN".equals(category) && !"PERSONAL_LOAN".equals(category)) {
+        if (!"GOLD_LOAN".equals(category) && !"PERSONAL_LOAN".equals(category) && !"HOME_LOAN".equals(category)) {
             throw new IllegalArgumentException("Unsupported transfer category");
         }
         return processLoanPayment(senderAccountNumber, senderChequeNumber, amount, description, performedBy,
@@ -292,9 +312,9 @@ public class AdminFundTransferService {
                 throw new RuntimeException("Approved cheque number not found for sender account");
             }
             if (resolved.value instanceof SavingsChequeRequest savingsCheque
-                    && isGoldLoanPrepaymentCheque(savingsCheque)) {
-                throw new IllegalArgumentException("This cheque is reserved for prepayment of Gold Loan "
-                        + savingsCheque.getGoldLoanAccountNumber());
+                    && isLoanReservedCheque(savingsCheque)) {
+                throw new IllegalArgumentException("This cheque is reserved for loan payment of "
+                        + (isHomeLoanCheque(savingsCheque) ? savingsCheque.getHomeLoanAccountNumber() : savingsCheque.getGoldLoanAccountNumber()));
             }
         }
 
@@ -355,6 +375,10 @@ public class AdminFundTransferService {
         String normalizedLoanNumber = loanAccountNumber.trim();
         String type = normalizeLoanType(category);
         String action = loanPaymentType == null ? "" : loanPaymentType.trim().toUpperCase();
+        if ("HOME_LOAN".equals(type)) {
+            return processHomeLoanPayment(normalizedSender, senderChequeNumber, requestedAmount, description,
+                    performedBy, normalizedLoanNumber, action, prepaymentAdjustment);
+        }
         Map<String, Object> loanDetails = verifyLoan(type, normalizedLoanNumber);
         if (!Boolean.TRUE.equals(loanDetails.get("found"))) {
             throw new IllegalArgumentException(String.valueOf(loanDetails.get("message")));
@@ -373,6 +397,9 @@ public class AdminFundTransferService {
         ResolvedCheque resolved = resolveCheque(senderChequeNumber, normalizedSender);
         if (resolved == null) {
             throw new IllegalArgumentException("Approved cheque number not found for sender account");
+        }
+        if (resolved.value instanceof SavingsChequeRequest homeCheque && isHomeLoanCheque(homeCheque)) {
+            throw new IllegalArgumentException("This cheque is reserved for Home Loan " + homeCheque.getHomeLoanAccountNumber());
         }
         if (resolved.value instanceof SavingsChequeRequest savingsCheque
                 && isGoldLoanPrepaymentCheque(savingsCheque)) {
@@ -501,6 +528,178 @@ public class AdminFundTransferService {
         result.put("payment", paymentResult);
         result.put("newBalance", getBalance(normalizedSender, (String) senderInfo.get("accountType")));
         return result;
+    }
+
+    private Map<String, Object> verifyHomeLoan(String number, Map<String, Object> result) {
+        HomeLoan loan = homeLoanRepository.findByLoanAccountNumber(number).orElse(null);
+        if (loan == null) {
+            result.put("found", false);
+            result.put("message", "Home loan account not found");
+            return result;
+        }
+        result.put("found", true);
+        result.put("borrowerAccountNumber", loan.getAccountNumber());
+        result.put("borrowerName", loan.getUserName());
+        result.put("status", loan.getStatus());
+        result.put("loan", loan);
+        if ("Approved".equalsIgnoreCase(loan.getStatus())) {
+            Map<String, Object> due = homeLoanService.emiDue(loan.getId());
+            due.put("id", loan.getId());
+            due.put("status", "Pending");
+            due.put("loanAccountNumber", number);
+            result.put("pendingEmis", List.of(due));
+            result.put("nextEmi", due);
+            Map<String, Object> closure = new HashMap<>(homeLoanService.closurePreview(loan.getId()));
+            closure.put("success", true);
+            closure.put("remainingPrincipal", closure.get("outstandingPrincipal"));
+            closure.put("remainingInterest", closure.get("accruedInterest"));
+            closure.put("foreclosureCharges", closure.get("closureCharge"));
+            closure.put("totalForeclosureAmount", closure.get("totalPayable"));
+            result.put("foreclosure", closure);
+        } else {
+            result.put("pendingEmis", List.of());
+            result.put("nextEmi", null);
+            result.put("foreclosure", Map.of("success", false, "message", "Loan is not active"));
+        }
+        return result;
+    }
+
+    private Map<String, Object> homeSnapshot(HomeLoan h) {
+        double rp = valueOrZero(h.getRemainingPrincipal());
+        int tenure = h.getRemainingTenure() == null ? 0 : h.getRemainingTenure();
+        Map<String, Object> s = new HashMap<>();
+        s.put("outstandingPrincipal", rp);
+        s.put("remainingInterest", round2(Math.max(0.0, valueOrZero(h.getEmi()) * tenure - rp)));
+        s.put("emiAmount", valueOrZero(h.getEmi()));
+        s.put("remainingTenure", tenure);
+        return s;
+    }
+
+    private Map<String, Object> processHomeLoanPayment(String sender, String chequeNumber, Double requestedAmount,
+            String description, String performedBy, String loanNumber, String action, String adjustmentInput) {
+        HomeLoan loan = homeLoanRepository.findByLoanAccountNumber(loanNumber)
+                .orElseThrow(() -> new IllegalArgumentException("Home loan account not found"));
+        if (!"Approved".equalsIgnoreCase(loan.getStatus())) {
+            throw new IllegalArgumentException("Only approved loans can receive payments");
+        }
+        if (!sender.equalsIgnoreCase(String.valueOf(loan.getAccountNumber()))) {
+            throw new IllegalArgumentException("The source account must belong to the loan borrower");
+        }
+        Map<String, Object> senderInfo = accountService.verifyAccountByNumber(sender);
+        if (!Boolean.TRUE.equals(senderInfo.get("found"))) {
+            throw new IllegalArgumentException("Sender account not found");
+        }
+        String senderType = (String) senderInfo.get("accountType");
+        ResolvedCheque resolved = resolveCheque(chequeNumber, sender);
+        if (resolved == null) {
+            throw new IllegalArgumentException("Approved cheque number not found for sender account");
+        }
+        SavingsChequeRequest reserved = resolved.value instanceof SavingsChequeRequest s ? s : null;
+        if (reserved != null && isGoldLoanPrepaymentCheque(reserved)) {
+            throw new IllegalArgumentException("This cheque is reserved for Gold Loan " + reserved.getGoldLoanAccountNumber());
+        }
+        if (reserved != null && isHomeLoanCheque(reserved)
+                && !loanNumber.equalsIgnoreCase(reserved.getHomeLoanAccountNumber())) {
+            throw new IllegalArgumentException("This cheque is reserved only for Home Loan " + reserved.getHomeLoanAccountNumber());
+        }
+
+        String transferId = "AFT" + System.currentTimeMillis();
+        Map<String, Object> before = homeSnapshot(loan);
+        Map<String, Object> details = new HashMap<>();
+        appendSnapshotBefore(details, before);
+        double chequeBasis;
+        double totalDebit;
+        String adjustment = adjustmentInput == null ? "" : adjustmentInput.trim().toUpperCase();
+        HomeLoan updated;
+        if ("EMI".equals(action)) {
+            Map<String, Object> due = homeLoanService.emiDue(loan.getId());
+            chequeBasis = totalDebit = numberValue(due.get("totalAmount"));
+            if (requestedAmount != null && round2(requestedAmount) != round2(chequeBasis)) {
+                throw new IllegalArgumentException("EMI amount must match the installment due");
+            }
+            details.put("principalPaid", due.get("principalAmount"));
+            details.put("interestPaid", due.get("interestAmount"));
+            details.put("charges", 0.0);
+            details.put("interestSaved", 0.0);
+            checkHomeCheque(reserved, sender, chequeBasis);
+            requireSufficientBalance(sender, senderType, totalDebit);
+            updated = homeLoanService.payEmi(loan.getId(), performedBy == null ? "Admin" : performedBy, transferId);
+        } else if ("PREPAYMENT".equals(action)) {
+            if (requestedAmount == null || requestedAmount <= 0) {
+                throw new IllegalArgumentException("Prepayment amount must be greater than 0");
+            }
+            if (!"REDUCE_EMI".equals(adjustment) && !"REDUCE_TENURE".equals(adjustment)) {
+                throw new IllegalArgumentException("Choose whether to reduce future EMI or reduce the loan tenure");
+            }
+            chequeBasis = round2(requestedAmount);
+            Map<String, Object> preview = homeLoanService.prepayPreview(loan.getId(), chequeBasis, adjustment);
+            totalDebit = numberValue(preview.get("totalDebit"));
+            details.put("principalPaid", chequeBasis);
+            details.put("interestPaid", 0.0);
+            details.put("charges", round2(numberValue(preview.get("charge")) + numberValue(preview.get("gst"))));
+            details.put("interestSaved", round2(Math.max(0.0, numberValue(before.get("remainingInterest"))
+                    - (numberValue(preview.get("newEmi")) * numberValue(preview.get("newRemainingTenure"))
+                    - numberValue(preview.get("newOutstanding"))))));
+            checkHomeCheque(reserved, sender, chequeBasis);
+            requireSufficientBalance(sender, senderType, totalDebit);
+            updated = homeLoanService.prepay(loan.getId(), chequeBasis, adjustment, performedBy == null ? "Admin" : performedBy, transferId);
+        } else if ("FORECLOSURE".equals(action)) {
+            Map<String, Object> preview = homeLoanService.closurePreview(loan.getId());
+            chequeBasis = totalDebit = numberValue(preview.get("totalPayable"));
+            details.put("principalPaid", preview.get("outstandingPrincipal"));
+            details.put("interestPaid", preview.get("accruedInterest"));
+            details.put("charges", round2(numberValue(preview.get("closureCharge")) + numberValue(preview.get("gst"))));
+            details.put("interestSaved", 0.0);
+            checkHomeCheque(reserved, sender, chequeBasis);
+            requireSufficientBalance(sender, senderType, totalDebit);
+            updated = homeLoanService.close(loan.getId(), performedBy == null ? "Admin" : performedBy, transferId);
+        } else {
+            throw new IllegalArgumentException("Choose EMI, prepayment, or foreclosure");
+        }
+        adjustBalance(senderType, sender, -totalDebit);
+        double balanceAfter = getBalance(sender, senderType);
+        appendSnapshot(details, homeSnapshot(updated));
+        saveLedgerTransaction(sender, (String) senderInfo.get("name"), totalDebit, "Debit", balanceAfter,
+                "Home loan " + action.toLowerCase() + " " + loanNumber + " | " + transferId);
+
+        AdminFundTransfer transfer = new AdminFundTransfer();
+        transfer.setTransferId(transferId);
+        transfer.setSenderAccountNumber(sender);
+        transfer.setSenderName((String) senderInfo.get("name"));
+        transfer.setSenderAccountType(senderType);
+        transfer.setSenderChequeNumber(chequeNumber);
+        transfer.setReceiverAccountNumber(loanNumber);
+        transfer.setReceiverName(loan.getUserName());
+        transfer.setReceiverAccountType("HOME_LOAN");
+        transfer.setAmount(round2(totalDebit));
+        transfer.setTransferCharge(0.0);
+        transfer.setTransferCategory("HOME_LOAN");
+        transfer.setLoanAccountNumber(loanNumber);
+        transfer.setLoanPaymentType(action);
+        transfer.setPrepaymentAdjustment("PREPAYMENT".equals(action) ? adjustment : null);
+        setTransferPaymentDetails(transfer, details);
+        transfer.setDescription(description);
+        transfer.setStatus("COMPLETED");
+        transfer.setPerformedBy(performedBy != null && !performedBy.isBlank() ? performedBy : "Admin");
+        transfer.setPerformedAt(LocalDateTime.now());
+        AdminFundTransfer saved = repository.save(transfer);
+        markChequeUsed(resolved, saved.getTransferId(), sender, performedBy);
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("success", true);
+        result.put("message", action + " applied successfully to HOME LOAN account.");
+        result.put("transfer", saved);
+        result.put("payment", Map.of("success", true));
+        result.put("newBalance", balanceAfter);
+        return result;
+    }
+
+    private void checkHomeCheque(SavingsChequeRequest reserved, String sender, double basis) {
+        if (reserved == null || !isHomeLoanCheque(reserved)) return;
+        if (reserved.getAmount() == null || round2(reserved.getAmount().doubleValue()) != round2(basis)) {
+            throw new IllegalArgumentException("Payment amount must match the amount written on the Home Loan cheque");
+        }
+        requirePositivePayApproval(sender, reserved);
     }
 
     private Map<String, Object> applyPrepayment(String type, String loanAccountNumber, double amount, String adjustment) {
@@ -743,7 +942,8 @@ public class AdminFundTransferService {
         String type = loanType == null ? "" : loanType.trim().toUpperCase();
         if ("GOLD".equals(type) || "GOLD_LOAN".equals(type)) return "GOLD_LOAN";
         if ("PERSONAL".equals(type) || "PERSONAL_LOAN".equals(type)) return "PERSONAL_LOAN";
-        throw new IllegalArgumentException("Loan type must be GOLD_LOAN or PERSONAL_LOAN");
+        if ("HOME".equals(type) || "HOME_LOAN".equals(type)) return "HOME_LOAN";
+        throw new IllegalArgumentException("Loan type must be GOLD_LOAN, PERSONAL_LOAN or HOME_LOAN");
     }
 
     private double numberValue(Object value) {
@@ -789,7 +989,7 @@ public class AdminFundTransferService {
         }
 
         for (SavingsChequeRequest request : savingsChequeRequestRepository.findAllByChequeNumber(number)) {
-            if (!isGoldLoanPrepaymentCheque(request)
+            if (!isLoanReservedCheque(request)
                     || !("PENDING".equalsIgnoreCase(request.getStatus())
                     || "AWAITING_POSITIVE_PAY".equalsIgnoreCase(request.getStatus()))) {
                 continue;
@@ -818,16 +1018,18 @@ public class AdminFundTransferService {
             request.setStatus("COMPLETED");
             request.setTransactionReference(transferId);
             request.setDebitedFromAccount(senderAccountNumber);
-            request.setCreditedToAccount(request.getGoldLoanAccountNumber());
+            boolean homeCheque = isHomeLoanCheque(request);
+            request.setCreditedToAccount(homeCheque ? request.getHomeLoanAccountNumber() : request.getGoldLoanAccountNumber());
             request.setApprovedBy(performedBy != null && !performedBy.isBlank() ? performedBy : request.getApprovedBy());
             request.setUpdatedAt(LocalDateTime.now());
             SavingsChequeRequest saved = savingsChequeRequestRepository.save(request);
             SavingsChequeAuditLog audit = new SavingsChequeAuditLog();
             audit.setChequeRequestId(saved.getId());
             audit.setAdminEmail(performedBy != null && !performedBy.isBlank() ? performedBy : "Admin");
-            audit.setAction("GOLD_LOAN_PREPAYMENT");
-            audit.setRemarks("Reserved cheque used for prepayment of Gold Loan "
-                    + saved.getGoldLoanAccountNumber() + " | Transfer: " + transferId);
+            audit.setAction(homeCheque ? "HOME_LOAN_PAYMENT" : "GOLD_LOAN_PREPAYMENT");
+            audit.setRemarks(homeCheque
+                    ? "Reserved cheque used for payment of Home Loan " + saved.getHomeLoanAccountNumber() + " | Transfer: " + transferId
+                    : "Reserved cheque used for prepayment of Gold Loan " + saved.getGoldLoanAccountNumber() + " | Transfer: " + transferId);
             audit.setTimestamp(LocalDateTime.now());
             savingsChequeAuditLogRepository.save(audit);
         } else if (resolved.value instanceof BusinessChequeRequest request) {
