@@ -8,6 +8,7 @@ import { environment } from '../../../../environment/environment';
 
 interface Transaction {
   id: string;
+  transactionId?: string;
   user: string;
   userName?: string;
   userPAN?: string;
@@ -19,6 +20,10 @@ interface Transaction {
   description?: string;
   merchant?: string;
   accountNumber?: string;
+  sourceAccountNumber?: string;
+  recipientAccountNumber?: string;
+  recipientName?: string;
+  transferType?: string;
   category?: string;
   // OTP verification and ACH timestamp (optional, populated from backend when available)
   otpVerified?: boolean;
@@ -39,6 +44,24 @@ interface UserProfile {
   };
 }
 
+interface TransactionLookupRecord {
+  type?: string;
+  transactionType?: string;
+  status?: string;
+  applicationStatus?: string;
+  loanType?: string;
+  investmentType?: string;
+  merchant?: string;
+  origin?: string;
+  paymentMethod?: string;
+  matchType?: string;
+  amount?: number;
+  transferType?: string;
+  description?: string;
+  balance?: number;
+  [key: string]: any;
+}
+
 @Component({
   selector: 'app-transactions',
   standalone: true,
@@ -54,6 +77,10 @@ export class Transactions implements OnInit {
   allTransactions: Transaction[] = [];
   users: UserProfile[] = [];
   isLoadingTransactions: boolean = false;
+  transactionLookupQuery = '';
+  transactionLookupResults: TransactionLookupRecord[] = [];
+  isSearchingTransaction = false;
+  transactionLookupError = '';
   
   // Signature Verification
   showSignatureModal: boolean = false;
@@ -130,10 +157,15 @@ export class Transactions implements OnInit {
           
           this.allTransactions.push({
             id: transaction.id,
+            transactionId: transaction.transactionId,
             user: userName,
             userName: userName,
             userPAN: userPAN,
             accountNumber: transaction.accountNumber,
+            sourceAccountNumber: transaction.sourceAccountNumber,
+            recipientAccountNumber: transaction.recipientAccountNumber,
+            recipientName: transaction.recipientName,
+            transferType: transaction.transferType,
             type: transaction.type,
             amount: transaction.amount,
             balance: transaction.balance,
@@ -357,6 +389,81 @@ export class Transactions implements OnInit {
     this.transactions = this.getFilteredTransactions();
   }
 
+  searchTransactionId() {
+    const query = this.transactionLookupQuery.trim();
+    this.transactionLookupError = '';
+    this.transactionLookupResults = [];
+    if (!query) {
+      this.transactionLookupError = 'Enter a transaction, loan, or cheque ID to search.';
+      return;
+    }
+
+    this.isSearchingTransaction = true;
+    this.http.get<{ results?: TransactionLookupRecord[]; message?: string }>(
+      `${environment.apiBaseUrl}/api/admin/search/transactions`,
+      { params: { q: query } }
+    ).subscribe({
+      next: response => {
+        this.transactionLookupResults = response.results || [];
+        if (this.transactionLookupResults.length === 0) {
+          this.transactionLookupError = response.message || 'No matching transaction records found.';
+        }
+        this.isSearchingTransaction = false;
+      },
+      error: error => {
+        console.error('Error searching transaction records:', error);
+        this.transactionLookupError = error.error?.message || 'Unable to search transaction records. Please try again.';
+        this.isSearchingTransaction = false;
+      }
+    });
+  }
+
+  clearTransactionLookup() {
+    this.transactionLookupQuery = '';
+    this.transactionLookupResults = [];
+    this.transactionLookupError = '';
+  }
+
+  getLookupRecordId(record: TransactionLookupRecord): string {
+    const value = record['transactionId'] || record['loanAccountNumber'] || record['chequeNumber']
+      || record['ddNumber'] || record['orderId'] || record['fdAccountNumber']
+      || record['applicationNumber'] || record['databaseId'] || record['loanId']
+      || record['chequeId'] || record['pgId'] || record['globalTransactionSequence']
+      || record['id'];
+    return value == null ? '—' : String(value);
+  }
+
+  getLookupRecordDate(record: TransactionLookupRecord): string | null {
+    const value = record['date'] || record['createdAt'] || record['applicationDate']
+      || record['drawnDate'] || record['investmentDate'] || record['dueDate']
+      || record['approvalDate'] || record['paymentDate'] || record['requestDate']
+      || record['processedDate'] || record['creditedDate'] || record['maturityDate']
+      || record['startDate'] || record['settledAt'];
+    return value == null ? null : String(value);
+  }
+
+  getLookupSenderName(record: TransactionLookupRecord): string {
+    return record['senderName'] || record['userName'] || record['accountHolderName']
+      || record['customerName'] || record['applicantName'] || record['payerName'] || '—';
+  }
+
+  getLookupSenderAccount(record: TransactionLookupRecord): string {
+    return record['senderAccountNumber'] || record['sourceAccountNumber']
+      || record['accountNumber'] || record['applicantAccountNumber']
+      || record['payerAccount'] || '—';
+  }
+
+  getLookupReceiverName(record: TransactionLookupRecord): string {
+    return record['receiverName'] || record['recipientName'] || record['payeeName']
+      || record['childName'] || record['collegeAccountHolderName'] || '—';
+  }
+
+  getLookupReceiverAccount(record: TransactionLookupRecord): string {
+    return record['receiverAccountNumber'] || record['recipientAccountNumber']
+      || record['childAccountNumber'] || record['collegeAccountNumber']
+      || record['loanAccountNumber'] || '—';
+  }
+
   // Get filtered transactions
   getFilteredTransactions(): Transaction[] {
     let filtered = this.allTransactions;
@@ -411,8 +518,13 @@ export class Transactions implements OnInit {
     if (this.transactionsSearchQuery && this.transactionsSearchQuery.trim() !== '') {
       const query = this.transactionsSearchQuery.toLowerCase();
       filtered = filtered.filter(t => {
+        if (t.transactionId && t.transactionId.toLowerCase().includes(query)) return true;
+        if (t.id && t.id.toLowerCase().includes(query)) return true;
         if (t.accountNumber && t.accountNumber.toLowerCase().includes(query)) return true;
         if (t.userName && t.userName.toLowerCase().includes(query)) return true;
+        if (t.recipientName && t.recipientName.toLowerCase().includes(query)) return true;
+        if (t.recipientAccountNumber && t.recipientAccountNumber.toLowerCase().includes(query)) return true;
+        if (t.transferType && t.transferType.toLowerCase().includes(query)) return true;
         if (t.description && t.description.toLowerCase().includes(query)) return true;
         if (t.merchant && t.merchant.toLowerCase().includes(query)) return true;
         if (t.description && t.description.toLowerCase().includes('loan') && query.includes('loan')) return true;

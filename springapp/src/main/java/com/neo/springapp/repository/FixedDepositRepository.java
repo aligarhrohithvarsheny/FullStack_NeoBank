@@ -18,6 +18,8 @@ public interface FixedDepositRepository extends JpaRepository<FixedDeposit, Long
     List<FixedDeposit> findByAccountNumberAndStatus(String accountNumber, String status);
     
     Optional<FixedDeposit> findByFdAccountNumber(String fdAccountNumber);
+
+    Optional<FixedDeposit> findByTransactionId(String transactionId);
     
     List<FixedDeposit> findByMaturityDateBetween(java.time.LocalDate startDate, java.time.LocalDate endDate);
     
@@ -28,4 +30,3 @@ public interface FixedDepositRepository extends JpaRepository<FixedDeposit, Long
     @Query("SELECT f FROM FixedDeposit f WHERE LOWER(f.fdAccountNumber) LIKE LOWER(CONCAT('%', :term, '%'))")
     List<FixedDeposit> findByFdAccountNumberContainingIgnoreCase(@Param("term") String term);
 }
-

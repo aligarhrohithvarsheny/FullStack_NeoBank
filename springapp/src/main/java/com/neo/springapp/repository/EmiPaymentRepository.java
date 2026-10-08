@@ -21,6 +21,8 @@ public interface EmiPaymentRepository extends JpaRepository<EmiPayment, Long> {
     
     // Find EMIs by account number (user's savings account)
     List<EmiPayment> findByAccountNumberOrderByDueDateDesc(String accountNumber);
+
+    List<EmiPayment> findByTransactionId(String transactionId);
     
     // Find EMIs by status
     List<EmiPayment> findByStatusOrderByDueDateAsc(String status);
@@ -51,4 +53,3 @@ public interface EmiPaymentRepository extends JpaRepository<EmiPayment, Long> {
     @Query("SELECT e FROM EmiPayment e WHERE e.loanId = :loanId AND e.status = 'Pending' ORDER BY e.dueDate ASC")
     List<EmiPayment> findNextDueEmi(@Param("loanId") Long loanId);
 }
-

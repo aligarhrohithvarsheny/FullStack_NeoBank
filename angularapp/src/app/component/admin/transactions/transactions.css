@@ -261,6 +261,169 @@
   color: #94a3b8;
 }
 
+.transaction-lookup-section {
+  background: #fff;
+  border: 1px solid #dbe5f0;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.lookup-heading h3 {
+  margin: 0;
+  color: #1e293b;
+  font-size: 1.1rem;
+}
+
+.lookup-heading h3 i {
+  color: #2563eb;
+  margin-right: 8px;
+}
+
+.lookup-heading p {
+  color: #64748b;
+  margin: 6px 0 14px;
+}
+
+.lookup-controls {
+  display: flex;
+  gap: 10px;
+}
+
+.lookup-controls input {
+  flex: 1;
+  min-width: 0;
+  padding: 11px 14px;
+  border: 2px solid #dbe5f0;
+  border-radius: 8px;
+  font: inherit;
+}
+
+.lookup-controls input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.lookup-controls button {
+  border: 0;
+  border-radius: 8px;
+  padding: 10px 16px;
+  color: #fff;
+  background: #2563eb;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.lookup-controls button:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.lookup-controls .lookup-clear-btn {
+  color: #475569;
+  background: #e2e8f0;
+}
+
+.lookup-message {
+  margin: 12px 0 0;
+  color: #b91c1c;
+}
+
+.lookup-results {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.lookup-result-card {
+  min-width: 0;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 16px;
+  background: #f8fafc;
+}
+
+.lookup-result-card header,
+.lookup-result-card header > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.lookup-result-card header > div {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+.lookup-result-card header strong {
+  color: #0f172a;
+  overflow-wrap: anywhere;
+}
+
+.lookup-record-type {
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #dbeafe;
+  color: #1e40af;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.lookup-result-card dl {
+  display: grid;
+  grid-template-columns: minmax(120px, 0.8fr) 1.2fr;
+  gap: 9px 12px;
+  margin: 16px 0 0;
+}
+
+.lookup-result-card dl > div {
+  display: contents;
+}
+
+.lookup-result-card dt {
+  color: #64748b;
+  font-weight: 600;
+}
+
+.lookup-result-card dd {
+  min-width: 0;
+  margin: 0;
+  color: #1e293b;
+  overflow-wrap: anywhere;
+}
+
+.lookup-result-card dd span {
+  color: #64748b;
+}
+
+.status-badge.status-success {
+  background: #d4edda;
+  color: #155724;
+}
+
+.status-badge.status-approved,
+.status-badge.status-active,
+.status-badge.status-drawn,
+.status-badge.status-used,
+.status-badge.status-paid,
+.status-badge.status-credited {
+  background: #d4edda;
+  color: #155724;
+}
+
+.status-badge.status-rejected,
+.status-badge.status-bounced,
+.status-badge.status-cancelled,
+.status-badge.status-reverted,
+.status-badge.status-overdue {
+  background: #f8d7da;
+  color: #721c24;
+}
+
 /* Loading State */
 .loading-state {
   text-align: center;
@@ -589,5 +752,22 @@
   
   .transactions-table table {
     min-width: 1000px;
+  }
+
+  .lookup-controls {
+    flex-wrap: wrap;
+  }
+
+  .lookup-controls input {
+    flex-basis: 100%;
+  }
+
+  .lookup-result-card dl {
+    grid-template-columns: 1fr;
+    gap: 3px;
+  }
+
+  .lookup-result-card dd {
+    margin-bottom: 8px;
   }
 }

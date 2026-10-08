@@ -19,11 +19,14 @@ public class LoanService {
     private final LoanRepository loanRepository;
     private final AccountService accountService;
     private final EmiPaymentRepository emiPaymentRepository;
+    private final BranchAccountService branchAccountService;
 
-    public LoanService(LoanRepository loanRepository, AccountService accountService, EmiPaymentRepository emiPaymentRepository) {
+    public LoanService(LoanRepository loanRepository, AccountService accountService, EmiPaymentRepository emiPaymentRepository,
+                       BranchAccountService branchAccountService) {
         this.loanRepository = loanRepository;
         this.accountService = accountService;
         this.emiPaymentRepository = emiPaymentRepository;
+        this.branchAccountService = branchAccountService;
     }
 
     // Save new loan
@@ -83,24 +86,30 @@ public class LoanService {
     }
 
     // Approve or reject loan
+    @Transactional
     public Loan approveLoan(Long id, String status) {
         Loan loan = loanRepository.findById(id).orElse(null);
         if (loan != null) {
-            loan.setStatus(status);
-            loan.setApprovalDate(LocalDateTime.now());
-            
-            // If approved, add loan amount to user's account balance and set EMI start date
             if ("Approved".equals(status)) {
                 Account account = accountService.getAccountByNumber(loan.getAccountNumber());
-                if (account != null) {
-                    accountService.creditBalance(loan.getAccountNumber(), loan.getAmount());
+                if (account == null) {
+                    throw new IllegalStateException("Customer account not found");
                 }
-                
+                if (loan.getAmount() == null || loan.getAmount() <= 0) {
+                    throw new IllegalStateException("Loan amount must be greater than zero");
+                }
+                branchAccountService.recordTreasuryMovement(loan.getAmount(), false, "Loan Disbursement",
+                        "Loan sanctioned: " + loan.getLoanAccountNumber() + " - " + loan.getType(),
+                        loan.getAccountNumber());
+                if (accountService.creditBalance(loan.getAccountNumber(), loan.getAmount()) == null) {
+                    throw new IllegalStateException("Unable to credit the approved loan to the customer account");
+                }
                 // Set EMI start date to approval date (loan sanction date)
                 java.time.LocalDate emiStartDate = java.time.LocalDate.now();
                 loan.setEmiStartDate(emiStartDate);
             }
-            
+            loan.setStatus(status);
+            loan.setApprovalDate(LocalDateTime.now());
             return loanRepository.save(loan);
         }
         return null;

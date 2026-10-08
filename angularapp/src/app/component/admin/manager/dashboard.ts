@@ -58,7 +58,7 @@ export class ManagerDashboard implements OnInit, OnDestroy {
         { section: 'session-history', icon: 'fa-clock', label: 'Login/Logout History' },
         { section: 'fraud-alerts', icon: 'fa-shield-alt', label: 'Fraud Alerts', badgeDanger: () => this.fraudAlertsPendingCount },
         { section: 'loans-overview', icon: 'fa-coins', label: 'Loans & Subsidies' },
-        { section: 'branch-account', icon: 'fa-university', label: 'Branch Account' },
+        { section: 'branch-account', icon: 'fa-university', label: 'NeoBank Treasury Account' },
         { section: 'attendance-salary', icon: 'fa-user-check', label: 'Attendance & Salary' },
         { section: 'salary-accounts', icon: 'fa-money-check-alt', label: 'Salary Account Opening', badge: () => this.salaryAccounts.length },
         { section: 'manager-permissions', icon: 'fa-user-lock', label: 'Manager Permissions' },
@@ -270,6 +270,7 @@ export class ManagerDashboard implements OnInit, OnDestroy {
   branchAccountNumber: string = '';
   branchAccountName: string = '';
   branchAccountIfsc: string = '';
+  isFetchingBranchAccount = false;
   isLoadingBranchAccount: boolean = false;
   isSavingBranchAccount: boolean = false;
   // Branch account transactions (opened bank account)
@@ -444,6 +445,7 @@ export class ManagerDashboard implements OnInit, OnDestroy {
       this.loadManagerInfo();
       this.loadManagerSessionTiming();
       this.loadAllAdmins();
+      this.loadBranchAccountSummary();
       this.loadBlockedAdmins();
       this.loadBlockedEmployees();
       this.loadFeatureAccess();
@@ -2436,6 +2438,27 @@ export class ManagerDashboard implements OnInit, OnDestroy {
         console.error('Error loading branch account', err);
         this.branchAccountSummary = null;
         this.isLoadingBranchAccount = false;
+      }
+    });
+  }
+
+  fetchNeoBankTreasuryAccount() {
+    this.isFetchingBranchAccount = true;
+    this.http.get<any>(`${environment.apiBaseUrl}/api/admins/branch-account/available`).subscribe({
+      next: (response) => {
+        this.isFetchingBranchAccount = false;
+        const account = response?.accounts?.[0];
+        if (!response?.success || !account) {
+          this.alertService.error('Branch Account', response?.message || 'No verified NeoBank account is available to link.');
+          return;
+        }
+        this.branchAccountNumber = String(account.accountNumber);
+        this.branchAccountName = String(account.accountName);
+        this.alertService.success('Branch Account', 'Verified NeoBank account fetched. Save to link it.');
+      },
+      error: (err) => {
+        this.isFetchingBranchAccount = false;
+        this.alertService.error('Branch Account', err.error?.message || 'Could not fetch a verified NeoBank account.');
       }
     });
   }

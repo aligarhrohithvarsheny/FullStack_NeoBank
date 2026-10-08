@@ -60,6 +60,12 @@
         <h2>Manager Dashboard</h2>
       </div>
       <div class="header-right">
+          <button type="button" class="manager-account-action" (click)="setActiveSection('branch-account')" title="View NeoBank treasury funds and transactions">
+            <i class="fa fa-wallet"></i>
+            NeoBank Funds:
+            <span *ngIf="branchAccountSummary">₹ {{ (branchAccountSummary.balance ?? 0) | number:'1.2-2' }}</span>
+            <span *ngIf="!branchAccountSummary">Loading</span>
+          </button>
           <button type="button" class="manager-account-action" (click)="openAccountDashboard()" title="View linked allocation account">
             <i class="fa fa-university"></i> Allocation Account
           </button>
@@ -1701,9 +1707,9 @@
       <div class="section-header">
         <div class="header-content">
           <div>
-            <h2><i class="fa fa-university"></i> Branch Account (Open New)</h2>
+            <h2><i class="fa fa-university"></i> NeoBank Treasury Account</h2>
             <p class="section-subtitle">
-              All bank transactions, loan charges, KYC charges, debit card charges, and loan interest are deposited in this account. Map NeoBank A/C by entering account details below or in Admin Profile.
+              View available NeoBank treasury funds and the ledger for loan sanctions, repayments, interest, processing fees, CIBIL charges, and other collections.
             </p>
           </div>
           <button class="refresh-btn" (click)="loadBranchAccountSummary()" [disabled]="isLoadingBranchAccount">
@@ -1719,7 +1725,7 @@
       </div>
 
       <div class="info-card idcard-panel" *ngIf="branchAccountSummary && !isLoadingBranchAccount">
-        <h4><i class="fa fa-wallet"></i> Current Branch Deposit Account</h4>
+        <h4><i class="fa fa-wallet"></i> Current Treasury Account</h4>
         <div class="details-grid" style="margin-top: 12px;">
           <div class="detail-item">
             <label>Account Number</label>
@@ -1834,18 +1840,18 @@
       </div>
 
       <div class="info-card branch-account-form-card" style="margin-top: 24px;">
-        <h4><i class="fa fa-plus-circle"></i> Open / Set Branch Account</h4>
+        <h4><i class="fa fa-plus-circle"></i> Link NeoBank Treasury Account</h4>
         <p class="section-description">
-          Enter the account details where all user charges (monthly bank, loan, CIBIL, debit card) and loan interest should be deposited. This account will receive all NeoBank fee income.
+          Fetch the existing verified NeoBank-owned account. Customer and external accounts cannot be linked as the treasury account.
         </p>
         <div class="details-grid">
           <div class="detail-item">
-            <label>Account Number <span class="required">*</span></label>
-            <input type="text" [(ngModel)]="branchAccountNumber" class="form-input" placeholder="e.g. NEOBANK000001 or your branch account">
+            <label>Account Number</label>
+            <input type="text" [(ngModel)]="branchAccountNumber" readonly class="form-input" placeholder="Fetch the verified NeoBank account">
           </div>
           <div class="detail-item">
             <label>Account Name</label>
-            <input type="text" [(ngModel)]="branchAccountName" class="form-input" placeholder="e.g. NeoBank Main Branch">
+            <input type="text" [(ngModel)]="branchAccountName" readonly class="form-input" placeholder="NeoBank Official">
           </div>
           <div class="detail-item">
             <label>IFSC (optional)</label>
@@ -1853,21 +1859,24 @@
           </div>
         </div>
         <div class="branch-account-actions" style="margin-top: 16px;">
+          <button type="button" class="refresh-btn" (click)="fetchNeoBankTreasuryAccount()" [disabled]="isFetchingBranchAccount">
+            <i class="fa" [class.fa-spinner]="isFetchingBranchAccount" [class.fa-spin]="isFetchingBranchAccount" [class.fa-download]="!isFetchingBranchAccount"></i>
+            {{ isFetchingBranchAccount ? 'Fetching...' : 'Fetch NeoBank Account' }}
+          </button>
           <button type="button" class="btn-open-bank-account" (click)="setBranchAccount()" [disabled]="isSavingBranchAccount || !(branchAccountNumber || '').trim()">
             <i class="fa" [class.fa-spinner]="isSavingBranchAccount" [class.fa-university]="!isSavingBranchAccount" [class.fa-spin]="isSavingBranchAccount"></i>
-            {{ isSavingBranchAccount ? 'Saving...' : 'Open Bank Account' }}
+            {{ isSavingBranchAccount ? 'Linking...' : 'Link Treasury Account' }}
           </button>
-          <span class="action-hint" style="margin-left: 12px; font-size: 13px; color: #666;"> or update existing branch account above</span>
         </div>
         <p class="section-description" style="margin-top: 12px; font-size: 12px;">
-          You can also set this from <strong>Admin Profile</strong>: enter Branch Account Number, Name and IFSC in your profile and save. All charges and interest will then deposit to that account.
+          Only the verified NeoBank treasury account is eligible. Loan sanctions are debited from available funds; loan repayments, fees, and interest are credited to this ledger.
         </p>
       </div>
 
       <!-- Branch Account Transactions (opened bank account) -->
       <div class="info-card" style="margin-top: 24px;">
-        <h4><i class="fa fa-list-alt"></i> Branch Account Transactions (All)</h4>
-        <p class="section-description">All credits to this branch account (charges and interest from user accounts).</p>
+        <h4><i class="fa fa-list-alt"></i> NeoBank Treasury Transactions</h4>
+        <p class="section-description">All treasury debits and credits, including sanctions, EMIs, prepayments, interest, processing fees, and CIBIL charges.</p>
         <div class="branch-txns-filters details-grid" style="margin-bottom: 16px;">
           <div class="detail-item">
             <label>From Date</label>
@@ -1895,8 +1904,8 @@
               <tr>
                 <th>ID</th>
                 <th>Date</th>
-                <th>Debited User Account Name</th>
-                <th>Debited Account No.</th>
+                <th>Related Account Name</th>
+                <th>Related Account No.</th>
                 <th>Amount</th>
                 <th>Type</th>
                 <th>Description</th>

@@ -514,14 +514,6 @@ public class AdminController {
                     updatedAdmin.setProfileComplete(true);
                     updatedAdmin = adminService.saveAdmin(updatedAdmin);
 
-                    if (branchAccountService != null && updatedAdmin.getBranchAccountNumber() != null && !updatedAdmin.getBranchAccountNumber().trim().isEmpty()) {
-                        branchAccountService.setBranchAccount(
-                            updatedAdmin.getBranchAccountNumber(),
-                            updatedAdmin.getBranchAccountName(),
-                            updatedAdmin.getBranchAccountIfsc(),
-                            updatedAdmin.getId()
-                        );
-                    }
                     response.put("success", true);
                     response.put("message", "Profile completed successfully");
                     response.put("admin", updatedAdmin);
@@ -567,8 +559,20 @@ public class AdminController {
         return ResponseEntity.ok(branchAccountService.getBranchAccountSummary());
     }
 
+    @GetMapping("/branch-account/available")
+    public ResponseEntity<Map<String, Object>> getAvailableBranchAccounts() {
+        if (branchAccountService == null) {
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(Map.of("success", false, "message", "Branch account service not available"));
+        }
+        return ResponseEntity.ok(Map.of(
+            "success", true,
+            "accounts", branchAccountService.getAvailableTreasuryAccounts()
+        ));
+    }
+
     /**
-     * Get branch account transactions (all credits to branch) with optional date filter and search.
+     * Get NeoBank treasury movements with optional date filter and search.
      * Query params: fromDate (yyyy-MM-dd), toDate (yyyy-MM-dd), search, page (default 0), size (default 20).
      */
     @GetMapping("/branch-account/transactions")

@@ -12,6 +12,7 @@ import com.neo.springapp.repository.GoldLoanHistoryRepository;
 import com.neo.springapp.repository.EmiPaymentRepository;
 import com.neo.springapp.repository.SalaryAccountRepository;
 import com.neo.springapp.repository.SalaryNormalTransactionRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -41,6 +42,8 @@ public class GoldLoanService {
     private final AllocationUtilizationService allocationUtilizationService;
     private final ChargeManagementService chargeManagementService;
     private final TransactionService transactionService;
+    @Autowired
+    private BranchAccountService branchAccountService;
 
     public GoldLoanService(GoldLoanRepository goldLoanRepository, 
                           GoldRateService goldRateService,
@@ -280,6 +283,8 @@ public class GoldLoanService {
                 if (!Boolean.TRUE.equals(allocationDebit.get("success"))) {
                     throw new IllegalStateException("Allocation disbursement failed: " + allocationDebit.get("message"));
                 }
+                branchAccountService.recordTreasuryMovement(recalculatedLoanAmount, false, "Gold Loan Disbursement",
+                        "Gold loan sanctioned: " + goldLoan.getLoanAccountNumber(), goldLoan.getAccountNumber());
                 System.out.println("✅ Recalculated loan amount: ₹" + recalculatedLoanAmount + 
                                  " (75% of verified gold value: ₹" + verifiedValue + ")");
                 

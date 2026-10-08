@@ -241,6 +241,51 @@ public class AdminSearchService {
         return results;
     }
 
+    /**
+     * Search transaction-related records across their source entities by generated ID.
+     */
+    public List<Map<String, Object>> searchTransactionRecords(String searchTerm) {
+        if (searchTerm == null || searchTerm.trim().isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        String term = searchTerm.trim();
+        List<Map<String, Object>> matches = new ArrayList<>();
+        matches.addAll(searchTransactions(term));
+        matches.addAll(searchLoans(term));
+        matches.addAll(searchGoldLoans(term));
+        matches.addAll(searchEducationLoans(term));
+        matches.addAll(searchCheques(term));
+        matches.addAll(searchDemandDrafts(term));
+        matches.addAll(searchFixedDeposits(term));
+        matches.addAll(searchInvestments(term));
+        matches.addAll(searchEmis(term));
+        matches.addAll(searchPgPayments(term));
+        matches.addAll(searchSubsidyClaims(term));
+
+        Map<String, Map<String, Object>> uniqueMatches = new LinkedHashMap<>();
+        for (Map<String, Object> match : matches) {
+            String recordType = String.valueOf(match.getOrDefault("type", "Record"));
+            Object generatedId = firstPresent(match, "databaseId", "loanId", "chequeId", "pgId",
+                    "id", "transactionId", "loanAccountNumber", "chequeNumber", "ddNumber",
+                    "orderId", "fdAccountNumber");
+            String key = recordType + ":" + String.valueOf(generatedId);
+            uniqueMatches.putIfAbsent(key, match);
+        }
+
+        return uniqueMatches.values().stream().limit(100).toList();
+    }
+
+    private Object firstPresent(Map<String, Object> values, String... keys) {
+        for (String key : keys) {
+            Object value = values.get(key);
+            if (value != null) {
+                return value;
+            }
+        }
+        return "";
+    }
+
     private List<Map<String, Object>> limitResults(List<Map<String, Object>> list, int maxSize) {
         return list.size() <= maxSize ? list : new ArrayList<>(list.subList(0, maxSize));
     }
@@ -752,8 +797,11 @@ public class AdminSearchService {
         result.put("accountNumber", loan.getAccountNumber());
         result.put("childAccountNumber", loan.getChildAccountNumber());
         result.put("userName", loan.getUserName());
+        result.put("senderName", loan.getUserName());
+        result.put("senderAccountNumber", loan.getAccountNumber());
         result.put("userEmail", loan.getUserEmail());
         result.put("loanType", loan.getType());
+        result.put("origin", loan.getType());
         result.put("amount", loan.getAmount());
         result.put("status", loan.getStatus());
         result.put("tenure", loan.getTenure());
@@ -800,14 +848,23 @@ public class AdminSearchService {
     private Map<String, Object> createChequeResult(Cheque cheque, String matchType) {
         Map<String, Object> result = new HashMap<>();
         result.put("type", "Cheque");
+        result.put("origin", "Cheque Management");
         result.put("chequeId", cheque.getId());
         result.put("chequeNumber", cheque.getChequeNumber());
         result.put("accountNumber", cheque.getAccountNumber());
         result.put("accountHolderName", cheque.getAccountHolderName());
+        result.put("senderName", cheque.getAccountHolderName());
+        result.put("senderAccountNumber", cheque.getAccountNumber());
+        result.put("receiverName", cheque.getPayeeName());
         result.put("amount", cheque.getAmount());
         result.put("status", cheque.getStatus());
         result.put("createdAt", cheque.getCreatedAt());
         result.put("drawnDate", cheque.getDrawnDate());
+        result.put("requestStatus", cheque.getRequestStatus());
+        result.put("usedFor", cheque.getUsedFor());
+        result.put("usedReference", cheque.getUsedReference());
+        result.put("rejectionReason", cheque.getRejectionReason());
+        result.put("bounceReason", cheque.getBounceReason());
         result.put("matchType", matchType);
         return result;
     }
@@ -892,6 +949,14 @@ public class AdminSearchService {
         transactionRepository.findByTransactionId(term).ifPresent(t -> {
             if (seenIds.add(t.getId())) results.add(createTransactionResult(t, "Transaction ID"));
         });
+        try {
+            Long sequence = Long.parseLong(term);
+            transactionRepository.findByGlobalTransactionSequence(sequence).ifPresent(t -> {
+                if (seenIds.add(t.getId())) results.add(createTransactionResult(t, "Global Transaction Sequence"));
+            });
+        } catch (NumberFormatException e) {
+            // Global sequence searches are only applicable to numeric IDs.
+        }
         for (Transaction t : transactionRepository.findByTransactionIdContainingIgnoreCase(term)) {
             if (seenIds.add(t.getId())) results.add(createTransactionResult(t, "Transaction ID (Partial)"));
         }
@@ -932,9 +997,19 @@ public class AdminSearchService {
         result.put("type", "Transaction");
         result.put("transactionId", transaction.getTransactionId() != null ? transaction.getTransactionId() : String.valueOf(transaction.getId()));
         result.put("databaseId", transaction.getId());
+        result.put("globalTransactionSequence", transaction.getGlobalTransactionSequence());
         result.put("accountNumber", transaction.getAccountNumber());
+        result.put("senderName", transaction.getUserName());
+        result.put("senderAccountNumber", transaction.getSourceAccountNumber() != null
+                ? transaction.getSourceAccountNumber() : transaction.getAccountNumber());
+        result.put("receiverName", transaction.getRecipientName());
+        result.put("receiverAccountNumber", transaction.getRecipientAccountNumber());
         result.put("amount", transaction.getAmount());
         result.put("transactionType", transaction.getType());
+        result.put("transferType", transaction.getTransferType());
+        result.put("origin", transaction.getTransferType() != null
+                ? transaction.getTransferType()
+                : (transaction.getMerchant() != null ? transaction.getMerchant() : transaction.getType()));
         result.put("merchant", transaction.getMerchant());
         result.put("description", transaction.getDescription());
         result.put("status", transaction.getStatus());
@@ -1047,8 +1122,14 @@ public class AdminSearchService {
         List<Map<String, Object>> results = new ArrayList<>();
         if (fixedDepositRepository == null) return results;
         try {
+            fixedDepositRepository.findByTransactionId(term)
+                    .ifPresent(fd -> results.add(createFixedDepositResult(fd, "Transaction ID")));
             Optional<FixedDeposit> byFdAccount = fixedDepositRepository.findByFdAccountNumber(term);
-            byFdAccount.ifPresent(fd -> results.add(createFixedDepositResult(fd, "FD Account Number")));
+            byFdAccount.ifPresent(fd -> {
+                if (results.stream().noneMatch(r -> r.get("id").equals(fd.getId()))) {
+                    results.add(createFixedDepositResult(fd, "FD Account Number"));
+                }
+            });
 
             List<FixedDeposit> byAccount = fixedDepositRepository.findByAccountNumber(term);
             for (FixedDeposit fd : byAccount) {
@@ -1078,11 +1159,19 @@ public class AdminSearchService {
     private Map<String, Object> createFixedDepositResult(FixedDeposit fd, String matchType) {
         Map<String, Object> result = new HashMap<>();
         result.put("type", "FixedDeposit");
+        result.put("origin", "Fixed Deposit");
         result.put("id", fd.getId());
         result.put("fdAccountNumber", fd.getFdAccountNumber());
+        result.put("transactionId", fd.getTransactionId());
         result.put("accountNumber", fd.getAccountNumber());
+        result.put("userName", fd.getUserName());
+        result.put("senderName", fd.getUserName());
+        result.put("senderAccountNumber", fd.getAccountNumber());
         result.put("amount", fd.getPrincipalAmount());
         result.put("status", fd.getStatus());
+        result.put("applicationDate", fd.getApplicationDate());
+        result.put("approvalDate", fd.getApprovalDate());
+        result.put("balanceAfter", fd.getBalanceAfter());
         result.put("interestRate", fd.getInterestRate());
         result.put("tenure", fd.getTenure());
         result.put("matchType", matchType);
@@ -1094,9 +1183,13 @@ public class AdminSearchService {
         List<Map<String, Object>> results = new ArrayList<>();
         if (investmentRepository == null) return results;
         try {
+            investmentRepository.findByTransactionId(term)
+                    .ifPresent(inv -> results.add(createInvestmentResult(inv, "Transaction ID")));
             List<Investment> byAccount = investmentRepository.findByAccountNumber(term);
             for (Investment inv : byAccount) {
-                results.add(createInvestmentResult(inv, "Account Number"));
+                if (results.stream().noneMatch(r -> r.get("id").equals(inv.getId()))) {
+                    results.add(createInvestmentResult(inv, "Account Number"));
+                }
             }
             try {
                 Long invId = Long.parseLong(term);
@@ -1114,11 +1207,19 @@ public class AdminSearchService {
     private Map<String, Object> createInvestmentResult(Investment inv, String matchType) {
         Map<String, Object> result = new HashMap<>();
         result.put("type", "Investment");
+        result.put("origin", inv.getInvestmentType());
         result.put("id", inv.getId());
+        result.put("transactionId", inv.getTransactionId());
         result.put("accountNumber", inv.getAccountNumber());
+        result.put("userName", inv.getUserName());
+        result.put("senderName", inv.getUserName());
+        result.put("senderAccountNumber", inv.getAccountNumber());
         result.put("investmentType", inv.getInvestmentType());
         result.put("amount", inv.getInvestmentAmount());
         result.put("status", inv.getStatus());
+        result.put("investmentDate", inv.getInvestmentDate());
+        result.put("applicationDate", inv.getApplicationDate());
+        result.put("fundName", inv.getFundName());
         result.put("matchType", matchType);
         return result;
     }
@@ -1128,9 +1229,14 @@ public class AdminSearchService {
         List<Map<String, Object>> results = new ArrayList<>();
         if (emiPaymentRepository == null) return results;
         try {
+            for (EmiPayment emi : emiPaymentRepository.findByTransactionId(term)) {
+                results.add(createEmiResult(emi, "Transaction ID"));
+            }
             List<EmiPayment> byLoanAccount = emiPaymentRepository.findByLoanAccountNumberOrderByEmiNumberAsc(term);
             for (EmiPayment emi : byLoanAccount) {
-                results.add(createEmiResult(emi, "Loan Account Number"));
+                if (results.stream().noneMatch(r -> r.get("id").equals(emi.getId()))) {
+                    results.add(createEmiResult(emi, "Loan Account Number"));
+                }
             }
             List<EmiPayment> byAccount = emiPaymentRepository.findByAccountNumberOrderByDueDateDesc(term);
             for (EmiPayment emi : byAccount) {
@@ -1155,13 +1261,18 @@ public class AdminSearchService {
     private Map<String, Object> createEmiResult(EmiPayment emi, String matchType) {
         Map<String, Object> result = new HashMap<>();
         result.put("type", "EMI");
+        result.put("origin", "Loan EMI");
         result.put("id", emi.getId());
         result.put("loanAccountNumber", emi.getLoanAccountNumber());
         result.put("accountNumber", emi.getAccountNumber());
+        result.put("senderAccountNumber", emi.getAccountNumber());
         result.put("emiNumber", emi.getEmiNumber());
         result.put("amount", emi.getTotalAmount());
         result.put("status", emi.getStatus());
         result.put("dueDate", emi.getDueDate());
+        result.put("paymentDate", emi.getPaymentDate());
+        result.put("transactionId", emi.getTransactionId());
+        result.put("balanceAfterPayment", emi.getBalanceAfterPayment());
         result.put("matchType", matchType);
         return result;
     }
@@ -1234,12 +1345,17 @@ public class AdminSearchService {
     private Map<String, Object> createPgPaymentResult(PgTransaction pg, String matchType) {
         Map<String, Object> result = new HashMap<>();
         result.put("type", "PgPayment");
+        result.put("origin", "Payment Gateway");
         result.put("pgId", pg.getId());
         result.put("transactionId", pg.getTransactionId());
         result.put("orderId", pg.getOrderId());
         result.put("merchantId", pg.getMerchantId());
+        result.put("senderName", pg.getPayerName());
+        result.put("senderAccountNumber", pg.getPayerAccount());
         result.put("amount", pg.getAmount());
         result.put("status", pg.getStatus());
+        result.put("createdAt", pg.getCreatedAt());
+        result.put("errorDescription", pg.getErrorDescription());
         result.put("paymentMethod", pg.getPaymentMethod());
         result.put("matchType", matchType);
         return result;
@@ -1590,10 +1706,17 @@ public class AdminSearchService {
     private Map<String, Object> createGoldLoanResult(GoldLoan gl, String matchType) {
         Map<String, Object> result = new HashMap<>();
         result.put("type", "GoldLoan");
+        result.put("origin", "Gold Loan");
         result.put("id", gl.getId());
         result.put("loanAccountNumber", gl.getLoanAccountNumber());
         result.put("accountNumber", gl.getAccountNumber());
+        result.put("userName", gl.getUserName());
+        result.put("senderName", gl.getUserName());
+        result.put("senderAccountNumber", gl.getAccountNumber());
+        result.put("amount", gl.getLoanAmount());
         result.put("status", gl.getStatus());
+        result.put("applicationDate", gl.getApplicationDate());
+        result.put("approvalDate", gl.getApprovalDate());
         result.put("matchType", matchType);
         return result;
     }
@@ -1634,11 +1757,20 @@ public class AdminSearchService {
     private Map<String, Object> createEducationLoanResult(EducationLoanApplication el, String matchType) {
         Map<String, Object> result = new HashMap<>();
         result.put("type", "EducationLoan");
+        result.put("origin", "Education Loan");
         result.put("id", el.getId());
         result.put("loanAccountNumber", el.getLoanAccountNumber());
         result.put("applicantAccountNumber", el.getApplicantAccountNumber());
+        result.put("senderAccountNumber", el.getApplicantAccountNumber());
+        result.put("applicantName", el.getApplicantName());
+        result.put("senderName", el.getApplicantName());
         result.put("childName", el.getChildName());
+        result.put("childAccountNumber", el.getChildAccountNumber());
+        result.put("receiverName", el.getCollegeAccountHolderName());
+        result.put("receiverAccountNumber", el.getCollegeAccountNumber());
+        result.put("amount", el.getRequestedLoanAmount());
         result.put("applicationStatus", el.getApplicationStatus());
+        result.put("applicationDate", el.getApplicationDate());
         result.put("matchType", matchType);
         return result;
     }
@@ -1648,9 +1780,13 @@ public class AdminSearchService {
         List<Map<String, Object>> results = new ArrayList<>();
         if (educationLoanSubsidyClaimRepository == null) return results;
         try {
+            educationLoanSubsidyClaimRepository.findByTransactionId(term)
+                    .ifPresent(sc -> results.add(createSubsidyClaimResult(sc, "Transaction ID")));
             List<EducationLoanSubsidyClaim> byAccount = educationLoanSubsidyClaimRepository.findByAccountNumber(term);
             for (EducationLoanSubsidyClaim sc : byAccount) {
-                results.add(createSubsidyClaimResult(sc, "Account Number"));
+                if (results.stream().noneMatch(r -> r.get("id").equals(sc.getId()))) {
+                    results.add(createSubsidyClaimResult(sc, "Account Number"));
+                }
             }
             List<EducationLoanSubsidyClaim> byLoanAccount = educationLoanSubsidyClaimRepository.findByLoanAccountNumber(term);
             for (EducationLoanSubsidyClaim sc : byLoanAccount) {
@@ -1674,10 +1810,20 @@ public class AdminSearchService {
     private Map<String, Object> createSubsidyClaimResult(EducationLoanSubsidyClaim sc, String matchType) {
         Map<String, Object> result = new HashMap<>();
         result.put("type", "SubsidyClaim");
+        result.put("origin", "Education Loan Subsidy");
         result.put("id", sc.getId());
+        result.put("transactionId", sc.getTransactionId());
         result.put("accountNumber", sc.getAccountNumber());
+        result.put("userName", sc.getUserName());
+        result.put("senderName", sc.getUserName());
+        result.put("senderAccountNumber", sc.getAccountNumber());
         result.put("loanAccountNumber", sc.getLoanAccountNumber());
         result.put("status", sc.getStatus());
+        result.put("amount", sc.getApprovedSubsidyAmount() != null
+                ? sc.getApprovedSubsidyAmount() : sc.getCalculatedSubsidyAmount());
+        result.put("requestDate", sc.getRequestDate());
+        result.put("processedDate", sc.getProcessedDate());
+        result.put("creditedDate", sc.getCreditedDate());
         result.put("matchType", matchType);
         return result;
     }
@@ -1779,4 +1925,3 @@ public class AdminSearchService {
         return result;
     }
 }
-

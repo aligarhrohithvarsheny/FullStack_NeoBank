@@ -5,6 +5,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -29,6 +30,22 @@ public class AdminSearchController {
             error.put("message", "Search failed: " + e.getMessage());
             return ResponseEntity.internalServerError().body(error);
         }
+    }
+
+    @GetMapping("/transactions")
+    public ResponseEntity<Map<String, Object>> searchTransactionRecords(@RequestParam String q) {
+        if (q == null || q.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", "Transaction ID is required"));
+        }
+
+        List<Map<String, Object>> matches = adminSearchService.searchTransactionRecords(q);
+        return ResponseEntity.ok(Map.of(
+                "success", true,
+                "searchTerm", q.trim(),
+                "count", matches.size(),
+                "results", matches));
     }
 
     @GetMapping("/barcode")
@@ -62,7 +79,4 @@ public class AdminSearchController {
         }
     }
 }
-
-
-
 

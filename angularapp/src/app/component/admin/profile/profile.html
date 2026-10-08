@@ -176,43 +176,10 @@
           </div>
         </div>
 
-        <!-- Branch Account (NeoBank A/C - where all charges & interest are deposited) -->
+        <!-- Treasury account linkage is managed centrally from the admin dashboard. -->
         <div class="details-section">
-          <h4>🏦 Branch Account (NeoBank A/C)</h4>
-          <p class="note">Map your branch account where all user charges (bank, loan, CIBIL, debit card) and loan interest are deposited. You can also set this from Manager Dashboard → Branch Account.</p>
-          <p class="note" style="margin-top: 8px;"><strong>Verify to add:</strong> When adding a bank account, the <strong>Branch Account Name</strong> must match the Neo Bank name (e.g. NeoBank, Neo Bank, Neo Bank Main Branch). Only then will the account be verified and added.</p>
-          <div class="details-grid">
-            <div class="detail-item">
-              <label>Branch Account Number</label>
-              <input 
-                *ngIf="editMode" 
-                type="text" 
-                [(ngModel)]="profileForm.branchAccountNumber" 
-                class="form-input"
-                placeholder="e.g. NEOBANK000001 or your branch account">
-              <span *ngIf="!editMode" class="value">{{ admin.branchAccountNumber || 'Not set' }}</span>
-            </div>
-            <div class="detail-item">
-              <label>Branch Account Name</label>
-              <input 
-                *ngIf="editMode" 
-                type="text" 
-                [(ngModel)]="profileForm.branchAccountName" 
-                class="form-input"
-                placeholder="e.g. NeoBank Main Branch">
-              <span *ngIf="!editMode" class="value">{{ admin.branchAccountName || 'Not set' }}</span>
-            </div>
-            <div class="detail-item">
-              <label>IFSC (optional)</label>
-              <input 
-                *ngIf="editMode" 
-                type="text" 
-                [(ngModel)]="profileForm.branchAccountIfsc" 
-                class="form-input"
-                placeholder="e.g. NEOB0001234">
-              <span *ngIf="!editMode" class="value">{{ admin.branchAccountIfsc || 'Not set' }}</span>
-            </div>
-          </div>
+          <h4>🏦 NeoBank Treasury Account</h4>
+          <p class="note">Treasury account linking is managed centrally from the Admin Dashboard → NeoBank Treasury Account. Only the verified NeoBank-owned account can be linked.</p>
         </div>
 
         <!-- Salary Account (Admin salary will be credited here) -->
@@ -306,7 +273,6 @@
     <button class="retry-btn" (click)="loadProfile()">Retry</button>
   </div>
 </div>
-
 
 
 

@@ -228,28 +228,21 @@ public class EmiService {
             return response;
         }
 
-        // Map loan interest to manager branch account in real time (credit branch with interest portion)
-        Double interestAmount = emi.getInterestAmount() != null ? emi.getInterestAmount() : 0.0;
-        if (branchAccountService != null && interestAmount > 0) {
-            String depositAccount = branchAccountService.getDepositAccountNumber();
-            Account branchAccount = accountService.getAccountByNumber(depositAccount);
-            if (branchAccount != null) {
-                accountService.creditBalance(depositAccount, interestAmount);
-                Double branchBalance = accountService.getBalanceByAccountNumber(depositAccount);
-                Transaction creditTxn = new Transaction();
-                creditTxn.setMerchant("Loan EMI Interest - " + accountNumber);
-                creditTxn.setAmount(interestAmount);
-                creditTxn.setType("Credit");
-                creditTxn.setDescription("Loan interest (EMI #" + emi.getEmiNumber() + " from " + accountNumber + ")");
-                creditTxn.setAccountNumber(depositAccount);
-                creditTxn.setUserName("NeoBank");
-                creditTxn.setSourceAccountNumber(accountNumber);
-                creditTxn.setBalance(branchBalance != null ? branchBalance : interestAmount);
-                creditTxn.setDate(LocalDateTime.now());
-                creditTxn.setStatus("Completed");
-                transactionService.saveTransaction(creditTxn);
-            }
+        // Record the full EMI collected (principal and interest) against NeoBank treasury.
+        if (branchAccountService == null) {
+            throw new IllegalStateException("NeoBank treasury service is unavailable; EMI collection was not recorded.");
         }
+        if (emi.getTotalAmount() == null || emi.getTotalAmount() <= 0) {
+            throw new IllegalStateException("EMI amount must be greater than zero.");
+        }
+        branchAccountService.recordTreasuryMovement(
+            emi.getTotalAmount(),
+            true,
+            "Loan EMI Collection",
+            "EMI #" + emi.getEmiNumber() + " collected from " + accountNumber
+                + " (principal: " + emi.getPrincipalAmount() + ", interest: " + emi.getInterestAmount() + ")",
+            accountNumber
+        );
 
         // Update EMI payment
         emi.setStatus("Paid");

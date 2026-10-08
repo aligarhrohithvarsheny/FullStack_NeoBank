@@ -28,8 +28,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Manages the single branch deposit account where all charges and interest are credited.
- * Can be set from Manager Dashboard (Open Branch Account) or from Admin profile (map NeoBank A/C).
+ * Manages the NeoBank treasury account used for loan funding and collected fees/repayments.
  */
 @Service
 public class BranchAccountService {
@@ -54,13 +53,23 @@ public class BranchAccountService {
     @Autowired
     private SalaryAccountRepository salaryAccountRepository;
 
-    /** Get the account number to use for depositing charges/interest. Falls back to NEOBANK000001 if not set. */
+    /** Resolve the single allowed NeoBank treasury account, ignoring legacy non-NeoBank mappings. */
     public String getDepositAccountNumber() {
-        BranchAccount b = getBranchAccount();
-        if (b != null && b.getAccountNumber() != null && !b.getAccountNumber().trim().isEmpty()) {
-            return b.getAccountNumber().trim();
-        }
         return DEFAULT_NEOBANK_ACCOUNT;
+    }
+
+    /** Return the verified NeoBank-owned account that can be linked as the treasury account. */
+    public List<Map<String, Object>> getAvailableTreasuryAccounts() {
+        Account account = accountRepository.findByAccountNumber(DEFAULT_NEOBANK_ACCOUNT);
+        if (!isNeoBankOwned(account)) {
+            throw new IllegalStateException("The NeoBank treasury account is not available or is not verified.");
+        }
+        Map<String, Object> option = new HashMap<>();
+        option.put("accountNumber", account.getAccountNumber());
+        option.put("accountName", account.getName());
+        option.put("balance", account.getBalance() == null ? 0.0 : account.getBalance());
+        option.put("status", account.getStatus());
+        return List.of(option);
     }
 
     /** Get full branch account record (for display). */
@@ -68,10 +77,7 @@ public class BranchAccountService {
         return branchAccountRepository.findAll().stream().findFirst().orElse(null);
     }
 
-    /**
-     * Set or update the branch deposit account. Creates the Account in the system if it does not exist
-     * so that credits can be applied. Called from Manager Dashboard or when admin saves profile with branch details.
-     */
+    /** Link the existing, verified NeoBank treasury account from the admin or manager dashboard. */
     @Transactional
     public Map<String, Object> setBranchAccount(String accountNumber, String accountName, String ifscCode, Long adminId) {
         Map<String, Object> result = new HashMap<>();
@@ -84,32 +90,22 @@ public class BranchAccountService {
         accountName = accountName != null ? accountName.trim() : "";
         ifscCode = ifscCode != null ? ifscCode.trim() : "";
 
-        // Verify branch account name matches Neo Bank name before add/update
-        if (!accountName.isEmpty() && !NEOBANK_NAME_PATTERN.matcher(accountName).matches()) {
+        if (!DEFAULT_NEOBANK_ACCOUNT.equals(accountNumber)) {
             result.put("success", false);
-            result.put("message", "Branch account name must match Neo Bank name to verify and add (e.g. NeoBank, Neo Bank).");
+            result.put("message", "Only the verified NeoBank treasury account can be linked.");
             return result;
         }
 
         Account existingAccount = accountRepository.findByAccountNumber(accountNumber);
-        if (existingAccount == null) {
-            Account newAccount = new Account();
-            newAccount.setAccountNumber(accountNumber);
-            newAccount.setName(accountName.isEmpty() ? "Branch Account " + accountNumber : accountName);
-            newAccount.setStatus("ACTIVE");
-            newAccount.setAccountType("Current");
-            newAccount.setBalance(0.0);
-            String suffix = accountNumber.replaceAll("[^0-9A-Za-z]", "").toUpperCase();
-            if (suffix.length() > 12) suffix = suffix.substring(0, 12);
-            newAccount.setAadharNumber("BRANCHAADHAR" + suffix);
-            newAccount.setPan("BRANCHPAN" + suffix);
-            int hash = Math.abs((accountNumber + "branch").hashCode() % 100000000);
-            newAccount.setPhone("98" + String.format("%08d", hash));
-            newAccount.setDob("01-01-2000");
-            newAccount.setAge(25);
-            newAccount.setOccupation("Branch");
-            newAccount.setAddress("NeoBank Branch");
-            accountRepository.save(newAccount);
+        if (!isNeoBankOwned(existingAccount)) {
+            result.put("success", false);
+            result.put("message", "The selected account must already exist and be owned by NeoBank.");
+            return result;
+        }
+        if (!accountName.isEmpty() && !accountName.equalsIgnoreCase(existingAccount.getName())) {
+            result.put("success", false);
+            result.put("message", "The account name must match the verified NeoBank account name.");
+            return result;
         }
 
         BranchAccount branch = getBranchAccount();
@@ -117,20 +113,66 @@ public class BranchAccountService {
             branch = new BranchAccount();
         }
         branch.setAccountNumber(accountNumber);
-        branch.setAccountName(accountName.isEmpty() ? null : accountName);
+        branch.setAccountName(existingAccount.getName());
         branch.setIfscCode(ifscCode.isEmpty() ? null : ifscCode);
         branch.setUpdatedByAdminId(adminId);
         branch.setUpdatedAt(LocalDateTime.now());
         branchAccountRepository.save(branch);
 
         result.put("success", true);
-        result.put("message", "Branch account set successfully. All charges and interest will be deposited here.");
-        result.put("branchAccount", Map.of(
-            "accountNumber", branch.getAccountNumber(),
-            "accountName", branch.getAccountName(),
-            "ifscCode", branch.getIfscCode()
-        ));
+        result.put("message", "NeoBank treasury account linked successfully.");
+        Map<String, Object> branchDetails = new HashMap<>();
+        branchDetails.put("accountNumber", branch.getAccountNumber());
+        branchDetails.put("accountName", branch.getAccountName());
+        branchDetails.put("ifscCode", branch.getIfscCode());
+        result.put("branchAccount", branchDetails);
         return result;
+    }
+
+    /**
+     * Apply a loan/collection movement to the NeoBank treasury account and create its ledger entry.
+     * Debits require sufficient available funds; the caller's transaction rolls back on failure.
+     */
+    @Transactional
+    public double recordTreasuryMovement(double amount, boolean credit, String merchant, String description,
+                                         String sourceAccountNumber) {
+        if (!Double.isFinite(amount) || amount <= 0) {
+            throw new IllegalArgumentException("Treasury transaction amount must be greater than zero.");
+        }
+        String accountNumber = getDepositAccountNumber();
+        Account account = accountRepository.findByAccountNumber(accountNumber);
+        if (!isNeoBankOwned(account)) {
+            throw new IllegalStateException("The linked NeoBank treasury account is unavailable or unverified.");
+        }
+        double currentBalance = account.getBalance() == null ? 0.0 : account.getBalance();
+        if (!credit && currentBalance < amount) {
+            throw new IllegalStateException("Insufficient NeoBank treasury funds. Available: " + currentBalance + ", Required: " + amount);
+        }
+        double newBalance = round2(credit ? currentBalance + amount : currentBalance - amount);
+        account.setBalance(newBalance);
+        accountRepository.save(account);
+
+        Transaction transaction = new Transaction();
+        transaction.setMerchant(merchant);
+        transaction.setAmount(round2(amount));
+        transaction.setType(credit ? "Credit" : "Debit");
+        transaction.setDescription(description);
+        transaction.setAccountNumber(accountNumber);
+        transaction.setUserName("NeoBank");
+        transaction.setSourceAccountNumber(sourceAccountNumber);
+        transaction.setBalance(newBalance);
+        transaction.setDate(LocalDateTime.now());
+        transaction.setStatus("Completed");
+        transactionRepository.save(transaction);
+        return newBalance;
+    }
+
+    private boolean isNeoBankOwned(Account account) {
+        return account != null
+            && DEFAULT_NEOBANK_ACCOUNT.equals(account.getAccountNumber())
+            && account.getName() != null
+            && NEOBANK_NAME_PATTERN.matcher(account.getName().trim()).matches()
+            && "ACTIVE".equalsIgnoreCase(account.getStatus());
     }
 
     /** Get summary for dashboard: balance and deposit account info. */
@@ -139,17 +181,19 @@ public class BranchAccountService {
         BranchAccount b = getBranchAccount();
         String depositAccountNumber = getDepositAccountNumber();
         Double balance = accountService.getBalanceByAccountNumber(depositAccountNumber);
+        Account account = accountRepository.findByAccountNumber(depositAccountNumber);
         summary.put("accountNumber", depositAccountNumber);
-        summary.put("accountName", b != null && b.getAccountName() != null ? b.getAccountName() : "NeoBank Branch");
+        summary.put("accountName", account != null && account.getName() != null ? account.getName()
+                : (b != null && b.getAccountName() != null ? b.getAccountName() : "NeoBank Official"));
         summary.put("ifscCode", b != null ? b.getIfscCode() : null);
         summary.put("balance", balance != null ? balance : 0.0);
-        summary.put("isConfigured", b != null && b.getAccountNumber() != null);
+        summary.put("isConfigured", b != null && DEFAULT_NEOBANK_ACCOUNT.equals(b.getAccountNumber()));
         return summary;
     }
 
     /**
-     * Get branch account transactions (credits to branch) with optional date filter and search.
-     * Returns id, date, amount, type, description, debitedUserAccountNumber, debitedUserAccountName.
+     * Get treasury account movements with optional date filter and search.
+     * Returns transaction details and the related customer account when available.
      */
     public Map<String, Object> getBranchAccountTransactions(String depositAccountNumberParam, LocalDate fromDate, LocalDate toDate, String search, int page, int size) {
         Map<String, Object> result = new HashMap<>();

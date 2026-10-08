@@ -65,6 +65,9 @@ public class LoanController {
     @Autowired(required = false)
     private com.neo.springapp.service.BankChargesService bankChargesService;
 
+    @Autowired
+    private com.neo.springapp.service.BranchAccountService branchAccountService;
+
     @Autowired(required = false)
     private com.neo.springapp.service.EducationLoanApplicationService educationLoanApplicationService;
 
@@ -143,9 +146,6 @@ public class LoanController {
                 // If loan is approved, credit the amount to user's account
                 if ("Approved".equals(status)) {
                     System.out.println("=== CREDITING LOAN AMOUNT TO USER ACCOUNT ===");
-                    
-                    // Credit the loan amount to user's account
-                    accountService.creditBalance(approvedLoan.getAccountNumber(), approvedLoan.getAmount());
                     
                     // Create transaction record
                     Transaction loanTransaction = new Transaction();
@@ -447,6 +447,13 @@ public class LoanController {
                 foreclosureTransaction.setBalance(newBalance);
                 
                 transactionService.saveTransaction(foreclosureTransaction);
+                branchAccountService.recordTreasuryMovement(
+                    foreclosureAmount,
+                    true,
+                    "Loan Foreclosure Collection",
+                    foreclosureTransaction.getDescription(),
+                    foreclosedLoan.getAccountNumber()
+                );
             }
 
             // Generate foreclosure PDF

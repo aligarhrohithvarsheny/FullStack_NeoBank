@@ -22,6 +22,8 @@ public interface EducationLoanSubsidyClaimRepository extends JpaRepository<Educa
     
     // Find by loan account number
     List<EducationLoanSubsidyClaim> findByLoanAccountNumber(String loanAccountNumber);
+
+    Optional<EducationLoanSubsidyClaim> findByTransactionId(String transactionId);
     
     // Find by status
     List<EducationLoanSubsidyClaim> findByStatus(String status);
@@ -37,4 +39,3 @@ public interface EducationLoanSubsidyClaimRepository extends JpaRepository<Educa
     @Query("SELECT c FROM EducationLoanSubsidyClaim c WHERE c.status = 'Approved' ORDER BY c.processedDate DESC")
     List<EducationLoanSubsidyClaim> findApprovedButNotCreditedClaims();
 }
-

@@ -57,6 +57,9 @@ public class GoldLoanController {
     @Autowired
     private EmailService emailService;
 
+    @Autowired
+    private com.neo.springapp.service.BranchAccountService branchAccountService;
+
     @Autowired(required = false)
     private com.neo.springapp.service.BankChargesService bankChargesService;
 
@@ -394,6 +397,13 @@ public class GoldLoanController {
                 foreclosureTransaction.setBalance(newBalance);
                 
                 transactionService.saveTransaction(foreclosureTransaction);
+                branchAccountService.recordTreasuryMovement(
+                    foreclosureAmount,
+                    true,
+                    "Gold Loan Foreclosure Collection",
+                    foreclosureTransaction.getDescription(),
+                    goldLoan.getAccountNumber()
+                );
 
                 // Also create salary normal transaction if it's a salary account
                 if (isSalaryAccount && salaryAccount != null) {

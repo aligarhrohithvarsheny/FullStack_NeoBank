@@ -38,6 +38,7 @@ public class HomeLoanService {
     @Autowired private AccountRepository accountRepository;
     @Autowired private TransactionService transactionService;
     @Autowired private HomeLoanAnalysisService analysisService;
+    @Autowired private BranchAccountService branchAccountService;
 
     private static double n(Double v) { return v == null ? 0.0 : v; }
     private static double r2(double v) { return Math.round(v * 100.0) / 100.0; }
@@ -284,6 +285,14 @@ public class HomeLoanService {
         h.setNextEmiDate(LocalDate.now().plusMonths(1));
         h.setStatus("Approved");
         touch(h);
+        branchAccountService.recordTreasuryMovement(amount, false, "Home Loan Sanction",
+                "Home loan sanctioned and disbursed: " + h.getLoanAccountNumber(), h.getAccountNumber());
+        if (fee > 0) branchAccountService.recordTreasuryMovement(fee, true, "Home Loan Processing Fee",
+                "Processing fee collected for " + h.getLoanAccountNumber(), h.getAccountNumber());
+        if (gst > 0) branchAccountService.recordTreasuryMovement(gst, true, "Home Loan Processing GST",
+                "GST collected on processing fee for " + h.getLoanAccountNumber(), h.getAccountNumber());
+        if (LEGAL_CHARGES > 0) branchAccountService.recordTreasuryMovement(LEGAL_CHARGES, true, "Home Loan Legal Charges",
+                "Legal charges collected for " + h.getLoanAccountNumber(), h.getAccountNumber());
         double newBal = r2(n(acc.getBalance()) + h.getNetDisbursed());
         acc.setBalance(newBal);
         accountRepository.save(acc);
@@ -318,7 +327,10 @@ public class HomeLoanService {
         boolean last = h.getRemainingTenure() <= 1 || principal >= rp - 0.01;
         if (last) principal = rp;
         double debit = r2(principal + interest);
-        if (ref == null) debitAccount(h, debit, "Home Loan EMI", "Home Loan EMI " + (h.getPaidEmis() + 1) + " - " + h.getLoanAccountNumber());
+        String emiDescription = "Home Loan EMI " + (h.getPaidEmis() + 1) + " - " + h.getLoanAccountNumber()
+                + " (principal " + principal + ", interest " + interest + ")";
+        if (ref == null) debitAccount(h, debit, "Home Loan EMI", emiDescription);
+        else creditTreasury(h, debit, "Home Loan EMI", emiDescription + refNote(ref));
         h.setPrincipalPaid(r2(n(h.getPrincipalPaid()) + principal));
         h.setInterestPaid(r2(n(h.getInterestPaid()) + interest));
         h.setRemainingPrincipal(r2(rp - principal));
@@ -402,7 +414,10 @@ public class HomeLoanService {
         Map<String, Object> p = prepayPreview(id, amount, adjustment);
         HomeLoan h = activeLoan(id);
         double total = (Double) p.get("totalDebit");
-        if (ref == null) debitAccount(h, total, "Home Loan Prepayment", "Part-prepayment " + amount + " (+charges) - " + h.getLoanAccountNumber());
+        String prepaymentDescription = "Home Loan Prepayment (principal " + amount + ", charges "
+                + p.get("charge") + " + GST " + p.get("gst") + ") - " + h.getLoanAccountNumber();
+        if (ref == null) debitAccount(h, total, "Home Loan Prepayment", prepaymentDescription);
+        else creditTreasury(h, total, "Home Loan Prepayment", prepaymentDescription + refNote(ref));
         h.setRemainingPrincipal((Double) p.get("newOutstanding"));
         h.setRemainingTenure((Integer) p.get("newRemainingTenure"));
         if (reduceEmi) h.setEmi((Double) p.get("newEmi"));
@@ -438,7 +453,11 @@ public class HomeLoanService {
         Map<String, Object> p = closurePreview(id);
         HomeLoan h = activeLoan(id);
         double total = (Double) p.get("totalPayable");
-        if (ref == null) debitAccount(h, total, "Home Loan Closure", "Home loan foreclosure - " + h.getLoanAccountNumber());
+        String closureDescription = "Home loan foreclosure - " + h.getLoanAccountNumber()
+                + " (principal " + n(h.getRemainingPrincipal()) + ", interest " + p.get("accruedInterest")
+                + ", charges " + p.get("closureCharge") + " + GST " + p.get("gst") + ")";
+        if (ref == null) debitAccount(h, total, "Home Loan Closure", closureDescription);
+        else creditTreasury(h, total, "Home Loan Closure", closureDescription + refNote(ref));
         double principal = n(h.getRemainingPrincipal());
         h.setPrincipalPaid(r2(n(h.getPrincipalPaid()) + principal));
         h.setInterestPaid(r2(n(h.getInterestPaid()) + (Double) p.get("accruedInterest")));
@@ -559,6 +578,8 @@ public class HomeLoanService {
         Account acc = accountRepository.findByAccountNumber(h.getAccountNumber());
         if (acc == null) throw new RuntimeException("Account not found");
         double nb = r2(n(acc.getBalance()) + amount);
+        branchAccountService.recordTreasuryMovement(amount, false, "Home Loan Top-up",
+                "Home loan top-up released - " + h.getLoanAccountNumber(), h.getAccountNumber());
         acc.setBalance(nb);
         accountRepository.save(acc);
         saveTxn(h, "Home Loan Top-up", amount, "Credit", nb, "Home loan top-up released - " + h.getLoanAccountNumber());
@@ -677,6 +698,11 @@ public class HomeLoanService {
         acc.setBalance(nb);
         accountRepository.save(acc);
         saveTxn(h, merchant, amount, "Debit", nb, desc);
+        creditTreasury(h, amount, merchant, desc);
+    }
+
+    private void creditTreasury(HomeLoan h, double amount, String merchant, String description) {
+        branchAccountService.recordTreasuryMovement(amount, true, merchant, description, h.getAccountNumber());
     }
 
     private void saveTxn(HomeLoan h, String merchant, double amount, String type, double balance, String desc) {

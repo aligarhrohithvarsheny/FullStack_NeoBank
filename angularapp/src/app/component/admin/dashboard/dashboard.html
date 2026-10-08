@@ -834,6 +834,63 @@
   </div>
   <!-- End Home Feature View -->
 
+  <section class="section-content" *ngIf="activeSection === 'bank-account-link'" style="padding: 24px;">
+    <div class="section-header">
+      <div>
+        <h2><i class="fa fa-link"></i> NeoBank Treasury Account</h2>
+        <p>Link the verified NeoBank-owned account used for loan disbursements and collected fees, repayments, and interest.</p>
+      </div>
+      <button type="button" class="refresh-btn" (click)="loadTreasuryAccountSummary()" [disabled]="isLoadingTreasuryAccount">
+        <i class="fa fa-sync-alt" [class.fa-spin]="isLoadingTreasuryAccount"></i> Refresh
+      </button>
+    </div>
+
+    <div class="info-card" *ngIf="isLoadingTreasuryAccount && !treasuryAccountSummary">
+      <p><i class="fa fa-spinner fa-spin"></i> Loading treasury account...</p>
+    </div>
+
+    <div class="info-card" *ngIf="treasuryAccountSummary">
+      <h3><i class="fa fa-wallet"></i> Available NeoBank Funds</h3>
+      <div class="details-grid">
+        <div class="detail-item"><label>Account name</label><span>{{ treasuryAccountSummary.accountName || 'NeoBank Official' }}</span></div>
+        <div class="detail-item"><label>Account number</label><span>{{ treasuryAccountSummary.accountNumber || '—' }}</span></div>
+        <div class="detail-item"><label>IFSC</label><span>{{ treasuryAccountSummary.ifscCode || 'Not provided' }}</span></div>
+        <div class="detail-item"><label>Available funds</label><span>₹ {{ (treasuryAccountSummary.balance ?? 0) | number:'1.2-2' }}</span></div>
+        <div class="detail-item"><label>Link status</label><span>{{ treasuryAccountSummary.isConfigured ? 'Linked' : 'Default NeoBank account' }}</span></div>
+      </div>
+      <p class="section-description">Sanctions debit available funds. Repayments, interest, processing charges, CIBIL charges, and other collected fees are recorded as credits.</p>
+    </div>
+
+    <div class="info-card" style="margin-top: 20px;">
+      <h3>Link the verified account</h3>
+      <p class="section-description">Only the existing NeoBank-owned account can be linked. Customer or external accounts are not eligible.</p>
+      <div class="details-grid">
+        <div class="detail-item">
+          <label>Account number</label>
+          <input type="text" [(ngModel)]="treasuryAccountNumber" readonly class="form-input" placeholder="Fetch the verified account">
+        </div>
+        <div class="detail-item">
+          <label>Account name</label>
+          <input type="text" [(ngModel)]="treasuryAccountName" readonly class="form-input" placeholder="NeoBank Official">
+        </div>
+        <div class="detail-item">
+          <label>IFSC (optional)</label>
+          <input type="text" [(ngModel)]="treasuryAccountIfsc" class="form-input" placeholder="Bank IFSC">
+        </div>
+      </div>
+      <div style="display:flex; gap:12px; margin-top:16px; flex-wrap:wrap;">
+        <button type="button" class="refresh-btn" (click)="fetchNeoBankTreasuryAccount()" [disabled]="isFetchingTreasuryAccount">
+          <i class="fa" [class.fa-spinner]="isFetchingTreasuryAccount" [class.fa-spin]="isFetchingTreasuryAccount" [class.fa-download]="!isFetchingTreasuryAccount"></i>
+          {{ isFetchingTreasuryAccount ? 'Fetching...' : 'Fetch NeoBank Account' }}
+        </button>
+        <button type="button" class="refresh-btn" (click)="linkNeoBankTreasuryAccount()" [disabled]="isSavingTreasuryAccount || !treasuryAccountNumber">
+          <i class="fa" [class.fa-spinner]="isSavingTreasuryAccount" [class.fa-spin]="isSavingTreasuryAccount" [class.fa-link]="!isSavingTreasuryAccount"></i>
+          {{ isSavingTreasuryAccount ? 'Linking...' : 'Link Account' }}
+        </button>
+      </div>
+    </div>
+  </section>
+
   <!-- Bank Forms Center (60 forms — PDF download & upload) -->
   <div class="bank-forms-section-wrapper section-content" *ngIf="activeSection === 'bank-forms'">
     <app-bank-forms-admin [adminName]="adminName"></app-bank-forms-admin>

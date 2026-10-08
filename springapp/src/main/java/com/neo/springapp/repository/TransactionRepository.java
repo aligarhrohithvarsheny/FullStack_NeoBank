@@ -19,6 +19,8 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
 
     List<Transaction> findByTransactionIdContainingIgnoreCase(String transactionId);
 
+    Optional<Transaction> findByGlobalTransactionSequence(Long globalTransactionSequence);
+
     // JPQL Query to find transactions by account number with pagination
     @Query("SELECT t FROM Transaction t WHERE t.accountNumber = :accountNumber ORDER BY t.date DESC")
     Page<Transaction> findByAccountNumberOrderByDateDesc(@Param("accountNumber") String accountNumber, Pageable pageable);

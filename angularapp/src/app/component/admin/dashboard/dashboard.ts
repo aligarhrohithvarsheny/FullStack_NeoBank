@@ -193,6 +193,7 @@ export class Dashboard implements OnInit, OnDestroy {
     { section: 'bulk-export', icon: 'fa-file-download', label: 'Bulk Data Export', description: 'Export account data in bulk PDF/Excel', gradient: 'linear-gradient(135deg, #43e97b, #38f9d7)', featureKey: 'manage-users' },
     { section: 'bank-forms', icon: 'fa-file-alt', label: 'Bank Forms', description: 'Download 60 banking forms as PDF and upload by account number', gradient: 'linear-gradient(135deg, #667eea, #764ba2)' },
     { section: 'deposit-withdraw', icon: 'fa-exchange-alt', label: 'Deposit/Withdraw', description: 'Process deposits and withdrawals', gradient: 'linear-gradient(135deg, #fa709a, #fee140)', featureKey: 'deposit-withdraw' },
+    { section: 'bank-account-link', icon: 'fa-link', label: 'NeoBank Treasury Account', description: 'Link the verified NeoBank account for loan funding and collected charges', gradient: 'linear-gradient(135deg, #0f766e, #14b8a6)' },
     { section: 'positive-pay', icon: 'fa-shield-alt', label: 'Positive Pay Requests', description: 'Verify customer cheque registrations', gradient: 'linear-gradient(135deg, #0284c7, #38bdf8)' },
     { section: 'branch-operations', icon: 'fa-university', label: 'Branch Operations', description: 'Daily allocation, balances, charges, loans and profit/loss', gradient: 'linear-gradient(135deg, #0f766e, #38bdf8)' },
     { section: 'transactions', icon: 'fa-chart-line', label: 'Transactions', description: 'View all transaction history', gradient: 'linear-gradient(135deg, #a18cd1, #fbc2eb)', featureKey: 'transactions' },
@@ -365,6 +366,13 @@ export class Dashboard implements OnInit, OnDestroy {
   // Sidebar Search
   sidebarSearchQuery: string = '';
   branchOperations: any = null;
+  treasuryAccountSummary: any = null;
+  treasuryAccountNumber: string = '';
+  treasuryAccountName: string = '';
+  treasuryAccountIfsc: string = '';
+  isLoadingTreasuryAccount = false;
+  isFetchingTreasuryAccount = false;
+  isSavingTreasuryAccount = false;
   branchOperationsDate: string = new Date().toISOString().substring(0, 10);
   branchOperationsToDate: string = new Date().toISOString().substring(0, 10);
   branchDailyAllocationAmount: number = 0;
@@ -387,6 +395,7 @@ export class Dashboard implements OnInit, OnDestroy {
       title: 'Financial Operations',
       items: [
         { section: 'deposit-withdraw', icon: 'fa-exchange-alt', label: 'Deposit/Withdraw', featureKey: 'deposit-withdraw' },
+        { section: 'bank-account-link', icon: 'fa-link', label: 'NeoBank Treasury Account' },
         { section: 'branch-operations', icon: 'fa-university', label: 'Branch Operations' },
         { section: 'transactions', icon: 'fa-chart-line', label: 'Transactions', featureKey: 'transactions' },
         { section: 'transfers', icon: 'fa-exchange-alt', label: 'Fund Transfers' },
@@ -1578,7 +1587,7 @@ export class Dashboard implements OnInit, OnDestroy {
     return this.featureBoxes.filter(f => {
       const matchesSearch = !query || f.label.toLowerCase().includes(query) || f.description.toLowerCase().includes(query) || f.section.toLowerCase().includes(query);
       const featureKey = f.featureKey || f.section;
-      const hasAccess = this.hasFeatureAccess(featureKey);
+      const hasAccess = featureKey === 'bank-account-link' || this.hasFeatureAccess(featureKey);
       return matchesSearch && hasAccess;
     }).sort((first, second) => first.label.localeCompare(second.label));
   }
@@ -1599,6 +1608,71 @@ export class Dashboard implements OnInit, OnDestroy {
     this.http.get<any>(url).subscribe({
       next: (data) => { this.branchOperations = data; this.isLoadingBranchOperations = false; },
       error: () => { this.branchOperations = null; this.isLoadingBranchOperations = false; }
+    });
+  }
+
+  loadTreasuryAccountSummary() {
+    this.isLoadingTreasuryAccount = true;
+    this.http.get<any>(`${environment.apiBaseUrl}/api/admins/branch-account`).subscribe({
+      next: (summary) => {
+        this.treasuryAccountSummary = summary;
+        this.treasuryAccountNumber = summary?.accountNumber || '';
+        this.treasuryAccountName = summary?.accountName || '';
+        this.treasuryAccountIfsc = summary?.ifscCode || '';
+        this.isLoadingTreasuryAccount = false;
+      },
+      error: (err) => {
+        this.isLoadingTreasuryAccount = false;
+        this.alertService.error('Treasury Account', err.error?.message || 'Could not load NeoBank treasury account.');
+      }
+    });
+  }
+
+  fetchNeoBankTreasuryAccount() {
+    this.isFetchingTreasuryAccount = true;
+    this.http.get<any>(`${environment.apiBaseUrl}/api/admins/branch-account/available`).subscribe({
+      next: (response) => {
+        const account = response?.accounts?.[0];
+        this.isFetchingTreasuryAccount = false;
+        if (!response?.success || !account) {
+          this.alertService.error('Treasury Account', response?.message || 'No verified NeoBank account is available to link.');
+          return;
+        }
+        this.treasuryAccountNumber = account.accountNumber;
+        this.treasuryAccountName = account.accountName;
+        this.alertService.success('Treasury Account', 'Verified NeoBank account fetched. Save to link it.');
+      },
+      error: (err) => {
+        this.isFetchingTreasuryAccount = false;
+        this.alertService.error('Treasury Account', err.error?.message || 'Could not fetch a verified NeoBank account.');
+      }
+    });
+  }
+
+  linkNeoBankTreasuryAccount() {
+    if (!this.treasuryAccountNumber.trim()) {
+      this.alertService.error('Treasury Account', 'Fetch the verified NeoBank account before linking.');
+      return;
+    }
+    this.isSavingTreasuryAccount = true;
+    this.http.put<any>(`${environment.apiBaseUrl}/api/admins/branch-account`, {
+      accountNumber: this.treasuryAccountNumber.trim(),
+      accountName: this.treasuryAccountName.trim(),
+      ifscCode: this.treasuryAccountIfsc.trim()
+    }).subscribe({
+      next: (response) => {
+        this.isSavingTreasuryAccount = false;
+        if (response?.success) {
+          this.alertService.success('Treasury Account', response.message || 'NeoBank treasury account linked.');
+          this.loadTreasuryAccountSummary();
+        } else {
+          this.alertService.error('Treasury Account', response?.message || 'Could not link the NeoBank account.');
+        }
+      },
+      error: (err) => {
+        this.isSavingTreasuryAccount = false;
+        this.alertService.error('Treasury Account', err.error?.message || 'Could not link the NeoBank account.');
+      }
     });
   }
 
@@ -1682,6 +1756,12 @@ export class Dashboard implements OnInit, OnDestroy {
     if (section === 'branch-operations') {
       this.activeSection = section;
       this.loadBranchOperations();
+      return;
+    }
+
+    if (section === 'bank-account-link') {
+      this.activeSection = section;
+      this.loadTreasuryAccountSummary();
       return;
     }
 
