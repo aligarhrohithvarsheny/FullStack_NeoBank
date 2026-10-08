@@ -220,6 +220,7 @@ public class HomeLoanService {
         if (f.get("interestRate") != null) {
             double v = num(f.get("interestRate"));
             if (v <= 0 || v > 30) throw new RuntimeException("Invalid interest rate");
+            if (n(h.getInterestRate()) != v) event(h, "RATE_CHANGE", admin, "Interest rate " + n(h.getInterestRate()) + " -> " + v, null, null, null, null);
             diff.append("rate ").append(h.getInterestRate()).append("->").append(v).append("; ");
             h.setInterestRate(v);
             if (approved) {
@@ -537,6 +538,133 @@ public class HomeLoanService {
     public Map<String, Object> analysis(Long id) {
         HomeLoan h = get(id);
         return analysisService.analyze(h.getAccountNumber(), h.getAmount(), h.getTenure(), h.getInterestRate(), h.getPropertyValue());
+    }
+
+    // ---------- Admin: top-up, upload, rate revert, NOC ----------
+
+    @Transactional
+    public HomeLoan topup(Long id, double amount, Double topupRate, Integer extraMonths, String note, String admin) {
+        HomeLoan h = activeLoan(id);
+        if (amount < 10000) throw new RuntimeException("Minimum top-up amount is 10,000");
+        double rp = n(h.getRemainingPrincipal());
+        double rate = topupRate == null ? n(h.getInterestRate()) : topupRate;
+        if (rate <= 0 || rate > 30) throw new RuntimeException("Invalid top-up interest rate");
+        int add = extraMonths == null ? 0 : extraMonths;
+        int newTenure = h.getRemainingTenure() + add;
+        if (add < 0 || newTenure < 1 || newTenure > 360) throw new RuntimeException("Total remaining tenure must be 1-360 months");
+        double newPrincipal = r2(rp + amount);
+        double blended = r2((rp * n(h.getInterestRate()) + amount * rate) / newPrincipal);
+        double oldRate = n(h.getInterestRate()), oldEmi = n(h.getEmi());
+
+        Account acc = accountRepository.findByAccountNumber(h.getAccountNumber());
+        if (acc == null) throw new RuntimeException("Account not found");
+        double nb = r2(n(acc.getBalance()) + amount);
+        acc.setBalance(nb);
+        accountRepository.save(acc);
+        saveTxn(h, "Home Loan Top-up", amount, "Credit", nb, "Home loan top-up released - " + h.getLoanAccountNumber());
+
+        h.setRemainingPrincipal(newPrincipal);
+        h.setRemainingTenure(newTenure);
+        h.setTenure(h.getTenure() + add);
+        h.setAmount(r2(n(h.getAmount()) + amount));
+        h.setTopupTotal(r2(n(h.getTopupTotal()) + amount));
+        h.setInterestRate(blended);
+        h.setEmi(r2(HomeLoanAnalysisService.emi(newPrincipal, blended, newTenure)));
+        h.setReviewedBy(admin);
+        touch(h);
+        repo.save(h);
+        if (blended != oldRate) event(h, "RATE_CHANGE", admin, "Interest rate " + oldRate + " -> " + blended + " (top-up blended)", null, null, null, null);
+        event(h, "TOPUP", admin, "Top-up " + amount + " released at " + rate + "% (blended " + blended + "%). EMI " + oldEmi + " -> " + h.getEmi()
+                + ", tenure +" + add + " months" + (note == null || note.isBlank() ? "" : ". " + note), null, amount, 0.0, 0.0, newPrincipal);
+        return h;
+    }
+
+    @Transactional
+    public HomeLoan adminUploadDocument(Long id, String type, MultipartFile file, String admin) throws IOException {
+        if (!DOC_TYPES.contains(type)) throw new RuntimeException("Unknown document type");
+        if (file == null || file.isEmpty()) throw new RuntimeException("File is empty");
+        HomeLoan h = get(id);
+        String orig = file.getOriginalFilename() == null ? "file" : file.getOriginalFilename();
+        String ext = orig.contains(".") ? orig.substring(orig.lastIndexOf('.')).toLowerCase() : "";
+        if (!List.of(".pdf", ".png", ".jpg", ".jpeg").contains(ext)) throw new RuntimeException("Only PDF, PNG or JPG files are allowed");
+        Files.createDirectories(UPLOAD_DIR);
+        String name = h.getApplicationId() + "-" + type + "-" + System.currentTimeMillis() + ext;
+        Files.copy(file.getInputStream(), UPLOAD_DIR.resolve(name), StandardCopyOption.REPLACE_EXISTING);
+        String remark = "Uploaded by admin " + admin;
+        switch (type) {
+            case "fdReceipt": h.setFdReceiptPath(name); h.setFdReceiptStatus("Verified"); h.setFdReceiptRemark(remark); break;
+            case "model": h.setModelDocPath(name); h.setModelDocStatus("Verified"); h.setModelDocRemark(remark); break;
+            default: h.setSignaturePath(name); h.setSignatureStatus("Verified"); h.setSignatureRemark(remark);
+        }
+        if (List.of("Submitted", "Under Review", "Documents Required", "Documents Submitted").contains(h.getStatus()) && allDocsVerified(h)) h.setStatus("Documents Verified");
+        touch(h);
+        repo.save(h);
+        event(h, "DOCUMENT", admin, "Admin uploaded " + docLabel(type) + " (" + orig + ")", null, null, null, null);
+        return h;
+    }
+
+    public List<Map<String, Object>> rateHistory(Long id) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (HomeLoanEvent e : eventRepo.findByHomeLoanIdOrderByEventDateAscIdAsc(id)) {
+            if (!"RATE_CHANGE".equals(e.getEventType()) && !"RATE_REVERTED".equals(e.getEventType())) continue;
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("type", e.getEventType());
+            m.put("date", e.getEventDate());
+            m.put("actor", e.getActor());
+            m.put("details", e.getDetails());
+            out.add(m);
+        }
+        return out;
+    }
+
+    private static double[] parseRates(String details) {
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("([0-9.]+) -> ([0-9.]+)").matcher(details == null ? "" : details);
+        return m.find() ? new double[]{Double.parseDouble(m.group(1)), Double.parseDouble(m.group(2))} : null;
+    }
+
+    @Transactional
+    public HomeLoan revertRate(Long id, String admin) {
+        HomeLoan h = get(id);
+        if (List.of("Closed", "Rejected", "Cancelled").contains(h.getStatus())) throw new RuntimeException("Loan is not editable");
+        Deque<double[]> stack = new ArrayDeque<>();
+        for (HomeLoanEvent e : eventRepo.findByHomeLoanIdOrderByEventDateAscIdAsc(id)) {
+            if ("RATE_CHANGE".equals(e.getEventType())) { double[] r = parseRates(e.getDetails()); if (r != null) stack.push(r); }
+            else if ("RATE_REVERTED".equals(e.getEventType()) && !stack.isEmpty()) stack.pop();
+        }
+        if (stack.isEmpty()) throw new RuntimeException("No interest rate change to revert");
+        double[] last = stack.peek();
+        double cur = n(h.getInterestRate());
+        h.setInterestRate(last[0]);
+        if ("Approved".equals(h.getStatus()) && h.getRemainingTenure() != null && h.getRemainingTenure() > 0)
+            h.setEmi(r2(HomeLoanAnalysisService.emi(n(h.getRemainingPrincipal()), last[0], h.getRemainingTenure())));
+        h.setReviewedBy(admin);
+        touch(h);
+        repo.save(h);
+        event(h, "RATE_REVERTED", admin, "Interest rate reverted " + cur + " -> " + last[0], null, null, null, null);
+        return h;
+    }
+
+    @Transactional
+    public HomeLoan adminClose(Long id, String admin, String reference) {
+        return close(id, admin, "OFFLINE" + (reference == null || reference.isBlank() ? "" : "-" + reference));
+    }
+
+    @Transactional
+    public Map<String, Object> noc(Long id, String admin) {
+        HomeLoan h = get(id);
+        if (!"Closed".equals(h.getStatus())) throw new RuntimeException("NOC can be issued only for closed loans");
+        if (h.getNocNumber() == null) {
+            h.setNocNumber("NOC-" + h.getLoanAccountNumber() + "-" + LocalDate.now().toString().replace("-", ""));
+            h.setNocDate(LocalDateTime.now());
+            touch(h);
+            repo.save(h);
+            event(h, "NOC", admin == null ? "System" : admin, "No Objection Certificate " + h.getNocNumber() + " issued", null, null, null, null);
+        }
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("loan", h);
+        m.put("nocNumber", h.getNocNumber());
+        m.put("issuedOn", h.getNocDate());
+        return m;
     }
 
     // ---------- helpers ----------

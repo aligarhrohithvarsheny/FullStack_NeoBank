@@ -77,6 +77,10 @@ public class HomeLoan {
     private LocalDateTime closureDate;
     private Double closureAmount;
 
+    private Double topupTotal = 0.0;
+    private String nocNumber;
+    private LocalDateTime nocDate;
+
     // ML analysis snapshot
     private Double approvalProbability;
     private String riskBand;

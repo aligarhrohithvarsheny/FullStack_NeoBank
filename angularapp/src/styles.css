@@ -120,3 +120,25 @@ body .card-details-modal .modal-actions {
     padding: 12px;
   }
 }
+
+/* Global small copy button for account/mobile/loan/FD/customer/application numbers */
+.neo-copy-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin-left: 6px;
+  padding: 0;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  background: #f8fafc;
+  color: #475569;
+  font-size: 11px;
+  line-height: 1;
+  vertical-align: middle;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.neo-copy-btn:hover { background: #e2e8f0; color: #0f172a; }
+.neo-copy-btn.copied { background: #16a34a; border-color: #16a34a; color: #fff; }

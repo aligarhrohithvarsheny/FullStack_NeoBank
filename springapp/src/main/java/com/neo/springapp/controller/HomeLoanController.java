@@ -117,6 +117,34 @@ public class HomeLoanController {
         }
     }
 
+    // ----- admin extras -----
+    @PostMapping("/{id}/topup")
+    public ResponseEntity<?> topup(@PathVariable Long id, @RequestParam double amount, @RequestParam(required = false) Double rate,
+                                   @RequestParam(required = false) Integer extraMonths, @RequestParam(required = false) String note, @RequestParam String admin) {
+        return run(() -> service.topup(id, amount, rate, extraMonths, note, admin));
+    }
+
+    @PostMapping("/{id}/admin-documents/{type}")
+    public ResponseEntity<?> adminUpload(@PathVariable Long id, @PathVariable String type, @RequestParam("file") MultipartFile file, @RequestParam String admin) {
+        return run(() -> {
+            try { return service.adminUploadDocument(id, type, file, admin); } catch (java.io.IOException e) { throw new RuntimeException("Upload failed: " + e.getMessage()); }
+        });
+    }
+
+    @GetMapping("/{id}/rate-history")
+    public ResponseEntity<?> rateHistory(@PathVariable Long id) { return run(() -> service.rateHistory(id)); }
+
+    @PutMapping("/{id}/revert-rate")
+    public ResponseEntity<?> revertRate(@PathVariable Long id, @RequestParam String admin) { return run(() -> service.revertRate(id, admin)); }
+
+    @PostMapping("/{id}/admin-close")
+    public ResponseEntity<?> adminClose(@PathVariable Long id, @RequestParam String admin, @RequestParam(required = false) String reference) {
+        return run(() -> service.adminClose(id, admin, reference));
+    }
+
+    @GetMapping("/{id}/noc")
+    public ResponseEntity<?> noc(@PathVariable Long id, @RequestParam(required = false) String admin) { return run(() -> service.noc(id, admin)); }
+
     // ----- repayments -----
     @PostMapping("/{id}/pay-emi")
     public ResponseEntity<?> payEmi(@PathVariable Long id, @RequestParam(defaultValue = "Customer") String by) { return run(() -> service.payEmi(id, by)); }

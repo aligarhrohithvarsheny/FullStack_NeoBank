@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../../environment/environment';
+import { printHomeLoanNoc, printHomeLoanDocuments } from '../../../service/home-loan-documents';
 import { printFundTransferReceipt } from '../../../service/fund-transfer-receipt';
 
 @Component({
@@ -120,8 +121,8 @@ import { printFundTransferReceipt } from '../../../service/fund-transfer-receipt
           <h4>Documents (upload PDF/image)</h4>
           <div class="doc" *ngFor="let d of docTypes">
             <span>{{d.label}}:
-              <b class="dstat" [attr.data-s]="l[d.path] ? (l[d.status]||'Pending') : 'None'">{{l[d.path] ? '? Uploaded ? ' + (l[d.status]||'Pending') : 'Not uploaded'}}</b>
-              <i *ngIf="l[d.remark]">? {{l[d.remark]}}</i></span>
+              <b class="dstat" [attr.data-s]="l[d.path] ? (l[d.status]||'Pending') : 'None'">{{l[d.path] ? '✔ Uploaded · ' + (l[d.status]||'Pending') : 'Not uploaded'}}</b>
+              <i *ngIf="l[d.remark]">— {{l[d.remark]}}</i></span>
             <span *ngIf="canUpload(l) && l[d.status]!=='Verified'">
               <input type="file" accept=".pdf,.png,.jpg,.jpeg" (change)="upload(l,d.key,$event)" [disabled]="uploading===d.key">
               <small *ngIf="uploading===d.key"> Uploading...</small>
@@ -157,6 +158,7 @@ import { printFundTransferReceipt } from '../../../service/fund-transfer-receipt
             <button class="btn danger sm" (click)="act(l,'close')">Confirm Closure</button></div>
           <div class="actions">
             <button class="btn sm" (click)="loadSchedule(l)">EMI Schedule</button>
+            <button class="btn sm" (click)="docs(l)">📄 Loan documents</button>
             <button class="btn sm" (click)="loadStatement(l)">Statement</button>
           </div>
         </div>
@@ -166,7 +168,7 @@ import { printFundTransferReceipt } from '../../../service/fund-transfer-receipt
           <table><tr><th>Date</th><th>Type</th><th>Amount</th><th>EMI</th><th>Tenure</th><th>Receipt</th></tr>
           <tr *ngFor="let p of payments"><td>{{p.performedAt | date:'short'}}</td><td>{{p.loanPaymentType}}</td><td>{{p.amount | number:'1.2-2'}}</td><td>{{p.emiAmountBefore | number:'1.0-0'}} → {{p.emiAmountAfter | number:'1.0-0'}}</td><td>{{p.remainingTenureBefore}} → {{p.remainingTenureAfter}}</td><td><button class="btn sm" (click)="receipt(p)">Receipt</button></td></tr></table>
         </div>
-        <div *ngIf="!isLive(l)"><button class="btn sm" (click)="loadStatement(l)">History</button></div>
+        <div *ngIf="!isLive(l)"><button class="btn sm" (click)="loadStatement(l)">History</button> <button class="btn sm" *ngIf="l.status==='Closed'" (click)="noc(l)">&#128220; Download NOC</button></div>
 
         <table *ngIf="schedule.length && sel?.id===l.id">
           <tr><th>#</th><th>Due</th><th>EMI</th><th>Principal</th><th>Interest</th><th>Balance</th></tr>
@@ -310,6 +312,8 @@ export class Homeloan implements OnInit, OnDestroy {
   }
   ngOnDestroy() { clearInterval(this.poll); clearTimeout(this.t); }
   loadPayments(l: any) { this.http.get<any[]>(`${this.api}/${l.id}/payments`).subscribe({ next: p => this.payments = p, error: () => {} }); }
+  noc(l: any) { this.http.get<any>(`${this.api}/${l.id}/noc?admin=customer`).subscribe({ next: n => printHomeLoanNoc(n), error: () => alert('NOC not available yet') }); }
+  docs(l: any) { this.http.get<any[]>(`${this.api}/${l.id}/schedule`).subscribe({ next: s => printHomeLoanDocuments(l, s), error: () => printHomeLoanDocuments(l, []) }); }
   receipt(p: any) { printFundTransferReceipt(p); }
   private flash(ok: string, bad = '') { this.msg = ok; this.err = bad; setTimeout(() => { this.msg = ''; this.err = ''; }, 5000); }
   private fail(e: any) { this.flash('', e?.error?.message || 'Request failed'); this.busy = false; }
