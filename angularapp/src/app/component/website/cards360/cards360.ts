@@ -17,6 +17,7 @@ interface Card360Card {
   approvedLimit?: number;
   availableLimit?: number;
   spendingLimit?: number;
+  outstandingBalance?: number;
 }
 
 interface Card360Transaction {
@@ -25,6 +26,11 @@ interface Card360Transaction {
   amount: string;
   type: string;
   status: string;
+}
+
+interface Cards360PaymentAccount {
+  maskedAccountNumber: string;
+  balance: number;
 }
 
 @Component({
@@ -41,11 +47,15 @@ export class Cards360 implements OnInit {
   linkCardNumber = '';
   cards: Card360Card[] = [];
   transactions: Card360Transaction[] = [];
+  paymentAccount: Cards360PaymentAccount | null = null;
   error = '';
   notice = '';
   loading = false;
   editingLimitId: number | null = null;
   spendingLimit = 0;
+  selectedBillCardId: number | null = null;
+  billPaymentAmount = 0;
+  payingBill = false;
 
   private readonly tokenKey = 'card360Token';
   private readonly api = `${environment.apiBaseUrl}/api/card360`;
@@ -59,6 +69,10 @@ export class Cards360 implements OnInit {
   ngOnInit(): void {
     if (!isPlatformBrowser(this.platformId)) return;
     if (this.router.url.includes('/dashboard')) this.loadDashboard();
+  }
+
+  get selectedBillCard(): Card360Card | undefined {
+    return this.cards.find(card => card.type === 'credit' && card.id === this.selectedBillCardId);
   }
 
   signIn(): void {
@@ -102,6 +116,10 @@ export class Cards360 implements OnInit {
     });
     this.http.get<Card360Transaction[]>(`${this.api}/transactions`, { headers: this.headers() }).subscribe({
       next: result => this.transactions = result || [],
+      error: err => this.handleProtectedError(err)
+    });
+    this.http.get<Cards360PaymentAccount>(`${this.api}/payment-account`, { headers: this.headers() }).subscribe({
+      next: result => this.paymentAccount = result,
       error: err => this.handleProtectedError(err)
     });
   }
@@ -153,6 +171,39 @@ export class Cards360 implements OnInit {
         },
         error: err => this.error = err.error?.message || 'Unable to update the spending limit.'
       });
+  }
+
+  beginBillPayment(card: Card360Card): void {
+    this.error = '';
+    this.selectedBillCardId = card.id;
+    this.billPaymentAmount = card.outstandingBalance ?? 0;
+  }
+
+  payCreditCardBill(): void {
+    this.error = '';
+    this.notice = '';
+    if (this.selectedBillCardId === null || !Number.isFinite(this.billPaymentAmount)
+        || this.billPaymentAmount <= 0) {
+      this.error = 'Enter a valid bill payment amount.';
+      return;
+    }
+    this.payingBill = true;
+    this.http.post<{ paidAmount: number; remainingOutstanding: number; accountBalanceAfter: number }>(
+      `${this.api}/credit-card-bill`,
+      { creditCardId: this.selectedBillCardId, amount: this.billPaymentAmount },
+      { headers: this.headers() }
+    ).subscribe({
+      next: result => {
+        this.payingBill = false;
+        this.notice = `Payment of ₹${result.paidAmount.toFixed(2)} completed. Remaining card balance: ₹${result.remainingOutstanding.toFixed(2)}.`;
+        if (this.paymentAccount) this.paymentAccount.balance = result.accountBalanceAfter;
+        this.loadDashboard();
+      },
+      error: err => {
+        this.payingBill = false;
+        this.error = err.error?.message || 'Unable to pay this credit-card bill.';
+      }
+    });
   }
 
   signOut(): void {

@@ -39,8 +39,12 @@ public class Card360Controller {
 
     @PutMapping("/admin/accounts/{accountNumber}/enabled")
     public ResponseEntity<?> setEnabled(@PathVariable String accountNumber, @RequestBody Map<String, String> request) {
+        String value = request.get("enabled");
+        if (!"true".equalsIgnoreCase(value) && !"false".equalsIgnoreCase(value)) {
+            return ResponseEntity.badRequest().body(Map.of("message", "enabled must be true or false"));
+        }
         try {
-            boolean enabled = Boolean.parseBoolean(request.get("enabled"));
+            boolean enabled = Boolean.parseBoolean(value);
             return ResponseEntity.ok(card360Service.setEnabled(accountNumber, enabled, request.get("adminEmail"), request.get("adminPassword")));
         } catch (IllegalArgumentException exception) {
             return ResponseEntity.badRequest().body(Map.of("message", exception.getMessage()));
@@ -83,9 +87,11 @@ public class Card360Controller {
                                           @RequestBody Map<String, Boolean> request, Authentication authentication) {
         SessionPrincipal principal = card360Principal(authentication);
         if (principal == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        if (request.get("blocked") == null) {
+            return ResponseEntity.badRequest().body(Map.of("message", "blocked is required"));
+        }
         try {
-            return ResponseEntity.ok(card360Service.updateCardStatus(principal.accountNumber(), type, id,
-                    Boolean.TRUE.equals(request.get("blocked"))));
+            return ResponseEntity.ok(card360Service.updateCardStatus(principal.accountNumber(), type, id, request.get("blocked")));
         } catch (IllegalArgumentException exception) {
             return ResponseEntity.badRequest().body(Map.of("message", exception.getMessage()));
         }
@@ -105,11 +111,44 @@ public class Card360Controller {
         }
     }
 
+    @GetMapping("/payment-account")
+    public ResponseEntity<?> paymentAccount(Authentication authentication) {
+        SessionPrincipal principal = card360Principal(authentication);
+        if (principal == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        try {
+            return ResponseEntity.ok(card360Service.getPaymentAccount(principal.accountNumber()));
+        } catch (IllegalArgumentException exception) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", exception.getMessage()));
+        }
+    }
+
+    @PostMapping("/credit-card-bill")
+    public ResponseEntity<?> payCreditCardBill(@RequestBody Map<String, Number> request,
+                                                Authentication authentication) {
+        SessionPrincipal principal = card360Principal(authentication);
+        if (principal == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        Number cardId = request.get("creditCardId");
+        Number amount = request.get("amount");
+        if (cardId == null || amount == null) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Credit card and payment amount are required"));
+        }
+        try {
+            return ResponseEntity.ok(card360Service.payCreditCardBill(principal.accountNumber(),
+                    cardId.longValue(), amount.doubleValue()));
+        } catch (IllegalArgumentException exception) {
+            return ResponseEntity.badRequest().body(Map.of("message", exception.getMessage()));
+        }
+    }
+
     @GetMapping("/transactions")
     public ResponseEntity<?> transactions(Authentication authentication) {
         SessionPrincipal principal = card360Principal(authentication);
         if (principal == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        return ResponseEntity.ok(card360Service.getTransactions(principal.accountNumber()));
+        try {
+            return ResponseEntity.ok(card360Service.getTransactions(principal.accountNumber()));
+        } catch (IllegalArgumentException exception) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", exception.getMessage()));
+        }
     }
 
     private SessionPrincipal card360Principal(Authentication authentication) {

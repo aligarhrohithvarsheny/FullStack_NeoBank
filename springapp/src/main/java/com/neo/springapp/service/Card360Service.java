@@ -21,6 +21,7 @@ public class Card360Service {
     private final UserRepository userRepository;
     private final AdminService adminService;
     private final UserSessionTokenService tokenService;
+    private final CreditCardService creditCardService;
     private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder(10);
     private final SecureRandom random = new SecureRandom();
 
@@ -28,7 +29,8 @@ public class Card360Service {
                           CardRepository cardRepository, CreditCardRepository creditCardRepository,
                           CreditCardTransactionRepository creditTransactionRepository,
                           TransactionRepository transactionRepository, UserRepository userRepository,
-                          AdminService adminService, UserSessionTokenService tokenService) {
+                          AdminService adminService, UserSessionTokenService tokenService,
+                          CreditCardService creditCardService) {
         this.accessRepository = accessRepository;
         this.auditRepository = auditRepository;
         this.cardRepository = cardRepository;
@@ -38,9 +40,10 @@ public class Card360Service {
         this.userRepository = userRepository;
         this.adminService = adminService;
         this.tokenService = tokenService;
+        this.creditCardService = creditCardService;
     }
 
-    private boolean customerCanUnblock(String accountNumber, String type, Long id) {
+    private boolean customerCanUnblock(String accountNumber, String type, long id) {
         return auditRepository.findFirstByAccountNumberAndCardTypeAndCardIdOrderByCreatedAtDesc(
                         accountNumber, type.toLowerCase(Locale.ROOT), id)
                 .filter(audit -> "CARD_BLOCKED".equals(audit.getAction())
@@ -48,7 +51,7 @@ public class Card360Service {
                 .isPresent();
     }
 
-    @Transactional
+    @Transactional(noRollbackFor = IllegalArgumentException.class)
     public Map<String, Object> generatePasscode(String accountNumber, String adminEmail, String adminPassword) {
         Admin admin = requireAdmin(adminEmail, adminPassword);
         User user = userRepository.findByAccountNumber(accountNumber)
@@ -73,9 +76,14 @@ public class Card360Service {
         return Map.of("success", true, "passcode", passcode, "customerName", customerName, "email", user.getEmail());
     }
 
-    @Transactional
+    @Transactional(noRollbackFor = IllegalArgumentException.class)
     public Map<String, Object> setEnabled(String accountNumber, boolean enabled, String adminEmail, String adminPassword) {
         Admin admin = requireAdmin(adminEmail, adminPassword);
+        if (enabled) {
+            userRepository.findByAccountNumber(accountNumber)
+                    .filter(value -> "APPROVED".equalsIgnoreCase(value.getStatus()))
+                    .orElseThrow(() -> new IllegalArgumentException("Approved customer account not found"));
+        }
         Card360Access access = accessRepository.findByAccountNumber(accountNumber)
                 .orElseThrow(() -> new IllegalArgumentException("Card360 access has not been set up for this account"));
         boolean previous = access.isEnabled();
@@ -88,7 +96,7 @@ public class Card360Service {
         return Map.of("success", true, "enabled", enabled);
     }
 
-    @Transactional
+    @Transactional(noRollbackFor = IllegalArgumentException.class)
     public Map<String, Object> login(String cardNumber, String email, String passcode) {
         if (isBlank(cardNumber) || isBlank(email) || isBlank(passcode)) {
             throw new IllegalArgumentException("Card number, email, and passcode are required");
@@ -120,15 +128,14 @@ public class Card360Service {
         access.setLockedUntil(null);
         accessRepository.save(access);
         User user = userRepository.findByAccountNumber(accountNumber)
+                .filter(value -> "APPROVED".equalsIgnoreCase(value.getStatus()))
                 .orElseThrow(() -> new IllegalArgumentException("Unable to sign in. Check your details or contact the bank."));
         return Map.of("success", true, "token", tokenService.issueCard360(user.getId(), accountNumber));
     }
 
     @Transactional(readOnly = true)
     public Map<String, Object> getCustomerCards(String accountNumber) {
-        Card360Access access = accessRepository.findByAccountNumber(accountNumber)
-                .filter(Card360Access::isEnabled)
-                .orElseThrow(() -> new IllegalArgumentException("Card360 access is disabled"));
+        requireEnabled(accountNumber);
         List<Map<String, Object>> cards = new ArrayList<>();
         for (Card card : cardRepository.findByAccountNumber(accountNumber)) {
             cards.add(debitCardView(card));
@@ -151,7 +158,7 @@ public class Card360Service {
     }
 
     @Transactional
-    public Map<String, Object> updateCardStatus(String accountNumber, String type, Long id, boolean blocked) {
+    public Map<String, Object> updateCardStatus(String accountNumber, String type, long id, boolean blocked) {
         requireEnabled(accountNumber);
         if (!blocked && !customerCanUnblock(accountNumber, type, id)) {
             throw new IllegalArgumentException("Contact NeoBank to unblock this card");
@@ -183,7 +190,7 @@ public class Card360Service {
     }
 
     @Transactional
-    public Map<String, Object> updateCreditLimit(String accountNumber, Long id, double limit) {
+    public Map<String, Object> updateCreditLimit(String accountNumber, long id, double limit) {
         requireEnabled(accountNumber);
         CreditCard card = creditCardRepository.findById(id).filter(c -> accountNumber.equals(c.getAccountNumber()))
                 .orElseThrow(() -> new IllegalArgumentException("Card not found"));
@@ -196,6 +203,21 @@ public class Card360Service {
         record(accountNumber, "credit", id, "SPENDING_LIMIT_CHANGED",
                 Objects.toString(oldLimit, "Not set"), Double.toString(limit), "CUSTOMER:" + accountNumber);
         return Map.of("success", true, "spendingLimit", limit);
+    }
+
+    @Transactional(readOnly = true)
+    public Map<String, Object> getPaymentAccount(String accountNumber) {
+        requireEnabled(accountNumber);
+        return creditCardService.getCards360PaymentAccount(accountNumber);
+    }
+
+    @Transactional
+    public Map<String, Object> payCreditCardBill(String accountNumber, Long creditCardId, double amount) {
+        requireEnabled(accountNumber);
+        Map<String, Object> result = creditCardService.payCards360Bill(accountNumber, creditCardId, amount);
+        record(accountNumber, "credit", creditCardId, "CARD_BILL_PAYMENT", null,
+                Objects.toString(result.get("paidAmount"), "0"), "CUSTOMER:" + accountNumber);
+        return result;
     }
 
     @Transactional(readOnly = true)
@@ -218,7 +240,7 @@ public class Card360Service {
         return items.stream().limit(100).toList();
     }
 
-    @Transactional
+    @Transactional(noRollbackFor = IllegalArgumentException.class)
     public List<Card360Audit> getAuditHistory(String accountNumber, String adminEmail, String adminPassword) {
         requireAdmin(adminEmail, adminPassword);
         return auditRepository.findTop200ByAccountNumberOrderByCreatedAtDesc(accountNumber);
@@ -229,7 +251,7 @@ public class Card360Service {
         if (debit != null && email.equalsIgnoreCase(Objects.toString(debit.getUserEmail(), ""))) return debit.getAccountNumber();
         return creditCardRepository.findByCardNumber(number)
                 .filter(card -> email.equalsIgnoreCase(Objects.toString(card.getUserEmail(), "")))
-                .map(CreditCard::getAccountNumber).orElse(null);
+                .map(card -> card.getAccountNumber()).orElse(null);
     }
 
     private Map<String, Object> ownedCard(String accountNumber, String number) {
@@ -260,6 +282,7 @@ public class Card360Service {
         result.put("approvedLimit", card.getApprovedLimit());
         result.put("availableLimit", card.getAvailableLimit());
         result.put("spendingLimit", card.getUserSetSpendingLimit());
+        result.put("outstandingBalance", card.getCurrentBalance());
         result.put("canUnblock", customerCanUnblock(card.getAccountNumber(), "credit", card.getId()));
         return result;
     }
@@ -294,8 +317,11 @@ public class Card360Service {
 
     private void requireEnabled(String accountNumber) {
         accessRepository.findByAccountNumber(accountNumber)
-                .filter(Card360Access::isEnabled)
+                .filter(access -> access.isEnabled())
                 .orElseThrow(() -> new IllegalArgumentException("Card360 access is disabled"));
+        userRepository.findByAccountNumber(accountNumber)
+                .filter(user -> "APPROVED".equalsIgnoreCase(user.getStatus()))
+                .orElseThrow(() -> new IllegalArgumentException("Approved customer account not found"));
     }
 
     private String generatePasscodeValue() {

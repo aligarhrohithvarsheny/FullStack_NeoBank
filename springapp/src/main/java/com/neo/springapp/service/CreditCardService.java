@@ -624,6 +624,47 @@ public class CreditCardService {
             throw new IllegalArgumentException("Insufficient balance or account unavailable");
         }
 
+        return postCreditCardBillPayment(card, payerAccountNumber, amount, accountBalanceAfter, "USER");
+    }
+
+    @Transactional
+    public Map<String, Object> payCards360Bill(String customerAccountNumber, Long creditCardId, Double amount) {
+        if (amount == null || !Double.isFinite(amount) || amount <= 0) {
+            throw new IllegalArgumentException("Payment amount must be greater than zero");
+        }
+        if (customerAccountNumber == null || customerAccountNumber.isBlank()) {
+            throw new IllegalArgumentException("Customer account is required");
+        }
+        CreditCard card = creditCardRepository.findById(creditCardId)
+                .filter(value -> customerAccountNumber.equals(value.getAccountNumber()))
+                .orElseThrow(() -> new IllegalArgumentException("Credit card does not belong to this customer"));
+        if (!"Active".equalsIgnoreCase(card.getStatus()) || card.isBlocked() || card.isDeactivated()) {
+            throw new IllegalArgumentException("Credit card is not active or has been blocked");
+        }
+        double outstanding = card.getCurrentBalance() == null ? 0.0 : card.getCurrentBalance();
+        if (outstanding <= 0) {
+            throw new IllegalArgumentException("No outstanding balance on this card");
+        }
+        if (amount > outstanding + 0.01) {
+            throw new IllegalArgumentException("Payment cannot exceed the outstanding balance of ₹"
+                    + String.format("%.2f", outstanding));
+        }
+
+        Account savingsAccount = accountService.getAccountByNumber(customerAccountNumber);
+        if (savingsAccount == null || !"ACTIVE".equalsIgnoreCase(savingsAccount.getStatus())) {
+            throw new IllegalArgumentException("Primary savings account is unavailable");
+        }
+        Double accountBalanceAfter = accountService.debitBalance(customerAccountNumber, amount);
+        if (accountBalanceAfter == null) {
+            throw new IllegalArgumentException("Insufficient balance in the primary savings account");
+        }
+        return postCreditCardBillPayment(card, customerAccountNumber, amount, accountBalanceAfter, "CARD360");
+    }
+
+    private Map<String, Object> postCreditCardBillPayment(CreditCard card, String payerAccountNumber,
+                                                           Double amount, Double accountBalanceAfter,
+                                                           String processedBy) {
+        double outstanding = card.getCurrentBalance() == null ? 0.0 : card.getCurrentBalance();
         double cardBalanceAfter = Math.max(0.0, outstanding - amount);
         card.setCurrentBalance(cardBalanceAfter);
         card.setLastPaidDate(LocalDateTime.now());
@@ -658,7 +699,7 @@ public class CreditCardService {
         cardTx.setTransactionType("Payment");
         cardTx.setPaymentMethod("ACCOUNT");
         cardTx.setDebitAccountNumber(payerAccountNumber);
-        cardTx.setProcessedBy("USER");
+        cardTx.setProcessedBy(processedBy);
         cardTx.setAmount(amount);
         cardTx.setDescription(description);
         cardTx.setBalanceAfter(cardBalanceAfter);
@@ -695,6 +736,19 @@ public class CreditCardService {
         SalaryAccount sal = salaryAccountRepository.findByAccountNumber(accountNumber);
         if (sal != null) return sal.getBalance();
         return null;
+    }
+
+    public Map<String, Object> getCards360PaymentAccount(String accountNumber) {
+        Account savingsAccount = accountService.getAccountByNumber(accountNumber);
+        if (savingsAccount == null || !"ACTIVE".equalsIgnoreCase(savingsAccount.getStatus())) {
+            throw new IllegalArgumentException("Primary savings account is unavailable");
+        }
+        String suffix = accountNumber.length() <= 4
+                ? accountNumber : accountNumber.substring(accountNumber.length() - 4);
+        Map<String, Object> result = new HashMap<>();
+        result.put("maskedAccountNumber", "••••" + suffix);
+        result.put("balance", savingsAccount.getBalance() == null ? 0.0 : savingsAccount.getBalance());
+        return result;
     }
 
     /** Debits an account for a credit-card bill payment across savings, current, and salary accounts. */

@@ -46,6 +46,11 @@
             <button class="c360-secondary" type="button" (click)="toggleCard(card)" [disabled]="card.blocked && !card.canUnblock">{{ card.blocked ? (card.canUnblock ? 'Unblock card' : 'Contact NeoBank to unblock') : 'Block card' }}</button>
           </div>
           <div class="c360-limit" *ngIf="card.type === 'credit'">
+            <span>Outstanding bill: ₹{{ card.outstandingBalance ?? 0 }}</span>
+            <button class="c360-text-button" type="button" (click)="beginBillPayment(card)"
+              [disabled]="card.blocked || (card.outstandingBalance ?? 0) <= 0">Pay bill</button>
+          </div>
+          <div class="c360-limit" *ngIf="card.type === 'credit'">
             <span>Spending limit: ₹{{ card.spendingLimit ?? card.approvedLimit ?? 0 }}</span>
             <button type="button" class="c360-text-button" (click)="beginLimitEdit(card)">Change</button>
             <div *ngIf="editingLimitId === card.id" class="c360-limit-edit">
@@ -56,6 +61,36 @@
         </article>
       </div>
       <ng-template #noCards><p class="c360-muted">{{ loading ? 'Loading cards…' : 'No cards are linked to this account yet.' }}</p></ng-template>
+    </section>
+
+    <section class="c360-section c360-payment-panel" *ngIf="selectedBillCardId !== null">
+      <div>
+        <span class="c360-eyebrow">SECURE BILL PAYMENT</span>
+        <h2>Pay credit-card bill</h2>
+        <p class="c360-muted" *ngIf="paymentAccount">
+          Source: primary savings account {{ paymentAccount.maskedAccountNumber }}
+          · Available balance ₹{{ paymentAccount.balance }}
+        </p>
+        <p class="c360-muted" *ngIf="!paymentAccount">Loading primary savings account…</p>
+      </div>
+      <form (ngSubmit)="payCreditCardBill()">
+        <label for="c360-bill-amount">Payment amount</label>
+        <div class="c360-payment-controls">
+          <input id="c360-bill-amount" name="billPaymentAmount" type="number" min="0.01" step="0.01"
+            [max]="selectedBillCard?.outstandingBalance || 0"
+            [(ngModel)]="billPaymentAmount" required>
+          <button class="c360-secondary" type="button" (click)="billPaymentAmount = selectedBillCard?.outstandingBalance || 0">
+            Pay full outstanding
+          </button>
+          <button class="c360-primary" type="submit" [disabled]="payingBill || !paymentAccount || paymentAccount.balance < billPaymentAmount">
+            {{ payingBill ? 'Processing…' : 'Pay securely' }}
+          </button>
+          <button class="c360-text-button" type="button" (click)="selectedBillCardId = null">Cancel</button>
+        </div>
+        <p class="c360-muted" *ngIf="paymentAccount && paymentAccount.balance < billPaymentAmount">
+          Payment amount exceeds the primary savings balance.
+        </p>
+      </form>
     </section>
 
     <section class="c360-section c360-link-panel">
