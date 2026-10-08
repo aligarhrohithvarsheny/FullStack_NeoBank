@@ -126,6 +126,28 @@ class Card360ServiceTest {
         org.mockito.Mockito.verify(creditCardService).payCards360Bill("ACC123", 29L, 125.0);
     }
 
+    @Test
+    void adminAccountLookupReturnsCustomerEmailAndMaskedCardsOnly() {
+        Admin admin = new Admin();
+        admin.setEmail("admin@neobank.test");
+        admin.setRole("ADMIN");
+        when(adminService.login("admin@neobank.test", "admin-password")).thenReturn(admin);
+        when(userRepository.findByAccountNumber("ACC123")).thenReturn(Optional.of(approvedUser()));
+        when(cardRepository.findByAccountNumber("ACC123")).thenReturn(List.of(debitCard()));
+        when(creditCardRepository.findByAccountNumber("ACC123")).thenReturn(List.of());
+        when(accessRepository.findByAccountNumber("ACC123")).thenReturn(Optional.empty());
+
+        Map<String, Object> result = service.getAdminCustomerDetails("ACC123", "admin@neobank.test", "admin-password");
+        Map<?, ?> card = (Map<?, ?>) ((List<?>) result.get("cards")).get(0);
+
+        assertThat(result.get("email")).isEqualTo("customer@neobank.test");
+        assertThat(result.get("enabled")).isEqualTo(false);
+        assertThat(card.get("maskedNumber")).isEqualTo("•••• •••• •••• 1234");
+        assertThat(card.containsKey("cardNumber")).isFalse();
+        assertThat(card.containsKey("cvv")).isFalse();
+        assertThat(card.containsKey("pin")).isFalse();
+    }
+
     private User approvedUser() {
         User user = new User();
         user.setId(123L);

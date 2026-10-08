@@ -241,6 +241,30 @@ public class Card360Service {
     }
 
     @Transactional(noRollbackFor = IllegalArgumentException.class)
+    public Map<String, Object> getAdminCustomerDetails(String accountNumber, String adminEmail, String adminPassword) {
+        requireAdmin(adminEmail, adminPassword);
+        if (isBlank(accountNumber)) throw new IllegalArgumentException("Customer account number is required");
+        User user = userRepository.findByAccountNumber(accountNumber.trim())
+                .filter(value -> "APPROVED".equalsIgnoreCase(value.getStatus()))
+                .orElseThrow(() -> new IllegalArgumentException("Approved customer account not found"));
+        List<Map<String, Object>> cards = new ArrayList<>();
+        for (Card card : cardRepository.findByAccountNumber(accountNumber.trim())) {
+            cards.add(debitCardView(card));
+        }
+        for (CreditCard card : creditCardRepository.findByAccountNumber(accountNumber.trim())) {
+            cards.add(creditCardView(card));
+        }
+        Map<String, Object> result = new HashMap<>();
+        result.put("accountNumber", accountNumber.trim());
+        result.put("customerName", Objects.toString(user.getUsername(), "Customer"));
+        result.put("email", Objects.toString(user.getEmail(), ""));
+        result.put("cards", cards);
+        Optional<Card360Access> access = accessRepository.findByAccountNumber(accountNumber.trim());
+        result.put("enabled", access.isPresent() && access.get().isEnabled());
+        return result;
+    }
+
+    @Transactional(noRollbackFor = IllegalArgumentException.class)
     public List<Card360Audit> getAuditHistory(String accountNumber, String adminEmail, String adminPassword) {
         requireAdmin(adminEmail, adminPassword);
         return auditRepository.findTop200ByAccountNumberOrderByCreatedAtDesc(accountNumber);

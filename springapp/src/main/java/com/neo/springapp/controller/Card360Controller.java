@@ -60,6 +60,19 @@ public class Card360Controller {
         }
     }
 
+    @PostMapping("/admin/accounts/{accountNumber}/lookup")
+    public ResponseEntity<?> getAdminCustomerDetails(@PathVariable String accountNumber,
+                                                      @RequestBody Map<String, String> request) {
+        try {
+            return ResponseEntity.ok(card360Service.getAdminCustomerDetails(accountNumber,
+                    request.get("adminEmail"), request.get("adminPassword")));
+        } catch (IllegalArgumentException exception) {
+            HttpStatus status = "Admin authentication failed".equals(exception.getMessage())
+                    ? HttpStatus.UNAUTHORIZED : HttpStatus.NOT_FOUND;
+            return ResponseEntity.status(status).body(Map.of("message", exception.getMessage()));
+        }
+    }
+
     @GetMapping("/cards")
     public ResponseEntity<?> cards(Authentication authentication) {
         SessionPrincipal principal = card360Principal(authentication);

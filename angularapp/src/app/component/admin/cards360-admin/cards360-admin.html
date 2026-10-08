@@ -6,10 +6,34 @@
     <p>Issue an account-specific passcode, disable customer sign-in, and review a customer-visible change history.</p>
     <label for="c360-account">Customer account number</label>
     <input id="c360-account" name="accountNumber" [(ngModel)]="accountNumber" (ngModelChange)="accountChanged()" autocomplete="off" required>
-    <label for="c360-admin-email">Your admin email</label>
+    <p class="helper">Use your signed-in ADMIN email and password to authorize management actions. The customer email is looked up from the account number and is not used as admin authentication.</p>
+    <label for="c360-admin-email">Signed-in admin email</label>
     <input id="c360-admin-email" name="adminEmail" [(ngModel)]="adminEmail" type="email" autocomplete="username" required>
-    <label for="c360-admin-password">Confirm admin password</label>
+    <label for="c360-admin-password">Admin password</label>
     <input id="c360-admin-password" name="adminPassword" [(ngModel)]="adminPassword" type="password" autocomplete="current-password" required>
+    <button class="secondary lookup-button" type="button" [disabled]="loading || !accountNumber.trim() || !adminEmail.trim() || !adminPassword"
+      (click)="loadCustomerDetails()">Fetch customer details</button>
+    <section *ngIf="customer" class="customer-details">
+      <div class="customer-heading">
+        <div>
+          <h2>{{ customer.customerName }}</h2>
+          <p>{{ customer.email }} · Account {{ customer.accountNumber }}</p>
+        </div>
+        <span [class.enabled]="customer.enabled" [class.disabled]="!customer.enabled">
+          Cards360 {{ customer.enabled ? 'enabled' : 'disabled' }}
+        </span>
+      </div>
+      <h3>Cards on this account</h3>
+      <div class="customer-cards" *ngIf="customer.cards.length; else noCustomerCards">
+        <article *ngFor="let card of customer.cards">
+          <strong>{{ card.cardType }}</strong>
+          <span>{{ card.maskedNumber }}</span>
+          <span>{{ card.status }}<ng-container *ngIf="card.blocked"> · Blocked</ng-container></span>
+          <small>Expires {{ card.expiryDate || '—' }}</small>
+        </article>
+      </div>
+      <ng-template #noCustomerCards><p class="helper">No debit or credit cards are linked to this account.</p></ng-template>
+    </section>
     <div class="c360-admin-actions">
       <button class="primary" type="button" [disabled]="loading" (click)="generatePasscode()">Generate passcode</button>
       <button class="secondary" type="button" [disabled]="loading" (click)="setEnabled(false)">Disable sign-in</button>

@@ -15,6 +15,24 @@ interface Card360AuditRow {
   createdAt: string;
 }
 
+interface Card360AdminCard {
+  id: number;
+  type: 'debit' | 'credit';
+  cardType: string;
+  maskedNumber: string;
+  status: string;
+  expiryDate: string;
+  blocked: boolean;
+}
+
+interface Card360AdminCustomer {
+  accountNumber: string;
+  customerName: string;
+  email: string;
+  cards: Card360AdminCard[];
+  enabled: boolean;
+}
+
 @Component({
   selector: 'app-cards360-admin',
   standalone: true,
@@ -27,6 +45,7 @@ export class Cards360Admin {
   adminEmail = '';
   adminPassword = '';
   passcode = '';
+  customer: Card360AdminCustomer | null = null;
   enabled: boolean | null = null;
   history: Card360AuditRow[] = [];
   error = '';
@@ -51,7 +70,7 @@ export class Cards360Admin {
   }
 
   generatePasscode(): void {
-    if (!this.validate()) return;
+    if (!this.validateLoadedCustomer()) return;
     this.loading = true;
     this.error = '';
     this.notice = '';
@@ -72,12 +91,30 @@ export class Cards360Admin {
   accountChanged(): void {
     this.passcode = '';
     this.history = [];
+    this.customer = null;
     this.enabled = null;
     this.notice = '';
   }
 
-  setEnabled(enabled: boolean): void {
+  loadCustomerDetails(): void {
     if (!this.validate()) return;
+    this.loading = true;
+    this.error = '';
+    this.notice = '';
+    this.http.post<Card360AdminCustomer>(`${this.api}/${encodeURIComponent(this.accountNumber.trim())}/lookup`,
+      this.credentials()).subscribe({
+        next: result => {
+          this.loading = false;
+          this.customer = result;
+          this.enabled = result.enabled;
+          this.notice = 'Approved customer details loaded. Card numbers are masked for security.';
+        },
+        error: err => this.fail(err)
+      });
+  }
+
+  setEnabled(enabled: boolean): void {
+    if (!this.validateLoadedCustomer()) return;
     this.loading = true;
     this.error = '';
     this.http.put<{ enabled: boolean }>(`${this.api}/${encodeURIComponent(this.accountNumber)}/enabled`,
@@ -94,7 +131,7 @@ export class Cards360Admin {
   }
 
   loadHistory(): void {
-    if (!this.validate()) return;
+    if (!this.validateLoadedCustomer()) return;
     this.http.post<Card360AuditRow[]>(`${this.api}/${encodeURIComponent(this.accountNumber)}/history`,
       this.credentials()).subscribe({
         next: rows => this.history = rows || [],
@@ -119,8 +156,20 @@ export class Cards360Admin {
     return true;
   }
 
+  private validateLoadedCustomer(): boolean {
+    if (!this.validate()) return false;
+    if (!this.customer || this.customer.accountNumber !== this.accountNumber.trim()) {
+      this.error = 'Fetch and verify this customer account before managing Cards360 access.';
+      return false;
+    }
+    return true;
+  }
+
   private fail(err: { error?: { message?: string } }): void {
     this.loading = false;
-    this.error = err.error?.message || 'The Cards360 request could not be completed.';
+    const message = err.error?.message;
+    this.error = message === 'Admin authentication failed'
+      ? 'Admin authentication failed. Use the email and password for your signed-in ADMIN account; the customer email is only shown after account lookup.'
+      : message || 'The Cards360 request could not be completed.';
   }
 }

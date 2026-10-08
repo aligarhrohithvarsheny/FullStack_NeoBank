@@ -31,6 +31,7 @@
             <a href="#" class="dropdown-item" (click)="goTo('website/personal-kyc', $event)">Personal KYC</a>
             <a href="#" class="dropdown-item" (click)="goTo('website/user', $event)">User Login</a>
             <a href="#" class="dropdown-item" (click)="goTo('website/user', $event)">Internet Banking</a>
+            <a href="#" class="dropdown-item" (click)="goTo('website/cards360', $event)">NeoBank Cards360</a>
             <a href="#" class="dropdown-item" (click)="goTo('website/fasttag-login', $event)">FASTag Login</a>
           </div>
         </div>
@@ -95,6 +96,9 @@
           <button class="btn-outline large" routerLink="/website/user">
   Login to Dashboard
 </button>
+          <button class="btn-outline large" type="button" (click)="goTo('website/cards360', $event)">
+            NeoBank Cards360
+          </button>
           <button class="btn-fasttag-hero" (click)="goTo('website/fasttag-login', $event)">
             🏷️ FASTag Login
           </button>

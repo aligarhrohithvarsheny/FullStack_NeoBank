@@ -5,8 +5,23 @@
 .c360-label{font-size:11px;letter-spacing:1.4px;font-weight:800;color:#2875b7}
 .c360-admin h1{color:#183754;margin:9px 0;font-size:32px}
 .c360-admin-panel>p{color:#718297;line-height:1.6}
+.helper{color:#718297;font-size:13px;line-height:1.5}
 .c360-admin label{display:block;font-weight:700;font-size:13px;margin:18px 0 7px}
 .c360-admin input{width:100%;box-sizing:border-box;border:1px solid #ccd7e2;border-radius:8px;padding:12px;font:inherit}
+.lookup-button{margin-top:14px;border:0;border-radius:8px;padding:11px 14px;font-weight:700;cursor:pointer}
+.lookup-button:disabled{opacity:.6;cursor:wait}
+.customer-details{margin-top:22px;padding:18px;background:#f7faff;border:1px solid #dce8f4;border-radius:10px}
+.customer-heading{display:flex;justify-content:space-between;align-items:center;gap:16px}
+.customer-heading h2{margin:0;color:#183754;font-size:19px}
+.customer-heading p{margin:6px 0;color:#718297;font-size:13px}
+.customer-heading>span{padding:7px 10px;border-radius:20px;font-size:12px;font-weight:700}
+.customer-heading .enabled{background:#e6f7ec;color:#1b6546}
+.customer-heading .disabled{background:#fff1ef;color:#a12219}
+.customer-details h3{margin:20px 0 10px;color:#183754;font-size:15px}
+.customer-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px}
+.customer-cards article{display:grid;gap:6px;padding:13px;background:#fff;border:1px solid #e1e8f0;border-radius:8px;font-size:13px}
+.customer-cards article strong{color:#183754}
+.customer-cards article small{color:#718297}
 .c360-admin-actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:20px}
 .c360-admin-actions button{border:0;border-radius:8px;padding:11px 14px;font-weight:700;cursor:pointer}
 .c360-admin-actions button:disabled{opacity:.6}
@@ -27,4 +42,4 @@
 .history th,.history td{padding:12px 9px;border-bottom:1px solid #edf1f5;text-align:left;white-space:nowrap}
 .history th{font-size:11px;letter-spacing:.4px;color:#63788d;text-transform:uppercase}
 .empty{text-align:center!important;color:#8998a8;padding:25px!important;white-space:normal!important}
-@media(max-width:640px){.c360-admin{padding:0 14px 28px}.c360-admin-panel{padding:20px;margin:22px auto}.history-heading{align-items:flex-start;flex-direction:column}.c360-admin h1{font-size:27px}}
+@media(max-width:640px){.c360-admin{padding:0 14px 28px}.c360-admin-panel{padding:20px;margin:22px auto}.history-heading{align-items:flex-start;flex-direction:column}.customer-heading{align-items:flex-start;flex-direction:column}.c360-admin h1{font-size:27px}}
