@@ -102,7 +102,8 @@ public class Card360Service {
             throw new IllegalArgumentException("Card number, email, and passcode are required");
         }
         String normalizedEmail = email.trim().toLowerCase(Locale.ROOT);
-        String accountNumber = findCardAccount(cardNumber.trim(), normalizedEmail);
+        String normalizedCardNumber = cardNumber.replaceAll("[\\s-]", "");
+        String accountNumber = findCardAccount(normalizedCardNumber, normalizedEmail);
         if (accountNumber == null) {
             throw new IllegalArgumentException("Unable to sign in. Check your details or contact the bank.");
         }
@@ -272,10 +273,18 @@ public class Card360Service {
 
     private String findCardAccount(String number, String email) {
         Card debit = cardRepository.findByCardNumber(number);
-        if (debit != null && email.equalsIgnoreCase(Objects.toString(debit.getUserEmail(), ""))) return debit.getAccountNumber();
+        if (debit != null && accountEmailMatches(debit.getAccountNumber(), email)) return debit.getAccountNumber();
         return creditCardRepository.findByCardNumber(number)
-                .filter(card -> email.equalsIgnoreCase(Objects.toString(card.getUserEmail(), "")))
+                .filter(card -> accountEmailMatches(card.getAccountNumber(), email))
                 .map(card -> card.getAccountNumber()).orElse(null);
+    }
+
+    private boolean accountEmailMatches(String accountNumber, String email) {
+        if (isBlank(accountNumber)) return false;
+        return userRepository.findByAccountNumber(accountNumber)
+                .filter(user -> "APPROVED".equalsIgnoreCase(user.getStatus()))
+                .map(user -> email.equalsIgnoreCase(Objects.toString(user.getEmail(), "").trim()))
+                .orElse(false);
     }
 
     private Map<String, Object> ownedCard(String accountNumber, String number) {

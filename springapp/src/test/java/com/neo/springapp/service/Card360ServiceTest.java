@@ -61,10 +61,12 @@ class Card360ServiceTest {
         assertThat(access.isEnabled()).isTrue();
         assertThat(new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder()
                 .matches(passcode, access.getPasscodeHash())).isTrue();
-        when(cardRepository.findByCardNumber("4111111111111234")).thenReturn(debitCard());
+        Card debitCard = debitCard();
+        debitCard.setUserEmail("old-customer-email@neobank.test");
+        when(cardRepository.findByCardNumber("4111111111111234")).thenReturn(debitCard);
         when(accessRepository.findByAccountNumber("ACC123")).thenReturn(Optional.of(access));
 
-        Map<String, Object> loginResponse = service.login("4111111111111234", user.getEmail(), passcode);
+        Map<String, Object> loginResponse = service.login("4111 1111-1111 1234", user.getEmail(), passcode);
         UserSessionTokenService.SessionPrincipal principal =
                 tokenService.verify((String) loginResponse.get("token"));
 
@@ -103,6 +105,7 @@ class Card360ServiceTest {
         access.setPasscodeHash(new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder().encode("valid-code"));
 
         when(cardRepository.findByCardNumber("4111111111111234")).thenReturn(debitCard());
+        when(userRepository.findByAccountNumber("ACC123")).thenReturn(Optional.of(approvedUser()));
         when(accessRepository.findByAccountNumber("ACC123")).thenReturn(Optional.of(access));
         assertThatThrownBy(() -> service.login("4111111111111234", "customer@neobank.test", "wrong-code"))
                 .isInstanceOf(IllegalArgumentException.class);
