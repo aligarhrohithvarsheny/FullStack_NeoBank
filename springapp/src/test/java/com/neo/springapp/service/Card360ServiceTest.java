@@ -66,7 +66,8 @@ class Card360ServiceTest {
         when(cardRepository.findByCardNumber("4111111111111234")).thenReturn(debitCard);
         when(accessRepository.findByAccountNumber("ACC123")).thenReturn(Optional.of(access));
 
-        Map<String, Object> loginResponse = service.login("4111 1111-1111 1234", user.getEmail(), passcode);
+        Map<String, Object> loginResponse = service.login(
+                "4111 1111-1111 1234", "  " + user.getEmail().toUpperCase() + "  ", "  " + passcode + "\n");
         UserSessionTokenService.SessionPrincipal principal =
                 tokenService.verify((String) loginResponse.get("token"));
 

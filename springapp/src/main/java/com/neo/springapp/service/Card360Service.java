@@ -114,7 +114,7 @@ public class Card360Service {
         if (!access.isEnabled() || (access.getLockedUntil() != null && access.getLockedUntil().isAfter(now))) {
             throw new IllegalArgumentException("Unable to sign in. Check your details or contact the bank.");
         }
-        if (!encoder.matches(passcode, access.getPasscodeHash())) {
+        if (!encoder.matches(passcode.trim(), access.getPasscodeHash())) {
             int attempts = access.getFailedAttempts() + 1;
             access.setFailedAttempts(attempts);
             if (attempts >= 5) {
