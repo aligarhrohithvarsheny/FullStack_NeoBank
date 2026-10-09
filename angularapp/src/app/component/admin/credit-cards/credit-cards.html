@@ -24,6 +24,16 @@
         <button class="btn-primary" (click)="showApplyCreditCardModal = true">
           <i class="fa fa-plus"></i> Apply for Credit Card
         </button>
+        <div class="fee-setting-box emi-fee-setting">
+          <label>EMI APR % p.a.:</label>
+          <input type="number" min="0.01" max="100" step="0.1" [(ngModel)]="emiAnnualInterestPercent" />
+          <label>EMI processing % (min 8):</label>
+          <input type="number" min="8" max="100" step="0.1" [(ngModel)]="emiProcessingFeePercent" />
+          <button class="btn-secondary" (click)="saveEmiSettings()" [disabled]="isSavingEmiSettings">
+            {{ isSavingEmiSettings ? 'Saving...' : 'Save EMI rates' }}
+          </button>
+          <small>Changes apply to new plans only; existing schedules stay fixed.</small>
+        </div>
         <button class="btn-primary" (click)="loadCreditCards()">
           <i class="fa fa-sync-alt"></i> Refresh
         </button>
@@ -208,15 +218,56 @@
           </div>
 
           <div class="details-section">
+            <h4>EMI plans and installment history</h4>
+            <article class="admin-emi-plan" *ngFor="let plan of creditCardEmiPlans">
+              <div class="info-grid">
+                <div class="info-item"><label>Plan / Customer:</label><span>#{{ plan.id }} · {{ plan.userName }} ({{ plan.accountNumber }})</span></div>
+                <div class="info-item"><label>Card:</label><span>{{ plan.maskedCardNumber }}</span></div>
+                <div class="info-item"><label>Status / Tenure:</label><span>{{ plan.status }} · {{ plan.tenureMonths }} months</span></div>
+                <div class="info-item"><label>Principal:</label><span>₹{{ plan.principalAmount | number:'1.2-2' }}</span></div>
+                <div class="info-item"><label>Annual interest:</label><span>{{ plan.annualInterestPercent }}% p.a.</span></div>
+                <div class="info-item"><label>Monthly EMI:</label><span>₹{{ plan.monthlyEmi | number:'1.2-2' }}</span></div>
+                <div class="info-item"><label>Total interest:</label><span>₹{{ plan.totalInterest | number:'1.2-2' }}</span></div>
+                <div class="info-item"><label>One-time fee:</label><span>{{ plan.processingFeePercent }}% · ₹{{ plan.processingFeeAmount | number:'1.2-2' }}</span></div>
+                <div class="info-item"><label>Total repayment:</label><span>₹{{ plan.totalRepayment | number:'1.2-2' }}</span></div>
+                <div class="info-item"><label>Remaining principal:</label><span>₹{{ plan.outstandingPrincipal | number:'1.2-2' }}</span></div>
+                <div class="info-item"><label>Created:</label><span>{{ plan.createdAt | date:'dd/MM/yyyy HH:mm' }}</span></div>
+              </div>
+              <table class="data-table">
+                <thead><tr><th>#</th><th>Due</th><th>Principal</th><th>Interest</th><th>Installment</th><th>Paid</th><th>Status</th><th>Bill #</th><th>Paid on</th></tr></thead>
+                <tbody>
+                  <tr *ngFor="let installment of plan.installments">
+                    <td>{{ installment.installmentNumber }}</td>
+                    <td>{{ installment.dueDate | date:'dd/MM/yyyy' }}</td>
+                    <td>₹{{ installment.principalAmount | number:'1.2-2' }}</td>
+                    <td>₹{{ installment.interestAmount | number:'1.2-2' }}</td>
+                    <td>₹{{ installment.totalAmount | number:'1.2-2' }}</td>
+                    <td>₹{{ installment.paidAmount | number:'1.2-2' }}</td>
+                    <td>{{ installment.status }}</td>
+                    <td>{{ installment.billId || '—' }}</td>
+                    <td>{{ installment.paidAt ? (installment.paidAt | date:'dd/MM/yyyy HH:mm') : '—' }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </article>
+            <p *ngIf="!creditCardEmiPlans.length" class="no-data">No EMI plans for this card.</p>
+          </div>
+
+          <div class="details-section">
             <h4>Bills</h4>
             <table class="data-table">
               <thead>
                 <tr>
                   <th>Bill Date</th>
                   <th>Due Date</th>
-                  <th>Total Amount</th>
+                  <th>Regular</th>
+                  <th>EMI</th>
+                  <th>Fine</th>
+                  <th>Overdue penalty</th>
+                  <th>Total due</th>
                   <th>Minimum Due</th>
                   <th>Paid Amount</th>
+                  <th>Receipt/Remaining</th>
                   <th>Status</th>
                   <th>Action</th>
                 </tr>
@@ -225,9 +276,14 @@
                 <tr *ngFor="let bill of creditCardBills">
                   <td>{{ bill.billGenerationDate | date:'dd/MM/yyyy' }}</td>
                   <td>{{ bill.dueDate | date:'dd/MM/yyyy' }}</td>
-                  <td>₹{{ bill.totalAmount | number:'1.2-2' }}</td>
+                  <td>₹{{ (bill.regularAmount ?? bill.totalAmount) | number:'1.2-2' }}</td>
+                  <td>₹{{ (bill.emiAmount || 0) | number:'1.2-2' }}</td>
+                  <td>₹{{ (bill.fine || 0) | number:'1.2-2' }}</td>
+                  <td>₹{{ (bill.penalty || 0) | number:'1.2-2' }}</td>
+                  <td>₹{{ ((bill.totalAmount || 0) + (bill.fine || 0) + (bill.penalty || 0)) | number:'1.2-2' }}</td>
                   <td>₹{{ bill.minimumDue | number:'1.2-2' }}</td>
                   <td>₹{{ bill.paidAmount | number:'1.2-2' }}</td>
+                  <td>₹{{ ((bill.totalAmount || 0) + (bill.fine || 0) + (bill.penalty || 0) - (bill.paidAmount || 0)) | number:'1.2-2' }}</td>
                   <td><span class="status-badge" [ngClass]="bill.status?.toLowerCase()">{{ bill.status }}</span></td>
                   <td>
                     <button class="btn-success" (click)="openBillPayment(bill)" [disabled]="bill.status?.toLowerCase() === 'paid'">

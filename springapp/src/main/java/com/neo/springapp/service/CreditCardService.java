@@ -5,12 +5,19 @@ import com.neo.springapp.repository.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Base64;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.Set;
+import java.util.HashSet;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 
 @Service
 @SuppressWarnings("null")
@@ -29,6 +36,8 @@ public class CreditCardService {
     private final BusinessChequeRequestRepository businessChequeRequestRepository;
     private final SalaryAccountRepository salaryAccountRepository;
     private final CurrentAccountRepository currentAccountRepository;
+    private final CreditCardEmiPlanRepository emiPlanRepository;
+    private final CreditCardEmiInstallmentRepository emiInstallmentRepository;
 
     public CreditCardService(
             CreditCardRepository creditCardRepository,
@@ -43,7 +52,9 @@ public class CreditCardService {
             ChequeRequestRepository chequeRequestRepository,
             BusinessChequeRequestRepository businessChequeRequestRepository,
             SalaryAccountRepository salaryAccountRepository,
-            CurrentAccountRepository currentAccountRepository) {
+            CurrentAccountRepository currentAccountRepository,
+            CreditCardEmiPlanRepository emiPlanRepository,
+            CreditCardEmiInstallmentRepository emiInstallmentRepository) {
         this.creditCardRepository = creditCardRepository;
         this.transactionRepository = transactionRepository;
         this.billRepository = billRepository;
@@ -57,6 +68,8 @@ public class CreditCardService {
         this.businessChequeRequestRepository = businessChequeRequestRepository;
         this.salaryAccountRepository = salaryAccountRepository;
         this.currentAccountRepository = currentAccountRepository;
+        this.emiPlanRepository = emiPlanRepository;
+        this.emiInstallmentRepository = emiInstallmentRepository;
     }
 
     /** Normalized cheque lookup result spanning savings (Cheque), salary (ChequeRequest), and current (BusinessChequeRequest) cheques. */
@@ -287,11 +300,6 @@ public class CreditCardService {
         
         CreditCard card = cardOpt.get();
 
-        // No outstanding balance means nothing to bill; do not generate a zero-amount statement
-        if (card.getCurrentBalance() == null || card.getCurrentBalance() <= 0.0) {
-            throw new IllegalArgumentException("No outstanding balance on this card. Statement not generated.");
-        }
-        
         // Check if bill already exists for this month
         Optional<CreditCardBill> existingBill = billRepository.findFirstByCreditCardIdOrderByBillGenerationDateDesc(creditCardId);
         if (existingBill.isPresent()) {
@@ -303,22 +311,49 @@ public class CreditCardService {
             }
         }
         
+        LocalDateTime generatedAt = LocalDateTime.now();
+        List<CreditCardEmiPlan> activePlans = emiPlanRepository
+                .findByCreditCardIdOrderByCreatedAtDesc(creditCardId).stream()
+                .filter(plan -> "Active".equalsIgnoreCase(plan.getStatus()))
+                .toList();
+        double emiPrincipal = activePlans.stream()
+                .mapToDouble(plan -> value(plan.getOutstandingPrincipal())).sum();
+        double regularAmount = Math.max(0.0, value(card.getCurrentBalance()) - emiPrincipal);
+        List<CreditCardEmiInstallment> dueInstallments = activePlans.stream()
+                .flatMap(plan -> emiInstallmentRepository.findByPlanIdOrderByInstallmentNumberAsc(plan.getId()).stream())
+                .filter(installment -> "Pending".equalsIgnoreCase(installment.getStatus())
+                        && installment.getBillId() == null
+                        && !installment.getDueDate().isAfter(generatedAt.toLocalDate()))
+                .toList();
+        double emiAmount = dueInstallments.stream().mapToDouble(item -> value(item.getTotalAmount())).sum();
+        double totalAmount = roundMoney(regularAmount + emiAmount);
+        if (totalAmount <= 0.0) {
+            throw new IllegalArgumentException("No outstanding balance on this card. Statement not generated.");
+        }
+
         CreditCardBill bill = new CreditCardBill();
         bill.setCreditCardId(creditCardId);
         bill.setCardNumber(card.getCardNumber());
         bill.setAccountNumber(card.getAccountNumber());
         bill.setUserName(card.getUserName());
-        bill.setBillGenerationDate(LocalDateTime.now());
-        bill.setDueDate(LocalDateTime.now().plusDays(21)); // 21 days from bill generation
-        bill.setTotalAmount(card.getCurrentBalance());
-        bill.setMinimumDue(card.getCurrentBalance() * 0.05); // 5% minimum due
+        bill.setBillGenerationDate(generatedAt);
+        bill.setDueDate(generatedAt.plusDays(21));
+        bill.setRegularAmount(roundMoney(regularAmount));
+        bill.setEmiAmount(roundMoney(emiAmount));
+        bill.setTotalAmount(totalAmount);
+        bill.setMinimumDue(roundMoney(Math.min(totalAmount + value(card.getFine()) + value(card.getPenalty()),
+                Math.max(100.0, (totalAmount + value(card.getFine()) + value(card.getPenalty())) * 0.05))));
         bill.setOverdueAmount(card.getOverdueAmount());
         bill.setFine(card.getFine());
         bill.setPenalty(card.getPenalty());
         bill.setStatus("Generated");
-        bill.setBillingPeriod(LocalDateTime.now().getMonth().toString() + " " + LocalDateTime.now().getYear());
-        
-        return billRepository.save(bill);
+        bill.setBillingPeriod(generatedAt.getMonth().toString() + " " + generatedAt.getYear());
+        CreditCardBill savedBill = billRepository.save(bill);
+        for (CreditCardEmiInstallment installment : dueInstallments) {
+            installment.setBillId(savedBill.getId());
+            emiInstallmentRepository.save(installment);
+        }
+        return savedBill;
     }
 
     // Get bills
@@ -330,6 +365,178 @@ public class CreditCardService {
         return billRepository.findByAccountNumber(accountNumber);
     }
 
+    public Map<String, Object> getEmiSettings() {
+        CreditCardSettings settings = emiSettings();
+        Map<String, Object> result = new HashMap<>();
+        result.put("enabled", settings.getEmiAnnualInterestPercent() != null);
+        result.put("annualInterestPercent", settings.getEmiAnnualInterestPercent());
+        result.put("processingFeePercent", settings.getEmiProcessingFeePercent() == null
+                ? 8.0 : settings.getEmiProcessingFeePercent());
+        result.put("minimumTransactionAmount", 3000.0);
+        result.put("tenuresMonths", List.of(3, 6, 9, 12));
+        result.put("updatedBy", settings.getUpdatedBy());
+        result.put("updatedAt", settings.getUpdatedAt());
+        return result;
+    }
+
+    @Transactional
+    public Map<String, Object> updateEmiSettings(Double annualInterestPercent,
+                                                  Double processingFeePercent, String updatedBy) {
+        if (annualInterestPercent == null || !Double.isFinite(annualInterestPercent)
+                || annualInterestPercent <= 0 || annualInterestPercent > 100) {
+            throw new IllegalArgumentException("Annual EMI interest rate must be between 0 and 100 percent");
+        }
+        if (processingFeePercent == null || !Double.isFinite(processingFeePercent)
+                || processingFeePercent < 8 || processingFeePercent > 100) {
+            throw new IllegalArgumentException("EMI processing fee must be between 8 and 100 percent");
+        }
+        CreditCardSettings settings = emiSettings();
+        settings.setEmiAnnualInterestPercent(annualInterestPercent);
+        settings.setEmiProcessingFeePercent(processingFeePercent);
+        settings.setUpdatedBy(updatedBy);
+        settings.setUpdatedAt(LocalDateTime.now());
+        settingsRepository.save(settings);
+        return getEmiSettings();
+    }
+
+    @Transactional(readOnly = true)
+    public List<CreditCardTransaction> getEmiEligibleTransactions(Long creditCardId) {
+        CreditCard card = creditCardRepository.findById(creditCardId)
+                .orElseThrow(() -> new IllegalArgumentException("Credit card not found"));
+        LocalDateTime lastBillDate = billRepository
+                .findFirstByCreditCardIdOrderByBillGenerationDateDesc(creditCardId)
+                .map(CreditCardBill::getBillGenerationDate).orElse(null);
+        return transactionRepository.findByCreditCardId(creditCardId).stream()
+                .filter(tx -> "Completed".equalsIgnoreCase(tx.getStatus()))
+                .filter(tx -> tx.getTransactionType() != null
+                        && tx.getTransactionType().toLowerCase().contains("purchase"))
+                .filter(tx -> tx.getAmount() != null && tx.getAmount() >= 3000.0)
+                .filter(tx -> tx.getEmiPlanId() == null)
+                .filter(tx -> lastBillDate == null || (tx.getTransactionDate() != null
+                        && tx.getTransactionDate().isAfter(lastBillDate)))
+                .sorted(Comparator.comparing(CreditCardTransaction::getTransactionDate,
+                        Comparator.nullsLast(Comparator.reverseOrder())))
+                .toList();
+    }
+
+    @Transactional
+    public Map<String, Object> convertTransactionsToEmi(Long creditCardId,
+                                                         List<Long> transactionIds, Integer tenureMonths) {
+        if (transactionIds == null || transactionIds.isEmpty()) {
+            throw new IllegalArgumentException("Select at least one eligible transaction");
+        }
+        if (tenureMonths == null || !Set.of(3, 6, 9, 12).contains(tenureMonths)) {
+            throw new IllegalArgumentException("Choose a 3, 6, 9, or 12 month EMI tenure");
+        }
+        CreditCard card = creditCardRepository.findById(creditCardId)
+                .orElseThrow(() -> new IllegalArgumentException("Credit card not found"));
+        if (!"Active".equalsIgnoreCase(card.getStatus()) || card.isBlocked() || card.isDeactivated()) {
+            throw new IllegalArgumentException("Credit card is not active");
+        }
+        CreditCardSettings settings = emiSettings();
+        Double apr = settings.getEmiAnnualInterestPercent();
+        if (apr == null || apr <= 0) {
+            throw new IllegalArgumentException("EMI conversion is unavailable until an admin configures the annual interest rate");
+        }
+        List<CreditCardTransaction> eligible = getEmiEligibleTransactions(creditCardId);
+        Set<Long> eligibleIds = new HashSet<>();
+        eligible.forEach(tx -> eligibleIds.add(tx.getId()));
+        if (new HashSet<>(transactionIds).size() != transactionIds.size()
+                || !eligibleIds.containsAll(transactionIds)) {
+            throw new IllegalArgumentException("One or more selected purchases are no longer eligible for EMI conversion");
+        }
+        List<CreditCardTransaction> selected = transactionIds.stream()
+                .map(id -> transactionRepository.findById(id)
+                        .orElseThrow(() -> new IllegalArgumentException("Selected transaction was not found")))
+                .toList();
+        double principal = roundMoney(selected.stream().mapToDouble(tx -> value(tx.getAmount())).sum());
+        double feePercent = settings.getEmiProcessingFeePercent() == null ? 8.0 : settings.getEmiProcessingFeePercent();
+        double feeAmount = roundMoney(principal * feePercent / 100.0);
+        int months = tenureMonths;
+        double monthlyRate = apr / 1200.0;
+        double rawEmi = principal * monthlyRate / (1.0 - Math.pow(1.0 + monthlyRate, -months));
+        double regularInstallment = roundMoney(rawEmi);
+
+        CreditCardEmiPlan plan = new CreditCardEmiPlan();
+        plan.setCreditCardId(card.getId());
+        plan.setAccountNumber(card.getAccountNumber());
+        plan.setUserName(card.getUserName());
+        plan.setCardNumber(maskCardNumber(card.getCardNumber()));
+        plan.setTenureMonths(months);
+        plan.setPrincipalAmount(principal);
+        plan.setProcessingFeePercent(feePercent);
+        plan.setProcessingFeeAmount(feeAmount);
+        plan.setAnnualInterestPercent(apr);
+        plan.setMonthlyEmi(regularInstallment);
+        plan.setOutstandingPrincipal(principal);
+        plan.setStatus("Active");
+        plan = emiPlanRepository.save(plan);
+
+        double remaining = principal;
+        double totalInterest = 0.0;
+        double totalRepayment = 0.0;
+        LocalDate dueDate = LocalDate.now().plusMonths(1);
+        for (int i = 1; i <= months; i++) {
+            double interest = roundMoney(remaining * monthlyRate);
+            double installmentPrincipal = i == months
+                    ? roundMoney(remaining) : Math.min(remaining, roundMoney(regularInstallment - interest));
+            double installmentTotal = roundMoney(installmentPrincipal + interest);
+            CreditCardEmiInstallment installment = new CreditCardEmiInstallment();
+            installment.setPlanId(plan.getId());
+            installment.setInstallmentNumber(i);
+            installment.setDueDate(dueDate);
+            installment.setPrincipalAmount(installmentPrincipal);
+            installment.setInterestAmount(interest);
+            installment.setTotalAmount(installmentTotal);
+            installment.setPaidPrincipal(0.0);
+            installment.setPaidInterest(0.0);
+            installment.setPaidAmount(0.0);
+            installment.setStatus("Pending");
+            emiInstallmentRepository.save(installment);
+            remaining = roundMoney(Math.max(0.0, remaining - installmentPrincipal));
+            totalInterest += interest;
+            totalRepayment += installmentTotal;
+            dueDate = dueDate.plusMonths(1);
+        }
+        plan.setTotalInterest(roundMoney(totalInterest));
+        plan.setTotalRepayment(roundMoney(totalRepayment));
+        emiPlanRepository.save(plan);
+        for (CreditCardTransaction transaction : selected) {
+            transaction.setEmiPlanId(plan.getId());
+            transactionRepository.save(transaction);
+        }
+        if (feeAmount > 0) {
+            card.setCurrentBalance(roundMoney(value(card.getCurrentBalance()) + feeAmount));
+            card.calculateAvailableLimit();
+            card.calculateUsageLimit();
+            creditCardRepository.save(card);
+            CreditCardTransaction feeTransaction = new CreditCardTransaction();
+            feeTransaction.setCreditCardId(card.getId());
+            feeTransaction.setCardNumber(card.getCardNumber());
+            feeTransaction.setAccountNumber(card.getAccountNumber());
+            feeTransaction.setUserName(card.getUserName());
+            feeTransaction.setTransactionType("Fee");
+            feeTransaction.setAmount(feeAmount);
+            feeTransaction.setDescription("EMI processing fee (" + feePercent + "%) for plan #" + plan.getId());
+            feeTransaction.setBalanceAfter(card.getCurrentBalance());
+            transactionRepository.save(feeTransaction);
+        }
+        return planDetails(plan);
+    }
+
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> getEmiPlans(Long creditCardId) {
+        creditCardRepository.findById(creditCardId)
+                .orElseThrow(() -> new IllegalArgumentException("Credit card not found"));
+        return emiPlanRepository.findByCreditCardIdOrderByCreatedAtDesc(creditCardId).stream()
+                .map(this::planDetails).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> getAllEmiPlans() {
+        return emiPlanRepository.findAllByOrderByCreatedAtDesc().stream().map(this::planDetails).toList();
+    }
+
     // Pay bill
     @Transactional
     public CreditCardBill payBill(Long billId, Double amount) {
@@ -338,13 +545,20 @@ public class CreditCardService {
             return null;
         }
         
+        if (amount == null || !Double.isFinite(amount) || amount <= 0) {
+            throw new IllegalArgumentException("Payment amount must be greater than zero");
+        }
         CreditCardBill bill = billOpt.get();
         Double paidAmount = bill.getPaidAmount() != null ? bill.getPaidAmount() : 0.0;
+        double billTotalDue = billTotalDue(bill);
+        if (amount > billTotalDue - paidAmount + 0.01) {
+            throw new IllegalArgumentException("Payment cannot exceed the remaining bill amount");
+        }
         paidAmount += amount;
         bill.setPaidAmount(paidAmount);
         bill.setPaidDate(LocalDateTime.now());
         
-        if (paidAmount >= bill.getTotalAmount()) {
+        if (paidAmount + 0.01 >= billTotalDue) {
             bill.setStatus("Paid");
         } else {
             bill.setStatus("Partial");
@@ -354,9 +568,13 @@ public class CreditCardService {
         Optional<CreditCard> cardOpt = creditCardRepository.findById(bill.getCreditCardId());
         if (cardOpt.isPresent()) {
             CreditCard card = cardOpt.get();
-            card.setCurrentBalance(Math.max(0, card.getCurrentBalance() - amount));
+            card.setCurrentBalance(Math.max(0, value(card.getCurrentBalance()) - amount));
             card.setLastPaidDate(LocalDateTime.now());
-            card.setOverdueAmount(0.0);
+            if ("Paid".equals(bill.getStatus())) {
+                card.setOverdueAmount(0.0);
+                card.setFine(0.0);
+                card.setPenalty(0.0);
+            }
             card.calculateAvailableLimit();
             card.calculateUsageLimit();
             creditCardRepository.save(card);
@@ -368,12 +586,14 @@ public class CreditCardService {
             payment.setAccountNumber(card.getAccountNumber());
             payment.setUserName(card.getUserName());
             payment.setTransactionType("Payment");
+            payment.setPaymentMethod("ACCOUNT");
+            payment.setBillId(billId);
             payment.setAmount(amount);
             payment.setDescription("Bill Payment");
             payment.setBalanceAfter(card.getCurrentBalance());
             transactionRepository.save(payment);
         }
-        
+        applyEmiPayment(bill, emiPaymentForBill(bill, paidAmount - amount, amount));
         return billRepository.save(bill);
     }
 
@@ -399,9 +619,7 @@ public class CreditCardService {
                 .orElseThrow(() -> new IllegalArgumentException("Credit card not found"));
 
         double paidAmount = bill.getPaidAmount() == null ? 0.0 : bill.getPaidAmount();
-        double billDue = (bill.getTotalAmount() == null ? 0.0 : bill.getTotalAmount())
-                + (bill.getFine() == null ? 0.0 : bill.getFine())
-                + (bill.getPenalty() == null ? 0.0 : bill.getPenalty()) - paidAmount;
+        double billDue = billTotalDue(bill) - paidAmount;
         double amount = request.getAmount();
         if (amount > billDue + 0.01) {
             throw new IllegalArgumentException("Payment cannot exceed the outstanding bill amount of ₹"
@@ -458,17 +676,20 @@ public class CreditCardService {
         double cardBalanceAfter = Math.max(0.0, (card.getCurrentBalance() == null ? 0.0 : card.getCurrentBalance()) - amount);
         card.setCurrentBalance(cardBalanceAfter);
         card.setLastPaidDate(LocalDateTime.now());
-        card.setOverdueAmount(0.0);
-        card.setFine(0.0);
-        card.setPenalty(0.0);
+        if (paidAmount + amount + 0.01 >= billTotalDue(bill)) {
+            card.setOverdueAmount(0.0);
+            card.setFine(0.0);
+            card.setPenalty(0.0);
+        }
         card.calculateAvailableLimit();
         card.calculateUsageLimit();
         creditCardRepository.save(card);
 
         bill.setPaidAmount(paidAmount + amount);
         bill.setPaidDate(LocalDateTime.now());
-        bill.setStatus(bill.getPaidAmount() >= bill.getTotalAmount() ? "Paid" : "Partial");
+        bill.setStatus(bill.getPaidAmount() + 0.01 >= billTotalDue(bill) ? "Paid" : "Partial");
         billRepository.save(bill);
+        applyEmiPayment(bill, emiPaymentForBill(bill, paidAmount, amount));
 
         Long globalSequence = transactionIdGenerator.getNextTransactionId();
         CreditCardTransaction cardTransaction = new CreditCardTransaction();
@@ -478,6 +699,7 @@ public class CreditCardService {
         cardTransaction.setAccountNumber(card.getAccountNumber());
         cardTransaction.setUserName(card.getUserName());
         cardTransaction.setTransactionType("Payment");
+        cardTransaction.setBillId(billId);
         cardTransaction.setPaymentMethod(paymentMethod);
         cardTransaction.setChequeNumber(request.getChequeNumber());
         cardTransaction.setChequeHolderName(request.getChequeHolderName());
@@ -610,7 +832,11 @@ public class CreditCardService {
             throw new IllegalArgumentException("Paying account is required");
         }
         CreditCard card = findCardForBillPay(last4, mobile);
-        double outstanding = card.getCurrentBalance() == null ? 0.0 : card.getCurrentBalance();
+        CreditCardBill latestBill = billRepository
+                .findFirstByCreditCardIdOrderByBillGenerationDateDesc(card.getId()).orElse(null);
+        double outstanding = latestBill != null && !"Paid".equalsIgnoreCase(latestBill.getStatus())
+                ? Math.max(0.0, billTotalDue(latestBill) - value(latestBill.getPaidAmount()))
+                : value(card.getCurrentBalance());
         if (outstanding <= 0) {
             throw new IllegalArgumentException("No outstanding balance on this card");
         }
@@ -644,7 +870,11 @@ public class CreditCardService {
         if (!"Active".equalsIgnoreCase(card.getStatus()) || card.isBlocked() || card.isDeactivated()) {
             throw new IllegalArgumentException("Credit card is not active or has been blocked");
         }
-        double outstanding = card.getCurrentBalance() == null ? 0.0 : card.getCurrentBalance();
+        CreditCardBill latestBill = billRepository
+                .findFirstByCreditCardIdOrderByBillGenerationDateDesc(card.getId()).orElse(null);
+        double outstanding = latestBill != null && !"Paid".equalsIgnoreCase(latestBill.getStatus())
+                ? Math.max(0.0, billTotalDue(latestBill) - value(latestBill.getPaidAmount()))
+                : value(card.getCurrentBalance());
         if (outstanding <= 0) {
             throw new IllegalArgumentException("No outstanding balance on this card");
         }
@@ -668,27 +898,32 @@ public class CreditCardService {
                                                            Double amount, Double accountBalanceAfter,
                                                            String processedBy) {
         double outstanding = card.getCurrentBalance() == null ? 0.0 : card.getCurrentBalance();
-        double cardBalanceAfter = Math.max(0.0, outstanding - amount);
+        double cardBalanceAfter = Math.max(0.0, outstanding - Math.min(amount, value(card.getCurrentBalance())));
         card.setCurrentBalance(cardBalanceAfter);
         card.setLastPaidDate(LocalDateTime.now());
-        if (cardBalanceAfter <= 0) {
-            card.setOverdueAmount(0.0);
-            card.setFine(0.0);
-            card.setPenalty(0.0);
-        }
         card.calculateAvailableLimit();
         card.calculateUsageLimit();
         creditCardRepository.save(card);
 
-        billRepository.findFirstByCreditCardIdOrderByBillGenerationDateDesc(card.getId()).ifPresent(bill -> {
+        CreditCardBill paidBill = billRepository.findFirstByCreditCardIdOrderByBillGenerationDateDesc(card.getId()).orElse(null);
+        double priorBillPaid = paidBill == null ? 0.0 : value(paidBill.getPaidAmount());
+        if (paidBill != null) {
+            CreditCardBill bill = paidBill;
             if (!"Paid".equalsIgnoreCase(bill.getStatus())) {
-                double paid = (bill.getPaidAmount() == null ? 0.0 : bill.getPaidAmount()) + amount;
+                double paid = priorBillPaid + amount;
                 bill.setPaidAmount(paid);
                 bill.setPaidDate(LocalDateTime.now());
-                bill.setStatus(paid >= (bill.getTotalAmount() == null ? 0.0 : bill.getTotalAmount()) ? "Paid" : "Partial");
+                bill.setStatus(paid + 0.01 >= billTotalDue(bill) ? "Paid" : "Partial");
                 billRepository.save(bill);
+                applyEmiPayment(bill, emiPaymentForBill(bill, priorBillPaid, amount));
+                if ("Paid".equalsIgnoreCase(bill.getStatus())) {
+                    card.setOverdueAmount(0.0);
+                    card.setFine(0.0);
+                    card.setPenalty(0.0);
+                    creditCardRepository.save(card);
+                }
             }
-        });
+        }
 
         String description = "Credit card bill payment (" + card.getMaskedCardNumber() + ") from account " + payerAccountNumber;
         Long globalSequence = transactionIdGenerator.getNextTransactionId();
@@ -700,6 +935,7 @@ public class CreditCardService {
         cardTx.setAccountNumber(card.getAccountNumber());
         cardTx.setUserName(card.getUserName());
         cardTx.setTransactionType("Payment");
+        cardTx.setBillId(paidBill == null ? null : paidBill.getId());
         cardTx.setPaymentMethod("ACCOUNT");
         cardTx.setDebitAccountNumber(payerAccountNumber);
         cardTx.setProcessedBy(processedBy);
@@ -834,6 +1070,104 @@ public class CreditCardService {
         return settingsRepository.save(settings);
     }
 
+    private CreditCardSettings emiSettings() {
+        CreditCardSettings settings = settingsRepository.findAll().stream().findFirst()
+                .orElseGet(CreditCardSettings::new);
+        if (settings.getEmiProcessingFeePercent() == null) settings.setEmiProcessingFeePercent(8.0);
+        return settings;
+    }
+
+    private Map<String, Object> planDetails(CreditCardEmiPlan plan) {
+        Map<String, Object> result = new HashMap<>();
+        result.put("id", plan.getId());
+        result.put("creditCardId", plan.getCreditCardId());
+        result.put("accountNumber", plan.getAccountNumber());
+        result.put("userName", plan.getUserName());
+        result.put("maskedCardNumber", plan.getCardNumber());
+        result.put("tenureMonths", plan.getTenureMonths());
+        result.put("principalAmount", plan.getPrincipalAmount());
+        result.put("processingFeePercent", plan.getProcessingFeePercent());
+        result.put("processingFeeAmount", plan.getProcessingFeeAmount());
+        result.put("annualInterestPercent", plan.getAnnualInterestPercent());
+        result.put("monthlyEmi", plan.getMonthlyEmi());
+        result.put("totalInterest", plan.getTotalInterest());
+        result.put("totalRepayment", plan.getTotalRepayment());
+        result.put("outstandingPrincipal", plan.getOutstandingPrincipal());
+        result.put("status", plan.getStatus());
+        result.put("createdAt", plan.getCreatedAt());
+        result.put("installments", emiInstallmentRepository
+                .findByPlanIdOrderByInstallmentNumberAsc(plan.getId()));
+        return result;
+    }
+
+    private void applyEmiPayment(CreditCardBill bill, double billPayment) {
+        double emiPaid = Math.min(billPayment, value(bill.getEmiAmount()));
+        if (emiPaid <= 0) return;
+        for (CreditCardEmiInstallment installment :
+                emiInstallmentRepository.findByBillIdOrderByDueDateAsc(bill.getId())) {
+            double remainingDue = Math.max(0.0,
+                    value(installment.getTotalAmount()) - value(installment.getPaidAmount()));
+            double allocation = Math.min(emiPaid, remainingDue);
+            if (allocation <= 0) continue;
+
+            double unpaidInterest = Math.max(0.0,
+                    value(installment.getInterestAmount()) - value(installment.getPaidInterest()));
+            double interestPaid = Math.min(allocation, unpaidInterest);
+            double principalPaid = Math.min(allocation - interestPaid,
+                    Math.max(0.0, value(installment.getPrincipalAmount()) - value(installment.getPaidPrincipal())));
+            installment.setPaidInterest(roundMoney(value(installment.getPaidInterest()) + interestPaid));
+            installment.setPaidPrincipal(roundMoney(value(installment.getPaidPrincipal()) + principalPaid));
+            installment.setPaidAmount(roundMoney(value(installment.getPaidAmount()) + allocation));
+            if (value(installment.getPaidAmount()) + 0.01 >= value(installment.getTotalAmount())) {
+                installment.setStatus("Paid");
+                installment.setPaidAt(LocalDateTime.now());
+            } else {
+                installment.setStatus("Partial");
+            }
+
+            emiInstallmentRepository.save(installment);
+            emiPlanRepository.findById(installment.getPlanId()).ifPresent(plan -> {
+                plan.setOutstandingPrincipal(roundMoney(Math.max(0.0,
+                        value(plan.getOutstandingPrincipal()) - principalPaid)));
+                boolean complete = emiInstallmentRepository.findByPlanIdOrderByInstallmentNumberAsc(plan.getId())
+                        .stream().allMatch(item -> "Paid".equalsIgnoreCase(item.getStatus())
+                                || item.getId().equals(installment.getId())
+                                && "Paid".equalsIgnoreCase(installment.getStatus()));
+                if (complete) plan.setStatus("Completed");
+                emiPlanRepository.save(plan);
+            });
+            emiPaid = roundMoney(emiPaid - allocation);
+        }
+    }
+
+    private double emiPaymentForBill(CreditCardBill bill, double previouslyPaid, double payment) {
+        double charges = value(bill.getFine()) + value(bill.getPenalty());
+        double regular = bill.getRegularAmount() == null
+                ? Math.max(0.0, value(bill.getTotalAmount()) - value(bill.getEmiAmount()))
+                : value(bill.getRegularAmount());
+        double emiTotal = value(bill.getEmiAmount());
+        double emiPaidBefore = Math.min(emiTotal, Math.max(0.0, previouslyPaid - charges - regular));
+        double emiPaidAfter = Math.min(emiTotal, Math.max(0.0, previouslyPaid + payment - charges - regular));
+        return roundMoney(Math.max(0.0, emiPaidAfter - emiPaidBefore));
+    }
+
+    private double billTotalDue(CreditCardBill bill) {
+        return roundMoney(value(bill.getTotalAmount()) + value(bill.getFine()) + value(bill.getPenalty()));
+    }
+
+    private double value(Double amount) {
+        return amount == null || !Double.isFinite(amount) ? 0.0 : amount;
+    }
+
+    private double roundMoney(double amount) {
+        return BigDecimal.valueOf(amount).setScale(2, RoundingMode.HALF_UP).doubleValue();
+    }
+
+    private String maskCardNumber(String number) {
+        if (number == null || number.length() < 4) return "****";
+        return "•••• •••• •••• " + number.substring(number.length() - 4);
+    }
+
     /**
      * Transfer money from a credit card's available limit to any savings/salary/current account.
      * A configurable percentage fee is deducted from the transferred amount and credited to the
@@ -954,9 +1288,11 @@ public class CreditCardService {
     // Calculate overdue and penalties
     @Transactional
     public void calculateOverdueAndPenalties() {
-        List<CreditCardBill> overdueBills = billRepository.findByStatus("Overdue");
+        List<CreditCardBill> overdueBills = new ArrayList<>();
+        overdueBills.addAll(billRepository.findByStatus("Generated"));
+        overdueBills.addAll(billRepository.findByStatus("Partial"));
         for (CreditCardBill bill : overdueBills) {
-            if (bill.getDueDate().isBefore(LocalDateTime.now()) && bill.getStatus().equals("Generated")) {
+            if (bill.getDueDate().isBefore(LocalDateTime.now())) {
                 bill.setStatus("Overdue");
                 Optional<CreditCard> cardOpt = creditCardRepository.findById(bill.getCreditCardId());
                 if (cardOpt.isPresent()) {

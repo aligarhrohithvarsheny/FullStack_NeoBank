@@ -226,7 +226,9 @@ public class Card360Service {
                                     Objects.toString(tx.getMerchant(), "Card transaction")),
                             "amount", Objects.toString(tx.getAmount(), "0"),
                             "type", Objects.toString(tx.getTransactionType(), ""),
-                            "status", Objects.toString(tx.getStatus(), ""))));
+                            "status", Objects.toString(tx.getStatus(), ""),
+                            "receipt", Objects.toString(tx.getGlobalTransactionSequence(),
+                                    tx.getBillId() == null ? "—" : "Bill #" + tx.getBillId()))));
             return items;
         }
         if ("debit".equalsIgnoreCase(type)) {
@@ -314,6 +316,22 @@ public class Card360Service {
         result.put("spendingLimit", card.getUserSetSpendingLimit());
         result.put("outstandingBalance", card.getCurrentBalance());
         result.put("canUnblock", customerCanUnblock(card.getAccountNumber(), "credit", card.getId()));
+        result.put("fine", card.getFine());
+        result.put("penalty", card.getPenalty());
+        creditCardService.getBillsByCardId(card.getId()).stream()
+                .max(Comparator.comparing(CreditCardBill::getBillGenerationDate,
+                        Comparator.nullsLast(Comparator.naturalOrder())))
+                .ifPresent(bill -> {
+                    result.put("billGenerationDate", bill.getBillGenerationDate());
+                    result.put("billDueDate", bill.getDueDate());
+                    result.put("billTotalAmount", bill.getTotalAmount());
+                    result.put("billPaidAmount", bill.getPaidAmount());
+                    result.put("billMinimumDue", bill.getMinimumDue());
+                    result.put("billFine", bill.getFine());
+                    result.put("billPenalty", bill.getPenalty());
+                    result.put("billEmiAmount", bill.getEmiAmount());
+                    result.put("billStatus", bill.getStatus());
+                });
         return result;
     }
 

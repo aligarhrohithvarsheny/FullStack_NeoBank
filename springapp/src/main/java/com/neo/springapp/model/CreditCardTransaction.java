@@ -17,6 +17,8 @@ public class CreditCardTransaction {
     private Long globalTransactionSequence;
 
     private Long creditCardId;
+    private Long billId;
+    private Long emiPlanId;
     private String cardNumber;
     private String accountNumber;
     private String userName;

@@ -17,6 +17,12 @@ public class CreditCardSettings {
     /** Percentage fee deducted from every credit-card-to-account transfer. Admin editable. Default 2%. */
     private Double transferFeePercent = 2.0;
 
+    /** Annual interest rate for new credit-card EMI plans. Null disables EMI conversion. */
+    private Double emiAnnualInterestPercent;
+
+    /** One-time processing fee for new credit-card EMI plans. Must be at least 8%. */
+    private Double emiProcessingFeePercent = 8.0;
+
     private String updatedBy;
     private LocalDateTime updatedAt;
 }

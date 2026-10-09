@@ -50,6 +50,11 @@
 .c360-detail-grid span,.c360-detail-grid strong{display:block}
 .c360-detail-grid span{margin-bottom:8px;color:#71849a;font-size:12px}
 .c360-detail-grid strong{color:#173655;font-size:15px}
+.c360-bill-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-top:16px;padding:16px;border:1px solid #e8eef4;border-radius:12px;background:#fbfdff}
+.c360-bill-summary h3{grid-column:1/-1;margin:0 0 2px;color:#173655;font-size:15px}
+.c360-bill-summary span,.c360-bill-summary strong{display:block}
+.c360-bill-summary span{margin-bottom:5px;color:#71849a;font-size:12px}
+.c360-bill-summary strong{color:#173655;font-size:13px}
 .c360-detail-actions{display:flex;flex-wrap:wrap;gap:9px;margin-top:18px}
 .c360-limit-edit{display:flex;gap:8px;width:100%;margin-top:12px}
 .c360-limit-edit input{max-width:180px;padding:9px}

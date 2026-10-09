@@ -71,8 +71,19 @@
             <div><span>Status</span><strong>{{ card.status }}</strong></div>
             <div *ngIf="card.type === 'credit'"><span>Approved limit</span><strong>₹{{ card.approvedLimit ?? 0 }}</strong></div>
             <div *ngIf="card.type === 'credit'"><span>Available limit</span><strong>₹{{ card.availableLimit ?? 0 }}</strong></div>
-            <div *ngIf="card.type === 'credit'"><span>Outstanding bill</span><strong>₹{{ card.outstandingBalance ?? 0 }}</strong></div>
+            <div *ngIf="card.type === 'credit'"><span>Outstanding bill</span><strong>₹{{ billOutstanding(card) | number:'1.2-2' }}</strong></div>
             <div *ngIf="card.type === 'credit'"><span>Spending limit</span><strong>₹{{ card.spendingLimit ?? card.approvedLimit ?? 0 }}</strong></div>
+          </div>
+          <div class="c360-bill-summary" *ngIf="card.type === 'credit' && card.billGenerationDate">
+            <h3>Latest bill breakdown</h3>
+            <div><span>Generated</span><strong>{{ card.billGenerationDate | date:'dd/MM/yyyy HH:mm' }}</strong></div>
+            <div><span>Due date</span><strong>{{ card.billDueDate | date:'dd/MM/yyyy' }}</strong></div>
+            <div><span>Bill total</span><strong>₹{{ (card.billTotalAmount ?? 0) | number:'1.2-2' }}</strong></div>
+            <div><span>EMI installments</span><strong>₹{{ (card.billEmiAmount ?? 0) | number:'1.2-2' }}</strong></div>
+            <div><span>Fine / overdue charges</span><strong>₹{{ ((card.billFine ?? 0) + (card.billPenalty ?? 0)) | number:'1.2-2' }}</strong></div>
+            <div><span>Paid</span><strong>₹{{ (card.billPaidAmount ?? 0) | number:'1.2-2' }}</strong></div>
+            <div><span>Minimum due</span><strong>₹{{ (card.billMinimumDue ?? 0) | number:'1.2-2' }}</strong></div>
+            <div><span>Status</span><strong>{{ card.billStatus || 'Generated' }}</strong></div>
           </div>
           <div class="c360-detail-actions">
             <button class="c360-secondary" type="button" (click)="toggleCard(card)"
@@ -81,7 +92,7 @@
             </button>
             <button *ngIf="card.type === 'credit'" class="c360-secondary" type="button" (click)="beginLimitEdit(card)">Change spending limit</button>
             <button *ngIf="card.type === 'credit'" class="c360-secondary" type="button" (click)="beginBillPayment(card)"
-              [disabled]="card.blocked || (card.outstandingBalance ?? 0) <= 0">Pay bill</button>
+              [disabled]="card.blocked || billOutstanding(card) <= 0">Pay bill</button>
           </div>
           <div *ngIf="editingLimitId === card.id" class="c360-limit-edit">
             <input type="number" min="0" [max]="card.approvedLimit || 0" [(ngModel)]="spendingLimit" [name]="'limit-' + card.id">
@@ -96,13 +107,13 @@
           </p>
           <div class="c360-table-wrap" *ngIf="card.type === 'credit'">
             <table>
-              <thead><tr><th>Date</th><th>Details</th><th>Type</th><th>Status</th><th>Amount</th></tr></thead>
+              <thead><tr><th>Date</th><th>Receipt / bill</th><th>Details</th><th>Type</th><th>Status</th><th>Amount</th></tr></thead>
               <tbody>
                 <tr *ngFor="let transaction of selectedTransactions">
-                  <td>{{ transaction.date | date:'medium' }}</td><td>{{ transaction.description }}</td>
+                  <td>{{ transaction.date | date:'medium' }}</td><td>{{ transaction.receipt }}</td><td>{{ transaction.description }}</td>
                   <td>{{ transaction.type }}</td><td>{{ transaction.status }}</td><td>₹{{ transaction.amount }}</td>
                 </tr>
-                <tr *ngIf="!selectedTransactions.length"><td colspan="5" class="c360-muted">
+                <tr *ngIf="!selectedTransactions.length"><td colspan="6" class="c360-muted">
                   {{ loadingTransactions ? 'Loading this card’s transactions…' : 'No transactions for this card.' }}
                 </td></tr>
               </tbody>
@@ -126,9 +137,9 @@
         <label for="c360-bill-amount">Payment amount</label>
         <div class="c360-payment-controls">
           <input id="c360-bill-amount" name="billPaymentAmount" type="number" min="0.01" step="0.01"
-            [max]="selectedBillCard?.outstandingBalance || 0"
+            [max]="selectedBillCard ? billOutstanding(selectedBillCard) : 0"
             [(ngModel)]="billPaymentAmount" required>
-          <button class="c360-secondary" type="button" (click)="billPaymentAmount = selectedBillCard?.outstandingBalance || 0">
+          <button class="c360-secondary" type="button" (click)="billPaymentAmount = selectedBillCard ? billOutstanding(selectedBillCard) : 0">
             Pay full outstanding
           </button>
           <button class="c360-primary" type="submit" [disabled]="payingBill || !paymentAccount || paymentAccount.balance < billPaymentAmount">

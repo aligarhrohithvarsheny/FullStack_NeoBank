@@ -23,6 +23,8 @@ public class CreditCardBill {
     private LocalDateTime paidDate;
     
     private Double totalAmount; // Total bill amount
+    private Double emiAmount;
+    private Double regularAmount;
     private Double minimumDue; // Minimum due amount
     private Double paidAmount; // Amount paid
     private Double overdueAmount; // Overdue amount

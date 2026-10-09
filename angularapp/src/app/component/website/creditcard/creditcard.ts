@@ -47,6 +47,8 @@ interface UserProfile {
 
 interface CreditCardTransaction {
   id: number;
+  billId?: number | null;
+  emiPlanId?: number | null;
   transactionType: string;
   amount: number;
   merchant: string;
@@ -62,6 +64,8 @@ interface CreditCardBill {
   dueDate: string;
   paidDate?: string;
   totalAmount: number;
+  regularAmount?: number;
+  emiAmount?: number;
   minimumDue: number;
   paidAmount: number;
   overdueAmount: number;
@@ -69,6 +73,14 @@ interface CreditCardBill {
   penalty: number;
   status: string;
   billingPeriod: string;
+}
+
+interface EmiSettings {
+  enabled: boolean;
+  annualInterestPercent: number | null;
+  processingFeePercent: number;
+  minimumTransactionAmount: number;
+  tenuresMonths: number[];
 }
 
 @Component({
@@ -96,6 +108,12 @@ export class CreditCard implements OnInit {
   billPaymentAmount: number = 0;
   transactions: CreditCardTransaction[] = [];
   bills: CreditCardBill[] = [];
+  emiEligibleTransactions: CreditCardTransaction[] = [];
+  emiPlans: any[] = [];
+  emiSettings: EmiSettings | null = null;
+  selectedEmiTransactionIds: number[] = [];
+  emiTenureMonths = 3;
+  isConvertingToEmi = false;
   isLoading: boolean = false;
   showApplyForm: boolean = false;
   panInput: string = '';
@@ -188,6 +206,7 @@ export class CreditCard implements OnInit {
     if (!this.selectedCard) return;
     this.loadTransactions();
     this.loadBills();
+    this.loadEmiDetails();
   }
 
   loadTransactions() {
@@ -214,6 +233,77 @@ export class CreditCard implements OnInit {
       error: (err: any) => {
         console.error('Error loading bills:', err);
         this.bills = [];
+      }
+    });
+  }
+
+  loadEmiDetails() {
+    if (!this.selectedCard) return;
+    const cardId = this.selectedCard.id;
+    this.selectedEmiTransactionIds = [];
+    this.http.get<EmiSettings>(`${environment.apiBaseUrl}/api/credit-cards/emi-settings`).subscribe({
+      next: settings => this.emiSettings = settings,
+      error: err => {
+        console.error('Error loading EMI settings:', err);
+        this.emiSettings = null;
+      }
+    });
+    this.http.get<CreditCardTransaction[]>(
+      `${environment.apiBaseUrl}/api/credit-cards/${cardId}/emi-eligible-transactions`
+    ).subscribe({
+      next: transactions => this.emiEligibleTransactions = Array.isArray(transactions) ? transactions : [],
+      error: err => {
+        console.error('Error loading EMI-eligible transactions:', err);
+        this.emiEligibleTransactions = [];
+      }
+    });
+    this.http.get<any[]>(`${environment.apiBaseUrl}/api/credit-cards/${cardId}/emi-plans`).subscribe({
+      next: plans => this.emiPlans = Array.isArray(plans) ? plans : [],
+      error: err => {
+        console.error('Error loading credit-card EMI plans:', err);
+        this.emiPlans = [];
+      }
+    });
+  }
+
+  toggleEmiTransaction(transactionId: number, checked: boolean) {
+    this.selectedEmiTransactionIds = checked
+      ? [...new Set([...this.selectedEmiTransactionIds, transactionId])]
+      : this.selectedEmiTransactionIds.filter(id => id !== transactionId);
+  }
+
+  selectedEmiPrincipal(): number {
+    return this.emiEligibleTransactions
+      .filter(transaction => this.selectedEmiTransactionIds.includes(transaction.id))
+      .reduce((sum, transaction) => sum + transaction.amount, 0);
+  }
+
+  estimatedEmi(): number {
+    const principal = this.selectedEmiPrincipal();
+    const annualRate = (this.emiSettings?.annualInterestPercent || 0) / 1200;
+    if (!principal || !annualRate || !this.emiTenureMonths) return 0;
+    return principal * annualRate / (1 - Math.pow(1 + annualRate, -this.emiTenureMonths));
+  }
+
+  convertToEmi() {
+    if (!this.selectedCard || !this.selectedEmiTransactionIds.length || !this.emiSettings?.enabled) return;
+    this.isConvertingToEmi = true;
+    this.http.post<any>(
+      `${environment.apiBaseUrl}/api/credit-cards/${this.selectedCard.id}/emi-conversions`,
+      { transactionIds: this.selectedEmiTransactionIds, tenureMonths: this.emiTenureMonths }
+    ).subscribe({
+      next: plan => {
+        this.isConvertingToEmi = false;
+        this.alertService.success(
+          'EMI created',
+          `Plan #${plan.id}: monthly EMI ₹${Number(plan.monthlyEmi).toFixed(2)}, processing fee ₹${Number(plan.processingFeeAmount).toFixed(2)}, total interest ₹${Number(plan.totalInterest).toFixed(2)}.`
+        );
+        this.loadCardDetails();
+        this.loadCreditCards();
+      },
+      error: err => {
+        this.isConvertingToEmi = false;
+        this.alertService.operationError('EMI conversion', err.error?.message || 'Unable to convert selected transactions');
       }
     });
   }
@@ -276,8 +366,16 @@ export class CreditCard implements OnInit {
 
   openBillPayment(bill: CreditCardBill) {
     this.selectedBill = bill;
-    this.billPaymentAmount = bill.minimumDue || bill.totalAmount;
+    this.billPaymentAmount = bill.minimumDue || this.billOutstanding(bill);
     this.showBillPaymentModal = true;
+  }
+
+  billTotalDue(bill: CreditCardBill): number {
+    return (bill.totalAmount || 0) + (bill.fine || 0) + (bill.penalty || 0);
+  }
+
+  billOutstanding(bill: CreditCardBill): number {
+    return Math.max(0, this.billTotalDue(bill) - (bill.paidAmount || 0));
   }
 
   payBill() {
@@ -293,6 +391,7 @@ export class CreditCard implements OnInit {
         this.selectedBill = null;
         this.billPaymentAmount = 0;
         this.loadBills();
+        this.loadTransactions();
         this.loadCreditCards();
       },
       error: (err: any) => {

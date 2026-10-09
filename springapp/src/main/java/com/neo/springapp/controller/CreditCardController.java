@@ -13,6 +13,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.ArrayList;
 
 @RestController
 @RequestMapping("/api/credit-cards")
@@ -184,6 +185,69 @@ public class CreditCardController {
     @GetMapping("/{id}/bills")
     public ResponseEntity<List<CreditCardBill>> getBills(@PathVariable Long id) {
         return ResponseEntity.ok(creditCardService.getBillsByCardId(id));
+    }
+
+    @GetMapping("/emi-settings")
+    public ResponseEntity<?> getEmiSettings() {
+        return ResponseEntity.ok(creditCardService.getEmiSettings());
+    }
+
+    @PutMapping("/emi-settings")
+    public ResponseEntity<?> updateEmiSettings(@RequestBody Map<String, Object> request) {
+        try {
+            Number apr = request.get("annualInterestPercent") instanceof Number value ? value : null;
+            Number fee = request.get("processingFeePercent") instanceof Number value ? value : null;
+            return ResponseEntity.ok(creditCardService.updateEmiSettings(
+                    apr == null ? null : apr.doubleValue(),
+                    fee == null ? null : fee.doubleValue(),
+                    request.get("adminName") == null ? null : String.valueOf(request.get("adminName"))));
+        } catch (IllegalArgumentException exception) {
+            return ResponseEntity.badRequest().body(Map.of("message", exception.getMessage()));
+        }
+    }
+
+    @GetMapping("/{id}/emi-eligible-transactions")
+    public ResponseEntity<?> getEmiEligibleTransactions(@PathVariable Long id) {
+        try {
+            return ResponseEntity.ok(creditCardService.getEmiEligibleTransactions(id));
+        } catch (IllegalArgumentException exception) {
+            return ResponseEntity.badRequest().body(Map.of("message", exception.getMessage()));
+        }
+    }
+
+    @PostMapping("/{id}/emi-conversions")
+    public ResponseEntity<?> convertToEmi(@PathVariable Long id, @RequestBody Map<String, Object> request) {
+        try {
+            Object rawIds = request.get("transactionIds");
+            List<Long> transactionIds = new ArrayList<>();
+            if (rawIds instanceof List<?> ids) {
+                for (Object transactionId : ids) {
+                    if (!(transactionId instanceof Number number)) {
+                        return ResponseEntity.badRequest().body(Map.of("message", "Transaction IDs must be numeric"));
+                    }
+                    transactionIds.add(number.longValue());
+                }
+            }
+            Object rawTenure = request.get("tenureMonths");
+            Integer tenure = rawTenure instanceof Number number ? number.intValue() : null;
+            return ResponseEntity.ok(creditCardService.convertTransactionsToEmi(id, transactionIds, tenure));
+        } catch (IllegalArgumentException exception) {
+            return ResponseEntity.badRequest().body(Map.of("message", exception.getMessage()));
+        }
+    }
+
+    @GetMapping("/{id}/emi-plans")
+    public ResponseEntity<?> getEmiPlans(@PathVariable Long id) {
+        try {
+            return ResponseEntity.ok(creditCardService.getEmiPlans(id));
+        } catch (IllegalArgumentException exception) {
+            return ResponseEntity.badRequest().body(Map.of("message", exception.getMessage()));
+        }
+    }
+
+    @GetMapping("/emi-plans")
+    public ResponseEntity<?> getAllEmiPlans() {
+        return ResponseEntity.ok(creditCardService.getAllEmiPlans());
     }
 
     @GetMapping("/account/{accountNumber}/bills")

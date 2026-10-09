@@ -250,6 +250,7 @@
           <th>Date</th>
           <th>Type</th>
           <th>Merchant</th>
+          <th>Bill receipt</th>
           <th>Amount</th>
           <th>Balance After</th>
           <th>Status</th>
@@ -260,6 +261,7 @@
           <td>{{ transaction.transactionDate | date:'dd/MM/yyyy HH:mm' }}</td>
           <td>{{ transaction.transactionType }}</td>
           <td>{{ transaction.merchant || transaction.description || '-' }}</td>
+          <td>{{ transaction.billId ? 'Bill #' + transaction.billId : '—' }}</td>
           <td>₹{{ transaction.amount | number:'1.2-2' }}</td>
           <td>₹{{ transaction.balanceAfter | number:'1.2-2' }}</td>
           <td><span class="status-badge" [ngClass]="transaction.status.toLowerCase()">{{ transaction.status }}</span></td>
@@ -267,6 +269,80 @@
       </tbody>
     </table>
     <p *ngIf="transactions.length === 0" class="no-data">No transactions found</p>
+  </div>
+
+  <div class="bills-section" *ngIf="selectedCard">
+    <h4>Convert eligible purchases to EMI</h4>
+    <p *ngIf="!emiSettings?.enabled" class="no-data">
+      EMI conversion is unavailable until an administrator configures the annual interest rate.
+    </p>
+    <p *ngIf="emiSettings?.enabled">
+      Select unbilled purchases of at least ₹{{ emiSettings?.minimumTransactionAmount | number:'1.0-0' }} each.
+      Processing fee: {{ emiSettings?.processingFeePercent }}% one-time.
+      Interest: {{ emiSettings?.annualInterestPercent }}% p.a. on reducing monthly principal.
+    </p>
+    <table class="data-table" *ngIf="emiEligibleTransactions.length">
+      <thead><tr><th>Select</th><th>Date</th><th>Purchase</th><th>Amount</th></tr></thead>
+      <tbody>
+        <tr *ngFor="let transaction of emiEligibleTransactions">
+          <td><input type="checkbox" [disabled]="!emiSettings?.enabled"
+            (change)="toggleEmiTransaction(transaction.id, emiSelection.checked)" #emiSelection></td>
+          <td>{{ transaction.transactionDate | date:'dd/MM/yyyy HH:mm' }}</td>
+          <td>{{ transaction.merchant || transaction.description || 'Purchase' }}</td>
+          <td>₹{{ transaction.amount | number:'1.2-2' }}</td>
+        </tr>
+      </tbody>
+    </table>
+    <p *ngIf="emiSettings?.enabled && !emiEligibleTransactions.length" class="no-data">
+      No eligible unbilled purchases found for this card.
+    </p>
+    <div *ngIf="emiEligibleTransactions.length" class="emi-conversion-controls">
+      <label>Tenure
+        <select [(ngModel)]="emiTenureMonths">
+          <option *ngFor="let months of (emiSettings?.tenuresMonths || [3, 6, 9, 12])" [ngValue]="months">
+            {{ months }} months
+          </option>
+        </select>
+      </label>
+      <span>Selected principal: ₹{{ selectedEmiPrincipal() | number:'1.2-2' }}</span>
+      <span>Estimated monthly EMI: ₹{{ estimatedEmi() | number:'1.2-2' }}</span>
+      <span>One-time processing fee: ₹{{ (selectedEmiPrincipal() * (emiSettings?.processingFeePercent || 0) / 100) | number:'1.2-2' }}</span>
+      <button class="pay-btn" (click)="convertToEmi()"
+        [disabled]="isConvertingToEmi || !emiSettings?.enabled || !selectedEmiTransactionIds.length">
+        {{ isConvertingToEmi ? 'Creating plan…' : 'Convert selected purchases' }}
+      </button>
+    </div>
+  </div>
+
+  <div class="bills-section" *ngIf="selectedCard && emiPlans.length">
+    <h4>EMI plans and monthly schedule</h4>
+    <article class="emi-plan" *ngFor="let plan of emiPlans">
+      <div class="emi-plan-summary">
+        <strong>Plan #{{ plan.id }} · {{ plan.maskedCardNumber }}</strong>
+        <span>{{ plan.status }} · {{ plan.tenureMonths }} months</span>
+        <span>Principal ₹{{ plan.principalAmount | number:'1.2-2' }}</span>
+        <span>Interest ₹{{ plan.totalInterest | number:'1.2-2' }} at {{ plan.annualInterestPercent }}% p.a.</span>
+        <span>Processing fee ₹{{ plan.processingFeeAmount | number:'1.2-2' }} ({{ plan.processingFeePercent }}%)</span>
+        <span>Monthly EMI ₹{{ plan.monthlyEmi | number:'1.2-2' }}</span>
+        <span>Total repayment ₹{{ plan.totalRepayment | number:'1.2-2' }}</span>
+        <span>Remaining principal ₹{{ plan.outstandingPrincipal | number:'1.2-2' }}</span>
+      </div>
+      <table class="data-table">
+        <thead><tr><th>Installment</th><th>Due date</th><th>Principal</th><th>Interest</th><th>Installment total</th><th>Paid</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr *ngFor="let installment of plan.installments">
+            <td>{{ installment.installmentNumber }}</td>
+            <td>{{ installment.dueDate | date:'dd/MM/yyyy' }}</td>
+            <td>₹{{ installment.principalAmount | number:'1.2-2' }}</td>
+            <td>₹{{ installment.interestAmount | number:'1.2-2' }}</td>
+            <td>₹{{ installment.totalAmount | number:'1.2-2' }}</td>
+            <td>₹{{ installment.paidAmount | number:'1.2-2' }}</td>
+            <td>{{ installment.status }}</td>
+          </tr>
+        </tbody>
+      </table>
+      <p class="no-data">Installments are added to the bill generated after their due date and are paid with that bill.</p>
+    </article>
   </div>
 
   <!-- Bills Section -->
@@ -277,20 +353,30 @@
         <tr>
           <th>Bill Date</th>
           <th>Due Date</th>
-          <th>Total Amount</th>
+          <th>Regular Amount</th>
+          <th>EMI Amount</th>
+          <th>Fine</th>
+          <th>Overdue Penalty</th>
+          <th>Total Due</th>
           <th>Minimum Due</th>
           <th>Paid Amount</th>
+          <th>Remaining</th>
           <th>Status</th>
           <th>Actions</th>
         </tr>
       </thead>
       <tbody>
         <tr *ngFor="let bill of bills">
-          <td>{{ bill.billGenerationDate | date:'dd/MM/yyyy' }}</td>
+          <td>{{ bill.billGenerationDate | date:'dd/MM/yyyy HH:mm' }}</td>
           <td [ngClass]="{'overdue': bill.status === 'Overdue'}">{{ bill.dueDate | date:'dd/MM/yyyy' }}</td>
-          <td>₹{{ bill.totalAmount | number:'1.2-2' }}</td>
+          <td>₹{{ (bill.regularAmount ?? bill.totalAmount) | number:'1.2-2' }}</td>
+          <td>₹{{ (bill.emiAmount || 0) | number:'1.2-2' }}</td>
+          <td>₹{{ (bill.fine || 0) | number:'1.2-2' }}</td>
+          <td>₹{{ (bill.penalty || 0) | number:'1.2-2' }}</td>
+          <td>₹{{ billTotalDue(bill) | number:'1.2-2' }}</td>
           <td>₹{{ bill.minimumDue | number:'1.2-2' }}</td>
           <td>₹{{ bill.paidAmount | number:'1.2-2' }}</td>
+          <td>₹{{ billOutstanding(bill) | number:'1.2-2' }}</td>
           <td><span class="status-badge" [ngClass]="bill.status.toLowerCase()">{{ bill.status }}</span></td>
           <td>
             <button class="pay-btn" (click)="openBillPayment(bill)" *ngIf="bill.status !== 'Paid'">
@@ -500,14 +586,21 @@
       <h3>Pay Bill</h3>
       <div *ngIf="selectedBill">
         <div class="bill-info">
-          <p><strong>Total Amount:</strong> ₹{{ selectedBill.totalAmount | number:'1.2-2' }}</p>
+          <p><strong>Statement generated:</strong> {{ selectedBill.billGenerationDate | date:'dd/MM/yyyy HH:mm' }}</p>
+          <p><strong>Due date:</strong> {{ selectedBill.dueDate | date:'dd/MM/yyyy' }}</p>
+          <p><strong>Regular charges:</strong> ₹{{ (selectedBill.regularAmount ?? selectedBill.totalAmount) | number:'1.2-2' }}</p>
+          <p><strong>EMI installments:</strong> ₹{{ (selectedBill.emiAmount || 0) | number:'1.2-2' }}</p>
+          <p><strong>Fine:</strong> ₹{{ (selectedBill.fine || 0) | number:'1.2-2' }}</p>
+          <p><strong>Overdue penalty:</strong> ₹{{ (selectedBill.penalty || 0) | number:'1.2-2' }}</p>
+          <p><strong>Total due:</strong> ₹{{ billTotalDue(selectedBill) | number:'1.2-2' }}</p>
           <p><strong>Minimum Due:</strong> ₹{{ selectedBill.minimumDue | number:'1.2-2' }}</p>
-          <p><strong>Due Date:</strong> {{ selectedBill.dueDate | date:'dd/MM/yyyy' }}</p>
+          <p><strong>Already paid:</strong> ₹{{ (selectedBill.paidAmount || 0) | number:'1.2-2' }}</p>
+          <p><strong>Remaining:</strong> ₹{{ billOutstanding(selectedBill) | number:'1.2-2' }}</p>
         </div>
         <label>Payment Amount:</label>
-        <input type="number" [(ngModel)]="billPaymentAmount" [min]="selectedBill.minimumDue" [max]="selectedBill.totalAmount" />
+        <input type="number" [(ngModel)]="billPaymentAmount" [min]="0.01" [max]="billOutstanding(selectedBill)" />
         <div class="modal-actions">
-          <button (click)="payBill()" class="pay-btn">Pay Bill</button>
+          <button (click)="payBill()" class="pay-btn" [disabled]="billPaymentAmount <= 0 || billPaymentAmount > billOutstanding(selectedBill)">Pay Bill</button>
           <button (click)="showBillPaymentModal = false" class="cancel-btn">Cancel</button>
         </div>
       </div>

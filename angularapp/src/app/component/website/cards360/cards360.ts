@@ -18,6 +18,15 @@ interface Card360Card {
   availableLimit?: number;
   spendingLimit?: number;
   outstandingBalance?: number;
+  billGenerationDate?: string;
+  billDueDate?: string;
+  billTotalAmount?: number;
+  billPaidAmount?: number;
+  billMinimumDue?: number;
+  billFine?: number;
+  billPenalty?: number;
+  billEmiAmount?: number;
+  billStatus?: string;
 }
 
 interface Card360Transaction {
@@ -26,6 +35,7 @@ interface Card360Transaction {
   amount: string;
   type: string;
   status: string;
+  receipt: string;
 }
 
 interface Cards360PaymentAccount {
@@ -78,6 +88,14 @@ export class Cards360 implements OnInit {
 
   get selectedCard(): Card360Card | undefined {
     return this.cards.find(card => this.cardKey(card) === this.selectedCardKey);
+  }
+
+  billOutstanding(card: Card360Card): number {
+    if (card.billTotalAmount !== undefined && card.billStatus?.toLowerCase() !== 'paid') {
+      return Math.max(0, card.billTotalAmount + (card.billFine ?? 0) + (card.billPenalty ?? 0)
+        - (card.billPaidAmount ?? 0));
+    }
+    return card.outstandingBalance ?? 0;
   }
 
   signIn(): void {
@@ -202,7 +220,7 @@ export class Cards360 implements OnInit {
   beginBillPayment(card: Card360Card): void {
     this.error = '';
     this.selectedBillCardId = card.id;
-    this.billPaymentAmount = card.outstandingBalance ?? 0;
+    this.billPaymentAmount = this.billOutstanding(card);
   }
 
   payCreditCardBill(): void {

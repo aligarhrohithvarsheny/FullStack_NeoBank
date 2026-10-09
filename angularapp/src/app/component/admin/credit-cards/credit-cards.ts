@@ -70,6 +70,10 @@ export class CreditCards implements OnInit, OnDestroy {
   isTransferring: boolean = false;
   transferFeePercent: number = 2;
   isSavingTransferFee: boolean = false;
+  emiAnnualInterestPercent: number | null = null;
+  emiProcessingFeePercent = 8;
+  creditCardEmiPlans: any[] = [];
+  isSavingEmiSettings = false;
 
   constructor(
     private router: Router,
@@ -92,6 +96,7 @@ export class CreditCards implements OnInit, OnDestroy {
       }
       this.loadCreditCards();
       this.loadTransferFeePercent();
+      this.loadEmiSettings();
       this.refreshTimer = setInterval(() => this.silentRefresh(), 10000);
     }
   }
@@ -188,6 +193,7 @@ export class CreditCards implements OnInit, OnDestroy {
     }
     this.selectedCreditCard = card;
     this.loadCreditCardDetails(card.id);
+    this.loadEmiPlans();
   }
 
   loadCreditCardDetails(cardId: string | number) {
@@ -855,6 +861,59 @@ export class CreditCards implements OnInit, OnDestroy {
     this.http.get(`${environment.apiBaseUrl}/api/credit-cards/transfer-fee-percent`).subscribe({
       next: (res: any) => { this.transferFeePercent = res.transferFeePercent ?? 2; },
       error: () => {}
+    });
+  }
+
+  loadEmiSettings() {
+    this.http.get<any>(`${environment.apiBaseUrl}/api/credit-cards/emi-settings`).subscribe({
+      next: settings => {
+        this.emiAnnualInterestPercent = settings.annualInterestPercent ?? null;
+        this.emiProcessingFeePercent = settings.processingFeePercent ?? 8;
+      },
+      error: err => console.error('Error loading credit-card EMI settings:', err)
+    });
+  }
+
+  saveEmiSettings() {
+    if (this.emiAnnualInterestPercent == null || this.emiAnnualInterestPercent <= 0
+        || this.emiAnnualInterestPercent > 100) {
+      this.alertService.error('Validation Error', 'Set an annual EMI interest rate between 0 and 100 percent');
+      return;
+    }
+    if (this.emiProcessingFeePercent < 8 || this.emiProcessingFeePercent > 100) {
+      this.alertService.error('Validation Error', 'The EMI processing fee must be between 8 and 100 percent');
+      return;
+    }
+    this.isSavingEmiSettings = true;
+    const adminData = isPlatformBrowser(this.platformId) ? sessionStorage.getItem('adminData') : null;
+    const admin = adminData ? JSON.parse(adminData) : {};
+    this.http.put(`${environment.apiBaseUrl}/api/credit-cards/emi-settings`, {
+      annualInterestPercent: this.emiAnnualInterestPercent,
+      processingFeePercent: this.emiProcessingFeePercent,
+      adminName: admin.name || admin.username || this.adminName
+    }).subscribe({
+      next: () => {
+        this.isSavingEmiSettings = false;
+        this.alertService.success('Saved', 'EMI rates updated for new conversions. Existing plans are unchanged.');
+      },
+      error: err => {
+        this.isSavingEmiSettings = false;
+        this.alertService.error('Error', err.error?.message || 'Unable to save EMI rates');
+      }
+    });
+  }
+
+  loadEmiPlans() {
+    this.http.get<any[]>(`${environment.apiBaseUrl}/api/credit-cards/emi-plans`).subscribe({
+      next: plans => {
+        const cardId = this.selectedCreditCard?.id;
+        this.creditCardEmiPlans = (Array.isArray(plans) ? plans : [])
+          .filter(plan => plan.creditCardId === cardId);
+      },
+      error: err => {
+        console.error('Error loading EMI plans for admin:', err);
+        this.creditCardEmiPlans = [];
+      }
     });
   }
 
