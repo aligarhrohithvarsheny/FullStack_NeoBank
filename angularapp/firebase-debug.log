@@ -19,3 +19,10 @@
 [debug] [2026-10-09T15:22:28.893Z] Checked if tokens are valid: true, expires at: 1791562281333
 [debug] [2026-10-09T15:22:28.893Z] Checked if tokens are valid: true, expires at: 1791562281333
 [debug] [2026-10-09T15:22:28.893Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/neo-bank-669 [none]
+[debug] [2026-10-09T15:22:29.703Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects/neo-bank-669 200
+[debug] [2026-10-09T15:22:29.704Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects/neo-bank-669 {"projectId":"neo-bank-669","projectNumber":"777219590514","displayName":"neo-bank-669","name":"projects/neo-bank-669","resources":{"hostingSite":"neo-bank-669"},"state":"ACTIVE","labels":{"firebase":"enabled"},"etag":"1_6688e0aa-ad56-41d3-8fb3-28ceec6e1253"}
+[info] 
+[info] === Deploying to 'neo-bank-669'...
+[info] 
+[info] i  deploying hosting 
+[info] Running command: npm run build:prod
