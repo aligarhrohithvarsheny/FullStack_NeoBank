@@ -217,7 +217,7 @@
         <table class="ins-table">
           <thead>
             <tr>
-              <th>Email</th>
+              <th>Customer Email</th>
               <th>Policy</th>
               <th>Review</th>
             </tr>
@@ -363,8 +363,8 @@
   <div class="ins-tab-content" *ngIf="activeTab === 'applications'">
     <div class="ins-panel">
       <div class="ins-panel-header">
-        <h2 class="ins-panel-title">Pending Applications</h2>
-        <span class="ins-count-badge">{{ pendingApplications.length }} pending</span>
+        <h2 class="ins-panel-title">Applications Awaiting Review</h2>
+        <span class="ins-count-badge">{{ pendingApplications.length }} awaiting review</span>
       </div>
       <div *ngIf="pendingApplications.length === 0" class="ins-empty">
         <div class="ins-empty-icon">✅</div>
@@ -378,6 +378,7 @@
               <th>Application #</th>
               <th>Policy</th>
               <th>Account</th>
+              <th>Email</th>
               <th>Nominee</th>
               <th>Age</th>
               <th>Premium</th>
@@ -398,6 +399,11 @@
               <td><span class="ins-mono">{{ app.applicationNumber }}</span></td>
               <td><span class="ins-text-bold">{{ app.policy?.name }}</span></td>
               <td><span class="ins-mono">{{ app.accountNumber }}</span></td>
+              <td>
+                <a *ngIf="app.applicantEmail; else missingApplicantEmail"
+                   [href]="'mailto:' + app.applicantEmail">{{ app.applicantEmail }}</a>
+                <ng-template #missingApplicantEmail>—</ng-template>
+              </td>
               <td>{{ app.nomineeName }}</td>
               <td class="ins-td-center">{{ app.proposerAge || '—' }}</td>
               <td>

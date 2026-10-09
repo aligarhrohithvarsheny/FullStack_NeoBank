@@ -416,6 +416,7 @@ export class AdminInsuranceDashboard implements OnInit {
     this.http.post(`${environment.apiBaseUrl}/api/admin/insurance/applications/${app.id}/approve`, {}).subscribe({
       next: (res: any) => {
         if (res?.success) {
+          this.pendingApplications = this.pendingApplications.filter(application => application.id !== app.id);
           this.alertService.adminSuccess('Application Approved', res.message || 'Application approved.');
           this.loadPendingApplications();
           this.loadStats();
@@ -438,6 +439,7 @@ export class AdminInsuranceDashboard implements OnInit {
     this.http.post(`${environment.apiBaseUrl}/api/admin/insurance/applications/${app.id}/reject?remark=${encodeURIComponent(remark)}`, {}).subscribe({
       next: (res: any) => {
         if (res?.success) {
+          this.pendingApplications = this.pendingApplications.filter(application => application.id !== app.id);
           this.alertService.adminSuccess('Application Rejected', res.message || 'Application rejected.');
           this.loadPendingApplications();
           this.loadStats();

@@ -111,12 +111,7 @@ public class AdminInsuranceController {
 
     @GetMapping("/insurance/applications/pending")
     public ResponseEntity<List<InsuranceApplication>> getPendingApplications() {
-        // include both pending approval and under-review for admin view
-        java.util.List<InsuranceApplication> pending = new java.util.ArrayList<>();
-        pending.addAll(insuranceService.getPendingApplications());
-        pending.addAll(insuranceService.getUnderReviewApplications());
-        pending.addAll(insuranceService.getApprovedApplications()); // approved but pending activation/payment
-        return ResponseEntity.ok(pending);
+        return ResponseEntity.ok(insuranceService.getApplicationsAwaitingReview());
     }
 
     @GetMapping("/insurance/applications/all")

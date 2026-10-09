@@ -841,6 +841,15 @@ public class InsuranceService {
         return applicationRepository.findByStatus("PENDING_APPROVAL");
     }
 
+    public List<InsuranceApplication> getApplicationsAwaitingReview() {
+        List<InsuranceApplication> applications = new java.util.ArrayList<>(
+                applicationRepository.findByStatus("PENDING_APPROVAL"));
+        applications.addAll(applicationRepository.findByStatus("UNDER_REVIEW"));
+        applications.forEach(application -> userService.getUserById(application.getUserId())
+                .ifPresent(user -> application.setApplicantEmail(user.getEmail())));
+        return applications;
+    }
+
     /**
      * Lookup an insurance policy by its policy number and return a linked active application if exists.
      */
@@ -881,6 +890,10 @@ public class InsuranceService {
     public InsuranceApplication approveApplication(Long applicationId, String adminRemark) {
         InsuranceApplication application = applicationRepository.findById(applicationId)
                 .orElseThrow(() -> new RuntimeException("Application not found"));
+        if (!"PENDING_APPROVAL".equalsIgnoreCase(application.getStatus())
+                && !"UNDER_REVIEW".equalsIgnoreCase(application.getStatus())) {
+            throw new RuntimeException("Only pending or under-review applications can be approved");
+        }
         // Approve does NOT mean active unless payment completed
         if ("COMPLETED".equalsIgnoreCase(application.getPaymentStatus())) {
             application.setStatus("ACTIVE");
@@ -889,7 +902,10 @@ public class InsuranceService {
         }
         application.setAdminRemark(adminRemark);
         application.setApprovedAt(LocalDateTime.now());
-        return applicationRepository.save(application);
+        InsuranceApplication saved = applicationRepository.save(application);
+        userService.getUserById(saved.getUserId())
+                .ifPresent(user -> saved.setApplicantEmail(user.getEmail()));
+        return saved;
     }
 
     @Transactional

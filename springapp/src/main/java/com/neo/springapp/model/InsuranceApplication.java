@@ -31,6 +31,9 @@ public class InsuranceApplication {
     @Column(nullable = false)
     private String accountNumber; // Convenience for lookups
 
+    @Transient
+    private String applicantEmail;
+
     @Column(nullable = false)
     private String nomineeName;
 
@@ -95,4 +98,3 @@ public class InsuranceApplication {
         }
     }
 }
-
