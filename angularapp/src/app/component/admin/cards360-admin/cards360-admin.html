@@ -3,7 +3,7 @@
   <section class="c360-admin-panel">
     <span class="c360-label">CARD ACCESS MANAGEMENT</span>
     <h1>Cards360 access</h1>
-    <p>Issue an account-specific passcode, disable customer sign-in, and review a customer-visible change history.</p>
+    <p>Provision Cards360 access for an account, disable customer sign-in, and review the customer-visible change history.</p>
     <label for="c360-account">Customer account number</label>
     <input id="c360-account" name="accountNumber" [(ngModel)]="accountNumber" (ngModelChange)="accountChanged()" autocomplete="off" required>
     <p class="helper">Use your signed-in ADMIN email and password to authorize management actions. The customer email is looked up from the account number and is not used as admin authentication.</p>
@@ -43,9 +43,9 @@
     <p *ngIf="error" class="error" role="alert">{{ error }}</p>
     <p *ngIf="notice" class="notice" role="status">{{ notice }}</p>
     <div *ngIf="passcode" class="passcode-box">
-      <strong>Customer passcode (shown once)</strong>
+      <strong>One-time provisioning passcode (shown once)</strong>
       <code>{{ passcode }}</code>
-      <p>Deliver this securely to the verified customer. Generating another passcode invalidates this one.</p>
+      <p>This passcode is used only to provision Cards360 access and is not used for sign-in. Future sign-ins use the registered email and card number.</p>
     </div>
     <section class="history">
       <div class="history-heading"><h2>Cards360 activity</h2><span>{{ history.length }} recent changes</span></div>

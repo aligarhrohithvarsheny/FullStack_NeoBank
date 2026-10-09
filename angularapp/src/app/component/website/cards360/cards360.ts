@@ -43,10 +43,11 @@ interface Cards360PaymentAccount {
 export class Cards360 implements OnInit {
   cardNumber = '';
   email = '';
-  passcode = '';
   linkCardNumber = '';
   cards: Card360Card[] = [];
-  transactions: Card360Transaction[] = [];
+  selectedTransactions: Card360Transaction[] = [];
+  selectedCardKey = '';
+  loadingTransactions = false;
   paymentAccount: Cards360PaymentAccount | null = null;
   error = '';
   notice = '';
@@ -75,19 +76,21 @@ export class Cards360 implements OnInit {
     return this.cards.find(card => card.type === 'credit' && card.id === this.selectedBillCardId);
   }
 
+  get selectedCard(): Card360Card | undefined {
+    return this.cards.find(card => this.cardKey(card) === this.selectedCardKey);
+  }
+
   signIn(): void {
     this.error = '';
     this.loading = true;
     this.http.post<{ token: string }>(`${this.api}/login`, {
       cardNumber: this.cardNumber.replace(/\s/g, ''),
-      email: this.email.trim(),
-      passcode: this.passcode
+      email: this.email.trim()
     }).subscribe({
       next: response => {
         sessionStorage.setItem(this.tokenKey, response.token);
         this.cardNumber = '';
         this.email = '';
-        this.passcode = '';
         this.loading = false;
         void this.router.navigate(['/website/cards360/dashboard']).then(navigated => {
           if (navigated) this.loadDashboard();
@@ -111,17 +114,40 @@ export class Cards360 implements OnInit {
       next: result => {
         this.cards = result.cards || [];
         this.loading = false;
+        if (this.selectedCardKey && this.selectedCard) this.selectCard(this.selectedCard);
+        else if (this.selectedCardKey) this.showOverview();
       },
-      error: err => this.handleProtectedError(err)
-    });
-    this.http.get<Card360Transaction[]>(`${this.api}/transactions`, { headers: this.headers() }).subscribe({
-      next: result => this.transactions = result || [],
       error: err => this.handleProtectedError(err)
     });
     this.http.get<Cards360PaymentAccount>(`${this.api}/payment-account`, { headers: this.headers() }).subscribe({
       next: result => this.paymentAccount = result,
       error: err => this.handleProtectedError(err)
     });
+  }
+
+  selectCard(card: Card360Card): void {
+    this.selectedCardKey = this.cardKey(card);
+    this.selectedTransactions = [];
+    this.loadingTransactions = true;
+    this.error = '';
+    this.http.get<Card360Transaction[]>(
+      `${this.api}/cards/${card.type}/${card.id}/transactions`,
+      { headers: this.headers() }
+    ).subscribe({
+      next: result => {
+        this.selectedTransactions = result || [];
+        this.loadingTransactions = false;
+      },
+      error: err => {
+        this.loadingTransactions = false;
+        this.handleProtectedError(err);
+      }
+    });
+  }
+
+  showOverview(): void {
+    this.selectedCardKey = '';
+    this.selectedTransactions = [];
   }
 
   linkCard(): void {
@@ -209,8 +235,13 @@ export class Cards360 implements OnInit {
   signOut(): void {
     sessionStorage.removeItem(this.tokenKey);
     this.cards = [];
-    this.transactions = [];
+    this.selectedTransactions = [];
+    this.selectedCardKey = '';
     this.router.navigate(['/website/cards360']);
+  }
+
+  private cardKey(card: Card360Card): string {
+    return `${card.type}-${card.id}`;
   }
 
   private headers(): HttpHeaders {

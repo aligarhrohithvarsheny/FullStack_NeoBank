@@ -8,8 +8,8 @@
     <div class="c360-intro">
       <span class="c360-eyebrow">NEOBANK · CARDS360</span>
       <h1>Your cards, all in one place.</h1>
-      <p>Manage your linked debit and credit cards, set a spending limit, and review recent activity.</p>
-      <div class="c360-trust">Protected with your admin-issued Card360 passcode</div>
+      <p>Manage your linked debit and credit cards, set a spending limit, and review each card's activity separately.</p>
+      <div class="c360-trust">Cards360 access is enabled by your NeoBank administrator</div>
     </div>
     <form class="c360-panel" (ngSubmit)="signIn()">
       <h2>Sign in to Cards360</h2>
@@ -17,11 +17,9 @@
       <input id="c360-number" name="cardNumber" [(ngModel)]="cardNumber" inputmode="numeric" autocomplete="cc-number" maxlength="23" required>
       <label for="c360-email">Registered email</label>
       <input id="c360-email" name="email" [(ngModel)]="email" type="email" autocomplete="email" required>
-      <label for="c360-passcode">Admin-issued passcode</label>
-      <input id="c360-passcode" name="passcode" [(ngModel)]="passcode" type="password" autocomplete="current-password" required>
       <p class="c360-error" *ngIf="error" role="alert">{{ error }}</p>
       <button class="c360-primary" type="submit" [disabled]="loading">{{ loading ? 'Signing in…' : 'Continue securely' }}</button>
-      <p class="c360-help">Need access? Contact your NeoBank administrator to enable Cards360 and issue a passcode.</p>
+      <p class="c360-help">Sign in with the email registered to your account and your full card number. Contact NeoBank if access has not been enabled.</p>
     </form>
   </section>
 
@@ -33,35 +31,86 @@
     <p class="c360-error" *ngIf="error" role="alert">{{ error }}</p>
     <p class="c360-notice" *ngIf="notice" role="status">{{ notice }}</p>
 
-    <section class="c360-section">
-      <h2>Your cards</h2>
-      <div class="c360-grid" *ngIf="cards.length; else noCards">
-        <article class="c360-card" *ngFor="let card of cards">
-          <div class="c360-card-top"><span>NEOBANK</span><span>CARDS360</span></div>
-          <p class="c360-kind">{{ card.cardType }}</p>
-          <p class="c360-number">{{ card.maskedNumber }}</p>
-          <div class="c360-card-bottom"><span>{{ card.expiryDate || '—' }}</span><span>{{ card.status }}</span></div>
-          <div class="c360-card-info">
-            <span *ngIf="card.type === 'credit'">Available ₹{{ card.availableLimit ?? 0 }} / ₹{{ card.approvedLimit ?? 0 }}</span>
-            <button class="c360-secondary" type="button" (click)="toggleCard(card)" [disabled]="card.blocked && !card.canUnblock">{{ card.blocked ? (card.canUnblock ? 'Unblock card' : 'Contact NeoBank to unblock') : 'Block card' }}</button>
+    <div class="c360-workspace">
+      <aside class="c360-sidebar" aria-label="Cards navigation">
+        <span class="c360-sidebar-heading">YOUR CARDS</span>
+        <button class="c360-nav-item" type="button" [class.active]="!selectedCardKey" (click)="showOverview()">
+          All cards
+        </button>
+        <button class="c360-nav-item c360-card-nav" type="button" *ngFor="let card of cards"
+          [class.active]="selectedCardKey === card.type + '-' + card.id" (click)="selectCard(card)">
+          <span>{{ card.cardType }}</span>
+          <strong>{{ card.maskedNumber }}</strong>
+        </button>
+        <p class="c360-muted" *ngIf="!cards.length">{{ loading ? 'Loading cards…' : 'No cards linked.' }}</p>
+      </aside>
+
+      <div class="c360-main">
+        <section class="c360-section" *ngIf="!selectedCard">
+          <h2>Your cards</h2>
+          <div class="c360-grid" *ngIf="cards.length; else noCards">
+            <article class="c360-card" *ngFor="let card of cards">
+              <div class="c360-card-top"><span>NEOBANK</span><span>CARDS360</span></div>
+              <p class="c360-kind">{{ card.cardType }}</p>
+              <p class="c360-number">{{ card.maskedNumber }}</p>
+              <div class="c360-card-bottom"><span>{{ card.expiryDate || '—' }}</span><span>{{ card.status }}</span></div>
+              <button class="c360-card-open" type="button" (click)="selectCard(card)">View card details and transactions</button>
+            </article>
           </div>
-          <div class="c360-limit" *ngIf="card.type === 'credit'">
-            <span>Outstanding bill: ₹{{ card.outstandingBalance ?? 0 }}</span>
-            <button class="c360-text-button" type="button" (click)="beginBillPayment(card)"
+          <ng-template #noCards><p class="c360-muted">{{ loading ? 'Loading cards…' : 'No cards are linked to this account yet.' }}</p></ng-template>
+        </section>
+
+        <section class="c360-section" *ngIf="selectedCard as card">
+          <div class="c360-detail-heading">
+            <div><span class="c360-eyebrow">CARD DETAILS</span><h2>{{ card.cardType }}</h2></div>
+            <button class="c360-secondary" type="button" (click)="showOverview()">Back to all cards</button>
+          </div>
+          <div class="c360-detail-grid">
+            <div><span>Card number</span><strong>{{ card.maskedNumber }}</strong></div>
+            <div><span>Expiry date</span><strong>{{ card.expiryDate || '—' }}</strong></div>
+            <div><span>Status</span><strong>{{ card.status }}</strong></div>
+            <div *ngIf="card.type === 'credit'"><span>Approved limit</span><strong>₹{{ card.approvedLimit ?? 0 }}</strong></div>
+            <div *ngIf="card.type === 'credit'"><span>Available limit</span><strong>₹{{ card.availableLimit ?? 0 }}</strong></div>
+            <div *ngIf="card.type === 'credit'"><span>Outstanding bill</span><strong>₹{{ card.outstandingBalance ?? 0 }}</strong></div>
+            <div *ngIf="card.type === 'credit'"><span>Spending limit</span><strong>₹{{ card.spendingLimit ?? card.approvedLimit ?? 0 }}</strong></div>
+          </div>
+          <div class="c360-detail-actions">
+            <button class="c360-secondary" type="button" (click)="toggleCard(card)"
+              [disabled]="card.blocked && !card.canUnblock">
+              {{ card.blocked ? (card.canUnblock ? 'Unblock card' : 'Contact NeoBank to unblock') : 'Block card' }}
+            </button>
+            <button *ngIf="card.type === 'credit'" class="c360-secondary" type="button" (click)="beginLimitEdit(card)">Change spending limit</button>
+            <button *ngIf="card.type === 'credit'" class="c360-secondary" type="button" (click)="beginBillPayment(card)"
               [disabled]="card.blocked || (card.outstandingBalance ?? 0) <= 0">Pay bill</button>
           </div>
-          <div class="c360-limit" *ngIf="card.type === 'credit'">
-            <span>Spending limit: ₹{{ card.spendingLimit ?? card.approvedLimit ?? 0 }}</span>
-            <button type="button" class="c360-text-button" (click)="beginLimitEdit(card)">Change</button>
-            <div *ngIf="editingLimitId === card.id" class="c360-limit-edit">
-              <input type="number" min="0" [max]="card.approvedLimit || 0" [(ngModel)]="spendingLimit" [name]="'limit-' + card.id">
-              <button class="c360-primary" type="button" (click)="saveLimit(card)">Save limit</button>
-            </div>
+          <div *ngIf="editingLimitId === card.id" class="c360-limit-edit">
+            <input type="number" min="0" [max]="card.approvedLimit || 0" [(ngModel)]="spendingLimit" [name]="'limit-' + card.id">
+            <button class="c360-primary" type="button" (click)="saveLimit(card)">Save limit</button>
           </div>
-        </article>
+        </section>
+
+        <section class="c360-section c360-transactions" *ngIf="selectedCard as card">
+          <h2>Transactions · {{ card.maskedNumber }}</h2>
+          <p class="c360-muted" *ngIf="card.type === 'debit' && !loadingTransactions">
+            Debit card transactions are not available because the transaction ledger does not associate entries with individual debit cards.
+          </p>
+          <div class="c360-table-wrap" *ngIf="card.type === 'credit'">
+            <table>
+              <thead><tr><th>Date</th><th>Details</th><th>Type</th><th>Status</th><th>Amount</th></tr></thead>
+              <tbody>
+                <tr *ngFor="let transaction of selectedTransactions">
+                  <td>{{ transaction.date | date:'medium' }}</td><td>{{ transaction.description }}</td>
+                  <td>{{ transaction.type }}</td><td>{{ transaction.status }}</td><td>₹{{ transaction.amount }}</td>
+                </tr>
+                <tr *ngIf="!selectedTransactions.length"><td colspan="5" class="c360-muted">
+                  {{ loadingTransactions ? 'Loading this card’s transactions…' : 'No transactions for this card.' }}
+                </td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
       </div>
-      <ng-template #noCards><p class="c360-muted">{{ loading ? 'Loading cards…' : 'No cards are linked to this account yet.' }}</p></ng-template>
-    </section>
+    </div>
 
     <section class="c360-section c360-payment-panel" *ngIf="selectedBillCardId !== null">
       <div>
@@ -101,20 +150,5 @@
       </form>
     </section>
 
-    <section class="c360-section">
-      <h2>Recent transactions</h2>
-      <div class="c360-table-wrap">
-        <table>
-          <thead><tr><th>Date</th><th>Details</th><th>Type</th><th>Status</th><th>Amount</th></tr></thead>
-          <tbody>
-            <tr *ngFor="let transaction of transactions">
-              <td>{{ transaction.date | date:'medium' }}</td><td>{{ transaction.description }}</td>
-              <td>{{ transaction.type }}</td><td>{{ transaction.status }}</td><td>₹{{ transaction.amount }}</td>
-            </tr>
-            <tr *ngIf="!transactions.length"><td colspan="5" class="c360-muted">{{ loading ? 'Loading transactions…' : 'No recent transactions.' }}</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
   </section>
 </main>

@@ -17,7 +17,6 @@ public class Card360Service {
     private final CardRepository cardRepository;
     private final CreditCardRepository creditCardRepository;
     private final CreditCardTransactionRepository creditTransactionRepository;
-    private final TransactionRepository transactionRepository;
     private final UserRepository userRepository;
     private final AdminService adminService;
     private final UserSessionTokenService tokenService;
@@ -28,7 +27,7 @@ public class Card360Service {
     public Card360Service(Card360AccessRepository accessRepository, Card360AuditRepository auditRepository,
                           CardRepository cardRepository, CreditCardRepository creditCardRepository,
                           CreditCardTransactionRepository creditTransactionRepository,
-                          TransactionRepository transactionRepository, UserRepository userRepository,
+                          UserRepository userRepository,
                           AdminService adminService, UserSessionTokenService tokenService,
                           CreditCardService creditCardService) {
         this.accessRepository = accessRepository;
@@ -36,7 +35,6 @@ public class Card360Service {
         this.cardRepository = cardRepository;
         this.creditCardRepository = creditCardRepository;
         this.creditTransactionRepository = creditTransactionRepository;
-        this.transactionRepository = transactionRepository;
         this.userRepository = userRepository;
         this.adminService = adminService;
         this.tokenService = tokenService;
@@ -97,9 +95,9 @@ public class Card360Service {
     }
 
     @Transactional(noRollbackFor = IllegalArgumentException.class)
-    public Map<String, Object> login(String cardNumber, String email, String passcode) {
-        if (isBlank(cardNumber) || isBlank(email) || isBlank(passcode)) {
-            throw new IllegalArgumentException("Card number, email, and passcode are required");
+    public Map<String, Object> login(String cardNumber, String email) {
+        if (isBlank(cardNumber) || isBlank(email)) {
+            throw new IllegalArgumentException("Card number and email are required");
         }
         String normalizedEmail = email.trim().toLowerCase(Locale.ROOT);
         String normalizedCardNumber = cardNumber.replaceAll("[\\s-]", "");
@@ -110,18 +108,7 @@ public class Card360Service {
 
         Card360Access access = accessRepository.findByAccountNumber(accountNumber)
                 .orElseThrow(() -> new IllegalArgumentException("Unable to sign in. Check your details or contact the bank."));
-        LocalDateTime now = LocalDateTime.now();
-        if (!access.isEnabled() || (access.getLockedUntil() != null && access.getLockedUntil().isAfter(now))) {
-            throw new IllegalArgumentException("Unable to sign in. Check your details or contact the bank.");
-        }
-        if (!encoder.matches(passcode.trim(), access.getPasscodeHash())) {
-            int attempts = access.getFailedAttempts() + 1;
-            access.setFailedAttempts(attempts);
-            if (attempts >= 5) {
-                access.setLockedUntil(now.plusMinutes(15));
-                access.setFailedAttempts(0);
-            }
-            accessRepository.save(access);
+        if (!access.isEnabled()) {
             throw new IllegalArgumentException("Unable to sign in. Check your details or contact the bank.");
         }
 
@@ -222,23 +209,33 @@ public class Card360Service {
     }
 
     @Transactional(readOnly = true)
-    public List<Map<String, Object>> getTransactions(String accountNumber) {
+    public List<Map<String, Object>> getCardTransactions(String accountNumber, String type, long cardId) {
         requireEnabled(accountNumber);
         List<Map<String, Object>> items = new ArrayList<>();
-        transactionRepository.findByAccountNumberOrderByDateDesc(accountNumber).stream().limit(50).forEach(tx ->
-                items.add(Map.of("date", Objects.toString(tx.getDate(), ""),
-                        "description", Objects.toString(tx.getDescription(), Objects.toString(tx.getMerchant(), "Transaction")),
-                        "amount", Objects.toString(tx.getAmount(), "0"),
-                        "type", Objects.toString(tx.getType(), ""),
-                        "status", Objects.toString(tx.getStatus(), ""))));
-        creditTransactionRepository.findByAccountNumberOrderByTransactionDateDesc(accountNumber).stream().limit(50).forEach(tx ->
-                items.add(Map.of("date", Objects.toString(tx.getTransactionDate(), ""),
-                        "description", Objects.toString(tx.getDescription(), Objects.toString(tx.getMerchant(), "Card transaction")),
-                        "amount", Objects.toString(tx.getAmount(), "0"),
-                        "type", Objects.toString(tx.getTransactionType(), ""),
-                        "status", Objects.toString(tx.getStatus(), ""))));
-        items.sort(Comparator.comparing(item -> (String) item.get("date"), Comparator.reverseOrder()));
-        return items.stream().limit(100).toList();
+        if ("credit".equalsIgnoreCase(type)) {
+            CreditCard card = creditCardRepository.findById(cardId)
+                    .filter(value -> accountNumber.equals(value.getAccountNumber()))
+                    .orElseThrow(() -> new IllegalArgumentException("Card not found"));
+            creditTransactionRepository.findByCreditCardId(card.getId()).stream()
+                    .sorted(Comparator.comparing(CreditCardTransaction::getTransactionDate,
+                            Comparator.nullsLast(Comparator.reverseOrder())))
+                    .limit(100)
+                    .forEach(tx -> items.add(Map.of(
+                            "date", Objects.toString(tx.getTransactionDate(), ""),
+                            "description", Objects.toString(tx.getDescription(),
+                                    Objects.toString(tx.getMerchant(), "Card transaction")),
+                            "amount", Objects.toString(tx.getAmount(), "0"),
+                            "type", Objects.toString(tx.getTransactionType(), ""),
+                            "status", Objects.toString(tx.getStatus(), ""))));
+            return items;
+        }
+        if ("debit".equalsIgnoreCase(type)) {
+            cardRepository.findById(cardId)
+                    .filter(value -> accountNumber.equals(value.getAccountNumber()))
+                    .orElseThrow(() -> new IllegalArgumentException("Card not found"));
+            return items;
+        }
+        throw new IllegalArgumentException("Unsupported card type");
     }
 
     @Transactional(noRollbackFor = IllegalArgumentException.class)

@@ -81,7 +81,7 @@ export class Cards360Admin {
           this.loading = false;
           this.passcode = result.passcode;
           this.enabled = true;
-          this.notice = 'Passcode generated and access enabled. Copy and securely deliver it now; it cannot be shown again.';
+          this.notice = 'One-time provisioning passcode generated and access enabled. Future customer sign-ins use their registered email and card number.';
           this.loadHistory();
         },
         error: err => this.fail(err)

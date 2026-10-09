@@ -3,6 +3,8 @@ package com.neo.springapp.service;
 import com.neo.springapp.model.Admin;
 import com.neo.springapp.model.Card;
 import com.neo.springapp.model.Card360Access;
+import com.neo.springapp.model.CreditCard;
+import com.neo.springapp.model.CreditCardTransaction;
 import com.neo.springapp.model.User;
 import com.neo.springapp.repository.*;
 import org.junit.jupiter.api.BeforeEach;
@@ -27,7 +29,6 @@ class Card360ServiceTest {
     @Mock private CardRepository cardRepository;
     @Mock private CreditCardRepository creditCardRepository;
     @Mock private CreditCardTransactionRepository creditTransactionRepository;
-    @Mock private TransactionRepository transactionRepository;
     @Mock private UserRepository userRepository;
     @Mock private AdminService adminService;
     @Mock private CreditCardService creditCardService;
@@ -39,7 +40,7 @@ class Card360ServiceTest {
     void setUp() {
         tokenService = new UserSessionTokenService("test-secret-with-at-least-32-characters");
         service = new Card360Service(accessRepository, auditRepository, cardRepository, creditCardRepository,
-                creditTransactionRepository, transactionRepository, userRepository, adminService, tokenService,
+                creditTransactionRepository, userRepository, adminService, tokenService,
                 creditCardService);
     }
 
@@ -67,7 +68,7 @@ class Card360ServiceTest {
         when(accessRepository.findByAccountNumber("ACC123")).thenReturn(Optional.of(access));
 
         Map<String, Object> loginResponse = service.login(
-                "4111 1111-1111 1234", "  " + user.getEmail().toUpperCase() + "  ", "  " + passcode + "\n");
+                "4111 1111-1111 1234", "  " + user.getEmail().toUpperCase() + "  ");
         UserSessionTokenService.SessionPrincipal principal =
                 tokenService.verify((String) loginResponse.get("token"));
 
@@ -99,19 +100,65 @@ class Card360ServiceTest {
     }
 
     @Test
-    void wrongPasscodeIncrementsFailureCounter() {
+    void wrongEmailCannotSignInWithCardNumber() {
+        when(cardRepository.findByCardNumber("4111111111111234")).thenReturn(debitCard());
+        when(userRepository.findByAccountNumber("ACC123")).thenReturn(Optional.of(approvedUser()));
+        assertThatThrownBy(() -> service.login("4111111111111234", "wrong@neobank.test"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Unable to sign in. Check your details or contact the bank.");
+    }
+
+    @Test
+    void cardTransactionsAreLimitedToTheOwnedCreditCard() {
         Card360Access access = new Card360Access();
         access.setAccountNumber("ACC123");
         access.setEnabled(true);
-        access.setPasscodeHash(new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder().encode("valid-code"));
-
-        when(cardRepository.findByCardNumber("4111111111111234")).thenReturn(debitCard());
-        when(userRepository.findByAccountNumber("ACC123")).thenReturn(Optional.of(approvedUser()));
+        CreditCard card = new CreditCard();
+        card.setId(29L);
+        card.setAccountNumber("ACC123");
+        CreditCardTransaction tx = new CreditCardTransaction();
+        tx.setCreditCardId(29L);
+        tx.setAmount(25.0);
+        tx.setDescription("Card purchase");
         when(accessRepository.findByAccountNumber("ACC123")).thenReturn(Optional.of(access));
-        assertThatThrownBy(() -> service.login("4111111111111234", "customer@neobank.test", "wrong-code"))
-                .isInstanceOf(IllegalArgumentException.class);
+        when(userRepository.findByAccountNumber("ACC123")).thenReturn(Optional.of(approvedUser()));
+        when(creditCardRepository.findById(29L)).thenReturn(Optional.of(card));
+        when(creditTransactionRepository.findByCreditCardId(29L)).thenReturn(List.of(tx));
 
-        assertThat(access.getFailedAttempts()).isEqualTo(1);
+        List<Map<String, Object>> result = service.getCardTransactions("ACC123", "credit", 29L);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).get("description")).isEqualTo("Card purchase");
+        org.mockito.Mockito.verify(creditTransactionRepository).findByCreditCardId(29L);
+    }
+
+    @Test
+    void cardTransactionsRejectCardsOwnedByAnotherAccount() {
+        Card360Access access = new Card360Access();
+        access.setAccountNumber("ACC123");
+        access.setEnabled(true);
+        CreditCard card = new CreditCard();
+        card.setId(29L);
+        card.setAccountNumber("OTHER");
+        when(accessRepository.findByAccountNumber("ACC123")).thenReturn(Optional.of(access));
+        when(userRepository.findByAccountNumber("ACC123")).thenReturn(Optional.of(approvedUser()));
+        when(creditCardRepository.findById(29L)).thenReturn(Optional.of(card));
+
+        assertThatThrownBy(() -> service.getCardTransactions("ACC123", "credit", 29L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Card not found");
+    }
+
+    @Test
+    void debitCardTransactionsDoNotIncludeAccountWideActivity() {
+        Card360Access access = new Card360Access();
+        access.setAccountNumber("ACC123");
+        access.setEnabled(true);
+        when(accessRepository.findByAccountNumber("ACC123")).thenReturn(Optional.of(access));
+        when(userRepository.findByAccountNumber("ACC123")).thenReturn(Optional.of(approvedUser()));
+        when(cardRepository.findById(17L)).thenReturn(Optional.of(debitCard()));
+
+        assertThat(service.getCardTransactions("ACC123", "debit", 17L)).isEmpty();
     }
 
     @Test

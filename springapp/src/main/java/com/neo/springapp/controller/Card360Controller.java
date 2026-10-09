@@ -22,7 +22,7 @@ public class Card360Controller {
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody Map<String, String> request) {
         try {
-            return ResponseEntity.ok(card360Service.login(request.get("cardNumber"), request.get("email"), request.get("passcode")));
+            return ResponseEntity.ok(card360Service.login(request.get("cardNumber"), request.get("email")));
         } catch (IllegalArgumentException exception) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("message", exception.getMessage()));
         }
@@ -153,14 +153,17 @@ public class Card360Controller {
         }
     }
 
-    @GetMapping("/transactions")
-    public ResponseEntity<?> transactions(Authentication authentication) {
+    @GetMapping("/cards/{type}/{id}/transactions")
+    public ResponseEntity<?> cardTransactions(@PathVariable String type, @PathVariable Long id,
+                                              Authentication authentication) {
         SessionPrincipal principal = card360Principal(authentication);
         if (principal == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         try {
-            return ResponseEntity.ok(card360Service.getTransactions(principal.accountNumber()));
+            return ResponseEntity.ok(card360Service.getCardTransactions(principal.accountNumber(), type, id));
         } catch (IllegalArgumentException exception) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", exception.getMessage()));
+            HttpStatus status = "Card not found".equals(exception.getMessage())
+                    ? HttpStatus.NOT_FOUND : HttpStatus.FORBIDDEN;
+            return ResponseEntity.status(status).body(Map.of("message", exception.getMessage()));
         }
     }
 
