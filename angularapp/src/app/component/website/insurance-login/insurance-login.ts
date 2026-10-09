@@ -112,7 +112,9 @@ export class InsuranceLogin implements OnInit {
       },
       error: (error) => {
         this.isLoggingIn = false;
-        this.loginError = error.error?.message || 'Unable to create insurance password.';
+        this.loginError = error.status === 404
+          ? 'The insurance password endpoint is missing from the backend deployment. Please deploy the latest Spring backend and try again.'
+          : error.error?.message || 'Unable to create insurance password.';
       }
     });
   }

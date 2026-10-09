@@ -217,23 +217,15 @@
         <table class="ins-table">
           <thead>
             <tr>
-              <th>Reference</th>
-              <th>Applicant</th>
               <th>Email</th>
-              <th>Phone</th>
               <th>Policy</th>
-              <th>Submitted</th>
               <th>Review</th>
             </tr>
           </thead>
           <tbody>
             <tr *ngFor="let application of pendingGuestApplications" class="ins-table-row">
-              <td><span class="ins-mono">{{ application.applicationNumber }}</span></td>
-              <td>{{ application.applicantName }}</td>
-              <td>{{ application.email }}</td>
-              <td>{{ application.phone }}</td>
+              <td><a [href]="'mailto:' + application.email">{{ application.email }}</a></td>
               <td>{{ application.policy?.name }} ({{ application.policy?.type }})</td>
-              <td>{{ application.createdAt | date:'medium' }}</td>
               <td>
                 <div class="ins-actions">
                   <button class="ins-btn ins-btn-xs ins-btn-success"

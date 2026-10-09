@@ -164,7 +164,10 @@ export class AdminInsuranceDashboard implements OnInit {
       },
       error: error => {
         this.reviewingGuestApplicationId = null;
-        this.alertService.adminError('Review Failed', error.error?.message || 'Unable to review application.');
+        const message = error.status === 404
+          ? 'The guest-insurance review endpoint is missing from the backend deployment. Please deploy the latest Spring backend and try again.'
+          : error.error?.message || 'Unable to review application.';
+        this.alertService.adminError('Review Failed', message);
       }
     });
   }

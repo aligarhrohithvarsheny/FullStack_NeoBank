@@ -137,20 +137,21 @@ public class AdminInsuranceController {
     @PostMapping("/insurance/guest-applications/{id}/review")
     public ResponseEntity<?> reviewGuestApplication(
             @PathVariable Long id,
-                @RequestHeader("X-Admin-Email") String adminEmail,
-                @RequestHeader("X-Admin-Password") String adminPassword,
-                @RequestBody Map<String, Object> request) {
+            @RequestHeader("X-Admin-Email") String adminEmail,
+            @RequestHeader("X-Admin-Password") String adminPassword,
+            @RequestBody Map<String, Object> request) {
         try {
-                if (!adminService.verifyInsuranceReviewer(adminEmail, adminPassword)) {
-                    return ResponseEntity.status(401).body(Map.of("success", false, "message", "Admin verification failed"));
-                }
-                if (!(request.get("approve") instanceof Boolean approve)) {
-                    throw new IllegalArgumentException("approve must be true or false");
-                }
-                String remark = request.get("remark") == null ? null : String.valueOf(request.get("remark"));
+            if (!adminService.verifyInsuranceReviewer(adminEmail, adminPassword)) {
+                return ResponseEntity.status(401).body(Map.of("success", false, "message", "Admin verification failed"));
+            }
+            if (!(request.get("approve") instanceof Boolean approve)) {
+                throw new IllegalArgumentException("approve must be true or false");
+            }
+            String remark = request.get("remark") == null ? null : String.valueOf(request.get("remark"));
+            var reviewedApplication = insuranceService.reviewGuestApplication(id, approve, remark);
             return ResponseEntity.ok(Map.of(
                     "success", true,
-                    "application", insuranceService.reviewGuestApplication(id, approve, remark),
+                    "email", reviewedApplication.getEmail(),
                     "message", approve ? "Insurance application approved" : "Insurance application rejected"));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("success", false, "message",
