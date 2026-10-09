@@ -7,10 +7,12 @@ export class DemandDraftService {
   private api = `${environment.apiBaseUrl}/api/demand-drafts`;
   constructor(private http: HttpClient) {}
   verifyCheque(accountNumber: string, chequeNumber: string) { return this.http.get<any>(`${this.api}/verify-cheque?accountNumber=${encodeURIComponent(accountNumber)}&chequeNumber=${encodeURIComponent(chequeNumber)}`); }
+  verifyPositivePay(accountNumber: string, chequeNumber: string, amount: number, payeeName: string) { return this.http.get<any>(`${this.api}/verify-positive-pay?accountNumber=${encodeURIComponent(accountNumber)}&chequeNumber=${encodeURIComponent(chequeNumber)}&amount=${encodeURIComponent(amount)}&payeeName=${encodeURIComponent(payeeName)}`); }
   getByAccount(accountNumber: string) { return this.http.get<any[]>(`${this.api}/account/${encodeURIComponent(accountNumber)}`); }
   create(accountNumber: string, draft: any) { return this.http.post<any>(`${this.api}/account/${encodeURIComponent(accountNumber)}`, draft); }
   getAll() { return this.http.get<any[]>(`${this.api}/admin/all`); }
   update(id: number, draft: any, adminName: string) { return this.http.put<any>(`${this.api}/admin/${id}`, { ...draft, adminName }); }
+  verifyAccountDetails(id: number, adminName: string) { return this.http.post<any>(`${this.api}/admin/${id}/verify-account-details`, { adminName }); }
   approve(id: number, adminName: string) { return this.http.post<any>(`${this.api}/admin/${id}/approve`, { adminName }); }
   reject(id: number, adminName: string, reason: string) { return this.http.post<any>(`${this.api}/admin/${id}/reject`, { adminName, reason }); }
   download(id: number) { return this.http.get(`${this.api}/${id}/download`, { responseType: 'blob' }); }

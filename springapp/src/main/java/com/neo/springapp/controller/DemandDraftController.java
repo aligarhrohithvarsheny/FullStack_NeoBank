@@ -6,6 +6,7 @@ import com.neo.springapp.service.DemandDraftService;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 import java.util.*;
+import java.math.BigDecimal;
 
 @RestController
 @RequestMapping("/api/demand-drafts")
@@ -21,9 +22,21 @@ public class DemandDraftController {
         return ResponseEntity.ok(Map.of("success", true, "accountNumber", account.getAccountNumber(), "accountHolder", account.getName(), "accountType", account.getAccountType(), "balance", account.getBalance(), "chequeNumber", chequeNumber));
     }
 
+    @GetMapping("/verify-positive-pay")
+    public ResponseEntity<?> verifyPositivePay(@RequestParam String accountNumber, @RequestParam String chequeNumber,
+                                                @RequestParam BigDecimal amount, @RequestParam String payeeName) {
+        try {
+            var registration = service.verifyPositivePay(accountNumber, chequeNumber, amount, payeeName);
+            return ResponseEntity.ok(Map.of("verified", true, "referenceNumber", registration.getReferenceNumber()));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("verified", false, "message", e.getMessage()));
+        }
+    }
+
     @GetMapping("/account/{accountNumber}") public List<DemandDraft> getByAccount(@PathVariable String accountNumber) { return service.findByAccount(accountNumber); }
     @PostMapping("/account/{accountNumber}") public ResponseEntity<?> create(@PathVariable String accountNumber, @RequestBody DemandDraft request) { try { return ResponseEntity.ok(service.create(accountNumber, request)); } catch (Exception e) { return ResponseEntity.badRequest().body(Map.of("success", false, "message", e.getMessage())); } }
     @PutMapping("/admin/{id}") public ResponseEntity<?> update(@PathVariable Long id, @RequestBody Map<String,Object> request) { try { return ResponseEntity.ok(service.update(id, request, String.valueOf(request.getOrDefault("adminName", "Admin")))); } catch (Exception e) { return ResponseEntity.badRequest().body(Map.of("success", false, "message", e.getMessage())); } }
+    @PostMapping("/admin/{id}/verify-account-details") public ResponseEntity<?> verifyAccountDetails(@PathVariable Long id, @RequestBody(required=false) Map<String,String> request) { try { return ResponseEntity.ok(service.verifyAccountDetails(id, request == null ? "Admin" : request.getOrDefault("adminName", "Admin"))); } catch (Exception e) { return ResponseEntity.badRequest().body(Map.of("success", false, "message", e.getMessage())); } }
     @PostMapping("/admin/{id}/approve") public ResponseEntity<?> approve(@PathVariable Long id, @RequestBody(required=false) Map<String,String> request) { try { return ResponseEntity.ok(service.approve(id, request == null ? "Admin" : request.getOrDefault("adminName", "Admin"))); } catch (Exception e) { return ResponseEntity.badRequest().body(Map.of("success", false, "message", e.getMessage())); } }
     @PostMapping("/admin/{id}/reject") public ResponseEntity<?> reject(@PathVariable Long id, @RequestBody Map<String,String> request) { try { return ResponseEntity.ok(service.reject(id, request.getOrDefault("adminName", "Admin"), request.get("reason"))); } catch (Exception e) { return ResponseEntity.badRequest().body(Map.of("success", false, "message", e.getMessage())); } }
     @GetMapping("/admin/all") public List<DemandDraft> all() { return service.findAll(); }

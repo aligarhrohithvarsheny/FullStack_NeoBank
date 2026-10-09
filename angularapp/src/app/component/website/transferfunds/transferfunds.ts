@@ -66,6 +66,7 @@ export class Transferfunds implements OnInit {
   isVerifyingAccount: boolean = false;
   accountVerificationError: string = '';
   verifiedAccountDetails: any = null;
+  private accountVerificationSequence = 0;
 
   // Beneficiaries UI
   showBeneficiaryForm: boolean = false;
@@ -161,10 +162,15 @@ export class Transferfunds implements OnInit {
   selectBeneficiary(beneficiary: any) {
     this.selectedBeneficiary = beneficiary;
     this.recipientAccountNumber = beneficiary.accountNumber || beneficiary.recipientAccountNumber || '';
-    this.recipientName = beneficiary.nickname || beneficiary.name || beneficiary.recipientName || '';
-    this.phone = beneficiary.phone || '';
-    this.ifsc = beneficiary.ifsc || this.ifsc || 'NEOB0001234';
-    this.isAccountVerified = true;
+    this.recipientName = beneficiary.recipientName || beneficiary.name || '';
+    this.phone = '';
+    this.ifsc = '';
+    this.accountVerificationSequence++;
+    this.isVerifyingAccount = false;
+    this.isAccountVerified = false;
+    this.verifiedAccountDetails = null;
+    this.accountVerificationError = '';
+    this.verifyAccountNumber();
   }
 
   clearBeneficiarySelection() {
@@ -389,7 +395,8 @@ export class Transferfunds implements OnInit {
 
   // Verify recipient account number
   verifyAccountNumber() {
-    if (!this.recipientAccountNumber || this.recipientAccountNumber.trim() === '') {
+    const requestedAccountNumber = this.recipientAccountNumber.trim();
+    if (!requestedAccountNumber) {
       this.isAccountVerified = false;
       this.accountVerificationError = '';
       this.verifiedAccountDetails = null;
@@ -398,7 +405,7 @@ export class Transferfunds implements OnInit {
     }
 
     // Don't verify if it's the same as sender account
-    if (this.recipientAccountNumber === this.userProfile.accountNumber) {
+    if (requestedAccountNumber.toLowerCase() === this.userProfile.accountNumber.trim().toLowerCase()) {
       this.isAccountVerified = false;
       this.accountVerificationError = 'Cannot transfer to your own account';
       this.verifiedAccountDetails = null;
@@ -406,14 +413,19 @@ export class Transferfunds implements OnInit {
       return;
     }
 
+    if (this.isVerifyingAccount) return;
+    const sequence = ++this.accountVerificationSequence;
     this.isVerifyingAccount = true;
     this.accountVerificationError = '';
     this.isAccountVerified = false;
+    this.verifiedAccountDetails = null;
 
     // Universal verify across all account types (Savings, Current, Salary)
-    this.http.get(`${environment.apiBaseUrl}/api/accounts/verify-account/${this.recipientAccountNumber}`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/api/accounts/verify-account/${encodeURIComponent(requestedAccountNumber)}`).subscribe({
       next: (res: any) => {
-        if (res.found) {
+        if (sequence !== this.accountVerificationSequence || requestedAccountNumber !== this.recipientAccountNumber.trim()) return;
+        if (res.found && String(res.status || '').toUpperCase() === 'ACTIVE') {
+          this.recipientAccountNumber = requestedAccountNumber;
           this.recipientName = res.name || '';
           this.phone = res.phone || '';
           this.ifsc = res.ifscCode || 'NEOB0001234';
@@ -434,15 +446,18 @@ export class Transferfunds implements OnInit {
         } else {
           this.isAccountVerified = false;
           this.isVerifyingAccount = false;
-          this.accountVerificationError = res.message || 'Account number not found. Please verify the account number.';
+          this.accountVerificationError = res.found
+            ? 'This NeoBank account is not active and cannot receive transfers.'
+            : res.message || 'Account number not found in NeoBank. Please verify the account number.';
           this.verifiedAccountDetails = null;
           this.clearRecipientDetails();
         }
       },
       error: (err: any) => {
+        if (sequence !== this.accountVerificationSequence || requestedAccountNumber !== this.recipientAccountNumber.trim()) return;
         this.isAccountVerified = false;
         this.isVerifyingAccount = false;
-        this.accountVerificationError = 'Account number not found. Please verify the account number.';
+        this.accountVerificationError = err.error?.message || 'Could not verify this NeoBank account. Please try again.';
         this.verifiedAccountDetails = null;
         this.clearRecipientDetails();
       }
@@ -460,12 +475,18 @@ export class Transferfunds implements OnInit {
 
   // Handle account number input change
   onAccountNumberChange() {
-    // Reset verification when account number changes
-    if (this.isAccountVerified && this.verifiedAccountDetails?.accountNumber !== this.recipientAccountNumber) {
+    const currentAccountNumber = this.recipientAccountNumber.trim();
+    if (this.verifiedAccountDetails?.accountNumber !== this.recipientAccountNumber) {
+      this.accountVerificationSequence++;
       this.isAccountVerified = false;
+      this.isVerifyingAccount = false;
       this.verifiedAccountDetails = null;
       this.accountVerificationError = '';
       this.clearRecipientDetails();
+      if (this.selectedBeneficiary &&
+          currentAccountNumber !== String(this.selectedBeneficiary.accountNumber || this.selectedBeneficiary.recipientAccountNumber || '').trim()) {
+        this.selectedBeneficiary = null;
+      }
     }
   }
 
@@ -509,7 +530,13 @@ export class Transferfunds implements OnInit {
       return false;
     }
 
-    if (this.recipientAccountNumber === this.userProfile.accountNumber) {
+    if (!this.verifiedAccountDetails ||
+        this.verifiedAccountDetails.accountNumber !== this.recipientAccountNumber.trim()) {
+      this.alertService.transferValidationError('Verify the current recipient account number before continuing');
+      return false;
+    }
+
+    if (this.recipientAccountNumber.trim().toLowerCase() === this.userProfile.accountNumber.trim().toLowerCase()) {
       this.alertService.transferValidationError('Cannot transfer to your own account');
       return false;
     }
@@ -771,6 +798,8 @@ Time: ${timestamp}`;
   }
 
   resetForm() {
+    this.accountVerificationSequence++;
+    this.isVerifyingAccount = false;
     this.recipientAccountNumber = '';
     this.recipientName = '';
     this.phone = '';
@@ -780,6 +809,7 @@ Time: ${timestamp}`;
     this.isAccountVerified = false;
     this.verifiedAccountDetails = null;
     this.accountVerificationError = '';
+    this.selectedBeneficiary = null;
   }
 
   // Set maximum amount to available balance

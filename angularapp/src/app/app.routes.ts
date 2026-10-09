@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { userAuthGuard, adminAuthGuard, hodAuthGuard, managerAuthGuard, salaryAuthGuard, currentAccountAuthGuard, positivePayAuthGuard, merchantSoundboxAuthGuard, agentAuthGuard, adminOrManagerAuthGuard, pgMerchantAuthGuard } from './guard/auth.guard';
+import { userAuthGuard, insuranceAuthGuard, insuranceGuestAuthGuard, adminAuthGuard, hodAuthGuard, managerAuthGuard, salaryAuthGuard, currentAccountAuthGuard, positivePayAuthGuard, merchantSoundboxAuthGuard, agentAuthGuard, adminOrManagerAuthGuard, pgMerchantAuthGuard } from './guard/auth.guard';
 
 import { Dashboard } from './component/admin/dashboard/dashboard';
 import { Users } from './component/admin/users/users';
@@ -52,6 +52,8 @@ import { CurrentAccounts } from './component/admin/current-accounts/current-acco
 import { AdminInsuranceDashboard } from './component/admin/insurance-dashboard/insurance-dashboard';
 import { Insurance } from './component/website/insurance/insurance';
 import { InsuranceLogin } from './component/website/insurance-login/insurance-login';
+import { InsuranceGuest } from './component/website/insurance-guest/insurance-guest';
+import { InsuranceGuestAccount } from './component/website/insurance-guest-account/insurance-guest-account';
 import { FasttagApply } from './component/website/fasttag/fasttag-apply';
 import { FasttagUser } from './component/website/fasttag/fasttag-user';
 import { FasttagAdmin } from './component/admin/fasttag/fasttag-admin';
@@ -142,8 +144,10 @@ export const routes: Routes = [
       { path: 'user', component: User },
       { path: 'cards360', component: Cards360 },
       { path: 'cards360/dashboard', component: Cards360 },
-      { path: 'insurance', component: Insurance, canActivate: [userAuthGuard] },
+      { path: 'insurance', component: Insurance, canActivate: [insuranceAuthGuard] },
       { path: 'insurance-login', component: InsuranceLogin },
+      { path: 'insurance-apply', component: InsuranceGuest },
+      { path: 'insurance-account', component: InsuranceGuestAccount, canActivate: [insuranceGuestAuthGuard] },
       { path: 'loan', component: Loan, canActivate: [userAuthGuard] },
       { path: 'card', component: Card, canActivate: [userAuthGuard] },
       { path: 'transaction', component: Transaction, canActivate: [userAuthGuard] },

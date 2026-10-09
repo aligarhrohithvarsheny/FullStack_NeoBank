@@ -93,6 +93,7 @@ public class CorsConfig {
             "X-Requested-With",
             "X-User-Id",
             "X-Admin-Email",
+            "X-Admin-Password",
             "Access-Control-Request-Method",
             "Access-Control-Request-Headers"
         ));

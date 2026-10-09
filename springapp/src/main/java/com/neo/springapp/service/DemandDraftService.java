@@ -3,10 +3,13 @@ package com.neo.springapp.service;
 import com.itextpdf.html2pdf.HtmlConverter;
 import com.neo.springapp.model.Account;
 import com.neo.springapp.model.DemandDraft;
+import com.neo.springapp.model.PositivePayRequest;
+import com.neo.springapp.model.PositivePayStatus;
 import com.neo.springapp.model.Transaction;
 import com.neo.springapp.repository.AccountRepository;
 import com.neo.springapp.repository.DemandDraftRepository;
 import com.neo.springapp.repository.ChequeRepository;
+import com.neo.springapp.repository.PositivePayRequestRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.io.ByteArrayOutputStream;
@@ -21,9 +24,12 @@ public class DemandDraftService {
     private final AccountRepository accountRepository;
     private final TransactionService transactionService;
     private final ChequeRepository chequeRepository;
+    private final PositivePayRequestRepository positivePayRequestRepository;
+    private final AccountService accountService;
 
-    public DemandDraftService(DemandDraftRepository draftRepository, AccountRepository accountRepository, TransactionService transactionService, ChequeRepository chequeRepository) {
+    public DemandDraftService(DemandDraftRepository draftRepository, AccountRepository accountRepository, TransactionService transactionService, ChequeRepository chequeRepository, PositivePayRequestRepository positivePayRequestRepository, AccountService accountService) {
         this.draftRepository = draftRepository; this.accountRepository = accountRepository; this.transactionService = transactionService; this.chequeRepository = chequeRepository;
+        this.positivePayRequestRepository = positivePayRequestRepository; this.accountService = accountService;
     }
 
     public Account verifyCheque(String accountNumber, String chequeNumber) {
@@ -35,6 +41,10 @@ public class DemandDraftService {
         return account;
     }
 
+    public PositivePayRequest verifyPositivePay(String accountNumber, String chequeNumber, BigDecimal amount, String payeeName) {
+        return requireApprovedPositivePay(accountNumber, chequeNumber, amount, payeeName);
+    }
+
     public List<DemandDraft> findByAccount(String accountNumber) { return draftRepository.findByAccountNumberOrderByCreatedAtDesc(accountNumber); }
     public List<DemandDraft> findAll() { return draftRepository.findAll(org.springframework.data.domain.Sort.by("createdAt").descending()); }
 
@@ -44,12 +54,19 @@ public class DemandDraftService {
         if (account == null) throw new IllegalArgumentException("Savings account not found");
         if (!"ACTIVE".equalsIgnoreCase(account.getStatus())) throw new IllegalArgumentException("Account is not active");
         if (request.getChequeNumber() == null || request.getChequeNumber().isBlank()) throw new IllegalArgumentException("Cheque number is required");
-        com.neo.springapp.model.Cheque cheque = chequeRepository.findByChequeNumber(request.getChequeNumber().trim())
+        if (request.getPayeeName() == null || request.getPayeeName().isBlank()) throw new IllegalArgumentException("Payee name is required");
+        if (request.getPayeeAccountNumber() == null || request.getPayeeAccountNumber().isBlank()) throw new IllegalArgumentException("Payee NeoBank account number is required");
+        String chequeNumber = request.getChequeNumber().trim();
+        request.setChequeNumber(chequeNumber);
+        request.setPayeeName(request.getPayeeName().trim());
+        request.setPayeeAccountNumber(request.getPayeeAccountNumber().trim());
+        com.neo.springapp.model.Cheque cheque = chequeRepository.findByChequeNumber(chequeNumber)
                 .filter(c -> accountNumber.equals(c.getAccountNumber()))
                 .orElseThrow(() -> new IllegalArgumentException("Cheque number is not allocated to this savings account"));
         if (!cheque.isAvailable()) throw new IllegalArgumentException("Cheque number has already been used and cannot be reused");
-        if (draftRepository.findByChequeNumberAndAccountNumber(request.getChequeNumber().trim(), accountNumber).isPresent()) throw new IllegalArgumentException("Cheque number already used");
+        if (draftRepository.findByChequeNumberAndAccountNumber(chequeNumber, accountNumber).isPresent()) throw new IllegalArgumentException("Cheque number already used");
         if (request.getAmount() == null || request.getAmount().signum() <= 0) throw new IllegalArgumentException("Amount must be greater than zero");
+        requireApprovedPositivePay(accountNumber, request.getChequeNumber(), request.getAmount(), request.getPayeeName());
         BigDecimal balance = BigDecimal.valueOf(account.getBalance() == null ? 0 : account.getBalance());
         if (balance.compareTo(request.getAmount()) < 0) throw new IllegalArgumentException("Insufficient balance");
         request.setAccountNumber(accountNumber); request.setUserName(account.getName()); request.setAvailableBalance(balance); request.setLockedAmount(request.getAmount()); request.setStatus("PENDING"); request.setDraftDate(request.getDraftDate() == null ? LocalDate.now() : request.getDraftDate());
@@ -65,6 +82,10 @@ public class DemandDraftService {
         DemandDraft draft = draftRepository.findById(id).orElseThrow(() -> new IllegalArgumentException("DD not found"));
         if (!"PENDING".equals(draft.getStatus())) throw new IllegalArgumentException("Only pending DDs can be edited");
         String before = draft.toString();
+        boolean accountDetailsChanged =
+                (data.get("payeeName") != null && !Objects.equals(draft.getPayeeName(), String.valueOf(data.get("payeeName"))))
+                || (data.get("payeeAccountNumber") != null && !Objects.equals(draft.getPayeeAccountNumber(), String.valueOf(data.get("payeeAccountNumber"))))
+                || (data.get("amount") != null && draft.getAmount().compareTo(new BigDecimal(String.valueOf(data.get("amount")))) != 0);
         if (data.get("payeeName") != null) draft.setPayeeName(String.valueOf(data.get("payeeName")));
         if (data.get("payeeAccountNumber") != null) draft.setPayeeAccountNumber(String.valueOf(data.get("payeeAccountNumber")));
         if (data.get("reason") != null) draft.setReason(String.valueOf(data.get("reason")));
@@ -74,7 +95,30 @@ public class DemandDraftService {
             if (amount.signum() <= 0 || draft.getAvailableBalance().compareTo(amount) < 0) throw new IllegalArgumentException("Invalid amount or insufficient balance");
             draft.setAmount(amount); draft.setLockedAmount(amount);
         }
+        if (accountDetailsChanged) {
+            draft.setAccountDetailsVerified(false);
+            draft.setAccountDetailsVerifiedBy(null);
+            draft.setAccountDetailsVerifiedAt(null);
+        }
         draft.setEditHistory((draft.getEditHistory() == null ? "" : draft.getEditHistory() + "\n") + LocalDateTime.now() + " by " + (admin == null ? "Admin" : admin) + " | before=" + before + " | after=" + draft);
+        return draftRepository.save(draft);
+    }
+
+    @Transactional
+    public DemandDraft verifyAccountDetails(Long id, String admin) {
+        DemandDraft draft = draftRepository.findById(id).orElseThrow(() -> new IllegalArgumentException("DD not found"));
+        if (!"PENDING".equals(draft.getStatus())) throw new IllegalArgumentException("Only pending DDs can be verified");
+        if (draft.getPayeeAccountNumber() == null || draft.getPayeeAccountNumber().isBlank()) {
+            throw new IllegalArgumentException("Payee NeoBank account number is required");
+        }
+        Map<String, Object> debitAccount = requireActiveAccount(draft.getAccountNumber(), "Customer debit account");
+        requireAccountHolderName(debitAccount, draft.getUserName(), "Customer debit account");
+        Map<String, Object> payeeAccount = requireActiveAccount(draft.getPayeeAccountNumber(), "Payee account");
+        requireAccountHolderName(payeeAccount, draft.getPayeeName(), "Payee account");
+        requireApprovedPositivePay(draft.getAccountNumber(), draft.getChequeNumber(), draft.getAmount(), draft.getPayeeName());
+        draft.setAccountDetailsVerified(true);
+        draft.setAccountDetailsVerifiedBy(admin);
+        draft.setAccountDetailsVerifiedAt(LocalDateTime.now());
         return draftRepository.save(draft);
     }
 
@@ -82,8 +126,17 @@ public class DemandDraftService {
     public DemandDraft approve(Long id, String admin) {
         DemandDraft draft = draftRepository.findById(id).orElseThrow(() -> new IllegalArgumentException("DD not found"));
         if (!"PENDING".equals(draft.getStatus())) throw new IllegalArgumentException("DD is not pending");
+        if (!Boolean.TRUE.equals(draft.getAccountDetailsVerified())) throw new IllegalArgumentException("Verify the customer and payee account details before approval");
+        Map<String, Object> debitAccount = requireActiveAccount(draft.getAccountNumber(), "Customer debit account");
+        requireAccountHolderName(debitAccount, draft.getUserName(), "Customer debit account");
+        Map<String, Object> payeeAccount = requireActiveAccount(draft.getPayeeAccountNumber(), "Payee account");
+        requireAccountHolderName(payeeAccount, draft.getPayeeName(), "Payee account");
+        requireApprovedPositivePay(draft.getAccountNumber(), draft.getChequeNumber(), draft.getAmount(), draft.getPayeeName());
         draft.setDdNumber("DD" + System.currentTimeMillis());
         Account account = accountRepository.findByAccountNumber(draft.getAccountNumber());
+        if (account == null || account.getBalance() == null || BigDecimal.valueOf(account.getBalance()).compareTo(draft.getAmount()) < 0) {
+            throw new IllegalArgumentException("Customer account has insufficient available balance");
+        }
         Double newBalance = account.getBalance() - draft.getAmount().doubleValue(); account.setBalance(newBalance); account.setLastUpdated(LocalDateTime.now()); accountRepository.save(account);
         Transaction transaction = new Transaction(); transaction.setAccountNumber(account.getAccountNumber()); transaction.setUserName(account.getName()); transaction.setAmount(draft.getAmount().doubleValue()); transaction.setType("Debit"); transaction.setMerchant("Demand Draft"); transaction.setDescription("Demand Draft " + draft.getDdNumber()); transaction.setBalance(newBalance); transaction.setStatus("Completed"); transactionService.saveTransaction(transaction);
         draft.setStatus("APPROVED"); draft.setApprovedBy(admin); draft.setApprovedAt(LocalDateTime.now()); draft.setLockedAmount(null); return draftRepository.save(draft);
@@ -106,6 +159,41 @@ public class DemandDraftService {
         if (!"APPROVED".equals(d.getStatus())) throw new IllegalArgumentException("DD is not approved");
         String html = generateDemandDraftHtml(d);
         ByteArrayOutputStream output = new ByteArrayOutputStream(); HtmlConverter.convertToPdf(html, output); return output.toByteArray();
+    }
+
+    private PositivePayRequest requireApprovedPositivePay(String accountNumber, String chequeNumber, BigDecimal amount, String payeeName) {
+        if (amount == null || amount.signum() <= 0 || payeeName == null || payeeName.isBlank()) {
+            throw new IllegalArgumentException("Enter the DD amount and payee name before verifying Positive Pay");
+        }
+        PositivePayRequest registration = positivePayRequestRepository
+                .findFirstByAccountNumberAndChequeNumberAndStatusIn(
+                        accountNumber, chequeNumber.trim(), List.of(PositivePayStatus.APPROVED))
+                .orElseThrow(() -> new IllegalArgumentException("An approved Positive Pay registration is required for this cheque"));
+        if (registration.getAmount().compareTo(amount) != 0) {
+            throw new IllegalArgumentException("DD amount does not match the approved Positive Pay amount");
+        }
+        if (!registration.getPayeeName().trim().equalsIgnoreCase(payeeName.trim())) {
+            throw new IllegalArgumentException("DD payee does not match the approved Positive Pay payee");
+        }
+        return registration;
+    }
+
+    private Map<String, Object> requireActiveAccount(String accountNumber, String description) {
+        Map<String, Object> details = accountService.verifyAccountByNumber(accountNumber.trim());
+        if (!Boolean.TRUE.equals(details.get("found"))) {
+            throw new IllegalArgumentException(description + " was not found in NeoBank");
+        }
+        if (!"ACTIVE".equalsIgnoreCase(String.valueOf(details.get("status")))) {
+            throw new IllegalArgumentException(description + " is not active");
+        }
+        return details;
+    }
+
+    private void requireAccountHolderName(Map<String, Object> accountDetails, String expectedName, String description) {
+        Object actualName = accountDetails.get("name");
+        if (expectedName == null || actualName == null || !String.valueOf(actualName).trim().equalsIgnoreCase(expectedName.trim())) {
+            throw new IllegalArgumentException(description + " holder name does not match the DD details");
+        }
     }
 
     // Builds the NeoBank-stamped Demand Draft HTML (same visual language as the cheque PDF:

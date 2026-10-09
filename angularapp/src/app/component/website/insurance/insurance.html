@@ -1,7 +1,7 @@
 <div class="insurance-page">
   <div class="page-header">
     <div class="page-header-left">
-      <button class="back-btn" type="button" (click)="goBackToDashboard()">← Back to Dashboard</button>
+      <button class="back-btn" type="button" (click)="goBackToDashboard()">Sign out</button>
       <h1 class="page-title">Insurance Services</h1>
     </div>
   </div>
@@ -151,7 +151,9 @@
         <tr>
           <th>Application #</th>
           <th>Policy</th>
+          <th>Source</th>
           <th>Status</th>
+          <th>Linked account</th>
           <th>Premium Type</th>
           <th>Premium (Calculated)</th>
           <th>Payment</th>
@@ -164,7 +166,9 @@
         <tr *ngFor="let app of applications">
           <td>{{ app.applicationNumber }}</td>
           <td>{{ app.policy?.name }} ({{ app.policy?.policyNumber }})</td>
+          <td>{{ app.createdByAdmin ? 'Assigned by NeoBank' : 'Customer application' }}</td>
           <td>{{ app.status }}</td>
+          <td>{{ app.linkedAccountType || 'NeoBank account' }}</td>
           <td>{{ app.premiumType }}</td>
           <td>₹{{ app.premiumAmountCalculated || app.policy?.premiumAmount || '-' }}</td>
           <td>{{ app.paymentStatus || '-' }}</td>
@@ -175,6 +179,13 @@
           </td>
           <td>{{ app.appliedAt | date:'short' }}</td>
           <td>
+            <button
+              type="button"
+              *ngIf="app.status === 'ACTIVE' || app.status === 'APPROVED'"
+              (click)="closeInsurance(app)">
+              Close insurance
+            </button>
+            <span *ngIf="app.status === 'CLOSED'">Closed</span>
             <button type="button" *ngIf="canGenerateReceipt(app)" (click)="downloadInsuranceReceipt(app)">Download Receipt</button>
             <span *ngIf="!canGenerateReceipt(app)">Available after approval</span>
           </td>
@@ -303,7 +314,7 @@
             Policy (Application)
             <select [(ngModel)]="selectedApplicationIdForPayment" name="paymentApplicationId" required>
               <option [ngValue]="null">Select</option>
-              <option *ngFor="let app of applications" [ngValue]="app.id" [disabled]="app.status === 'REJECTED' || app.status === 'EXPIRED'">
+              <option *ngFor="let app of applications" [ngValue]="app.id" [disabled]="app.status === 'REJECTED' || app.status === 'EXPIRED' || app.status === 'CLOSED'">
                 {{ app.policy?.name }} - {{ app.applicationNumber }} ({{ app.status }})
               </option>
             </select>

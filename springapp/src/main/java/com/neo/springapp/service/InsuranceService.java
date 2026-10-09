@@ -2,11 +2,16 @@ package com.neo.springapp.service;
 
 import com.neo.springapp.model.*;
 import com.neo.springapp.repository.InsuranceApplicationRepository;
+import com.neo.springapp.repository.InsuranceCredentialRepository;
+import com.neo.springapp.repository.GuestInsuranceClaimRepository;
 import com.neo.springapp.repository.InsuranceClaimRepository;
+import com.neo.springapp.repository.GuestInsuranceApplicationRepository;
 import com.neo.springapp.repository.InsurancePaymentRepository;
 import com.neo.springapp.repository.InsurancePolicyRepository;
 import com.neo.springapp.repository.CurrentAccountRepository;
 import com.neo.springapp.repository.SalaryAccountRepository;
+import com.neo.springapp.repository.GuestInsurancePaymentRepository;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,6 +19,7 @@ import com.itextpdf.html2pdf.HtmlConverter;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -30,6 +36,18 @@ public class InsuranceService {
     private InsuranceApplicationRepository applicationRepository;
 
     @Autowired
+    private InsuranceCredentialRepository insuranceCredentialRepository;
+
+    @Autowired
+    private GuestInsuranceApplicationRepository guestApplicationRepository;
+
+    @Autowired
+    private GuestInsuranceClaimRepository guestInsuranceClaimRepository;
+
+    @Autowired
+    private GuestInsurancePaymentRepository guestInsurancePaymentRepository;
+
+    @Autowired
     private InsurancePaymentRepository paymentRepository;
 
     @Autowired
@@ -37,6 +55,12 @@ public class InsuranceService {
 
     @Autowired
     private UserService userService;
+
+    @Autowired
+    private PasswordService passwordService;
+
+    @Autowired
+    private UserSessionTokenService userSessionTokenService;
 
     @Autowired
     private AccountService accountService;
@@ -53,6 +77,12 @@ public class InsuranceService {
     @Autowired
     private SalaryAccountRepository salaryAccountRepository;
 
+    @Autowired
+    private SavingsUpiService savingsUpiService;
+
+    @Value("${insurance.upi-id:}")
+    private String insuranceUpiId;
+
     @Autowired(required = false)
     private EmailService emailService;
 
@@ -68,6 +98,432 @@ public class InsuranceService {
 
     public Optional<InsurancePolicy> getPolicyByNumber(String policyNumber) {
         return policyRepository.findByPolicyNumber(policyNumber);
+    }
+
+    @Transactional
+    public Map<String, Object> createInsurancePassword(String insuranceNumber, String email, String password) {
+        String normalizedNumber = insuranceNumber == null ? "" : insuranceNumber.trim();
+        String normalizedEmail = UserService.normalizeEmail(email);
+        validateInsurancePassword(password);
+        Optional<GuestInsuranceApplication> guestApplication =
+                guestApplicationRepository.findByApplicationNumberAndEmailIgnoreCase(normalizedNumber, normalizedEmail);
+        if (guestApplication.isPresent()) {
+            return createGuestInsurancePassword(normalizedNumber, normalizedEmail, password);
+        }
+        User user = findCustomerForInsurance(normalizedNumber, normalizedEmail);
+        if (!"APPROVED".equalsIgnoreCase(user.getStatus())) {
+            throw new RuntimeException("Your NeoBank customer account must be approved before creating an insurance password");
+        }
+
+        InsuranceCredential credential = insuranceCredentialRepository.findByUserId(user.getId())
+                .orElseGet(InsuranceCredential::new);
+        if (credential.getUserId() != null) {
+            throw new RuntimeException("An insurance password already exists. Please sign in.");
+        }
+        credential.setUserId(user.getId());
+        credential.setPasswordHash(passwordService.encryptPassword(password));
+        credential.setFailedAttempts(0);
+        credential.setLockedUntil(null);
+        credential.setUpdatedAt(LocalDateTime.now());
+        insuranceCredentialRepository.save(credential);
+        return Map.of("success", true, "message", "Insurance password created. You can now sign in.");
+    }
+
+    @Transactional
+    public Map<String, Object> authenticateCustomer(String insuranceNumber, String email, String password) {
+        String normalizedNumber = insuranceNumber == null ? "" : insuranceNumber.trim();
+        String normalizedEmail = UserService.normalizeEmail(email);
+        if (normalizedNumber.isEmpty() || normalizedEmail == null || password == null || password.isBlank()) {
+            throw new IllegalArgumentException("Insurance number, registered email, and password are required");
+        }
+
+        Optional<GuestInsuranceApplication> guestApplication =
+                guestApplicationRepository.findByApplicationNumberAndEmailIgnoreCase(normalizedNumber, normalizedEmail);
+        if (guestApplication.isPresent()) {
+            return authenticateGuestCustomer(guestApplication.get(), password);
+        }
+
+        User user = findCustomerForInsurance(normalizedNumber, normalizedEmail);
+        InsuranceCredential credential = insuranceCredentialRepository.findByUserId(user.getId())
+                .orElseThrow(() -> new RuntimeException("Create an insurance password before signing in"));
+        if (credential.getLockedUntil() != null && credential.getLockedUntil().isAfter(LocalDateTime.now())) {
+            throw new RuntimeException("Insurance sign-in is temporarily locked. Try again later.");
+        }
+        if (!passwordService.verifyPassword(password, credential.getPasswordHash())) {
+            int attempts = credential.getFailedAttempts() + 1;
+            credential.setFailedAttempts(attempts);
+            if (attempts >= 5) {
+                credential.setFailedAttempts(0);
+                credential.setLockedUntil(LocalDateTime.now().plusMinutes(15));
+            }
+            insuranceCredentialRepository.save(credential);
+            throw new RuntimeException("Invalid insurance credentials");
+        }
+        credential.setFailedAttempts(0);
+        credential.setLockedUntil(null);
+        insuranceCredentialRepository.save(credential);
+
+        Map<String, Object> userData = new HashMap<>();
+        userData.put("id", user.getId());
+        userData.put("username", user.getUsername());
+        userData.put("email", user.getEmail());
+        userData.put("accountNumber", user.getAccountNumber());
+        userData.put("status", user.getStatus());
+        userData.put("passwordSet", user.isPasswordSet());
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", true);
+        response.put("user", userData);
+        response.put("token", userSessionTokenService.issue(user.getId(), user.getAccountNumber()));
+        response.put("message", "Insurance login successful");
+        return response;
+    }
+
+    @Transactional
+    public Map<String, Object> createGuestInsurancePassword(String applicationNumber, String email, String password) {
+        String normalizedNumber = applicationNumber == null ? "" : applicationNumber.trim();
+        String normalizedEmail = UserService.normalizeEmail(email);
+        validateInsurancePassword(password);
+        GuestInsuranceApplication application = guestApplicationRepository
+                .findByApplicationNumberAndEmailIgnoreCase(normalizedNumber, normalizedEmail)
+                .orElseThrow(() -> new RuntimeException("Invalid insurance application details"));
+        if (!"APPROVED".equalsIgnoreCase(application.getStatus())) {
+            throw new RuntimeException("Your insurance application must be approved before creating a password");
+        }
+        if (application.getPasswordHash() != null && !application.getPasswordHash().isBlank()) {
+            throw new RuntimeException("An insurance password already exists. Please sign in.");
+        }
+        application.setPasswordHash(passwordService.encryptPassword(password));
+        application.setFailedAttempts(0);
+        application.setLockedUntil(null);
+        guestApplicationRepository.save(application);
+        return Map.of("success", true, "message", "Insurance password created. You can now sign in.");
+    }
+
+    private Map<String, Object> authenticateGuestCustomer(GuestInsuranceApplication application, String password) {
+        if (!"APPROVED".equalsIgnoreCase(application.getStatus())) {
+            throw new RuntimeException("Your insurance application is still awaiting review");
+        }
+        if (application.getPasswordHash() == null || application.getPasswordHash().isBlank()) {
+            throw new RuntimeException("Create an insurance password before signing in");
+        }
+        if (application.getLockedUntil() != null && application.getLockedUntil().isAfter(LocalDateTime.now())) {
+            throw new RuntimeException("Insurance sign-in is temporarily locked. Try again later.");
+        }
+        if (!passwordService.verifyPassword(password, application.getPasswordHash())) {
+            int attempts = application.getFailedAttempts() + 1;
+            application.setFailedAttempts(attempts >= 5 ? 0 : attempts);
+            if (attempts >= 5) application.setLockedUntil(LocalDateTime.now().plusMinutes(15));
+            guestApplicationRepository.save(application);
+            throw new RuntimeException("Invalid insurance credentials");
+        }
+        application.setFailedAttempts(0);
+        application.setLockedUntil(null);
+        guestApplicationRepository.save(application);
+
+        Map<String, Object> guest = new HashMap<>();
+        guest.put("id", application.getId());
+        guest.put("applicationNumber", application.getApplicationNumber());
+        guest.put("applicantName", application.getApplicantName());
+        guest.put("email", application.getEmail());
+        guest.put("status", application.getStatus());
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", true);
+        response.put("guest", true);
+        response.put("user", guest);
+        response.put("token", userSessionTokenService.issueInsuranceGuest(application.getId()));
+        response.put("message", "Insurance login successful");
+        return response;
+    }
+
+    @Transactional(readOnly = true)
+    public Map<String, Object> getGuestApplicationForDashboard(Long id) {
+        GuestInsuranceApplication application = guestApplicationRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Insurance application not found"));
+        Map<String, Object> details = new HashMap<>();
+        details.put("applicationNumber", application.getApplicationNumber());
+        details.put("applicantName", application.getApplicantName());
+        details.put("policyName", application.getPolicy().getName());
+        details.put("policyType", application.getPolicy().getType());
+        details.put("coverageAmount", application.getPolicy().getCoverageAmount());
+        details.put("premiumAmount", application.getPolicy().getPremiumAmount());
+        details.put("premiumType", application.getPolicy().getPremiumType());
+        details.put("status", application.getStatus());
+        details.put("createdAt", application.getCreatedAt());
+        details.put("policyStartDate", application.getPolicyStartDate());
+        details.put("nextPremiumDueDate", application.getNextPremiumDueDate());
+        details.put("payments", guestInsurancePaymentRepository.findByApplicationIdOrderByPaidAtDesc(id).stream()
+                .map(payment -> Map.of(
+                        "amount", payment.getAmount(),
+                        "transactionReference", payment.getTransactionReference(),
+                        "payerAccountLastFour", payment.getPayerAccountLastFour(),
+                        "status", payment.getStatus(),
+                        "paidAt", payment.getPaidAt()))
+                .toList());
+        details.put("claims", guestInsuranceClaimRepository.findByApplicationIdOrderByCreatedAtDesc(id).stream()
+                .map(claim -> Map.of(
+                        "claimNumber", claim.getClaimNumber(),
+                        "claimAmount", claim.getClaimAmount(),
+                        "reason", claim.getReason(),
+                        "status", claim.getStatus(),
+                        "createdAt", claim.getCreatedAt(),
+                        "adminRemark", claim.getAdminRemark() == null ? "" : claim.getAdminRemark()))
+                .toList());
+        return details;
+    }
+
+    @Transactional
+    public Map<String, Object> payGuestInsurancePremium(Long applicationId, String payerAccountNumber, String pin) {
+        GuestInsuranceApplication application = guestApplicationRepository.findById(applicationId)
+                .orElseThrow(() -> new RuntimeException("Insurance application not found"));
+        if (!"APPROVED".equalsIgnoreCase(application.getStatus())
+                && !"ACTIVE".equalsIgnoreCase(application.getStatus())) {
+            throw new RuntimeException("Only an approved insurance application can receive premium payments");
+        }
+        if (application.getNextPremiumDueDate() != null
+                && application.getNextPremiumDueDate().isAfter(LocalDate.now())) {
+            throw new RuntimeException("The next premium is not due until "
+                    + application.getNextPremiumDueDate());
+        }
+        String normalizedPayerAccount = payerAccountNumber == null ? "" : payerAccountNumber.trim();
+        if (normalizedPayerAccount.isEmpty() || pin == null || !pin.matches("[0-9]{6}")) {
+            throw new IllegalArgumentException("A NeoBank savings account number and 6-digit UPI PIN are required");
+        }
+        if (insuranceUpiId == null || insuranceUpiId.isBlank()) {
+            throw new IllegalStateException("Insurance UPI recipient is not configured");
+        }
+
+        BigDecimal amount = BigDecimal.valueOf(application.getPolicy().getPremiumAmount())
+                .setScale(2, java.math.RoundingMode.HALF_UP);
+        Map<String, Object> transfer = savingsUpiService.sendMoney(
+                normalizedPayerAccount,
+                insuranceUpiId,
+                amount,
+                pin,
+                "Insurance premium " + application.getApplicationNumber());
+        if (!Boolean.TRUE.equals(transfer.get("success"))) {
+            return Map.of("success", false, "message",
+                    transfer.getOrDefault("error", "NeoBank UPI could not complete the transfer").toString());
+        }
+
+        Object transactionReferenceValue = transfer.get("transactionRef");
+        if (transactionReferenceValue == null || transactionReferenceValue.toString().isBlank()) {
+            throw new IllegalStateException("NeoBank UPI completed without returning a transaction reference");
+        }
+        String transactionReference = transactionReferenceValue.toString();
+        GuestInsurancePayment payment = new GuestInsurancePayment();
+        payment.setApplication(application);
+        payment.setTransactionReference(transactionReference);
+        payment.setPayerAccountLastFour(normalizedPayerAccount.substring(
+                Math.max(0, normalizedPayerAccount.length() - 4)));
+        payment.setAmount(amount);
+        payment.setPaidAt(LocalDateTime.now());
+        guestInsurancePaymentRepository.save(payment);
+
+        LocalDate today = LocalDate.now();
+        if (application.getPolicyStartDate() == null) {
+            application.setPolicyStartDate(today);
+        }
+        application.setStatus("ACTIVE");
+        String premiumType = application.getPolicy().getPremiumType();
+        application.setNextPremiumDueDate("YEARLY".equalsIgnoreCase(premiumType)
+                ? today.plusYears(1) : today.plusMonths(1));
+        guestApplicationRepository.save(application);
+
+        return Map.of(
+                "success", true,
+                "transactionReference", transactionReference,
+                "message", "Premium paid successfully using NeoBank UPI");
+    }
+
+    @Transactional
+    public GuestInsuranceClaim createGuestInsuranceClaim(
+            Long applicationId, java.math.BigDecimal amount, String reason, String details) {
+        GuestInsuranceApplication application = guestApplicationRepository.findById(applicationId)
+                .orElseThrow(() -> new RuntimeException("Insurance application not found"));
+        if (!"ACTIVE".equalsIgnoreCase(application.getStatus())) {
+            throw new RuntimeException("A premium-paid active policy is required to file a claim");
+        }
+        if (amount == null || amount.signum() <= 0
+                || amount.compareTo(java.math.BigDecimal.valueOf(application.getPolicy().getCoverageAmount())) > 0) {
+            throw new IllegalArgumentException("Claim amount must be positive and within the policy coverage");
+        }
+        String normalizedReason = reason == null ? "" : reason.trim();
+        String normalizedDetails = details == null ? "" : details.trim();
+        if (normalizedReason.isEmpty() || normalizedReason.length() > 80
+                || normalizedDetails.length() < 10 || normalizedDetails.length() > 4000) {
+            throw new IllegalArgumentException("Enter a claim reason and details between 10 and 4000 characters");
+        }
+        GuestInsuranceClaim claim = new GuestInsuranceClaim();
+        claim.setApplication(application);
+        claim.setClaimAmount(amount.setScale(2, java.math.RoundingMode.HALF_UP));
+        claim.setReason(normalizedReason);
+        claim.setDetails(normalizedDetails);
+        claim.setClaimNumber("GCL" + java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 12).toUpperCase());
+        claim.setStatus("PENDING_REVIEW");
+        claim.setCreatedAt(LocalDateTime.now());
+        return guestInsuranceClaimRepository.save(claim);
+    }
+
+    public List<GuestInsuranceClaim> getPendingGuestInsuranceClaims() {
+        return guestInsuranceClaimRepository.findByStatusOrderByCreatedAtAsc("PENDING_REVIEW");
+    }
+
+    @Transactional
+    public GuestInsuranceClaim reviewGuestInsuranceClaim(Long claimId, boolean approve, String remark) {
+        GuestInsuranceClaim claim = guestInsuranceClaimRepository.findById(claimId)
+                .orElseThrow(() -> new RuntimeException("Guest insurance claim not found"));
+        if (!"PENDING_REVIEW".equalsIgnoreCase(claim.getStatus())) {
+            throw new RuntimeException("This claim has already been reviewed");
+        }
+        claim.setStatus(approve ? "APPROVED" : "REJECTED");
+        claim.setAdminRemark(remark == null ? "" : remark.trim());
+        claim.setReviewedAt(LocalDateTime.now());
+        return guestInsuranceClaimRepository.save(claim);
+    }
+
+    @Transactional(readOnly = true)
+    public byte[] generateGuestInsuranceCertificate(Long applicationId) {
+        GuestInsuranceApplication application = guestApplicationRepository.findById(applicationId)
+                .orElseThrow(() -> new RuntimeException("Insurance application not found"));
+        if (!"ACTIVE".equalsIgnoreCase(application.getStatus())) {
+            throw new RuntimeException("A paid, active policy is required to download a certificate");
+        }
+        String html = """
+                <html><body style="font-family: sans-serif; padding: 32px; color: #172033">
+                  <h1 style="color: #075fbe">NeoBank Insurance Certificate</h1>
+                  <p>This certificate confirms the active insurance coverage below.</p>
+                  <table style="width: 100%%; border-collapse: collapse">
+                    <tr><td>Certificate reference</td><td>%s</td></tr>
+                    <tr><td>Applicant</td><td>%s</td></tr>
+                    <tr><td>Insurance application</td><td>%s</td></tr>
+                    <tr><td>Policy</td><td>%s (%s)</td></tr>
+                    <tr><td>Coverage amount</td><td>INR %s</td></tr>
+                    <tr><td>Premium</td><td>INR %s / %s</td></tr>
+                    <tr><td>Start date</td><td>%s</td></tr>
+                  </table>
+                </body></html>
+                """.formatted(
+                escapeHtml("CERT-" + application.getApplicationNumber()),
+                escapeHtml(application.getApplicantName()),
+                escapeHtml(application.getApplicationNumber()),
+                escapeHtml(application.getPolicy().getName()),
+                escapeHtml(application.getPolicy().getType()),
+                application.getPolicy().getCoverageAmount(),
+                application.getPolicy().getPremiumAmount(),
+                escapeHtml(application.getPolicy().getPremiumType()),
+                application.getPolicyStartDate() == null ? "" : application.getPolicyStartDate());
+        java.io.ByteArrayOutputStream pdf = new java.io.ByteArrayOutputStream();
+        try {
+            HtmlConverter.convertToPdf(html, pdf);
+            return pdf.toByteArray();
+        } catch (Exception exception) {
+            throw new IllegalStateException("Unable to generate insurance certificate", exception);
+        }
+    }
+
+    private String escapeHtml(String value) {
+        if (value == null) return "";
+        return value.replace("&", "&amp;").replace("<", "&lt;")
+                .replace(">", "&gt;").replace("\"", "&quot;").replace("'", "&#39;");
+    }
+
+    @Transactional
+    public Map<String, Object> closeGuestInsuranceApplication(Long id) {
+        GuestInsuranceApplication application = guestApplicationRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Insurance application not found"));
+        if (!"APPROVED".equalsIgnoreCase(application.getStatus())
+                && !"ACTIVE".equalsIgnoreCase(application.getStatus())) {
+            throw new RuntimeException("Only approved or active insurance can be closed");
+        }
+        application.setStatus("CLOSED");
+        guestApplicationRepository.save(application);
+        return Map.of("success", true, "message", "Insurance application closed");
+    }
+
+    private User findCustomerForInsurance(String insuranceNumber, String normalizedEmail) {
+        if (insuranceNumber == null || insuranceNumber.isBlank() || normalizedEmail == null) {
+            throw new IllegalArgumentException("Insurance number and registered email are required");
+        }
+        User user = userService.findByEmail(normalizedEmail)
+                .orElseThrow(() -> new RuntimeException("Invalid insurance credentials"));
+        boolean numberMatches = applicationRepository.findByUserId(user.getId()).stream()
+                .anyMatch(application -> insuranceNumber.equalsIgnoreCase(application.getApplicationNumber())
+                        || (application.getPolicy() != null
+                        && insuranceNumber.equalsIgnoreCase(application.getPolicy().getPolicyNumber())));
+        if (!numberMatches) {
+            throw new RuntimeException("Invalid insurance credentials");
+        }
+        return user;
+    }
+
+    private void validateInsurancePassword(String password) {
+        if (password == null || password.length() < 8
+                || !password.matches("^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d).+$")) {
+            throw new IllegalArgumentException("Password must be at least 8 characters and include uppercase, lowercase, and a number");
+        }
+    }
+
+    @Transactional
+    public GuestInsuranceApplication applyAsGuest(String name, String email, String phone, Long policyId) {
+        String normalizedName = name == null ? "" : name.trim();
+        String normalizedEmail = UserService.normalizeEmail(email);
+        String normalizedPhone = phone == null ? "" : phone.trim();
+        if (normalizedName.length() < 2 || normalizedEmail == null
+                || !normalizedEmail.matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$")
+                || !normalizedPhone.matches("[0-9+() -]{7,20}") || policyId == null) {
+            throw new IllegalArgumentException("Enter a name, valid email, phone number, and select an insurance policy");
+        }
+        InsurancePolicy policy = policyRepository.findById(policyId)
+                .filter(item -> "ACTIVE".equalsIgnoreCase(item.getStatus()))
+                .orElseThrow(() -> new RuntimeException("Selected insurance policy is unavailable"));
+
+        GuestInsuranceApplication application = new GuestInsuranceApplication();
+        application.setApplicantName(normalizedName);
+        application.setEmail(normalizedEmail);
+        application.setPhone(normalizedPhone);
+        application.setPolicy(policy);
+        application.setApplicationNumber("GIA" + java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 12).toUpperCase());
+        application.setStatus("PENDING_APPROVAL");
+        application.setCreatedAt(LocalDateTime.now());
+        return guestApplicationRepository.save(application);
+    }
+
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> trackGuestApplications(String email) {
+        String normalizedEmail = UserService.normalizeEmail(email);
+        if (normalizedEmail == null || !normalizedEmail.matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$")) {
+            throw new IllegalArgumentException("Enter a valid email address");
+        }
+        return guestApplicationRepository.findByEmailOrderByCreatedAtDesc(normalizedEmail).stream()
+                .map(application -> {
+                    Map<String, Object> status = new HashMap<>();
+                    status.put("applicationNumber", application.getApplicationNumber());
+                    status.put("policyName", application.getPolicy().getName());
+                    status.put("policyType", application.getPolicy().getType());
+                    status.put("status", application.getStatus());
+                    status.put("createdAt", application.getCreatedAt());
+                    return status;
+                })
+                .toList();
+    }
+
+    public List<GuestInsuranceApplication> getPendingGuestApplications() {
+        return guestApplicationRepository.findByStatusOrderByCreatedAtAsc("PENDING_APPROVAL");
+    }
+
+    @Transactional
+    public GuestInsuranceApplication reviewGuestApplication(Long id, boolean approve, String remark) {
+        GuestInsuranceApplication application = guestApplicationRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Insurance application not found"));
+        if (!"PENDING_APPROVAL".equalsIgnoreCase(application.getStatus())) {
+            throw new RuntimeException("This insurance application has already been reviewed");
+        }
+        application.setStatus(approve ? "APPROVED" : "REJECTED");
+        application.setAdminRemark(remark);
+        application.setReviewedAt(LocalDateTime.now());
+        return guestApplicationRepository.save(application);
     }
 
     public InsurancePolicy createPolicy(InsurancePolicy policy) {
@@ -364,6 +820,23 @@ public class InsuranceService {
         return applicationRepository.findByAccountNumber(accountNumber);
     }
 
+    @Transactional
+    public InsuranceApplication closePolicy(Long userId, Long applicationId) {
+        InsuranceApplication application = applicationRepository.findById(applicationId)
+                .orElseThrow(() -> new RuntimeException("Insurance application not found"));
+        if (!userId.equals(application.getUserId())) {
+            throw new RuntimeException("Insurance application not found");
+        }
+        if (!"ACTIVE".equalsIgnoreCase(application.getStatus())
+                && !"APPROVED".equalsIgnoreCase(application.getStatus())) {
+            throw new RuntimeException("Only approved or active insurance can be closed");
+        }
+        application.setStatus("CLOSED");
+        application.setPolicyEndDate(LocalDate.now());
+        application.setAdminRemark("Closed by customer");
+        return applicationRepository.save(application);
+    }
+
     public List<InsuranceApplication> getPendingApplications() {
         return applicationRepository.findByStatus("PENDING_APPROVAL");
     }
@@ -440,8 +913,8 @@ public class InsuranceService {
 
         // Allow payment even before approval (fraud + admin approval controls activation)
         String st = application.getStatus() != null ? application.getStatus().toUpperCase() : "";
-        if ("REJECTED".equals(st) || "EXPIRED".equals(st)) {
-            throw new RuntimeException("Cannot pay premium for rejected/expired applications");
+        if ("REJECTED".equals(st) || "EXPIRED".equals(st) || "CLOSED".equals(st)) {
+            throw new RuntimeException("Cannot pay premium for rejected, expired, or closing applications");
         }
 
         String accountNumber = application.getAccountNumber();

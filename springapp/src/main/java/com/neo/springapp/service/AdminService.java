@@ -134,6 +134,27 @@ public class AdminService {
         return adminRepository.findByEmailIgnoreCase(normalizedEmail);
     }
 
+    @Transactional
+    public boolean verifyInsuranceReviewer(String email, String password) {
+        if (email == null || email.isBlank() || password == null || password.isBlank()) return false;
+        Admin admin = adminRepository.findByEmailIgnoreCase(normalizeEmail(email));
+        if (admin == null || !"ADMIN".equalsIgnoreCase(admin.getRole())
+                || Boolean.TRUE.equals(admin.getAccountLocked()) || admin.getPassword() == null) return false;
+        if (passwordService.verifyPassword(password, admin.getPassword())) {
+            admin.setFailedLoginAttempts(0);
+            admin.setAccountLocked(false);
+            admin.setLastFailedLoginTime(null);
+            adminRepository.save(admin);
+            return true;
+        }
+        int attempts = admin.getFailedLoginAttempts() == null ? 1 : admin.getFailedLoginAttempts() + 1;
+        admin.setFailedLoginAttempts(attempts);
+        admin.setLastFailedLoginTime(LocalDateTime.now());
+        if (attempts >= 3) admin.setAccountLocked(true);
+        adminRepository.save(admin);
+        return false;
+    }
+
     public boolean emailExists(String email) {
         String normalizedEmail = normalizeEmail(email);
         if (normalizedEmail == null || normalizedEmail.isEmpty()) {

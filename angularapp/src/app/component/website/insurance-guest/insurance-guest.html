@@ -1,0 +1,73 @@
+<main class="insurance-guest-page">
+  <header class="page-header">
+    <a routerLink="/website/landing" class="back-link">← NeoBank home</a>
+    <p class="eyebrow">NEOBANK INSURANCE</p>
+    <h1>Insurance for everyone</h1>
+    <p>Explore available plans, apply without opening a bank account, and track your application with your email.</p>
+    <a routerLink="/website/insurance-login" class="login-link">Already have insurance? Sign in</a>
+  </header>
+
+  <div class="content-grid">
+    <section class="panel">
+      <h2>Apply for insurance</h2>
+      <p class="panel-intro">Submit your details for admin review. We’ll use your email to show the application status.</p>
+      <form (ngSubmit)="submitApplication()">
+        <label>
+          Full name
+          <input type="text" name="applicantName" [(ngModel)]="applicantName" autocomplete="name" required minlength="2">
+        </label>
+        <label>
+          Gmail or email address
+          <input type="email" name="email" [(ngModel)]="email" autocomplete="email" required>
+        </label>
+        <label>
+          Phone number
+          <input type="tel" name="phone" [(ngModel)]="phone" autocomplete="tel" required>
+        </label>
+        <label>
+          Insurance plan
+          <select name="policyId" [(ngModel)]="policyId" required>
+            <option [ngValue]="null" disabled>Select a plan</option>
+            <option *ngFor="let policy of policies" [ngValue]="policy.id">
+              {{ policy.name }} — {{ policy.type }} (₹{{ policy.premiumAmount }} / {{ policy.premiumType }})
+            </option>
+          </select>
+        </label>
+        <p class="message error" role="alert" *ngIf="applyError">{{ applyError }}</p>
+        <p class="message success" role="status" *ngIf="submittedApplicationNumber">
+          Application submitted. Reference: <strong>{{ submittedApplicationNumber }}</strong>
+        </p>
+        <button type="submit" [disabled]="applying || !policies.length">
+          {{ applying ? 'Submitting…' : 'Submit application' }}
+        </button>
+        <p class="empty-note" *ngIf="!policies.length && !applyError">No active plans are available right now.</p>
+      </form>
+    </section>
+
+    <section class="panel">
+      <h2>Track an application</h2>
+      <p class="panel-intro">Enter the same email address you used when applying. Only application status and plan details are shown.</p>
+      <form (ngSubmit)="trackApplications()">
+        <label>
+          Application email
+          <input type="email" name="trackingEmail" [(ngModel)]="trackingEmail" autocomplete="email" required>
+        </label>
+        <p class="message error" role="alert" *ngIf="trackingError">{{ trackingError }}</p>
+        <button type="submit" [disabled]="tracking">{{ tracking ? 'Checking…' : 'Check status' }}</button>
+      </form>
+      <div class="application-list" *ngIf="applications.length">
+        <article class="application-card" *ngFor="let application of applications">
+          <div>
+            <strong>{{ application.policyName }}</strong>
+            <p>{{ application.policyType }} · Ref {{ application.applicationNumber }}</p>
+            <small>Submitted {{ application.createdAt | date:'mediumDate' }}</small>
+          </div>
+          <span class="status" [attr.data-status]="application.status">{{ application.status.replace('_', ' ') }}</span>
+        </article>
+      </div>
+      <p class="empty-note" *ngIf="!tracking && !applications.length && trackingEmail && !trackingError">
+        No applications found for this email.
+      </p>
+    </section>
+  </div>
+</main>

@@ -11,9 +11,17 @@
   background: #ffffff;
   border-radius: 0.75rem;
   padding: 2rem;
-  max-width: 420px;
+  max-width: 460px;
   width: 100%;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+}
+
+.eyebrow {
+  color: #0f766e;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  margin: 0 0 0.75rem;
 }
 
 .card h1 {
@@ -36,10 +44,18 @@ label {
 }
 
 input[type="text"],
-input[type="email"] {
+input[type="email"],
+input[type="password"] {
+  box-sizing: border-box;
+  width: 100%;
   padding: 0.5rem 0.75rem;
   border-radius: 0.5rem;
   border: 1px solid #ccc;
+}
+
+input:focus {
+  outline: 2px solid #0d9488;
+  outline-offset: 1px;
 }
 
 button {
@@ -58,3 +74,21 @@ button[disabled] {
   cursor: default;
 }
 
+.mode-toggle {
+  margin-top: 0.75rem;
+  background: transparent;
+  color: #075fbe;
+  text-decoration: underline;
+}
+
+.error {
+  color: #b91c1c;
+  font-size: 0.9rem;
+}
+
+.home-link {
+  display: block;
+  margin-top: 1.25rem;
+  color: #0f766e;
+  text-align: center;
+}

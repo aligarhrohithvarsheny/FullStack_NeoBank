@@ -1,0 +1,108 @@
+<main class="guest-account">
+  <header>
+    <div>
+      <p class="eyebrow">NEOBANK INSURANCE</p>
+      <h1>Welcome, {{ account?.applicantName || 'Customer' }}</h1>
+      <p>Your insurance account is separate from NeoBank banking services.</p>
+    </div>
+    <button type="button" class="secondary" (click)="signOut()">Sign out</button>
+  </header>
+
+  <p class="error" role="alert" *ngIf="error">{{ error }}</p>
+  <section class="card" *ngIf="loading">Loading your insurance details…</section>
+  <section class="card" *ngIf="!loading && account">
+    <div class="card-heading">
+      <div>
+        <p class="eyebrow">YOUR INSURANCE</p>
+        <h2>{{ account.policyName }}</h2>
+        <p>{{ account.policyType }} plan · {{ account.applicationNumber }}</p>
+      </div>
+      <span class="status" [attr.data-status]="account.status">{{ account.status.replace('_', ' ') }}</span>
+    </div>
+    <div class="details">
+      <div><span>Coverage</span><strong>₹{{ account.coverageAmount | number:'1.0-0' }}</strong></div>
+      <div><span>Premium</span><strong>₹{{ account.premiumAmount | number:'1.0-0' }} / {{ account.premiumType }}</strong></div>
+      <div><span>Application date</span><strong>{{ account.createdAt | date:'mediumDate' }}</strong></div>
+    </div>
+    <div class="payment-section" *ngIf="account.status === 'APPROVED' || account.status === 'ACTIVE'">
+      <h3>Pay premium with NeoBank UPI</h3>
+      <form (ngSubmit)="payPremium()" *ngIf="isPremiumDue()">
+        <label>
+          NeoBank payer savings account number
+          <input type="text" name="payerAccountNumber" [(ngModel)]="payerAccountNumber"
+                 autocomplete="off" required>
+        </label>
+        <label>
+          6-digit UPI PIN
+          <input type="password" name="transactionPin" [(ngModel)]="transactionPin"
+                 inputmode="numeric" minlength="6" maxlength="6" pattern="[0-9]{6}"
+                 autocomplete="off" required>
+        </label>
+        <button type="submit" class="pay-button"
+                [disabled]="startingPayment || !isPaymentInputValid()">
+          {{ startingPayment ? 'Processing…' : 'Pay ₹' + (account.premiumAmount | number:'1.2-2') }}
+        </button>
+      </form>
+      <p class="note" *ngIf="account.nextPremiumDueDate && !isPremiumDue()">
+        Your next premium is due on {{ account.nextPremiumDueDate | date:'mediumDate' }}.
+      </p>
+      <p class="success" role="status" *ngIf="paymentMessage">{{ paymentMessage }}</p>
+      <p class="note">Payment is debited in real time from a UPI-enabled NeoBank savings account. You may use an authorized payer's account; the insurance account itself does not require a bank account. Your UPI PIN is used only to authorize this transfer.</p>
+    </div>
+    <div class="payment-history" *ngIf="account.payments?.length">
+      <h3>Premium payment history</h3>
+      <div class="payment-row" *ngFor="let payment of account.payments">
+        <span>{{ payment.paidAt | date:'mediumDate' }} · Ref {{ payment.transactionReference }}
+          <ng-container *ngIf="payment.payerAccountLastFour"> · Account ending {{ payment.payerAccountLastFour }}</ng-container>
+        </span>
+        <strong>₹{{ payment.amount | number:'1.2-2' }} — {{ payment.status }}</strong>
+      </div>
+    </div>
+    <section class="claim-section" *ngIf="account.status === 'ACTIVE'">
+      <h3>Submit a claim</h3>
+      <form (ngSubmit)="submitClaim()">
+        <label>
+          Claim amount (up to ₹{{ account.coverageAmount | number:'1.0-0' }})
+          <input type="number" name="claimAmount" [(ngModel)]="claimAmount"
+                 min="1" [max]="account.coverageAmount" step="0.01" required>
+        </label>
+        <label>
+          Reason
+          <input type="text" name="claimReason" [(ngModel)]="claimReason" maxlength="80" required>
+        </label>
+        <label>
+          Claim details
+          <textarea name="claimDetails" [(ngModel)]="claimDetails" minlength="10" maxlength="4000"
+                    rows="4" required></textarea>
+        </label>
+        <p class="success" role="status" *ngIf="claimMessage">{{ claimMessage }}</p>
+        <button class="secondary" type="submit" [disabled]="submittingClaim">
+          {{ submittingClaim ? 'Submitting…' : 'Submit claim for review' }}
+        </button>
+      </form>
+      <div class="claim-history" *ngIf="account.claims?.length">
+        <h4>Claim history</h4>
+        <article class="claim-row" *ngFor="let claim of account.claims">
+          <div>
+            <strong>{{ claim.claimNumber }} · ₹{{ claim.claimAmount | number:'1.2-2' }}</strong>
+            <p>{{ claim.reason }} · {{ claim.createdAt | date:'mediumDate' }}</p>
+            <small *ngIf="claim.adminRemark">{{ claim.adminRemark }}</small>
+          </div>
+          <span class="status" [attr.data-status]="claim.status">{{ claim.status.replace('_', ' ') }}</span>
+        </article>
+      </div>
+    </section>
+    <div class="actions">
+      <a routerLink="/website/insurance-apply">Apply for another plan</a>
+      <button type="button" class="secondary" (click)="downloadCertificate()"
+              [disabled]="account.status !== 'ACTIVE'">Download certificate</button>
+      <button type="button" class="danger" (click)="closeInsurance()"
+              [disabled]="closing || (account.status !== 'APPROVED' && account.status !== 'ACTIVE')">
+        {{ closing ? 'Closing…' : 'Close insurance' }}
+      </button>
+    </div>
+    <p class="note">
+      Submitted claims are reviewed by NeoBank Insurance; claim payout processing is handled separately.
+    </p>
+  </section>
+</main>

@@ -34,7 +34,14 @@ export class AdminInsuranceDashboard implements OnInit {
   editingApplicationId: number | null = null;
 
   // Tab navigation
-  activeTab: 'policies' | 'applications' | 'claims' | 'customers' = 'policies';
+  activeTab: 'policies' | 'applications' | 'guest-applications' | 'claims' | 'customers' = 'policies';
+  pendingGuestApplications: any[] = [];
+  pendingGuestClaims: any[] = [];
+  reviewingGuestApplicationId: number | null = null;
+  reviewingGuestClaimId: number | null = null;
+  reviewerEmail = '';
+  reviewerPassword = '';
+  guestApplicationsUnlocked = false;
 
   // Policy search
   policySearchQuery: string = '';
@@ -96,6 +103,100 @@ export class AdminInsuranceDashboard implements OnInit {
     this.http.get<any[]>(`${environment.apiBaseUrl}/api/admin/insurance/applications/pending`).subscribe({
       next: (res) => { this.pendingApplications = res || []; },
       error: () => { this.pendingApplications = []; }
+    });
+  }
+
+  loadPendingGuestApplications() {
+    if (!this.reviewerEmail.trim() || !this.reviewerPassword) return;
+    const headers = {
+      'X-Admin-Email': this.reviewerEmail.trim().toLowerCase(),
+      'X-Admin-Password': this.reviewerPassword
+    };
+    this.http.get<any[]>(`${environment.apiBaseUrl}/api/admin/insurance/guest-applications/pending`, { headers }).subscribe({
+      next: (res) => {
+        this.pendingGuestApplications = res || [];
+        this.guestApplicationsUnlocked = true;
+        this.loadPendingGuestClaims();
+      },
+      error: (error) => {
+        this.pendingGuestApplications = [];
+        this.guestApplicationsUnlocked = false;
+        this.alertService.adminError('Admin Verification Failed', error.error?.message || 'Verify your admin email and password.');
+      }
+    });
+  }
+
+  loadPendingGuestClaims(): void {
+    if (!this.reviewerEmail.trim() || !this.reviewerPassword) return;
+    const headers = {
+      'X-Admin-Email': this.reviewerEmail.trim().toLowerCase(),
+      'X-Admin-Password': this.reviewerPassword
+    };
+    this.http.get<any[]>(`${environment.apiBaseUrl}/api/admin/insurance/guest-claims/pending`, { headers }).subscribe({
+      next: claims => this.pendingGuestClaims = claims || [],
+      error: () => this.pendingGuestClaims = []
+    });
+  }
+
+  reviewGuestApplication(application: any, approve: boolean): void {
+    if (!application?.id || this.reviewingGuestApplicationId === application.id) return;
+    this.reviewingGuestApplicationId = application.id;
+    const headers = {
+      'X-Admin-Email': this.reviewerEmail.trim().toLowerCase(),
+      'X-Admin-Password': this.reviewerPassword
+    };
+    this.http.post<any>(
+      `${environment.apiBaseUrl}/api/admin/insurance/guest-applications/${application.id}/review`,
+      { approve, remark: '' },
+      { headers }
+    ).subscribe({
+      next: response => {
+        this.reviewingGuestApplicationId = null;
+        if (!response?.success) {
+          this.alertService.adminError('Review Failed', response?.message || 'Unable to review application.');
+          return;
+        }
+        this.alertService.adminSuccess(
+          approve ? 'Application Approved' : 'Application Rejected',
+          response.message || 'Guest insurance application reviewed.'
+        );
+        this.loadPendingGuestApplications();
+      },
+      error: error => {
+        this.reviewingGuestApplicationId = null;
+        this.alertService.adminError('Review Failed', error.error?.message || 'Unable to review application.');
+      }
+    });
+  }
+
+  reviewGuestClaim(claim: any, approve: boolean): void {
+    if (!claim?.id || this.reviewingGuestClaimId === claim.id) return;
+    this.reviewingGuestClaimId = claim.id;
+    const headers = {
+      'X-Admin-Email': this.reviewerEmail.trim().toLowerCase(),
+      'X-Admin-Password': this.reviewerPassword
+    };
+    this.http.post<any>(
+      `${environment.apiBaseUrl}/api/admin/insurance/guest-claims/${claim.id}/review`,
+      { approve, remark: '' },
+      { headers }
+    ).subscribe({
+      next: response => {
+        this.reviewingGuestClaimId = null;
+        if (!response?.success) {
+          this.alertService.adminError('Claim Review Failed', response?.message || 'Unable to review claim.');
+          return;
+        }
+        this.alertService.adminSuccess(
+          approve ? 'Claim Approved' : 'Claim Rejected',
+          response.message || 'Guest insurance claim reviewed.'
+        );
+        this.loadPendingGuestClaims();
+      },
+      error: error => {
+        this.reviewingGuestClaimId = null;
+        this.alertService.adminError('Claim Review Failed', error.error?.message || 'Unable to review claim.');
+      }
     });
   }
 

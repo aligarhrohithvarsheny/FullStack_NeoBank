@@ -1,1 +1,59 @@
-<div class="admin-dd"><h1>Savings Account Demand Drafts</h1><div class="toolbar"><input [(ngModel)]="search" (ngModelChange)="filter()" placeholder="Search DD, cheque, customer, account, payee"><button (click)="load()" [disabled]="loading">Refresh</button></div><p *ngIf="loading">Loading demand drafts...</p><table *ngIf="!loading"><tr><th>DD/Cheque</th><th>Customer</th><th>Account</th><th>Payee</th><th>Amount</th><th>Date</th><th>Status</th><th>Action</th></tr><tr *ngFor="let d of filteredDrafts"><td>{{d.ddNumber || 'Pending'}}<br>{{d.chequeNumber}}</td><td>{{d.userName}}<br>{{d.userEmail}}</td><td>{{d.accountNumber}}<br>Locked: ₹{{d.lockedAmount | number:'1.2-2'}}</td><td>{{d.payeeName}}<br>{{d.payeeAccountNumber}}</td><td>₹{{d.amount | number:'1.2-2'}}</td><td>{{d.draftDate}}</td><td>{{d.status}}</td><td><button (click)="select(d)">Edit/View</button><button *ngIf="d.status==='PENDING'" (click)="approve()" [disabled]="saving">Approve</button><button *ngIf="d.status==='PENDING'" (click)="reject()" [disabled]="saving">Reject</button><button *ngIf="d.status==='APPROVED'" (click)="download(d.id)">Download DD</button></td></tr></table><section *ngIf="selected" class="edit"><h2>DD Details and Admin Edit</h2><label>Customer: {{selected.userName}} | {{selected.accountNumber}}</label><div *ngIf="signature" class="signature"><b>Account Signature</b><span>{{signature.signatureVerified ? 'Verified' : 'Uploaded, not verified'}}</span><img *ngIf="signature.signatureCopyPath" [src]="signature.signatureCopyPath" alt="Customer signature"></div><label>Payee Name<input [(ngModel)]="edit.payeeName"></label><label>Payee Account<input [(ngModel)]="edit.payeeAccountNumber"></label><label>Amount<input type="number" [(ngModel)]="edit.amount"></label><label>Date<input type="date" [(ngModel)]="edit.draftDate"></label><label>Reason<textarea [(ngModel)]="edit.reason"></textarea></label><button (click)="save()" [disabled]="saving">Save Changes</button><button (click)="selected=null">Close</button><p>History: {{selected.editHistory || 'No edits'}}</p></section></div>
+<div class="admin-dd">
+  <h1>Savings Account Demand Drafts</h1>
+  <div class="toolbar">
+    <input [(ngModel)]="search" (ngModelChange)="filter()" placeholder="Search DD, cheque, customer, account, payee">
+    <button (click)="load()" [disabled]="loading">Refresh</button>
+  </div>
+  <p *ngIf="error" class="error">{{error}}</p>
+  <p *ngIf="loading">Loading demand drafts...</p>
+  <table *ngIf="!loading">
+    <tr><th>DD/Cheque</th><th>Customer</th><th>Account</th><th>Payee</th><th>Amount</th><th>Date</th><th>Status</th><th>Action</th></tr>
+    <tr *ngFor="let d of filteredDrafts">
+      <td>{{d.ddNumber || 'Pending'}}<br>{{d.chequeNumber}}</td>
+      <td>{{d.userName}}<br>{{d.userEmail}}</td>
+      <td>{{d.accountNumber}}<br>Locked: ₹{{d.lockedAmount | number:'1.2-2'}}</td>
+      <td>{{d.payeeName}}<br>{{d.payeeAccountNumber}}</td>
+      <td>₹{{d.amount | number:'1.2-2'}}</td>
+      <td>{{d.draftDate}}</td>
+      <td>{{d.status}}<br><span *ngIf="d.accountDetailsVerified" class="verified-label">Accounts verified</span></td>
+      <td>
+        <button (click)="select(d)">View</button>
+        <button *ngIf="d.status==='PENDING'" (click)="verifyAccountDetails(d)" [disabled]="saving || d.accountDetailsVerified">
+          {{d.accountDetailsVerified ? 'Accounts Verified' : 'Verify Account Details'}}
+        </button>
+        <button *ngIf="d.status==='PENDING'" (click)="approve(d)" [disabled]="saving || !d.accountDetailsVerified">Approve</button>
+        <button *ngIf="d.status==='PENDING'" (click)="reject(d)" [disabled]="saving">Reject</button>
+        <button *ngIf="d.status==='APPROVED'" (click)="download(d.id)">Download DD</button>
+      </td>
+    </tr>
+  </table>
+  <section *ngIf="selected" class="edit">
+    <h2>DD Details — {{selected.status}}</h2>
+    <label>Customer: {{selected.userName}} | {{selected.accountNumber}}</label>
+    <div *ngIf="signature" class="signature">
+      <b>Account Signature</b>
+      <span>{{signature.signatureVerified ? 'Verified' : 'Uploaded, not verified'}}</span>
+      <img *ngIf="signature.signatureCopyPath" [src]="signature.signatureCopyPath" alt="Customer signature">
+    </div>
+    <p *ngIf="selected.accountDetailsVerified" class="verified-label">
+      Customer debit account and payee NeoBank account verified
+      <span *ngIf="selected.accountDetailsVerifiedBy">by {{selected.accountDetailsVerifiedBy}}</span>
+      <span *ngIf="selected.accountDetailsVerifiedAt">at {{selected.accountDetailsVerifiedAt | date:'medium'}}</span>
+    </p>
+    <p *ngIf="selected.status==='PENDING' && !selected.accountDetailsVerified">
+      Verify both active NeoBank accounts and confirm the payee name before approving.
+    </p>
+    <label>Payee Name<input [(ngModel)]="edit.payeeName" [disabled]="selected.status!=='PENDING'"></label>
+    <label>Payee Account<input [(ngModel)]="edit.payeeAccountNumber" [disabled]="selected.status!=='PENDING'"></label>
+    <label>Amount<input type="number" [(ngModel)]="edit.amount" [disabled]="selected.status!=='PENDING'"></label>
+    <label>Date<input type="date" [(ngModel)]="edit.draftDate" [disabled]="selected.status!=='PENDING'"></label>
+    <label>Reason<textarea [(ngModel)]="edit.reason" [disabled]="selected.status!=='PENDING'"></textarea></label>
+    <button *ngIf="selected.status==='PENDING'" (click)="save()" [disabled]="saving">Save Changes</button>
+    <button *ngIf="selected.status==='PENDING'" (click)="verifyAccountDetails(selected)" [disabled]="saving || selected.accountDetailsVerified">
+      {{selected.accountDetailsVerified ? 'Accounts Verified' : 'Verify Account Details'}}
+    </button>
+    <button *ngIf="selected.status==='PENDING'" (click)="approve(selected)" [disabled]="saving || !selected.accountDetailsVerified">Approve</button>
+    <button (click)="selected=null">Close</button>
+    <p>History: {{selected.editHistory || 'No edits'}}</p>
+  </section>
+</div>

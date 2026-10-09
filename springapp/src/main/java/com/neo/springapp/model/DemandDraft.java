@@ -27,6 +27,9 @@ public class DemandDraft {
     private String ddNumber;
     private String approvedBy;
     private LocalDateTime approvedAt;
+    private Boolean accountDetailsVerified = false;
+    private String accountDetailsVerifiedBy;
+    private LocalDateTime accountDetailsVerifiedAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private String editHistory;

@@ -68,7 +68,7 @@ export class Insurance implements OnInit {
   premiumAmount: number = 0;
   enableAutoDebit: boolean = false;
   isPayingPremium: boolean = false;
-  private readonly approvedStatuses = new Set(['APPROVED', 'ACTIVE']);
+  private readonly approvedStatuses = new Set(['APPROVED', 'ACTIVE', 'CLOSED']);
 
   // EMI calculator
   premiumCalculator = {
@@ -110,12 +110,9 @@ export class Insurance implements OnInit {
       return;
     }
 
-    const currentUserRaw = sessionStorage.getItem('currentUser');
-    if (!currentUserRaw) {
-      this.alertService.userError('Login Required', 'Please login to access insurance services.');
-      this.router.navigate(['/website/user'], {
-        queryParams: { redirectTo: 'insurance' }
-      });
+    const currentUserRaw = sessionStorage.getItem('insuranceUser');
+    if (!currentUserRaw || !sessionStorage.getItem('insuranceAuthToken')) {
+      this.router.navigate(['/website/insurance-login']);
       return;
     }
     try {
@@ -124,7 +121,9 @@ export class Insurance implements OnInit {
       this.userId = Number(currentUser.id);
     } catch {
       this.alertService.userError('Session Error', 'Unable to read user session. Please login again.');
-      this.router.navigate(['/website/user']);
+      sessionStorage.removeItem('insuranceUser');
+      sessionStorage.removeItem('insuranceAuthToken');
+      this.router.navigate(['/website/insurance-login']);
       return;
     }
 
@@ -178,10 +177,9 @@ export class Insurance implements OnInit {
             if (!pn) { policy.unavailable = false; return; }
             this.http.get<any>(`${environment.apiBaseUrl}/api/insurance/policy/lookup/${encodeURIComponent(pn)}`).subscribe({
               next: (info) => {
-                const assignedAccount = info?.accountNumber || null;
-                policy.assignedAccount = assignedAccount;
+                policy.assignedAccount = info?.isAssignedToCurrentUser ? this.userAccountNumber : null;
                 policy.assignedApplication = info?.application || null;
-                policy.unavailable = !!assignedAccount && (assignedAccount.toString() !== (this.userAccountNumber || '').toString());
+                policy.unavailable = info?.isAssigned === true && info?.isAssignedToCurrentUser !== true;
               },
               error: () => {
                 policy.assignedAccount = null;
@@ -377,7 +375,31 @@ export class Insurance implements OnInit {
   }
 
   goBackToDashboard() {
-    this.router.navigate(['/website/userdashboard']);
+    sessionStorage.removeItem('insuranceUser');
+    sessionStorage.removeItem('insuranceAuthToken');
+    this.router.navigate(['/website/landing']);
+  }
+
+  closeInsurance(application: any) {
+    if (!application?.id || !window.confirm(`Close ${application.policy?.name || 'this insurance policy'}? This cannot be undone.`)) {
+      return;
+    }
+    this.http.post<any>(
+      `${environment.apiBaseUrl}/api/insurance/applications/${application.id}/close`,
+      {}
+    ).subscribe({
+      next: (response) => {
+        if (response?.success) {
+          this.alertService.userSuccess('Insurance Closed', response.message || 'Your insurance was closed.');
+          this.loadApplicationsAndLookup();
+        } else {
+          this.alertService.userError('Closure Failed', response?.message || 'Unable to close the insurance.');
+        }
+      },
+      error: (error) => {
+        this.alertService.userError('Closure Failed', error.error?.message || 'Unable to close the insurance.');
+      }
+    });
   }
 
   buildHealthConditionsPayload(): string {

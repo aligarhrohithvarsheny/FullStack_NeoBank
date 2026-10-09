@@ -176,6 +176,10 @@
       <span class="ins-tab-icon">📄</span> Applications
       <span class="ins-tab-badge ins-badge-warn" *ngIf="pendingApplications.length">{{ pendingApplications.length }}</span>
     </button>
+    <button class="ins-tab" [class.active]="activeTab === 'guest-applications'" (click)="activeTab = 'guest-applications'">
+      <span class="ins-tab-icon">🌐</span> Guest Applications
+      <span class="ins-tab-badge ins-badge-warn" *ngIf="pendingGuestApplications.length">{{ pendingGuestApplications.length }}</span>
+    </button>
     <button class="ins-tab" [class.active]="activeTab === 'claims'" (click)="activeTab = 'claims'">
       <span class="ins-tab-icon">🛡️</span> Claims
       <span class="ins-tab-badge ins-badge-danger" *ngIf="pendingClaims.length">{{ pendingClaims.length }}</span>
@@ -184,6 +188,105 @@
       <span class="ins-tab-icon">👥</span> Customers
       <span class="ins-tab-badge" *ngIf="customers.length">{{ customers.length }}</span>
     </button>
+  </div>
+
+  <!-- ═══════════ TAB: GUEST APPLICATIONS ═══════════ -->
+  <div class="ins-tab-content" *ngIf="activeTab === 'guest-applications'">
+    <div class="ins-panel">
+      <div class="ins-panel-header">
+        <h2 class="ins-panel-title">Applications from non-bank customers</h2>
+        <button class="ins-btn ins-btn-outline" *ngIf="guestApplicationsUnlocked" (click)="loadPendingGuestApplications()">Refresh</button>
+      </div>
+      <div class="ins-form-grid" *ngIf="!guestApplicationsUnlocked">
+        <div class="ins-field">
+          <label class="ins-label" for="guest-reviewer-email">Admin email</label>
+          <input id="guest-reviewer-email" class="ins-input" type="email" [(ngModel)]="reviewerEmail" autocomplete="username">
+        </div>
+        <div class="ins-field">
+          <label class="ins-label" for="guest-reviewer-password">Confirm admin password</label>
+          <input id="guest-reviewer-password" class="ins-input" type="password" [(ngModel)]="reviewerPassword" autocomplete="current-password">
+        </div>
+        <div class="ins-field">
+          <button class="ins-btn ins-btn-accent" (click)="loadPendingGuestApplications()">Verify and load applications</button>
+        </div>
+      </div>
+      <div class="ins-empty" *ngIf="guestApplicationsUnlocked && !pendingGuestApplications.length && !pendingGuestClaims.length">
+        <p>No guest insurance applications or claims are awaiting review.</p>
+      </div>
+      <div class="ins-table-wrap" *ngIf="guestApplicationsUnlocked && pendingGuestApplications.length">
+        <table class="ins-table">
+          <thead>
+            <tr>
+              <th>Reference</th>
+              <th>Applicant</th>
+              <th>Email</th>
+              <th>Phone</th>
+              <th>Policy</th>
+              <th>Submitted</th>
+              <th>Review</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let application of pendingGuestApplications" class="ins-table-row">
+              <td><span class="ins-mono">{{ application.applicationNumber }}</span></td>
+              <td>{{ application.applicantName }}</td>
+              <td>{{ application.email }}</td>
+              <td>{{ application.phone }}</td>
+              <td>{{ application.policy?.name }} ({{ application.policy?.type }})</td>
+              <td>{{ application.createdAt | date:'medium' }}</td>
+              <td>
+                <div class="ins-actions">
+                  <button class="ins-btn ins-btn-xs ins-btn-success"
+                          (click)="reviewGuestApplication(application, true)"
+                          [disabled]="reviewingGuestApplicationId === application.id">✓ Approve</button>
+                  <button class="ins-btn ins-btn-xs ins-btn-danger"
+                          (click)="reviewGuestApplication(application, false)"
+                          [disabled]="reviewingGuestApplicationId === application.id">✕ Reject</button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <section *ngIf="guestApplicationsUnlocked && pendingGuestClaims.length">
+        <h3 class="ins-sub-title">Guest insurance claims awaiting review</h3>
+        <div class="ins-table-wrap">
+          <table class="ins-table">
+            <thead>
+              <tr>
+                <th>Claim</th>
+                <th>Applicant</th>
+                <th>Email</th>
+                <th>Policy</th>
+                <th>Reason / details</th>
+                <th>Amount</th>
+                <th>Review</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let claim of pendingGuestClaims" class="ins-table-row">
+                <td><span class="ins-mono">{{ claim.claimNumber }}</span></td>
+                <td>{{ claim.application?.applicantName }}</td>
+                <td>{{ claim.application?.email }}</td>
+                <td>{{ claim.application?.policy?.name }}</td>
+                <td>{{ claim.reason }} — {{ claim.details }}</td>
+                <td>₹{{ claim.claimAmount | number:'1.2-2' }}</td>
+                <td>
+                  <div class="ins-actions">
+                    <button class="ins-btn ins-btn-xs ins-btn-success"
+                            (click)="reviewGuestClaim(claim, true)"
+                            [disabled]="reviewingGuestClaimId === claim.id">✓ Approve</button>
+                    <button class="ins-btn ins-btn-xs ins-btn-danger"
+                            (click)="reviewGuestClaim(claim, false)"
+                            [disabled]="reviewingGuestClaimId === claim.id">✕ Reject</button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
   </div>
 
   <!-- ═══════════ TAB: POLICIES ═══════════ -->

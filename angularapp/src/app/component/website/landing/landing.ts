@@ -1,5 +1,5 @@
 import { Component, ViewEncapsulation, HostListener, OnInit, OnDestroy, Inject, PLATFORM_ID } from '@angular/core';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 
 type FooterInformation = {
@@ -8,12 +8,20 @@ type FooterInformation = {
   details: string[];
 };
 
+type LandingSearchResult = {
+  label: string;
+  description: string;
+  keywords: string;
+  route?: string;
+  sectionId?: string;
+};
+
 @Component({
   selector: 'app-landing',
   templateUrl: './landing.html',
   styleUrls: ['./landing.css'],
   encapsulation: ViewEncapsulation.None,
-  imports: [CommonModule]
+  imports: [CommonModule, RouterLink]
 })
 export class Landing implements OnInit, OnDestroy {
   showPersonalDropdown = false;
@@ -24,6 +32,77 @@ export class Landing implements OnInit, OnDestroy {
   isScrolled = false;
   isBrowser = false;
   activeFooterInformation: FooterInformation | null = null;
+  isSearchOpen = false;
+  searchQuery = '';
+
+  readonly searchItems: LandingSearchResult[] = [
+    {
+      label: 'Open Account',
+      description: 'Start creating your NeoBank account.',
+      keywords: 'open create signup savings salary current account',
+      route: 'website/createaccount'
+    },
+    {
+      label: 'Account Opening',
+      description: 'Explore savings, salary, and current accounts.',
+      keywords: 'account opening savings salary current video kyc',
+      sectionId: 'accounts'
+    },
+    {
+      label: 'Payments',
+      description: 'Learn about UPI, bill payments, and transfers.',
+      keywords: 'payments upi transfer bills qr pay money',
+      sectionId: 'payments'
+    },
+    {
+      label: 'Loans & Credit',
+      description: 'Explore personal loans, credit cards, and EMI tools.',
+      keywords: 'loans credit personal loan emi credit card',
+      sectionId: 'loans'
+    },
+    {
+      label: 'Insurance',
+      description: 'Explore insurance and protection services.',
+      keywords: 'insurance protection health motor claims policy',
+      sectionId: 'insurance'
+    },
+    {
+      label: 'NeoBank Cards360',
+      description: 'Manage and explore your NeoBank cards.',
+      keywords: 'cards cards360 credit debit',
+      route: 'website/cards360'
+    },
+    {
+      label: 'FASTag',
+      description: 'Access FASTag services and account login.',
+      keywords: 'fastag toll recharge tag',
+      route: 'website/fasttag-login'
+    },
+    {
+      label: 'Payment Gateway',
+      description: 'Explore payment gateway services for businesses.',
+      keywords: 'payment gateway merchant accept payments business',
+      sectionId: 'payment-gateway'
+    },
+    {
+      label: 'Banking Dashboard',
+      description: 'See the digital banking dashboard features.',
+      keywords: 'dashboard account balances transactions banking',
+      sectionId: 'dashboard'
+    },
+    {
+      label: 'Security',
+      description: 'Learn how NeoBank helps protect your banking.',
+      keywords: 'security safe secure fraud protection',
+      sectionId: 'security'
+    },
+    {
+      label: 'Login',
+      description: 'Sign in to your NeoBank account.',
+      keywords: 'login sign in user internet banking',
+      route: 'website/user'
+    }
+  ];
 
   readonly footerInformation: Record<string, Omit<FooterInformation, 'title'>> = {
     'Savings Account': {
@@ -209,6 +288,52 @@ export class Landing implements OnInit, OnDestroy {
   @HostListener('document:keydown.escape')
   onEscapeKey() {
     this.closeFooterInformation();
+    this.closeSearch();
+  }
+
+  get searchResults(): LandingSearchResult[] {
+    const query = this.searchQuery.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
+    if (!query.length) return [];
+
+    return this.searchItems
+      .filter(item => {
+        const searchableText = `${item.label} ${item.description} ${item.keywords}`.toLocaleLowerCase();
+        return query.every(term => searchableText.includes(term));
+      })
+      .slice(0, 7);
+  }
+
+  toggleSearch() {
+    this.isSearchOpen = !this.isSearchOpen;
+    if (!this.isSearchOpen) this.searchQuery = '';
+  }
+
+  onSearchInput(event: Event) {
+    this.searchQuery = (event.target as HTMLInputElement).value;
+  }
+
+  selectFirstSearchResult(event: Event) {
+    const firstResult = this.searchResults[0];
+    if (firstResult) this.selectSearchResult(firstResult, event);
+  }
+
+  selectSearchResult(result: LandingSearchResult, event: Event) {
+    event.preventDefault();
+    this.closeSearch();
+
+    if (result.route) {
+      this.goTo(result.route);
+      return;
+    }
+
+    if (result.sectionId && this.isBrowser) {
+      document.getElementById(result.sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }
+
+  closeSearch() {
+    this.isSearchOpen = false;
+    this.searchQuery = '';
   }
 
   private setupObservers() {
@@ -277,6 +402,7 @@ export class Landing implements OnInit, OnDestroy {
   onDocumentClick(event: Event) {
     const target = event.target as HTMLElement;
     const dropdown = target.closest('.dropdown');
+    if (!target.closest('.nav-search')) this.closeSearch();
     if (!dropdown) {
       this.showPersonalDropdown = false;
       this.showBusinessDropdown = false;

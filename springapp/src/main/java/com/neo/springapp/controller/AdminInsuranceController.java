@@ -4,6 +4,7 @@ import com.neo.springapp.model.InsuranceApplication;
 import com.neo.springapp.model.InsuranceClaim;
 import com.neo.springapp.model.InsurancePolicy;
 import com.neo.springapp.service.InsuranceService;
+import com.neo.springapp.service.AdminService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -24,6 +25,9 @@ public class AdminInsuranceController {
 
     @Autowired
     private InsuranceService insuranceService;
+
+    @Autowired
+    private AdminService adminService;
 
     // ===== Policy management =====
 
@@ -118,6 +122,74 @@ public class AdminInsuranceController {
     @GetMapping("/insurance/applications/all")
     public ResponseEntity<List<InsuranceApplication>> getAllInsuranceApplications() {
         return ResponseEntity.ok(insuranceService.getAllApplications());
+    }
+
+    @GetMapping("/insurance/guest-applications/pending")
+    public ResponseEntity<?> getPendingGuestApplications(
+            @RequestHeader("X-Admin-Email") String adminEmail,
+            @RequestHeader("X-Admin-Password") String adminPassword) {
+        if (!adminService.verifyInsuranceReviewer(adminEmail, adminPassword)) {
+            return ResponseEntity.status(401).body(Map.of("success", false, "message", "Admin verification failed"));
+        }
+        return ResponseEntity.ok(insuranceService.getPendingGuestApplications());
+    }
+
+    @PostMapping("/insurance/guest-applications/{id}/review")
+    public ResponseEntity<?> reviewGuestApplication(
+            @PathVariable Long id,
+                @RequestHeader("X-Admin-Email") String adminEmail,
+                @RequestHeader("X-Admin-Password") String adminPassword,
+                @RequestBody Map<String, Object> request) {
+        try {
+                if (!adminService.verifyInsuranceReviewer(adminEmail, adminPassword)) {
+                    return ResponseEntity.status(401).body(Map.of("success", false, "message", "Admin verification failed"));
+                }
+                if (!(request.get("approve") instanceof Boolean approve)) {
+                    throw new IllegalArgumentException("approve must be true or false");
+                }
+                String remark = request.get("remark") == null ? null : String.valueOf(request.get("remark"));
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "application", insuranceService.reviewGuestApplication(id, approve, remark),
+                    "message", approve ? "Insurance application approved" : "Insurance application rejected"));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message",
+                    e.getMessage() == null ? "Unable to review insurance application" : e.getMessage()));
+        }
+    }
+
+    @GetMapping("/insurance/guest-claims/pending")
+    public ResponseEntity<?> getPendingGuestInsuranceClaims(
+            @RequestHeader("X-Admin-Email") String adminEmail,
+            @RequestHeader("X-Admin-Password") String adminPassword) {
+        if (!adminService.verifyInsuranceReviewer(adminEmail, adminPassword)) {
+            return ResponseEntity.status(401).body(Map.of("success", false, "message", "Admin verification failed"));
+        }
+        return ResponseEntity.ok(insuranceService.getPendingGuestInsuranceClaims());
+    }
+
+    @PostMapping("/insurance/guest-claims/{id}/review")
+    public ResponseEntity<?> reviewGuestInsuranceClaim(
+            @PathVariable Long id,
+            @RequestHeader("X-Admin-Email") String adminEmail,
+            @RequestHeader("X-Admin-Password") String adminPassword,
+            @RequestBody Map<String, Object> request) {
+        try {
+            if (!adminService.verifyInsuranceReviewer(adminEmail, adminPassword)) {
+                return ResponseEntity.status(401).body(Map.of("success", false, "message", "Admin verification failed"));
+            }
+            if (!(request.get("approve") instanceof Boolean approve)) {
+                throw new IllegalArgumentException("approve must be true or false");
+            }
+            String remark = request.get("remark") == null ? null : String.valueOf(request.get("remark"));
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "claim", insuranceService.reviewGuestInsuranceClaim(id, approve, remark),
+                    "message", approve ? "Guest insurance claim approved" : "Guest insurance claim rejected"));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message",
+                    e.getMessage() == null ? "Unable to review guest claim" : e.getMessage()));
+        }
     }
 
     @PostMapping("/insurance/assign-policy")
@@ -334,4 +406,3 @@ public class AdminInsuranceController {
         return ResponseEntity.ok(insuranceService.getAdminDashboardStats());
     }
 }
-

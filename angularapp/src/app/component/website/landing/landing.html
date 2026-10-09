@@ -48,8 +48,48 @@
           <a href="#" class="nav-link" (click)="toggleInvestInsureDropdown($event)">Invest & Insure <span class="chevron">▾</span></a>
           <div class="dropdown-menu" [class.show]="showInvestInsureDropdown">
             <a href="#" class="dropdown-item" (click)="goTo('website/insurance-login', $event)">Insurance Login</a>
-            <a href="#" class="dropdown-item" (click)="goTo('website/createaccount', $event)">Insurance Signup</a>
-            <a href="#" class="dropdown-item" (click)="goTo('website/insurance', $event)">Apply Insurance</a>
+            <a href="#" class="dropdown-item" (click)="goTo('website/insurance-apply', $event)">Apply / Track Insurance</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="nav-search">
+        <button
+          class="search-toggle"
+          type="button"
+          (click)="toggleSearch()"
+          [attr.aria-expanded]="isSearchOpen"
+          aria-controls="landing-search-panel"
+          [attr.aria-label]="isSearchOpen ? 'Close search' : 'Search NeoBank features'">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="10.8" cy="10.8" r="6.8"></circle>
+            <path d="m16 16 5 5"></path>
+          </svg>
+        </button>
+        <div class="search-panel" id="landing-search-panel" *ngIf="isSearchOpen">
+          <label class="visually-hidden" for="landing-search-input">Search NeoBank features</label>
+          <input
+            id="landing-search-input"
+            type="search"
+            placeholder="Search accounts, loans, FASTag..."
+            autocomplete="off"
+            [value]="searchQuery"
+            (input)="onSearchInput($event)"
+            (keydown.enter)="selectFirstSearchResult($event)">
+          <div class="search-results" *ngIf="searchQuery.trim()">
+            <ng-container *ngIf="searchResults.length; else noSearchResults">
+              <a
+                *ngFor="let result of searchResults"
+                href="#"
+                class="search-result"
+                (click)="selectSearchResult(result, $event)">
+                <span class="search-result-title">{{ result.label }}</span>
+                <span class="search-result-description">{{ result.description }}</span>
+              </a>
+            </ng-container>
+            <ng-template #noSearchResults>
+              <p class="search-empty">No matching features found.</p>
+            </ng-template>
           </div>
         </div>
       </div>
@@ -223,7 +263,7 @@
   </section>
 
   <!-- ========== 3. ZIGZAG: SMART PAYMENTS ========== -->
-  <section class="zigzag-section zigzag-reverse" data-anim="zigzag2Visible">
+  <section class="zigzag-section zigzag-reverse" id="payments" data-anim="zigzag2Visible">
     <div class="zigzag-container" [class.visible]="zigzag2Visible">
       <div class="zigzag-content">
         <span class="section-badge">Payments</span>
@@ -263,7 +303,7 @@
   </section>
 
   <!-- ========== 4. ZIGZAG: LOANS & CREDIT ========== -->
-  <section class="zigzag-section" data-anim="zigzag3Visible">
+  <section class="zigzag-section" id="loans" data-anim="zigzag3Visible">
     <div class="zigzag-container" [class.visible]="zigzag3Visible">
       <div class="zigzag-visual">
         <div class="zigzag-illustration">
@@ -307,7 +347,7 @@
   </section>
 
   <!-- ========== 5. ZIGZAG: INSURANCE ========== -->
-  <section class="zigzag-section zigzag-reverse" data-anim="zigzag4Visible">
+  <section class="zigzag-section zigzag-reverse" id="insurance" data-anim="zigzag4Visible">
     <div class="zigzag-container" [class.visible]="zigzag4Visible">
       <div class="zigzag-content">
         <span class="section-badge">Insurance</span>
@@ -381,7 +421,7 @@
   </section>
 
   <!-- ========== 6.5 EZYVAULT PAY — PAYMENT GATEWAY ========== -->
-  <section class="pg-showcase-section" data-anim="paymentGatewayVisible">
+  <section class="pg-showcase-section" id="payment-gateway" data-anim="paymentGatewayVisible">
     <div class="pg-showcase-container" [class.visible]="paymentGatewayVisible">
       <div class="pg-showcase-bg">
         <div class="pg-grid-line pg-gl1"></div>
@@ -494,7 +534,7 @@
   </section>
 
   <!-- ========== 7. DASHBOARD PREVIEW ========== -->
-  <section class="dashboard-section" data-anim="dashboardVisible">
+  <section class="dashboard-section" id="dashboard" data-anim="dashboardVisible">
     <div class="dashboard-container" [class.visible]="dashboardVisible">
       <div class="section-header-center">
         <span class="section-badge">Dashboard</span>
@@ -565,7 +605,7 @@
   </section>
 
   <!-- ========== 8. SECURITY SECTION ========== -->
-  <section class="security-section" data-anim="securityVisible">
+  <section class="security-section" id="security" data-anim="securityVisible">
     <div class="security-container" [class.visible]="securityVisible">
       <div class="security-content">
         <div class="security-text">

@@ -25,6 +25,48 @@ export const userAuthGuard: CanActivateFn = () => {
   return router.createUrlTree(['/website/user']);
 };
 
+export const insuranceAuthGuard: CanActivateFn = () => {
+  const router = inject(Router);
+  const platformId = inject(PLATFORM_ID);
+
+  if (!isPlatformBrowser(platformId)) {
+    return false;
+  }
+
+  const insuranceUserRaw = sessionStorage.getItem('insuranceUser');
+  const insuranceToken = sessionStorage.getItem('insuranceAuthToken');
+  if (insuranceUserRaw && insuranceToken) {
+    try {
+      const user = JSON.parse(insuranceUserRaw);
+      if (user?.id && user?.accountNumber) {
+        return true;
+      }
+    } catch {
+      sessionStorage.removeItem('insuranceUser');
+      sessionStorage.removeItem('insuranceAuthToken');
+    }
+  }
+
+  return router.createUrlTree(['/website/insurance-login']);
+};
+
+export const insuranceGuestAuthGuard: CanActivateFn = () => {
+  const router = inject(Router);
+  const platformId = inject(PLATFORM_ID);
+  if (!isPlatformBrowser(platformId)) return false;
+  const guestRaw = sessionStorage.getItem('insuranceGuest');
+  const token = sessionStorage.getItem('insuranceAuthToken');
+  if (guestRaw && token) {
+    try {
+      if (JSON.parse(guestRaw)?.id) return true;
+    } catch {
+      sessionStorage.removeItem('insuranceGuest');
+      sessionStorage.removeItem('insuranceAuthToken');
+    }
+  }
+  return router.createUrlTree(['/website/insurance-login']);
+};
+
 export const adminAuthGuard: CanActivateFn = () => {
   const router = inject(Router);
   const platformId = inject(PLATFORM_ID);

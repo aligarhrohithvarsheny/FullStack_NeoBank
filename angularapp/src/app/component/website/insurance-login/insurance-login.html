@@ -1,8 +1,69 @@
 <div class="insurance-login-page">
   <div class="card">
+    <p class="eyebrow">NEOBANK · INSURANCE</p>
     <h1>Insurance Login</h1>
-    <p class="subtitle">Checking your savings account details...</p>
-    <div class="loading-state" *ngIf="checkingAccount">Please wait...</div>
+    <p class="subtitle">
+      {{ mode === 'login' ? 'Sign in to manage your insurance policies, premiums, and claims.' : 'Create a separate password for your insurance account.' }}
+    </p>
+    <form (ngSubmit)="mode === 'login' ? login() : createPassword()">
+      <label>
+        Insurance or application number
+        <input
+          type="text"
+          name="insuranceNumber"
+          [(ngModel)]="insuranceNumber"
+          autocomplete="username"
+          placeholder="Enter your policy or application number"
+          required>
+      </label>
+      <label>
+        Registered email address
+        <input
+          type="email"
+          name="email"
+          [(ngModel)]="email"
+          autocomplete="email"
+          placeholder="name@example.com"
+          required>
+      </label>
+      <label *ngIf="mode === 'login'">
+        Insurance password
+        <input
+          type="password"
+          name="password"
+          [(ngModel)]="password"
+          autocomplete="current-password"
+          placeholder="Enter your insurance password"
+          required>
+      </label>
+      <label *ngIf="mode === 'create-password'">
+        Create insurance password
+        <input
+          type="password"
+          name="password"
+          [(ngModel)]="password"
+          autocomplete="new-password"
+          placeholder="8+ characters with uppercase, lowercase, and a number"
+          required>
+      </label>
+      <label *ngIf="mode === 'create-password'">
+        Confirm insurance password
+        <input
+          type="password"
+          name="confirmPassword"
+          [(ngModel)]="confirmPassword"
+          autocomplete="new-password"
+          placeholder="Re-enter your new password"
+          required>
+      </label>
+      <p class="error" role="alert" *ngIf="loginError">{{ loginError }}</p>
+      <button type="submit" [disabled]="isLoggingIn">
+        {{ isLoggingIn ? 'Please wait…' : mode === 'login' ? 'Sign in to insurance' : 'Create insurance password' }}
+      </button>
+    </form>
+    <button class="mode-toggle" type="button" (click)="mode = mode === 'login' ? 'create-password' : 'login'; password = ''; confirmPassword = ''; loginError = ''">
+      {{ mode === 'login' ? 'First time? Create insurance password' : 'Already set a password? Sign in' }}
+    </button>
+    <a class="home-link" routerLink="/website/landing">Back to NeoBank home</a>
   </div>
 </div>
-
