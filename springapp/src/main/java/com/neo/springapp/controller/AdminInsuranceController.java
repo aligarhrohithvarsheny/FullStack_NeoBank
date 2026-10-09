@@ -3,6 +3,7 @@ package com.neo.springapp.controller;
 import com.neo.springapp.model.InsuranceApplication;
 import com.neo.springapp.model.InsuranceClaim;
 import com.neo.springapp.model.InsurancePolicy;
+import com.neo.springapp.model.GuestInsuranceApplication;
 import com.neo.springapp.service.InsuranceService;
 import com.neo.springapp.service.AdminService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -119,6 +120,37 @@ public class AdminInsuranceController {
         return ResponseEntity.ok(insuranceService.getAllApplications());
     }
 
+    @PutMapping("/insurance/applications/{id}/premium")
+    public ResponseEntity<?> updateApprovedInsurancePremium(
+            @PathVariable Long id, @RequestBody Map<String, Object> request) {
+        try {
+            Double amount = request.get("premiumAmount") == null
+                    ? null : Double.valueOf(request.get("premiumAmount").toString());
+            String type = request.get("premiumType") == null
+                    ? null : request.get("premiumType").toString();
+            InsuranceApplication application = insuranceService.updateInsurancePremium(id, amount, type);
+            return ResponseEntity.ok(Map.of("success", true, "application", application,
+                    "message", "Application premium updated"));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message",
+                    e.getMessage() == null ? "Unable to update application premium" : e.getMessage()));
+        }
+    }
+
+    @GetMapping("/insurance/payments/{paymentId}/receipt")
+    public ResponseEntity<?> downloadInsurancePaymentReceipt(@PathVariable Long paymentId) {
+        try {
+            byte[] receipt = insuranceService.generateInsurancePaymentReceipt(paymentId);
+            return ResponseEntity.ok()
+                    .header("Content-Type", "application/pdf")
+                    .header("Content-Disposition", "attachment; filename=insurance-receipt-" + paymentId + ".pdf")
+                    .body(receipt);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message",
+                    e.getMessage() == null ? "Unable to generate payment receipt" : e.getMessage()));
+        }
+    }
+
     @GetMapping("/insurance/guest-applications/pending")
     public ResponseEntity<?> getPendingGuestApplications(
             @RequestHeader("X-Admin-Email") String adminEmail,
@@ -127,6 +159,61 @@ public class AdminInsuranceController {
             return ResponseEntity.status(401).body(Map.of("success", false, "message", "Admin verification failed"));
         }
         return ResponseEntity.ok(insuranceService.getPendingGuestApplications());
+    }
+
+    @GetMapping("/insurance/guest-applications/approved")
+    public ResponseEntity<?> getApprovedGuestApplications(
+            @RequestHeader("X-Admin-Email") String adminEmail,
+            @RequestHeader("X-Admin-Password") String adminPassword) {
+        if (!adminService.verifyInsuranceReviewer(adminEmail, adminPassword)) {
+            return ResponseEntity.status(401).body(Map.of("success", false, "message", "Admin verification failed"));
+        }
+        return ResponseEntity.ok(insuranceService.getApprovedGuestApplications());
+    }
+
+    @PutMapping("/insurance/guest-applications/{id}/premium")
+    public ResponseEntity<?> updateApprovedGuestInsurancePremium(
+            @PathVariable Long id,
+            @RequestHeader("X-Admin-Email") String adminEmail,
+            @RequestHeader("X-Admin-Password") String adminPassword,
+            @RequestBody Map<String, Object> request) {
+        if (!adminService.verifyInsuranceReviewer(adminEmail, adminPassword)) {
+            return ResponseEntity.status(401).body(Map.of("success", false, "message", "Admin verification failed"));
+        }
+        try {
+            Double amount = request.get("premiumAmount") == null
+                    ? null : Double.valueOf(request.get("premiumAmount").toString());
+            String type = request.get("premiumType") == null
+                    ? null : request.get("premiumType").toString();
+            GuestInsuranceApplication application =
+                    insuranceService.updateGuestInsurancePremium(id, amount, type);
+            return ResponseEntity.ok(Map.of("success", true, "applicationNumber",
+                    application.getApplicationNumber(), "email", application.getEmail(),
+                    "message", "Application premium updated"));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message",
+                    e.getMessage() == null ? "Unable to update guest premium" : e.getMessage()));
+        }
+    }
+
+    @GetMapping("/insurance/guest-payments/{paymentId}/receipt")
+    public ResponseEntity<?> downloadGuestInsurancePaymentReceipt(
+            @PathVariable Long paymentId,
+            @RequestHeader("X-Admin-Email") String adminEmail,
+            @RequestHeader("X-Admin-Password") String adminPassword) {
+        if (!adminService.verifyInsuranceReviewer(adminEmail, adminPassword)) {
+            return ResponseEntity.status(401).body(Map.of("success", false, "message", "Admin verification failed"));
+        }
+        try {
+            byte[] receipt = insuranceService.generateGuestInsurancePaymentReceipt(paymentId);
+            return ResponseEntity.ok()
+                    .header("Content-Type", "application/pdf")
+                    .header("Content-Disposition", "attachment; filename=guest-insurance-receipt-" + paymentId + ".pdf")
+                    .body(receipt);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message",
+                    e.getMessage() == null ? "Unable to generate guest payment receipt" : e.getMessage()));
+        }
     }
 
     @PostMapping("/insurance/guest-applications/{id}/review")

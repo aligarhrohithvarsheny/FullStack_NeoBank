@@ -6,6 +6,8 @@ import lombok.Data;
 
 import java.time.LocalDateTime;
 import java.time.LocalDate;
+import java.util.List;
+import java.util.Map;
 
 @Entity
 @Data
@@ -33,6 +35,9 @@ public class InsuranceApplication {
 
     @Transient
     private String applicantEmail;
+
+    @Transient
+    private List<Map<String, Object>> paymentReceipts;
 
     @Column(nullable = false)
     private String nomineeName;

@@ -176,6 +176,12 @@
       <span class="ins-tab-icon">📄</span> Applications
       <span class="ins-tab-badge ins-badge-warn" *ngIf="pendingApplications.length">{{ pendingApplications.length }}</span>
     </button>
+    <button class="ins-tab" [class.active]="activeTab === 'approved-applications'" (click)="openApprovedApplications()">
+      <span class="ins-tab-icon">✅</span> Approved Policies
+      <span class="ins-tab-badge" *ngIf="approvedBankApplications.length + approvedGuestApplications.length">
+        {{ approvedBankApplications.length + approvedGuestApplications.length }}
+      </span>
+    </button>
     <button class="ins-tab" [class.active]="activeTab === 'guest-applications'" (click)="activeTab = 'guest-applications'">
       <span class="ins-tab-icon">🌐</span> Guest Applications
       <span class="ins-tab-badge ins-badge-warn" *ngIf="pendingGuestApplications.length">{{ pendingGuestApplications.length }}</span>
@@ -469,6 +475,197 @@
                   <button class="ins-btn ins-btn-xs ins-btn-accent" *ngIf="app.status === 'ACTIVE'" (click)="renewApplication(app)">Renew</button>
                   <button class="ins-btn ins-btn-xs ins-btn-ghost" *ngIf="app.paymentStatus === 'COMPLETED' || app.status === 'ACTIVE'" (click)="downloadCertificate(app)">PDF</button>
                 </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════ TAB: APPROVED POLICIES ═══════════ -->
+  <div class="ins-tab-content" *ngIf="activeTab === 'approved-applications'">
+    <div class="ins-panel">
+      <div class="ins-panel-header">
+        <h2 class="ins-panel-title">Approved Insurance Policies</h2>
+        <button class="ins-btn ins-btn-outline" (click)="openApprovedApplications()">Refresh</button>
+      </div>
+
+      <div class="ins-form-grid" *ngIf="!guestApplicationsUnlocked">
+        <p class="ins-text-muted">Verify an admin account to also load approved non-bank customer policies and their receipts.</p>
+        <div class="ins-field">
+          <label class="ins-label" for="approved-reviewer-email">Admin email</label>
+          <input id="approved-reviewer-email" class="ins-input" type="email"
+                 [(ngModel)]="reviewerEmail" autocomplete="username">
+        </div>
+        <div class="ins-field">
+          <label class="ins-label" for="approved-reviewer-password">Admin password</label>
+          <input id="approved-reviewer-password" class="ins-input" type="password"
+                 [(ngModel)]="reviewerPassword" autocomplete="current-password">
+        </div>
+        <div class="ins-field">
+          <button class="ins-btn ins-btn-accent" (click)="loadApprovedGuestApplications()">
+            Verify and load guest policies
+          </button>
+        </div>
+      </div>
+
+      <h3 class="ins-sub-title">NeoBank customer policies</h3>
+      <div class="ins-empty" *ngIf="!approvedBankApplications.length">
+        <p>No approved NeoBank customer policies found.</p>
+      </div>
+      <div class="ins-table-wrap" *ngIf="approvedBankApplications.length">
+        <table class="ins-table">
+          <thead>
+            <tr>
+              <th>Customer / email</th>
+              <th>Application / policy</th>
+              <th>Status</th>
+              <th>Coverage</th>
+              <th>Premium</th>
+              <th>Edit premium</th>
+              <th>Details and receipts</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let app of approvedBankApplications" class="ins-table-row">
+              <td>
+                <a *ngIf="app.applicantEmail" [href]="'mailto:' + app.applicantEmail">{{ app.applicantEmail }}</a>
+                <span class="ins-text-muted" *ngIf="!app.applicantEmail">Email unavailable</span>
+                <div class="ins-text-muted">{{ app.accountNumber }}</div>
+              </td>
+              <td>
+                <strong>{{ app.applicationNumber }}</strong>
+                <div>{{ app.policy?.name }} ({{ app.policy?.type }})</div>
+              </td>
+              <td><span class="ins-status-badge active">{{ app.status }}</span></td>
+              <td>₹{{ app.policy?.coverageAmount | number:'1.0-0' }}</td>
+              <td>₹{{ app.premiumAmountCalculated ?? app.policy?.premiumAmount | number:'1.2-2' }} / {{ app.premiumType }}</td>
+              <td>
+                <div class="approved-premium-editor" *ngIf="bankPremiumDrafts[app.id]">
+                  <input class="ins-input" type="number" min="0.01" step="0.01"
+                         [(ngModel)]="bankPremiumDrafts[app.id].amount" aria-label="Premium amount">
+                  <select class="ins-input" [(ngModel)]="bankPremiumDrafts[app.id].type" aria-label="Premium frequency">
+                    <option value="MONTHLY">Monthly</option>
+                    <option value="YEARLY">Yearly</option>
+                  </select>
+                  <button class="ins-btn ins-btn-xs ins-btn-accent" (click)="saveBankPremium(app)"
+                          [disabled]="savingPremiumKey === 'bank-' + app.id">
+                    {{ savingPremiumKey === 'bank-' + app.id ? 'Saving…' : 'Save' }}
+                  </button>
+                </div>
+              </td>
+              <td>
+                <details>
+                  <summary>Application details ({{ app.paymentReceipts?.length || 0 }} receipts)</summary>
+                  <dl class="approved-details">
+                    <dt>Nominee</dt><dd>{{ app.nomineeName || '—' }} {{ app.nomineeRelation ? '(' + app.nomineeRelation + ')' : '' }}</dd>
+                    <dt>Age</dt><dd>{{ app.proposerAge ?? '—' }}</dd>
+                    <dt>Health conditions</dt><dd>{{ app.healthConditions || 'None recorded' }}</dd>
+                    <dt>Lifestyle</dt><dd>{{ app.lifestyleHabits || 'None recorded' }}</dd>
+                    <dt>Existing EMIs</dt><dd>{{ app.hasExistingEmis ? 'Yes' : 'No' }}</dd>
+                    <dt>Fraud score</dt><dd>{{ app.fraudScore ?? '—' }}</dd>
+                    <dt>Payment status</dt><dd>{{ app.paymentStatus || '—' }}</dd>
+                    <dt>Auto debit</dt><dd>{{ app.autoDebitApproved ? 'Approved' : (app.autoDebitRequested ? 'Requested' : 'Off') }}</dd>
+                    <dt>Linked account type</dt><dd>{{ app.linkedAccountType || '—' }}</dd>
+                    <dt>Vehicle</dt><dd>{{ app.vehicleNumber || '—' }} {{ app.makeModel || '' }}</dd>
+                    <dt>Registration date</dt><dd>{{ app.registrationDate || '—' }}</dd>
+                    <dt>Chassis / engine</dt><dd>{{ app.chassisNumber || '—' }} / {{ app.engineNumber || '—' }}</dd>
+                    <dt>KYC document</dt><dd>{{ app.kycDocumentPath || '—' }}</dd>
+                    <dt>Submitted</dt><dd>{{ app.appliedAt | date:'medium' }}</dd>
+                    <dt>Approved</dt><dd>{{ app.approvedAt | date:'medium' }}</dd>
+                    <dt>Admin remark</dt><dd>{{ app.adminRemark || '—' }}</dd>
+                    <dt>Policy benefits</dt><dd>{{ app.policy?.benefits || '—' }}</dd>
+                    <dt>Policy terms</dt><dd>{{ app.policy?.termsAndConditions || '—' }}</dd>
+                  </dl>
+                  <div class="approved-receipts">
+                    <strong>Payment receipts</strong>
+                    <p *ngIf="!app.paymentReceipts?.length" class="ins-text-muted">No payments recorded.</p>
+                    <div class="approved-receipt" *ngFor="let payment of app.paymentReceipts">
+                      <span>{{ payment.paidAt | date:'medium' }} · {{ payment.reference }} · ₹{{ payment.amount | number:'1.2-2' }} · {{ payment.status }}</span>
+                      <button class="ins-btn ins-btn-xs ins-btn-outline" *ngIf="payment.status === 'SUCCESS'"
+                              (click)="downloadPaymentReceipt(payment)">Download receipt</button>
+                    </div>
+                  </div>
+                </details>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 class="ins-sub-title">Non-NeoBank customer policies</h3>
+      <div class="ins-empty" *ngIf="guestApplicationsUnlocked && !approvedGuestApplications.length">
+        <p>No approved non-bank customer policies found.</p>
+      </div>
+      <div class="ins-table-wrap" *ngIf="guestApplicationsUnlocked && approvedGuestApplications.length">
+        <table class="ins-table">
+          <thead>
+            <tr>
+              <th>Customer / email</th>
+              <th>Application / policy</th>
+              <th>Status</th>
+              <th>Coverage</th>
+              <th>Premium</th>
+              <th>Edit premium</th>
+              <th>Details and receipts</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let app of approvedGuestApplications" class="ins-table-row">
+              <td>
+                <a [href]="'mailto:' + app.email">{{ app.email }}</a>
+                <div>{{ app.applicantName }}</div>
+              </td>
+              <td>
+                <strong>{{ app.applicationNumber }}</strong>
+                <div>{{ app.policy?.name }} ({{ app.policy?.type }})</div>
+              </td>
+              <td><span class="ins-status-badge active">{{ app.status }}</span></td>
+              <td>₹{{ app.policy?.coverageAmount | number:'1.0-0' }}</td>
+              <td>₹{{ app.premiumAmountOverride ?? app.policy?.premiumAmount | number:'1.2-2' }} / {{ app.premiumTypeOverride || app.policy?.premiumType }}</td>
+              <td>
+                <div class="approved-premium-editor" *ngIf="guestPremiumDrafts[app.id]">
+                  <input class="ins-input" type="number" min="0.01" step="0.01"
+                         [(ngModel)]="guestPremiumDrafts[app.id].amount" aria-label="Premium amount">
+                  <select class="ins-input" [(ngModel)]="guestPremiumDrafts[app.id].type" aria-label="Premium frequency">
+                    <option value="MONTHLY">Monthly</option>
+                    <option value="YEARLY">Yearly</option>
+                  </select>
+                  <button class="ins-btn ins-btn-xs ins-btn-accent" (click)="saveGuestPremium(app)"
+                          [disabled]="savingPremiumKey === 'guest-' + app.id">
+                    {{ savingPremiumKey === 'guest-' + app.id ? 'Saving…' : 'Save' }}
+                  </button>
+                </div>
+              </td>
+              <td>
+                <details>
+                  <summary>Application details ({{ app.paymentReceipts?.length || 0 }} receipts)</summary>
+                  <dl class="approved-details">
+                    <dt>Applicant</dt><dd>{{ app.applicantName }}</dd>
+                    <dt>Email</dt><dd>{{ app.email }}</dd>
+                    <dt>Phone</dt><dd>{{ app.phone }}</dd>
+                    <dt>Submitted</dt><dd>{{ app.createdAt | date:'medium' }}</dd>
+                    <dt>Reviewed</dt><dd>{{ app.reviewedAt | date:'medium' }}</dd>
+                    <dt>Policy start</dt><dd>{{ app.policyStartDate | date:'mediumDate' }}</dd>
+                    <dt>Next premium due</dt><dd>{{ app.nextPremiumDueDate | date:'mediumDate' }}</dd>
+                    <dt>Admin remark</dt><dd>{{ app.adminRemark || '—' }}</dd>
+                    <dt>Policy description</dt><dd>{{ app.policy?.description || '—' }}</dd>
+                    <dt>Benefits</dt><dd>{{ app.policy?.benefits || '—' }}</dd>
+                    <dt>Terms</dt><dd>{{ app.policy?.termsAndConditions || '—' }}</dd>
+                  </dl>
+                  <div class="approved-receipts">
+                    <strong>Payment receipts</strong>
+                    <p *ngIf="!app.paymentReceipts?.length" class="ins-text-muted">No payments recorded.</p>
+                    <div class="approved-receipt" *ngFor="let payment of app.paymentReceipts">
+                      <span>{{ payment.paidAt | date:'medium' }} · {{ payment.reference }} · ₹{{ payment.amount | number:'1.2-2' }} · {{ payment.status }}
+                        <ng-container *ngIf="payment.payerAccountLastFour"> · Payer ending {{ payment.payerAccountLastFour }}</ng-container>
+                      </span>
+                      <button class="ins-btn ins-btn-xs ins-btn-outline" *ngIf="payment.status === 'SUCCESS'"
+                              (click)="downloadPaymentReceipt(payment, true)">Download receipt</button>
+                    </div>
+                  </div>
+                </details>
               </td>
             </tr>
           </tbody>

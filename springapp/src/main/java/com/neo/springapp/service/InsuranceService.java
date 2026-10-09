@@ -247,8 +247,8 @@ public class InsuranceService {
         details.put("policyName", application.getPolicy().getName());
         details.put("policyType", application.getPolicy().getType());
         details.put("coverageAmount", application.getPolicy().getCoverageAmount());
-        details.put("premiumAmount", application.getPolicy().getPremiumAmount());
-        details.put("premiumType", application.getPolicy().getPremiumType());
+        details.put("premiumAmount", getGuestPremiumAmount(application));
+        details.put("premiumType", getGuestPremiumType(application));
         details.put("status", application.getStatus());
         details.put("createdAt", application.getCreatedAt());
         details.put("policyStartDate", application.getPolicyStartDate());
@@ -294,7 +294,7 @@ public class InsuranceService {
             throw new IllegalStateException("Insurance UPI recipient is not configured");
         }
 
-        BigDecimal amount = BigDecimal.valueOf(application.getPolicy().getPremiumAmount())
+        BigDecimal amount = BigDecimal.valueOf(getGuestPremiumAmount(application))
                 .setScale(2, java.math.RoundingMode.HALF_UP);
         Map<String, Object> transfer = savingsUpiService.sendMoney(
                 normalizedPayerAccount,
@@ -326,7 +326,7 @@ public class InsuranceService {
             application.setPolicyStartDate(today);
         }
         application.setStatus("ACTIVE");
-        String premiumType = application.getPolicy().getPremiumType();
+        String premiumType = getGuestPremiumType(application);
         application.setNextPremiumDueDate("YEARLY".equalsIgnoreCase(premiumType)
                 ? today.plusYears(1) : today.plusMonths(1));
         guestApplicationRepository.save(application);
@@ -883,7 +883,162 @@ public class InsuranceService {
     }
 
     public List<InsuranceApplication> getAllApplications() {
-        return applicationRepository.findAll();
+        List<InsuranceApplication> applications = applicationRepository.findAll();
+        applications.forEach(application -> {
+            userService.getUserById(application.getUserId())
+                    .ifPresent(user -> application.setApplicantEmail(user.getEmail()));
+            application.setPaymentReceipts(paymentRepository.findByApplication(application).stream()
+                    .map(payment -> Map.<String, Object>of(
+                            "id", payment.getId(),
+                            "reference", payment.getPaymentReference(),
+                            "amount", payment.getAmount(),
+                            "paidAt", payment.getPaymentDate(),
+                            "status", payment.getStatus()))
+                    .toList());
+        });
+        return applications;
+    }
+
+    @Transactional(readOnly = true)
+    public List<GuestInsuranceApplication> getApprovedGuestApplications() {
+        return guestApplicationRepository.findAll().stream()
+                .filter(application -> "APPROVED".equalsIgnoreCase(application.getStatus())
+                        || "ACTIVE".equalsIgnoreCase(application.getStatus())
+                        || "CLOSED".equalsIgnoreCase(application.getStatus()))
+                .peek(application -> application.setPaymentReceipts(
+                        guestInsurancePaymentRepository.findByApplicationIdOrderByPaidAtDesc(application.getId())
+                                .stream()
+                                .map(payment -> Map.<String, Object>of(
+                                        "id", payment.getId(),
+                                        "reference", payment.getTransactionReference(),
+                                        "amount", payment.getAmount(),
+                                        "paidAt", payment.getPaidAt(),
+                                        "status", payment.getStatus(),
+                                        "payerAccountLastFour", payment.getPayerAccountLastFour()))
+                                .toList()))
+                .toList();
+    }
+
+    @Transactional
+    public GuestInsuranceApplication updateGuestInsurancePremium(
+            Long applicationId, Double premiumAmount, String premiumType) {
+        GuestInsuranceApplication application = guestApplicationRepository.findById(applicationId)
+                .orElseThrow(() -> new RuntimeException("Insurance application not found"));
+        if (!"APPROVED".equalsIgnoreCase(application.getStatus())
+                && !"ACTIVE".equalsIgnoreCase(application.getStatus())
+                && !"CLOSED".equalsIgnoreCase(application.getStatus())) {
+            throw new RuntimeException("Only approved insurance applications can be edited");
+        }
+        if (premiumAmount == null || !Double.isFinite(premiumAmount) || premiumAmount <= 0) {
+            throw new IllegalArgumentException("Premium amount must be greater than zero");
+        }
+        String normalizedType = premiumType == null ? "" : premiumType.trim().toUpperCase();
+        if (!"MONTHLY".equals(normalizedType) && !"YEARLY".equals(normalizedType)) {
+            throw new IllegalArgumentException("Premium type must be MONTHLY or YEARLY");
+        }
+        application.setPremiumAmountOverride(premiumAmount);
+        application.setPremiumTypeOverride(normalizedType);
+        return guestApplicationRepository.save(application);
+    }
+
+    @Transactional
+    public InsuranceApplication updateInsurancePremium(Long applicationId, Double premiumAmount, String premiumType) {
+        InsuranceApplication application = applicationRepository.findById(applicationId)
+                .orElseThrow(() -> new RuntimeException("Insurance application not found"));
+        if (!"APPROVED".equalsIgnoreCase(application.getStatus())
+                && !"ACTIVE".equalsIgnoreCase(application.getStatus())
+                && !"CLOSED".equalsIgnoreCase(application.getStatus())) {
+            throw new RuntimeException("Only approved insurance applications can be edited");
+        }
+        if (premiumAmount == null || !Double.isFinite(premiumAmount) || premiumAmount <= 0) {
+            throw new IllegalArgumentException("Premium amount must be greater than zero");
+        }
+        String normalizedType = premiumType == null ? "" : premiumType.trim().toUpperCase();
+        if (!"MONTHLY".equals(normalizedType) && !"YEARLY".equals(normalizedType)) {
+            throw new IllegalArgumentException("Premium type must be MONTHLY or YEARLY");
+        }
+        application.setPremiumAmountCalculated(premiumAmount);
+        application.setPremiumType(normalizedType);
+        InsuranceApplication saved = applicationRepository.save(application);
+        userService.getUserById(saved.getUserId())
+                .ifPresent(user -> saved.setApplicantEmail(user.getEmail()));
+        return saved;
+    }
+
+    @Transactional(readOnly = true)
+    public byte[] generateInsurancePaymentReceipt(Long paymentId) {
+        InsurancePayment payment = paymentRepository.findById(paymentId)
+                .orElseThrow(() -> new RuntimeException("Insurance payment not found"));
+        if (!"SUCCESS".equalsIgnoreCase(payment.getStatus())) {
+            throw new RuntimeException("A receipt is available only for successful payments");
+        }
+        InsuranceApplication application = payment.getApplication();
+        User user = userService.getUserById(application.getUserId())
+                .orElseThrow(() -> new RuntimeException("Insurance customer not found"));
+        String html = """
+                <html><body style="font-family:Arial,sans-serif;padding:32px;color:#172033">
+                  <h1 style="color:#075fbe">NeoBank Insurance - Payment Receipt</h1>
+                  <p><strong>Receipt reference:</strong> %s</p>
+                  <p><strong>Customer:</strong> %s (%s)</p>
+                  <p><strong>Application:</strong> %s</p>
+                  <p><strong>Policy:</strong> %s</p>
+                  <p><strong>Amount paid:</strong> INR %s</p>
+                  <p><strong>Payment date:</strong> %s</p>
+                  <p><strong>Payment status:</strong> %s</p>
+                </body></html>
+                """.formatted(escapeHtml(payment.getPaymentReference()), escapeHtml(user.getUsername()),
+                escapeHtml(user.getEmail()), escapeHtml(application.getApplicationNumber()),
+                escapeHtml(application.getPolicy().getName()), payment.getAmount(),
+                payment.getPaymentDate(), escapeHtml(payment.getStatus()));
+        return renderPdf(html, "Unable to generate insurance payment receipt");
+    }
+
+    @Transactional(readOnly = true)
+    public byte[] generateGuestInsurancePaymentReceipt(Long paymentId) {
+        GuestInsurancePayment payment = guestInsurancePaymentRepository.findById(paymentId)
+                .orElseThrow(() -> new RuntimeException("Insurance payment not found"));
+        if (!"SUCCESS".equalsIgnoreCase(payment.getStatus())) {
+            throw new RuntimeException("A receipt is available only for successful payments");
+        }
+        GuestInsuranceApplication application = payment.getApplication();
+        String html = """
+                <html><body style="font-family:Arial,sans-serif;padding:32px;color:#172033">
+                  <h1 style="color:#075fbe">NeoBank Insurance - Payment Receipt</h1>
+                  <p><strong>Receipt reference:</strong> %s</p>
+                  <p><strong>Customer:</strong> %s (%s)</p>
+                  <p><strong>Application:</strong> %s</p>
+                  <p><strong>Policy:</strong> %s</p>
+                  <p><strong>Amount paid:</strong> INR %s</p>
+                  <p><strong>Payment date:</strong> %s</p>
+                  <p><strong>Payment status:</strong> %s</p>
+                </body></html>
+                """.formatted(escapeHtml(payment.getTransactionReference()),
+                escapeHtml(application.getApplicantName()), escapeHtml(application.getEmail()),
+                escapeHtml(application.getApplicationNumber()), escapeHtml(application.getPolicy().getName()),
+                payment.getAmount(), payment.getPaidAt(), escapeHtml(payment.getStatus()));
+        return renderPdf(html, "Unable to generate insurance payment receipt");
+    }
+
+    private double getGuestPremiumAmount(GuestInsuranceApplication application) {
+        return application.getPremiumAmountOverride() == null
+                ? application.getPolicy().getPremiumAmount()
+                : application.getPremiumAmountOverride();
+    }
+
+    private String getGuestPremiumType(GuestInsuranceApplication application) {
+        return application.getPremiumTypeOverride() == null || application.getPremiumTypeOverride().isBlank()
+                ? application.getPolicy().getPremiumType()
+                : application.getPremiumTypeOverride();
+    }
+
+    private byte[] renderPdf(String html, String message) {
+        java.io.ByteArrayOutputStream pdf = new java.io.ByteArrayOutputStream();
+        try {
+            HtmlConverter.convertToPdf(html, pdf);
+            return pdf.toByteArray();
+        } catch (Exception exception) {
+            throw new IllegalStateException(message, exception);
+        }
     }
 
     @Transactional

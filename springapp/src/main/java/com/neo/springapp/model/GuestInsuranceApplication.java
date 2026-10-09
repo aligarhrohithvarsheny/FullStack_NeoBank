@@ -6,6 +6,8 @@ import jakarta.persistence.*;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
 
 @Entity
 @Table(name = "guest_insurance_applications")
@@ -56,6 +58,13 @@ public class GuestInsuranceApplication {
 
     private LocalDate policyStartDate;
 
+    private Double premiumAmountOverride;
+
+    private String premiumTypeOverride;
+
+    @Transient
+    private List<Map<String, Object>> paymentReceipts;
+
     public Long getId() { return id; }
     public String getApplicationNumber() { return applicationNumber; }
     public void setApplicationNumber(String applicationNumber) { this.applicationNumber = applicationNumber; }
@@ -85,4 +94,10 @@ public class GuestInsuranceApplication {
     public void setNextPremiumDueDate(LocalDate nextPremiumDueDate) { this.nextPremiumDueDate = nextPremiumDueDate; }
     public LocalDate getPolicyStartDate() { return policyStartDate; }
     public void setPolicyStartDate(LocalDate policyStartDate) { this.policyStartDate = policyStartDate; }
+    public Double getPremiumAmountOverride() { return premiumAmountOverride; }
+    public void setPremiumAmountOverride(Double premiumAmountOverride) { this.premiumAmountOverride = premiumAmountOverride; }
+    public String getPremiumTypeOverride() { return premiumTypeOverride; }
+    public void setPremiumTypeOverride(String premiumTypeOverride) { this.premiumTypeOverride = premiumTypeOverride; }
+    public List<Map<String, Object>> getPaymentReceipts() { return paymentReceipts; }
+    public void setPaymentReceipts(List<Map<String, Object>> paymentReceipts) { this.paymentReceipts = paymentReceipts; }
 }

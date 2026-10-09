@@ -20,6 +20,10 @@ export class AdminInsuranceDashboard implements OnInit {
   pendingClaims: any[] = [];
   policies: any[] = [];
   allApplications: any[] = [];
+  approvedGuestApplications: any[] = [];
+  bankPremiumDrafts: Record<number, { amount: number; type: 'MONTHLY' | 'YEARLY' }> = {};
+  guestPremiumDrafts: Record<number, { amount: number; type: 'MONTHLY' | 'YEARLY' }> = {};
+  savingPremiumKey = '';
   customers: any[] = [];
 
   // Assign policy
@@ -34,7 +38,7 @@ export class AdminInsuranceDashboard implements OnInit {
   editingApplicationId: number | null = null;
 
   // Tab navigation
-  activeTab: 'policies' | 'applications' | 'guest-applications' | 'claims' | 'customers' = 'policies';
+  activeTab: 'policies' | 'applications' | 'approved-applications' | 'guest-applications' | 'claims' | 'customers' = 'policies';
   pendingGuestApplications: any[] = [];
   pendingGuestClaims: any[] = [];
   reviewingGuestApplicationId: number | null = null;
@@ -219,8 +223,137 @@ export class AdminInsuranceDashboard implements OnInit {
 
   loadAllApplications() {
     this.http.get<any[]>(`${environment.apiBaseUrl}/api/admin/insurance/applications/all`).subscribe({
-      next: (res) => this.allApplications = res || [],
-      error: () => this.allApplications = []
+      next: (res) => {
+        this.allApplications = res || [];
+        this.bankPremiumDrafts = {};
+        this.allApplications.forEach(application => {
+          this.bankPremiumDrafts[application.id] = {
+            amount: Number(application.premiumAmountCalculated ?? application.policy?.premiumAmount ?? 0),
+            type: application.premiumType === 'YEARLY' ? 'YEARLY' : 'MONTHLY'
+          };
+        });
+      },
+      error: error => this.alertService.adminError(
+        'Applications Unavailable',
+        error.error?.message || 'Unable to load insurance applications.'
+      )
+    });
+  }
+
+  get approvedBankApplications(): any[] {
+    return this.allApplications.filter(application =>
+      ['APPROVED', 'ACTIVE', 'CLOSED'].includes(String(application.status || '').toUpperCase()));
+  }
+
+  openApprovedApplications(): void {
+    this.activeTab = 'approved-applications';
+    this.loadAllApplications();
+    if (this.guestApplicationsUnlocked) this.loadApprovedGuestApplications();
+  }
+
+  loadApprovedGuestApplications(): void {
+    if (!this.reviewerEmail.trim() || !this.reviewerPassword) return;
+    const headers = {
+      'X-Admin-Email': this.reviewerEmail.trim().toLowerCase(),
+      'X-Admin-Password': this.reviewerPassword
+    };
+    this.http.get<any[]>(`${environment.apiBaseUrl}/api/admin/insurance/guest-applications/approved`, { headers }).subscribe({
+      next: applications => {
+        this.approvedGuestApplications = applications || [];
+        this.guestPremiumDrafts = {};
+        this.approvedGuestApplications.forEach(application => {
+          this.guestPremiumDrafts[application.id] = {
+            amount: Number(application.premiumAmountOverride ?? application.policy?.premiumAmount ?? 0),
+            type: (application.premiumTypeOverride ?? application.policy?.premiumType) === 'YEARLY' ? 'YEARLY' : 'MONTHLY'
+          };
+        });
+        this.guestApplicationsUnlocked = true;
+      },
+      error: error => {
+        this.approvedGuestApplications = [];
+        this.guestApplicationsUnlocked = false;
+        this.alertService.adminError('Applications Unavailable', error.error?.message || 'Unable to load approved guest applications.');
+      }
+    });
+  }
+
+  saveBankPremium(application: any): void {
+    const draft = this.bankPremiumDrafts[application.id];
+    if (!draft || this.savingPremiumKey) return;
+    this.savingPremiumKey = `bank-${application.id}`;
+    this.http.put<any>(
+      `${environment.apiBaseUrl}/api/admin/insurance/applications/${application.id}/premium`,
+      { premiumAmount: draft.amount, premiumType: draft.type }
+    ).subscribe({
+      next: response => {
+        this.savingPremiumKey = '';
+        if (!response?.success) {
+          this.alertService.adminError('Premium Update Failed', response?.message || 'Unable to update premium.');
+          return;
+        }
+        this.alertService.adminSuccess('Premium Updated', response.message || 'Application premium updated.');
+        this.loadAllApplications();
+      },
+      error: error => {
+        this.savingPremiumKey = '';
+        this.alertService.adminError('Premium Update Failed', error.error?.message || 'Unable to update premium.');
+      }
+    });
+  }
+
+  saveGuestPremium(application: any): void {
+    const draft = this.guestPremiumDrafts[application.id];
+    if (!draft || this.savingPremiumKey) return;
+    this.savingPremiumKey = `guest-${application.id}`;
+    const headers = {
+      'X-Admin-Email': this.reviewerEmail.trim().toLowerCase(),
+      'X-Admin-Password': this.reviewerPassword
+    };
+    this.http.put<any>(
+      `${environment.apiBaseUrl}/api/admin/insurance/guest-applications/${application.id}/premium`,
+      { premiumAmount: draft.amount, premiumType: draft.type },
+      { headers }
+    ).subscribe({
+      next: response => {
+        this.savingPremiumKey = '';
+        if (!response?.success) {
+          this.alertService.adminError('Premium Update Failed', response?.message || 'Unable to update guest premium.');
+          return;
+        }
+        this.alertService.adminSuccess('Premium Updated', response.message || 'Guest application premium updated.');
+        this.loadApprovedGuestApplications();
+      },
+      error: error => {
+        this.savingPremiumKey = '';
+        this.alertService.adminError('Premium Update Failed', error.error?.message || 'Unable to update guest premium.');
+      }
+    });
+  }
+
+  downloadPaymentReceipt(payment: any, guest = false): void {
+    if (!payment?.id) return;
+    const headers = guest ? {
+      'X-Admin-Email': this.reviewerEmail.trim().toLowerCase(),
+      'X-Admin-Password': this.reviewerPassword
+    } : undefined;
+    const options: { responseType: 'blob'; headers?: Record<string, string> } = { responseType: 'blob' };
+    if (headers) options.headers = headers;
+    const path = guest
+      ? `/api/admin/insurance/guest-payments/${payment.id}/receipt`
+      : `/api/admin/insurance/payments/${payment.id}/receipt`;
+    this.http.get(`${environment.apiBaseUrl}${path}`, options).subscribe({
+      next: blob => {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `insurance-receipt-${payment.reference || payment.id}.pdf`;
+        link.click();
+        URL.revokeObjectURL(url);
+      },
+      error: error => this.alertService.adminError(
+        'Receipt Unavailable',
+        error.error?.message || 'Unable to download this payment receipt.'
+      )
     });
   }
 
