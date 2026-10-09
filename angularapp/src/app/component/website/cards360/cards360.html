@@ -66,7 +66,7 @@
             <button class="c360-secondary" type="button" (click)="showOverview()">Back to all cards</button>
           </div>
           <div class="c360-detail-grid">
-            <div><span>Card number</span><strong>{{ card.maskedNumber }}</strong></div>
+            <div><span>Card number</span><strong>{{ card.fullCardNumber || card.maskedNumber }}</strong></div>
             <div><span>Expiry date</span><strong>{{ card.expiryDate || '—' }}</strong></div>
             <div><span>Status</span><strong>{{ card.status }}</strong></div>
             <div *ngIf="card.type === 'credit'"><span>Approved limit</span><strong>₹{{ card.approvedLimit ?? 0 }}</strong></div>
@@ -86,6 +86,10 @@
             <div><span>Status</span><strong>{{ card.billStatus || 'Generated' }}</strong></div>
           </div>
           <div class="c360-detail-actions">
+            <button *ngIf="card.type === 'credit'" class="c360-secondary" type="button"
+              (click)="toggleFullCardNumber(card)">
+              {{ card.fullCardNumber ? 'Hide full card number' : 'View full card number' }}
+            </button>
             <button class="c360-secondary" type="button" (click)="toggleCard(card)"
               [disabled]="card.blocked && !card.canUnblock">
               {{ card.blocked ? (card.canUnblock ? 'Unblock card' : 'Contact NeoBank to unblock') : 'Block card' }}
@@ -93,11 +97,53 @@
             <button *ngIf="card.type === 'credit'" class="c360-secondary" type="button" (click)="beginLimitEdit(card)">Change spending limit</button>
             <button *ngIf="card.type === 'credit'" class="c360-secondary" type="button" (click)="beginBillPayment(card)"
               [disabled]="card.blocked || billOutstanding(card) <= 0">Pay bill</button>
+            <button *ngIf="card.type === 'credit' && !card.closureRequestStatus && card.status !== 'Closed'"
+              class="c360-secondary" type="button" (click)="requestingClosureFor = card.id; error = ''">
+              Request card closure
+            </button>
           </div>
+          <p class="c360-notice" *ngIf="card.closureRequestStatus">Card closure request is pending admin review.</p>
+          <form *ngIf="requestingClosureFor === card.id" class="c360-close-request"
+            (ngSubmit)="submitClosureRequest(card)">
+            <label [for]="'closure-reason-' + card.id">Reason for closing this card</label>
+            <textarea [id]="'closure-reason-' + card.id" [name]="'closure-reason-' + card.id"
+              [(ngModel)]="closureReason" maxlength="1000" required></textarea>
+            <button class="c360-primary" type="submit" [disabled]="submittingClosureRequest">
+              {{ submittingClosureRequest ? 'Submitting…' : 'Send request to admin' }}
+            </button>
+            <button class="c360-text-button" type="button" (click)="requestingClosureFor = null">Cancel</button>
+          </form>
           <div *ngIf="editingLimitId === card.id" class="c360-limit-edit">
             <input type="number" min="0" [max]="card.approvedLimit || 0" [(ngModel)]="spendingLimit" [name]="'limit-' + card.id">
             <button class="c360-primary" type="button" (click)="saveLimit(card)">Save limit</button>
           </div>
+        </section>
+
+        <section class="c360-section" *ngIf="selectedCard?.type === 'credit'">
+          <h2>Statements and bills</h2>
+          <div class="c360-statement-actions">
+            <button class="c360-secondary" type="button" (click)="downloadCurrentBill()"
+              [disabled]="downloadingStatement || !cardBills.length">
+              Download current bill
+            </button>
+            <button class="c360-secondary" type="button" (click)="downloadLastBill()"
+              [disabled]="downloadingStatement || cardBills.length < 2">
+              Download last bill
+            </button>
+          </div>
+          <form class="c360-date-range" (ngSubmit)="downloadCustomStatement()">
+            <label for="c360-statement-start">Statement from</label>
+            <input id="c360-statement-start" name="statementStartDate" type="date"
+              [(ngModel)]="statementStartDate" required>
+            <label for="c360-statement-end">to</label>
+            <input id="c360-statement-end" name="statementEndDate" type="date"
+              [(ngModel)]="statementEndDate" [min]="statementStartDate" required>
+            <button class="c360-primary" type="submit" [disabled]="downloadingStatement">
+              {{ downloadingStatement ? 'Preparing…' : 'Download custom statement' }}
+            </button>
+          </form>
+          <p class="c360-muted">Statement downloads contain this credit card’s activity only. Card numbers remain masked in downloaded statements.</p>
+          <p class="c360-muted" *ngIf="!cardBills.length && selectedCard">No bill is available to download yet.</p>
         </section>
 
         <section class="c360-section c360-transactions" *ngIf="selectedCard as card">

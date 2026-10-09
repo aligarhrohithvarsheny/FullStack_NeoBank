@@ -27,6 +27,8 @@ interface Card360Card {
   billPenalty?: number;
   billEmiAmount?: number;
   billStatus?: string;
+  fullCardNumber?: string;
+  closureRequestStatus?: string;
 }
 
 interface Card360Transaction {
@@ -41,6 +43,21 @@ interface Card360Transaction {
 interface Cards360PaymentAccount {
   maskedAccountNumber: string;
   balance: number;
+}
+
+interface Card360Bill {
+  id: number;
+  billGenerationDate: string;
+  dueDate: string;
+  totalAmount: number;
+  regularAmount: number;
+  emiAmount: number;
+  minimumDue: number;
+  paidAmount: number;
+  fine: number;
+  penalty: number;
+  status: string;
+  billingPeriod: string;
 }
 
 @Component({
@@ -67,6 +84,13 @@ export class Cards360 implements OnInit {
   selectedBillCardId: number | null = null;
   billPaymentAmount = 0;
   payingBill = false;
+  cardBills: Card360Bill[] = [];
+  statementStartDate = '';
+  statementEndDate = '';
+  closureReason = '';
+  requestingClosureFor: number | null = null;
+  submittingClosureRequest = false;
+  downloadingStatement = false;
 
   private readonly tokenKey = 'card360Token';
   private readonly api = `${environment.apiBaseUrl}/api/card360`;
@@ -145,7 +169,9 @@ export class Cards360 implements OnInit {
 
   selectCard(card: Card360Card): void {
     this.selectedCardKey = this.cardKey(card);
+    this.cards.forEach(item => item.fullCardNumber = undefined);
     this.selectedTransactions = [];
+    this.cardBills = [];
     this.loadingTransactions = true;
     this.error = '';
     this.http.get<Card360Transaction[]>(
@@ -161,11 +187,77 @@ export class Cards360 implements OnInit {
         this.handleProtectedError(err);
       }
     });
+    if (card.type === 'credit') {
+      this.http.get<Card360Bill[]>(`${this.api}/cards/credit/${card.id}/bills`, { headers: this.headers() })
+        .subscribe({
+          next: bills => this.cardBills = bills || [],
+          error: err => this.handleProtectedError(err)
+        });
+    }
   }
 
   showOverview(): void {
     this.selectedCardKey = '';
     this.selectedTransactions = [];
+    this.cardBills = [];
+    this.cards.forEach(card => card.fullCardNumber = undefined);
+  }
+
+  toggleFullCardNumber(card: Card360Card): void {
+    this.error = '';
+    if (card.fullCardNumber) {
+      card.fullCardNumber = undefined;
+      return;
+    }
+    this.http.get<{ fullCardNumber: string }>(`${this.api}/cards/credit/${card.id}/number`,
+      { headers: this.headers() }).subscribe({
+        next: result => card.fullCardNumber = result.fullCardNumber,
+        error: err => this.error = err.error?.message || 'Unable to reveal this card number.'
+      });
+  }
+
+  submitClosureRequest(card: Card360Card): void {
+    if (!this.closureReason.trim()) {
+      this.error = 'Enter a reason for your card closure request.';
+      return;
+    }
+    this.submittingClosureRequest = true;
+    this.error = '';
+    this.http.post<{ status: string }>(`${this.api}/cards/credit/${card.id}/closure-requests`,
+      { reason: this.closureReason.trim() }, { headers: this.headers() }).subscribe({
+        next: result => {
+          this.submittingClosureRequest = false;
+          this.requestingClosureFor = null;
+          this.closureReason = '';
+          card.closureRequestStatus = result.status;
+          this.notice = 'Your card closure request was sent to NeoBank for review.';
+        },
+        error: err => {
+          this.submittingClosureRequest = false;
+          this.error = err.error?.message || 'Unable to submit the card closure request.';
+        }
+      });
+  }
+
+  downloadCurrentBill(): void {
+    const latestBill = this.cardBills[0];
+    if (latestBill) this.downloadBill(latestBill);
+  }
+
+  downloadLastBill(): void {
+    const previousBill = this.cardBills[1];
+    if (previousBill) this.downloadBill(previousBill);
+  }
+
+  downloadCustomStatement(): void {
+    if (!this.selectedCard || this.selectedCard.type !== 'credit') return;
+    if (!this.statementStartDate || !this.statementEndDate
+        || this.statementEndDate < this.statementStartDate) {
+      this.error = 'Choose a valid statement start and end date.';
+      return;
+    }
+    this.downloadStatement(this.selectedCard, this.statementStartDate, this.statementEndDate,
+      `card-statement-${this.statementStartDate}-to-${this.statementEndDate}`);
   }
 
   linkCard(): void {
@@ -255,7 +347,83 @@ export class Cards360 implements OnInit {
     this.cards = [];
     this.selectedTransactions = [];
     this.selectedCardKey = '';
+    this.cardBills = [];
+    this.cards.forEach(card => card.fullCardNumber = undefined);
     this.router.navigate(['/website/cards360']);
+  }
+
+  private downloadBill(bill: Card360Bill): void {
+    if (!this.selectedCard) return;
+    const previousBill = this.cardBills.find(candidate =>
+      new Date(candidate.billGenerationDate) < new Date(bill.billGenerationDate));
+    const billDate = bill.billGenerationDate.slice(0, 10);
+    const previousDate = previousBill?.billGenerationDate.slice(0, 10);
+    const start = previousDate
+      ? new Date(new Date(`${previousDate}T00:00:00Z`).getTime() + 86400000).toISOString().slice(0, 10)
+      : `${billDate.slice(0, 7)}-01`;
+    const end = billDate;
+    this.downloadStatement(this.selectedCard, start, end, `credit-card-bill-${bill.id}`, bill);
+  }
+
+  private downloadStatement(card: Card360Card, startDate: string, endDate: string,
+                            fileName: string, bill?: Card360Bill): void {
+    this.downloadingStatement = true;
+    this.error = '';
+    const params = new URLSearchParams({ startDate, endDate });
+    this.http.get<{ maskedCardNumber: string; transactions: Array<{
+      date: string; description: string; type: string; amount: number; balanceAfter: number; billId: number | null;
+    }> }>(`${this.api}/cards/credit/${card.id}/statement?${params.toString()}`, {
+      headers: this.headers()
+    }).subscribe({
+      next: async statement => {
+        this.downloadingStatement = false;
+        try {
+          const { jsPDF } = await import('jspdf');
+          const pdf = new jsPDF();
+          pdf.setFontSize(18);
+          pdf.text('NeoBank Credit Card Statement', 14, 20);
+          pdf.setFontSize(10);
+          pdf.text(`Card: ${statement.maskedCardNumber}`, 14, 30);
+          pdf.text(`Period: ${startDate} to ${endDate}`, 14, 37);
+          if (bill) {
+            pdf.text(`Bill #${bill.id} · ${bill.billingPeriod} · ${bill.status}`, 14, 44);
+            pdf.text(`Generated: ${new Date(bill.billGenerationDate).toLocaleString()}`, 14, 51);
+            pdf.text(`Due: ${new Date(bill.dueDate).toLocaleDateString()}`, 14, 58);
+            pdf.text(`Regular: Rs ${Number(bill.regularAmount || 0).toFixed(2)}  EMI: Rs ${Number(bill.emiAmount || 0).toFixed(2)}`, 14, 65);
+            pdf.text(`Bill total: Rs ${Number(bill.totalAmount || 0).toFixed(2)}  Fine: Rs ${Number(bill.fine || 0).toFixed(2)}  Penalty: Rs ${Number(bill.penalty || 0).toFixed(2)}`, 14, 72);
+            pdf.text(`Minimum due: Rs ${Number(bill.minimumDue || 0).toFixed(2)}  Paid: Rs ${Number(bill.paidAmount || 0).toFixed(2)}`, 14, 79);
+          }
+          let y = bill ? 91 : 49;
+          pdf.setFontSize(9);
+          pdf.text('Date', 14, y);
+          pdf.text('Description', 43, y);
+          pdf.text('Type', 112, y);
+          pdf.text('Amount', 139, y);
+          pdf.text('Balance', 171, y);
+          y += 7;
+          for (const transaction of statement.transactions) {
+            if (y > 275) {
+              pdf.addPage();
+              y = 20;
+            }
+            pdf.text(new Date(transaction.date).toLocaleDateString(), 14, y);
+            pdf.text(pdf.splitTextToSize(transaction.description || 'Card activity', 63), 43, y);
+            pdf.text(transaction.type || '-', 112, y);
+            pdf.text(`Rs ${Number(transaction.amount || 0).toFixed(2)}`, 139, y);
+            pdf.text(`Rs ${Number(transaction.balanceAfter || 0).toFixed(2)}`, 171, y);
+            y += 8;
+          }
+          if (!statement.transactions.length) pdf.text('No card transactions for this period.', 14, y);
+          pdf.save(`${fileName}.pdf`);
+        } catch {
+          this.error = 'Unable to create the statement PDF. Please try again.';
+        }
+      },
+      error: err => {
+        this.downloadingStatement = false;
+        this.error = err.error?.message || 'Unable to load statement data.';
+      }
+    });
   }
 
   private cardKey(card: Card360Card): string {

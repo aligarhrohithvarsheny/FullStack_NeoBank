@@ -7,6 +7,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.Map;
 
 @RestController
@@ -73,6 +75,36 @@ public class Card360Controller {
         }
     }
 
+    @PostMapping("/admin/closure-requests")
+    public ResponseEntity<?> getAdminClosureRequests(@RequestBody Map<String, String> request) {
+        try {
+            return ResponseEntity.ok(card360Service.getAdminClosureRequests(request.get("accountNumber"),
+                    request.get("adminEmail"), request.get("adminPassword")));
+        } catch (IllegalArgumentException exception) {
+            return ResponseEntity.status("Admin authentication failed".equals(exception.getMessage())
+                    ? HttpStatus.UNAUTHORIZED : HttpStatus.BAD_REQUEST)
+                    .body(Map.of("message", exception.getMessage()));
+        }
+    }
+
+    @PostMapping("/admin/closure-requests/{id}/review")
+    public ResponseEntity<?> reviewClosureRequest(@PathVariable Long id,
+                                                   @RequestBody Map<String, String> request) {
+        String decision = request.get("decision");
+        if (!"approve".equalsIgnoreCase(decision) && !"reject".equalsIgnoreCase(decision)) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Decision must be approve or reject"));
+        }
+        try {
+            return ResponseEntity.ok(card360Service.reviewClosureRequest(id,
+                    "approve".equalsIgnoreCase(decision), request.get("reviewNote"),
+                    request.get("adminEmail"), request.get("adminPassword")));
+        } catch (IllegalArgumentException exception) {
+            return ResponseEntity.status("Admin authentication failed".equals(exception.getMessage())
+                    ? HttpStatus.UNAUTHORIZED : HttpStatus.BAD_REQUEST)
+                    .body(Map.of("message", exception.getMessage()));
+        }
+    }
+
     @GetMapping("/cards")
     public ResponseEntity<?> cards(Authentication authentication) {
         SessionPrincipal principal = card360Principal(authentication);
@@ -119,6 +151,59 @@ public class Card360Controller {
             Number limit = request.get("spendingLimit");
             if (limit == null) return ResponseEntity.badRequest().body(Map.of("message", "Spending limit is required"));
             return ResponseEntity.ok(card360Service.updateCreditLimit(principal.accountNumber(), id, limit.doubleValue()));
+        } catch (IllegalArgumentException exception) {
+            return ResponseEntity.badRequest().body(Map.of("message", exception.getMessage()));
+        }
+    }
+
+    @GetMapping("/cards/credit/{id}/number")
+    public ResponseEntity<?> revealCreditCardNumber(@PathVariable Long id, Authentication authentication) {
+        SessionPrincipal principal = card360Principal(authentication);
+        if (principal == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        try {
+            return ResponseEntity.ok(card360Service.revealCreditCardNumber(principal.accountNumber(), id));
+        } catch (IllegalArgumentException exception) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", exception.getMessage()));
+        }
+    }
+
+    @GetMapping("/cards/credit/{id}/bills")
+    public ResponseEntity<?> creditCardBills(@PathVariable Long id, Authentication authentication) {
+        SessionPrincipal principal = card360Principal(authentication);
+        if (principal == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        try {
+            return ResponseEntity.ok(card360Service.getCreditCardBills(principal.accountNumber(), id));
+        } catch (IllegalArgumentException exception) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", exception.getMessage()));
+        }
+    }
+
+    @GetMapping("/cards/credit/{id}/statement")
+    public ResponseEntity<?> creditCardStatement(@PathVariable Long id,
+                                                  @RequestParam String startDate,
+                                                  @RequestParam String endDate,
+                                                  Authentication authentication) {
+        SessionPrincipal principal = card360Principal(authentication);
+        if (principal == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        try {
+            return ResponseEntity.ok(card360Service.getCreditCardStatement(principal.accountNumber(), id,
+                    LocalDate.parse(startDate), LocalDate.parse(endDate)));
+        } catch (DateTimeParseException exception) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Statement dates must use YYYY-MM-DD format"));
+        } catch (IllegalArgumentException exception) {
+            return ResponseEntity.badRequest().body(Map.of("message", exception.getMessage()));
+        }
+    }
+
+    @PostMapping("/cards/credit/{id}/closure-requests")
+    public ResponseEntity<?> requestCreditCardClosure(@PathVariable Long id,
+                                                       @RequestBody Map<String, String> request,
+                                                       Authentication authentication) {
+        SessionPrincipal principal = card360Principal(authentication);
+        if (principal == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        try {
+            return ResponseEntity.ok(card360Service.requestCreditCardClosure(principal.accountNumber(), id,
+                    request.get("reason")));
         } catch (IllegalArgumentException exception) {
             return ResponseEntity.badRequest().body(Map.of("message", exception.getMessage()));
         }

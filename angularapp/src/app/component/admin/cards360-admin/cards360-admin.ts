@@ -33,6 +33,20 @@ interface Card360AdminCustomer {
   enabled: boolean;
 }
 
+interface CardClosureRequest {
+  id: number;
+  creditCardId: number;
+  accountNumber: string;
+  customerName: string;
+  maskedCardNumber: string;
+  reason: string;
+  status: string;
+  requestedAt: string;
+  reviewedAt?: string;
+  reviewedBy?: string;
+  reviewNote?: string;
+}
+
 @Component({
   selector: 'app-cards360-admin',
   standalone: true,
@@ -48,6 +62,8 @@ export class Cards360Admin {
   customer: Card360AdminCustomer | null = null;
   enabled: boolean | null = null;
   history: Card360AuditRow[] = [];
+  closureRequests: CardClosureRequest[] = [];
+  closureReviewNotes: Record<number, string> = {};
   error = '';
   notice = '';
   loading = false;
@@ -92,6 +108,7 @@ export class Cards360Admin {
     this.passcode = '';
     this.history = [];
     this.customer = null;
+    this.closureRequests = [];
     this.enabled = null;
     this.notice = '';
   }
@@ -108,6 +125,7 @@ export class Cards360Admin {
           this.customer = result;
           this.enabled = result.enabled;
           this.notice = 'Approved customer details loaded. Card numbers are masked for security.';
+          this.loadClosureRequests();
         },
         error: err => this.fail(err)
       });
@@ -137,6 +155,41 @@ export class Cards360Admin {
         next: rows => this.history = rows || [],
         error: err => this.fail(err)
       });
+  }
+
+  loadClosureRequests(): void {
+    if (!this.validateLoadedCustomer()) return;
+    this.http.post<CardClosureRequest[]>(`${environment.apiBaseUrl}/api/card360/admin/closure-requests`,
+      { ...this.credentials(), accountNumber: this.accountNumber.trim() }).subscribe({
+        next: requests => this.closureRequests = requests || [],
+        error: err => this.fail(err)
+      });
+  }
+
+  reviewClosureRequest(request: CardClosureRequest, decision: 'approve' | 'reject'): void {
+    if (!this.validateLoadedCustomer()) return;
+    const reviewNote = (this.closureReviewNotes[request.id] || '').trim();
+    if (decision === 'reject' && !reviewNote) {
+      this.error = 'Enter a reason before rejecting a closure request.';
+      return;
+    }
+    this.loading = true;
+    this.error = '';
+    this.http.post<CardClosureRequest>(
+      `${environment.apiBaseUrl}/api/card360/admin/closure-requests/${request.id}/review`,
+      { ...this.credentials(), decision, reviewNote }
+    ).subscribe({
+      next: result => {
+        this.loading = false;
+        this.notice = result.status === 'Approved'
+          ? 'Card closed and closure request approved.'
+          : 'Closure request rejected.';
+        this.loadClosureRequests();
+        this.loadCustomerDetails();
+        this.loadHistory();
+      },
+      error: err => this.fail(err)
+    });
   }
 
   back(): void {

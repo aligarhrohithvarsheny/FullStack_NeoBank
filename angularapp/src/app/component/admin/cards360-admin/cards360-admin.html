@@ -34,6 +34,30 @@
       </div>
       <ng-template #noCustomerCards><p class="helper">No debit or credit cards are linked to this account.</p></ng-template>
     </section>
+    <section *ngIf="customer" class="history">
+      <div class="history-heading"><h2>Credit-card closure requests</h2><button class="secondary" type="button" (click)="loadClosureRequests()">Refresh</button></div>
+      <div class="history-table">
+        <table>
+          <thead><tr><th>Requested</th><th>Customer</th><th>Card</th><th>Reason</th><th>Status / review</th><th>Admin action</th></tr></thead>
+          <tbody>
+            <tr *ngFor="let request of closureRequests">
+              <td>{{ request.requestedAt | date:'medium' }}</td>
+              <td>{{ request.customerName || customer.customerName }}</td>
+              <td>{{ request.maskedCardNumber }} · #{{ request.creditCardId }}</td>
+              <td>{{ request.reason }}</td>
+              <td>{{ request.status }}<small *ngIf="request.reviewNote"><br>{{ request.reviewNote }}</small></td>
+              <td *ngIf="request.status === 'Pending'">
+                <input type="text" [name]="'closure-note-' + request.id" [(ngModel)]="closureReviewNotes[request.id]" placeholder="Rejection note">
+                <button class="primary" type="button" [disabled]="loading" (click)="reviewClosureRequest(request, 'approve')">Approve & close</button>
+                <button class="secondary" type="button" [disabled]="loading" (click)="reviewClosureRequest(request, 'reject')">Reject</button>
+              </td>
+              <td *ngIf="request.status !== 'Pending'">{{ request.reviewedBy || '—' }}</td>
+            </tr>
+            <tr *ngIf="!closureRequests.length"><td colspan="6" class="empty">No closure requests for this account.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
     <div class="c360-admin-actions">
       <button class="primary" type="button" [disabled]="loading" (click)="generatePasscode()">Generate passcode</button>
       <button class="secondary" type="button" [disabled]="loading" (click)="setEnabled(false)">Disable sign-in</button>

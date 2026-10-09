@@ -3,6 +3,7 @@ package com.neo.springapp.service;
 import com.neo.springapp.model.Admin;
 import com.neo.springapp.model.Card;
 import com.neo.springapp.model.Card360Access;
+import com.neo.springapp.model.Card360ClosureRequest;
 import com.neo.springapp.model.CreditCard;
 import com.neo.springapp.model.CreditCardTransaction;
 import com.neo.springapp.model.User;
@@ -29,6 +30,7 @@ class Card360ServiceTest {
     @Mock private CardRepository cardRepository;
     @Mock private CreditCardRepository creditCardRepository;
     @Mock private CreditCardTransactionRepository creditTransactionRepository;
+    @Mock private Card360ClosureRequestRepository closureRequestRepository;
     @Mock private UserRepository userRepository;
     @Mock private AdminService adminService;
     @Mock private CreditCardService creditCardService;
@@ -40,7 +42,7 @@ class Card360ServiceTest {
     void setUp() {
         tokenService = new UserSessionTokenService("test-secret-with-at-least-32-characters");
         service = new Card360Service(accessRepository, auditRepository, cardRepository, creditCardRepository,
-                creditTransactionRepository, userRepository, adminService, tokenService,
+                creditTransactionRepository, closureRequestRepository, userRepository, adminService, tokenService,
                 creditCardService);
     }
 
@@ -97,6 +99,56 @@ class Card360ServiceTest {
         assertThat(card.containsKey("cardNumber")).isFalse();
         assertThat(card.containsKey("cvv")).isFalse();
         assertThat(card.containsKey("pin")).isFalse();
+    }
+
+    @Test
+    void fullCreditCardNumberIsReturnedOnlyFromOwnerScopedReveal() {
+        Card360Access access = new Card360Access();
+        access.setAccountNumber("ACC123");
+        access.setEnabled(true);
+        CreditCard card = new CreditCard();
+        card.setId(29L);
+        card.setAccountNumber("ACC123");
+        card.setCardNumber("5555444433332222");
+        when(accessRepository.findByAccountNumber("ACC123")).thenReturn(Optional.of(access));
+        when(userRepository.findByAccountNumber("ACC123")).thenReturn(Optional.of(approvedUser()));
+        when(creditCardRepository.findById(29L)).thenReturn(Optional.of(card));
+
+        assertThat(service.revealCreditCardNumber("ACC123", 29L))
+                .containsEntry("fullCardNumber", "5555444433332222");
+        card.setAccountNumber("OTHER");
+        assertThatThrownBy(() -> service.revealCreditCardNumber("ACC123", 29L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Card not found");
+    }
+
+    @Test
+    void customerCanSubmitOnePendingClosureRequestForOwnedCreditCard() {
+        Card360Access access = new Card360Access();
+        access.setAccountNumber("ACC123");
+        access.setEnabled(true);
+        CreditCard card = new CreditCard();
+        card.setId(29L);
+        card.setAccountNumber("ACC123");
+        card.setCardNumber("5555444433332222");
+        card.setUserName("NeoBank Customer");
+        when(accessRepository.findByAccountNumber("ACC123")).thenReturn(Optional.of(access));
+        when(userRepository.findByAccountNumber("ACC123")).thenReturn(Optional.of(approvedUser()));
+        when(creditCardRepository.findById(29L)).thenReturn(Optional.of(card));
+        when(closureRequestRepository.findFirstByCreditCardIdAndStatusOrderByRequestedAtDesc(29L, "Pending"))
+                .thenReturn(Optional.empty());
+        org.mockito.Mockito.when(closureRequestRepository.save(
+                org.mockito.ArgumentMatchers.any(Card360ClosureRequest.class))).thenAnswer(invocation -> {
+                    Card360ClosureRequest request = invocation.getArgument(0);
+                    request.setId(51L);
+                    return request;
+                });
+
+        Map<String, Object> result = service.requestCreditCardClosure("ACC123", 29L, "No longer needed");
+
+        assertThat(result.get("id")).isEqualTo(51L);
+        assertThat(result.get("status")).isEqualTo("Pending");
+        assertThat(result.get("maskedCardNumber")).isEqualTo("•••• •••• •••• 2222");
     }
 
     @Test

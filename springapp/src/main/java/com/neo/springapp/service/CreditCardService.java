@@ -14,6 +14,8 @@ import java.util.Optional;
 import java.util.Base64;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.Locale;
+import java.util.Objects;
 import java.util.Set;
 import java.util.HashSet;
 import java.math.BigDecimal;
@@ -1274,9 +1276,15 @@ public class CreditCardService {
         Optional<CreditCard> cardOpt = creditCardRepository.findById(creditCardId);
         if (cardOpt.isPresent()) {
             CreditCard card = cardOpt.get();
-            if (card.getCurrentBalance() > 0) {
+            if (value(card.getCurrentBalance()) > 0 || value(card.getOverdueAmount()) > 0
+                    || value(card.getFine()) > 0 || value(card.getPenalty()) > 0) {
                 return false; // Cannot close with outstanding balance
             }
+            boolean hasUnpaidBill = billRepository.findByCreditCardId(creditCardId).stream()
+                    .anyMatch(bill -> !Set.of("paid", "completed").contains(
+                            Objects.toString(bill.getStatus(), "").toLowerCase(Locale.ROOT))
+                            && billTotalDue(bill) - value(bill.getPaidAmount()) > 0.01);
+            if (hasUnpaidBill) return false;
             card.setStatus("Closed");
             card.setClosureDate(LocalDateTime.now());
             creditCardRepository.save(card);

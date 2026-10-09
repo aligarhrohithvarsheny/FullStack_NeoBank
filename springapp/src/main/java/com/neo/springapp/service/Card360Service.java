@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
 
@@ -17,6 +18,7 @@ public class Card360Service {
     private final CardRepository cardRepository;
     private final CreditCardRepository creditCardRepository;
     private final CreditCardTransactionRepository creditTransactionRepository;
+    private final Card360ClosureRequestRepository closureRequestRepository;
     private final UserRepository userRepository;
     private final AdminService adminService;
     private final UserSessionTokenService tokenService;
@@ -27,6 +29,7 @@ public class Card360Service {
     public Card360Service(Card360AccessRepository accessRepository, Card360AuditRepository auditRepository,
                           CardRepository cardRepository, CreditCardRepository creditCardRepository,
                           CreditCardTransactionRepository creditTransactionRepository,
+                          Card360ClosureRequestRepository closureRequestRepository,
                           UserRepository userRepository,
                           AdminService adminService, UserSessionTokenService tokenService,
                           CreditCardService creditCardService) {
@@ -35,6 +38,7 @@ public class Card360Service {
         this.cardRepository = cardRepository;
         this.creditCardRepository = creditCardRepository;
         this.creditTransactionRepository = creditTransactionRepository;
+        this.closureRequestRepository = closureRequestRepository;
         this.userRepository = userRepository;
         this.adminService = adminService;
         this.tokenService = tokenService;
@@ -240,6 +244,165 @@ public class Card360Service {
         throw new IllegalArgumentException("Unsupported card type");
     }
 
+    @Transactional(readOnly = true)
+    public Map<String, Object> revealCreditCardNumber(String accountNumber, long cardId) {
+        requireEnabled(accountNumber);
+        CreditCard card = creditCardRepository.findById(cardId)
+                .filter(value -> accountNumber.equals(value.getAccountNumber()))
+                .orElseThrow(() -> new IllegalArgumentException("Card not found"));
+        return Map.of("fullCardNumber", Objects.toString(card.getCardNumber(), ""));
+    }
+
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> getCreditCardBills(String accountNumber, long cardId) {
+        requireEnabled(accountNumber);
+        CreditCard card = creditCardRepository.findById(cardId)
+                .filter(value -> accountNumber.equals(value.getAccountNumber()))
+                .orElseThrow(() -> new IllegalArgumentException("Card not found"));
+        return creditCardService.getBillsByCardId(card.getId()).stream()
+                .sorted(Comparator.comparing(CreditCardBill::getBillGenerationDate,
+                        Comparator.nullsLast(Comparator.reverseOrder())))
+                .map(this::billStatementView)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public Map<String, Object> getCreditCardStatement(String accountNumber, long cardId,
+                                                       LocalDate startDate, LocalDate endDate) {
+        requireEnabled(accountNumber);
+        CreditCard card = creditCardRepository.findById(cardId)
+                .filter(value -> accountNumber.equals(value.getAccountNumber()))
+                .orElseThrow(() -> new IllegalArgumentException("Card not found"));
+        if (startDate == null || endDate == null || endDate.isBefore(startDate)) {
+            throw new IllegalArgumentException("Enter a valid statement date range");
+        }
+        LocalDateTime start = startDate.atStartOfDay();
+        LocalDateTime endExclusive = endDate.plusDays(1).atStartOfDay();
+        List<Map<String, Object>> transactions = creditTransactionRepository.findByCreditCardId(card.getId())
+                .stream()
+                .filter(tx -> tx.getTransactionDate() != null
+                        && !tx.getTransactionDate().isBefore(start)
+                        && tx.getTransactionDate().isBefore(endExclusive))
+                .sorted(Comparator.comparing(CreditCardTransaction::getTransactionDate))
+                .map(tx -> {
+                    Map<String, Object> item = new HashMap<>();
+                    item.put("date", tx.getTransactionDate());
+                    item.put("description", Objects.toString(tx.getDescription(),
+                            Objects.toString(tx.getMerchant(), "Card transaction")));
+                    item.put("type", Objects.toString(tx.getTransactionType(), ""));
+                    item.put("amount", tx.getAmount());
+                    item.put("balanceAfter", tx.getBalanceAfter());
+                    item.put("billId", tx.getBillId());
+                    return item;
+                }).toList();
+        Map<String, Object> result = new HashMap<>();
+        result.put("cardType", "Credit Card");
+        result.put("maskedCardNumber", mask(card.getCardNumber()));
+        result.put("startDate", startDate);
+        result.put("endDate", endDate);
+        result.put("transactions", transactions);
+        return result;
+    }
+
+    @Transactional
+    public Map<String, Object> requestCreditCardClosure(String accountNumber, long cardId, String reason) {
+        requireEnabled(accountNumber);
+        CreditCard card = creditCardRepository.findById(cardId)
+                .filter(value -> accountNumber.equals(value.getAccountNumber()))
+                .orElseThrow(() -> new IllegalArgumentException("Card not found"));
+        if ("Closed".equalsIgnoreCase(card.getStatus())) {
+            throw new IllegalArgumentException("This credit card is already closed");
+        }
+        if (closureRequestRepository.findFirstByCreditCardIdAndStatusOrderByRequestedAtDesc(cardId, "Pending").isPresent()) {
+            throw new IllegalArgumentException("A closure request is already pending for this card");
+        }
+        if (isBlank(reason)) throw new IllegalArgumentException("Enter a reason for closing this card");
+        Card360ClosureRequest request = new Card360ClosureRequest();
+        request.setCreditCardId(card.getId());
+        request.setAccountNumber(accountNumber);
+        request.setCustomerName(card.getUserName());
+        request.setMaskedCardNumber(mask(card.getCardNumber()));
+        request.setReason(reason.trim());
+        request.setStatus("Pending");
+        Card360ClosureRequest saved = closureRequestRepository.save(request);
+        record(accountNumber, "credit", cardId, "CARD_CLOSURE_REQUESTED", null,
+                "Request #" + saved.getId() + ": " + reason.trim(), "CUSTOMER:" + accountNumber);
+        return closureRequestView(saved);
+    }
+
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> getAdminClosureRequests(String accountNumber, String adminEmail,
+                                                              String adminPassword) {
+        requireAdmin(adminEmail, adminPassword);
+        if (isBlank(accountNumber)) throw new IllegalArgumentException("Customer account number is required");
+        return closureRequestRepository.findByAccountNumberOrderByRequestedAtDesc(accountNumber.trim())
+                .stream().map(this::closureRequestView).toList();
+    }
+
+    @Transactional
+    public Map<String, Object> reviewClosureRequest(Long requestId, boolean approve, String reviewNote,
+                                                     String adminEmail, String adminPassword) {
+        Admin admin = requireAdmin(adminEmail, adminPassword);
+        Card360ClosureRequest request = closureRequestRepository.findById(requestId)
+                .orElseThrow(() -> new IllegalArgumentException("Card closure request not found"));
+        if (!"Pending".equalsIgnoreCase(request.getStatus())) {
+            throw new IllegalArgumentException("This closure request has already been reviewed");
+        }
+        if (approve) {
+            CreditCard card = creditCardRepository.findById(request.getCreditCardId())
+                    .filter(value -> request.getAccountNumber().equals(value.getAccountNumber()))
+                    .orElseThrow(() -> new IllegalArgumentException("Requested credit card not found"));
+            if (!creditCardService.closeCreditCard(card.getId())) {
+                throw new IllegalArgumentException("Card cannot be closed while it has an outstanding balance");
+            }
+            request.setStatus("Approved");
+        } else {
+            if (isBlank(reviewNote)) throw new IllegalArgumentException("Enter a reason when rejecting the request");
+            request.setStatus("Rejected");
+        }
+        request.setReviewedAt(LocalDateTime.now());
+        request.setReviewedBy(admin.getEmail());
+        request.setReviewNote(isBlank(reviewNote) ? null : reviewNote.trim());
+        Card360ClosureRequest saved = closureRequestRepository.save(request);
+        record(request.getAccountNumber(), "credit", request.getCreditCardId(),
+                approve ? "CARD_CLOSURE_REQUEST_APPROVED" : "CARD_CLOSURE_REQUEST_REJECTED",
+                "Pending", saved.getStatus(), admin.getEmail());
+        return closureRequestView(saved);
+    }
+
+    private Map<String, Object> billStatementView(CreditCardBill bill) {
+        Map<String, Object> result = new HashMap<>();
+        result.put("id", bill.getId());
+        result.put("billGenerationDate", bill.getBillGenerationDate());
+        result.put("dueDate", bill.getDueDate());
+        result.put("totalAmount", bill.getTotalAmount());
+        result.put("regularAmount", bill.getRegularAmount());
+        result.put("emiAmount", bill.getEmiAmount());
+        result.put("minimumDue", bill.getMinimumDue());
+        result.put("paidAmount", bill.getPaidAmount());
+        result.put("fine", bill.getFine());
+        result.put("penalty", bill.getPenalty());
+        result.put("status", bill.getStatus());
+        result.put("billingPeriod", bill.getBillingPeriod());
+        return result;
+    }
+
+    private Map<String, Object> closureRequestView(Card360ClosureRequest request) {
+        Map<String, Object> result = new HashMap<>();
+        result.put("id", request.getId());
+        result.put("creditCardId", request.getCreditCardId());
+        result.put("accountNumber", request.getAccountNumber());
+        result.put("customerName", request.getCustomerName());
+        result.put("maskedCardNumber", request.getMaskedCardNumber());
+        result.put("reason", request.getReason());
+        result.put("status", request.getStatus());
+        result.put("requestedAt", request.getRequestedAt());
+        result.put("reviewedAt", request.getReviewedAt());
+        result.put("reviewedBy", request.getReviewedBy());
+        result.put("reviewNote", request.getReviewNote());
+        return result;
+    }
+
     @Transactional(noRollbackFor = IllegalArgumentException.class)
     public Map<String, Object> getAdminCustomerDetails(String accountNumber, String adminEmail, String adminPassword) {
         requireAdmin(adminEmail, adminPassword);
@@ -318,6 +481,8 @@ public class Card360Service {
         result.put("canUnblock", customerCanUnblock(card.getAccountNumber(), "credit", card.getId()));
         result.put("fine", card.getFine());
         result.put("penalty", card.getPenalty());
+        closureRequestRepository.findFirstByCreditCardIdAndStatusOrderByRequestedAtDesc(card.getId(), "Pending")
+                .ifPresent(request -> result.put("closureRequestStatus", request.getStatus()));
         creditCardService.getBillsByCardId(card.getId()).stream()
                 .max(Comparator.comparing(CreditCardBill::getBillGenerationDate,
                         Comparator.nullsLast(Comparator.naturalOrder())))
