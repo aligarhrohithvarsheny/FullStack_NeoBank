@@ -99,6 +99,12 @@ public class CurrentAccount {
     @JsonIgnore
     private String password;
     private Boolean passwordSet = false;
+    @JsonIgnore
+    private String ownerDob;
+    private Integer failedLoginAttempts = 0;
+    private Boolean accountLocked = false;
+    private LocalDateTime lastFailedLoginTime;
+    private String lockReason;
 
     // Net Banking control per customer
     private Boolean netBankingEnabled = true;

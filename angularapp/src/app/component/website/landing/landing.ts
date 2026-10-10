@@ -1,6 +1,8 @@
 import { Component, ViewEncapsulation, HostListener, OnInit, OnDestroy, Inject, PLATFORM_ID } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { AccountRecoveryService, RecoveryAccountType } from '../../../service/account-recovery.service';
 
 type FooterInformation = {
   title: string;
@@ -14,6 +16,7 @@ type LandingSearchResult = {
   keywords: string;
   route?: string;
   sectionId?: string;
+  action?: 'account-recovery';
 };
 
 @Component({
@@ -21,11 +24,12 @@ type LandingSearchResult = {
   templateUrl: './landing.html',
   styleUrls: ['./landing.css'],
   encapsulation: ViewEncapsulation.None,
-  imports: [CommonModule, RouterLink]
+  imports: [CommonModule, RouterLink, FormsModule]
 })
 export class Landing implements OnInit, OnDestroy {
   showPersonalDropdown = false;
   showBusinessDropdown = false;
+  showCorporateDropdown = false;
   showInvestInsureDropdown = false;
   showAnimatedLogo = true;
   logoAnimationComplete = false;
@@ -34,6 +38,19 @@ export class Landing implements OnInit, OnDestroy {
   activeFooterInformation: FooterInformation | null = null;
   isSearchOpen = false;
   searchQuery = '';
+  accountRecoveryOpen = false;
+  recoveryAccountType: RecoveryAccountType = 'Savings';
+  recoveryCustomerId = '';
+  recoveryAccountNumber = '';
+  recoveryDob = '';
+  recoveryMaskedName = '';
+  recoveryVerified = false;
+  recoveryNewPassword = '';
+  recoveryConfirmPassword = '';
+  recoveryError = '';
+  recoverySuccess = '';
+  isVerifyingRecovery = false;
+  isResettingRecovery = false;
 
   readonly searchItems: LandingSearchResult[] = [
     {
@@ -101,6 +118,12 @@ export class Landing implements OnInit, OnDestroy {
       description: 'Sign in to your NeoBank account.',
       keywords: 'login sign in user internet banking',
       route: 'website/user'
+    },
+    {
+      label: 'Recover Account',
+      description: 'Reset a blocked Savings, Current, or Salary account password.',
+      keywords: 'recover account blocked unlock password reset',
+      action: 'account-recovery'
     }
   ];
 
@@ -228,6 +251,7 @@ export class Landing implements OnInit, OnDestroy {
 
   constructor(
     private router: Router,
+    private accountRecoveryService: AccountRecoveryService,
     @Inject(PLATFORM_ID) private platformId: Object
   ) {
     this.isBrowser = isPlatformBrowser(this.platformId);
@@ -289,6 +313,94 @@ export class Landing implements OnInit, OnDestroy {
   onEscapeKey() {
     this.closeFooterInformation();
     this.closeSearch();
+    this.closeAccountRecovery();
+  }
+
+  openAccountRecovery(event?: Event) {
+    event?.preventDefault();
+    event?.stopPropagation();
+    this.accountRecoveryOpen = true;
+    this.recoveryError = '';
+    this.recoverySuccess = '';
+  }
+
+  closeAccountRecovery() {
+    this.accountRecoveryOpen = false;
+    this.recoveryCustomerId = '';
+    this.recoveryAccountNumber = '';
+    this.recoveryDob = '';
+    this.recoveryMaskedName = '';
+    this.recoveryNewPassword = '';
+    this.recoveryConfirmPassword = '';
+    this.recoveryVerified = false;
+    this.recoveryError = '';
+    this.recoverySuccess = '';
+  }
+
+  resetRecoveryVerification() {
+    this.recoveryVerified = false;
+    this.recoveryMaskedName = '';
+    this.recoveryError = '';
+    this.recoverySuccess = '';
+  }
+
+  verifyRecoveryDetails() {
+    if (!this.recoveryAccountType || !this.recoveryCustomerId.trim()
+        || !this.recoveryAccountNumber.trim() || !this.recoveryDob) {
+      this.recoveryError = 'Enter your account type, Customer ID, account number, and date of birth.';
+      return;
+    }
+
+    this.isVerifyingRecovery = true;
+    this.recoveryError = '';
+    this.accountRecoveryService.verify(this.recoveryIdentity()).subscribe({
+      next: response => {
+        this.isVerifyingRecovery = false;
+        this.recoveryMaskedName = response.maskedName;
+        this.recoveryVerified = response.success;
+      },
+      error: err => {
+        this.isVerifyingRecovery = false;
+        this.recoveryError = err.error?.message || 'We could not verify those details. Check them and try again.';
+      }
+    });
+  }
+
+  submitRecoveryPassword() {
+    if (this.recoveryNewPassword.length < 8 || this.recoveryNewPassword.length > 128) {
+      this.recoveryError = 'Password must be between 8 and 128 characters.';
+      return;
+    }
+    if (this.recoveryNewPassword !== this.recoveryConfirmPassword) {
+      this.recoveryError = 'The passwords do not match.';
+      return;
+    }
+
+    this.isResettingRecovery = true;
+    this.recoveryError = '';
+    this.accountRecoveryService.resetPassword(this.recoveryIdentity(), this.recoveryNewPassword).subscribe({
+      next: response => {
+        this.isResettingRecovery = false;
+        this.recoverySuccess = response.message;
+        this.recoveryVerified = false;
+        this.recoveryMaskedName = '';
+        this.recoveryNewPassword = '';
+        this.recoveryConfirmPassword = '';
+      },
+      error: err => {
+        this.isResettingRecovery = false;
+        this.recoveryError = err.error?.message || 'Password reset failed. Check your details and try again.';
+      }
+    });
+  }
+
+  private recoveryIdentity() {
+    return {
+      accountType: this.recoveryAccountType,
+      customerId: this.recoveryCustomerId.trim(),
+      accountNumber: this.recoveryAccountNumber.trim(),
+      dob: this.recoveryDob
+    };
   }
 
   get searchResults(): LandingSearchResult[] {
@@ -326,6 +438,11 @@ export class Landing implements OnInit, OnDestroy {
       return;
     }
 
+    if (result.action === 'account-recovery') {
+      this.openAccountRecovery();
+      return;
+    }
+
     if (result.sectionId && this.isBrowser) {
       document.getElementById(result.sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
@@ -359,6 +476,7 @@ export class Landing implements OnInit, OnDestroy {
     event.preventDefault();
     this.showPersonalDropdown = !this.showPersonalDropdown;
     this.showBusinessDropdown = false;
+    this.showCorporateDropdown = false;
     this.showInvestInsureDropdown = false;
   }
 
@@ -366,6 +484,15 @@ export class Landing implements OnInit, OnDestroy {
     event.preventDefault();
     this.showBusinessDropdown = !this.showBusinessDropdown;
     this.showPersonalDropdown = false;
+    this.showCorporateDropdown = false;
+    this.showInvestInsureDropdown = false;
+  }
+
+  toggleCorporateDropdown(event: Event) {
+    event.preventDefault();
+    this.showCorporateDropdown = !this.showCorporateDropdown;
+    this.showPersonalDropdown = false;
+    this.showBusinessDropdown = false;
     this.showInvestInsureDropdown = false;
   }
 
@@ -374,6 +501,7 @@ export class Landing implements OnInit, OnDestroy {
     this.showInvestInsureDropdown = !this.showInvestInsureDropdown;
     this.showPersonalDropdown = false;
     this.showBusinessDropdown = false;
+    this.showCorporateDropdown = false;
   }
 
   goTo(path: string, event?: Event) {
@@ -384,6 +512,7 @@ export class Landing implements OnInit, OnDestroy {
     this.router.navigate([`/${path}`]);
     this.showPersonalDropdown = false;
     this.showBusinessDropdown = false;
+    this.showCorporateDropdown = false;
     this.showInvestInsureDropdown = false;
   }
 
@@ -395,6 +524,7 @@ export class Landing implements OnInit, OnDestroy {
     this.router.navigate(['/admin/login'], { queryParams: { role } });
     this.showPersonalDropdown = false;
     this.showBusinessDropdown = false;
+    this.showCorporateDropdown = false;
     this.showInvestInsureDropdown = false;
   }
 
@@ -406,6 +536,7 @@ export class Landing implements OnInit, OnDestroy {
     if (!dropdown) {
       this.showPersonalDropdown = false;
       this.showBusinessDropdown = false;
+      this.showCorporateDropdown = false;
       this.showInvestInsureDropdown = false;
     }
   }

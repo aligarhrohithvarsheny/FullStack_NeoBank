@@ -25,6 +25,32 @@ describe('Landing', () => {
     expect(component).toBeTruthy();
   });
 
+  it('shows the login and account shortcuts in the Corporate menu', () => {
+    const corporateMenu = fixture.nativeElement.querySelector('#corporate-menu') as HTMLElement;
+    const shortcuts = Array.from(corporateMenu.querySelectorAll('.dropdown-item'))
+      .map(item => item.textContent?.trim());
+
+    expect(shortcuts).toEqual([
+      'Admin Login',
+      'Manager Login',
+      'HOD Login',
+      'FASTag Login',
+      'Merchant Login',
+      'Open Account'
+    ]);
+    expect(fixture.nativeElement.querySelector('.nav-actions')).toBeNull();
+  });
+
+  it('opens Corporate without leaving another navigation menu open', () => {
+    const event = { preventDefault: () => {} } as Event;
+    component.showBusinessDropdown = true;
+
+    component.toggleCorporateDropdown(event);
+
+    expect(component.showCorporateDropdown).toBeTrue();
+    expect(component.showBusinessDropdown).toBeFalse();
+  });
+
   it('finds account opening when searching with multiple words', () => {
     component.searchQuery = 'open account';
 
@@ -47,5 +73,18 @@ describe('Landing', () => {
     component.searchQuery = 'fastag recharge';
 
     expect(component.searchResults[0].route).toBe('website/fasttag-login');
+  });
+
+  it('opens account recovery from the landing-page search result', () => {
+    component.searchQuery = 'recover blocked account';
+    const result = component.searchResults[0];
+    const event = { preventDefault: () => {} } as Event;
+
+    expect(result.label).toBe('Recover Account');
+    component.selectSearchResult(result, event);
+    fixture.detectChanges();
+
+    expect(component.accountRecoveryOpen).toBeTrue();
+    expect(fixture.nativeElement.querySelector('#account-recovery-title')?.textContent).toContain('Recover your account');
   });
 });

@@ -717,7 +717,7 @@ public class CurrentAccountService {
         return result;
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public Map<String, Object> authenticate(String accountNumber, String password) {
         Map<String, Object> result = new HashMap<>();
         Optional<CurrentAccount> opt = accountRepository.findByAccountNumber(accountNumber);
@@ -737,12 +737,36 @@ public class CurrentAccountService {
             result.put("message", "Account is not active. Current status: " + account.getStatus());
             return result;
         }
-        if (!passwordEncoder.matches(password, account.getPassword())) {
+        if (Boolean.TRUE.equals(account.getAccountLocked())) {
             result.put("success", false);
-            result.put("message", "Invalid password");
+            result.put("accountLocked", true);
+            result.put("message", "Account is locked after multiple failed login attempts. Use account recovery to reset your password.");
+            return result;
+        }
+        if (!passwordEncoder.matches(password, account.getPassword())) {
+            int attempts = account.getFailedLoginAttempts() != null ? account.getFailedLoginAttempts() + 1 : 1;
+            account.setFailedLoginAttempts(attempts);
+            account.setLastFailedLoginTime(LocalDateTime.now());
+            if (attempts >= 3) {
+                account.setAccountLocked(true);
+                account.setLockReason("Account locked after 3 failed password attempts");
+                accountRepository.save(account);
+                result.put("accountLocked", true);
+                result.put("message", "Account locked due to 3 failed login attempts. Use account recovery to reset your password.");
+            } else {
+                accountRepository.save(account);
+                result.put("failedAttempts", attempts);
+                result.put("message", "Invalid password. " + (3 - attempts) + " attempt(s) remaining before account lock.");
+            }
+            result.put("success", false);
             return result;
         }
 
+        if (account.getFailedLoginAttempts() != null && account.getFailedLoginAttempts() > 0) {
+            account.setFailedLoginAttempts(0);
+            account.setLastFailedLoginTime(null);
+            accountRepository.save(account);
+        }
         result.put("success", true);
         result.put("message", "Login successful");
         result.put("account", toSafeAccountResponse(account));

@@ -30,6 +30,7 @@
             <a href="#" class="dropdown-item" (click)="goTo('website/createaccount', $event)">Create Account</a>
             <a href="#" class="dropdown-item" (click)="goTo('website/personal-kyc', $event)">Personal KYC</a>
             <a href="#" class="dropdown-item" (click)="goTo('website/user', $event)">User Login</a>
+            <a href="#" class="dropdown-item" (click)="openAccountRecovery($event)">Recover Account</a>
             <a href="#" class="dropdown-item" (click)="goTo('website/user', $event)">Internet Banking</a>
             <a href="#" class="dropdown-item" (click)="goTo('website/cards360', $event)">NeoBank Cards360</a>
             <a href="#" class="dropdown-item" (click)="goTo('website/fasttag-login', $event)">FASTag Login</a>
@@ -41,8 +42,26 @@
             <a href="#" class="dropdown-item" (click)="goTo('website/merchant-login', $event)">Merchant Login</a>
             <a href="#" class="dropdown-item" (click)="goTo('website/agent-login', $event)">Agent Login</a>
             <a href="#" class="dropdown-item" (click)="goTo('website/pg-login', $event)">Payment Gateway Login</a>
-                        <a href="#" class="dropdown-item" (click)="goTo('website/ecs-cancel-request', $event)">ECS Cancel Request</a>
-                      </div>
+            <a href="#" class="dropdown-item" (click)="goTo('website/ecs-cancel-request', $event)">ECS Cancel Request</a>
+          </div>
+        </div>
+        <div class="nav-item dropdown">
+          <a
+            href="#"
+            class="nav-link"
+            (click)="toggleCorporateDropdown($event)"
+            [attr.aria-expanded]="showCorporateDropdown"
+            aria-controls="corporate-menu">
+            Corporate <span class="chevron">▾</span>
+          </a>
+          <div class="dropdown-menu" id="corporate-menu" [class.show]="showCorporateDropdown">
+            <a href="#" class="dropdown-item" (click)="goToAdminRole('ADMIN', $event)">Admin Login</a>
+            <a href="#" class="dropdown-item" (click)="goToAdminRole('MANAGER', $event)">Manager Login</a>
+            <a href="#" class="dropdown-item" (click)="goTo('hod/login', $event)">HOD Login</a>
+            <a href="#" class="dropdown-item" (click)="goTo('website/fasttag-login', $event)">FASTag Login</a>
+            <a href="#" class="dropdown-item" (click)="goTo('website/merchant-login', $event)">Merchant Login</a>
+            <a href="#" class="dropdown-item" (click)="goTo('website/createaccount', $event)">Open Account</a>
+          </div>
         </div>
         <div class="nav-item dropdown">
           <a href="#" class="nav-link" (click)="toggleInvestInsureDropdown($event)">Invest & Insure <span class="chevron">▾</span></a>
@@ -94,14 +113,6 @@
         </div>
       </div>
 
-      <div class="nav-actions">
-        <button class="btn-ghost" (click)="goToAdminRole('ADMIN', $event)">Admin Login</button>
-        <button class="btn-manager" (click)="goToAdminRole('MANAGER', $event)">Manager Login</button>
-        <button class="btn-hod" (click)="goTo('hod/login', $event)">HOD Login</button>
-        <button class="btn-fasttag" (click)="goTo('website/fasttag-login', $event)">FASTag Login</button>
-        <button class="btn-merchant" (click)="goTo('website/merchant-login', $event)">Merchant Login</button>
-        <button class="btn-glow" (click)="goTo('website/createaccount', $event)">Open Account</button>
-      </div>
     </div>
   </nav>
 
@@ -802,6 +813,106 @@
       <div class="footer-info-footer">
         <button type="button" (click)="closeFooterInformation()">Close</button>
       </div>
+    </section>
+  </div>
+
+  <div
+    class="account-recovery-backdrop"
+    *ngIf="accountRecoveryOpen"
+    (click)="closeAccountRecovery()"
+  >
+    <section
+      class="account-recovery-dialog"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="account-recovery-title"
+      (click)="$event.stopPropagation()"
+    >
+      <div class="account-recovery-header">
+        <div>
+          <span class="account-recovery-eyebrow">SECURE ACCOUNT ACCESS</span>
+          <h2 id="account-recovery-title">Recover your account</h2>
+          <p>Verify your registered details to reset your password and unlock your login.</p>
+        </div>
+        <button type="button" class="account-recovery-close" aria-label="Close account recovery" (click)="closeAccountRecovery()">×</button>
+      </div>
+
+      <form (ngSubmit)="recoveryVerified ? submitRecoveryPassword() : verifyRecoveryDetails()">
+        <div class="account-recovery-grid">
+          <label>
+            Account type
+            <select
+              name="recoveryAccountType"
+              [(ngModel)]="recoveryAccountType"
+              (ngModelChange)="resetRecoveryVerification()"
+              [disabled]="recoveryVerified">
+              <option value="Savings">Savings</option>
+              <option value="Current">Current</option>
+              <option value="Salary">Salary</option>
+            </select>
+          </label>
+          <label>
+            Customer ID
+            <input
+              name="recoveryCustomerId"
+              type="text"
+              autocomplete="off"
+              [(ngModel)]="recoveryCustomerId"
+              (ngModelChange)="resetRecoveryVerification()"
+              [disabled]="recoveryVerified"
+              required>
+          </label>
+          <label>
+            Account number
+            <input
+              name="recoveryAccountNumber"
+              type="text"
+              inputmode="numeric"
+              autocomplete="off"
+              [(ngModel)]="recoveryAccountNumber"
+              (ngModelChange)="resetRecoveryVerification()"
+              [disabled]="recoveryVerified"
+              required>
+          </label>
+          <label>
+            Date of birth
+            <input
+              name="recoveryDob"
+              type="date"
+              [(ngModel)]="recoveryDob"
+              (ngModelChange)="resetRecoveryVerification()"
+              [disabled]="recoveryVerified"
+              required>
+          </label>
+        </div>
+
+        <div class="recovery-verified-name" *ngIf="recoveryVerified">
+          Verified account name: <strong>{{ recoveryMaskedName }}</strong>
+        </div>
+        <ng-container *ngIf="recoveryVerified">
+          <label class="account-recovery-password">
+            New password
+            <input name="recoveryNewPassword" type="password" autocomplete="new-password" [(ngModel)]="recoveryNewPassword" required minlength="8" maxlength="128">
+          </label>
+          <label class="account-recovery-password">
+            Confirm new password
+            <input name="recoveryConfirmPassword" type="password" autocomplete="new-password" [(ngModel)]="recoveryConfirmPassword" required minlength="8" maxlength="128">
+          </label>
+        </ng-container>
+
+        <p class="account-recovery-error" role="alert" *ngIf="recoveryError">{{ recoveryError }}</p>
+        <p class="account-recovery-success" role="status" *ngIf="recoverySuccess">{{ recoverySuccess }}</p>
+        <div class="account-recovery-actions">
+          <button type="button" class="account-recovery-cancel" (click)="closeAccountRecovery()">Close</button>
+          <button
+            type="submit"
+            class="account-recovery-submit"
+            [disabled]="isVerifyingRecovery || isResettingRecovery">
+            <ng-container *ngIf="!recoveryVerified">{{ isVerifyingRecovery ? 'Verifying...' : 'Verify account' }}</ng-container>
+            <ng-container *ngIf="recoveryVerified">{{ isResettingRecovery ? 'Resetting...' : 'Set new password' }}</ng-container>
+          </button>
+        </div>
+      </form>
     </section>
   </div>
 

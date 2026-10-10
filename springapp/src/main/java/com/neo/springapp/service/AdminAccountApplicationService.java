@@ -406,6 +406,7 @@ public class AdminAccountApplicationService {
         } else if ("Current".equals(app.getAccountType())) {
             CurrentAccount ca = new CurrentAccount();
             ca.setOwnerName(app.getFullName());
+            ca.setOwnerDob(app.getDateOfBirth());
             ca.setBusinessName(app.getBusinessName() != null ? app.getBusinessName() : app.getFullName());
             ca.setBusinessType(app.getBusinessType() != null ? app.getBusinessType() : "Proprietor");
             ca.setBusinessRegistrationNumber(app.getBusinessRegistrationNumber());
