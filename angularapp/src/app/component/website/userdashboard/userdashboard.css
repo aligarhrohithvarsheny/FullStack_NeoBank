@@ -818,6 +818,16 @@ select.ud-input { cursor: pointer; }
 
 /* Account Grid */
 .ud-account-grid { background: #f8f5ff; border-radius: 14px; padding: 20px; border: 1.5px solid #e9d5ff; }
+.ud-cancelled-cheque-section { margin-top: 24px; padding: 20px; border: 1px solid #e2e8f0; border-radius: 14px; background: #fbfdff; }
+.ud-cancelled-cheque-section h3 { margin: 0 0 6px; color: #0f172a; font-size: 17px; }
+.ud-cancelled-cheque-section > p { color: #475569; font-size: 13px; line-height: 1.5; }
+.ud-cancelled-cheque-list { margin-top: 14px; }
+.ud-cancelled-cheque-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 0; border-top: 1px solid #e2e8f0; }
+.ud-cancelled-cheque-row > div:first-child { display: grid; gap: 4px; min-width: 0; }
+.ud-cancelled-cheque-row > div:first-child strong { color: #1e293b; font-size: 14px; }
+.ud-cancelled-cheque-row > div:first-child span { color: #64748b; font-size: 12px; overflow-wrap: anywhere; }
+.ud-cancelled-cheque-row .ud-form-actions { flex-shrink: 0; }
+.ud-cancelled-cheque-empty { margin-top: 14px; color: #64748b; font-size: 13px; }
 
 /* Deposit Cards */
 .ud-deposit-list { display: grid; gap: 14px; }

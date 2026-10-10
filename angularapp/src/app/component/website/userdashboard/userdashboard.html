@@ -957,6 +957,20 @@
         <div class="ud-feature-header"><h2>Account Details</h2><button (click)="loadUserProfile()" class="ud-chip-btn">Refresh</button></div>
         <div class="ud-account-grid"><div class="ud-info-row"><span>Account Number:</span><span>{{ userAccountNumber }}</span></div><div class="ud-info-row"><span>Holder:</span><span>{{ username }}</span></div><div class="ud-info-row"><span>Balance:</span><span class="ud-text-success">&#8377;{{ currentBalance | number:'1.2-2' }}</span></div><div class="ud-info-row" *ngIf="userProfile?.email"><span>Email:</span><span>{{ userProfile.email }}</span></div></div>
         <div class="ud-form-actions" style="margin-top:16px"><button (click)="selectFeature('transaction')" class="ud-btn-outline">View Transactions</button><button (click)="selectFeature('transferfunds')" class="ud-btn-primary">Transfer Funds</button></div>
+        <section class="ud-cancelled-cheque-section" aria-labelledby="cancelled-cheque-heading">
+          <h3 id="cancelled-cheque-heading">Cancelled Cheque</h3>
+          <p>Download the same account-specific cheque copy again whenever you need it. Every copy is clearly marked CANCELLED; no cheque leaf is issued.</p>
+          <div class="ud-cancelled-cheque-list" *ngIf="cancelledChequeAccounts.length">
+            <div class="ud-cancelled-cheque-row" *ngFor="let account of cancelledChequeAccounts">
+              <div><strong>{{ account.type }} Account</strong><span>A/C {{ account.accountNumber }}</span></div>
+              <div class="ud-form-actions">
+                <button type="button" class="ud-btn-primary ud-btn-sm" (click)="downloadCancelledChequePdf(account)">Download PDF</button>
+                <button type="button" class="ud-btn-outline ud-btn-sm" (click)="downloadCancelledChequeImage(account)">Download PNG</button>
+              </div>
+            </div>
+          </div>
+          <p class="ud-cancelled-cheque-empty" *ngIf="!cancelledChequeAccounts.length">Account details are not available yet. Refresh your account details and try again.</p>
+        </section>
       </div>
 
       <!-- Embedded Features -->

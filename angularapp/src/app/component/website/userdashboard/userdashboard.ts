@@ -41,6 +41,14 @@ import { of } from 'rxjs';
 
 type SidebarCategory = 'savings' | 'cards' | 'transfer' | 'withdrawal' | 'deposits' | 'loans' | 'government' | 'emi' | 'investments' | 'bills' | 'fx' | 'family' | 'fasttag' | 'upi' | 'other';
 
+interface CancelledChequeAccount {
+  type: 'Savings' | 'Salary' | 'Current';
+  accountNumber: string;
+  holderName: string;
+  branch: string;
+  ifsc: string;
+}
+
 @Component({
   selector: 'app-userdashboard',
   standalone: true,
@@ -257,6 +265,161 @@ export class Userdashboard implements OnInit, OnDestroy {
       mobile: account.mobile,
       branch: account.branch
     };
+  }
+
+  get cancelledChequeAccounts(): CancelledChequeAccount[] {
+    const accounts: CancelledChequeAccount[] = [];
+    const savingsAccount = this.userProfile?.account || {};
+    const salaryAccount = this.userProfile?.salaryAccount || {};
+    const currentAccount = this.linkedCurrentAccountDetails || {};
+
+    if (this.userAccountNumber && this.userAccountNumber !== 'ACC001') {
+      accounts.push({
+        type: 'Savings',
+        accountNumber: this.userAccountNumber,
+        holderName: savingsAccount.name || this.username,
+        branch: savingsAccount.branchName || 'NeoBank Digital Branch',
+        ifsc: savingsAccount.ifscCode || 'NEOB0001234'
+      });
+    }
+
+    if (salaryAccount.accountNumber) {
+      accounts.push({
+        type: 'Salary',
+        accountNumber: salaryAccount.accountNumber,
+        holderName: salaryAccount.employeeName || this.username,
+        branch: salaryAccount.branchName || 'NeoBank Digital Branch',
+        ifsc: salaryAccount.ifscCode || 'NEOB0001234'
+      });
+    }
+
+    const currentAccountNumber = currentAccount.accountNumber || this.linkedAccount?.currentAccountNumber;
+    if (currentAccountNumber) {
+      accounts.push({
+        type: 'Current',
+        accountNumber: currentAccountNumber,
+        holderName: currentAccount.ownerName || this.username,
+        branch: currentAccount.branchName || 'NeoBank Digital Branch',
+        ifsc: currentAccount.ifscCode || 'NEOB0001234'
+      });
+    }
+
+    return accounts;
+  }
+
+  async downloadCancelledChequePdf(account: CancelledChequeAccount): Promise<void> {
+    if (!isPlatformBrowser(this.platformId)) return;
+
+    try {
+      const { jsPDF } = await import('jspdf');
+      const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [200, 100] });
+      pdf.setFillColor(255, 255, 255);
+      pdf.setDrawColor(15, 118, 110);
+      pdf.setLineWidth(1);
+      pdf.roundedRect(4, 4, 192, 92, 3, 3, 'FD');
+      pdf.setFillColor(15, 118, 110);
+      pdf.rect(4, 4, 192, 19, 'F');
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(15);
+      pdf.text('NEOBANK', 11, 13);
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(7);
+      pdf.text(`${account.type.toUpperCase()} ACCOUNT`, 11, 18);
+      pdf.setTextColor(31, 41, 55);
+      pdf.setFontSize(8);
+      pdf.text('PAY: ______________________________________________', 11, 34);
+      pdf.text('RUPEES: ___________________________________________', 11, 42);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(10);
+      pdf.text(account.holderName.slice(0, 42), 11, 57);
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(8);
+      pdf.text(`Account number: ${account.accountNumber}`, 11, 64);
+      pdf.text(`Branch: ${account.branch.slice(0, 48)}`, 11, 70);
+      pdf.text(`IFSC: ${account.ifsc}`, 11, 76);
+      pdf.setTextColor(100, 116, 139);
+      pdf.setFontSize(6);
+      pdf.text('For account verification only - not a valid cheque leaf', 11, 87);
+      pdf.setTextColor(220, 38, 38);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(30);
+      pdf.text('CANCELLED', 105, 54, { align: 'center', angle: -18 });
+      pdf.save(`${this.cancelledChequeFileStem(account)}.pdf`);
+    } catch (err) {
+      console.error('Error downloading cancelled cheque PDF:', err);
+      this.showTemporaryError('Unable to create the cancelled cheque PDF. Please try again.');
+    }
+  }
+
+  async downloadCancelledChequeImage(account: CancelledChequeAccount): Promise<void> {
+    if (!isPlatformBrowser(this.platformId)) return;
+
+    let imageUrl: string | null = null;
+    try {
+      const svg = this.cancelledChequeSvg(account);
+      imageUrl = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml;charset=utf-8' }));
+      const image = new Image();
+      image.src = imageUrl;
+      await new Promise<void>((resolve, reject) => {
+        image.onload = () => resolve();
+        image.onerror = () => reject(new Error('Could not render the cancelled cheque image.'));
+      });
+
+      const canvas = document.createElement('canvas');
+      canvas.width = 1600;
+      canvas.height = 800;
+      const context = canvas.getContext('2d');
+      if (!context) throw new Error('Could not prepare the cancelled cheque image.');
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+      const png = await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Could not export the cancelled cheque image.')), 'image/png');
+      });
+      const downloadUrl = URL.createObjectURL(png);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = `${this.cancelledChequeFileStem(account)}.png`;
+      link.click();
+      URL.revokeObjectURL(downloadUrl);
+    } catch (err) {
+      console.error('Error downloading cancelled cheque image:', err);
+      this.showTemporaryError('Unable to create the cancelled cheque image. Please try again.');
+    } finally {
+      if (imageUrl) URL.revokeObjectURL(imageUrl);
+    }
+  }
+
+  private cancelledChequeFileStem(account: CancelledChequeAccount): string {
+    const accountNumber = account.accountNumber.replace(/[^a-zA-Z0-9_-]/g, '');
+    return `NeoBank_${account.type}_Cancelled_Cheque_${accountNumber}`;
+  }
+
+  private cancelledChequeSvg(account: CancelledChequeAccount): string {
+    const escapeXml = (value: string) => value.replace(/[<>&'"]/g, character => ({
+      '<': '&lt;',
+      '>': '&gt;',
+      '&': '&amp;',
+      "'": '&apos;',
+      '"': '&quot;'
+    })[character] || character);
+    const text = (value: string, x: number, y: number, size = 20, weight = 400) =>
+      `<text x="${x}" y="${y}" font-family="Arial,sans-serif" font-size="${size}" font-weight="${weight}" fill="#1f2937">${escapeXml(value)}</text>`;
+
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="800" viewBox="0 0 800 400">
+      <rect width="800" height="400" rx="18" fill="#fff" stroke="#0f766e" stroke-width="6"/>
+      <path d="M18 20h764v72H18z" fill="#0f766e"/>
+      <text x="44" y="57" font-family="Arial,sans-serif" font-size="32" font-weight="700" fill="#fff">NEOBANK</text>
+      <text x="44" y="82" font-family="Arial,sans-serif" font-size="15" fill="#fff">${escapeXml(account.type.toUpperCase())} ACCOUNT</text>
+      ${text('PAY: ______________________________________________', 44, 142)}
+      ${text('RUPEES: ___________________________________________', 44, 178)}
+      ${text(account.holderName.slice(0, 42), 44, 232, 24, 700)}
+      ${text(`Account number: ${account.accountNumber}`, 44, 270)}
+      ${text(`Branch: ${account.branch}`, 44, 306)}
+      ${text(`IFSC: ${account.ifsc}`, 44, 342)}
+      <text x="44" y="378" font-family="Arial,sans-serif" font-size="13" fill="#64748b">For account verification only - not a valid cheque leaf</text>
+      <text x="400" y="235" text-anchor="middle" transform="rotate(-18 400 205)" font-family="Arial,sans-serif" font-size="104" font-weight="700" fill="#dc2626" fill-opacity=".25">CANCELLED</text>
+    </svg>`;
   }
 
   get depositDenominationTotal(): number {
