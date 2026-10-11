@@ -61,6 +61,7 @@ CREATE TABLE IF NOT EXISTS atm_transactions (
     transaction_ref     VARCHAR(50) UNIQUE NOT NULL,
     atm_id              VARCHAR(20) NOT NULL,
     account_number      VARCHAR(50) NOT NULL,
+    account_type        VARCHAR(30),
     card_number         VARCHAR(30),
     user_name           VARCHAR(150),
     user_email          VARCHAR(150),
@@ -87,6 +88,8 @@ CREATE TABLE IF NOT EXISTS atm_transactions (
     INDEX idx_atm_txn_date (created_at),
     INDEX idx_atm_txn_card (card_number)
 );
+
+ALTER TABLE atm_transactions ADD COLUMN IF NOT EXISTS account_type VARCHAR(30) AFTER account_number;
 
 -- ATM Stuck Card / Incident Log
 CREATE TABLE IF NOT EXISTS atm_incidents (

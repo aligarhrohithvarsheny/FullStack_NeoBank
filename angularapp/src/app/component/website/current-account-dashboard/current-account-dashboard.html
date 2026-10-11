@@ -148,6 +148,17 @@
       </div>
     </section>
 
+    <section *ngIf="activeSection === 'atm-simulator' && account" class="section">
+      <h2 class="section-title">ATM Withdrawal</h2>
+      <app-atm-simulator
+        [accountNumberInput]="account.accountNumber || ''"
+        [accountTypeInput]="'CURRENT'"
+        [userNameInput]="account.ownerName"
+        [userEmailInput]="account.email"
+        (withdrawalCompleted)="onAtmWithdrawalCompleted()">
+      </app-atm-simulator>
+    </section>
+
     <!-- ==================== TRANSFER MONEY ==================== -->
     <section *ngIf="activeSection === 'transfer'" class="section">
       <h2 class="section-title">Transfer Money</h2>

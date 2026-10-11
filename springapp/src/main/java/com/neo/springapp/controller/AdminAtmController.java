@@ -336,18 +336,17 @@ public class AdminAtmController {
         try {
             String atmId = (String) body.get("atmId");
             String accountNumber = (String) body.get("accountNumber");
+            String accountType = (String) body.get("accountType");
             String cardNumber = (String) body.get("cardNumber");
             String userName = (String) body.get("userName");
             String userEmail = (String) body.get("userEmail");
             Double amount = Double.valueOf(body.get("amount").toString());
-            Double userBalanceBefore = body.get("userBalanceBefore") != null ?
-                    Double.valueOf(body.get("userBalanceBefore").toString()) : 0.0;
-            Double userBalanceAfter = body.get("userBalanceAfter") != null ?
-                    Double.valueOf(body.get("userBalanceAfter").toString()) : 0.0;
 
-            Map<String, Object> result = atmService.processWithdrawal(atmId, accountNumber, cardNumber,
-                    userName, userEmail, amount, userBalanceBefore, userBalanceAfter);
-            return ResponseEntity.ok(result);
+            Map<String, Object> result = atmService.processWithdrawal(atmId, accountNumber, accountType,
+                    cardNumber, userName, userEmail, amount);
+            return Boolean.TRUE.equals(result.get("success"))
+                    ? ResponseEntity.ok(result)
+                    : ResponseEntity.badRequest().body(result);
         } catch (Exception e) {
             Map<String, Object> response = new HashMap<>();
             response.put("success", false);

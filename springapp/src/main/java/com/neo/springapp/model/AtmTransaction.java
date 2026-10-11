@@ -20,6 +20,9 @@ public class AtmTransaction {
     @Column(name = "account_number", nullable = false)
     private String accountNumber;
 
+    @Column(name = "account_type")
+    private String accountType;
+
     @Column(name = "card_number")
     private String cardNumber;
 
@@ -91,6 +94,9 @@ public class AtmTransaction {
 
     public String getAccountNumber() { return accountNumber; }
     public void setAccountNumber(String accountNumber) { this.accountNumber = accountNumber; }
+
+    public String getAccountType() { return accountType; }
+    public void setAccountType(String accountType) { this.accountType = accountType; }
 
     public String getCardNumber() { return cardNumber; }
     public void setCardNumber(String cardNumber) { this.cardNumber = cardNumber; }

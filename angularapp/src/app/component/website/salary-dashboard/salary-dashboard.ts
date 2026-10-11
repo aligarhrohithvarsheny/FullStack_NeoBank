@@ -11,11 +11,12 @@ import { SubscriptionPaymentComponent } from '../subscription-payment/subscripti
 import { DrawChequeComponent } from './draw-cheque/draw-cheque.component';
 import { environment } from '../../../../environment/environment';
 import { CreditCardBillPay } from '../credit-card-bill-pay/credit-card-bill-pay';
+import { AtmSimulatorComponent } from '../atm-simulator/atm-simulator';
 
 @Component({
   selector: 'app-salary-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule, SubscriptionPaymentComponent, DrawChequeComponent, CreditCardBillPay],
+  imports: [CommonModule, FormsModule, SubscriptionPaymentComponent, DrawChequeComponent, CreditCardBillPay, AtmSimulatorComponent],
   templateUrl: './salary-dashboard.html',
   styleUrls: ['./salary-dashboard.css']
 })
@@ -336,6 +337,10 @@ export class SalaryDashboard implements OnInit, OnDestroy {
     else if (section === 'gold-loan') { this.loadCurrentGoldRate(); this.loadMyGoldLoans(); }
     else if (section === 'employee-profile') { this.initProfileForm(); }
     else if (section === 'credit-card') { this.loadMyCreditCards(); }
+  }
+
+  onAtmWithdrawalCompleted(): void {
+    this.loadAccount();
   }
 
   generatePassbook(): void {

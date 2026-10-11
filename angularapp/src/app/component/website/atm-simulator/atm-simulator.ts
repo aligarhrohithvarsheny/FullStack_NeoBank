@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, Inject, PLATFORM_ID, HostListener } from '@angular/core';
+import { Component, OnInit, OnDestroy, Inject, PLATFORM_ID, HostListener, Input, Output, EventEmitter } from '@angular/core';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
@@ -35,6 +35,12 @@ interface DebitCardData {
   styleUrls: ['./atm-simulator.css']
 })
 export class AtmSimulatorComponent implements OnInit, OnDestroy {
+  @Input() accountNumberInput = '';
+  @Input() accountTypeInput = '';
+  @Input() userNameInput = '';
+  @Input() userEmailInput = '';
+  @Output() withdrawalCompleted = new EventEmitter<void>();
+
   currentStep: AtmStep = 'idle';
   pin: string = '';
   pinMask: string = '';
@@ -42,12 +48,15 @@ export class AtmSimulatorComponent implements OnInit, OnDestroy {
   customAmount: number = 0;
   currentBalance: number = 0;
   accountNumber: string = '';
+  accountType = 'SAVINGS';
   username: string = '';
+  userEmail = '';
   errorMessage: string = '';
   noteCount: number = 0;
   dispensedNotes: number[] = [];
   showReceipt: boolean = false;
   receiptData: any = null;
+  private lastTransactionRef = '';
   miniStatement: MiniStatementEntry[] = [];
   private isBrowser: boolean;
   private stepTimeout: any;
@@ -81,9 +90,15 @@ export class AtmSimulatorComponent implements OnInit, OnDestroy {
       const currentUserStr = sessionStorage.getItem('currentUser');
       if (currentUserStr) {
         const currentUser = JSON.parse(currentUserStr);
-        this.accountNumber = currentUser.accountNumber || '';
-        this.username = currentUser.name || currentUser.email || '';
+        this.accountNumber = this.accountNumberInput || currentUser.accountNumber || '';
+        this.accountType = this.accountTypeInput || currentUser.accountType || 'SAVINGS';
+        this.username = this.userNameInput || currentUser.name || currentUser.email || '';
+        this.userEmail = this.userEmailInput || currentUser.email || '';
       }
+      if (!this.accountNumber) this.accountNumber = this.accountNumberInput;
+      if (this.accountTypeInput) this.accountType = this.accountTypeInput;
+      if (this.userNameInput) this.username = this.userNameInput;
+      if (this.userEmailInput) this.userEmail = this.userEmailInput;
       // Fallback to localStorage user_profile
       if (!this.accountNumber) {
         const profileStr = localStorage.getItem('user_profile');
@@ -91,6 +106,8 @@ export class AtmSimulatorComponent implements OnInit, OnDestroy {
           const profile = JSON.parse(profileStr);
           this.accountNumber = profile.accountNumber || '';
           this.username = profile.name || this.username;
+          this.accountType = profile.accountType || this.accountType;
+          this.userEmail = profile.email || this.userEmail;
         }
       }
       this.fetchBalance();
@@ -174,8 +191,9 @@ export class AtmSimulatorComponent implements OnInit, OnDestroy {
       next: (res) => {
         this.currentBalance = res.balance || res.currentBalance || 0;
       },
-      error: () => {
-        this.currentBalance = 50000; // Fallback for demo
+      error: (err) => {
+        this.currentBalance = 0;
+        console.error('ATM - Error loading account balance:', err);
       }
     });
   }
@@ -478,35 +496,30 @@ export class AtmSimulatorComponent implements OnInit, OnDestroy {
   }
 
   processWithdrawal(): void {
-    const balanceBefore = this.currentBalance;
-    this.http.post<any>(`${environment.apiBaseUrl}/api/transactions/withdraw`, {
+    if (!this.selectedAtmId) {
+      this.currentStep = 'error';
+      this.errorMessage = 'Select an available ATM before withdrawing.';
+      return;
+    }
+
+    this.http.post<any>(`${environment.apiBaseUrl}/api/admin/atm/withdraw`, {
+      atmId: this.selectedAtmId,
       accountNumber: this.accountNumber,
+      accountType: this.accountType,
+      cardNumber: this.debitCard?.cardNumber || '',
+      userName: this.username,
+      userEmail: this.userEmail,
       amount: this.selectedAmount,
-      type: 'ATM_WITHDRAWAL',
-      description: 'ATM Cash Withdrawal'
     }).subscribe({
       next: (res) => {
-        if (res.balance !== undefined) {
-          this.currentBalance = res.balance;
-        } else {
-          this.currentBalance -= this.selectedAmount;
+        if (!res.success) {
+          this.currentStep = 'error';
+          this.errorMessage = res.message || 'ATM withdrawal failed. Please try again.';
+          return;
         }
-        // Record ATM machine transaction if ATM is selected
-        if (this.selectedAtmId) {
-          this.http.post<any>(`${environment.apiBaseUrl}/api/admin/atm/withdraw`, {
-            atmId: this.selectedAtmId,
-            accountNumber: this.accountNumber,
-            cardNumber: this.debitCard?.cardNumber || '',
-            userName: this.username,
-            userEmail: '',
-            amount: this.selectedAmount,
-            userBalanceBefore: balanceBefore,
-            userBalanceAfter: this.currentBalance
-          }).subscribe({
-            next: () => {},
-            error: () => {}
-          });
-        }
+        this.currentBalance = res.balanceAfter;
+        this.lastTransactionRef = res.transactionRef || '';
+        this.withdrawalCompleted.emit();
         this.startDispensing();
       },
       error: (err) => {
@@ -555,7 +568,7 @@ export class AtmSimulatorComponent implements OnInit, OnDestroy {
       accountNumber: this.accountNumber ? '****' + this.accountNumber.slice(-4) : '****1234',
       amount: this.selectedAmount,
       balance: this.currentBalance,
-      txnId: 'ATM' + Date.now().toString().slice(-8)
+      txnId: this.lastTransactionRef || 'ATM' + Date.now().toString().slice(-8)
     };
   }
 

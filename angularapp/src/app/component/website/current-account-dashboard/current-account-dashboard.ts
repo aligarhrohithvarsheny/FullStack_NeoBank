@@ -18,11 +18,12 @@ import { UpiPayment, UpiStats, QrCodeResponse } from '../../../model/upi/upi.mod
 import { BusinessDrawChequeComponent } from './business-draw-cheque/business-draw-cheque.component';
 import { CreditCardBillPay } from '../credit-card-bill-pay/credit-card-bill-pay';
 import { PaymentGatewayService } from '../../../service/payment-gateway.service';
+import { AtmSimulatorComponent } from '../atm-simulator/atm-simulator';
 
 @Component({
   selector: 'app-current-account-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule, BusinessDrawChequeComponent, CreditCardBillPay],
+  imports: [CommonModule, FormsModule, BusinessDrawChequeComponent, CreditCardBillPay, AtmSimulatorComponent],
   templateUrl: './current-account-dashboard.html',
   styleUrls: ['./current-account-dashboard.css']
 })
@@ -36,6 +37,7 @@ export class CurrentAccountDashboard implements OnInit, OnDestroy {
   sidebarSearchQuery = '';
   currentMenuItems: { section: string; icon: string; label: string; action?: () => void }[] = [
     { section: 'dashboard', icon: '', label: 'Dashboard' },
+    { section: 'atm-simulator', icon: '', label: 'ATM Withdrawal' },
     { section: 'transfer', icon: '', label: 'Transfer Money' },
     { section: 'vendors', icon: '', label: 'Vendor Payments' },
     { section: 'transactions', icon: '', label: 'Transaction History' },
@@ -431,6 +433,10 @@ export class CurrentAccountDashboard implements OnInit, OnDestroy {
     if (section === 'users') this.loadBusinessUsers();
     if (section === 'soundbox') this.loadSoundboxData();
     if (section === 'upi') { this.loadUpiData(); this.loadCurrentPaymentLinks(); }
+  }
+
+  onAtmWithdrawalCompleted(): void {
+    this.loadDashboardData();
   }
 
   // ==================== Transactions ====================

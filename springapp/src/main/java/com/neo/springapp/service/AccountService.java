@@ -12,6 +12,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.*;
@@ -138,27 +139,93 @@ public class AccountService {
     }
 
     public Double getBalanceByAccountNumber(String accountNumber) {
-        Account account = getAccountByNumber(accountNumber);
-        return account != null ? account.getBalance() : null;
+        return getBalanceByAccountNumber(accountNumber, null);
     }
 
-    public Double debitBalance(String accountNumber, Double amount) {
-        Account account = getAccountByNumber(accountNumber);
-        if (account == null) {
-            return null;
+    public Double getBalanceByAccountNumber(String accountNumber, String accountType) {
+        String requestedType = normalizeAccountType(accountType);
+        if (requestedType.isEmpty() || requestedType.equals("SAVINGS")) {
+            Account account = accountRepository.findByAccountNumber(accountNumber);
+            if (account != null) return account.getBalance();
+            if (!requestedType.isEmpty()) return null;
         }
-        // Check if account is active
-        if (!"ACTIVE".equalsIgnoreCase(account.getStatus())) {
-            throw new RuntimeException("Cannot perform withdrawal: account is not active. Account number: " + accountNumber + " | status=" + account.getStatus());
+        if (requestedType.isEmpty() || requestedType.equals("CURRENT")) {
+            Optional<CurrentAccount> currentAccount = currentAccountRepository.findByAccountNumber(accountNumber);
+            if (currentAccount.isPresent()) return currentAccount.get().getBalance();
+            if (!requestedType.isEmpty()) return null;
         }
-        
-        if (account.getBalance() >= amount) {
-            account.setBalance(account.getBalance() - amount);
-            account.setLastUpdated(LocalDateTime.now());
-            accountRepository.save(account);
-            return account.getBalance();
+        if (requestedType.isEmpty() || requestedType.equals("SALARY")) {
+            SalaryAccount salaryAccount = salaryAccountRepository.findByAccountNumber(accountNumber);
+            return salaryAccount != null ? salaryAccount.getBalance() : null;
         }
         return null;
+    }
+
+    @Transactional
+    public Double debitBalance(String accountNumber, Double amount) {
+        return debitBalance(accountNumber, amount, null);
+    }
+
+    @Transactional
+    public Double debitBalance(String accountNumber, Double amount, String accountType) {
+        String requestedType = normalizeAccountType(accountType);
+        if (requestedType.isEmpty() || requestedType.equals("SAVINGS")) {
+            Account account = accountRepository.findByAccountNumber(accountNumber);
+            if (account != null) {
+                if (!"ACTIVE".equalsIgnoreCase(account.getStatus())) {
+                    throw new RuntimeException("Cannot perform withdrawal: account is not active. Account number: " + accountNumber + " | status=" + account.getStatus());
+                }
+                if (account.getBalance() >= amount) {
+                    account.setBalance(account.getBalance() - amount);
+                    account.setLastUpdated(LocalDateTime.now());
+                    accountRepository.save(account);
+                    return account.getBalance();
+                }
+                return null;
+            }
+            if (!requestedType.isEmpty()) return null;
+        }
+
+        if (requestedType.isEmpty() || requestedType.equals("CURRENT")) {
+            Optional<CurrentAccount> currentAccount = currentAccountRepository.findByAccountNumber(accountNumber);
+            if (currentAccount.isPresent()) {
+                CurrentAccount current = currentAccount.get();
+                if (!"ACTIVE".equalsIgnoreCase(current.getStatus())) {
+                    throw new RuntimeException("Cannot perform withdrawal: account is not active. Account number: " + accountNumber + " | status=" + current.getStatus());
+                }
+                if (current.getBalance() != null && current.getBalance() >= amount) {
+                    current.setBalance(current.getBalance() - amount);
+                    currentAccountRepository.save(current);
+                    return current.getBalance();
+                }
+                return null;
+            }
+            if (!requestedType.isEmpty()) return null;
+        }
+
+        if (requestedType.isEmpty() || requestedType.equals("SALARY")) {
+            SalaryAccount salary = salaryAccountRepository.findByAccountNumber(accountNumber);
+            if (salary != null) {
+                if (!"ACTIVE".equalsIgnoreCase(salary.getStatus())) {
+                    throw new RuntimeException("Cannot perform withdrawal: account is not active. Account number: " + accountNumber + " | status=" + salary.getStatus());
+                }
+                if (salary.getBalance() != null && salary.getBalance() >= amount) {
+                    salary.setBalance(salary.getBalance() - amount);
+                    salaryAccountRepository.save(salary);
+                    return salary.getBalance();
+                }
+            }
+        }
+        return null;
+    }
+
+    private String normalizeAccountType(String accountType) {
+        if (accountType == null) return "";
+        String normalized = accountType.replaceAll("[^A-Za-z]", "").toUpperCase(Locale.ROOT);
+        if (normalized.endsWith("ACCOUNT")) {
+            normalized = normalized.substring(0, normalized.length() - "ACCOUNT".length());
+        }
+        return "SAVING".equals(normalized) ? "SAVINGS" : normalized;
     }
 
     public Double creditBalance(String accountNumber, Double amount) {

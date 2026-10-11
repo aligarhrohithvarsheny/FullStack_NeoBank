@@ -1817,7 +1817,7 @@ export class Dashboard implements OnInit, OnDestroy {
       this.closeUserDetails();
       this.activeSection = section;
       if (isPlatformBrowser(this.platformId)) {
-        setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 0);
+        setTimeout(() => window.scrollTo({ top: 0, behavior: 'auto' }), 0);
       }
       return;
     } else if (section === 'cards') {

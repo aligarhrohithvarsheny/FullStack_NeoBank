@@ -32,6 +32,12 @@ public class AtmManagementService {
     @Autowired
     private AtmServiceLogRepository atmServiceLogRepository;
 
+    @Autowired
+    private AccountService accountService;
+
+    @Autowired
+    private TransactionService transactionService;
+
     // ─── ATM Machine CRUD ──────────────────────────────────
 
     public List<AtmMachine> getAllAtms() {
@@ -177,39 +183,86 @@ public class AtmManagementService {
     // ─── ATM Withdrawal (for user-facing ATM simulator) ───
 
     @Transactional
-    public Map<String, Object> processWithdrawal(String atmId, String accountNumber, String cardNumber,
-                                                   String userName, String userEmail, Double amount,
-                                                   Double userBalanceBefore, Double userBalanceAfter) {
+    public Map<String, Object> processWithdrawal(String atmId, String accountNumber, String accountType,
+                                                   String cardNumber, String userName, String userEmail,
+                                                   Double amount) {
         AtmMachine atm = atmMachineRepository.findByAtmId(atmId)
                 .orElseThrow(() -> new RuntimeException("ATM not found: " + atmId));
 
+        String normalizedAccountType = accountType == null ? "" :
+                accountType.replaceAll("[^A-Za-z]", "").toUpperCase(Locale.ROOT);
+        if (normalizedAccountType.endsWith("ACCOUNT")) {
+            normalizedAccountType = normalizedAccountType.substring(0,
+                    normalizedAccountType.length() - "ACCOUNT".length());
+        }
+        if ("SAVING".equals(normalizedAccountType)) normalizedAccountType = "SAVINGS";
+        if (accountNumber == null || accountNumber.isBlank()) {
+            throw new IllegalArgumentException("Account number is required");
+        }
+        if (amount == null || amount <= 0) {
+            return createFailedTransaction(atmId, accountNumber, normalizedAccountType, cardNumber, userName, userEmail,
+                    amount, null, "Invalid withdrawal amount");
+        }
+        if (!List.of("SAVINGS", "CURRENT", "SALARY").contains(normalizedAccountType)) {
+            return createFailedTransaction(atmId, accountNumber, normalizedAccountType, cardNumber, userName, userEmail,
+                    amount, null, "Unsupported account type");
+        }
+        Double userBalanceBefore = accountService.getBalanceByAccountNumber(accountNumber, normalizedAccountType);
+        if (userBalanceBefore == null) {
+            return createFailedTransaction(atmId, accountNumber, normalizedAccountType, cardNumber, userName, userEmail,
+                    amount, null, "Account not found");
+        }
+
         // Check ATM status
         if (!"ACTIVE".equals(atm.getStatus())) {
-            return createFailedTransaction(atmId, accountNumber, cardNumber, userName, userEmail,
+            return createFailedTransaction(atmId, accountNumber, normalizedAccountType, cardNumber, userName, userEmail,
                     amount, userBalanceBefore, "ATM is " + atm.getStatus());
         }
 
         // Check ATM has enough cash
         if (atm.getCashAvailable() < amount) {
-            return createFailedTransaction(atmId, accountNumber, cardNumber, userName, userEmail,
+            return createFailedTransaction(atmId, accountNumber, normalizedAccountType, cardNumber, userName, userEmail,
                     amount, userBalanceBefore, "ATM has insufficient cash");
         }
 
         // Check per-transaction limit
         if (amount > atm.getMaxWithdrawalLimit()) {
-            return createFailedTransaction(atmId, accountNumber, cardNumber, userName, userEmail,
+            return createFailedTransaction(atmId, accountNumber, normalizedAccountType, cardNumber, userName, userEmail,
                     amount, userBalanceBefore,
                     "Amount exceeds ATM per-transaction limit of ₹" + atm.getMaxWithdrawalLimit());
+        }
+
+        if (amount > userBalanceBefore) {
+            return createFailedTransaction(atmId, accountNumber, normalizedAccountType, cardNumber, userName, userEmail,
+                    amount, userBalanceBefore, "Insufficient balance");
         }
 
         // Check user daily limit
         LocalDateTime todayStart = LocalDate.now().atStartOfDay();
         Double dailyWithdrawn = atmTransactionRepository.getUserDailyWithdrawal(accountNumber, todayStart);
-        if (dailyWithdrawn + amount > atm.getDailyLimit()) {
-            return createFailedTransaction(atmId, accountNumber, cardNumber, userName, userEmail,
+        if ((dailyWithdrawn != null ? dailyWithdrawn : 0.0) + amount > atm.getDailyLimit()) {
+            return createFailedTransaction(atmId, accountNumber, normalizedAccountType, cardNumber, userName, userEmail,
                     amount, userBalanceBefore,
                     "Daily ATM withdrawal limit of ₹" + atm.getDailyLimit() + " exceeded");
         }
+
+        Double userBalanceAfter = accountService.debitBalance(accountNumber, amount, normalizedAccountType);
+        if (userBalanceAfter == null) {
+            return createFailedTransaction(atmId, accountNumber, normalizedAccountType, cardNumber, userName, userEmail,
+                    amount, userBalanceBefore, "Insufficient balance or account not found");
+        }
+
+        Transaction accountTransaction = new Transaction();
+        accountTransaction.setAccountNumber(accountNumber);
+        accountTransaction.setUserName(userName);
+        accountTransaction.setAmount(amount);
+        accountTransaction.setType("Withdraw");
+        accountTransaction.setDescription("ATM Cash Withdrawal");
+        accountTransaction.setBalance(userBalanceAfter);
+        accountTransaction.setMerchant("ATM");
+        accountTransaction.setStatus("Completed");
+        accountTransaction.setDate(LocalDateTime.now());
+        transactionService.saveTransaction(accountTransaction);
 
         // Debit ATM cash
         Double atmBalanceBefore = atm.getCashAvailable();
@@ -231,6 +284,7 @@ public class AtmManagementService {
         txn.setTransactionRef(txnRef);
         txn.setAtmId(atmId);
         txn.setAccountNumber(accountNumber);
+        txn.setAccountType(normalizedAccountType);
         txn.setCardNumber(cardNumber);
         txn.setUserName(userName);
         txn.setUserEmail(userEmail);
@@ -251,18 +305,20 @@ public class AtmManagementService {
         result.put("receiptNumber", receiptNo);
         result.put("amount", amount);
         result.put("balanceAfter", userBalanceAfter);
+        result.put("transactionId", accountTransaction.getTransactionId());
         result.put("atmBalanceAfter", atmBalanceAfter);
         return result;
     }
 
     private Map<String, Object> createFailedTransaction(String atmId, String accountNumber,
-                                                         String cardNumber, String userName, String userEmail,
+                                                         String accountType, String cardNumber, String userName, String userEmail,
                                                          Double amount, Double balanceBefore, String reason) {
         String txnRef = "ATM" + System.currentTimeMillis() + (int)(Math.random() * 1000);
         AtmTransaction txn = new AtmTransaction();
         txn.setTransactionRef(txnRef);
         txn.setAtmId(atmId);
         txn.setAccountNumber(accountNumber);
+        txn.setAccountType(accountType);
         txn.setCardNumber(cardNumber);
         txn.setUserName(userName);
         txn.setUserEmail(userEmail);

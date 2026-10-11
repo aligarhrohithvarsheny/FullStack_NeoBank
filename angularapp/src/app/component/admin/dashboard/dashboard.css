@@ -156,7 +156,6 @@
   font-size: 30px;
   color: #60a5fa;
   text-shadow: 0 0 25px rgba(96, 165, 250, 0.7);
-  animation: pulse-glow 2.5s ease-in-out infinite;
   filter: drop-shadow(0 0 8px rgba(96, 165, 250, 0.6));
 }
 
@@ -385,7 +384,6 @@
   font-size: 11px;
   font-weight: 700;
   box-shadow: 0 2px 8px rgba(239, 68, 68, 0.4);
-  animation: pulse-badge 2s ease-in-out infinite;
 }
 
 @keyframes pulse-badge {
@@ -488,7 +486,6 @@
   font-size: 32px;
   color: #60a5fa;
   filter: drop-shadow(0 0 10px rgba(96, 165, 250, 0.6));
-  animation: pulse-glow 2.5s ease-in-out infinite;
 }
 
 .brand-text {
@@ -1128,7 +1125,6 @@
 }
 
 .feature-box:hover {
-  transform: translateY(-8px) scale(1.02);
   box-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.15), 0 8px 16px -8px rgba(0, 0, 0, 0.1);
   border-color: transparent;
 }
@@ -1138,7 +1134,7 @@
 }
 
 .feature-box:active {
-  transform: translateY(-4px) scale(1.01);
+  box-shadow: 0 8px 20px -8px rgba(0, 0, 0, 0.15);
 }
 
 .feature-box.disabled {
@@ -1165,7 +1161,6 @@
 }
 
 .feature-box:hover .feature-icon-wrapper {
-  transform: scale(1.1) rotate(-3deg);
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.18);
 }
 
@@ -1205,7 +1200,6 @@
   padding: 4px 10px;
   border-radius: 20px;
   box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
-  animation: badge-pulse 2s ease-in-out infinite;
 }
 
 @keyframes badge-pulse {
