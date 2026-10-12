@@ -6187,6 +6187,21 @@
 
     <!-- ─── TRANSACTIONS TAB ──────────────────────────── -->
     <div *ngIf="atmActiveTab === 'transactions'">
+      <div style="display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; align-items: center;">
+        <input [(ngModel)]="atmTransactionSearchTerm"
+          (keyup.enter)="loadAtmTransactions()"
+          placeholder="Search card, transaction, receipt, or account number"
+          aria-label="Search ATM transactions by card, transaction, receipt, or account number"
+          style="flex: 1; min-width: 260px; max-width: 480px; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 13px;">
+        <button (click)="loadAtmTransactions()"
+          style="padding: 10px 16px; border: none; border-radius: 8px; background: #1e293b; color: white; cursor: pointer; font-weight: 600;">
+          Search
+        </button>
+        <button *ngIf="atmTransactionSearchTerm" (click)="atmTransactionSearchTerm = ''; loadAtmTransactions()"
+          style="padding: 10px 16px; border: 1px solid #e2e8f0; border-radius: 8px; background: white; color: #475569; cursor: pointer; font-weight: 600;">
+          Clear
+        </button>
+      </div>
       <div style="display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap;">
         <button *ngFor="let f of ['ALL', 'SUCCESS', 'FAILED']" (click)="atmTransactionFilter = f; loadAtmTransactions()"
           [style.background]="atmTransactionFilter === f ? '#1e293b' : '#f1f5f9'"
@@ -6199,14 +6214,15 @@
         <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
           <thead>
             <tr style="background: #f8fafc;">
-              <th style="padding: 12px; text-align: left; color: #64748b; font-weight: 600; border-bottom: 2px solid #e2e8f0;">Txn Ref</th>
+              <th style="padding: 12px; text-align: left; color: #64748b; font-weight: 600; border-bottom: 2px solid #e2e8f0;">Transaction ID</th>
               <th style="padding: 12px; text-align: left; color: #64748b; font-weight: 600; border-bottom: 2px solid #e2e8f0;">ATM ID</th>
               <th style="padding: 12px; text-align: left; color: #64748b; font-weight: 600; border-bottom: 2px solid #e2e8f0;">Account</th>
               <th style="padding: 12px; text-align: left; color: #64748b; font-weight: 600; border-bottom: 2px solid #e2e8f0;">Account Type</th>
+              <th style="padding: 12px; text-align: left; color: #64748b; font-weight: 600; border-bottom: 2px solid #e2e8f0;">Card Number</th>
               <th style="padding: 12px; text-align: left; color: #64748b; font-weight: 600; border-bottom: 2px solid #e2e8f0;">User</th>
-              <th style="padding: 12px; text-align: right; color: #64748b; font-weight: 600; border-bottom: 2px solid #e2e8f0;">Amount</th>
+              <th style="padding: 12px; text-align: right; color: #64748b; font-weight: 600; border-bottom: 2px solid #e2e8f0;">Withdrawal Amount</th>
               <th style="padding: 12px; text-align: center; color: #64748b; font-weight: 600; border-bottom: 2px solid #e2e8f0;">Status</th>
-              <th style="padding: 12px; text-align: center; color: #64748b; font-weight: 600; border-bottom: 2px solid #e2e8f0;">Receipt</th>
+              <th style="padding: 12px; text-align: center; color: #64748b; font-weight: 600; border-bottom: 2px solid #e2e8f0;">Receipt Number</th>
               <th style="padding: 12px; text-align: left; color: #64748b; font-weight: 600; border-bottom: 2px solid #e2e8f0;">Date</th>
             </tr>
           </thead>
@@ -6216,6 +6232,7 @@
               <td style="padding: 12px; color: #64748b;">{{ txn.atmId }}</td>
               <td style="padding: 12px; color: #64748b;">{{ txn.accountNumber }}</td>
               <td style="padding: 12px; color: #64748b;">{{ txn.accountType || 'Savings' }}</td>
+              <td style="padding: 12px; color: #64748b; font-family: monospace;">{{ formatAtmCardNumber(txn.cardNumber) }}</td>
               <td style="padding: 12px; color: #1e293b;">{{ txn.userName }}</td>
               <td style="padding: 12px; text-align: right; font-weight: 700; color: #1e293b;">{{ formatCurrency(txn.amount) }}</td>
               <td style="padding: 12px; text-align: center;">
@@ -6232,7 +6249,7 @@
               <td style="padding: 12px; color: #64748b; font-size: 12px;">{{ txn.createdAt | date:'medium' }}</td>
             </tr>
             <tr *ngIf="atmTransactions.length === 0">
-              <td colspan="9" style="padding: 40px; text-align: center; color: #94a3b8;">No transactions found</td>
+              <td colspan="10" style="padding: 40px; text-align: center; color: #94a3b8;">No transactions found</td>
             </tr>
           </tbody>
         </table>

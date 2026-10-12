@@ -4,7 +4,7 @@ import { isPlatformBrowser } from '@angular/common';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { AlertService } from '../../../service/alert.service';
 import { BackendWakeupService } from '../../../service/backend-wakeup.service';
 import { FaceAuthService } from '../../../service/face-auth.service';
@@ -280,6 +280,7 @@ export class Dashboard implements OnInit, OnDestroy {
   atmActiveTab: string = 'overview';
   atmSelectedMachine: any = null;
   atmTransactionFilter: string = 'ALL';
+  atmTransactionSearchTerm: string = '';
   atmIncidentFilter: string = 'ALL';
   atmTransactionPage: number = 0;
   atmTransactionTotalPages: number = 0;
@@ -6995,7 +6996,14 @@ export class Dashboard implements OnInit, OnDestroy {
   }
 
   loadSupportTicketStats() {
-    this.http.get<any>(`${environment.apiBaseUrl}/api/support-tickets/stats`).subscribe({
+    const token = typeof sessionStorage !== 'undefined'
+      ? sessionStorage.getItem('adminSessionToken')
+      : null;
+    const headers = token
+      ? new HttpHeaders({ Authorization: `Bearer ${token}` })
+      : new HttpHeaders();
+
+    this.http.get<any>(`${environment.apiBaseUrl}/api/support-tickets/stats`, { headers }).subscribe({
       next: (res: any) => {
         this.supportTicketStats = {
           openCount: res.openCount || 0,
@@ -7772,17 +7780,29 @@ export class Dashboard implements OnInit, OnDestroy {
 
   loadAtmTransactions(page: number = 0): void {
     this.atmTransactionPage = page;
-    let url = `${environment.apiBaseUrl}/api/admin/atm/transactions?page=${page}&size=20`;
+    let url = `${environment.apiBaseUrl}/api/admin/atm/transactions`;
     if (this.atmTransactionFilter && this.atmTransactionFilter !== 'ALL') {
-      url = `${environment.apiBaseUrl}/api/admin/atm/transactions/status/${this.atmTransactionFilter}?page=${page}&size=20`;
+      url = `${environment.apiBaseUrl}/api/admin/atm/transactions/status/${this.atmTransactionFilter}`;
     }
-    this.http.get<any>(url).subscribe({
+    const params = new HttpParams()
+      .set('page', page)
+      .set('size', 20)
+      .set('search', this.atmTransactionSearchTerm.trim());
+    this.http.get<any>(url, { params }).subscribe({
       next: (res) => {
         this.atmTransactions = res.transactions || [];
         this.atmTransactionTotalPages = res.totalPages || 0;
       },
       error: (err) => console.error('Failed to load ATM transactions:', err)
     });
+  }
+
+  formatAtmCardNumber(cardNumber: string | null | undefined): string {
+    if (!cardNumber) return '—';
+    const normalizedCardNumber = cardNumber.replace(/\s/g, '');
+    return normalizedCardNumber.length > 4
+      ? `•••• •••• •••• ${normalizedCardNumber.slice(-4)}`
+      : normalizedCardNumber;
   }
 
   loadAtmIncidents(page: number = 0): void {

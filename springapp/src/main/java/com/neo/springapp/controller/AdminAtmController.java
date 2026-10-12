@@ -231,9 +231,10 @@ public class AdminAtmController {
     @GetMapping("/transactions")
     public ResponseEntity<Map<String, Object>> getAllTransactions(
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String search) {
         try {
-            Page<AtmTransaction> txns = atmService.getAllTransactions(page, size);
+            Page<AtmTransaction> txns = atmService.searchTransactions(page, size, null, search);
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);
             response.put("transactions", txns.getContent());
@@ -292,9 +293,10 @@ public class AdminAtmController {
     @GetMapping("/transactions/status/{status}")
     public ResponseEntity<Map<String, Object>> getTransactionsByStatus(@PathVariable String status,
                                                                          @RequestParam(defaultValue = "0") int page,
-                                                                         @RequestParam(defaultValue = "20") int size) {
+                                                                         @RequestParam(defaultValue = "20") int size,
+                                                                         @RequestParam(required = false) String search) {
         try {
-            Page<AtmTransaction> txns = atmService.getTransactionsByStatus(status, page, size);
+            Page<AtmTransaction> txns = atmService.searchTransactions(page, size, status, search);
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);
             response.put("transactions", txns.getContent());

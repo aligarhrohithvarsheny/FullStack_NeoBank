@@ -177,6 +177,16 @@ public class SupportTicketController {
     public ResponseEntity<Map<String, Object>> getStats(
             @AuthenticationPrincipal SessionPrincipal principal) {
         if (principal == null) return unauthorized();
+        if ("ADMIN".equals(principal.scope())) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("openCount", supportTicketService.getOpenTicketsCount());
+            response.put("inProgressCount", supportTicketService.getInProgressCount());
+            response.put("resolvedCount", supportTicketService.getResolvedCount());
+            response.put("totalCount", supportTicketService.getTotalTicketsCount());
+            return ResponseEntity.ok(response);
+        }
+
         List<SupportTicket> tickets = supportTicketService.getTicketsByAccountNumber(principal.accountNumber());
         Map<String, Object> response = new HashMap<>();
         response.put("success", true);

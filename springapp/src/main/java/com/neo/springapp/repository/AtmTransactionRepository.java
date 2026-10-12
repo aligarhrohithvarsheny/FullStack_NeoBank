@@ -4,6 +4,7 @@ import com.neo.springapp.model.AtmTransaction;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.repository.query.Param;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
@@ -23,6 +24,18 @@ public interface AtmTransactionRepository extends JpaRepository<AtmTransaction, 
     Page<AtmTransaction> findByStatusOrderByCreatedAtDesc(String status, Pageable pageable);
 
     Page<AtmTransaction> findAllByOrderByCreatedAtDesc(Pageable pageable);
+
+    @Query("SELECT t FROM AtmTransaction t " +
+            "WHERE (:status IS NULL OR t.status = :status) " +
+            "AND (:searchTerm IS NULL OR :searchTerm = '' " +
+            "OR LOWER(COALESCE(t.cardNumber, '')) LIKE LOWER(CONCAT('%', :searchTerm, '%')) " +
+            "OR LOWER(COALESCE(t.transactionRef, '')) LIKE LOWER(CONCAT('%', :searchTerm, '%')) " +
+            "OR LOWER(COALESCE(t.receiptNumber, '')) LIKE LOWER(CONCAT('%', :searchTerm, '%')) " +
+            "OR LOWER(COALESCE(t.accountNumber, '')) LIKE LOWER(CONCAT('%', :searchTerm, '%'))) " +
+            "ORDER BY t.createdAt DESC")
+    Page<AtmTransaction> searchTransactions(@Param("status") String status,
+                                             @Param("searchTerm") String searchTerm,
+                                             Pageable pageable);
 
     Page<AtmTransaction> findByCreatedAtBetweenOrderByCreatedAtDesc(LocalDateTime start, LocalDateTime end, Pageable pageable);
 

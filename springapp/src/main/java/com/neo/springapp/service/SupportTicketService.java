@@ -150,4 +150,8 @@ public class SupportTicketService {
     public long getResolvedCount() {
         return supportTicketRepository.countByStatus("RESOLVED");
     }
+
+    public long getTotalTicketsCount() {
+        return supportTicketRepository.count();
+    }
 }

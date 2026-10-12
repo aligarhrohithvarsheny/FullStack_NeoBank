@@ -343,6 +343,13 @@ public class AtmManagementService {
         return atmTransactionRepository.findAllByOrderByCreatedAtDesc(PageRequest.of(page, size));
     }
 
+    public Page<AtmTransaction> searchTransactions(int page, int size, String status, String searchTerm) {
+        String normalizedStatus = status == null || status.isBlank() ? null : status.trim();
+        String normalizedSearchTerm = searchTerm == null || searchTerm.isBlank() ? null : searchTerm.trim();
+        return atmTransactionRepository.searchTransactions(
+                normalizedStatus, normalizedSearchTerm, PageRequest.of(page, size));
+    }
+
     public Page<AtmTransaction> getTransactionsByAtm(String atmId, int page, int size) {
         return atmTransactionRepository.findByAtmIdOrderByCreatedAtDesc(atmId, PageRequest.of(page, size));
     }
