@@ -23,7 +23,7 @@ interface AccountOption {
 }
 
 interface CardOption {
-  id: number;
+  id: string | number;
   maskedCardNumber: string;
   cardType: string;
   status: string;
@@ -140,6 +140,10 @@ export class KillSwitchesComponent implements OnInit {
     return this.snapshot?.isolatedAccounts.some(
       control => control.scopeKey.toUpperCase() === accountNumber.toUpperCase()
     ) ?? false;
+  }
+
+  get hasPausedRail(): boolean {
+    return this.snapshot?.rails.some(rail => rail.paused) ?? false;
   }
 
   toggleRail(control: RailControl): void {

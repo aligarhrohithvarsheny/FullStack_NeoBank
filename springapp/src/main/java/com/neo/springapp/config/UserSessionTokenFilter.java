@@ -6,6 +6,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.stereotype.Component;
@@ -27,7 +28,7 @@ public class UserSessionTokenFilter extends OncePerRequestFilter {
         if (authorization != null && authorization.startsWith("Bearer ")) {
             UserSessionTokenService.SessionPrincipal principal = tokenService.verify(authorization.substring(7));
             if (principal != null) {
-                var authorities = switch (principal.scope()) {
+                java.util.Collection<GrantedAuthority> authorities = switch (principal.scope()) {
                     case "ADMIN" -> Collections.singletonList(new SimpleGrantedAuthority("ROLE_ADMIN"));
                     case "MANAGER" -> Collections.singletonList(new SimpleGrantedAuthority("ROLE_MANAGER"));
                     default -> Collections.emptyList();

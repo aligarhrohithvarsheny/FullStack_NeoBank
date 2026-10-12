@@ -6,6 +6,7 @@ import com.neo.springapp.model.Card;
 import com.neo.springapp.repository.CardRepository;
 import com.neo.springapp.repository.EmergencyControlAuditRepository;
 import com.neo.springapp.repository.EmergencyControlRepository;
+import com.neo.springapp.repository.SalaryAccountRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -23,14 +24,17 @@ public class EmergencyControlService {
     private final EmergencyControlRepository controlRepository;
     private final EmergencyControlAuditRepository auditRepository;
     private final CardRepository cardRepository;
+    private final SalaryAccountRepository salaryAccountRepository;
 
     public EmergencyControlService(
             EmergencyControlRepository controlRepository,
             EmergencyControlAuditRepository auditRepository,
-            CardRepository cardRepository) {
+            CardRepository cardRepository,
+            SalaryAccountRepository salaryAccountRepository) {
         this.controlRepository = controlRepository;
         this.auditRepository = auditRepository;
         this.cardRepository = cardRepository;
+        this.salaryAccountRepository = salaryAccountRepository;
     }
 
     @Transactional(readOnly = true)
@@ -140,29 +144,51 @@ public class EmergencyControlService {
         }
 
         if (normalizedType.equals("CARD") && previousState != active) {
-            Long cardId;
-            try {
-                cardId = Long.valueOf(normalizedKey);
-            } catch (NumberFormatException exception) {
-                throw new IllegalArgumentException("Invalid card id.");
-            }
-            Card card = cardRepository.findById(cardId)
-                    .orElseThrow(() -> new IllegalArgumentException("Card not found."));
-            if (active) {
-                card.setBlocked(true);
-                card.setStatus("Blocked");
+            if (normalizedKey.startsWith("SALARY:")) {
+                String accountNumber = normalizedKey.substring("SALARY:".length());
+                var salaryAccount = salaryAccountRepository.findByAccountNumber(accountNumber);
+                if (salaryAccount == null) {
+                    throw new IllegalArgumentException("Salary account card not found.");
+                }
+                if (active) {
+                    salaryAccount.setDebitCardStatus("Blocked");
+                } else {
+                    salaryAccount.setDebitCardStatus(control.getPriorState() == null
+                            ? "Active" : control.getPriorState());
+                    control.setPriorState(null);
+                    controlRepository.save(control);
+                }
+                salaryAccountRepository.save(salaryAccount);
             } else {
-                String restoreState = control.getPriorState();
-                card.setBlocked("BLOCKED".equals(restoreState));
-                card.setDeactivated("DEACTIVATED".equals(restoreState));
-                card.setStatus("BLOCKED".equals(restoreState) ? "Blocked"
-                        : "DEACTIVATED".equals(restoreState) ? "Deactivated" : "Active");
-                control.setPriorState(null);
-                controlRepository.save(control);
+                Long cardId;
+                try {
+                    cardId = Long.valueOf(normalizedKey);
+                } catch (NumberFormatException exception) {
+                    throw new IllegalArgumentException("Invalid card id.");
+                }
+                Card card = cardRepository.findById(cardId)
+                        .orElseThrow(() -> new IllegalArgumentException("Card not found."));
+                if (active) {
+                    card.setBlocked(true);
+                    card.setStatus("Blocked");
+                } else {
+                    String restoreState = control.getPriorState();
+                    card.setBlocked("BLOCKED".equals(restoreState));
+                    card.setDeactivated("DEACTIVATED".equals(restoreState));
+                    card.setStatus("BLOCKED".equals(restoreState) ? "Blocked"
+                            : "DEACTIVATED".equals(restoreState) ? "Deactivated" : "Active");
+                    control.setPriorState(null);
+                    controlRepository.save(control);
+                }
+                cardRepository.save(card);
             }
-            cardRepository.save(card);
         }
         return saved;
+    }
+
+    @Transactional(readOnly = true)
+    public boolean isCardFrozen(String cardKey) {
+        return isActive("CARD", normalize(cardKey));
     }
 
     private boolean isActive(String scopeType, String scopeKey) {

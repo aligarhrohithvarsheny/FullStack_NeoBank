@@ -1405,6 +1405,12 @@ public class PaymentGatewayService {
         // 1. Check Salary Accounts (they have card numbers)
         SalaryAccount salAcc = salaryAccountRepository.findByDebitCardNumber(cardNumber);
         if (salAcc != null) {
+            if (salAcc.getDebitCardStatus() != null
+                    && !"Active".equalsIgnoreCase(salAcc.getDebitCardStatus())) {
+                result.put("success", false);
+                result.put("message", "This debit card is not active");
+                return result;
+            }
             // Verify CVV and expiry
             if (salAcc.getDebitCardCvv() != null && !salAcc.getDebitCardCvv().equals(cardCvv)) {
                 result.put("success", false);
@@ -1488,6 +1494,14 @@ public class PaymentGatewayService {
         String cardType = (String) request.getOrDefault("cardType", "DEBIT");
         String payerAccount = (String) request.get("payerAccount");
         String merchantId = (String) request.get("merchantId");
+
+        SalaryAccount salaryCard = salaryAccountRepository.findByDebitCardNumber(cardNumber);
+        if (salaryCard != null && salaryCard.getDebitCardStatus() != null
+                && !"Active".equalsIgnoreCase(salaryCard.getDebitCardStatus())) {
+            result.put("success", false);
+            result.put("message", "This debit card is not active");
+            return result;
+        }
 
         // Verify OTP
         String otpKey = "card_" + orderId + "_" + cardNumber.substring(cardNumber.length() - 4);

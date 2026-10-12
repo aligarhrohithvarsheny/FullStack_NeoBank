@@ -23,8 +23,8 @@
         <p class="eyebrow">BANK-WIDE</p>
         <h2 id="rails-heading">Outbound rail circuit breakers</h2>
       </div>
-      <span class="status-pill" [class.paused]="snapshot?.rails?.some(rail => rail.paused)">
-        {{ snapshot?.rails?.some(rail => rail.paused) ? 'PAUSE ACTIVE' : 'ALL RAILS ENABLED' }}
+      <span class="status-pill" [class.paused]="hasPausedRail">
+        {{ hasPausedRail ? 'PAUSE ACTIVE' : 'ALL RAILS ENABLED' }}
       </span>
     </div>
     <p class="note">IMPS, NEFT, and RTGS are enforced in the active transfer flow. SEPA and ACH controls are saved for rail integrations that are not currently implemented.</p>

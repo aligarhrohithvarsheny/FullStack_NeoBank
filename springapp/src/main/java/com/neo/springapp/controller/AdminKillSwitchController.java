@@ -116,7 +116,24 @@ public class AdminKillSwitchController {
                     result.put("emergencyFrozen", cardControl != null && cardControl.isActive());
                     return result;
                 }).toList();
-        return ResponseEntity.ok(Map.of("cards", cards));
+        List<Map<String, Object>> accountCards = new ArrayList<>(cards);
+        SalaryAccount salaryAccount = salaryAccountRepository.findByAccountNumber(accountNumber.trim());
+        if (salaryAccount != null && salaryAccount.getDebitCardNumber() != null
+                && !salaryAccount.getDebitCardNumber().isBlank()) {
+            String number = salaryAccount.getDebitCardNumber();
+            String cardKey = "SALARY:" + salaryAccount.getAccountNumber();
+            Map<String, Object> salaryCard = new HashMap<>();
+            salaryCard.put("id", cardKey);
+            salaryCard.put("maskedCardNumber", number.length() < 4
+                    ? "****" : "**** **** **** " + number.substring(number.length() - 4));
+            salaryCard.put("cardType", "DEBIT");
+            salaryCard.put("status", salaryAccount.getDebitCardStatus());
+            salaryCard.put("blocked", "BLOCKED".equalsIgnoreCase(salaryAccount.getDebitCardStatus()));
+            salaryCard.put("deactivated", "DEACTIVATED".equalsIgnoreCase(salaryAccount.getDebitCardStatus()));
+            salaryCard.put("emergencyFrozen", controlService.isCardFrozen(cardKey));
+            accountCards.add(salaryCard);
+        }
+        return ResponseEntity.ok(Map.of("cards", accountCards));
     }
 
     @PutMapping("/rails/{rail}")
@@ -135,14 +152,31 @@ public class AdminKillSwitchController {
 
     @PutMapping("/cards/{cardId}")
     public ResponseEntity<?> setCard(
-            @PathVariable Long cardId, @RequestBody ControlRequest request) {
-        Card card = cardService.getCardById(cardId);
+            @PathVariable String cardId, @RequestBody ControlRequest request) {
+        if (cardId.startsWith("SALARY:")) {
+            String accountNumber = cardId.substring("SALARY:".length());
+            SalaryAccount salaryAccount = salaryAccountRepository.findByAccountNumber(accountNumber);
+            if (salaryAccount == null || salaryAccount.getDebitCardNumber() == null
+                    || salaryAccount.getDebitCardNumber().isBlank()) {
+                return error(HttpStatus.NOT_FOUND, "Salary account card not found.");
+            }
+            String priorState = salaryAccount.getDebitCardStatus() == null
+                    ? "Active" : salaryAccount.getDebitCardStatus();
+            return updateControl("CARD", cardId, request, priorState);
+        }
+        Long numericCardId;
+        try {
+            numericCardId = Long.valueOf(cardId);
+        } catch (NumberFormatException exception) {
+            return error(HttpStatus.BAD_REQUEST, "Invalid card id.");
+        }
+        Card card = cardService.getCardById(numericCardId);
         if (card == null) {
             return error(HttpStatus.NOT_FOUND, "Card not found.");
         }
         String priorState = card.isBlocked() ? "BLOCKED"
                 : card.isDeactivated() ? "DEACTIVATED" : "ACTIVE";
-        return updateControl("CARD", cardId.toString(), request, priorState);
+        return updateControl("CARD", numericCardId.toString(), request, priorState);
     }
 
     private ResponseEntity<?> updateControl(
