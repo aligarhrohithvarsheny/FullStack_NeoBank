@@ -1,0 +1,132 @@
+<main class="kill-switch-page">
+  <header class="page-header">
+    <div>
+      <button class="back-button" type="button" (click)="goBack()">
+        <i class="fa fa-arrow-left"></i> Dashboard
+      </button>
+      <p class="eyebrow">INCIDENT RESPONSE</p>
+      <h1>Emergency Kill-Switches</h1>
+      <p class="subtitle">Pause outbound payment rails, isolate customer accounts, and freeze cards.</p>
+    </div>
+    <span class="admin-only"><i class="fa fa-lock"></i> Admin-only controls</span>
+  </header>
+
+  <section class="reason-panel">
+    <label for="incident-reason">Incident reason <span>Required and recorded in the audit trail</span></label>
+    <input id="incident-reason" type="text" [(ngModel)]="reason" maxlength="500"
+      placeholder="e.g. Suspected account takeover — case INC-1042">
+  </section>
+
+  <section class="panel" aria-labelledby="rails-heading">
+    <div class="panel-heading">
+      <div>
+        <p class="eyebrow">BANK-WIDE</p>
+        <h2 id="rails-heading">Outbound rail circuit breakers</h2>
+      </div>
+      <span class="status-pill" [class.paused]="snapshot?.rails?.some(rail => rail.paused)">
+        {{ snapshot?.rails?.some(rail => rail.paused) ? 'PAUSE ACTIVE' : 'ALL RAILS ENABLED' }}
+      </span>
+    </div>
+    <p class="note">IMPS, NEFT, and RTGS are enforced in the active transfer flow. SEPA and ACH controls are saved for rail integrations that are not currently implemented.</p>
+    <div class="rail-grid" *ngIf="snapshot; else loading">
+      <article class="rail-card" *ngFor="let rail of snapshot.rails" [class.paused]="rail.paused">
+        <div class="rail-icon"><i class="fa fa-circle-exclamation"></i></div>
+        <div class="rail-info">
+          <h3>{{ rail.rail }}</h3>
+          <p>{{ rail.paused ? 'Outbound processing paused' : 'Outbound processing available' }}</p>
+          <small *ngIf="rail.paused">{{ rail.reason }} · {{ rail.changedBy }}</small>
+        </div>
+        <button type="button" [class.resume]="rail.paused" (click)="toggleRail(rail)" [disabled]="isSaving">
+          {{ rail.paused ? 'Resume' : 'Pause' }}
+        </button>
+      </article>
+    </div>
+  </section>
+
+  <section class="panel account-panel">
+    <div class="panel-heading">
+      <div>
+        <p class="eyebrow">PER-ENTITY</p>
+        <h2>Account isolation &amp; card freeze</h2>
+      </div>
+    </div>
+    <p class="note">Account isolation blocks outgoing IMPS, NEFT, and RTGS transfers. Search spans Savings, Current, and Salary account records.</p>
+    <form class="search-row" (ngSubmit)="searchAccounts()">
+      <input name="accountSearch" [(ngModel)]="searchTerm" placeholder="Name, account number, or customer ID" aria-label="Search customer accounts">
+      <button type="submit" [disabled]="isSearching">
+        <i class="fa fa-search"></i> {{ isSearching ? 'Searching…' : 'Search accounts' }}
+      </button>
+    </form>
+
+    <div class="account-results" *ngIf="accounts.length">
+      <button class="account-result" type="button" *ngFor="let account of accounts"
+        [class.selected]="selectedAccount?.accountNumber === account.accountNumber" (click)="selectAccount(account)">
+        <span class="account-avatar"><i class="fa fa-user"></i></span>
+        <span class="account-copy">
+          <strong>{{ account.name || 'Customer' }}</strong>
+          <small>{{ account.accountNumber }} · {{ account.accountType }} · {{ account.status }}</small>
+        </span>
+        <span class="isolation-tag" *ngIf="isAccountIsolated(account.accountNumber)">ISOLATED</span>
+      </button>
+    </div>
+    <p class="empty" *ngIf="!isSearching && searchTerm.trim().length >= 2 && !accounts.length">No matching accounts.</p>
+
+    <div class="selected-account" *ngIf="selectedAccount as account">
+      <div class="selected-heading">
+        <div>
+          <span class="eyebrow">SELECTED ACCOUNT</span>
+          <h3>{{ account.name || 'Customer' }}</h3>
+          <p>{{ account.accountNumber }} · {{ account.accountType }} · Customer ID {{ account.customerId || '—' }}</p>
+        </div>
+        <button class="danger-button" type="button" (click)="toggleAccount()" [disabled]="isSaving">
+          <i class="fa" [class.fa-unlock]="isAccountIsolated(account.accountNumber)" [class.fa-user-lock]="!isAccountIsolated(account.accountNumber)"></i>
+          {{ isAccountIsolated(account.accountNumber) ? 'Release isolation' : 'Isolate account' }}
+        </button>
+      </div>
+
+      <div class="cards-area">
+        <div class="cards-heading">
+          <h3><i class="fa fa-credit-card"></i> Cards on this account</h3>
+          <span>{{ cards.length }} found</span>
+        </div>
+        <p class="empty" *ngIf="!cards.length">No cards are linked to this account.</p>
+        <article class="card-row" *ngFor="let card of cards">
+          <div>
+            <strong>{{ card.maskedCardNumber }}</strong>
+            <small>{{ card.cardType }} · {{ card.status }}<span *ngIf="card.emergencyFrozen"> · Emergency freeze active</span></small>
+          </div>
+          <button type="button" [class.resume]="card.emergencyFrozen" (click)="toggleCard(card)" [disabled]="isSaving || card.deactivated">
+            {{ card.emergencyFrozen ? 'Release freeze' : 'Freeze card' }}
+          </button>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel audit-panel">
+    <div class="panel-heading">
+      <div><p class="eyebrow">IMMUTABLE CHANGE HISTORY</p><h2>Recent control actions</h2></div>
+      <button class="refresh-button" type="button" (click)="loadControls()" [disabled]="isLoading">
+        <i class="fa fa-sync-alt"></i> Refresh
+      </button>
+    </div>
+    <div class="table-wrap" *ngIf="snapshot?.recentAudit?.length; else noAudit">
+      <table>
+        <thead><tr><th>Time</th><th>Control</th><th>Target</th><th>Action</th><th>Reason</th><th>Changed by</th></tr></thead>
+        <tbody>
+          <tr *ngFor="let entry of snapshot?.recentAudit">
+            <td>{{ entry.changedAt | date:'medium' }}</td>
+            <td>{{ entry.scopeType }}</td>
+            <td>{{ entry.scopeKey }}</td>
+            <td><span class="audit-action" [class.active]="entry.newState">{{ entry.action }}</span></td>
+            <td>{{ entry.reason }}</td>
+            <td>{{ entry.changedBy }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <ng-template #noAudit><p class="empty">{{ isLoading ? 'Loading control history…' : 'No emergency control changes recorded.' }}</p></ng-template>
+  </section>
+
+  <ng-template #loading><p class="empty">Loading emergency controls…</p></ng-template>
+</main>

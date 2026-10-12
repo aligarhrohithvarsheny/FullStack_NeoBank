@@ -187,6 +187,11 @@ export class Dashboard implements OnInit, OnDestroy {
 
   // Feature Box Definitions
   featureBoxes: { section: string; icon: string; label: string; description: string; gradient: string; featureKey?: string; route?: string; action?: () => void; badge?: () => number }[] = [
+    { section: 'executive-control-center', icon: 'fa-chart-pie', label: 'Executive Control Center', description: 'Bank-wide customer, financial, approval and API health metrics', gradient: 'linear-gradient(135deg, #0f766e, #38bdf8)', route: 'executive-control-center' },
+    { section: 'system-monitoring', icon: 'fa-heartbeat', label: 'System Monitoring & Incidents', description: 'Monitor API errors, slow database operations, scheduled jobs, service health and delivery failures', gradient: 'linear-gradient(135deg, #0f766e, #14b8a6)', route: 'system-monitoring' },
+    { section: 'kill-switches', icon: 'fa-shield-alt', label: 'Emergency Kill-Switches', description: 'Pause outbound rails, isolate customer accounts, freeze cards, and review the action audit', gradient: 'linear-gradient(135deg, #991b1b, #f97316)', route: 'kill-switches' },
+    { section: 'customer-360', icon: 'fa-user-circle', label: 'Customer 360°', description: 'Review a customer’s accounts, activity, KYC, complaints, loans and relationships', gradient: 'linear-gradient(135deg, #4f46e5, #a78bfa)', route: 'customer-360' },
+    { section: 'banking-products', icon: 'fa-sliders-h', label: 'Banking Product Configuration', description: 'Propose effective-dated savings and current account product changes for approval', gradient: 'linear-gradient(135deg, #c2410c, #fb923c)', route: 'banking-products' },
     { section: 'profile', icon: 'fa-user-shield', label: 'Admin Profile', description: 'View and manage admin profile', gradient: 'linear-gradient(135deg, #667eea, #764ba2)' },
     { section: 'users', icon: 'fa-users', label: 'Manage Users', description: 'View, edit and manage all user accounts', gradient: 'linear-gradient(135deg, #f093fb, #f5576c)', featureKey: 'manage-users', route: 'users' },
     { section: 'user-control', icon: 'fa-user-cog', label: 'Full User Control', description: 'Block, unblock and control user access', gradient: 'linear-gradient(135deg, #4facfe, #00f2fe)', featureKey: 'user-control', route: 'user-control' },
@@ -2155,6 +2160,7 @@ export class Dashboard implements OnInit, OnDestroy {
   logout() {
     // Store logout timestamp
     this.logoutTime = new Date();
+    sessionStorage.removeItem('adminSessionToken');
 
     // Update sessionStorage with logout time
     const adminData = sessionStorage.getItem('admin');

@@ -1,0 +1,66 @@
+:host { display: block; min-height: 100vh; background: #f3f6fb; color: #172033; font-family: 'Segoe UI', Arial, sans-serif; }
+.monitoring-page { max-width: 1440px; margin: 0 auto; padding: 28px clamp(16px, 4vw, 52px) 48px; }
+.monitoring-header, .heading, .header-actions, .panel-heading { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
+.monitoring-header { margin-bottom: 28px; }
+.heading { justify-content: flex-start; }
+.back-button, .refresh-button, .error-state button { border: 1px solid #d7dfeb; border-radius: 9px; background: #fff; color: #34415a; padding: 10px 14px; cursor: pointer; font-weight: 600; }
+.back-button:hover, .refresh-button:hover, .error-state button:hover { background: #eef4fb; }
+.refresh-button:disabled { opacity: .6; cursor: wait; }
+.eyebrow { color: #71809a; font-size: 10px; letter-spacing: 1.4px; font-weight: 800; margin: 0 0 5px; }
+h1, h2, p { margin-top: 0; }
+h1 { font-size: clamp(22px, 3vw, 31px); margin-bottom: 5px; color: #101b31; }
+h2 { font-size: 18px; margin-bottom: 0; color: #172033; }
+.subtitle { color: #71809a; margin-bottom: 0; font-size: 13px; }
+.service-status, .pool-status { display: inline-flex; align-items: center; gap: 7px; color: #07885a; font-size: 12px; font-weight: 800; }
+.service-status i { font-size: 8px; }
+.service-status.degraded, .pool-status.degraded { color: #d3483e; }
+.summary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-bottom: 18px; }
+.metric-card, .panel { background: #fff; border: 1px solid #e4eaf2; border-radius: 14px; box-shadow: 0 5px 20px rgba(24, 43, 77, .045); }
+.metric-card { display: flex; align-items: center; gap: 14px; padding: 18px; }
+.metric-icon { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 12px; font-size: 17px; }
+.metric-icon.api { background: #fff0ed; color: #d34b3b; }
+.metric-icon.database { background: #eaf2ff; color: #3478d4; }
+.metric-icon.jobs { background: #fff6df; color: #bd8213; }
+.metric-icon.notifications { background: #f3edff; color: #7953c5; }
+.metric-card div { display: flex; flex-direction: column; gap: 4px; }
+.metric-card strong { font-size: 25px; color: #14213a; }
+.metric-card div span { color: #71809a; font-size: 12px; }
+.detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 18px; }
+.panel { padding: 21px; margin-bottom: 18px; }
+.detail-grid .panel { margin-bottom: 0; }
+.panel-heading { margin-bottom: 18px; }
+.runtime-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 15px; }
+.runtime-stats > div { background: #f7f9fc; border-radius: 9px; padding: 12px; display: flex; flex-direction: column; gap: 6px; }
+.runtime-stats span { color: #78869b; font-size: 11px; }
+.runtime-stats strong { font-size: 14px; color: #1b2a43; }
+.pool-meter { grid-column: 1 / -1; }
+.meter-track { height: 7px; background: #e8edf5; border-radius: 5px; overflow: hidden; margin-top: 4px; }
+.meter-track span { display: block; height: 100%; background: #3478d4; border-radius: inherit; }
+.pool-status { border-radius: 20px; padding: 5px 9px; background: #e8f8f1; }
+.pool-status.degraded { background: #fff0ed; }
+.count-badge { min-width: 27px; height: 27px; padding: 0 8px; display: inline-grid; place-items: center; border-radius: 20px; background: #edf1f7; color: #54637b; font-size: 12px; font-weight: 800; }
+.count-badge.has-alerts { background: #fff0ed; color: #d3483e; }
+.empty-state { display: flex; align-items: center; gap: 9px; border-radius: 9px; padding: 15px; background: #f5faf8; color: #47715f; font-size: 13px; }
+.empty-state i { color: #159568; }
+.alert-list { display: grid; gap: 9px; }
+.alert-row { display: flex; align-items: flex-start; gap: 13px; padding: 13px; border: 1px solid #f3dfb3; border-radius: 9px; background: #fffbf1; }
+.alert-row.high { border-color: #f4d1cb; background: #fff7f5; }
+.alert-severity { font-size: 10px; font-weight: 900; color: #ad7711; }
+.alert-row.high .alert-severity { color: #c83b2c; }
+.alert-row strong { font-size: 13px; }
+.alert-row p { color: #69778d; margin: 4px 0 0; font-size: 12px; }
+.table-wrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 12px; min-width: 720px; }
+th { text-align: left; color: #71809a; font-size: 10px; letter-spacing: .7px; text-transform: uppercase; padding: 10px; border-bottom: 1px solid #e9edf3; }
+td { padding: 12px 10px; color: #4d5b71; border-bottom: 1px solid #f0f2f6; }
+tbody tr:last-child td { border-bottom: 0; }
+.event-category { display: inline-block; border-radius: 5px; padding: 5px 7px; background: #edf2fa; color: #455774; white-space: nowrap; font-size: 10px; font-weight: 800; }
+.event-category[data-category='API_ERROR'], .event-category[data-category='SCHEDULED_JOB_FAILURE'], .event-category[data-category='NOTIFICATION_FAILURE'] { color: #be463c; background: #fff0ed; }
+.event-category[data-category='SLOW_DATABASE_QUERY'] { color: #986d17; background: #fff6df; }
+.event-source { font-family: Consolas, monospace; color: #455774; }
+.retention-note { color: #8793a5; font-size: 11px; line-height: 1.5; margin: 15px 0 0; }
+.loading-state, .error-state { min-height: 240px; display: flex; justify-content: center; align-items: center; gap: 12px; color: #71809a; }
+.loading-state i { color: #3478d4; font-size: 22px; }
+.error-state { color: #bd493e; }
+@media (max-width: 900px) { .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .detail-grid { grid-template-columns: 1fr; } }
+@media (max-width: 600px) { .monitoring-header, .heading { align-items: flex-start; flex-direction: column; } .monitoring-header { gap: 16px; } .header-actions { width: 100%; justify-content: space-between; } .summary-grid { grid-template-columns: 1fr 1fr; gap: 10px; } .metric-card { padding: 12px; gap: 9px; } .metric-icon { width: 36px; height: 36px; } .metric-card strong { font-size: 20px; } .metric-card div span { font-size: 10px; } .panel { padding: 15px; } }

@@ -44,6 +44,9 @@ public class SpringSecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 // Allow OPTIONS requests for CORS preflight (MUST be first)
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+
+                // Emergency account controls require a backend-verified admin login.
+                .requestMatchers("/api/admin/kill-switches/**").hasRole("ADMIN")
                 
                 // Explicitly allow GET and POST methods for all API endpoints
                 .requestMatchers(HttpMethod.GET, "/api/**").permitAll()

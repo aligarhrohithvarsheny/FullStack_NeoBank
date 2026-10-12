@@ -1,0 +1,130 @@
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+<main class="monitoring-page">
+  <header class="monitoring-header">
+    <div class="heading">
+      <button class="back-button" type="button" (click)="goBack()">
+        <i class="fa fa-arrow-left"></i> Dashboard
+      </button>
+      <div>
+        <p class="eyebrow">OPERATIONS</p>
+        <h1>System Monitoring &amp; Incident Center</h1>
+        <p class="subtitle">Service health, operational signals, and recent incidents</p>
+      </div>
+    </div>
+    <div class="header-actions">
+      <span *ngIf="snapshot" class="service-status" [class.degraded]="snapshot.status !== 'UP'">
+        <i class="fa fa-circle"></i> {{ snapshot.status }}
+      </span>
+      <button class="refresh-button" type="button" (click)="loadSnapshot()" [disabled]="isRefreshing">
+        <i class="fa fa-sync-alt" [class.fa-spin]="isRefreshing"></i>
+        {{ isRefreshing ? 'Refreshing' : 'Refresh' }}
+      </button>
+    </div>
+  </header>
+
+  <section class="loading-state" *ngIf="isLoading">
+    <i class="fa fa-circle-notch fa-spin"></i>
+    <p>Loading live system signals…</p>
+  </section>
+
+  <section class="error-state" *ngIf="!isLoading && errorMessage">
+    <i class="fa fa-triangle-exclamation"></i>
+    <span>{{ errorMessage }}</span>
+    <button type="button" (click)="loadSnapshot()">Retry</button>
+  </section>
+
+  <ng-container *ngIf="!isLoading && snapshot as data">
+    <section class="summary-grid" aria-label="System metrics">
+      <article class="metric-card">
+        <span class="metric-icon api"><i class="fa fa-bug"></i></span>
+        <div><strong>{{ data.metrics.apiErrors5m }}</strong><span>API errors · 5 min</span></div>
+      </article>
+      <article class="metric-card">
+        <span class="metric-icon database"><i class="fa fa-database"></i></span>
+        <div><strong>{{ data.metrics.slowDatabaseOperations5m }}</strong><span>Slow DB operations · 5 min</span></div>
+      </article>
+      <article class="metric-card">
+        <span class="metric-icon jobs"><i class="fa fa-clock"></i></span>
+        <div><strong>{{ data.metrics.scheduledJobFailures5m }}</strong><span>Failed scheduled jobs · 5 min</span></div>
+      </article>
+      <article class="metric-card">
+        <span class="metric-icon notifications"><i class="fa fa-envelope"></i></span>
+        <div><strong>{{ data.metrics.notificationFailures5m }}</strong><span>Delivery failures · 5 min</span></div>
+      </article>
+    </section>
+
+    <section class="detail-grid">
+      <article class="panel">
+        <div class="panel-heading">
+          <div><p class="eyebrow">RUNTIME</p><h2>Service availability</h2></div>
+          <span class="service-status" [class.degraded]="data.status !== 'UP'">
+            <i class="fa fa-circle"></i> {{ data.status }}
+          </span>
+        </div>
+        <div class="runtime-stats">
+          <div><span>Process uptime</span><strong>{{ formatUptime(data.metrics.uptimeSeconds) }}</strong></div>
+          <div><span>Database pool</span><strong>{{ data.metrics.databasePool.status }}</strong></div>
+          <div><span>Last sampled</span><strong>{{ data.generatedAt | date:'mediumTime' }}</strong></div>
+        </div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-heading">
+          <div><p class="eyebrow">DATABASE</p><h2>Connection pool</h2></div>
+          <span class="pool-status" [class.degraded]="data.metrics.databasePool.status !== 'UP'">
+            {{ data.metrics.databasePool.status }}
+          </span>
+        </div>
+        <div class="runtime-stats">
+          <div><span>Active / maximum</span><strong>{{ data.metrics.databasePool.activeConnections ?? '—' }} / {{ data.metrics.databasePool.maximumPoolSize ?? '—' }}</strong></div>
+          <div><span>Idle / total</span><strong>{{ data.metrics.databasePool.idleConnections ?? '—' }} / {{ data.metrics.databasePool.totalConnections ?? '—' }}</strong></div>
+          <div><span>Waiting threads</span><strong>{{ data.metrics.databasePool.threadsAwaitingConnection ?? '—' }}</strong></div>
+          <div class="pool-meter">
+            <span>Pool utilization</span><strong>{{ formatUtilization(data.metrics.databasePool.utilization) }}</strong>
+            <div class="meter-track"><span [style.width]="formatUtilization(data.metrics.databasePool.utilization)"></span></div>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <section class="panel alerts-panel">
+      <div class="panel-heading">
+        <div><p class="eyebrow">AUTOMATIC THRESHOLDS</p><h2>Active alerts</h2></div>
+        <span class="count-badge" [class.has-alerts]="data.alerts.length > 0">{{ data.alerts.length }}</span>
+      </div>
+      <div class="empty-state" *ngIf="data.alerts.length === 0">
+        <i class="fa fa-circle-check"></i> No thresholds breached in the current window.
+      </div>
+      <div class="alert-list" *ngIf="data.alerts.length > 0">
+        <article class="alert-row" *ngFor="let alert of data.alerts" [class.high]="alert.severity === 'HIGH'">
+          <span class="alert-severity">{{ alert.severity }}</span>
+          <div><strong>{{ alert.title }}</strong><p>{{ alert.message }}</p></div>
+        </article>
+      </div>
+    </section>
+
+    <section class="panel events-panel">
+      <div class="panel-heading">
+        <div><p class="eyebrow">LIVE EVENT BUFFER</p><h2>Recent incidents and signals</h2></div>
+        <span class="count-badge">{{ data.events.length }}</span>
+      </div>
+      <div class="table-wrap" *ngIf="data.events.length > 0; else noEvents">
+        <table>
+          <thead><tr><th>Time</th><th>Category</th><th>Source</th><th>Details</th><th>Duration</th></tr></thead>
+          <tbody>
+            <tr *ngFor="let event of data.events">
+              <td>{{ formatEventTime(event.timestamp) }}</td>
+              <td><span class="event-category" [attr.data-category]="event.category">{{ event.category.replaceAll('_', ' ') }}</span></td>
+              <td class="event-source">{{ event.source }}</td>
+              <td>{{ event.message }}</td>
+              <td>{{ event.durationMs === null ? '—' : event.durationMs + ' ms' }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <ng-template #noEvents><div class="empty-state">No incidents recorded in this process yet.</div></ng-template>
+      <p class="retention-note"><i class="fa fa-circle-info"></i> {{ data.retention }}. Slow database signals measure repository-operation duration, including application overhead.</p>
+    </section>
+  </ng-container>
+</main>

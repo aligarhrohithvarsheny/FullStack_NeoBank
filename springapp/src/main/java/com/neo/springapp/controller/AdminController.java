@@ -42,6 +42,9 @@ public class AdminController {
 
     @Autowired
     private AdminService adminService;
+
+    @Autowired
+    private com.neo.springapp.service.UserSessionTokenService userSessionTokenService;
     
     @Autowired
     private UserLoginHistoryService loginHistoryService;
@@ -785,6 +788,10 @@ public class AdminController {
                 response.put("success", true);
                 response.put("role", userRole);
                 response.put("admin", adminResponse);
+                if ("ADMIN".equalsIgnoreCase(userRole)) {
+                    response.put("sessionToken", userSessionTokenService.issueAdmin(
+                            loggedInAdmin.getId(), loggedInAdmin.getEmail(), userRole));
+                }
                 response.put("profileComplete", profileComplete);
                 response.put("profileRequired", profileRequired);
                 if (profileRequired && "ADMIN".equals(userRole)) {

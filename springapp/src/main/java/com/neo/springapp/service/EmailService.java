@@ -31,6 +31,9 @@ public class EmailService {
     
     @Autowired(required = false)
     private ApplicationContext applicationContext;
+
+    @Autowired
+    private SystemMonitoringService systemMonitoringService;
     
     /**
      * Initialize mail sender if available
@@ -158,6 +161,7 @@ public class EmailService {
 
     private void logOtpDeliveryFailure(String toEmail) {
         System.err.println("OTP email delivery failed for " + toEmail + ". Check Gmail API or SMTP configuration and provider logs.");
+        systemMonitoringService.recordNotificationFailure("OTP email");
     }
     
     /**
@@ -1336,4 +1340,3 @@ public class EmailService {
                "NeoBank FASTag Team";
     }
 }
-

@@ -19,6 +19,7 @@ public class SavingsUpiService {
     @Autowired private SavingsUpiTransactionRepository savingsUpiTxnRepo;
     @Autowired private SalaryAccountRepository salaryAccountRepository;
     @Autowired private CurrentAccountRepository currentAccountRepository;
+    @Autowired private EmergencyControlService emergencyControlService;
 
     private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder(10);
 
@@ -198,6 +199,7 @@ public class SavingsUpiService {
 
         Account senderAcc = sender.getAccount();
         if (senderAcc == null) { res.put("success", false); res.put("error", "Account not found"); return res; }
+        emergencyControlService.assertAccountNotIsolated(senderAccountNumber);
         if (senderAcc.getBalance() == null || senderAcc.getBalance() < amount.doubleValue()) {
             res.put("success", false); res.put("error", "Insufficient balance"); return res;
         }

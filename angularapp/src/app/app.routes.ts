@@ -85,6 +85,10 @@ import { PositivePayComponent } from './component/website/positive-pay/positive-
 import { AdminPositivePayComponent } from './component/admin/positive-pay/admin-positive-pay.component';
 import { Cards360 } from './component/website/cards360/cards360';
 import { Cards360Admin } from './component/admin/cards360-admin/cards360-admin';
+import { ExecutiveControlCenter } from './component/admin/executive-control-center/executive-control-center';
+import { Customer360 } from './component/admin/customer-360/customer-360';
+import { BankingProducts } from './component/admin/banking-products/banking-products';
+import { KillSwitchesComponent } from './component/admin/kill-switches/kill-switches';
 
 
 
@@ -95,6 +99,11 @@ export const routes: Routes = [
   { path: 'hod/dashboard', component: HodDashboard, canActivate: [hodAuthGuard] },
   { path: 'hod/account-linking', loadComponent: () => import('./component/admin/account-linking/account-linking').then(m => m.AccountLinkingComponent), canActivate: [hodAuthGuard] },
   { path: 'admin/dashboard', component: Dashboard, canActivate: [adminAuthGuard] },
+  { path: 'admin/executive-control-center', component: ExecutiveControlCenter, canActivate: [adminAuthGuard] },
+  { path: 'admin/system-monitoring', loadComponent: () => import('./component/admin/system-monitoring/system-monitoring').then(m => m.SystemMonitoringComponent), canActivate: [adminAuthGuard] },
+  { path: 'admin/kill-switches', component: KillSwitchesComponent, canActivate: [adminAuthGuard] },
+  { path: 'admin/customer-360', component: Customer360, canActivate: [adminAuthGuard] },
+  { path: 'admin/banking-products', component: BankingProducts, canActivate: [adminAuthGuard] },
 { path: 'admin/multi-view', loadComponent: () => import('./component/admin/multi-view/multi-view').then(m => m.AdminMultiView), canActivate: [adminAuthGuard] },
   { path: 'admin/account-verification', loadComponent: () => import('./component/admin/account-verification/account-verification').then(m => m.AccountVerificationComponent), canActivate: [adminAuthGuard] },
   // ------------------ MANAGER ------------------

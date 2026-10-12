@@ -35,6 +35,11 @@ public class UserSessionTokenService {
         return issue(guestApplicationId, "GUEST", "INSURANCE_GUEST");
     }
 
+    public String issueAdmin(Long adminId, String email, String role) {
+        String scope = "ADMIN".equalsIgnoreCase(role) ? "ADMIN" : "MANAGER";
+        return issue(adminId, email, scope);
+    }
+
     private String issue(Long userId, String accountNumber, String scope) {
         long expiresAt = Instant.now().getEpochSecond() + TOKEN_LIFETIME_SECONDS;
         String payload = userId + "|" + accountNumber + "|" + expiresAt + "|" + scope;
@@ -50,7 +55,8 @@ public class UserSessionTokenService {
             if ((values.length != 3 && values.length != 4)
                     || Long.parseLong(values[2]) < Instant.now().getEpochSecond()) return null;
             String scope = values.length == 4 ? values[3] : "USER";
-            if (!"USER".equals(scope) && !"CARD360".equals(scope) && !"INSURANCE_GUEST".equals(scope)) return null;
+            if (!"USER".equals(scope) && !"CARD360".equals(scope) && !"INSURANCE_GUEST".equals(scope)
+                    && !"ADMIN".equals(scope) && !"MANAGER".equals(scope)) return null;
             return new SessionPrincipal(Long.parseLong(values[0]), values[1], scope);
         } catch (RuntimeException exception) {
             return null;

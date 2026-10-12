@@ -1,0 +1,99 @@
+<main class="executive-page">
+  <header class="page-header">
+    <div>
+      <p class="eyebrow">ADMINISTRATION · OVERVIEW</p>
+      <h1>Executive Control Center</h1>
+      <p class="subtitle">Bank-wide operating and financial health at a glance.</p>
+    </div>
+    <div class="header-actions">
+      <span class="health-pill" [class.up]="health === 'up'" [class.down]="health === 'down'">
+        <span class="health-dot"></span>
+        {{ health === 'checking' ? 'Checking API' : health === 'up' ? 'API operational' : 'API unavailable' }}
+        <small *ngIf="apiResponseMs !== null">{{ apiResponseMs }} ms</small>
+      </span>
+      <button type="button" class="primary-button" (click)="refresh()" [disabled]="loading">
+        <span aria-hidden="true">↻</span> Refresh
+      </button>
+    </div>
+  </header>
+
+  <p class="error-banner" role="alert" *ngIf="summaryError">{{ summaryError }}</p>
+  <p class="loading-state" *ngIf="loading && !summary">Loading bank-wide metrics…</p>
+
+  <ng-container *ngIf="summary as data">
+    <section class="metric-grid" aria-label="Executive metrics">
+      <article class="metric-card">
+        <span class="metric-label">Total customers</span>
+        <strong>{{ data.totals.customers | number }}</strong>
+        <small>{{ data.totals.newRegistrationsToday | number }} registered today</small>
+      </article>
+      <article class="metric-card">
+        <span class="metric-label">Active accounts</span>
+        <strong>{{ data.totals.activeAccounts | number }}</strong>
+        <small>{{ data.totals.newRegistrationsThisMonth | number }} new this month</small>
+      </article>
+      <article class="metric-card">
+        <span class="metric-label">Deposits</span>
+        <strong>{{ data.totals.deposits | currency:'INR':'symbol':'1.0-0' }}</strong>
+        <small>All recorded transactions</small>
+      </article>
+      <article class="metric-card">
+        <span class="metric-label">Withdrawals</span>
+        <strong>{{ data.totals.withdrawals | currency:'INR':'symbol':'1.0-0' }}</strong>
+        <small>All recorded transactions</small>
+      </article>
+      <article class="metric-card">
+        <span class="metric-label">Transfers</span>
+        <strong>{{ data.totals.transfers | currency:'INR':'symbol':'1.0-0' }}</strong>
+        <small>All recorded transactions</small>
+      </article>
+      <article class="metric-card alert-metric">
+        <span class="metric-label">Pending approvals</span>
+        <strong>{{ data.totals.pendingApprovals | number }}</strong>
+        <small>{{ data.totals.pendingRegistrations }} registrations · {{ data.totals.pendingKyc }} KYC</small>
+      </article>
+      <article class="metric-card" [class.alert-metric]="data.totals.failedTransactions > 0">
+        <span class="metric-label">Failed transactions</span>
+        <strong>{{ data.totals.failedTransactions | number }}</strong>
+        <small>Requires operational review</small>
+      </article>
+      <article class="metric-card">
+        <span class="metric-label">New registrations this year</span>
+        <strong>{{ data.totals.newRegistrationsThisYear | number }}</strong>
+        <small>Year to date</small>
+      </article>
+    </section>
+
+    <section class="chart-card">
+      <div class="chart-header">
+        <div>
+          <p class="eyebrow">FINANCIAL ACTIVITY</p>
+          <h2>Transaction volumes</h2>
+        </div>
+        <div class="range-tabs" role="group" aria-label="Chart time range">
+          <button type="button" [class.active]="selectedRange === 'daily'" (click)="selectedRange = 'daily'">Daily</button>
+          <button type="button" [class.active]="selectedRange === 'monthly'" (click)="selectedRange = 'monthly'">Monthly</button>
+          <button type="button" [class.active]="selectedRange === 'yearly'" (click)="selectedRange = 'yearly'">Yearly</button>
+        </div>
+      </div>
+      <div class="chart-legend">
+        <span><i class="deposit"></i> Deposits</span>
+        <span><i class="withdrawal"></i> Withdrawals</span>
+        <span><i class="transfer"></i> Transfers</span>
+      </div>
+      <div class="chart" *ngIf="chartRows.length; else noChartData">
+        <div class="chart-column" *ngFor="let point of chartRows">
+          <div class="bars">
+            <span class="bar deposit" [style.height.%]="barHeight(point, 'deposits')" [title]="'Deposits: ' + (point.deposits | currency:'INR')"></span>
+            <span class="bar withdrawal" [style.height.%]="barHeight(point, 'withdrawals')" [title]="'Withdrawals: ' + (point.withdrawals | currency:'INR')"></span>
+            <span class="bar transfer" [style.height.%]="barHeight(point, 'transfers')" [title]="'Transfers: ' + (point.transfers | currency:'INR')"></span>
+          </div>
+          <small>{{ point.label }}</small>
+        </div>
+      </div>
+      <ng-template #noChartData><p class="empty-state">No transaction activity is available for this period.</p></ng-template>
+    </section>
+
+    <p class="updated-at" *ngIf="healthCheckedAt">API health checked {{ healthCheckedAt | date:'mediumTime' }}</p>
+  </ng-container>
+</main>

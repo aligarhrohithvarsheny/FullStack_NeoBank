@@ -5,11 +5,37 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 public interface AdminCashTransactionRepository extends JpaRepository<AdminCashTransaction, Long> {
 
     List<AdminCashTransaction> findAllByOrderByPerformedAtDesc();
+
+    @Query("SELECT UPPER(t.operationType), COALESCE(SUM(t.amount), 0) FROM AdminCashTransaction t " +
+           "WHERE UPPER(t.status) = 'COMPLETED' GROUP BY UPPER(t.operationType)")
+    List<Object[]> summarizeCompletedOperations();
+
+    @Query("SELECT FUNCTION('DATE', t.performedAt), UPPER(t.operationType), COALESCE(SUM(t.amount), 0) " +
+           "FROM AdminCashTransaction t WHERE t.performedAt >= :start AND t.performedAt < :end " +
+           "AND UPPER(t.status) = 'COMPLETED' " +
+           "GROUP BY FUNCTION('DATE', t.performedAt), UPPER(t.operationType) " +
+           "ORDER BY FUNCTION('DATE', t.performedAt)")
+    List<Object[]> summarizeDailyOperations(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+    @Query("SELECT FUNCTION('YEAR', t.performedAt), FUNCTION('MONTH', t.performedAt), UPPER(t.operationType), COALESCE(SUM(t.amount), 0) " +
+           "FROM AdminCashTransaction t WHERE t.performedAt >= :start AND t.performedAt < :end " +
+           "AND UPPER(t.status) = 'COMPLETED' " +
+           "GROUP BY FUNCTION('YEAR', t.performedAt), FUNCTION('MONTH', t.performedAt), UPPER(t.operationType) " +
+           "ORDER BY FUNCTION('YEAR', t.performedAt), FUNCTION('MONTH', t.performedAt)")
+    List<Object[]> summarizeMonthlyOperations(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+    @Query("SELECT FUNCTION('YEAR', t.performedAt), UPPER(t.operationType), COALESCE(SUM(t.amount), 0) " +
+           "FROM AdminCashTransaction t WHERE t.performedAt >= :start AND t.performedAt < :end " +
+           "AND UPPER(t.status) = 'COMPLETED' " +
+           "GROUP BY FUNCTION('YEAR', t.performedAt), UPPER(t.operationType) " +
+           "ORDER BY FUNCTION('YEAR', t.performedAt)")
+    List<Object[]> summarizeYearlyOperations(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 
     @Query("SELECT t FROM AdminCashTransaction t WHERE " +
            "LOWER(t.refId) LIKE LOWER(CONCAT('%', :term, '%')) OR " +

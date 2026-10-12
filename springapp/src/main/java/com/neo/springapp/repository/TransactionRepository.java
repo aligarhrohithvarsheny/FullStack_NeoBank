@@ -15,6 +15,37 @@ import java.util.Optional;
 @Repository
 public interface TransactionRepository extends JpaRepository<Transaction, Long> {
 
+    @Query("SELECT LOWER(t.type), COALESCE(SUM(t.amount), 0) FROM Transaction t " +
+           "WHERE LOWER(t.type) IN ('deposit', 'withdraw', 'withdrawal', 'transfer') " +
+           "AND (t.status IS NULL OR LOWER(t.status) <> 'failed') " +
+           "GROUP BY LOWER(t.type)")
+    List<Object[]> summarizeBankFlows();
+
+    @Query("SELECT COUNT(t) FROM Transaction t WHERE LOWER(t.status) = 'failed'")
+    long countFailedTransactions();
+
+    @Query("SELECT FUNCTION('DATE', t.date), LOWER(t.type), COALESCE(SUM(t.amount), 0) " +
+           "FROM Transaction t WHERE t.date >= :start AND t.date < :end " +
+           "AND LOWER(t.type) IN ('deposit', 'withdraw', 'withdrawal', 'transfer') " +
+           "AND (t.status IS NULL OR LOWER(t.status) <> 'failed') " +
+           "GROUP BY FUNCTION('DATE', t.date), LOWER(t.type) ORDER BY FUNCTION('DATE', t.date)")
+    List<Object[]> summarizeDailyBankFlows(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+    @Query("SELECT FUNCTION('YEAR', t.date), FUNCTION('MONTH', t.date), LOWER(t.type), COALESCE(SUM(t.amount), 0) " +
+           "FROM Transaction t WHERE t.date >= :start AND t.date < :end " +
+           "AND LOWER(t.type) IN ('deposit', 'withdraw', 'withdrawal', 'transfer') " +
+           "AND (t.status IS NULL OR LOWER(t.status) <> 'failed') " +
+           "GROUP BY FUNCTION('YEAR', t.date), FUNCTION('MONTH', t.date), LOWER(t.type) " +
+           "ORDER BY FUNCTION('YEAR', t.date), FUNCTION('MONTH', t.date)")
+    List<Object[]> summarizeMonthlyBankFlows(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+    @Query("SELECT FUNCTION('YEAR', t.date), LOWER(t.type), COALESCE(SUM(t.amount), 0) " +
+           "FROM Transaction t WHERE t.date >= :start AND t.date < :end " +
+           "AND LOWER(t.type) IN ('deposit', 'withdraw', 'withdrawal', 'transfer') " +
+           "AND (t.status IS NULL OR LOWER(t.status) <> 'failed') " +
+           "GROUP BY FUNCTION('YEAR', t.date), LOWER(t.type) ORDER BY FUNCTION('YEAR', t.date)")
+    List<Object[]> summarizeYearlyBankFlows(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
     Optional<Transaction> findByTransactionId(String transactionId);
 
     List<Transaction> findByTransactionIdContainingIgnoreCase(String transactionId);

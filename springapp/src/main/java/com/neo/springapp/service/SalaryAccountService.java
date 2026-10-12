@@ -77,6 +77,9 @@ public class SalaryAccountService {
     private SalaryAccountEditHistoryRepository salaryAccountEditHistoryRepository;
 
     @Autowired
+    private EmergencyControlService emergencyControlService;
+
+    @Autowired
     private ObjectMapper objectMapper;
 
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder(10);
@@ -658,6 +661,7 @@ public class SalaryAccountService {
         if (opt.isEmpty()) { result.put("success", false); result.put("message", "Account not found"); return result; }
         SalaryAccount acc = opt.get();
         if (!"Active".equals(acc.getStatus())) { result.put("success", false); result.put("message", "Account is not active"); return result; }
+        emergencyControlService.assertOutboundAllowed(acc.getAccountNumber(), "NEFT");
 
         // Verify transaction PIN
         if (!Boolean.TRUE.equals(acc.getTransactionPinSet()) || acc.getTransactionPin() == null) {
@@ -713,6 +717,7 @@ public class SalaryAccountService {
         if (opt.isEmpty()) { result.put("success", false); result.put("message", "Account not found"); return result; }
         SalaryAccount acc = opt.get();
         if (!"Active".equals(acc.getStatus())) { result.put("success", false); result.put("message", "Account is not active"); return result; }
+        emergencyControlService.assertAccountNotIsolated(acc.getAccountNumber());
 
         if (!Boolean.TRUE.equals(acc.getTransactionPinSet()) || acc.getTransactionPin() == null) {
             result.put("success", false); result.put("message", "Transaction PIN not set. Please set it first."); return result;
@@ -790,6 +795,7 @@ public class SalaryAccountService {
         Optional<SalaryAccount> opt = salaryAccountRepository.findById(accountId);
         if (opt.isEmpty()) { result.put("success", false); result.put("message", "Account not found"); return result; }
         SalaryAccount acc = opt.get();
+        emergencyControlService.assertAccountNotIsolated(acc.getAccountNumber());
 
         if (!passwordEncoder.matches(password, acc.getPassword())) {
             result.put("success", false); result.put("message", "Invalid password"); return result;

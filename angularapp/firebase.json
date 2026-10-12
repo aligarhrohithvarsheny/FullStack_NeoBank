@@ -1,7 +1,7 @@
 {
   "hosting": {
     "predeploy": [
-      "npm.cmd run build:prod"
+      "npm run build:prod"
     ],
     "public": "dist/angularapp/browser",
     "ignore": [

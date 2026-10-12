@@ -1,0 +1,188 @@
+<main class="customer-page">
+  <header class="page-header">
+    <div>
+      <p class="eyebrow">ADMINISTRATION · RELATIONSHIP VIEW</p>
+      <h1>Customer 360°</h1>
+      <p class="subtitle">Accounts, activity, service, lending, KYC and relationship history in one place.</p>
+    </div>
+    <button type="button" class="secondary-button" (click)="loadCustomers()" [disabled]="isLoadingCustomers">
+      Refresh directory
+    </button>
+  </header>
+
+  <section class="search-card">
+    <label for="customer-search">Find a customer by name, account, customer ID or email</label>
+    <div class="search-row">
+      <input id="customer-search" type="search" [(ngModel)]="searchQuery"
+        (keyup.enter)="searchCustomer()" placeholder="Search customer or enter account number">
+      <button type="button" class="primary-button" (click)="searchCustomer()" [disabled]="!searchQuery.trim()">
+        View profile
+      </button>
+    </div>
+    <div class="customer-suggestions" *ngIf="filteredCustomers.length">
+      <button type="button" *ngFor="let customer of filteredCustomers" (click)="selectCustomer(customer)">
+        <strong>{{ displayName(customer) }}</strong>
+        <span>{{ customer.accountNumber || 'No account' }} · {{ customer.email }}</span>
+      </button>
+    </div>
+    <p class="loading-state" *ngIf="isLoadingCustomers">Loading customer directory…</p>
+    <p class="error-banner" role="alert" *ngIf="profileError">{{ profileError }}</p>
+  </section>
+
+  <p class="loading-state" *ngIf="isLoadingProfile">Loading the customer relationship profile…</p>
+
+  <ng-container *ngIf="selectedCustomer as customer">
+    <section class="profile-card">
+      <div class="avatar">{{ displayName(customer).slice(0, 1).toUpperCase() }}</div>
+      <div class="profile-main">
+        <p class="eyebrow">CUSTOMER PROFILE</p>
+        <h2>{{ displayName(customer) }}</h2>
+        <p>{{ customer.email || 'No email recorded' }} · Customer ID {{ customer.account?.['customerId'] || '—' }}</p>
+      </div>
+      <div class="profile-status">
+        <span class="status-chip">{{ customer.status || 'STATUS UNKNOWN' }}</span>
+        <small>Joined {{ customer.joinDate ? (customer.joinDate | date:'mediumDate') : '—' }}</small>
+      </div>
+      <button type="button" class="secondary-button reveal-button" (click)="showSensitiveData = !showSensitiveData">
+        {{ showSensitiveData ? 'Mask sensitive data' : 'Reveal sensitive data' }}
+      </button>
+    </section>
+
+    <section class="data-card personal-card">
+      <div class="section-heading"><h2>Identity & contact</h2><span>Protected details</span></div>
+      <div class="identity-grid">
+        <div><small>Phone</small><strong>{{ customer.account?.['phone'] || '—' }}</strong></div>
+        <div><small>PAN</small><strong>{{ mask(customer.account?.['pan']) }}</strong></div>
+        <div><small>Aadhaar</small><strong>{{ mask(customer.account?.['aadharNumber']) }}</strong></div>
+        <div><small>Date of birth</small><strong>{{ customer.account?.['dob'] ? (customer.account?.['dob'] | date:'mediumDate') : '—' }}</strong></div>
+        <div><small>Occupation</small><strong>{{ customer.account?.['occupation'] || '—' }}</strong></div>
+        <div><small>Address</small><strong>{{ customer.account?.['address'] || '—' }}</strong></div>
+      </div>
+    </section>
+
+    <div class="profile-grid">
+      <section class="data-card">
+        <div class="section-heading"><h2>Accounts & balances</h2><span>{{ linkedAccounts.length + 1 }} linked records</span></div>
+        <article class="record-card">
+          <strong>{{ customer.account?.['accountType'] || 'Primary account' }}</strong>
+          <span>Account {{ customer.accountNumber || '—' }}</span>
+          <span>Balance {{ customer.account?.['balance'] | currency:'INR':'symbol':'1.2-2' }}</span>
+          <span>Status {{ customer.account?.['status'] || customer.status || '—' }}</span>
+        </article>
+        <article class="record-card" *ngFor="let account of linkedAccounts">
+          <strong>{{ account.accountType || account.productName || account.type || 'Linked product' }}</strong>
+          <span>Account {{ account.accountNumber || account.fdAccountNumber || account.id || '—' }}</span>
+          <span *ngIf="account.balance !== undefined">Balance {{ account.balance | currency:'INR':'symbol':'1.2-2' }}</span>
+          <span *ngIf="account.status">Status {{ account.status }}</span>
+        </article>
+        <p class="empty-state" *ngIf="!linkedAccounts.length">No additional linked accounts or deposits were returned.</p>
+        <p class="resource-error" *ngIf="resourceFailure('currentAccounts') || resourceFailure('salaryAccount') || resourceFailure('fixedDeposits')">
+          Some linked-account data could not be loaded.
+        </p>
+      </section>
+
+      <section class="data-card">
+        <div class="section-heading"><h2>KYC status</h2><span>{{ kycRecords.length }} record(s)</span></div>
+        <article class="record-card" *ngFor="let record of kycRecords">
+          <strong>{{ record.status || 'Status not recorded' }}</strong>
+          <span>{{ record.name || record.userName || displayName(customer) }}</span>
+          <span>Submitted {{ (record.submittedDate || record.createdAt) | date:'mediumDate' }}</span>
+          <span>PAN {{ mask(record.panNumber || record.pan) }}</span>
+        </article>
+        <p class="empty-state" *ngIf="!kycRecords.length && !resourceFailure('kyc')">No KYC records found.</p>
+        <p class="resource-error" *ngIf="resourceFailure('kyc')">{{ resourceFailure('kyc') }}</p>
+      </section>
+
+      <section class="data-card">
+        <div class="section-heading"><h2>Loans</h2><span>{{ loans.length }} loan(s)</span></div>
+        <article class="record-card" *ngFor="let loan of loans">
+          <strong>{{ loan.loanType || loan.type || loan.loanAccountNumber || 'Loan' }}</strong>
+          <span>{{ loan.status || 'Status not recorded' }} · {{ loan.amount | currency:'INR':'symbol':'1.0-0' }}</span>
+          <span *ngIf="loan.interestRate !== undefined">Interest {{ loan.interestRate }}%</span>
+          <span *ngIf="loan.createdAt || loan.applicationDate">Opened {{ (loan.createdAt || loan.applicationDate) | date:'mediumDate' }}</span>
+        </article>
+        <p class="empty-state" *ngIf="!loans.length && !resourceFailure('loans') && !resourceFailure('goldLoans')">No loans found.</p>
+        <p class="resource-error" *ngIf="resourceFailure('loans') || resourceFailure('goldLoans')">Some loan information could not be loaded.</p>
+      </section>
+
+      <section class="data-card">
+        <div class="section-heading"><h2>Complaints & service</h2><span>{{ complaints.length }} case(s)</span></div>
+        <article class="record-card" *ngFor="let complaint of complaints">
+          <strong>{{ complaint.subject || complaint.category || complaint.ticketId }}</strong>
+          <span>{{ complaint.status }} · Priority {{ complaint.priority || '—' }}</span>
+          <span>{{ complaint.description }}</span>
+          <small>{{ (complaint.createdAt || complaint.updatedAt) | date:'medium' }}</small>
+        </article>
+        <p class="empty-state" *ngIf="!complaints.length && !resourceFailure('complaints')">No complaints or support tickets found.</p>
+        <p class="resource-error" *ngIf="resourceFailure('complaints')">{{ resourceFailure('complaints') }}</p>
+      </section>
+
+      <section class="data-card">
+        <div class="section-heading"><h2>Nominees</h2><span>{{ nominees.length }} nominee(s)</span></div>
+        <article class="record-card nominee-record" *ngFor="let nominee of nominees">
+          <strong>{{ nominee.nomineeName }}</strong>
+          <span>{{ nominee.relationship }}</span>
+          <span>{{ nominee.sharePercentage }}% share</span>
+        </article>
+        <p class="empty-state" *ngIf="!nominees.length && !resourceFailure('nominees')">No nominees recorded for this account.</p>
+        <p class="resource-error" *ngIf="resourceFailure('nominees')">{{ resourceFailure('nominees') }}</p>
+        <form class="nominee-form" (ngSubmit)="addNominee()">
+          <input name="nomineeName" [(ngModel)]="nomineeDraft.nomineeName" required placeholder="Nominee name">
+          <input name="relationship" [(ngModel)]="nomineeDraft.relationship" required placeholder="Relationship">
+          <input name="sharePercentage" [(ngModel)]="nomineeDraft.sharePercentage" type="number" min="0.01" max="100" step="0.01" required aria-label="Nominee share percentage">
+          <button type="submit" class="secondary-button" [disabled]="savingNominee">Add nominee</button>
+        </form>
+        <p class="resource-error" role="alert" *ngIf="nomineeError">{{ nomineeError }}</p>
+      </section>
+
+      <section class="data-card">
+        <div class="section-heading"><h2>Family relationships</h2><span>{{ familyLinks.length }} link(s)</span></div>
+        <article class="record-card" *ngFor="let link of familyLinks">
+          <strong>{{ link.name || link.memberName || link.accountName || link.relationship || 'Linked family account' }}</strong>
+          <span>Account {{ link.accountNumber || link.linkedAccountNumber || '—' }}</span>
+          <span>{{ link.relationship || link.status || 'Relationship recorded' }}</span>
+        </article>
+        <p class="empty-state" *ngIf="!familyLinks.length && !resourceFailure('family')">No linked family accounts found.</p>
+        <p class="resource-error" *ngIf="resourceFailure('family')">{{ resourceFailure('family') }}</p>
+      </section>
+
+      <section class="data-card activity-card">
+        <div class="section-heading"><h2>Recent transactions</h2><span>{{ transactions.length }} shown</span></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Date</th><th>Type</th><th>Reference</th><th>Amount</th><th>Status</th></tr></thead>
+            <tbody>
+              <tr *ngFor="let transaction of transactions">
+                <td>{{ transaction.date | date:'short' }}</td>
+                <td>{{ transaction.type || transaction.description }}</td>
+                <td>{{ transaction.transactionId || transaction.id }}</td>
+                <td>{{ transaction.amount | currency:'INR':'symbol':'1.2-2' }}</td>
+                <td>{{ transaction.status || '—' }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="empty-state" *ngIf="!transactions.length && !resourceFailure('transactions')">No transactions found.</p>
+        <p class="resource-error" *ngIf="resourceFailure('transactions')">{{ resourceFailure('transactions') }}</p>
+      </section>
+
+      <section class="data-card activity-card">
+        <div class="section-heading"><h2>Account change timeline</h2><span>{{ timeline.length }} event(s)</span></div>
+        <ol class="timeline">
+          <li *ngFor="let event of timeline">
+            <span class="timeline-marker"></span>
+            <div>
+              <strong>{{ event.action || event.changeType || event.fieldName || event.eventType || 'Account profile updated' }}</strong>
+              <p>{{ event.description || event.newValue || event.status || event.details || 'Account relationship change recorded.' }}</p>
+              <small>{{ (event.createdAt || event.updatedAt || event.date || event.submittedDate || event.statusChangedAt) | date:'medium' }}</small>
+            </div>
+          </li>
+        </ol>
+        <p class="empty-state" *ngIf="!timeline.length">No account-change history was returned.</p>
+        <p class="resource-error" *ngIf="resourceFailure('profileHistory') || resourceFailure('currentAccountHistory') || resourceFailure('familyHistory')">
+          Some account-history sources could not be loaded.
+        </p>
+      </section>
+    </div>
+  </ng-container>
+</main>

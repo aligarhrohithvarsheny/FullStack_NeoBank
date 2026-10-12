@@ -30,6 +30,9 @@ public class AccountService {
     @Autowired
     private SalaryAccountRepository salaryAccountRepository;
 
+    @Autowired
+    private EmergencyControlService emergencyControlService;
+
     // Basic CRUD operations
     public Account saveAccount(Account account) {
         if (account.getAccountNumber() == null) {
@@ -168,6 +171,7 @@ public class AccountService {
 
     @Transactional
     public Double debitBalance(String accountNumber, Double amount, String accountType) {
+        emergencyControlService.assertAccountNotIsolated(accountNumber);
         String requestedType = normalizeAccountType(accountType);
         if (requestedType.isEmpty() || requestedType.equals("SAVINGS")) {
             Account account = accountRepository.findByAccountNumber(accountNumber);

@@ -65,6 +65,10 @@ public interface UserRepository extends JpaRepository<User, Long> {
     // Statistics queries
     @Query("SELECT COUNT(u) FROM User u WHERE u.status = :status")
     Long countByStatus(@Param("status") String status);
+
+    @Query("SELECT COUNT(u) FROM User u WHERE u.joinDate >= :start AND u.joinDate < :end")
+    long countRegistrationsBetween(@Param("start") java.time.LocalDateTime start,
+                                   @Param("end") java.time.LocalDateTime end);
     
     @Query("SELECT AVG(a.income) FROM User u LEFT JOIN u.account a WHERE u.status = 'APPROVED'")
     Double getAverageIncome();

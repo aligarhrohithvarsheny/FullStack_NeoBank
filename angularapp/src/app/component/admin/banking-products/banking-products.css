@@ -1,0 +1,21 @@
+:host { display: block; min-height: 100vh; background: #f4f7fb; color: #17283e; }
+.products-page { max-width: 1500px; margin: 0 auto; padding: 34px clamp(16px, 4vw, 54px); }
+.page-header, .section-header, .product-title, .form-footer { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.page-header { margin-bottom: 22px; }.eyebrow { margin: 0 0 7px; color: #718198; font-size: 11px; font-weight: 800; letter-spacing: .13em; }
+h1 { margin: 0; font-size: clamp(25px, 3vw, 36px); letter-spacing: -.04em; }.subtitle { margin: 8px 0 0; color: #6b7c91; }
+.product-card { margin: 14px 0; padding: 20px; border: 1px solid #e3eaf2; border-radius: 14px; background: white; box-shadow: 0 5px 18px #263c580c; }
+.section-header { margin-bottom: 15px; }.section-header h2 { margin: 0; font-size: 17px; }.section-header > span { color: #718198; font-size: 11px; }
+.primary-button, .secondary-button, .approve-button, .reject-button { padding: 10px 13px; border: 0; border-radius: 8px; font-weight: 700; cursor: pointer; }
+.primary-button, .approve-button { background: #2459d3; color: white; }.secondary-button { background: #edf2f8; color: #29425f; }.reject-button { background: #fff0ed; color: #b54735; }
+button:disabled { opacity: .55; cursor: wait; }.active-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 11px; }
+.active-grid article { padding: 15px; border: 1px solid #e7edf4; border-radius: 10px; background: #fbfcfe; }.product-title strong { font-size: 14px; }.product-title span { padding: 4px 7px; border-radius: 16px; background: #eaf0ff; color: #305dbb; font-size: 10px; font-weight: 800; }
+.active-grid small, td small { display: block; margin-top: 5px; color: #8290a2; font-size: 10px; }.term-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 14px; }.term-grid span { color: #6d7d91; font-size: 10px; }.term-grid b { display: block; margin-top: 2px; color: #283b53; font-size: 11px; }
+.eligibility { margin: 12px 0 0; color: #64758b; font-size: 11px; line-height: 1.5; }
+.product-form { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }.product-form label { display: grid; gap: 6px; color: #586b82; font-size: 11px; font-weight: 700; }.product-form input, .product-form select, .product-form textarea, .review-actions input { width: 100%; box-sizing: border-box; padding: 10px; border: 1px solid #d9e2ec; border-radius: 8px; color: #26384e; font: inherit; font-size: 12px; }
+.eligibility-field, .form-footer { grid-column: 1 / -1; }.product-form textarea { resize: vertical; }.form-footer { margin-top: 2px; color: #75859a; font-size: 11px; }
+.table-wrap { overflow-x: auto; }table { width: 100%; border-collapse: collapse; text-align: left; font-size: 11px; }th, td { padding: 11px 8px; border-bottom: 1px solid #edf1f5; vertical-align: top; }th { color: #718198; font-size: 10px; text-transform: uppercase; letter-spacing: .04em; }td strong { display: block; }td { color: #4d6078; }
+.status { display: inline-block; padding: 5px 7px; border-radius: 15px; background: #edf2f8; color: #53657a; font-size: 9px; font-weight: 800; }.status.pending_approval { background: #fff3d6; color: #95640c; }.status.approved { background: #e7f7ee; color: #187147; }.status.rejected { background: #fff0ed; color: #b54735; }
+.review-actions { min-width: 130px; display: grid; gap: 5px; }.review-actions button { padding: 7px 9px; font-size: 10px; }.notice { margin: 10px 0; padding: 11px 13px; border-radius: 8px; font-size: 12px; }.notice.success { background: #eaf8f0; color: #187147; }.notice.error { background: #fff0ed; color: #a33c2b; }
+.empty-state, .loading-state { padding: 14px; color: #8290a2; font-size: 12px; }
+@media (max-width: 900px) { .product-form { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 600px) { .page-header { align-items: flex-start; flex-direction: column; }.product-form { grid-template-columns: 1fr; }.form-footer { align-items: flex-start; flex-direction: column; }.section-header { align-items: flex-start; }.form-footer button { width: 100%; } }

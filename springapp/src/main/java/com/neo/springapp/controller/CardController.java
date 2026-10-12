@@ -4,6 +4,7 @@ import com.neo.springapp.model.Card;
 import com.neo.springapp.service.CardService;
 import com.neo.springapp.service.PasswordService;
 import org.springframework.data.domain.Page;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -17,6 +18,8 @@ public class CardController {
 
     private final CardService cardService;
     private final PasswordService passwordService;
+    @Autowired
+    private com.neo.springapp.service.EmergencyControlService emergencyControlService;
 
     public CardController(CardService cardService, PasswordService passwordService) {
         this.cardService = cardService;
@@ -183,6 +186,17 @@ public class CardController {
                 response.put("success", false);
                 response.put("message", "PIN not set for this card");
                 return ResponseEntity.badRequest().body(response);
+            }
+
+            if (card.isBlocked() || card.isDeactivated()) {
+                return ResponseEntity.status(423).body(Map.of(
+                        "success", false,
+                        "message", "This card is frozen or deactivated."));
+            }
+            if (emergencyControlService.isAccountIsolated(card.getAccountNumber())) {
+                return ResponseEntity.status(423).body(Map.of(
+                        "success", false,
+                        "message", "The linked account is isolated by the bank."));
             }
             
             boolean isValid = passwordService.verifyPin(pin, card.getPin());

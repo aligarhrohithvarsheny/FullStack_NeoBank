@@ -27,6 +27,26 @@ class UserSessionTokenServiceTest {
     }
 
     @Test
+    void adminTokenCarriesAdminIdentityAndRoleScope() {
+        UserSessionTokenService.SessionPrincipal principal =
+                service.verify(service.issueAdmin(42L, "ops@example.com", "ADMIN"));
+
+        assertThat(principal).isNotNull();
+        assertThat(principal.userId()).isEqualTo(42L);
+        assertThat(principal.accountNumber()).isEqualTo("ops@example.com");
+        assertThat(principal.scope()).isEqualTo("ADMIN");
+    }
+
+    @Test
+    void managerTokenDoesNotCarryAdminScope() {
+        UserSessionTokenService.SessionPrincipal principal =
+                service.verify(service.issueAdmin(42L, "manager@example.com", "MANAGER"));
+
+        assertThat(principal).isNotNull();
+        assertThat(principal.scope()).isEqualTo("MANAGER");
+    }
+
+    @Test
     void modifiedTokenIsRejected() {
         String token = service.issueCard360(7L, "ACC700");
 

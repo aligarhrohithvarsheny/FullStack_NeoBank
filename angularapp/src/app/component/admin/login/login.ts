@@ -76,6 +76,9 @@ export class Login {
             // so guarded routes like /admin/complete-profile can open.
             sessionStorage.setItem('admin', JSON.stringify(serverAdmin));
             sessionStorage.setItem('userRole', role);
+            if (role === 'ADMIN' && response.sessionToken) {
+              sessionStorage.setItem('adminSessionToken', response.sessionToken);
+            }
             try {
               sessionStorage.setItem('adminLoginTime', new Date().toISOString());
             } catch (e) {

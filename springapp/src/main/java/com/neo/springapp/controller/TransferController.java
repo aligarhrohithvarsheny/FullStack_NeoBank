@@ -10,6 +10,7 @@ import com.neo.springapp.service.AiSecurityService;
 import com.neo.springapp.service.OtpService;
 import com.neo.springapp.service.UserService;
 import org.springframework.data.domain.Page;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -39,6 +40,8 @@ public class TransferController {
     private final AiSecurityService aiSecurityService;
     private final OtpService otpService;
     private final UserService userService;
+    @Autowired
+    private com.neo.springapp.service.EmergencyControlService emergencyControlService;
     private final Map<String, PendingTransferOtp> pendingTransferOtps = new ConcurrentHashMap<>();
 
     private static class PendingTransferOtp {
@@ -92,6 +95,15 @@ public class TransferController {
         var account = accountService.getAccountByNumber(senderAccountNumber);
         if (account == null || "CLOSED".equalsIgnoreCase(account.getStatus())) {
             return ResponseEntity.badRequest().body(Map.of("success", false, "message", "This sender account cannot make transfers."));
+        }
+        String rail = Objects.toString(transferData.get("transferType"), "").trim().toUpperCase();
+        if (!List.of("IMPS", "NEFT", "RTGS").contains(rail)) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "A supported transfer rail is required."));
+        }
+        if (emergencyControlService.isOutboundBlocked(senderAccountNumber, rail)) {
+            return ResponseEntity.status(423).body(Map.of(
+                    "success", false,
+                    "message", "Outbound transfers are temporarily paused for this rail or account. Contact the bank."));
         }
 
         String txnId = UUID.randomUUID().toString();
@@ -203,6 +215,11 @@ public class TransferController {
                 errorResponse.put("error", "Cannot transfer from a closed account");
                 errorResponse.put("message", "The sender account is closed and cannot perform transfers");
                 return ResponseEntity.badRequest().body(errorResponse);
+            }
+            if (emergencyControlService.isOutboundBlocked(senderAccountNumber, transferType)) {
+                return ResponseEntity.status(423).body(Map.of(
+                        "error", "Outbound transfers are temporarily paused for this rail or account.",
+                        "message", "Contact the bank before retrying this transfer."));
             }
 
             // Check if recipient account is closed (if it exists in our system)
@@ -757,6 +774,20 @@ public class TransferController {
                 TransferRecord transfer = transferService.getTransferById(transferId);
                 if (transfer != null && "Pending".equals(transfer.getStatus()) && 
                     transfer.getTransferType() == TransferRecord.TransferType.NEFT) {
+                    if (emergencyControlService.isOutboundBlocked(
+                            transfer.getSenderAccountNumber(), transfer.getTransferType().name())) {
+                        Double refundedBalance = accountService.creditBalance(
+                                transfer.getSenderAccountNumber(), transfer.getAmount());
+                        transactionService.createTransferTransaction(
+                                transfer.getSenderAccountNumber(),
+                                "NEFT returned because outbound transfers were paused",
+                                transfer.getAmount(),
+                                "Credit",
+                                refundedBalance);
+                        transfer.setStatus("Failed");
+                        transferService.saveTransfer(transfer);
+                        return;
+                    }
                     
                     // Check if it's been at least 2 hours
                     if (transfer.canProcessNeft()) {

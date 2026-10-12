@@ -1,0 +1,86 @@
+<main class="products-page">
+  <header class="page-header">
+    <div>
+      <p class="eyebrow">ADMINISTRATION · PRODUCT GOVERNANCE</p>
+      <h1>Banking product configuration</h1>
+      <p class="subtitle">Propose versioned savings and current account terms, then review effective-dated changes.</p>
+    </div>
+    <button type="button" class="secondary-button" (click)="loadProducts()" [disabled]="loading">Refresh</button>
+  </header>
+
+  <p class="notice success" role="status" *ngIf="success">{{ success }}</p>
+  <p class="notice error" role="alert" *ngIf="error">{{ error }}</p>
+
+  <section class="product-card active-products">
+    <div class="section-header">
+      <div><p class="eyebrow">CURRENT TERMS</p><h2>Effective products</h2></div>
+      <span>{{ activeProducts.length }} active</span>
+    </div>
+    <div class="active-grid" *ngIf="activeProducts.length; else noActiveProducts">
+      <article *ngFor="let product of activeProducts">
+        <div class="product-title"><strong>{{ product.productName }}</strong><span>{{ product.accountType }}</span></div>
+        <small>{{ product.productCode }} · Effective {{ product.effectiveFrom | date:'mediumDate' }}</small>
+        <div class="term-grid">
+          <span>Interest <b>{{ product.interestRate }}%</b></span>
+          <span>Minimum balance <b>{{ product.minimumBalance | currency:'INR':'symbol':'1.0-0' }}</b></span>
+          <span>Daily limit <b>{{ product.dailyTransactionLimit | currency:'INR':'symbol':'1.0-0' }}</b></span>
+          <span>Monthly limit <b>{{ product.monthlyTransactionLimit | currency:'INR':'symbol':'1.0-0' }}</b></span>
+          <span>Service charge <b>{{ product.serviceCharge | currency:'INR':'symbol':'1.2-2' }}</b></span>
+        </div>
+        <p class="eligibility">{{ product.eligibility }}</p>
+      </article>
+    </div>
+    <ng-template #noActiveProducts><p class="empty-state">No approved product versions are effective yet. Submit and approve a product version to establish terms.</p></ng-template>
+  </section>
+
+  <section class="product-card proposal-card">
+    <div class="section-header">
+      <div><p class="eyebrow">CHANGE REQUEST</p><h2>Propose a product version</h2></div>
+      <span>Changes require approval</span>
+    </div>
+    <form class="product-form" (ngSubmit)="proposeChange()">
+      <label>Product code<input name="productCode" [(ngModel)]="form.productCode" required maxlength="40" placeholder="SAVINGS-PLUS"></label>
+      <label>Product name<input name="productName" [(ngModel)]="form.productName" required maxlength="120" placeholder="Savings Plus"></label>
+      <label>Account type<select name="accountType" [(ngModel)]="form.accountType"><option value="SAVINGS">Savings</option><option value="CURRENT">Current</option></select></label>
+      <label>Interest rate (% p.a.)<input name="interestRate" type="number" [(ngModel)]="form.interestRate" required min="0" step="0.01"></label>
+      <label>Minimum balance (₹)<input name="minimumBalance" type="number" [(ngModel)]="form.minimumBalance" required min="0" step="0.01"></label>
+      <label>Daily transaction limit (₹)<input name="dailyTransactionLimit" type="number" [(ngModel)]="form.dailyTransactionLimit" required min="0" step="0.01"></label>
+      <label>Monthly transaction limit (₹)<input name="monthlyTransactionLimit" type="number" [(ngModel)]="form.monthlyTransactionLimit" required min="0" step="0.01"></label>
+      <label>Service charge (₹)<input name="serviceCharge" type="number" [(ngModel)]="form.serviceCharge" required min="0" step="0.01"></label>
+      <label>Effective from<input name="effectiveFrom" type="date" [(ngModel)]="form.effectiveFrom" required></label>
+      <label class="eligibility-field">Eligibility criteria<textarea name="eligibility" [(ngModel)]="form.eligibility" rows="3" maxlength="2000" required placeholder="Describe who can open this account and any eligibility rules"></textarea></label>
+      <div class="form-footer"><span>Submitted by {{ adminName }} · Proposal will remain pending until reviewed.</span><button type="submit" class="primary-button" [disabled]="saving">{{ saving ? 'Submitting…' : 'Submit for approval' }}</button></div>
+    </form>
+  </section>
+
+  <section class="product-card">
+    <div class="section-header">
+      <div><p class="eyebrow">VERSION HISTORY</p><h2>Product changes & approvals</h2></div>
+      <span>{{ products.length }} version(s)</span>
+    </div>
+    <p class="loading-state" *ngIf="loading">Loading product versions…</p>
+    <div class="table-wrap" *ngIf="!loading">
+      <table>
+        <thead><tr><th>Product</th><th>Terms</th><th>Effective date</th><th>Status</th><th>Requested by</th><th>Review</th></tr></thead>
+        <tbody>
+          <tr *ngFor="let product of products">
+            <td><strong>{{ product.productName }}</strong><small>{{ product.productCode }} · {{ product.accountType }}</small></td>
+            <td>Interest {{ product.interestRate }}% · Min {{ product.minimumBalance | currency:'INR':'symbol':'1.0-0' }}<small>Daily {{ product.dailyTransactionLimit | currency:'INR':'symbol':'1.0-0' }} · Monthly {{ product.monthlyTransactionLimit | currency:'INR':'symbol':'1.0-0' }} · Fee {{ product.serviceCharge | currency:'INR':'symbol':'1.2-2' }}</small></td>
+            <td>{{ product.effectiveFrom | date:'mediumDate' }}</td>
+            <td><span class="status" [ngClass]="product.status.toLowerCase()">{{ product.status.replace('_', ' ') }}</span><small *ngIf="product.rejectionReason">{{ product.rejectionReason }}</small></td>
+            <td>{{ product.requestedBy }}<small *ngIf="product.approvedBy">Reviewed by {{ product.approvedBy }}</small></td>
+            <td>
+              <div class="review-actions" *ngIf="product.status === 'PENDING_APPROVAL'; else noReview">
+                <button type="button" class="approve-button" (click)="approve(product)">Approve</button>
+                <input [name]="'reason-' + product.id" [(ngModel)]="rejectionReasons[product.id]" placeholder="Reason to reject">
+                <button type="button" class="reject-button" (click)="reject(product)">Reject</button>
+              </div>
+              <ng-template #noReview>—</ng-template>
+            </td>
+          </tr>
+          <tr *ngIf="products.length === 0"><td colspan="6" class="empty-state">No banking product versions configured yet.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</main>

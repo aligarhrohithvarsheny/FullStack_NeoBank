@@ -15,6 +15,26 @@ export const serverRoutes: ServerRoute[] = [
     renderMode: RenderMode.Client
   },
   {
+    path: 'admin/executive-control-center',
+    renderMode: RenderMode.Client
+  },
+  {
+    path: 'admin/system-monitoring',
+    renderMode: RenderMode.Client
+  },
+  {
+    path: 'admin/kill-switches',
+    renderMode: RenderMode.Client
+  },
+  {
+    path: 'admin/customer-360',
+    renderMode: RenderMode.Client
+  },
+  {
+    path: 'admin/banking-products',
+    renderMode: RenderMode.Client
+  },
+  {
     path: 'admin/users',
     renderMode: RenderMode.Client
   },

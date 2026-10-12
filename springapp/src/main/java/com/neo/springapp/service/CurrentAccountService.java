@@ -28,6 +28,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -41,6 +42,9 @@ import java.util.Optional;
 @Service
 @SuppressWarnings("null")
 public class CurrentAccountService {
+
+    @Autowired
+    private EmergencyControlService emergencyControlService;
 
     private final CurrentAccountRepository accountRepository;
     private final BusinessTransactionRepository transactionRepository;
@@ -257,6 +261,9 @@ public class CurrentAccountService {
         if (account == null || account.getAccountFrozen() || !"ACTIVE".equals(account.getStatus())) {
             return null;
         }
+        if (!"Credit".equalsIgnoreCase(txnType)) {
+            emergencyControlService.assertAccountNotIsolated(accountNumber);
+        }
 
         Double currentBalance = account.getBalance();
 
@@ -331,6 +338,7 @@ public class CurrentAccountService {
     @Transactional
     public BusinessTransaction processTransfer(String fromAccount, String toAccount, String recipientName,
                                                 Double amount, String transferType, String description) {
+        emergencyControlService.assertOutboundAllowed(fromAccount, transferType);
         CurrentAccount sender = accountRepository.findByAccountNumber(fromAccount).orElse(null);
         if (sender == null || sender.getAccountFrozen() || !"ACTIVE".equals(sender.getStatus())) {
             return null;
@@ -608,6 +616,7 @@ public class CurrentAccountService {
 
     @Transactional
     public CurrentAccountVendorPayment processVendorPayment(CurrentAccountVendorPayment payment) {
+        emergencyControlService.assertAccountNotIsolated(payment.getAccountNumber());
         CurrentAccount account = accountRepository.findByAccountNumber(payment.getAccountNumber()).orElse(null);
         if (account == null || account.getAccountFrozen() || !"ACTIVE".equals(account.getStatus())) {
             return null;

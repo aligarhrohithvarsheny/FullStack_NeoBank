@@ -8,6 +8,7 @@ import com.neo.springapp.repository.SalaryAccountRepository;
 import com.neo.springapp.repository.UserRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,6 +20,9 @@ import java.util.Map;
 
 @Service
 public class CurrentAccountUpiService {
+
+    @Autowired
+    private EmergencyControlService emergencyControlService;
 
     private final CurrentAccountRepository accountRepository;
     private final CurrentAccountUpiPaymentRepository upiPaymentRepository;
@@ -365,6 +369,7 @@ public class CurrentAccountUpiService {
 
     @Transactional
     public Map<String, Object> processCrossCustomerPayment(String senderAccountNumber, String receiverUpiId, Double amount, String note) {
+        emergencyControlService.assertAccountNotIsolated(senderAccountNumber);
         // Validate sender
         CurrentAccount sender = accountRepository.findByAccountNumber(senderAccountNumber)
                 .orElseThrow(() -> new RuntimeException("Sender account not found"));
