@@ -255,4 +255,8 @@ export class FasttagAdmin implements OnInit {
   getRcImageUrl(filename: string): string {
     return this.fasttagService.getRcImageUrl(filename);
   }
+
+  isRcImage(filename: string): boolean {
+    return /\.(png|jpe?g|gif|webp|bmp)$/i.test(filename || '');
+  }
 }

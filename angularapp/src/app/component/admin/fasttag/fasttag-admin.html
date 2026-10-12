@@ -124,11 +124,13 @@
                   <h5>📄 RC Upload</h5>
                   <div *ngIf="t.rcFrontPath" class="ft-admin-rc-img">
                     <span>RC Front:</span>
-                    <img [src]="getRcImageUrl(t.rcFrontPath)" alt="RC Front" />
+                    <img *ngIf="isRcImage(t.rcFrontPath)" [src]="getRcImageUrl(t.rcFrontPath)" alt="RC Front" />
+                    <a *ngIf="!isRcImage(t.rcFrontPath)" [href]="getRcImageUrl(t.rcFrontPath)" target="_blank" rel="noopener">View RC document</a>
                   </div>
                   <div *ngIf="t.rcBackPath" class="ft-admin-rc-img">
                     <span>RC Back:</span>
-                    <img [src]="getRcImageUrl(t.rcBackPath)" alt="RC Back" />
+                    <img *ngIf="isRcImage(t.rcBackPath)" [src]="getRcImageUrl(t.rcBackPath)" alt="RC Back" />
+                    <a *ngIf="!isRcImage(t.rcBackPath)" [href]="getRcImageUrl(t.rcBackPath)" target="_blank" rel="noopener">View RC document</a>
                   </div>
                   <div *ngIf="!t.rcFrontPath && !t.rcBackPath" class="ft-admin-no-data">No RC images uploaded</div>
                 </div>

@@ -3,6 +3,7 @@ package com.neo.springapp.controller;
 import com.neo.springapp.model.Fasttag;
 import com.neo.springapp.service.FasttagService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -12,7 +13,6 @@ import org.springframework.core.io.UrlResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
-import java.io.File;
 import java.io.FileInputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -30,6 +30,9 @@ public class FasttagController {
 
     @Autowired
     private FasttagService fasttagService;
+
+    @Value("${app.upload-dir:uploads}")
+    private String uploadRoot;
 
     @GetMapping
     public List<Fasttag> listAll() {
@@ -202,15 +205,14 @@ public class FasttagController {
         Fasttag f = fasttagService.getById(id);
         if (f == null) return ResponseEntity.notFound().build();
         try {
-            String uploadDir = "uploads/fasttag-rc";
-            File dir = new File(uploadDir);
-            if (!dir.exists()) dir.mkdirs();
+            Path uploadDir = Paths.get(uploadRoot, "fasttag-rc");
+            Files.createDirectories(uploadDir);
 
             if (rcFront != null && !rcFront.isEmpty()) {
                 String originalName = rcFront.getOriginalFilename();
                 String ext = originalName != null && originalName.contains(".") ? originalName.substring(originalName.lastIndexOf('.')) : ".jpg";
                 String fileName = "rc_front_" + id + "_" + System.currentTimeMillis() + ext;
-                Path target = Paths.get(uploadDir, fileName);
+                Path target = uploadDir.resolve(fileName);
                 Files.copy(rcFront.getInputStream(), target, StandardCopyOption.REPLACE_EXISTING);
                 f.setRcFrontPath(target.toString());
             }
@@ -218,7 +220,7 @@ public class FasttagController {
                 String originalName = rcBack.getOriginalFilename();
                 String ext = originalName != null && originalName.contains(".") ? originalName.substring(originalName.lastIndexOf('.')) : ".jpg";
                 String fileName = "rc_back_" + id + "_" + System.currentTimeMillis() + ext;
-                Path target = Paths.get(uploadDir, fileName);
+                Path target = uploadDir.resolve(fileName);
                 Files.copy(rcBack.getInputStream(), target, StandardCopyOption.REPLACE_EXISTING);
                 f.setRcBackPath(target.toString());
             }
@@ -234,7 +236,7 @@ public class FasttagController {
         try {
             // Sanitize filename to prevent path traversal
             String sanitized = Paths.get(filename).getFileName().toString();
-            Path filePath = Paths.get("uploads/fasttag-rc", sanitized);
+            Path filePath = Paths.get(uploadRoot, "fasttag-rc", sanitized);
             if (!Files.exists(filePath)) return ResponseEntity.notFound().build();
             Resource resource = new UrlResource(filePath.toUri());
             String contentType = Files.probeContentType(filePath);

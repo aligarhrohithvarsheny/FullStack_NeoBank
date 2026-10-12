@@ -8,6 +8,7 @@ import com.neo.springapp.repository.AccountRepository;
 import com.neo.springapp.repository.HomeLoanEventRepository;
 import com.neo.springapp.repository.HomeLoanRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -30,8 +31,10 @@ public class HomeLoanService {
     private static final double PREPAYMENT_CHARGE_PCT = 1.0;
     private static final double CLOSURE_CHARGE_PCT = 2.0;
     private static final double RENEWAL_FEE_PCT = 0.5;
-    private static final Path UPLOAD_DIR = Paths.get("uploads", "home-loan-documents");
     private static final Set<String> DOC_TYPES = Set.of("fdReceipt", "model", "signature");
+
+    @Value("${app.upload-dir:uploads}")
+    private String uploadRoot;
 
     @Autowired private HomeLoanRepository repo;
     @Autowired private HomeLoanEventRepository eventRepo;
@@ -42,6 +45,7 @@ public class HomeLoanService {
 
     private static double n(Double v) { return v == null ? 0.0 : v; }
     private static double r2(double v) { return Math.round(v * 100.0) / 100.0; }
+    private Path homeLoanUploadDir() { return Paths.get(uploadRoot, "home-loan-documents"); }
 
     // ---------- Application ----------
 
@@ -145,9 +149,10 @@ public class HomeLoanService {
         String orig = file.getOriginalFilename() == null ? "file" : file.getOriginalFilename();
         String ext = orig.contains(".") ? orig.substring(orig.lastIndexOf('.')).toLowerCase() : "";
         if (!List.of(".pdf", ".png", ".jpg", ".jpeg").contains(ext)) throw new RuntimeException("Only PDF, PNG or JPG files are allowed");
-        Files.createDirectories(UPLOAD_DIR);
+        Path uploadDir = homeLoanUploadDir();
+        Files.createDirectories(uploadDir);
         String name = h.getApplicationId() + "-" + type + "-" + System.currentTimeMillis() + ext;
-        Files.copy(file.getInputStream(), UPLOAD_DIR.resolve(name), StandardCopyOption.REPLACE_EXISTING);
+        Files.copy(file.getInputStream(), uploadDir.resolve(name), StandardCopyOption.REPLACE_EXISTING);
         switch (type) {
             case "fdReceipt": h.setFdReceiptPath(name); h.setFdReceiptStatus("Pending"); h.setFdReceiptRemark(null); break;
             case "model": h.setModelDocPath(name); h.setModelDocStatus("Pending"); h.setModelDocRemark(null); break;
@@ -191,8 +196,9 @@ public class HomeLoanService {
             default -> null;
         };
         if (name == null) throw new RuntimeException("Document not uploaded");
-        Path p = UPLOAD_DIR.resolve(name).normalize();
-        if (!p.startsWith(UPLOAD_DIR.normalize()) || !Files.exists(p)) throw new RuntimeException("File missing");
+        Path uploadDir = homeLoanUploadDir();
+        Path p = uploadDir.resolve(name).normalize();
+        if (!p.startsWith(uploadDir.normalize()) || !Files.exists(p)) throw new RuntimeException("File missing");
         Map<String, Object> m = new HashMap<>();
         m.put("path", p);
         m.put("name", name);
@@ -619,9 +625,10 @@ public class HomeLoanService {
         String orig = file.getOriginalFilename() == null ? "file" : file.getOriginalFilename();
         String ext = orig.contains(".") ? orig.substring(orig.lastIndexOf('.')).toLowerCase() : "";
         if (!List.of(".pdf", ".png", ".jpg", ".jpeg").contains(ext)) throw new RuntimeException("Only PDF, PNG or JPG files are allowed");
-        Files.createDirectories(UPLOAD_DIR);
+        Path uploadDir = homeLoanUploadDir();
+        Files.createDirectories(uploadDir);
         String name = h.getApplicationId() + "-" + type + "-" + System.currentTimeMillis() + ext;
-        Files.copy(file.getInputStream(), UPLOAD_DIR.resolve(name), StandardCopyOption.REPLACE_EXISTING);
+        Files.copy(file.getInputStream(), uploadDir.resolve(name), StandardCopyOption.REPLACE_EXISTING);
         String remark = "Uploaded by admin " + admin;
         switch (type) {
             case "fdReceipt": h.setFdReceiptPath(name); h.setFdReceiptStatus("Verified"); h.setFdReceiptRemark(remark); break;
