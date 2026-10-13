@@ -85,13 +85,34 @@
       </div>
 
       <div class="feature-access-panel" *ngIf="account.accountType.toUpperCase() === 'SAVINGS'">
+        <div class="product-assignment">
+          <div>
+            <h3><i class="fa fa-layer-group"></i> Savings product / tier</h3>
+            <p class="note">Assign an active tier to an existing Savings account. Its default features take effect immediately.</p>
+          </div>
+          <div class="product-assignment-controls">
+            <select aria-label="Savings product tier" [(ngModel)]="selectedProductCode" [ngModelOptions]="{standalone: true}"
+              [disabled]="isLoadingProducts || isSaving">
+              <option value="">Select a savings product</option>
+              <option *ngFor="let product of savingsProducts" [value]="product.productCode">
+                {{ product.productName }} ({{ product.productCode }})
+              </option>
+            </select>
+            <button type="button" class="product-save-button" (click)="updateSavingsProduct()"
+              [disabled]="isSaving || isLoadingProducts || !selectedProductCode || selectedProductCode === account.savingsProductCode">
+              {{ isSaving ? 'Saving...' : 'Update tier' }}
+            </button>
+          </div>
+          <small *ngIf="account.savingsProductCode">Current tier: {{ account.savingsProductCode }}</small>
+          <small *ngIf="!isLoadingProducts && !savingsProducts.length">No active Savings product tiers are available.</small>
+        </div>
         <div class="cards-heading">
-          <h3><i class="fa fa-sliders-h"></i> Savings feature access</h3>
+          <h3><i class="fa fa-sliders-h"></i> Individual feature access</h3>
           <button type="button" class="refresh-button" (click)="loadAccountFeatures(account)" [disabled]="isLoadingFeatures">
             Refresh
           </button>
         </div>
-        <p class="note">Changes override the account type's defaults and are enforced for the customer dashboard and protected APIs.</p>
+        <p class="note">Override any feature for this account, including standard Savings accounts. Overrides stay in place when the account tier changes. Customers see access changes within seconds.</p>
         <p class="empty" *ngIf="isLoadingFeatures">Loading feature access…</p>
         <div class="feature-access-list" *ngIf="!isLoadingFeatures">
           <div class="feature-access-row" *ngFor="let feature of accountFeatures">

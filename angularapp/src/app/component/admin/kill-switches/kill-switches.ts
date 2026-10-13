@@ -20,6 +20,14 @@ interface AccountOption {
   accountType: string;
   status: string;
   customerId: string;
+  savingsProductCode: string;
+}
+
+interface SavingsProductOption {
+  productCode: string;
+  productName: string;
+  accountType: string;
+  enabledFeatures: string[];
 }
 
 interface SavingsFeatureControl {
@@ -80,7 +88,10 @@ export class KillSwitchesComponent implements OnInit {
   selectedAccount: AccountOption | null = null;
   cards: CardOption[] = [];
   accountFeatures: SavingsFeatureControl[] = [];
+  savingsProducts: SavingsProductOption[] = [];
+  selectedProductCode = '';
   isLoadingFeatures = false;
+  isLoadingProducts = false;
   isLoading = true;
   isSearching = false;
   isSaving = false;
@@ -93,6 +104,7 @@ export class KillSwitchesComponent implements OnInit {
 
   ngOnInit(): void {
     this.loadControls();
+    this.loadSavingsProducts();
   }
 
   loadControls(): void {
@@ -134,6 +146,7 @@ export class KillSwitchesComponent implements OnInit {
 
   selectAccount(account: AccountOption): void {
     this.selectedAccount = account;
+    this.selectedProductCode = account.savingsProductCode || '';
     this.cards = [];
     this.accountFeatures = [];
     if (account.accountType.toUpperCase() === 'SAVINGS') this.loadAccountFeatures(account);
@@ -143,6 +156,62 @@ export class KillSwitchesComponent implements OnInit {
     ).subscribe({
       next: response => this.cards = response.cards,
       error: error => this.showError(error, 'Unable to load the account cards.')
+    });
+  }
+
+  loadSavingsProducts(): void {
+    this.isLoadingProducts = true;
+    this.http.get<SavingsProductOption[]>(
+      `${environment.apiBaseUrl}/api/admin/banking-products/active`,
+      { headers: this.adminHeaders() }
+    ).subscribe({
+      next: products => {
+        this.savingsProducts = (products || []).filter(
+          product => product.accountType?.toUpperCase() === 'SAVINGS');
+        this.isLoadingProducts = false;
+      },
+      error: error => {
+        this.isLoadingProducts = false;
+        this.showError(error, 'Unable to load active savings products.');
+      }
+    });
+  }
+
+  updateSavingsProduct(): void {
+    const account = this.selectedAccount;
+    const product = this.savingsProducts.find(option => option.productCode === this.selectedProductCode);
+    const reason = this.reason.trim();
+    if (!account || !product) {
+      this.alertService.warning('Savings product required', 'Select an active savings product to continue.');
+      return;
+    }
+    if (!reason) {
+      this.alertService.warning('Reason required', 'Enter a reason before changing the savings product.');
+      return;
+    }
+    if (account.savingsProductCode === product.productCode) return;
+    if (this.isSaving || !window.confirm(
+      `Change account ${account.accountNumber} to ${product.productName}? Product-default features will update immediately; individual overrides will be retained.`)) return;
+
+    this.isSaving = true;
+    this.http.put<any>(
+      `${this.controlUrl}/accounts/${encodeURIComponent(account.accountNumber)}/product`,
+      { productCode: product.productCode, reason },
+      { headers: this.adminHeaders() }
+    ).subscribe({
+      next: response => {
+        account.savingsProductCode = response.productCode || product.productCode;
+        this.accountFeatures = response.features || [];
+        this.reason = '';
+        this.isSaving = false;
+        this.alertService.success(
+          'Savings product updated',
+          `${product.productName} is now assigned. The customer dashboard refreshes access within seconds.`);
+      },
+      error: error => {
+        this.isSaving = false;
+        this.showError(error, 'Unable to change this savings product.');
+      }
     });
   }
 

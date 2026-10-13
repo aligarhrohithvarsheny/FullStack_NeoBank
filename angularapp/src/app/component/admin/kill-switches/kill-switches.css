@@ -41,6 +41,13 @@ button.resume { background: #047857; }
 .selected-account { margin-top: 18px; padding-top: 18px; border-top: 1px solid #e5eaf1; }
 .selected-heading h3, .selected-heading p { margin: 5px 0; }
 .cards-area { margin-top: 18px; padding: 16px; border-radius: 12px; background: #f7f9fc; }
+.product-assignment { display: grid; grid-template-columns: 1fr; gap: 9px; margin: 0 0 18px; padding: 16px; border: 1px solid #dce5ef; border-radius: 12px; background: #f7f9fc; }
+.product-assignment h3 { margin: 0; font-size: 15px; }
+.product-assignment .note { margin: 5px 0 0; }
+.product-assignment-controls { display: flex; gap: 10px; }
+.product-assignment-controls select { flex: 1; min-width: 0; padding: 11px 12px; border: 1px solid #ccd6e3; border-radius: 9px; color: #172338; background: #fff; font: inherit; }
+.product-save-button { background: #1d4ed8; }
+.product-assignment > small { color: #627087; }
 .cards-heading { margin-bottom: 10px; }
 .cards-heading h3 { margin: 0; font-size: 15px; }
 .cards-heading span { color: #718099; font-size: 12px; }
@@ -57,6 +64,7 @@ th { color: #65748b; font-size: 11px; text-transform: uppercase; letter-spacing:
   .page-header, .selected-heading { align-items: flex-start; flex-direction: column; }
   .reason-panel, .panel { padding: 16px; }
   .search-row { flex-direction: column; }
+  .product-assignment-controls { align-items: stretch; flex-direction: column; }
   .rail-card { flex-wrap: wrap; }
   .rail-info { flex-basis: calc(100% - 70px); }
   .rail-card > button { margin-left: auto; }

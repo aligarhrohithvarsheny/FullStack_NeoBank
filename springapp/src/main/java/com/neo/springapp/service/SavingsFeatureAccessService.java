@@ -7,6 +7,7 @@ import com.neo.springapp.repository.AccountRepository;
 import com.neo.springapp.repository.BankingProductConfigRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
@@ -58,6 +59,34 @@ public class SavingsFeatureAccessService {
     public boolean isSavingsAccount(String accountNumber) {
         Account account = accountRepository.findByAccountNumber(accountNumber == null ? "" : accountNumber.trim());
         return account != null && "SAVINGS".equalsIgnoreCase(account.getAccountType());
+    }
+
+    @Transactional
+    public Map<String, Object> setSavingsProduct(
+            String accountNumber, String productCode, String reason, String changedBy) {
+        Account account = requireSavingsAccount(accountNumber);
+        String normalizedCode = productCode == null ? "" : productCode.trim();
+        if (normalizedCode.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "A savings product must be selected.");
+        }
+        LocalDate today = LocalDate.now();
+        BankingProductConfig product = productRepository
+                .findAllByOrderByProductCodeAscEffectiveFromDescCreatedAtDesc().stream()
+                .filter(candidate -> candidate.getProductCode().equalsIgnoreCase(normalizedCode))
+                .filter(candidate -> "SAVINGS".equalsIgnoreCase(candidate.getAccountType()))
+                .filter(candidate -> "APPROVED".equalsIgnoreCase(candidate.getStatus()))
+                .filter(candidate -> candidate.getEffectiveFrom() != null
+                        && !candidate.getEffectiveFrom().isAfter(today))
+                .findFirst()
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST, "The selected savings product is not active."));
+
+        String previousProductCode = account.getSavingsProductCode();
+        account.setSavingsProductCode(product.getProductCode());
+        accountRepository.save(account);
+        controlService.recordSavingsProductChange(
+                account.getAccountNumber(), previousProductCode, product.getProductCode(), reason, changedBy);
+        return getFeatureAccess(account.getAccountNumber());
     }
 
     public void setFeatureEnabled(String accountNumber, String feature, boolean enabled, String reason, String changedBy) {

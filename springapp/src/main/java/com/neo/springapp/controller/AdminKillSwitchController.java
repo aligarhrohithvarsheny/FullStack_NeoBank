@@ -82,21 +82,21 @@ public class AdminKillSwitchController {
                 : accountRepository.searchAccounts(term, PageRequest.of(0, pageSize)).getContent();
         savingsAccounts.forEach(account -> addAccount(
                 matches, account.getAccountNumber(), account.getName(), account.getAccountType(),
-                account.getStatus(), account.getCustomerId()));
+                account.getStatus(), account.getCustomerId(), account.getSavingsProductCode()));
 
         var currentAccounts = term.isEmpty()
                 ? currentAccountRepository.findAll(PageRequest.of(0, pageSize)).getContent()
                 : currentAccountRepository.searchAccounts(term, PageRequest.of(0, pageSize)).getContent();
         currentAccounts.forEach(account -> addAccount(
                 matches, account.getAccountNumber(), account.getOwnerName(), "CURRENT",
-                account.getStatus(), account.getCustomerId()));
+                account.getStatus(), account.getCustomerId(), null));
 
         List<SalaryAccount> salaryAccounts = term.isEmpty()
                 ? salaryAccountRepository.findAll(PageRequest.of(0, pageSize)).getContent()
                 : salaryAccountRepository.search(term).stream().limit(pageSize).toList();
         salaryAccounts.forEach(account -> addAccount(
                 matches, account.getAccountNumber(), account.getEmployeeName(), "SALARY",
-                account.getStatus(), account.getCustomerId()));
+                account.getStatus(), account.getCustomerId(), null));
 
         return ResponseEntity.ok(Map.of("accounts", new ArrayList<>(matches.values())));
     }
@@ -161,6 +161,26 @@ public class AdminKillSwitchController {
             return ResponseEntity.ok(savingsFeatureAccessService.getFeatureAccess(accountNumber));
         } catch (org.springframework.web.server.ResponseStatusException exception) {
             return error(HttpStatus.valueOf(exception.getStatusCode().value()), exception.getReason());
+        }
+    }
+
+    @PutMapping("/accounts/{accountNumber}/product")
+    public ResponseEntity<?> setSavingsProduct(
+            @PathVariable String accountNumber, @RequestBody SavingsProductRequest request) {
+        if (request == null || request.productCode() == null || request.productCode().isBlank()
+                || request.reason() == null || request.reason().isBlank()
+                || request.reason().length() > 500) {
+            return error(HttpStatus.BAD_REQUEST,
+                    "A savings product code and a reason of 1-500 characters are required.");
+        }
+        try {
+            String changedBy = authenticatedAdmin();
+            return ResponseEntity.ok(savingsFeatureAccessService.setSavingsProduct(
+                    accountNumber, request.productCode(), request.reason(), changedBy));
+        } catch (org.springframework.web.server.ResponseStatusException exception) {
+            return error(HttpStatus.valueOf(exception.getStatusCode().value()), exception.getReason());
+        } catch (IllegalStateException exception) {
+            return error(HttpStatus.FORBIDDEN, exception.getMessage());
         }
     }
 
@@ -258,15 +278,18 @@ public class AdminKillSwitchController {
 
     private void addAccount(
             Map<String, Map<String, Object>> results,
-            String accountNumber, String name, String accountType, String status, String customerId) {
+            String accountNumber, String name, String accountType, String status, String customerId,
+            String savingsProductCode) {
         if (accountNumber == null || accountNumber.isBlank()
                 || (name == null && customerId == null)) return;
-        results.putIfAbsent(accountNumber.toUpperCase(Locale.ROOT), Map.of(
-                "accountNumber", accountNumber,
-                "name", name == null ? "" : name,
-                "accountType", accountType == null ? "UNKNOWN" : accountType,
-                "status", status == null ? "" : status,
-                "customerId", customerId == null ? "" : customerId));
+        Map<String, Object> account = new LinkedHashMap<>();
+        account.put("accountNumber", accountNumber);
+        account.put("name", name == null ? "" : name);
+        account.put("accountType", accountType == null ? "UNKNOWN" : accountType);
+        account.put("status", status == null ? "" : status);
+        account.put("customerId", customerId == null ? "" : customerId);
+        account.put("savingsProductCode", savingsProductCode == null ? "" : savingsProductCode);
+        results.putIfAbsent(accountNumber.toUpperCase(Locale.ROOT), account);
     }
 
     private ResponseEntity<Map<String, Object>> error(HttpStatus status, String message) {
@@ -274,4 +297,5 @@ public class AdminKillSwitchController {
     }
 
     public record ControlRequest(Boolean active, String reason) {}
+    public record SavingsProductRequest(String productCode, String reason) {}
 }

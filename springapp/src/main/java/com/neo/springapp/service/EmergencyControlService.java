@@ -86,6 +86,23 @@ public class EmergencyControlService {
     }
 
     @Transactional
+    public void recordSavingsProductChange(
+            String accountNumber, String previousProductCode, String newProductCode,
+            String reason, String changedBy) {
+        EmergencyControlAudit audit = new EmergencyControlAudit();
+        audit.setScopeType("SAVINGS_PRODUCT");
+        audit.setScopeKey(normalize(accountNumber) + ":"
+                + (previousProductCode == null || previousProductCode.isBlank() ? "unassigned" : previousProductCode)
+                + ">" + newProductCode);
+        audit.setAction("PRODUCT_CHANGED");
+        audit.setPreviousState(previousProductCode != null && !previousProductCode.isBlank());
+        audit.setNewState(true);
+        audit.setReason(reason.trim());
+        audit.setChangedBy(changedBy);
+        auditRepository.save(audit);
+    }
+
+    @Transactional
     public EmergencyControl setControl(
             String scopeType, String scopeKey, boolean active, String reason, String changedBy) {
         return setControl(scopeType, scopeKey, active, reason, changedBy, null);
