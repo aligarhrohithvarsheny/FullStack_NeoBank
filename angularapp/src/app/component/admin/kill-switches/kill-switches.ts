@@ -34,6 +34,7 @@ interface SavingsFeatureControl {
   id: string;
   enabled: boolean;
   inherited: boolean;
+  reason: string;
 }
 
 interface CardOption {

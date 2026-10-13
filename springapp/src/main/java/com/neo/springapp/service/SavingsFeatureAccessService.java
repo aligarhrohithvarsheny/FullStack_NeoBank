@@ -43,7 +43,16 @@ public class SavingsFeatureAccessService {
             boolean enabled = inherited
                     ? defaultFeatures.contains(feature)
                     : !override.isActive();
-            return Map.of("id", feature, "enabled", enabled, "inherited", inherited);
+            Map<String, Object> featureAccess = new LinkedHashMap<>();
+            featureAccess.put("id", feature);
+            featureAccess.put("enabled", enabled);
+            featureAccess.put("inherited", inherited);
+            featureAccess.put("reason", inherited
+                    ? "Using product defaults"
+                    : override.getReason() == null || override.getReason().isBlank()
+                            ? "No reason recorded"
+                            : override.getReason());
+            return featureAccess;
         }).toList());
         return response;
     }

@@ -114,14 +114,26 @@
         </div>
         <p class="note">Override any feature for this account, including standard Savings accounts. Overrides stay in place when the account tier changes. Customers see access changes within seconds.</p>
         <p class="empty" *ngIf="isLoadingFeatures">Loading feature access…</p>
-        <div class="feature-access-list" *ngIf="!isLoadingFeatures">
+        <div class="feature-access-list" *ngIf="!isLoadingFeatures && accountFeatures.length">
+          <div class="feature-access-row feature-access-header" aria-hidden="true">
+            <span>Feature</span>
+            <span>Current access</span>
+            <span>Reason</span>
+            <span>Action</span>
+          </div>
           <div class="feature-access-row" *ngFor="let feature of accountFeatures">
-            <span><strong>{{ featureLabel(feature.id) }}</strong><small>{{ feature.inherited ? 'Using account type default' : 'Account-specific setting' }}</small></span>
-            <button type="button" [class.resume]="!feature.enabled" (click)="toggleFeature(feature)" [disabled]="isSaving">
+            <span class="feature-name"><strong>{{ featureLabel(feature.id) }}</strong></span>
+            <span class="feature-state" [class.disabled-state]="!feature.enabled">
+              {{ feature.enabled ? 'Enabled' : 'Disabled' }}
+              <small>{{ feature.inherited ? 'Product default' : 'Account override' }}</small>
+            </span>
+            <span class="feature-reason">{{ feature.reason || 'No reason recorded' }}</span>
+            <button class="feature-action" type="button" [class.resume]="!feature.enabled" (click)="toggleFeature(feature)" [disabled]="isSaving">
               {{ feature.enabled ? 'Enabled · Disable' : 'Disabled · Enable' }}
             </button>
           </div>
         </div>
+        <p class="empty" *ngIf="!isLoadingFeatures && !accountFeatures.length">No Savings features are configured.</p>
       </div>
 
       <div class="cards-area">
