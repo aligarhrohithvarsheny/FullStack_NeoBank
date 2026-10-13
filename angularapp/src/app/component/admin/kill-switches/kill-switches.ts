@@ -338,7 +338,20 @@ export class KillSwitchesComponent implements OnInit {
   }
 
   private showError(error: any, fallback: string): void {
-    const message = error?.error?.message || fallback;
+    const status = Number(error?.status);
+    const message = error?.error?.message || (
+      status === 0
+        ? 'Cannot reach the banking API. Check that the backend is available, then try again.'
+        : status === 401
+          ? 'Your admin session has expired. Sign out and sign in again.'
+          : status === 403
+            ? 'Your current session is not authorized for admin controls. Sign in with an admin account.'
+            : status === 404
+              ? 'The backend does not have this admin endpoint yet. Deploy or restart the latest Spring backend, then try again.'
+              : status >= 500
+                ? `The banking API failed while processing this request (HTTP ${status}). Check backend logs and try again.`
+                : fallback
+    );
     this.alertService.error('Emergency controls unavailable', message);
   }
 }
