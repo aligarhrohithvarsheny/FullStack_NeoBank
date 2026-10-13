@@ -1,4 +1,4 @@
-import { Component, OnInit, Inject, PLATFORM_ID } from '@angular/core';
+import { Component, OnInit, OnDestroy, Inject, PLATFORM_ID } from '@angular/core';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -69,7 +69,7 @@ interface TransactionLookupRecord {
   templateUrl: './transactions.html',
   styleUrls: ['./transactions.css']
 })
-export class Transactions implements OnInit {
+export class Transactions implements OnInit, OnDestroy {
 
   constructor(private router: Router, @Inject(PLATFORM_ID) private platformId: Object, private http: HttpClient, private sanitizer: DomSanitizer) {}
 
@@ -97,12 +97,16 @@ export class Transactions implements OnInit {
   transactionsDateFilter: string = '';
   transactionsTypeFilter: string = 'ALL';
   transactionsCategoryFilter: string = 'ALL';
+  private transactionRefreshInterval: ReturnType<typeof setInterval> | null = null;
 
   ngOnInit() {
     // Only load in browser, not during SSR
     if (isPlatformBrowser(this.platformId)) {
       this.loadUsers();
       this.loadAllTransactions();
+      this.transactionRefreshInterval = setInterval(() => {
+        if (!this.isLoadingTransactions) this.loadAllTransactions();
+      }, 10000);
       
       // Check if there's a newly created account to filter by
       const newAccountNumber = sessionStorage.getItem('newAccountCreated');
@@ -113,6 +117,10 @@ export class Transactions implements OnInit {
         }, 1000);
       }
     }
+  }
+
+  ngOnDestroy() {
+    if (this.transactionRefreshInterval) clearInterval(this.transactionRefreshInterval);
   }
 
   // Load all users

@@ -16,6 +16,7 @@ import { Card } from '../card/card';
 import { CreditCard } from '../creditcard/creditcard';
 import { CreditCardBillPay } from '../credit-card-bill-pay/credit-card-bill-pay';
 import { Loan } from '../loan/loan';
+import { LoanRepayment } from '../loan-repayment/loan-repayment';
 import { ChequeComponent } from '../cheque/cheque';
 import { Kycupdate } from '../kycupdate/kycupdate';
 import { Goldloan } from '../goldloan/goldloan';
@@ -63,6 +64,7 @@ interface CancelledChequeAccount {
     CreditCard,
     CreditCardBillPay,
     Loan,
+    LoanRepayment,
     ChequeComponent,
     Kycupdate,
     Goldloan,

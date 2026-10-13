@@ -11,12 +11,68 @@ import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 
 @Service
 public class PdfService {
+
+    public byte[] generateLoanPaymentReceipt(
+            String customerName,
+            String loanAccountNumber,
+            String loanType,
+            String paymentMode,
+            Double amount,
+            Double remainingPrincipal,
+            String linkedAccountNumber,
+            String transactionId,
+            LocalDateTime paymentDate,
+            Double balanceAfter) throws IOException {
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss");
+        String html = """
+                <!DOCTYPE html>
+                <html><head><meta charset="UTF-8"><style>
+                body{font-family:Arial,sans-serif;color:#172033;padding:32px}
+                .receipt{max-width:640px;margin:auto;border:1px solid #dbe3ef;border-radius:14px;padding:28px}
+                h1{color:#0876c9;margin-bottom:4px}.muted{color:#5b667a}
+                .amount{font-size:26px;font-weight:bold;color:#0876c9;margin:22px 0}
+                .row{display:flex;justify-content:space-between;border-bottom:1px solid #e8edf4;padding:10px 0}
+                .label{font-weight:bold}.footer{margin-top:24px;font-size:12px;color:#5b667a}
+                </style></head><body><main class="receipt">
+                <h1>NeoBank</h1><div class="muted">Loan payment receipt</div>
+                <div class="amount">₹%s</div>
+                <div class="row"><span class="label">Customer</span><span>%s</span></div>
+                <div class="row"><span class="label">Loan type</span><span>%s</span></div>
+                <div class="row"><span class="label">Loan account</span><span>%s</span></div>
+                <div class="row"><span class="label">Payment</span><span>%s</span></div>
+                <div class="row"><span class="label">Transaction ID</span><span>%s</span></div>
+                <div class="row"><span class="label">Paid on</span><span>%s</span></div>
+                <div class="row"><span class="label">Debited account</span><span>%s</span></div>
+                <div class="row"><span class="label">Balance after payment</span><span>₹%s</span></div>
+                <div class="row"><span class="label">Remaining principal</span><span>₹%s</span></div>
+                <div class="footer">This receipt confirms the loan payment recorded by NeoBank. Keep it for your records.</div>
+                </main></body></html>
+                """.formatted(
+                money(amount),
+                escapeHtml(customerName),
+                escapeHtml(loanType),
+                escapeHtml(loanAccountNumber),
+                escapeHtml(paymentMode),
+                escapeHtml(transactionId),
+                (paymentDate == null ? LocalDateTime.now() : paymentDate).format(formatter),
+                escapeHtml(linkedAccountNumber),
+                money(balanceAfter),
+                money(remainingPrincipal));
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        HtmlConverter.convertToPdf(html, outputStream);
+        return outputStream.toByteArray();
+    }
+
+    private static String money(Double amount) {
+        return String.format(java.util.Locale.ROOT, "%.2f", amount == null ? 0.0 : amount);
+    }
 
     public byte[] generateTransferReceipt(TransferRecord transfer) throws IOException {
         String html = generateTransferReceiptHtml(transfer);

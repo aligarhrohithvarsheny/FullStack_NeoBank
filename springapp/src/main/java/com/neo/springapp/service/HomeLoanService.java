@@ -322,20 +322,25 @@ public class HomeLoanService {
     private double monthlyInterest(HomeLoan h) { return r2(n(h.getRemainingPrincipal()) * n(h.getInterestRate()) / 1200.0); }
 
     @Transactional
-    public HomeLoan payEmi(Long id, String actor) { return payEmi(id, actor, null, null); }
+    public HomeLoan payEmi(Long id, String actor) { return payEmiDetailed(id, actor, null, null).loan(); }
 
     @Transactional
-    public HomeLoan payEmi(Long id, String actor, String ref) { return payEmi(id, actor, ref, null); }
+    public HomeLoan payEmi(Long id, String actor, String ref) { return payEmiDetailed(id, actor, ref, null).loan(); }
 
     @Transactional
     public HomeLoan payEmiFromAccount(Long id, String debitAccountNumber, String actor) {
+        return payEmiFromAccountWithResult(id, debitAccountNumber, actor).loan();
+    }
+
+    @Transactional
+    public RepaymentResult payEmiFromAccountWithResult(Long id, String debitAccountNumber, String actor) {
         if (debitAccountNumber == null || debitAccountNumber.isBlank()) {
             throw new IllegalArgumentException("Debit account number is required");
         }
-        return payEmi(id, actor, null, debitAccountNumber);
+        return payEmiDetailed(id, actor, null, debitAccountNumber);
     }
 
-    private HomeLoan payEmi(Long id, String actor, String ref, String debitAccountNumber) {
+    private RepaymentResult payEmiDetailed(Long id, String actor, String ref, String debitAccountNumber) {
         HomeLoan h = activeLoan(id);
         double interest = monthlyInterest(h);
         double rp = n(h.getRemainingPrincipal());
@@ -343,10 +348,11 @@ public class HomeLoanService {
         boolean last = h.getRemainingTenure() <= 1 || principal >= rp - 0.01;
         if (last) principal = rp;
         double debit = r2(principal + interest);
+        Transaction transaction = null;
         String emiDescription = "Home Loan EMI " + (h.getPaidEmis() + 1) + " - " + h.getLoanAccountNumber()
                 + " (principal " + principal + ", interest " + interest + ")";
-        if (debitAccountNumber != null) debitAccount(h, debitAccountNumber, debit, "Home Loan EMI", emiDescription);
-        else if (ref == null) debitAccount(h, debit, "Home Loan EMI", emiDescription);
+        if (debitAccountNumber != null) transaction = debitAccount(h, debitAccountNumber, debit, "Home Loan EMI", emiDescription);
+        else if (ref == null) transaction = debitAccount(h, debit, "Home Loan EMI", emiDescription);
         else creditTreasury(h, debit, "Home Loan EMI", emiDescription + refNote(ref));
         h.setPrincipalPaid(r2(n(h.getPrincipalPaid()) + principal));
         h.setInterestPaid(r2(n(h.getInterestPaid()) + interest));
@@ -358,7 +364,7 @@ public class HomeLoanService {
         touch(h);
         repo.save(h);
         event(h, "EMI", actor, "EMI #" + h.getPaidEmis() + " paid" + refNote(ref), debit, null, principal, interest, h.getRemainingPrincipal());
-        return h;
+        return new RepaymentResult(h, transaction);
     }
 
     @Transactional
@@ -408,7 +414,7 @@ public class HomeLoanService {
 
     @Transactional
     public HomeLoan prepay(Long id, double amount, String actor) {
-        return prepay(id, amount, "REDUCE_TENURE", actor, null);
+        return prepayDetailed(id, amount, "REDUCE_TENURE", actor, null, null).loan();
     }
 
     public Map<String, Object> prepayPreview(Long id, double amount, String adjustment) {
@@ -427,13 +433,30 @@ public class HomeLoanService {
 
     @Transactional
     public HomeLoan prepay(Long id, double amount, String adjustment, String actor, String ref) {
+        return prepayDetailed(id, amount, adjustment, actor, ref, null).loan();
+    }
+
+    @Transactional
+    public RepaymentResult prepayFromAccountWithResult(Long id, String debitAccountNumber, double amount,
+            String adjustment, String actor) {
+        if (debitAccountNumber == null || debitAccountNumber.isBlank()) {
+            throw new IllegalArgumentException("Debit account number is required");
+        }
+        return prepayDetailed(id, amount, adjustment, actor, null, debitAccountNumber);
+    }
+
+    private RepaymentResult prepayDetailed(Long id, double amount, String adjustment, String actor, String ref,
+            String debitAccountNumber) {
         boolean reduceEmi = "REDUCE_EMI".equalsIgnoreCase(adjustment);
         Map<String, Object> p = prepayPreview(id, amount, adjustment);
         HomeLoan h = activeLoan(id);
         double total = (Double) p.get("totalDebit");
         String prepaymentDescription = "Home Loan Prepayment (principal " + amount + ", charges "
                 + p.get("charge") + " + GST " + p.get("gst") + ") - " + h.getLoanAccountNumber();
-        if (ref == null) debitAccount(h, total, "Home Loan Prepayment", prepaymentDescription);
+        Transaction transaction = null;
+        if (debitAccountNumber != null) {
+            transaction = debitAccount(h, debitAccountNumber, total, "Home Loan Prepayment", prepaymentDescription);
+        } else if (ref == null) transaction = debitAccount(h, total, "Home Loan Prepayment", prepaymentDescription);
         else creditTreasury(h, total, "Home Loan Prepayment", prepaymentDescription + refNote(ref));
         h.setRemainingPrincipal((Double) p.get("newOutstanding"));
         h.setRemainingTenure((Integer) p.get("newRemainingTenure"));
@@ -445,7 +468,7 @@ public class HomeLoanService {
         event(h, "PREPAYMENT", actor, "Prepaid " + amount + ", charges " + p.get("charge") + " + GST " + p.get("gst")
                 + (reduceEmi ? ". EMI reduced to " + h.getEmi() : ". Tenure reduced by " + p.get("tenureSaved") + " months") + refNote(ref),
                 total, null, amount, 0.0, h.getRemainingPrincipal());
-        return h;
+        return new RepaymentResult(h, transaction);
     }
     public Map<String, Object> closurePreview(Long id) {
         HomeLoan h = activeLoan(id);
@@ -708,30 +731,31 @@ public class HomeLoanService {
 
     // ---------- helpers ----------
 
-    private void debitAccount(HomeLoan h, double amount, String merchant, String desc) {
-        debitAccount(h, h.getAccountNumber(), amount, merchant, desc);
+    private Transaction debitAccount(HomeLoan h, double amount, String merchant, String desc) {
+        return debitAccount(h, h.getAccountNumber(), amount, merchant, desc);
     }
 
-    private void debitAccount(HomeLoan h, String accountNumber, double amount, String merchant, String desc) {
+    private Transaction debitAccount(HomeLoan h, String accountNumber, double amount, String merchant, String desc) {
         Account acc = accountRepository.findByAccountNumber(accountNumber);
         if (acc == null) throw new RuntimeException("Account not found");
         if (n(acc.getBalance()) < amount) throw new RuntimeException("Insufficient balance. Required " + amount);
         double nb = r2(n(acc.getBalance()) - amount);
         acc.setBalance(nb);
         accountRepository.save(acc);
-        saveTxn(h, accountNumber, merchant, amount, "Debit", nb, desc);
+        Transaction transaction = saveTxn(h, accountNumber, merchant, amount, "Debit", nb, desc);
         branchAccountService.recordTreasuryMovement(amount, true, merchant, desc, accountNumber);
+        return transaction;
     }
 
     private void creditTreasury(HomeLoan h, double amount, String merchant, String description) {
         branchAccountService.recordTreasuryMovement(amount, true, merchant, description, h.getAccountNumber());
     }
 
-    private void saveTxn(HomeLoan h, String merchant, double amount, String type, double balance, String desc) {
-        saveTxn(h, h.getAccountNumber(), merchant, amount, type, balance, desc);
+    private Transaction saveTxn(HomeLoan h, String merchant, double amount, String type, double balance, String desc) {
+        return saveTxn(h, h.getAccountNumber(), merchant, amount, type, balance, desc);
     }
 
-    private void saveTxn(HomeLoan h, String accountNumber, String merchant, double amount, String type, double balance, String desc) {
+    private Transaction saveTxn(HomeLoan h, String accountNumber, String merchant, double amount, String type, double balance, String desc) {
         Transaction t = new Transaction();
         t.setMerchant(merchant);
         t.setAmount(amount);
@@ -742,8 +766,10 @@ public class HomeLoanService {
         t.setDate(LocalDateTime.now());
         t.setStatus("Completed");
         t.setBalance(balance);
-        transactionService.saveTransaction(t);
+        return transactionService.saveTransaction(t);
     }
+
+    public record RepaymentResult(HomeLoan loan, Transaction transaction) {}
 
     private void event(HomeLoan h, String type, String actor, String details, Double debit, Double credit, Double principal, Double interest) {
         event(h, type, actor, details, debit, credit, principal, interest, h.getRemainingPrincipal());

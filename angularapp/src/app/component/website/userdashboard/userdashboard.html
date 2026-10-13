@@ -147,7 +147,7 @@
         <button type="button" class="cb-strip-subitem" [class.active]="selectedFeature === 'fixed-deposits'" (click)="selectFeature('fixed-deposits')">Fixed Deposits</button>
         <button type="button" class="cb-strip-subitem" [class.active]="selectedFeature === 'deposit-request'" (click)="selectFeature('deposit-request')">Cash Deposit Slip</button>
       </div>
-      <div class="cb-strip-item" [class.active]="['loan', 'goldloan', 'homeloan', 'ecs-mandate', 'ml-loan-prediction'].includes(selectedFeature || '')" role="button" tabindex="0" [attr.aria-expanded]="expandedSidebarCategory === 'loans'" (click)="toggleSidebarCategory('loans')" (keydown.enter)="toggleSidebarCategory('loans')" (keydown.space)="toggleSidebarCategory('loans')">
+      <div class="cb-strip-item" [class.active]="['loan', 'loan-payment', 'goldloan', 'homeloan', 'ecs-mandate', 'ml-loan-prediction'].includes(selectedFeature || '')" role="button" tabindex="0" [attr.aria-expanded]="expandedSidebarCategory === 'loans'" (click)="toggleSidebarCategory('loans')" (keydown.enter)="toggleSidebarCategory('loans')" (keydown.space)="toggleSidebarCategory('loans')">
         <div class="cb-strip-icon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
         </div>
@@ -156,6 +156,7 @@
       </div>
       <div class="cb-strip-submenu" *ngIf="expandedSidebarCategory === 'loans'">
         <button type="button" class="cb-strip-subitem" [class.active]="selectedFeature === 'loan'" (click)="selectFeature('loan')">Personal Loans</button>
+        <button type="button" class="cb-strip-subitem" [class.active]="selectedFeature === 'loan-payment'" (click)="selectFeature('loan-payment')">Pay Existing Loan</button>
         <button type="button" class="cb-strip-subitem" [class.active]="selectedFeature === 'goldloan'" (click)="selectFeature('goldloan')">Gold Loans</button>
         <button type="button" class="cb-strip-subitem" [class.active]="selectedFeature === 'ecs-mandate'" (click)="selectFeature('ecs-mandate')">ECS Mandates</button>
 <button type="button" class="cb-strip-subitem" [class.active]="selectedFeature === 'homeloan'" (click)="selectFeature('homeloan')">Home Loans</button>
@@ -979,7 +980,8 @@
       <div *ngIf="selectedFeature === 'card'" class="ud-embedded"><app-card></app-card></div>
       <div *ngIf="selectedFeature === 'credit-card'" class="ud-embedded"><app-creditcard></app-creditcard></div>
       <div *ngIf="selectedFeature === 'credit-card-bill'" class="ud-embedded"><app-credit-card-bill-pay [accountNumber]="userAccountNumber" (paid)="currentBalance = $event.accountBalanceAfter"></app-credit-card-bill-pay></div>
-      <div *ngIf="selectedFeature === 'loan'" class="ud-embedded"><app-loan></app-loan></div>
+      <div *ngIf="selectedFeature === 'loan'" class="ud-embedded"><app-loan (balanceUpdated)="currentBalance = $event"></app-loan></div>
+      <div *ngIf="selectedFeature === 'loan-payment'" class="ud-embedded"><app-loan-repayment (balanceUpdated)="currentBalance = $event"></app-loan-repayment></div>
       <div *ngIf="selectedFeature === 'cheque'" class="ud-embedded"><app-cheque></app-cheque></div>
       <div *ngIf="selectedFeature === 'kycupdate'" class="ud-embedded"><app-kycupdate></app-kycupdate></div>
       <div *ngIf="selectedFeature === 'goldloan'" class="ud-embedded"><app-goldloan></app-goldloan></div>

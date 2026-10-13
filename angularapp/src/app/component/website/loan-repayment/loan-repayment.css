@@ -1,0 +1,254 @@
+.loan-repayment-card {
+  width: min(100%, 920px);
+  margin: 28px auto;
+  padding: 26px;
+  border: 1px solid #dbe7f3;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 12px 34px rgba(15, 42, 70, 0.09);
+  color: #18324b;
+  font-family: inherit;
+}
+
+.repayment-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 20px;
+}
+
+.repayment-heading h2 {
+  margin: 5px 0;
+  color: #102a43;
+  font-size: 1.5rem;
+}
+
+.repayment-heading p,
+.repayment-hint {
+  margin: 0;
+  color: #60748a;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.repayment-eyebrow {
+  color: #0876c9;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.repayment-lock {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: #e9f6ff;
+}
+
+.repayment-lookup,
+.repayment-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  align-items: end;
+}
+
+.repayment-lookup label,
+.repayment-form label {
+  display: grid;
+  gap: 7px;
+  color: #304a63;
+  font-size: 0.88rem;
+  font-weight: 650;
+}
+
+.repayment-lookup input,
+.repayment-form input,
+.repayment-form select {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid #cbd7e3;
+  border-radius: 9px;
+  background: #fff;
+  color: #172b40;
+  font: inherit;
+}
+
+.repayment-lookup input:focus,
+.repayment-form input:focus,
+.repayment-form select:focus {
+  border-color: #0784d5;
+  outline: 3px solid rgba(7, 132, 213, 0.14);
+}
+
+.repayment-primary,
+.repayment-secondary {
+  min-height: 44px;
+  padding: 10px 16px;
+  border: 0;
+  border-radius: 9px;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.repayment-primary {
+  background: #0876c9;
+  color: #fff;
+}
+
+.repayment-primary:hover:not(:disabled) {
+  background: #0563ab;
+}
+
+.repayment-secondary {
+  margin-left: 8px;
+  border: 1px solid #cbd7e3;
+  background: #fff;
+  color: #304a63;
+}
+
+.repayment-primary:disabled,
+.repayment-secondary:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.verified-loan {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid #e6edf4;
+}
+
+.verified-loan h3,
+.repayment-review h4 {
+  margin: 0 0 14px;
+  color: #102a43;
+}
+
+.verified-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.verified-grid > div {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid #e6edf4;
+  border-radius: 10px;
+  background: #f8fbfe;
+}
+
+.verified-grid span,
+.verified-grid strong {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.verified-grid span {
+  margin-bottom: 5px;
+  color: #60748a;
+  font-size: 0.76rem;
+}
+
+.verified-grid strong {
+  color: #18324b;
+  font-size: 0.9rem;
+}
+
+.payment-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 22px;
+  margin: 22px 0 16px;
+  padding: 14px;
+  border: 1px solid #dbe7f3;
+  border-radius: 10px;
+}
+
+.payment-options legend {
+  padding: 0 6px;
+  color: #304a63;
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.payment-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #18324b;
+  font-size: 0.9rem;
+}
+
+.repayment-hint {
+  grid-column: 1 / -1;
+}
+
+.repayment-review {
+  margin-top: 18px;
+  padding: 16px;
+  border: 1px solid #b8daf1;
+  border-radius: 12px;
+  background: #f2f9ff;
+}
+
+.repayment-review p {
+  margin: 8px 0;
+}
+
+.repayment-review .repayment-hint {
+  margin: 8px 0 14px;
+}
+
+.review-button {
+  margin-top: 16px;
+}
+
+.repayment-error,
+.repayment-success {
+  margin: 14px 0 0;
+  padding: 11px 13px;
+  border-radius: 9px;
+  line-height: 1.5;
+}
+
+.repayment-error {
+  background: #fff0f0;
+  color: #a82727;
+}
+
+.repayment-success {
+  display: grid;
+  gap: 4px;
+  background: #edfbf3;
+  color: #17653b;
+}
+
+@media (max-width: 700px) {
+  .loan-repayment-card {
+    margin: 20px auto;
+    padding: 18px;
+  }
+
+  .repayment-lookup,
+  .repayment-form {
+    grid-template-columns: 1fr;
+  }
+
+  .verified-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 420px) {
+  .verified-grid {
+    grid-template-columns: 1fr;
+  }
+}

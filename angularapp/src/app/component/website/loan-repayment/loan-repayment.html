@@ -1,0 +1,121 @@
+<section class="loan-repayment-card" aria-labelledby="loan-repayment-title">
+  <div class="repayment-heading">
+    <div>
+      <span class="repayment-eyebrow">Secure loan payment</span>
+      <h2 id="loan-repayment-title">Pay a loan</h2>
+      <p>Verify your loan with the loan account number and date of birth.</p>
+    </div>
+    <span class="repayment-lock" aria-hidden="true">🔒</span>
+  </div>
+
+  <form class="repayment-lookup" (ngSubmit)="lookupLoan()">
+    <label>
+      Loan account number
+      <input
+        name="loanAccountNumber"
+        [(ngModel)]="loanAccountNumber"
+        (input)="clearVerification()"
+        autocomplete="off"
+        maxlength="40"
+        required>
+    </label>
+    <label>
+      Date of birth
+      <input
+        type="date"
+        name="dob"
+        [(ngModel)]="dob"
+        (input)="clearVerification()"
+        required>
+    </label>
+    <button class="repayment-primary" type="submit" [disabled]="isLookingUp">
+      {{ isLookingUp ? 'Verifying…' : 'Verify loan' }}
+    </button>
+  </form>
+
+  <p class="repayment-error" role="alert" *ngIf="error">{{ error }}</p>
+  <p class="repayment-success" role="status" *ngIf="success">
+    {{ success }}
+    <span *ngIf="transactionId">Transaction: {{ transactionId }}</span>
+    <span *ngIf="newBalance !== null">Updated linked-account balance: {{ newBalance | currency:'INR':'symbol':'1.2-2' }}</span>
+  </p>
+
+  <div class="verified-loan" *ngIf="details as loan">
+    <h3>Verified loan details</h3>
+    <div class="verified-grid">
+      <div><span>Customer</span><strong>{{ loan.maskedName }}</strong></div>
+      <div><span>Loan type</span><strong>{{ loan.loanType }}</strong></div>
+      <div><span>Loan account</span><strong>{{ loan.maskedLoanAccountNumber }}</strong></div>
+      <div><span>Linked account</span><strong>{{ loan.linkedAccountNumber }}</strong></div>
+      <div><span>Status</span><strong>{{ loan.status }}</strong></div>
+      <div><span>Outstanding principal</span><strong>{{ loan.outstandingPrincipal | currency:'INR':'symbol':'1.2-2' }}</strong></div>
+    </div>
+
+    <fieldset class="payment-options">
+      <legend>Choose payment type</legend>
+      <label class="payment-option">
+        <input type="radio" name="paymentMode" [(ngModel)]="paymentMode" value="EMI"
+          (change)="isReviewingPayment = false">
+        <span>Pay scheduled EMI</span>
+      </label>
+      <label class="payment-option" *ngIf="loan.prepaymentSupported">
+        <input type="radio" name="paymentMode" [(ngModel)]="paymentMode" value="PREPAYMENT"
+          (change)="isReviewingPayment = false">
+        <span>Make a prepayment</span>
+      </label>
+    </fieldset>
+
+    <div class="repayment-form" *ngIf="paymentMode === 'EMI'">
+      <label *ngIf="loan.emis.length">
+        Select EMI
+        <select name="selectedEmiNumber" [(ngModel)]="selectedEmiNumber"
+          (change)="isReviewingPayment = false">
+          <option *ngFor="let emi of loan.emis" [ngValue]="emi.emiNumber">
+            EMI #{{ emi.emiNumber }} · {{ emi.dueDate | date:'mediumDate' }} ·
+            {{ emi.amount | currency:'INR':'symbol':'1.2-2' }}
+          </option>
+        </select>
+      </label>
+      <p class="repayment-hint" *ngIf="!loan.emis.length">There are no pending EMIs available.</p>
+    </div>
+
+    <div class="repayment-form" *ngIf="paymentMode === 'PREPAYMENT'">
+      <label>
+        Prepayment amount
+        <input type="number" name="prepaymentAmount" [(ngModel)]="prepaymentAmount"
+          (input)="isReviewingPayment = false" min="0.01" [max]="loan.outstandingPrincipal - 0.01"
+          step="0.01" required>
+      </label>
+      <label>
+        Apply savings to
+        <select name="adjustment" [(ngModel)]="adjustment" (change)="isReviewingPayment = false">
+          <option value="REDUCE_TENURE">Reduce remaining tenure</option>
+          <option value="REDUCE_EMI">Reduce monthly EMI</option>
+        </select>
+      </label>
+      <p class="repayment-hint">
+        A {{ loan.prepaymentChargePercent }}% charge plus {{ loan.prepaymentGstPercent }}% GST on that
+        charge applies. Estimated total debit: {{ paymentTotal | currency:'INR':'symbol':'1.2-2' }}.
+      </p>
+    </div>
+
+    <div class="repayment-review" *ngIf="isReviewingPayment">
+      <h4>Review before confirming</h4>
+      <p>{{ paymentMode === 'EMI' ? 'Scheduled EMI' : 'Prepayment including applicable charges' }}:
+        <strong>{{ paymentTotal | currency:'INR':'symbol':'1.2-2' }}</strong>
+      </p>
+      <p>Debit account: <strong>{{ loan.linkedAccountNumber }}</strong></p>
+      <p class="repayment-hint">The payment is debited only from this loan's linked account.</p>
+      <button type="button" class="repayment-primary" (click)="confirmPayment()" [disabled]="isPaying">
+        {{ isPaying ? 'Processing…' : 'Confirm and debit' }}
+      </button>
+      <button type="button" class="repayment-secondary" (click)="isReviewingPayment = false"
+        [disabled]="isPaying">Back</button>
+    </div>
+
+    <button *ngIf="!isReviewingPayment" type="button" class="repayment-primary review-button"
+      (click)="reviewPayment()" [disabled]="isPaying || (paymentMode === 'EMI' && !loan.emis.length)">
+      Review payment
+    </button>
+  </div>
+</section>

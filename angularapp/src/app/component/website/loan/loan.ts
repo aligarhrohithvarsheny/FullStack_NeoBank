@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, Inject, PLATFORM_ID } from '@angular/core';
+import { Component, EventEmitter, OnInit, OnDestroy, Inject, Output, PLATFORM_ID } from '@angular/core';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -15,6 +15,7 @@ import {
   getAllColleges, 
   getCitiesByState 
 } from '../../../data/colleges-data';
+import { LoanRepayment } from '../loan-repayment/loan-repayment';
 
 interface LoanRequest {
   id: number;
@@ -63,11 +64,13 @@ interface EmiPayment {
 @Component({
   selector: 'app-loan',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, LoanRepayment],
   templateUrl: './loan.html',
   styleUrls: ['./loan.css']
 })
 export class Loan implements OnInit, OnDestroy {
+  @Output() balanceUpdated = new EventEmitter<number>();
+
   private loanRefreshInterval: ReturnType<typeof setInterval> | null = null;
 
   constructor(

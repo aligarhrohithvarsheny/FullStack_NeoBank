@@ -1,4 +1,4 @@
-import { Component, OnInit, Inject, PLATFORM_ID } from '@angular/core';
+import { Component, OnInit, OnDestroy, Inject, PLATFORM_ID } from '@angular/core';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
@@ -26,7 +26,7 @@ interface TransactionRecord {
   templateUrl: './transaction.html',
   styleUrls: ['./transaction.css']
 })
-export class Transaction implements OnInit {
+export class Transaction implements OnInit, OnDestroy {
   transactions: TransactionRecord[] = [];
   userAccountNumber: string = '';
   currentBalance: number = 0;
@@ -46,6 +46,7 @@ export class Transaction implements OnInit {
 
   // Email statement
   sendingEmail: boolean = false;
+  private transactionRefreshInterval: ReturnType<typeof setInterval> | null = null;
 
   constructor(
     private router: Router, 
@@ -58,7 +59,16 @@ export class Transaction implements OnInit {
     // Only load in browser, not during SSR
     if (isPlatformBrowser(this.platformId)) {
       this.loadUserAccount();
+      if (sessionStorage.getItem('currentUser')) {
+        this.transactionRefreshInterval = setInterval(() => {
+          if (this.userAccountNumber && !this.loading) this.loadTransactionsFromMySQL();
+        }, 10000);
+      }
     }
+  }
+
+  ngOnDestroy() {
+    if (this.transactionRefreshInterval) clearInterval(this.transactionRefreshInterval);
   }
 
   // Navigate back to dashboard

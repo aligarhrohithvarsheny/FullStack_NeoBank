@@ -3,6 +3,7 @@ import { Router, RouterLink } from '@angular/router';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { AccountRecoveryService, RecoveryAccountType } from '../../../service/account-recovery.service';
+import { LoanRepayment } from '../loan-repayment/loan-repayment';
 
 type FooterInformation = {
   title: string;
@@ -24,7 +25,7 @@ type LandingSearchResult = {
   templateUrl: './landing.html',
   styleUrls: ['./landing.css'],
   encapsulation: ViewEncapsulation.None,
-  imports: [CommonModule, RouterLink, FormsModule]
+  imports: [CommonModule, RouterLink, FormsModule, LoanRepayment]
 })
 export class Landing implements OnInit, OnDestroy {
   showPersonalDropdown = false;
@@ -73,8 +74,8 @@ export class Landing implements OnInit, OnDestroy {
     },
     {
       label: 'Loans & Credit',
-      description: 'Explore personal loans, credit cards, and EMI tools.',
-      keywords: 'loans credit personal loan emi credit card',
+      description: 'Explore loans, pay scheduled EMIs, and review supported prepayments.',
+      keywords: 'loans credit personal loan emi prepayment pay loan number dob credit card',
       sectionId: 'loans'
     },
     {
