@@ -49,6 +49,7 @@ export class Login {
 
     this.isLoading = true;
     this.errorMessage = '';
+    sessionStorage.removeItem('adminSessionToken');
 
     this.http
       .post(`${environment.apiBaseUrl}/api/admins/login`, {
@@ -70,13 +71,19 @@ export class Login {
             return;
           }
 
+          if (role === 'ADMIN' && !response.sessionToken) {
+            this.errorMessage =
+              'Admin login succeeded, but the backend did not provide an admin session token. Update the Spring backend and try again.';
+            return;
+          }
+
           if (response.admin) {
             const serverAdmin = response.admin;
             // Backend has already authenticated this admin; always persist session
             // so guarded routes like /admin/complete-profile can open.
             sessionStorage.setItem('admin', JSON.stringify(serverAdmin));
             sessionStorage.setItem('userRole', role);
-            if (role === 'ADMIN' && response.sessionToken) {
+            if (role === 'ADMIN') {
               sessionStorage.setItem('adminSessionToken', response.sessionToken);
             }
             try {

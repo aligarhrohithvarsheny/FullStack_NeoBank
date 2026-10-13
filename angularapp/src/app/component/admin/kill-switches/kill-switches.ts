@@ -95,6 +95,7 @@ export class KillSwitchesComponent implements OnInit {
   isLoading = true;
   isSearching = false;
   isSaving = false;
+  private authRedirectStarted = false;
 
   constructor(
     private http: HttpClient,
@@ -103,6 +104,15 @@ export class KillSwitchesComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
+    if (!sessionStorage.getItem('adminSessionToken')) {
+      this.isLoading = false;
+      this.alertService.warning(
+        'Admin sign-in required',
+        'Sign out and sign in again to refresh your verified admin session.'
+      );
+      void this.router.navigate(['/admin/login']);
+      return;
+    }
     this.loadControls();
     this.loadSavingsProducts();
   }
@@ -345,7 +355,7 @@ export class KillSwitchesComponent implements OnInit {
         : status === 401
           ? 'Your admin session has expired. Sign out and sign in again.'
           : status === 403
-            ? 'Your current session is not authorized for admin controls. Sign in with an admin account.'
+            ? 'Your admin session is missing, expired, or not authorized. Sign in again to refresh it.'
             : status === 404
               ? 'The backend does not have this admin endpoint yet. Deploy or restart the latest Spring backend, then try again.'
               : status >= 500
@@ -353,5 +363,10 @@ export class KillSwitchesComponent implements OnInit {
                 : fallback
     );
     this.alertService.error('Emergency controls unavailable', message);
+    if (status === 403 && !this.authRedirectStarted) {
+      this.authRedirectStarted = true;
+      sessionStorage.removeItem('adminSessionToken');
+      void this.router.navigate(['/admin/login']);
+    }
   }
 }
