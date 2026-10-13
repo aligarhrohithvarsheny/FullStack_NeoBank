@@ -12,5 +12,6 @@ public interface CurrentAccountInvoiceRepository extends JpaRepository<CurrentAc
     List<CurrentAccountInvoice> findByAccountNumberOrderByCreatedAtDesc(String accountNumber);
     List<CurrentAccountInvoice> findByAccountNumberAndStatus(String accountNumber, String status);
     Optional<CurrentAccountInvoice> findByInvoiceNumber(String invoiceNumber);
+    Optional<CurrentAccountInvoice> findByLinkedTransactionId(Long linkedTransactionId);
     long countByAccountNumber(String accountNumber);
 }

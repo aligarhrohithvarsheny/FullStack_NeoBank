@@ -6,6 +6,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
+import org.springframework.web.server.ResponseStatusException;
+
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -27,5 +30,18 @@ class GlobalExceptionHandlerTest {
                 new ClientAbortException("Broken pipe"));
 
         assertEquals(HttpStatus.NO_CONTENT, response.getStatusCode());
+    }
+
+    @Test
+    void responseStatusExceptionShouldPreserveClientErrorStatusAndMessage() {
+        String message = "A product version already exists for this code and effective date.";
+        ResponseEntity<Map<String, Object>> response = handler.handleResponseStatusException(
+                new ResponseStatusException(HttpStatus.CONFLICT, message));
+
+        assertEquals(HttpStatus.CONFLICT, response.getStatusCode());
+        assertEquals(false, response.getBody().get("success"));
+        assertEquals(message, response.getBody().get("message"));
+        assertEquals("CONFLICT", response.getBody().get("error"));
+        assertEquals(HttpStatus.CONFLICT.value(), response.getBody().get("status"));
     }
 }

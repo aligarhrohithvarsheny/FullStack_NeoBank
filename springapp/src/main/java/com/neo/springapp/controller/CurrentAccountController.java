@@ -11,6 +11,8 @@ import com.neo.springapp.service.CurrentAccountService;
 import com.neo.springapp.service.SessionHistoryService;
 import com.neo.springapp.repository.NetBankingServiceControlRepository;
 import org.springframework.data.domain.Page;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -754,6 +756,50 @@ public class CurrentAccountController {
         return currentAccountService.getInvoiceByNumber(invoiceNumber)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+    @PutMapping("/invoices/{invoiceId}/transactions/{transactionId}")
+    public ResponseEntity<Map<String, Object>> mapInvoiceToTransaction(
+            @PathVariable Long invoiceId, @PathVariable Long transactionId) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            CurrentAccountInvoice invoice =
+                    currentAccountService.mapInvoiceToTransaction(invoiceId, transactionId);
+            response.put("success", true);
+            response.put("invoice", invoice);
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            response.put("success", false);
+            response.put("error", e.getMessage());
+            return ResponseEntity.badRequest().body(response);
+        } catch (IllegalStateException | DataIntegrityViolationException e) {
+            response.put("success", false);
+            response.put("error", e instanceof DataIntegrityViolationException
+                    ? "This invoice or transaction is already linked"
+                    : e.getMessage());
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+        }
+    }
+
+    @DeleteMapping("/invoices/{invoiceId}/transactions/{transactionId}")
+    public ResponseEntity<Map<String, Object>> unmapInvoiceFromTransaction(
+            @PathVariable Long invoiceId, @PathVariable Long transactionId) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            CurrentAccountInvoice invoice =
+                    currentAccountService.unmapInvoiceFromTransaction(invoiceId, transactionId);
+            response.put("success", true);
+            response.put("invoice", invoice);
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            response.put("success", false);
+            response.put("error", e.getMessage());
+            return ResponseEntity.badRequest().body(response);
+        } catch (IllegalStateException e) {
+            response.put("success", false);
+            response.put("error", e.getMessage());
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+        }
     }
 
     @PutMapping("/invoices/status/{id}")

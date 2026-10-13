@@ -20,6 +20,9 @@ public class CurrentAccountInvoice {
     @Column(nullable = false)
     private String accountNumber;
 
+    @Column(unique = true)
+    private Long linkedTransactionId;
+
     @Column(nullable = false)
     private String clientName;
 

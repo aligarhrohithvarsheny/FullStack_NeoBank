@@ -11,6 +11,8 @@ import com.neo.springapp.repository.SalaryAccountRepository;
 import com.neo.springapp.service.CardService;
 import com.neo.springapp.service.EmergencyControlService;
 import com.neo.springapp.service.UserSessionTokenService;
+import com.neo.springapp.service.SavingsFeatureAccessService;
+import com.neo.springapp.model.SavingsFeature;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -33,18 +35,21 @@ public class AdminKillSwitchController {
     private final CurrentAccountRepository currentAccountRepository;
     private final SalaryAccountRepository salaryAccountRepository;
     private final CardService cardService;
+    private final SavingsFeatureAccessService savingsFeatureAccessService;
 
     public AdminKillSwitchController(
             EmergencyControlService controlService,
             AccountRepository accountRepository,
             CurrentAccountRepository currentAccountRepository,
             SalaryAccountRepository salaryAccountRepository,
-            CardService cardService) {
+            CardService cardService,
+            SavingsFeatureAccessService savingsFeatureAccessService) {
         this.controlService = controlService;
         this.accountRepository = accountRepository;
         this.currentAccountRepository = currentAccountRepository;
         this.salaryAccountRepository = salaryAccountRepository;
         this.cardService = cardService;
+        this.savingsFeatureAccessService = savingsFeatureAccessService;
     }
 
     @GetMapping
@@ -148,6 +153,38 @@ public class AdminKillSwitchController {
             return error(HttpStatus.NOT_FOUND, "Account not found in savings, current, or salary accounts.");
         }
         return updateControl("ACCOUNT", accountNumber, request, null);
+    }
+
+    @GetMapping("/accounts/{accountNumber}/features")
+    public ResponseEntity<?> getSavingsFeatures(@PathVariable String accountNumber) {
+        try {
+            return ResponseEntity.ok(savingsFeatureAccessService.getFeatureAccess(accountNumber));
+        } catch (org.springframework.web.server.ResponseStatusException exception) {
+            return error(HttpStatus.valueOf(exception.getStatusCode().value()), exception.getReason());
+        }
+    }
+
+    @PutMapping("/accounts/{accountNumber}/features/{feature}")
+    public ResponseEntity<?> setSavingsFeature(
+            @PathVariable String accountNumber,
+            @PathVariable String feature,
+            @RequestBody ControlRequest request) {
+        if (!SavingsFeature.ID_SET.contains(feature.toLowerCase(Locale.ROOT))) {
+            return error(HttpStatus.BAD_REQUEST, "Unknown savings account feature.");
+        }
+        if (request == null || request.active() == null || request.reason() == null
+                || request.reason().isBlank() || request.reason().length() > 500) {
+            return error(HttpStatus.BAD_REQUEST, "active and a reason of 1-500 characters are required.");
+        }
+        try {
+            savingsFeatureAccessService.setFeatureEnabled(
+                    accountNumber, feature, !request.active(), request.reason(), authenticatedAdmin());
+            return ResponseEntity.ok(savingsFeatureAccessService.getFeatureAccess(accountNumber));
+        } catch (org.springframework.web.server.ResponseStatusException exception) {
+            return error(HttpStatus.valueOf(exception.getStatusCode().value()), exception.getReason());
+        } catch (IllegalArgumentException exception) {
+            return error(HttpStatus.BAD_REQUEST, exception.getMessage());
+        }
     }
 
     @PutMapping("/cards/{cardId}")

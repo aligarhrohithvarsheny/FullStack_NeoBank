@@ -84,6 +84,25 @@
         </button>
       </div>
 
+      <div class="feature-access-panel" *ngIf="account.accountType.toUpperCase() === 'SAVINGS'">
+        <div class="cards-heading">
+          <h3><i class="fa fa-sliders-h"></i> Savings feature access</h3>
+          <button type="button" class="refresh-button" (click)="loadAccountFeatures(account)" [disabled]="isLoadingFeatures">
+            Refresh
+          </button>
+        </div>
+        <p class="note">Changes override the account type's defaults and are enforced for the customer dashboard and protected APIs.</p>
+        <p class="empty" *ngIf="isLoadingFeatures">Loading feature access…</p>
+        <div class="feature-access-list" *ngIf="!isLoadingFeatures">
+          <div class="feature-access-row" *ngFor="let feature of accountFeatures">
+            <span><strong>{{ featureLabel(feature.id) }}</strong><small>{{ feature.inherited ? 'Using account type default' : 'Account-specific setting' }}</small></span>
+            <button type="button" [class.resume]="!feature.enabled" (click)="toggleFeature(feature)" [disabled]="isSaving">
+              {{ feature.enabled ? 'Enabled · Disable' : 'Disabled · Enable' }}
+            </button>
+          </div>
+        </div>
+      </div>
+
       <div class="cards-area">
         <div class="cards-heading">
           <h3><i class="fa fa-credit-card"></i> Cards on this account</h3>

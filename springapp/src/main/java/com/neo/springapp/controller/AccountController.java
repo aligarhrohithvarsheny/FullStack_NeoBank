@@ -5,11 +5,17 @@ import com.neo.springapp.service.AccountService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
 import java.util.*;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import com.neo.springapp.model.SavingsFeature;
+import com.neo.springapp.service.SavingsFeatureAccessService;
+import com.neo.springapp.service.UserSessionTokenService;
 
 @RestController
 @RequestMapping("/api/accounts")
@@ -17,6 +23,9 @@ public class AccountController {
 
     @Autowired
     private AccountService accountService;
+
+    @Autowired
+    private SavingsFeatureAccessService savingsFeatureAccessService;
 
     @Value("${spring.web.cors.allowed-origins:}")
     private String allowedOrigins;
@@ -26,6 +35,19 @@ public class AccountController {
     public ResponseEntity<Map<String, Object>> verifyAccountUniversal(@PathVariable String accountNumber) {
         Map<String, Object> result = accountService.verifyAccountByNumber(accountNumber);
         return ResponseEntity.ok(result);
+    }
+
+    @GetMapping("/{accountNumber}/features")
+    public ResponseEntity<?> getSavingsFeatureAccess(@PathVariable String accountNumber) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null
+                || !(authentication.getPrincipal() instanceof UserSessionTokenService.SessionPrincipal principal)
+                || !"USER".equals(principal.scope())
+                || !principal.accountNumber().equalsIgnoreCase(accountNumber)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of(
+                    "success", false, "message", "A matching authenticated customer session is required."));
+        }
+        return ResponseEntity.ok(savingsFeatureAccessService.getFeatureAccess(accountNumber));
     }
 
     // Basic CRUD operations

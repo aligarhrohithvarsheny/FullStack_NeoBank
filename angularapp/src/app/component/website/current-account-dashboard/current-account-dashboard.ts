@@ -162,6 +162,8 @@ export class CurrentAccountDashboard implements OnInit, OnDestroy {
   invoiceSubtotal = 0;
   invoiceTaxAmount = 0;
   invoiceTotal = 0;
+  invoiceTransactionId: number | null = null;
+  selectedInvoiceByTransaction: Record<number, number | null> = {};
 
   // Business Loan
   businessLoans: CurrentAccountBusinessLoan[] = [];
@@ -370,6 +372,7 @@ export class CurrentAccountDashboard implements OnInit, OnDestroy {
           this.businessUserName = sessionStorage.getItem('businessUserName') || '';
         }
         this.loadDashboardData();
+        this.loadInvoices();
         this.initProfileFields();
         this.checkLinkedAccount();
       } else {
@@ -420,7 +423,10 @@ export class CurrentAccountDashboard implements OnInit, OnDestroy {
   setSection(section: string): void {
     this.activeSection = section;
     this.hideAlert();
-    if (section === 'transactions') this.loadTransactionHistory();
+    if (section === 'transactions') {
+      this.loadTransactionHistory();
+      this.loadInvoices();
+    }
     if (section === 'beneficiaries') this.loadBeneficiaries();
     if (section === 'cheque') this.loadChequeRequests();
     if (section === 'vendors') this.loadVendorPayments();
@@ -429,6 +435,7 @@ export class CurrentAccountDashboard implements OnInit, OnDestroy {
     }
     if (section === 'profile') this.initProfileFields();
     if (section === 'invoices') this.loadInvoices();
+    if (section === 'statement') this.loadInvoices();
     if (section === 'loans') this.loadBusinessLoans();
     if (section === 'users') this.loadBusinessUsers();
     if (section === 'soundbox') this.loadSoundboxData();
@@ -568,6 +575,7 @@ export class CurrentAccountDashboard implements OnInit, OnDestroy {
           this.showAlertMessage('Transfer of ₹' + this.transferAmount + ' completed successfully!', 'success');
           this.resetTransferForm();
           this.loadDashboardData();
+          this.loadRecentTransactions();
         } else {
           this.showAlertMessage(res.error || 'Transfer failed', 'error');
         }
@@ -871,6 +879,91 @@ export class CurrentAccountDashboard implements OnInit, OnDestroy {
     });
   }
 
+  getInvoiceForTransaction(transaction: BusinessTransaction): CurrentAccountInvoice | undefined {
+    return this.invoices.find(invoice => invoice.linkedTransactionId === transaction.id);
+  }
+
+  getAvailableInvoices(transaction: BusinessTransaction): CurrentAccountInvoice[] {
+    return this.invoices.filter(invoice =>
+      invoice.linkedTransactionId == null || invoice.linkedTransactionId === transaction.id
+    );
+  }
+
+  mapTransactionInvoice(transaction: BusinessTransaction): void {
+    if (!transaction.id) return;
+    const invoiceId = this.selectedInvoiceByTransaction[transaction.id];
+    if (!invoiceId) {
+      this.showAlertMessage('Select an invoice to link to this transaction', 'error');
+      return;
+    }
+    this.currentAccountService.mapInvoiceToTransaction(invoiceId, transaction.id).subscribe({
+      next: () => {
+        this.showAlertMessage('Invoice linked to transaction', 'success');
+        this.loadInvoices();
+      },
+      error: (err) => {
+        this.showAlertMessage(err.error?.error || 'Could not link invoice to transaction', 'error');
+        this.loadInvoices();
+      }
+    });
+  }
+
+  unmapTransactionInvoice(invoice: CurrentAccountInvoice): void {
+    if (!invoice.id || invoice.linkedTransactionId == null) return;
+    this.currentAccountService.unmapInvoiceFromTransaction(invoice.id, invoice.linkedTransactionId).subscribe({
+      next: () => {
+        this.showAlertMessage('Invoice unlinked from transaction', 'success');
+        this.loadInvoices();
+      },
+      error: (err) => {
+        this.showAlertMessage(err.error?.error || 'Could not unlink invoice from transaction', 'error');
+      }
+    });
+  }
+
+  createInvoiceForTransaction(transaction: BusinessTransaction): void {
+    if (!transaction.id) {
+      this.showAlertMessage('Transaction is missing its ID', 'error');
+      return;
+    }
+    if (this.getInvoiceForTransaction(transaction)) {
+      this.showAlertMessage('This transaction already has a linked invoice', 'error');
+      return;
+    }
+
+    const today = new Date();
+    const dueDate = new Date(today);
+    dueDate.setDate(dueDate.getDate() + 30);
+    const formatDate = (date: Date) => {
+      const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+      return localDate.toISOString().slice(0, 10);
+    };
+
+    this.resetInvoiceForm();
+    this.invoiceTransactionId = transaction.id;
+    this.invoiceClientName = transaction.recipientName || '';
+    this.invoiceDate = formatDate(today);
+    this.invoiceDueDate = formatDate(dueDate);
+    this.invoiceItems = [{
+      description: transaction.description || transaction.txnType,
+      quantity: 1,
+      unitPrice: transaction.amount,
+      amount: transaction.amount
+    }];
+    this.invoiceTaxRate = 0;
+    this.calculateInvoiceTotals();
+    this.showInvoiceForm = true;
+    this.setSection('invoices');
+  }
+
+  toggleInvoiceForm(): void {
+    if (this.showInvoiceForm) {
+      this.resetInvoiceForm();
+    } else {
+      this.showInvoiceForm = true;
+    }
+  }
+
   addInvoiceItem(): void {
     this.invoiceItems.push({ description: '', quantity: 1, unitPrice: 0, amount: 0 });
   }
@@ -928,18 +1021,40 @@ export class CurrentAccountDashboard implements OnInit, OnDestroy {
 
     this.currentAccountService.createInvoice(invoice).subscribe({
       next: (res) => {
-        this.isCreatingInvoice = false;
         if (res.success) {
+          const transactionId = this.invoiceTransactionId;
+          if (transactionId && res.invoice?.id) {
+            this.currentAccountService.mapInvoiceToTransaction(res.invoice.id, transactionId).subscribe({
+              next: () => {
+                this.isCreatingInvoice = false;
+                this.showAlertMessage('Invoice ' + res.invoice.invoiceNumber + ' created and linked!', 'success');
+                this.resetInvoiceForm();
+                this.loadInvoices();
+              },
+              error: (err) => {
+                this.isCreatingInvoice = false;
+                this.showAlertMessage(
+                  'Invoice created, but could not link it: ' + (err.error?.error || 'Please link it from the transaction list'),
+                  'error'
+                );
+                this.resetInvoiceForm();
+                this.loadInvoices();
+              }
+            });
+            return;
+          }
+          this.isCreatingInvoice = false;
           this.showAlertMessage('Invoice ' + res.invoice.invoiceNumber + ' created!', 'success');
           this.resetInvoiceForm();
           this.loadInvoices();
         } else {
+          this.isCreatingInvoice = false;
           this.showAlertMessage(res.error || 'Failed to create invoice', 'error');
         }
       },
-      error: () => {
+      error: (err) => {
         this.isCreatingInvoice = false;
-        this.showAlertMessage('Failed to create invoice', 'error');
+        this.showAlertMessage(err.error?.error || 'Failed to create invoice', 'error');
       }
     });
   }
@@ -961,6 +1076,7 @@ export class CurrentAccountDashboard implements OnInit, OnDestroy {
     this.invoiceSubtotal = 0;
     this.invoiceTaxAmount = 0;
     this.invoiceTotal = 0;
+    this.invoiceTransactionId = null;
   }
 
   markInvoiceAsSent(invoice: CurrentAccountInvoice): void {

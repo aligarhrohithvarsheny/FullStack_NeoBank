@@ -19,6 +19,9 @@ public class AdminAccountApplication {
     @Column(nullable = false, name = "account_type")
     private String accountType = "Savings"; // Savings, Current, Salary
 
+    @Column(name = "savings_product_code", length = 40)
+    private String savingsProductCode;
+
     @Column(nullable = false)
     private String status = "PENDING"; // PENDING, DOCUMENTS_UPLOADED, ADMIN_VERIFIED, MANAGER_APPROVED, MANAGER_REJECTED, ACTIVE, CLOSED
 
@@ -136,6 +139,12 @@ public class AdminAccountApplication {
 
     @Column(name = "additional_documents_path")
     private String additionalDocumentsPath;
+
+    @Column(name = "aadhar_document_path")
+    private String aadharDocumentPath;
+
+    @Column(name = "pan_document_path")
+    private String panDocumentPath;
 
     // Signatures & Declaration
     @Column(name = "applicant_signature_path")

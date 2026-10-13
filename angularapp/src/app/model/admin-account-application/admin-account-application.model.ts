@@ -2,6 +2,7 @@ export interface AdminAccountApplication {
   id?: number;
   applicationNumber?: string;
   accountType: string; // Savings, Current, Salary
+  savingsProductCode?: string;
   status?: string; // PENDING, DOCUMENTS_UPLOADED, ADMIN_VERIFIED, MANAGER_APPROVED, MANAGER_REJECTED, ACTIVE, CLOSED
 
   // Personal Details
@@ -60,6 +61,8 @@ export interface AdminAccountApplication {
   applicationPdfPath?: string;
   signedApplicationPath?: string;
   additionalDocumentsPath?: string;
+  aadharDocumentPath?: string;
+  panDocumentPath?: string;
 
   // Signatures
   applicantSignaturePath?: string;

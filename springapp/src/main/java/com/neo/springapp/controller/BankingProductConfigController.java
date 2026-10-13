@@ -3,6 +3,7 @@ package com.neo.springapp.controller;
 import com.neo.springapp.dto.BankingProductConfigRequest;
 import com.neo.springapp.dto.BankingProductRejectionRequest;
 import com.neo.springapp.model.BankingProductConfig;
+import com.neo.springapp.model.SavingsFeature;
 import com.neo.springapp.repository.BankingProductConfigRepository;
 import org.springframework.lang.NonNull;
 import org.springframework.http.HttpStatus;
@@ -77,6 +78,16 @@ public class BankingProductConfigController {
         product.setMonthlyTransactionLimit(request.monthlyTransactionLimit());
         product.setServiceCharge(request.serviceCharge());
         product.setEligibility(request.eligibility().trim());
+        List<String> enabledFeatures = request.enabledFeatures() == null
+                ? SavingsFeature.IDS
+                : request.enabledFeatures().stream()
+                        .map(feature -> feature == null ? "" : feature.trim().toLowerCase(Locale.ROOT))
+                        .distinct()
+                        .toList();
+        if (!SavingsFeature.ID_SET.containsAll(enabledFeatures)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "One or more savings features are invalid.");
+        }
+        product.setEnabledFeatures(enabledFeatures);
         product.setEffectiveFrom(request.effectiveFrom());
         product.setRequestedBy(request.requestedBy().trim());
         product.setStatus("PENDING_APPROVAL");

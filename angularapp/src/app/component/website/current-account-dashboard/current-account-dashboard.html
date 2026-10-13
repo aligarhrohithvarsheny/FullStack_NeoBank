@@ -130,6 +130,7 @@
                 <th>Debit</th>
                 <th>Credit</th>
                 <th>Balance</th>
+                <th>Invoice</th>
               </tr>
             </thead>
             <tbody>
@@ -140,6 +141,15 @@
                 <td class="amount-debit">{{ txn.txnType !== 'Credit' ? formatCurrency(txn.amount) : '' }}</td>
                 <td class="amount-credit">{{ txn.txnType === 'Credit' ? formatCurrency(txn.amount) : '' }}</td>
                 <td>{{ formatCurrency(txn.balance) }}</td>
+                <td>
+                  <ng-container *ngIf="getInvoiceForTransaction(txn) as linkedInvoice; else recentUnlinkedInvoice">
+                    <button class="btn btn-sm btn-primary" (click)="printInvoice(linkedInvoice)">View Invoice</button>
+                    <button class="btn btn-sm btn-danger" (click)="unmapTransactionInvoice(linkedInvoice)">Unlink</button>
+                  </ng-container>
+                  <ng-template #recentUnlinkedInvoice>
+                    <button class="btn btn-sm btn-secondary" (click)="createInvoiceForTransaction(txn)">Create Invoice</button>
+                  </ng-template>
+                </td>
               </tr>
             </tbody>
           </table>
@@ -166,6 +176,10 @@
       <div *ngIf="showTransferResult" class="result-card success-card">
         <h3>✅ Transfer Successful</h3>
         <p>{{ transferResult?.message }}</p>
+        <button *ngIf="transferResult?.transaction" class="btn btn-secondary"
+                (click)="createInvoiceForTransaction(transferResult.transaction)">
+          Create & Link Invoice
+        </button>
         <button class="btn btn-primary" (click)="showTransferResult = false">New Transfer</button>
       </div>
 
@@ -329,6 +343,7 @@
                 <th>Debit</th>
                 <th>Credit</th>
                 <th>Balance</th>
+                <th>Invoice</th>
               </tr>
             </thead>
             <tbody>
@@ -339,6 +354,23 @@
                 <td class="amount-debit">{{ txn.txnType !== 'Credit' ? formatCurrency(txn.amount) : '' }}</td>
                 <td class="amount-credit">{{ txn.txnType === 'Credit' ? formatCurrency(txn.amount) : '' }}</td>
                 <td>{{ formatCurrency(txn.balance) }}</td>
+                <td>
+                  <ng-container *ngIf="getInvoiceForTransaction(txn) as linkedInvoice; else transactionUnlinkedInvoice">
+                    <button class="btn btn-sm btn-primary" (click)="printInvoice(linkedInvoice)">View Invoice</button>
+                    <button class="btn btn-sm btn-danger" (click)="unmapTransactionInvoice(linkedInvoice)">Unlink</button>
+                  </ng-container>
+                  <ng-template #transactionUnlinkedInvoice>
+                    <select [(ngModel)]="selectedInvoiceByTransaction[txn.id!]" aria-label="Choose invoice">
+                      <option [ngValue]="null">Choose invoice</option>
+                      <option *ngFor="let invoice of getAvailableInvoices(txn)" [ngValue]="invoice.id">
+                        {{ invoice.invoiceNumber }} — {{ invoice.clientName }}
+                      </option>
+                    </select>
+                    <button class="btn btn-sm btn-primary" (click)="mapTransactionInvoice(txn)"
+                            [disabled]="!selectedInvoiceByTransaction[txn.id!]">Link</button>
+                    <button class="btn btn-sm btn-secondary" (click)="createInvoiceForTransaction(txn)">Create</button>
+                  </ng-template>
+                </td>
               </tr>
             </tbody>
           </table>
@@ -579,6 +611,7 @@
                 <th>Debit</th>
                 <th>Credit</th>
                 <th>Balance</th>
+                <th>Invoice</th>
               </tr>
             </thead>
             <tbody>
@@ -588,6 +621,23 @@
                 <td class="amount-debit">{{ txn.txnType !== 'Credit' ? formatCurrency(txn.amount) : '' }}</td>
                 <td class="amount-credit">{{ txn.txnType === 'Credit' ? formatCurrency(txn.amount) : '' }}</td>
                 <td>{{ formatCurrency(txn.balance) }}</td>
+                <td>
+                  <ng-container *ngIf="getInvoiceForTransaction(txn) as linkedInvoice; else statementUnlinkedInvoice">
+                    <button class="btn btn-sm btn-primary" (click)="printInvoice(linkedInvoice)">View Invoice</button>
+                    <button class="btn btn-sm btn-danger" (click)="unmapTransactionInvoice(linkedInvoice)">Unlink</button>
+                  </ng-container>
+                  <ng-template #statementUnlinkedInvoice>
+                    <select [(ngModel)]="selectedInvoiceByTransaction[txn.id!]" aria-label="Choose invoice">
+                      <option [ngValue]="null">Choose invoice</option>
+                      <option *ngFor="let invoice of getAvailableInvoices(txn)" [ngValue]="invoice.id">
+                        {{ invoice.invoiceNumber }} — {{ invoice.clientName }}
+                      </option>
+                    </select>
+                    <button class="btn btn-sm btn-primary" (click)="mapTransactionInvoice(txn)"
+                            [disabled]="!selectedInvoiceByTransaction[txn.id!]">Link</button>
+                    <button class="btn btn-sm btn-secondary" (click)="createInvoiceForTransaction(txn)">Create</button>
+                  </ng-template>
+                </td>
               </tr>
             </tbody>
           </table>
@@ -651,7 +701,7 @@
       <h2 class="section-title">Invoice Generation</h2>
 
       <div class="section-actions">
-        <button class="btn btn-primary" (click)="showInvoiceForm = !showInvoiceForm">
+        <button class="btn btn-primary" (click)="toggleInvoiceForm()">
           {{ showInvoiceForm ? '✕ Cancel' : '+ Create New Invoice' }}
         </button>
       </div>
@@ -659,6 +709,9 @@
       <!-- Invoice Form -->
       <div class="form-container" *ngIf="showInvoiceForm">
         <h3>Create Invoice</h3>
+        <p *ngIf="invoiceTransactionId" class="invoice-transaction-link">
+          This invoice will be linked to transaction #{{ invoiceTransactionId }} when created.
+        </p>
 
         <div class="invoice-section-label">Client Information</div>
         <div class="form-row">
@@ -763,6 +816,7 @@
                 <th>Due Date</th>
                 <th>Amount</th>
                 <th>Status</th>
+                <th>Linked Transaction</th>
                 <th>Actions</th>
               </tr>
             </thead>
@@ -774,6 +828,13 @@
                 <td>{{ inv.dueDate }}</td>
                 <td><strong>{{ formatCurrency(inv.totalAmount) }}</strong></td>
                 <td><span class="badge" [ngClass]="getStatusClass(inv.status)">{{ inv.status }}</span></td>
+                <td>
+                  <span *ngIf="inv.linkedTransactionId; else invoiceNotLinked">
+                    Transaction #{{ inv.linkedTransactionId }}
+                    <button class="btn btn-sm btn-danger" (click)="unmapTransactionInvoice(inv)">Unlink</button>
+                  </span>
+                  <ng-template #invoiceNotLinked>Not linked</ng-template>
+                </td>
                 <td class="action-cell">
                   <button class="btn btn-sm btn-primary" (click)="printInvoice(inv)" title="Print">🖨️</button>
                   <button class="btn btn-sm btn-secondary" (click)="markInvoiceAsSent(inv)" *ngIf="inv.status === 'DRAFT'" title="Mark Sent">📤</button>

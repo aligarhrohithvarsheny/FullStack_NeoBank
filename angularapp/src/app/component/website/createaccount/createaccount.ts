@@ -26,6 +26,15 @@ interface PendingAccount {
   assignedAccountNumber: string | null;
 }
 
+interface SavingsProductOption {
+  productCode: string;
+  productName: string;
+  accountType: string;
+  interestRate: number;
+  minimumBalance: number;
+  enabledFeatures: string[];
+}
+
 @Component({
   selector: 'app-createaccount',
   standalone: true,
@@ -67,6 +76,9 @@ export class Createaccount implements OnInit, OnDestroy {
   panPreview: string | null = null;
   uploading = false;
   uploadError = '';
+  documentsUploaded = false;
+  activeSavingsProducts: SavingsProductOption[] = [];
+  savingsProductLoadError = '';
 
   // Video KYC
   videoStarted = false;
@@ -321,6 +333,7 @@ export class Createaccount implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.form = this.fb.group({
       accountType: ['Savings'],
+      savingsProductCode: ['', Validators.required],
       name: ['', [Validators.required, Validators.minLength(2)]],
       email: ['', [Validators.required, Validators.email, this.gmailOnlyValidator]],
       dob: ['', [Validators.required]],
@@ -369,6 +382,9 @@ export class Createaccount implements OnInit, OnDestroy {
       childPassword: [''],
       confirmChildPassword: ['']
     }, { validators: this.childPasswordsMatchValidator });
+
+    this.updateAccountTypeValidators(this.form.get('accountType')?.value);
+    if (isPlatformBrowser(this.platformId)) this.loadSavingsProducts();
 
     // Listen for account type changes
     this.form.get('accountType')?.valueChanges.subscribe(type => {
@@ -442,6 +458,8 @@ export class Createaccount implements OnInit, OnDestroy {
     const salaryFields = ['companyName', 'monthlySalary', 'salaryCreditDate'];
     // Common fields that change based on type
     const occupationCtrl = this.form.get('occupation');
+    const savingsProductCtrl = this.form.get('savingsProductCode');
+    savingsProductCtrl?.clearValidators();
 
     // Clear all conditional validators first
     [...currentFields, ...salaryFields].forEach(field => {
@@ -468,12 +486,38 @@ export class Createaccount implements OnInit, OnDestroy {
       // Savings: occupation required
       occupationCtrl?.setValidators([Validators.required]);
       occupationCtrl?.updateValueAndValidity();
+      savingsProductCtrl?.setValidators([Validators.required]);
     }
+    savingsProductCtrl?.updateValueAndValidity();
 
     // Update validity for all conditional fields
     [...currentFields, ...salaryFields].forEach(field => {
       this.form.get(field)?.updateValueAndValidity();
     });
+  }
+
+  private loadSavingsProducts(): void {
+    this.http.get<SavingsProductOption[]>(`${environment.apiBaseUrl}/api/admin/banking-products/active`)
+      .subscribe({
+        next: products => {
+          this.activeSavingsProducts = (products || []).filter(
+            product => product.accountType?.toUpperCase() === 'SAVINGS');
+          if (!this.activeSavingsProducts.length) {
+            this.savingsProductLoadError = 'No active savings products are available. Please contact the bank.';
+          }
+        },
+        error: error => {
+          this.savingsProductLoadError = error?.error?.message || 'Unable to load available savings account types.';
+        }
+      });
+  }
+
+  get selectedSavingsProductName(): string {
+    const productCode = this.form?.get('savingsProductCode')?.value;
+    return this.activeSavingsProducts.find(product => product.productCode === productCode)?.productName
+      || productCode
+      || this.form?.get('accountType')?.value
+      || '';
   }
 
   // --- Custom validators ---
@@ -853,44 +897,13 @@ export class Createaccount implements OnInit, OnDestroy {
 
     const val = this.form.value;
     
-    const registrationData = {
-      fullName: val.name,
-      mobileNumber: val.mobile,
-      email: val.email.toLowerCase(),
-      aadharNumber: val.aadhar,
-      panNumber: val.pan.toUpperCase(),
-      addressCity: val.city,
-      addressState: val.state,
-      accountType: val.accountType || 'Savings'
-    };
-
-    this.videoKycService.register(registrationData).subscribe({
-      next: (response: any) => {
-        this.loading = false;
-        this.kycSessionData = response;
-        this.kycSessionData.id = response.sessionId;
-        this.successMessage = 'Registration successful! Please proceed to upload your documents.';
-        this.submitted = false;
-        
-        // Keep a server-generated application number for the filled-form PDF.
-        this.createApplicationRecord(val);
-        
-        // Move to step 2 after a short delay
-        setTimeout(() => {
-          this.successMessage = '';
-          this.currentStep = 2;
-        }, 1500);
-      },
-      error: (err: any) => {
-        this.loading = false;
-        this.submitError = err.error?.message || err.error?.error || 'Registration failed. Please try again.';
-      }
-    });
+    this.createApplicationRecord(val);
   }
 
   private createApplicationRecord(val: any) {
     const application = {
       accountType: val.accountType || 'Savings',
+      savingsProductCode: val.accountType === 'Savings' ? val.savingsProductCode : null,
       fullName: val.name,
       dateOfBirth: val.dob,
       age: new Date().getFullYear() - new Date(val.dob).getFullYear(),
@@ -927,9 +940,15 @@ export class Createaccount implements OnInit, OnDestroy {
         const saved = response?.application;
         this.applicationId = saved?.id || null;
         this.applicationNumber = saved?.applicationNumber || '';
+        this.loading = false;
+        this.successMessage = 'Application created. Upload your Aadhaar and PAN documents to submit it for review.';
+        this.currentStep = 2;
+        this.submitted = false;
+        setTimeout(() => this.successMessage = '', 4000);
         this.submitUserToBackend(val);
       },
       error: (err: any) => {
+        this.loading = false;
         this.submitError = err.error?.error || 'Unable to create your account application. Please try again.';
       }
     });
@@ -974,6 +993,7 @@ export class Createaccount implements OnInit, OnDestroy {
         age: new Date().getFullYear() - new Date(val.dob).getFullYear(),
         occupation: val.occupation || '',
         accountType: 'Savings',
+        savingsProductCode: val.savingsProductCode,
         aadharNumber: val.aadhar,
         pan: val.pan.toUpperCase(),
         income: Number(val.income),
@@ -991,7 +1011,7 @@ export class Createaccount implements OnInit, OnDestroy {
         this.submitToLocalStorage(val);
       },
       error: (err: any) => {
-        console.warn('Backend user creation failed (Video KYC will continue):', err);
+        console.error('Backend user creation failed:', err);
         this.submitToLocalStorage(val);
       }
     });
@@ -1207,22 +1227,13 @@ export class Createaccount implements OnInit, OnDestroy {
       this.submitError = '';
       this.successMessage = '';
       this.currentStep = step;
-      if (step === 3) {
-        this.loadAvailableSlots();
-        if (this.kycSessionData?.bookedSlotId) {
-          this.startCountdown();
-        }
-      }
     }
   }
 
   canGoToStep(step: number): boolean {
-    if (!this.kycSessionData) return step === 1;
-    if (step === 1) return true;
-    if (step === 2) return !!this.kycSessionData;
-    if (step === 3) return this.kycSessionData?.kycStatus !== 'Registered';
-    if (step === 4) return ['Scheduled', 'Under Review', 'Submitted', 'Approved', 'Rejected'].includes(this.kycSessionData?.kycStatus);
-    if (step === 5) return ['Under Review', 'Submitted', 'Approved', 'Rejected', 'Scheduled'].includes(this.kycSessionData?.kycStatus);
+    if (step === 1) return this.applicationId === null;
+    if (step === 2) return this.applicationId !== null;
+    if (step === 3) return this.documentsUploaded;
     return false;
   }
 
@@ -1279,16 +1290,23 @@ export class Createaccount implements OnInit, OnDestroy {
   }
 
   uploadDocuments() {
-    if (!this.aadharFile || !this.panFile || !this.kycSessionData?.id) return;
+    if (!this.aadharFile || !this.panFile || !this.applicationId) return;
     
     this.uploading = true;
     this.uploadError = '';
 
-    this.videoKycService.uploadDocuments(this.kycSessionData.id, this.aadharFile, this.panFile).subscribe({
+    const documents = new FormData();
+    documents.append('aadharFile', this.aadharFile);
+    documents.append('panFile', this.panFile);
+    this.http.post<any>(
+      `${environment.apiBaseUrl}/api/admin-account-applications/upload-identity-documents/${this.applicationId}`,
+      documents
+    ).subscribe({
       next: (response: any) => {
         this.uploading = false;
-        this.kycSessionData = { ...this.kycSessionData, ...response, id: this.kycSessionData.id };
-        this.successMessage = 'Documents uploaded successfully!';
+        this.documentsUploaded = true;
+        this.kycSessionData = { kycStatus: 'Submitted', ...response?.application };
+        this.successMessage = 'Application submitted successfully. The bank will review your documents.';
         setTimeout(() => {
           this.successMessage = '';
           this.currentStep = 3;

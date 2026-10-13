@@ -18,6 +18,8 @@ public class Account {
     private int age;
     private String occupation;
     private String accountType = "Savings"; // Savings, Current, etc.
+    @Column(name = "savings_product_code", length = 40)
+    private String savingsProductCode;
     private LocalDateTime createdAt;
     private LocalDateTime lastUpdated;
     private String status = "ACTIVE"; // ACTIVE, INACTIVE, CLOSED

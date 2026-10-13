@@ -394,6 +394,18 @@ public class FamilyBankingService {
         return transactionRepository.findByAccountNumberOrderByDateDesc(accountNumber);
     }
 
+    public List<Transaction> adminJointHistory(Long userId) {
+        List<String> jointAccountNumbers = jointProfileRepository
+                .findByPrimaryHolderUserIdOrJointHolderUserId(userId, userId)
+                .stream()
+                .map(JointAccountProfile::getJointAccountNumber)
+                .toList();
+        if (jointAccountNumbers.isEmpty()) {
+            return List.of();
+        }
+        return transactionRepository.findByAccountNumberInOrderByDateDesc(jointAccountNumbers);
+    }
+
     @Transactional
     public JointAccountProfile updateJointSettings(Long userId, String accountNumber, String operatingMode) {
         requireJointOwner(userId, accountNumber);

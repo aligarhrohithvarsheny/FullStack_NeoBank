@@ -96,7 +96,8 @@ public class EmergencyControlService {
             String scopeType, String scopeKey, boolean active, String reason, String changedBy, String priorState) {
         String normalizedType = scopeType.trim().toUpperCase(Locale.ROOT);
         String normalizedKey = normalize(scopeKey);
-        if (!normalizedType.equals("RAIL") && !normalizedType.equals("ACCOUNT") && !normalizedType.equals("CARD")) {
+        if (!normalizedType.equals("RAIL") && !normalizedType.equals("ACCOUNT")
+                && !normalizedType.equals("CARD") && !normalizedType.equals("FEATURE")) {
             throw new IllegalArgumentException("Unsupported emergency-control scope.");
         }
         if (normalizedType.equals("RAIL") && !VALID_RAILS.contains(normalizedKey)) {
@@ -135,6 +136,8 @@ public class EmergencyControlService {
                     ? (active ? "ISOLATE" : "RELEASE")
                     : normalizedType.equals("CARD")
                     ? (active ? "FREEZE" : "UNFREEZE")
+                    : normalizedType.equals("FEATURE")
+                    ? (active ? "FEATURE_DISABLE" : "FEATURE_ENABLE")
                     : (active ? "PAUSE" : "RESUME"));
             audit.setPreviousState(previousState);
             audit.setNewState(active);

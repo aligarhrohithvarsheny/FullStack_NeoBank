@@ -56,6 +56,8 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
     @Query("SELECT t FROM Transaction t WHERE t.accountNumber = :accountNumber ORDER BY t.date DESC")
     Page<Transaction> findByAccountNumberOrderByDateDesc(@Param("accountNumber") String accountNumber, Pageable pageable);
 
+    List<Transaction> findByAccountNumberInOrderByDateDesc(List<String> accountNumbers);
+
        List<Transaction> findByAccountNumberOrderByDateDesc(String accountNumber);
 
        List<Transaction> findByDateBetweenOrderByDateDesc(LocalDateTime startDate, LocalDateTime endDate);

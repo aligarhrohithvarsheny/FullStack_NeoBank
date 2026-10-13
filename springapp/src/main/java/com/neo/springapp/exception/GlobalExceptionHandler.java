@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.NoHandlerFoundException;
 
 import java.util.HashMap;
@@ -176,6 +177,27 @@ public class GlobalExceptionHandler {
         response.put("retryable", true);
         return ResponseEntity
                 .status(HttpStatus.SERVICE_UNAVAILABLE)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(response);
+    }
+
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<Map<String, Object>> handleResponseStatusException(ResponseStatusException e) {
+        HttpStatus status = HttpStatus.resolve(e.getStatusCode().value());
+        String message = e.getReason() == null ? e.getStatusCode().toString() : e.getReason();
+        if (e.getStatusCode().is5xxServerError()) {
+            log.error("Request failed with status {}: {}", e.getStatusCode().value(), message);
+        } else {
+            log.warn("Request rejected with status {}: {}", e.getStatusCode().value(), message);
+        }
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", false);
+        response.put("message", message);
+        response.put("error", status == null ? "HTTP_ERROR" : status.name());
+        response.put("status", e.getStatusCode().value());
+        return ResponseEntity
+                .status(e.getStatusCode())
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(response);
     }

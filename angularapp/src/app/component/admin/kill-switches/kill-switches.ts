@@ -22,6 +22,12 @@ interface AccountOption {
   customerId: string;
 }
 
+interface SavingsFeatureControl {
+  id: string;
+  enabled: boolean;
+  inherited: boolean;
+}
+
 interface CardOption {
   id: string | number;
   maskedCardNumber: string;
@@ -73,6 +79,8 @@ export class KillSwitchesComponent implements OnInit {
   accounts: AccountOption[] = [];
   selectedAccount: AccountOption | null = null;
   cards: CardOption[] = [];
+  accountFeatures: SavingsFeatureControl[] = [];
+  isLoadingFeatures = false;
   isLoading = true;
   isSearching = false;
   isSaving = false;
@@ -127,6 +135,8 @@ export class KillSwitchesComponent implements OnInit {
   selectAccount(account: AccountOption): void {
     this.selectedAccount = account;
     this.cards = [];
+    this.accountFeatures = [];
+    if (account.accountType.toUpperCase() === 'SAVINGS') this.loadAccountFeatures(account);
     this.http.get<{ cards: CardOption[] }>(
       `${this.controlUrl}/cards?accountNumber=${encodeURIComponent(account.accountNumber)}`,
       { headers: this.adminHeaders() }
@@ -134,6 +144,54 @@ export class KillSwitchesComponent implements OnInit {
       next: response => this.cards = response.cards,
       error: error => this.showError(error, 'Unable to load the account cards.')
     });
+  }
+
+  loadAccountFeatures(account: AccountOption): void {
+    this.isLoadingFeatures = true;
+    this.http.get<any>(`${this.controlUrl}/accounts/${encodeURIComponent(account.accountNumber)}/features`,
+      { headers: this.adminHeaders() }).subscribe({
+      next: response => {
+        this.accountFeatures = response.features || [];
+        this.isLoadingFeatures = false;
+      },
+      error: error => {
+        this.isLoadingFeatures = false;
+        this.showError(error, 'Unable to load savings feature access.');
+      }
+    });
+  }
+
+  toggleFeature(feature: SavingsFeatureControl): void {
+    if (!this.selectedAccount) return;
+    const action = feature.enabled ? 'Disable' : 'Enable';
+    const reason = this.reason.trim();
+    if (!reason) {
+      this.alertService.warning('Reason required', 'Enter a reason before changing customer feature access.');
+      return;
+    }
+    if (this.isSaving || !window.confirm(`${action} ${this.featureLabel(feature.id)} for account ${this.selectedAccount.accountNumber}?`)) return;
+
+    this.isSaving = true;
+    this.http.put<any>(
+      `${this.controlUrl}/accounts/${encodeURIComponent(this.selectedAccount.accountNumber)}/features/${encodeURIComponent(feature.id)}`,
+      { active: feature.enabled, reason },
+      { headers: this.adminHeaders() }
+    ).subscribe({
+      next: response => {
+        this.accountFeatures = response.features || [];
+        this.reason = '';
+        this.isSaving = false;
+        this.alertService.success('Feature access updated', `${this.featureLabel(feature.id)} access updated immediately.`);
+      },
+      error: error => {
+        this.isSaving = false;
+        this.showError(error, `Unable to ${action.toLowerCase()} this feature.`);
+      }
+    });
+  }
+
+  featureLabel(id: string): string {
+    return id.replace(/-/g, ' ').replace(/\b\w/g, letter => letter.toUpperCase());
   }
 
   isAccountIsolated(accountNumber: string): boolean {

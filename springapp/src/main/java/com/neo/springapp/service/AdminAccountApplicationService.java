@@ -9,10 +9,12 @@ import com.neo.springapp.repository.AdminAccountApplicationRepository;
 import com.neo.springapp.repository.AccountRepository;
 import com.neo.springapp.repository.CurrentAccountRepository;
 import com.neo.springapp.repository.SalaryAccountRepository;
+import com.neo.springapp.repository.BankingProductConfigRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -36,6 +38,9 @@ public class AdminAccountApplicationService {
     private SalaryAccountRepository salaryAccountRepository;
 
     @Autowired
+    private BankingProductConfigRepository bankingProductConfigRepository;
+
+    @Autowired
     private SalaryAccountService salaryAccountService;
 
     @Autowired
@@ -47,6 +52,20 @@ public class AdminAccountApplicationService {
     // ==================== Application Management ====================
 
     public AdminAccountApplication createApplication(AdminAccountApplication application) {
+        if ("Savings".equalsIgnoreCase(application.getAccountType())) {
+            String productCode = application.getSavingsProductCode() == null
+                    ? "" : application.getSavingsProductCode().trim();
+            var product = bankingProductConfigRepository.findAllByOrderByProductCodeAscEffectiveFromDescCreatedAtDesc()
+                    .stream()
+                    .filter(candidate -> candidate.getProductCode().equalsIgnoreCase(productCode))
+                    .filter(candidate -> "SAVINGS".equalsIgnoreCase(candidate.getAccountType()))
+                    .filter(candidate -> "APPROVED".equalsIgnoreCase(candidate.getStatus()))
+                    .filter(candidate -> candidate.getEffectiveFrom() != null
+                            && !candidate.getEffectiveFrom().isAfter(LocalDate.now()))
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalArgumentException("Select an active savings product."));
+            application.setSavingsProductCode(product.getProductCode());
+        }
         application.setApplicationNumber(generateApplicationNumber());
         application.setStatus("PENDING");
         application.setCreatedAt(LocalDateTime.now());
@@ -333,6 +352,17 @@ public class AdminAccountApplicationService {
     }
 
     @Transactional
+    public AdminAccountApplication uploadIdentityDocuments(Long id, String aadharFilePath, String panFilePath) {
+        AdminAccountApplication app = applicationRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Application not found"));
+        app.setAadharDocumentPath(aadharFilePath);
+        app.setPanDocumentPath(panFilePath);
+        app.setStatus("DOCUMENTS_UPLOADED");
+        app.setUpdatedAt(LocalDateTime.now());
+        return applicationRepository.save(app);
+    }
+
+    @Transactional
     public AdminAccountApplication saveApplicationPdfPath(Long id, String pdfPath) {
         AdminAccountApplication app = applicationRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Application not found"));
@@ -368,6 +398,7 @@ public class AdminAccountApplicationService {
             account.setAge(app.getAge() != null ? app.getAge() : 0);
             account.setOccupation(app.getOccupation());
             account.setAccountType("Savings");
+            account.setSavingsProductCode(app.getSavingsProductCode());
             account.setAadharNumber(app.getAadharNumber());
             account.setPan(app.getPanNumber());
             account.setAccountNumber(app.getAccountNumber());

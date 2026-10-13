@@ -56,6 +56,15 @@ public class AdminAccountApplicationController {
         return "application/octet-stream";
     }
 
+    private static String safeExtension(String originalFilename) {
+        if (originalFilename == null) return "";
+        String filename = Paths.get(originalFilename).getFileName().toString();
+        int dot = filename.lastIndexOf('.');
+        if (dot < 0) return "";
+        String extension = filename.substring(dot).toLowerCase(Locale.ROOT);
+        return extension.matches("\\.[a-z0-9]{1,8}") ? extension : "";
+    }
+
     // ==================== CRUD ====================
 
     @PostMapping("/create")
@@ -357,6 +366,62 @@ public class AdminAccountApplicationController {
             response.put("success", false);
             response.put("error", "Upload failed: " + e.getMessage());
             return ResponseEntity.badRequest().body(response);
+        }
+    }
+
+    @PostMapping("/upload-identity-documents/{id}")
+    public ResponseEntity<Map<String, Object>> uploadIdentityDocuments(
+            @PathVariable Long id,
+            @RequestParam("aadharFile") MultipartFile aadharFile,
+            @RequestParam("panFile") MultipartFile panFile) {
+        Map<String, Object> response = new HashMap<>();
+        if (aadharFile.isEmpty() || panFile.isEmpty()) {
+            response.put("success", false);
+            response.put("error", "Both Aadhaar and PAN documents are required.");
+            return ResponseEntity.badRequest().body(response);
+        }
+        try {
+            Path uploadPath = Paths.get(UPLOAD_DIR, "identity-documents");
+            Files.createDirectories(uploadPath);
+            String aadharName = "aadhar_" + id + "_" + UUID.randomUUID() + safeExtension(aadharFile.getOriginalFilename());
+            String panName = "pan_" + id + "_" + UUID.randomUUID() + safeExtension(panFile.getOriginalFilename());
+            Path aadharPath = uploadPath.resolve(aadharName);
+            Path panPath = uploadPath.resolve(panName);
+            Files.copy(aadharFile.getInputStream(), aadharPath);
+            Files.copy(panFile.getInputStream(), panPath);
+            AdminAccountApplication application = applicationService.uploadIdentityDocuments(
+                    id, aadharPath.toString(), panPath.toString());
+            response.put("success", true);
+            response.put("application", application);
+            response.put("message", "Identity documents uploaded successfully.");
+            return ResponseEntity.ok(response);
+        } catch (Exception exception) {
+            response.put("success", false);
+            response.put("error", "Identity document upload failed: " + exception.getMessage());
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
+
+    @GetMapping("/view-identity-document/{id}/{documentType}")
+    public ResponseEntity<byte[]> viewIdentityDocument(
+            @PathVariable Long id, @PathVariable String documentType) {
+        try {
+            Optional<AdminAccountApplication> application = applicationService.getById(id);
+            if (application.isEmpty()) return ResponseEntity.notFound().build();
+            String documentPath = switch (documentType.toLowerCase(Locale.ROOT)) {
+                case "aadhar" -> application.get().getAadharDocumentPath();
+                case "pan" -> application.get().getPanDocumentPath();
+                default -> null;
+            };
+            if (documentPath == null || documentPath.isBlank()) return ResponseEntity.notFound().build();
+            Path path = Paths.get(documentPath);
+            if (!Files.exists(path)) return ResponseEntity.notFound().build();
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.parseMediaType(resolveContentType(path)));
+            headers.setContentDisposition(ContentDisposition.builder("inline").filename(path.getFileName().toString()).build());
+            return new ResponseEntity<>(Files.readAllBytes(path), headers, HttpStatus.OK);
+        } catch (Exception exception) {
+            return ResponseEntity.badRequest().build();
         }
     }
 

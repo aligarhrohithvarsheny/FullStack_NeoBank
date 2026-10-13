@@ -6,6 +6,9 @@ import com.neo.springapp.model.SalaryAccount;
 import com.neo.springapp.repository.AccountRepository;
 import com.neo.springapp.repository.CurrentAccountRepository;
 import com.neo.springapp.repository.SalaryAccountRepository;
+import com.neo.springapp.repository.BankingProductConfigRepository;
+import com.neo.springapp.model.BankingProductConfig;
+import com.neo.springapp.model.SavingsFeature;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -31,10 +34,25 @@ public class AccountService {
     private SalaryAccountRepository salaryAccountRepository;
 
     @Autowired
+    private BankingProductConfigRepository bankingProductConfigRepository;
+
+    @Autowired
     private EmergencyControlService emergencyControlService;
 
     // Basic CRUD operations
     public Account saveAccount(Account account) {
+        if (account.getSavingsProductCode() != null && !account.getSavingsProductCode().isBlank()) {
+            boolean available = bankingProductConfigRepository.findAllByOrderByProductCodeAscEffectiveFromDescCreatedAtDesc()
+                    .stream()
+                    .anyMatch(product -> "SAVINGS".equalsIgnoreCase(product.getAccountType())
+                            && "APPROVED".equalsIgnoreCase(product.getStatus())
+                            && !product.getEffectiveFrom().isAfter(LocalDateTime.now().toLocalDate())
+                            && product.getProductCode().equalsIgnoreCase(account.getSavingsProductCode().trim()));
+            if (!available) {
+                throw new IllegalArgumentException("The selected savings product is not active.");
+            }
+            account.setSavingsProductCode(account.getSavingsProductCode().trim().toUpperCase(Locale.ROOT));
+        }
         if (account.getAccountNumber() == null) {
             account.setAccountNumber(generateAccountNumber());
         }

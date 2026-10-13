@@ -640,6 +640,7 @@
         <div class="detail-section">
           <h3><i class="fa fa-university"></i> Bank Details</h3>
           <div class="detail-row"><span class="detail-label">Account Type:</span><span class="detail-value"><span class="type-badge type-{{ selectedApplication.accountType.toLowerCase() }}">{{ selectedApplication.accountType }}</span></span></div>
+          <div class="detail-row" *ngIf="selectedApplication.accountType === 'Savings' && selectedApplication.savingsProductCode"><span class="detail-label">Savings Product:</span><span class="detail-value">{{ selectedApplication.savingsProductCode }}</span></div>
           <div class="detail-row"><span class="detail-label">Branch:</span><span class="detail-value">{{ selectedApplication.branchName }}</span></div>
           <div class="detail-row"><span class="detail-label">IFSC:</span><span class="detail-value">{{ selectedApplication.ifscCode }}</span></div>
           <div class="detail-row" *ngIf="selectedApplication.accountNumber"><span class="detail-label">Account Number:</span><span class="detail-value account-number">{{ selectedApplication.accountNumber }}</span></div>
@@ -882,6 +883,22 @@
       <div class="detail-section documents-section">
         <h3><i class="fa fa-paperclip"></i> Documents</h3>
         <div class="document-row">
+          <div class="document-item">
+            <span class="doc-label"><i class="fa fa-id-card"></i> Aadhaar document:</span>
+            <span *ngIf="selectedApplication.aadharDocumentPath" class="doc-status uploaded"><i class="fa fa-check"></i> Uploaded</span>
+            <span *ngIf="!selectedApplication.aadharDocumentPath" class="doc-status pending">Not uploaded</span>
+            <button *ngIf="selectedApplication.aadharDocumentPath" class="btn-view-doc" (click)="viewIdentityDocument('aadhar')" title="View Aadhaar document">
+              <i class="fa fa-eye"></i> View
+            </button>
+          </div>
+          <div class="document-item">
+            <span class="doc-label"><i class="fa fa-address-card"></i> PAN document:</span>
+            <span *ngIf="selectedApplication.panDocumentPath" class="doc-status uploaded"><i class="fa fa-check"></i> Uploaded</span>
+            <span *ngIf="!selectedApplication.panDocumentPath" class="doc-status pending">Not uploaded</span>
+            <button *ngIf="selectedApplication.panDocumentPath" class="btn-view-doc" (click)="viewIdentityDocument('pan')" title="View PAN document">
+              <i class="fa fa-eye"></i> View
+            </button>
+          </div>
           <div class="document-item">
             <span class="doc-label"><i class="fa fa-file-pdf"></i> Application PDF:</span>
             <span *ngIf="selectedApplication.applicationPdfPath" class="doc-status uploaded"><i class="fa fa-check"></i> Generated</span>

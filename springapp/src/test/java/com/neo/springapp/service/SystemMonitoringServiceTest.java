@@ -48,4 +48,21 @@ class SystemMonitoringServiceTest {
         assertEquals("UNAVAILABLE", pool.get("status"));
         assertEquals("DEGRADED", snapshot.get("status"));
     }
+
+    @Test
+    void optionalSalaryAccountNotFoundIsNotRecordedAsAnApiFailure() {
+        SystemMonitoringService service = new SystemMonitoringService(null, 1000, 1, 3, 1, 3, 0.85);
+
+        service.recordApiError("GET", "/api/salary-accounts/number/123456", 404);
+        service.recordApiError("GET", "/api/accounts/123456", 404);
+
+        Map<String, Object> snapshot = service.getSnapshot(100);
+        Map<?, ?> metrics = (Map<?, ?>) snapshot.get("metrics");
+        List<?> events = (List<?>) snapshot.get("events");
+
+        assertEquals(1L, metrics.get("apiErrors5m"));
+        assertEquals(1, events.size());
+        assertTrue(events.stream().anyMatch(event ->
+                ((SystemMonitoringService.MonitoringEvent) event).source().contains("/api/accounts/{id}")));
+    }
 }

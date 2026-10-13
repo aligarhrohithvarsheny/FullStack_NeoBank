@@ -138,8 +138,8 @@ export class Customer360 implements OnInit {
         ['history', 'changes']),
       currentAccountHistory: this.resource(`${root}/api/current-accounts/edit-history/account/${encodeURIComponent(accountNumber)}`,
         ['history', 'changes']),
-      familyHistory: this.resource(`${root}/api/family/joint-accounts/${encodeURIComponent(accountNumber)}/history?userId=${encodeURIComponent(String(this.selectedCustomer?.id || ''))}`,
-        ['history', 'changes']),
+      familyHistory: this.resource(`${root}/api/family/admin/joint-accounts/history?userId=${encodeURIComponent(String(this.selectedCustomer?.id || ''))}`,
+        ['history', 'changes'], { 'X-Admin-Email': this.getAdminEmail() }),
       fixedDeposits: this.resource(`${root}/api/fixed-deposits/account/${encodeURIComponent(accountNumber)}`,
         ['fixedDeposits', 'deposits']),
       goldLoans: this.resource(`${root}/api/gold-loans/account/${encodeURIComponent(accountNumber)}`, ['loans'])
@@ -204,14 +204,26 @@ export class Customer360 implements OnInit {
     return this.resourceErrors[name] || '';
   }
 
-  private resource(url: string, keys: string[]): Observable<CustomerResource> {
-    return this.http.get<any>(url).pipe(
+  private resource(url: string, keys: string[], headers?: Record<string, string>): Observable<CustomerResource> {
+    return this.http.get<any>(url, headers ? { headers } : {}).pipe(
       map(value => ({ rows: this.toRows(value, keys), error: '' })),
       catchError(error => of({
         rows: [],
         error: error?.error?.message || `Could not load ${keys[0]} data.`
       }))
     );
+  }
+
+  private getAdminEmail(): string {
+    if (typeof sessionStorage === 'undefined') return '';
+    const direct = sessionStorage.getItem('adminEmail');
+    if (direct) return direct;
+    try {
+      const admin = JSON.parse(sessionStorage.getItem('admin') || '{}');
+      return admin.email || admin.username || '';
+    } catch {
+      return '';
+    }
   }
 
   private toRows(value: any, keys: string[]): any[] {

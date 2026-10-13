@@ -16,6 +16,7 @@ interface BankingProduct {
   monthlyTransactionLimit: number;
   serviceCharge: number;
   eligibility: string;
+  enabledFeatures: string[];
   effectiveFrom: string;
   status: 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED';
   requestedBy: string;
@@ -32,6 +33,39 @@ interface BankingProduct {
   styleUrl: './banking-products.css'
 })
 export class BankingProducts implements OnInit {
+  readonly savingsFeatures = [
+    { id: 'accounts', label: 'Account overview' },
+    { id: 'ai-assistant', label: 'AI assistant' },
+    { id: 'atm-simulator', label: 'ATM withdrawal' },
+    { id: 'bank-messages', label: 'Bank messages' },
+    { id: 'beneficiary-management', label: 'Beneficiary management' },
+    { id: 'bill-payment', label: 'Bill payment' },
+    { id: 'card', label: 'Debit card' },
+    { id: 'cheque', label: 'Cheque management' },
+    { id: 'credit-card', label: 'Credit card' },
+    { id: 'credit-card-bill', label: 'Credit card bill pay' },
+    { id: 'demand-draft', label: 'Demand draft' },
+    { id: 'deposit-request', label: 'Cash deposit slip' },
+    { id: 'ecs-mandate', label: 'ECS mandates' },
+    { id: 'emi-monitoring', label: 'EMI monitoring' },
+    { id: 'family-banking', label: 'Family banking' },
+    { id: 'fasttag', label: 'FASTag' },
+    { id: 'fixed-deposits', label: 'Fixed deposits' },
+    { id: 'goldloan', label: 'Gold loans' },
+    { id: 'homeloan', label: 'Home loans' },
+    { id: 'investments', label: 'Investments' },
+    { id: 'kycupdate', label: 'Profile / KYC update' },
+    { id: 'loan', label: 'Personal loans' },
+    { id: 'ml-loan-prediction', label: 'Loan eligibility' },
+    { id: 'positive-pay', label: 'Positive Pay' },
+    { id: 'scheduled-payments', label: 'Scheduled payments' },
+    { id: 'subsidy-claim', label: 'Subsidy claims' },
+    { id: 'support-tickets', label: 'Support tickets' },
+    { id: 'transaction', label: 'Transactions' },
+    { id: 'transferfunds', label: 'Fund transfers' },
+    { id: 'upi-pay', label: 'UPI payments' },
+    { id: 'virtual-card', label: 'Virtual card' }
+  ];
   products: BankingProduct[] = [];
   activeProducts: BankingProduct[] = [];
   loading = false;
@@ -134,6 +168,12 @@ export class BankingProducts implements OnInit {
     });
   }
 
+  toggleFeature(featureId: string, enabled: boolean): void {
+    this.form.enabledFeatures = enabled
+      ? [...new Set([...this.form.enabledFeatures, featureId])]
+      : this.form.enabledFeatures.filter(feature => feature !== featureId);
+  }
+
   private createEmptyForm() {
     return {
       productCode: '',
@@ -145,6 +185,7 @@ export class BankingProducts implements OnInit {
       monthlyTransactionLimit: 0,
       serviceCharge: 0,
       eligibility: '',
+      enabledFeatures: this.savingsFeatures.map(feature => feature.id),
       effectiveFrom: new Date().toISOString().slice(0, 10)
     };
   }

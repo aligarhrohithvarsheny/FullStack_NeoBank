@@ -143,6 +143,7 @@ export interface CurrentAccountInvoice {
   id?: number;
   invoiceNumber?: string;
   accountNumber: string;
+  linkedTransactionId?: number | null;
   clientName: string;
   clientEmail?: string;
   clientPhone?: string;

@@ -47,6 +47,7 @@ public class SpringSecurityConfig {
 
                 // Emergency account controls require a backend-verified admin login.
                 .requestMatchers("/api/admin/kill-switches/**").hasRole("ADMIN")
+                .requestMatchers("/api/accounts/*/features").hasRole("USER")
                 
                 // Explicitly allow GET and POST methods for all API endpoints
                 .requestMatchers(HttpMethod.GET, "/api/**").permitAll()

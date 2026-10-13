@@ -624,6 +624,14 @@ export class AdminOpenAccount implements OnInit {
     });
   }
 
+  viewIdentityDocument(documentType: 'aadhar' | 'pan') {
+    if (!this.selectedApplication?.id) return;
+    this.appService.viewIdentityDocumentById(this.selectedApplication.id, documentType).subscribe({
+      next: blob => window.open(URL.createObjectURL(blob), '_blank'),
+      error: () => this.showAlertMessage(`Failed to load ${documentType.toUpperCase()} document`, 'error')
+    });
+  }
+
   // ==================== Aadhaar/PAN Auto-Fill ====================
 
   onAadharInput() {

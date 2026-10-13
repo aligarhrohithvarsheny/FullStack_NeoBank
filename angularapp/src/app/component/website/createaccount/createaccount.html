@@ -11,18 +11,8 @@
       <div class="step-label">Upload</div>
     </div>
     <div class="step-line" [class.active]="currentStep > 2"></div>
-    <div class="step-item" [class.active]="currentStep >= 3" [class.completed]="currentStep > 3" (click)="canGoToStep(3) && goToStep(3)">
-      <div class="step-circle"><span *ngIf="currentStep > 3"><i class="fa fa-check"></i></span><span *ngIf="currentStep <= 3">3</span></div>
-      <div class="step-label">Book Slot</div>
-    </div>
-    <div class="step-line" [class.active]="currentStep > 3"></div>
-    <div class="step-item" [class.active]="currentStep >= 4" [class.completed]="currentStep > 4" (click)="canGoToStep(4) && goToStep(4)">
-      <div class="step-circle"><span *ngIf="currentStep > 4"><i class="fa fa-check"></i></span><span *ngIf="currentStep <= 4">4</span></div>
-      <div class="step-label">Video KYC</div>
-    </div>
-    <div class="step-line" [class.active]="currentStep > 4"></div>
-    <div class="step-item" [class.active]="currentStep >= 5" [class.completed]="kycSessionData?.kycStatus === 'Approved'">
-      <div class="step-circle"><span *ngIf="kycSessionData?.kycStatus === 'Approved'"><i class="fa fa-check"></i></span><span *ngIf="kycSessionData?.kycStatus !== 'Approved'">5</span></div>
+    <div class="step-item" [class.active]="currentStep >= 3" [class.completed]="documentsUploaded" (click)="canGoToStep(3) && goToStep(3)">
+      <div class="step-circle"><span *ngIf="documentsUploaded"><i class="fa fa-check"></i></span><span *ngIf="!documentsUploaded">3</span></div>
       <div class="step-label">Status</div>
     </div>
   </div>
@@ -34,9 +24,7 @@
     </div>
     <h2 *ngIf="currentStep === 1">Create New Account</h2>
     <h2 *ngIf="currentStep === 2">Upload Documents</h2>
-    <h2 *ngIf="currentStep === 3">Book Video KYC Slot</h2>
-    <h2 *ngIf="currentStep === 4">Video KYC Verification</h2>
-    <h2 *ngIf="currentStep === 5">Application Status</h2>
+    <h2 *ngIf="currentStep === 3">Application Status</h2>
   </div>
 
   <!-- Loading State -->
@@ -57,7 +45,7 @@
   <div *ngIf="currentStep === 1" class="step-content">
 
     <!-- Video KYC Tracking Section -->
-    <div class="tracking-section">
+    <div class="tracking-section" *ngIf="false">
       <button type="button" (click)="toggleTracking()" class="tracking-toggle-btn">
         <i class="fa" [ngClass]="showTracking ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
         {{ showTracking ? 'Hide' : 'Track' }} Video KYC Status
@@ -164,6 +152,20 @@
           <option value="Current">Current Account</option>
           <option value="Salary">Salary Account</option>
         </select>
+      </div>
+
+      <div *ngIf="selectedAccountType === 'Savings'" class="form-group">
+        <label for="savingsProductCode">Savings Account Type</label>
+        <select id="savingsProductCode" formControlName="savingsProductCode" class="state-dropdown">
+          <option value="">Choose a savings account</option>
+          <option *ngFor="let product of activeSavingsProducts" [value]="product.productCode">
+            {{ product.productName }} — {{ product.interestRate }}% interest
+          </option>
+        </select>
+        <small *ngIf="savingsProductLoadError" class="error">{{ savingsProductLoadError }}</small>
+        <small *ngIf="submitted && f['savingsProductCode'].errors?.['required']" class="error">
+          Please choose a savings account type.
+        </small>
       </div>
 
       <!-- ═══════ SAVINGS ACCOUNT FIELDS ═══════ -->
@@ -802,7 +804,7 @@
   </div>
 
   <!-- ==================== STEP 3: BOOK SLOT ==================== -->
-  <div *ngIf="currentStep === 3" class="step-content">
+  <div *ngIf="false && currentStep === 3" class="step-content">
     <div class="slot-booking-section">
       
       <!-- Already Booked -->
@@ -925,7 +927,7 @@
   </div>
 
   <!-- ==================== STEP 4: VIDEO KYC ==================== -->
-  <div *ngIf="currentStep === 4" class="step-content">
+  <div *ngIf="false && currentStep === 4" class="step-content">
     <div class="video-kyc-section">
       
       <!-- Pre-Video Info -->
@@ -1030,7 +1032,28 @@
   </div>
 
   <!-- ==================== STEP 5: STATUS ==================== -->
-  <div *ngIf="currentStep === 5" class="step-content">
+  <div *ngIf="currentStep === 3" class="step-content">
+    <div class="status-section">
+      <div class="status-card status-pending">
+        <div class="status-icon-large"><i class="fa fa-hourglass-half fa-4x"></i></div>
+        <h3>Application submitted</h3>
+        <p>Your identity documents have been received and your application is awaiting bank review.</p>
+        <div class="detail-row" *ngIf="applicationNumber">
+          <label>Application ID:</label>
+          <span class="highlight">{{ applicationNumber }}</span>
+        </div>
+        <div class="detail-row">
+          <label>Savings account type:</label>
+          <span>{{ selectedSavingsProductName }}</span>
+        </div>
+        <button type="button" class="btn-secondary" (click)="goToStep(2)">
+          <i class="fa fa-file-upload"></i> View uploaded documents
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div *ngIf="false && currentStep === 5" class="step-content">
     <div class="status-section">
       
       <!-- Approved -->

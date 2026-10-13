@@ -5,6 +5,7 @@ import lombok.Data;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @Entity
@@ -44,6 +45,10 @@ public class BankingProductConfig {
 
     @Column(nullable = false, length = 2000)
     private String eligibility;
+
+    @Convert(converter = FeatureListConverter.class)
+    @Column(name = "enabled_features", columnDefinition = "TEXT")
+    private List<String> enabledFeatures = List.of();
 
     @Column(name = "effective_from", nullable = false)
     private LocalDate effectiveFrom;

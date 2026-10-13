@@ -2,8 +2,10 @@ package com.neo.springapp.controller;
 
 import com.neo.springapp.model.*;
 import com.neo.springapp.service.FamilyBankingService;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
@@ -58,6 +60,14 @@ public class FamilyBankingController {
     public FamilyBankingNotification markNotificationRead(@PathVariable Long id, @RequestBody DecisionRequest request) { return service.markNotificationRead(request.userId(), id); }
     @GetMapping("/joint-accounts/{accountNumber}/history")
     public List<Transaction> history(@PathVariable String accountNumber, @RequestParam Long userId) { return service.jointHistory(userId, accountNumber); }
+    @GetMapping("/admin/joint-accounts/history")
+    public List<Transaction> adminJointHistory(@RequestParam Long userId,
+            @RequestHeader(value = "X-Admin-Email", required = false) String adminEmail) {
+        if (adminEmail == null || adminEmail.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Admin identity is required. Please sign in again.");
+        }
+        return service.adminJointHistory(userId);
+    }
     @PatchMapping("/joint-accounts/{accountNumber}/settings")
     public JointAccountProfile settings(@PathVariable String accountNumber, @RequestBody SettingsRequest request) { return service.updateJointSettings(request.userId(), accountNumber, request.operatingMode()); }
     @PostMapping("/admin/minor-applications/{id}/review")

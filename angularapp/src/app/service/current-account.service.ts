@@ -252,6 +252,14 @@ export class CurrentAccountService {
     return this.http.get<CurrentAccountInvoice[]>(`${this.apiUrl}/invoices/${accountNumber}`);
   }
 
+  mapInvoiceToTransaction(invoiceId: number, transactionId: number): Observable<any> {
+    return this.http.put<any>(`${this.apiUrl}/invoices/${invoiceId}/transactions/${transactionId}`, null);
+  }
+
+  unmapInvoiceFromTransaction(invoiceId: number, transactionId: number): Observable<any> {
+    return this.http.delete<any>(`${this.apiUrl}/invoices/${invoiceId}/transactions/${transactionId}`);
+  }
+
   updateInvoiceStatus(id: number, status: string): Observable<any> {
     const params = new HttpParams().set('status', status);
     return this.http.put<any>(`${this.apiUrl}/invoices/status/${id}`, null, { params });

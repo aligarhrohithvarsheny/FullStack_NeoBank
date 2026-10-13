@@ -55,6 +55,10 @@ public class SystemMonitoringService {
     }
 
     public void recordApiError(String method, String path, int status) {
+        if ("GET".equalsIgnoreCase(method) && status == 404
+                && path.startsWith("/api/salary-accounts/number/")) {
+            return;
+        }
         record("API_ERROR", method + " " + normalizePath(path), "HTTP " + status, null);
     }
 

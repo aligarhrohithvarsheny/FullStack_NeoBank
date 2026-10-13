@@ -866,6 +866,42 @@ public class CurrentAccountService {
     }
 
     @Transactional
+    public CurrentAccountInvoice mapInvoiceToTransaction(Long invoiceId, Long transactionId) {
+        CurrentAccountInvoice invoice = invoiceRepository.findById(invoiceId)
+                .orElseThrow(() -> new IllegalArgumentException("Invoice not found"));
+        BusinessTransaction transaction = transactionRepository.findById(transactionId)
+                .orElseThrow(() -> new IllegalArgumentException("Transaction not found"));
+
+        if (!invoice.getAccountNumber().equals(transaction.getAccountNumber())) {
+            throw new IllegalArgumentException("Invoice and transaction must belong to the same account");
+        }
+        if (invoice.getLinkedTransactionId() != null
+                && !invoice.getLinkedTransactionId().equals(transactionId)) {
+            throw new IllegalStateException("This invoice is already linked to another transaction");
+        }
+        Optional<CurrentAccountInvoice> existingMapping =
+                invoiceRepository.findByLinkedTransactionId(transactionId);
+        if (existingMapping.isPresent() && !existingMapping.get().getId().equals(invoiceId)) {
+            throw new IllegalStateException("This transaction is already linked to another invoice");
+        }
+
+        invoice.setLinkedTransactionId(transactionId);
+        return invoiceRepository.save(invoice);
+    }
+
+    @Transactional
+    public CurrentAccountInvoice unmapInvoiceFromTransaction(Long invoiceId, Long transactionId) {
+        CurrentAccountInvoice invoice = invoiceRepository.findById(invoiceId)
+                .orElseThrow(() -> new IllegalArgumentException("Invoice not found"));
+        if (!transactionId.equals(invoice.getLinkedTransactionId())) {
+            throw new IllegalStateException("This invoice is not linked to that transaction");
+        }
+
+        invoice.setLinkedTransactionId(null);
+        return invoiceRepository.save(invoice);
+    }
+
+    @Transactional
     public CurrentAccountInvoice updateInvoiceStatus(Long id, String status) {
         CurrentAccountInvoice invoice = invoiceRepository.findById(id).orElse(null);
         if (invoice == null) return null;

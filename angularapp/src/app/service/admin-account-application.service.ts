@@ -134,6 +134,12 @@ export class AdminAccountApplicationService {
     });
   }
 
+  viewIdentityDocumentById(id: number, documentType: 'aadhar' | 'pan'): Observable<Blob> {
+    return this.http.get(`${this.apiUrl}/view-identity-document/${id}/${documentType}`, {
+      responseType: 'blob'
+    });
+  }
+
   // ==================== Preloaded Customer Data ====================
 
   private preloadedUrl = `${environment.apiBaseUrl}/api/preloaded-customer-data`;
