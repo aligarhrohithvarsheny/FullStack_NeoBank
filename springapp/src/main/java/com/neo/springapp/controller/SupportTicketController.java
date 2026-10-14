@@ -138,8 +138,16 @@ public class SupportTicketController {
         if (principal == null) return unauthorized();
         Map<String, Object> response = new HashMap<>();
         response.put("success", true);
-        response.put("tickets", supportTicketService.getTicketsByAccountNumber(principal.accountNumber()));
-        return ResponseEntity.ok(response);
+        if ("ADMIN".equals(principal.scope())) {
+            response.put("tickets", supportTicketService.getAllTickets());
+            return ResponseEntity.ok(response);
+        }
+        if ("USER".equals(principal.scope()) && principal.accountNumber() != null) {
+            response.put("tickets", supportTicketService.getTicketsByAccountNumber(principal.accountNumber()));
+            return ResponseEntity.ok(response);
+        }
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of(
+                "success", false, "message", "Only admins can view all support tickets"));
     }
 
     @PutMapping("/{id}/status")
@@ -148,15 +156,23 @@ public class SupportTicketController {
             @RequestBody Map<String, String> body,
             @AuthenticationPrincipal SessionPrincipal principal) {
         if (principal == null) return unauthorized();
-        Map<String, Object> response = new HashMap<>();
-        if (supportTicketService.getTicketByIdAndAccountNumber(id, principal.accountNumber()).isEmpty()) {
-            response.put("success", false);
-            response.put("message", "Ticket not found");
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+        if (!"ADMIN".equals(principal.scope())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of(
+                    "success", false, "message", "Only admins can update support tickets"));
         }
-        response.put("success", false);
-        response.put("message", "Only a support representative can update ticket status");
-        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+        String status = body == null ? null : body.get("status");
+        if (status == null || !List.of("OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED").contains(status)) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "success", false, "message", "A valid support ticket status is required"));
+        }
+        SupportTicket updated = supportTicketService.updateTicketStatus(
+                id, status, body.get("adminResponse"));
+        if (updated == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of(
+                    "success", false, "message", "Ticket not found"));
+        }
+        return ResponseEntity.ok(Map.of(
+                "success", true, "message", "Ticket updated successfully", "ticket", updated));
     }
 
     @PutMapping("/{id}/assign")
@@ -165,12 +181,22 @@ public class SupportTicketController {
             @RequestBody Map<String, String> body,
             @AuthenticationPrincipal SessionPrincipal principal) {
         if (principal == null) return unauthorized();
-        if (supportTicketService.getTicketByIdAndAccountNumber(id, principal.accountNumber()).isEmpty()) {
+        if (!"ADMIN".equals(principal.scope())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of(
+                    "success", false, "message", "Only admins can assign support tickets"));
+        }
+        String assignedTo = body == null ? null : body.get("assignedTo");
+        if (assignedTo == null || assignedTo.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "success", false, "message", "An assignee is required"));
+        }
+        SupportTicket updated = supportTicketService.assignTicket(id, assignedTo);
+        if (updated == null) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of(
                     "success", false, "message", "Ticket not found"));
         }
-        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of(
-                "success", false, "message", "Only a support representative can assign tickets"));
+        return ResponseEntity.ok(Map.of(
+                "success", true, "message", "Ticket assigned successfully", "ticket", updated));
     }
 
     @GetMapping("/stats")

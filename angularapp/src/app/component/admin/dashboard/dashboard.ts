@@ -6980,30 +6980,41 @@ export class Dashboard implements OnInit, OnDestroy {
   }
 
   // Support Ticket Methods
+  private getAdminSupportTicketOptions(): { headers: HttpHeaders } {
+    const token = typeof sessionStorage !== 'undefined'
+      ? sessionStorage.getItem('adminSessionToken')
+      : null;
+    return {
+      headers: new HttpHeaders(token ? { Authorization: `Bearer ${token}` } : {})
+    };
+  }
+
   loadSupportTickets() {
     this.isLoadingSupportTickets = true;
-    this.http.get<any>(`${environment.apiBaseUrl}/api/support-tickets/all`).subscribe({
+    this.http.get<any>(
+      `${environment.apiBaseUrl}/api/support-tickets/all`,
+      this.getAdminSupportTicketOptions()
+    ).subscribe({
       next: (res: any) => {
         this.supportTickets = res.tickets || [];
         this.filterSupportTickets();
         this.isLoadingSupportTickets = false;
       },
-      error: () => {
-        this.alertService.error('Error', 'Failed to load support tickets');
+      error: (err: any) => {
+        this.alertService.error(
+          'Error',
+          err.error?.message || 'Failed to load support tickets. Please sign in again and retry.'
+        );
         this.isLoadingSupportTickets = false;
       }
     });
   }
 
   loadSupportTicketStats() {
-    const token = typeof sessionStorage !== 'undefined'
-      ? sessionStorage.getItem('adminSessionToken')
-      : null;
-    const headers = token
-      ? new HttpHeaders({ Authorization: `Bearer ${token}` })
-      : new HttpHeaders();
-
-    this.http.get<any>(`${environment.apiBaseUrl}/api/support-tickets/stats`, { headers }).subscribe({
+    this.http.get<any>(
+      `${environment.apiBaseUrl}/api/support-tickets/stats`,
+      this.getAdminSupportTicketOptions()
+    ).subscribe({
       next: (res: any) => {
         this.supportTicketStats = {
           openCount: res.openCount || 0,
@@ -7042,7 +7053,7 @@ export class Dashboard implements OnInit, OnDestroy {
     this.http.put<any>(`${environment.apiBaseUrl}/api/support-tickets/${ticket.id}/status`, {
       status: status,
       adminResponse: this.adminResponseText || null
-    }).subscribe({
+    }, this.getAdminSupportTicketOptions()).subscribe({
       next: (res: any) => {
         if (res.success) {
           this.alertService.success('Success', `Ticket ${status.toLowerCase().replace('_', ' ')} successfully`);
@@ -7066,7 +7077,7 @@ export class Dashboard implements OnInit, OnDestroy {
     this.http.put<any>(`${environment.apiBaseUrl}/api/support-tickets/${ticket.id}/status`, {
       status: ticket.status === 'OPEN' ? 'IN_PROGRESS' : ticket.status,
       adminResponse: this.adminResponseText
-    }).subscribe({
+    }, this.getAdminSupportTicketOptions()).subscribe({
       next: (res: any) => {
         if (res.success) {
           this.alertService.success('Success', 'Response sent successfully');
