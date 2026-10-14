@@ -2,6 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
+import { Router } from '@angular/router';
 import { forkJoin, Observable, of } from 'rxjs';
 import { catchError, map } from 'rxjs/operators';
 import { environment } from '../../../../environment/environment';
@@ -50,10 +51,18 @@ export class Customer360 implements OnInit {
   savingNominee = false;
   nomineeError = '';
 
-  constructor(private http: HttpClient) {}
+  constructor(private http: HttpClient, private router: Router) {}
 
   ngOnInit(): void {
     this.loadCustomers();
+  }
+
+  goBack(): void {
+    const destination = typeof sessionStorage !== 'undefined'
+      && sessionStorage.getItem('userRole') === 'MANAGER'
+      ? '/manager/dashboard'
+      : '/admin/dashboard';
+    void this.router.navigateByUrl(destination);
   }
 
   get filteredCustomers(): CustomerSummary[] {

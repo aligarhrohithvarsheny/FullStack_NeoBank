@@ -178,6 +178,7 @@ export class ManagerDashboard implements OnInit, OnDestroy {
     { id: 'loans', name: 'Loan Requests', description: 'Approve or reject loan applications', category: 'Financial Operations', enabled: true, icon: 'fa-coins' },
     { id: 'gold-loans', name: 'Gold Loans', description: 'Approve loans, view EMI & foreclosure', category: 'Financial Operations', enabled: true, icon: 'fa-gem' },
     { id: 'cheques', name: 'Cheque Management', description: 'Draw and bounce cheques', category: 'Financial Operations', enabled: true, icon: 'fa-file-invoice' },
+    { id: 'customer-360', name: 'Customer 360°', description: 'Review customer accounts, activity, service, lending, and relationships', category: 'Management', enabled: true, icon: 'fa-user-circle' },
     { id: 'cards', name: 'Manage Cards', description: 'Issue, block, or update cards', category: 'Services', enabled: true, icon: 'fa-credit-card' },
     { id: 'kyc', name: 'KYC Verification', description: 'Approve or reject KYC requests', category: 'Services', enabled: true, icon: 'fa-id-card' },
     { id: 'subsidy-claims', name: 'Subsidy Claims', description: 'Manage education loan subsidies', category: 'Services', enabled: true, icon: 'fa-graduation-cap' },
@@ -1377,6 +1378,7 @@ export class ManagerDashboard implements OnInit, OnDestroy {
     // Map feature IDs to admin dashboard routes
     const routeMap: { [key: string]: string } = {
       'manage-users': '/admin/users',
+      'customer-360': '/admin/customer-360',
       'user-control': '/admin/user-control',
       'deposit-withdraw': '/admin/dashboard',
       'transactions': '/admin/transactions',

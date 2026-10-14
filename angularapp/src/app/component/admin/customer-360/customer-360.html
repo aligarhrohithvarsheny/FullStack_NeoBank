@@ -5,9 +5,12 @@
       <h1>Customer 360°</h1>
       <p class="subtitle">Accounts, activity, service, lending, KYC and relationship history in one place.</p>
     </div>
-    <button type="button" class="secondary-button" (click)="loadCustomers()" [disabled]="isLoadingCustomers">
-      Refresh directory
-    </button>
+    <div class="header-actions">
+      <button type="button" class="secondary-button" (click)="goBack()">Dashboard</button>
+      <button type="button" class="secondary-button" (click)="loadCustomers()" [disabled]="isLoadingCustomers">
+        Refresh directory
+      </button>
+    </div>
   </header>
 
   <section class="search-card">
