@@ -98,6 +98,7 @@ export class Userdashboard implements OnInit, OnDestroy {
   isSavingsAccount = false;
   savingsFeatureAccessLoaded = false;
   savingsFeatureAccess: Record<string, boolean> = {};
+  savingsFeatureAccessError = '';
   private savingsFeatureAccessRequestInFlight = false;
   loading: boolean = false;
   error: string = '';
@@ -839,11 +840,16 @@ export class Userdashboard implements OnInit, OnDestroy {
       || (this.savingsFeatureAccessLoaded && this.savingsFeatureAccess[featureId] === true);
   }
 
+  retrySavingsFeatureAccess(): void {
+    this.loadSavingsFeatureAccess();
+  }
+
   private loadSavingsFeatureAccess(): void {
     if (!this.isSavingsAccount || !this.userAccountNumber || this.savingsFeatureAccessRequestInFlight) return;
     const rawUser = sessionStorage.getItem('currentUser');
     if (!rawUser) {
       this.savingsFeatureAccessLoaded = false;
+      this.savingsFeatureAccessError = 'Unable to verify savings feature access. Please sign in again.';
       return;
     }
     let user: any;
@@ -852,19 +858,22 @@ export class Userdashboard implements OnInit, OnDestroy {
     } catch (error) {
       console.error('Unable to read customer session for feature access.', error);
       this.savingsFeatureAccessLoaded = false;
+      this.savingsFeatureAccessError = 'Unable to verify savings feature access. Please sign in again.';
       return;
     }
     if (!user.authToken) {
       this.savingsFeatureAccessLoaded = false;
+      this.savingsFeatureAccessError = 'Unable to verify savings feature access. Please sign in again.';
       return;
     }
 
     this.savingsFeatureAccessRequestInFlight = true;
+    this.savingsFeatureAccessError = '';
     const headers = new HttpHeaders({ Authorization: `Bearer ${user.authToken}` });
     this.http.get<any>(
       `${environment.apiBaseUrl}/api/accounts/${encodeURIComponent(this.userAccountNumber)}/features`,
       { headers }
-    ).subscribe({
+    ).pipe(timeout(10000)).subscribe({
       next: response => {
         const nextAccess: Record<string, boolean> = {};
         for (const feature of response?.features || []) {
@@ -874,6 +883,7 @@ export class Userdashboard implements OnInit, OnDestroy {
         }
         this.savingsFeatureAccess = nextAccess;
         this.savingsFeatureAccessLoaded = true;
+        this.savingsFeatureAccessError = '';
         if (this.selectedFeature && !this.isSavingsFeatureEnabled(this.selectedFeature)) {
           this.selectedFeature = null;
           this.stopUpiPolling();
@@ -882,7 +892,7 @@ export class Userdashboard implements OnInit, OnDestroy {
         this.savingsFeatureAccessRequestInFlight = false;
       },
       error: error => {
-        this.savingsFeatureAccessLoaded = false;
+        this.savingsFeatureAccessError = 'Unable to verify savings feature access. Disabled features remain protected; retry shortly.';
         this.savingsFeatureAccessRequestInFlight = false;
         console.error('Unable to refresh savings feature access.', error);
       }

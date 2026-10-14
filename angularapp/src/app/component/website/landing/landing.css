@@ -167,6 +167,8 @@ html { scroll-behavior: smooth; }
   box-shadow: 0 6px 24px rgba(14,165,233,0.35);
   background: var(--primary);
 }
+.loan-landing-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.loan-landing-actions a { display: inline-block; text-decoration: none; }
 .btn-glow.large { padding: 16px 36px; font-size: 1rem; }
 .btn-ghost {
   background: transparent; color: var(--text-dark); border: 1px solid var(--border);

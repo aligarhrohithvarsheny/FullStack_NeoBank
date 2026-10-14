@@ -2,8 +2,16 @@ package com.neo.springapp.service;
 
 import com.neo.springapp.model.SupportTicket;
 import com.neo.springapp.repository.SupportTicketRepository;
+import com.neo.springapp.model.CurrentAccountUpiPayment;
+import com.neo.springapp.model.EmiPayment;
+import com.neo.springapp.model.SavingsUpiTransaction;
 import com.neo.springapp.model.Transaction;
+import com.neo.springapp.model.TransferRecord;
+import com.neo.springapp.repository.CurrentAccountUpiPaymentRepository;
+import com.neo.springapp.repository.EmiPaymentRepository;
+import com.neo.springapp.repository.SavingsUpiTransactionRepository;
 import com.neo.springapp.repository.TransactionRepository;
+import com.neo.springapp.repository.TransferRepository;
 import com.neo.springapp.model.User;
 import com.neo.springapp.repository.UserRepository;
 import com.neo.springapp.service.UserSessionTokenService.SessionPrincipal;
@@ -23,6 +31,18 @@ public class SupportTicketService {
 
     @Autowired
     private TransactionRepository transactionRepository;
+
+    @Autowired
+    private SavingsUpiTransactionRepository savingsUpiTransactionRepository;
+
+    @Autowired
+    private CurrentAccountUpiPaymentRepository currentAccountUpiPaymentRepository;
+
+    @Autowired
+    private TransferRepository transferRepository;
+
+    @Autowired
+    private EmiPaymentRepository emiPaymentRepository;
 
     @Autowired
     private UserRepository userRepository;
@@ -55,32 +75,134 @@ public class SupportTicketService {
         ticket.setTransactionDescription(null);
 
         if (ticket.getTransactionId() != null && !ticket.getTransactionId().isBlank()) {
-            Transaction transaction = transactionRepository.findByTransactionId(ticket.getTransactionId().trim())
+            VerifiedTransaction transaction = getOwnTransaction(accountNumber, ticket.getTransactionId())
                     .orElseThrow(() -> new IllegalArgumentException("Transaction ID was not found for this account"));
-            if (!accountNumber.equals(transaction.getAccountNumber())) {
-                throw new IllegalArgumentException("You can only raise a ticket for your own transaction");
-            }
             copyTransactionDetails(ticket, transaction);
-            ticket.setTransactionId(transaction.getTransactionId());
+            ticket.setTransactionId(transaction.transactionId());
         }
         return supportTicketRepository.save(ticket);
     }
 
-    public Transaction getOwnTransaction(String accountNumber, String transactionId) {
-        if (accountNumber == null || transactionId == null || transactionId.isBlank()) return null;
-        return transactionRepository.findByTransactionId(transactionId.trim())
-                .filter(transaction -> accountNumber.equals(transaction.getAccountNumber()))
-                .orElse(null);
+    public Optional<VerifiedTransaction> getOwnTransaction(String accountNumber, String transactionId) {
+        if (accountNumber == null || accountNumber.isBlank() || transactionId == null || transactionId.isBlank()) {
+            return Optional.empty();
+        }
+        String id = transactionId.trim();
+
+        Optional<Transaction> transaction = transactionRepository.findByTransactionId(id)
+                .filter(item -> accountNumber.equals(item.getAccountNumber()));
+        if (transaction.isEmpty()) {
+            try {
+                transaction = transactionRepository.findByGlobalTransactionSequence(Long.valueOf(id))
+                        .filter(item -> accountNumber.equals(item.getAccountNumber()));
+            } catch (NumberFormatException ignored) {
+                // Non-numeric transaction IDs do not have a global sequence representation.
+            }
+        }
+        if (transaction.isPresent()) {
+            return transaction.map(item -> new VerifiedTransaction(
+                    item.getTransactionId() == null ? id : item.getTransactionId(),
+                    item.getAccountNumber(),
+                    item.getAmount(),
+                    item.getType(),
+                    item.getStatus(),
+                    item.getDate(),
+                    item.getDescription() == null ? item.getMerchant() : item.getDescription()));
+        }
+
+        Optional<SavingsUpiTransaction> savingsUpi = savingsUpiTransactionRepository.findByTransactionRef(id)
+                .filter(item -> accountNumber.equals(item.getSenderAccount())
+                        || accountNumber.equals(item.getReceiverAccount()));
+        if (savingsUpi.isPresent()) {
+            SavingsUpiTransaction item = savingsUpi.get();
+            boolean sent = accountNumber.equals(item.getSenderAccount());
+            return Optional.of(new VerifiedTransaction(
+                    item.getTransactionRef(),
+                    accountNumber,
+                    item.getAmount() == null ? null : item.getAmount().doubleValue(),
+                    sent ? "UPI DEBIT" : "UPI CREDIT",
+                    item.getStatus(),
+                    item.getCreatedAt(),
+                    item.getRemark()));
+        }
+
+        Optional<CurrentAccountUpiPayment> currentUpi = currentAccountUpiPaymentRepository.findByTxnId(id)
+                .filter(item -> accountNumber.equals(item.getAccountNumber()));
+        if (currentUpi.isPresent()) {
+            CurrentAccountUpiPayment item = currentUpi.get();
+            return Optional.of(new VerifiedTransaction(
+                    item.getTxnId(),
+                    item.getAccountNumber(),
+                    item.getAmount(),
+                    "UPI " + item.getTxnType(),
+                    item.getStatus(),
+                    item.getCreatedAt(),
+                    item.getNote()));
+        }
+
+        Optional<TransferRecord> transfer = transferRepository.findByTransferId(id)
+                .filter(item -> accountNumber.equals(item.getSenderAccountNumber())
+                        || accountNumber.equals(item.getRecipientAccountNumber()));
+        if (transfer.isEmpty()) {
+            try {
+                transfer = transferRepository.findByGlobalTransactionSequence(Long.valueOf(id))
+                        .filter(item -> accountNumber.equals(item.getSenderAccountNumber())
+                                || accountNumber.equals(item.getRecipientAccountNumber()));
+            } catch (NumberFormatException ignored) {
+                // Non-numeric transaction IDs do not have a global sequence representation.
+            }
+        }
+        if (transfer.isPresent()) {
+            TransferRecord item = transfer.get();
+            boolean sent = accountNumber.equals(item.getSenderAccountNumber());
+            return Optional.of(new VerifiedTransaction(
+                    item.getTransferId() == null ? id : item.getTransferId(),
+                    accountNumber,
+                    item.getAmount(),
+                    "FUND TRANSFER " + (item.getTransferType() == null ? "" : item.getTransferType().name()),
+                    item.getStatus(),
+                    item.getDate(),
+                    sent ? "Transfer to " + item.getRecipientName() : "Transfer from " + item.getSenderName()));
+        }
+
+        Optional<EmiPayment> emi = emiPaymentRepository.findByTransactionId(id).stream()
+                .filter(item -> accountNumber.equals(item.getAccountNumber()))
+                .findFirst();
+        if (emi.isEmpty()) {
+            try {
+                emi = emiPaymentRepository.findById(Long.valueOf(id))
+                        .filter(item -> accountNumber.equals(item.getAccountNumber()));
+            } catch (NumberFormatException ignored) {
+                // Non-numeric transaction IDs are not EMI database IDs.
+            }
+        }
+        return emi.map(item -> new VerifiedTransaction(
+                id,
+                item.getAccountNumber(),
+                item.getTotalAmount(),
+                "LOAN EMI",
+                item.getStatus(),
+                item.getPaymentDate() != null ? item.getPaymentDate() : item.getDueDate().atStartOfDay(),
+                "EMI " + item.getEmiNumber() + " for loan account " + item.getLoanAccountNumber()));
     }
 
-    private void copyTransactionDetails(SupportTicket ticket, Transaction transaction) {
-        ticket.setTransactionAccountNumber(transaction.getAccountNumber());
-        ticket.setTransactionAmount(transaction.getAmount());
-        ticket.setTransactionType(transaction.getType());
-        ticket.setTransactionStatus(transaction.getStatus());
-        ticket.setTransactionDate(transaction.getDate() == null ? null : transaction.getDate().toString());
-        ticket.setTransactionDescription(transaction.getDescription());
+    private void copyTransactionDetails(SupportTicket ticket, VerifiedTransaction transaction) {
+        ticket.setTransactionAccountNumber(transaction.accountNumber());
+        ticket.setTransactionAmount(transaction.amount());
+        ticket.setTransactionType(transaction.type());
+        ticket.setTransactionStatus(transaction.status());
+        ticket.setTransactionDate(transaction.date() == null ? null : transaction.date().toString());
+        ticket.setTransactionDescription(transaction.description());
     }
+
+    public record VerifiedTransaction(
+            String transactionId,
+            String accountNumber,
+            Double amount,
+            String type,
+            String status,
+            LocalDateTime date,
+            String description) {}
 
     public List<SupportTicket> getTicketsByAccountNumber(String accountNumber) {
         return supportTicketRepository.findByAccountNumberOrderByCreatedAtDesc(accountNumber);

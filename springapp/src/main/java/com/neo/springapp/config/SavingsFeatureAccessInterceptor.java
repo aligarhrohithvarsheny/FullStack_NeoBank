@@ -48,6 +48,7 @@ public class SavingsFeatureAccessInterceptor implements HandlerInterceptor {
             Map.entry("/api/home-loans", "homeloan"),
             Map.entry("/api/fixed-deposits", "fixed-deposits"),
             Map.entry("/api/term-deposit-plans", "fixed-deposits"),
+            Map.entry("/api/payment-gateway/payment-links", "upi-pay"),
             Map.entry("/api/ecs-mandates", "ecs-mandate"),
             Map.entry("/api/subsidy-claims", "subsidy-claim"),
             Map.entry("/api/investments", "investments"),
@@ -78,7 +79,6 @@ public class SavingsFeatureAccessInterceptor implements HandlerInterceptor {
 
         String path = request.getRequestURI();
         if (path.endsWith("/features")) return true;
-        if (!featureAccessService.isSavingsAccount(principal.accountNumber())) return true;
         String feature = resolveFeature(path);
         if (feature == null || featureAccessService.isFeatureEnabled(principal.accountNumber(), feature)) {
             return true;

@@ -12,6 +12,9 @@ public interface BankingProductConfigRepository extends JpaRepository<BankingPro
 
     List<BankingProductConfig> findByStatusOrderByCreatedAtDesc(String status);
 
+    BankingProductConfig findFirstByProductCodeIgnoreCaseAndAccountTypeIgnoreCaseAndStatusAndEffectiveFromLessThanEqualOrderByEffectiveFromDescCreatedAtDesc(
+            String productCode, String accountType, String status, LocalDate effectiveFrom);
+
     boolean existsByProductCodeIgnoreCaseAndEffectiveFromAndStatus(
             String productCode, LocalDate effectiveFrom, String status);
 }

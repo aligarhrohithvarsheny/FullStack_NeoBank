@@ -10,9 +10,14 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface TransferRepository extends JpaRepository<TransferRecord, Long> {
+
+    Optional<TransferRecord> findByTransferId(String transferId);
+
+    Optional<TransferRecord> findByGlobalTransactionSequence(Long globalTransactionSequence);
     
     // JPQL Query to find transfers by sender account number with pagination
     @Query("SELECT t FROM TransferRecord t WHERE t.senderAccountNumber = :accountNumber ORDER BY t.date DESC")

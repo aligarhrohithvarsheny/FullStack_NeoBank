@@ -2,7 +2,6 @@ package com.neo.springapp.controller;
 
 import com.neo.springapp.model.SupportTicket;
 import com.neo.springapp.service.SupportTicketService;
-import com.neo.springapp.model.Transaction;
 import com.neo.springapp.service.UserSessionTokenService.SessionPrincipal;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -47,14 +46,15 @@ public class SupportTicketController {
             @RequestParam String transactionId,
             @AuthenticationPrincipal SessionPrincipal principal) {
         if (principal == null) return unauthorized();
-        Transaction transaction = supportTicketService.getOwnTransaction(principal.accountNumber(), transactionId);
-        if (transaction == null) {
+        Optional<SupportTicketService.VerifiedTransaction> transaction =
+                supportTicketService.getOwnTransaction(principal.accountNumber(), transactionId);
+        if (transaction.isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of(
-                    "success", false, "message", "Transaction ID was not found in your account history"));
+                    "success", false, "message", "No matching transaction was found for your signed-in account"));
         }
         Map<String, Object> response = new HashMap<>();
         response.put("success", true);
-        response.put("transaction", transaction);
+        response.put("transaction", transaction.get());
         return ResponseEntity.ok(response);
     }
 

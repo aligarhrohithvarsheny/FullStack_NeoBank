@@ -184,12 +184,12 @@ public class KycController {
             
             // Generate and send OTP
             String otp = otpService.generateOtp();
-            otpService.storeOtp(userEmail, otp);
             
             // Send KYC update OTP via email
             boolean emailSent = emailService.sendKycUpdateOtpEmail(userEmail, otp);
             
             if (emailSent) {
+                otpService.storeOtp(userEmail, otp);
                 Map<String, Object> response = new HashMap<>();
                 response.put("success", true);
                 response.put("message", "OTP has been sent to your email. Please check and enter the OTP.");
@@ -200,7 +200,7 @@ public class KycController {
                 response.put("success", false);
                 response.put("message", "Failed to send OTP. Please try again.");
                 System.out.println("❌ Failed to send KYC update OTP to email: " + userEmail);
-                return ResponseEntity.badRequest().body(response);
+                return ResponseEntity.status(503).body(response);
             }
         } catch (Exception e) {
             Map<String, Object> response = new HashMap<>();

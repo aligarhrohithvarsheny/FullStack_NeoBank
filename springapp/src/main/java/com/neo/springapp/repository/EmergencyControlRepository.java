@@ -8,6 +8,7 @@ import java.util.Optional;
 
 public interface EmergencyControlRepository extends JpaRepository<EmergencyControl, Long> {
     Optional<EmergencyControl> findByScopeTypeAndScopeKey(String scopeType, String scopeKey);
+    List<EmergencyControl> findByScopeTypeAndScopeKeyStartingWith(String scopeType, String scopeKeyPrefix);
     List<EmergencyControl> findByScopeTypeAndActiveTrueOrderByUpdatedAtDesc(String scopeType);
     List<EmergencyControl> findAllByOrderByUpdatedAtDesc();
 }

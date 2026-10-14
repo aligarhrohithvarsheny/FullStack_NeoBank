@@ -81,6 +81,12 @@ public class EmergencyControlService {
     }
 
     @Transactional(readOnly = true)
+    public List<EmergencyControl> getFeatureControls(String accountFeatureKeyPrefix) {
+        return controlRepository.findByScopeTypeAndScopeKeyStartingWith(
+                "FEATURE", normalize(accountFeatureKeyPrefix));
+    }
+
+    @Transactional(readOnly = true)
     public List<EmergencyControlAudit> getRecentAudit() {
         return auditRepository.findTop50ByOrderByChangedAtDesc();
     }

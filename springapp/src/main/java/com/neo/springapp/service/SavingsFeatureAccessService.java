@@ -2,6 +2,7 @@ package com.neo.springapp.service;
 
 import com.neo.springapp.model.Account;
 import com.neo.springapp.model.BankingProductConfig;
+import com.neo.springapp.model.EmergencyControl;
 import com.neo.springapp.model.SavingsFeature;
 import com.neo.springapp.repository.AccountRepository;
 import com.neo.springapp.repository.BankingProductConfigRepository;
@@ -15,6 +16,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 public class SavingsFeatureAccessService {
@@ -33,15 +36,21 @@ public class SavingsFeatureAccessService {
 
     public Map<String, Object> getFeatureAccess(String accountNumber) {
         Account account = requireSavingsAccount(accountNumber);
-        List<String> defaultFeatures = getDefaultFeatures(account.getSavingsProductCode());
+        Map<String, Boolean> defaultFeatures = getDefaultFeatures(account.getSavingsProductCode());
+        Map<String, EmergencyControl> overrides = controlService
+                .getFeatureControls(featureKeyPrefix(account.getAccountNumber())).stream()
+                .collect(Collectors.toMap(
+                        control -> control.getScopeKey().toUpperCase(Locale.ROOT),
+                        Function.identity(),
+                        (first, ignored) -> first));
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("accountNumber", account.getAccountNumber());
         response.put("productCode", account.getSavingsProductCode());
         response.put("features", SavingsFeature.IDS.stream().map(feature -> {
-            var override = controlService.getControl("FEATURE", featureKey(accountNumber, feature));
+            var override = overrides.get(featureKey(account.getAccountNumber(), feature));
             boolean inherited = override == null;
             boolean enabled = inherited
-                    ? defaultFeatures.contains(feature)
+                    ? defaultFeatures.getOrDefault(feature, false)
                     : !override.isActive();
             Map<String, Object> featureAccess = new LinkedHashMap<>();
             featureAccess.put("id", feature);
@@ -59,10 +68,13 @@ public class SavingsFeatureAccessService {
 
     public boolean isFeatureEnabled(String accountNumber, String feature) {
         String featureId = normalizeFeature(feature);
-        Account account = requireSavingsAccount(accountNumber);
-        var override = controlService.getControl("FEATURE", featureKey(accountNumber, featureId));
+        Account account = accountRepository.findByAccountNumber(accountNumber == null ? "" : accountNumber.trim());
+        if (account == null || !"SAVINGS".equalsIgnoreCase(account.getAccountType())) {
+            return true;
+        }
+        var override = controlService.getControl("FEATURE", featureKey(account.getAccountNumber(), featureId));
         if (override != null) return !override.isActive();
-        return getDefaultFeatures(account.getSavingsProductCode()).contains(featureId);
+        return getDefaultFeatures(account.getSavingsProductCode()).getOrDefault(featureId, false);
     }
 
     public boolean isSavingsAccount(String accountNumber) {
@@ -80,15 +92,12 @@ public class SavingsFeatureAccessService {
         }
         LocalDate today = LocalDate.now();
         BankingProductConfig product = productRepository
-                .findAllByOrderByProductCodeAscEffectiveFromDescCreatedAtDesc().stream()
-                .filter(candidate -> candidate.getProductCode().equalsIgnoreCase(normalizedCode))
-                .filter(candidate -> "SAVINGS".equalsIgnoreCase(candidate.getAccountType()))
-                .filter(candidate -> "APPROVED".equalsIgnoreCase(candidate.getStatus()))
-                .filter(candidate -> candidate.getEffectiveFrom() != null
-                        && !candidate.getEffectiveFrom().isAfter(today))
-                .findFirst()
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.BAD_REQUEST, "The selected savings product is not active."));
+                .findFirstByProductCodeIgnoreCaseAndAccountTypeIgnoreCaseAndStatusAndEffectiveFromLessThanEqualOrderByEffectiveFromDescCreatedAtDesc(
+                        normalizedCode, "SAVINGS", "APPROVED", today);
+        if (product == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, "The selected savings product is not active.");
+        }
 
         String previousProductCode = account.getSavingsProductCode();
         account.setSavingsProductCode(product.getProductCode());
@@ -104,20 +113,19 @@ public class SavingsFeatureAccessService {
         controlService.setControl("FEATURE", featureKey(accountNumber, featureId), !enabled, reason, changedBy);
     }
 
-    private List<String> getDefaultFeatures(String productCode) {
+    private Map<String, Boolean> getDefaultFeatures(String productCode) {
         if (productCode == null || productCode.isBlank()) {
-            return SavingsFeature.IDS;
+            return SavingsFeature.IDS.stream().collect(Collectors.toMap(
+                    Function.identity(), ignored -> true, (first, ignored) -> first, LinkedHashMap::new));
         }
         LocalDate today = LocalDate.now();
-        return productRepository.findAllByOrderByProductCodeAscEffectiveFromDescCreatedAtDesc().stream()
-                .filter(product -> product.getProductCode().equalsIgnoreCase(productCode))
-                .filter(product -> "SAVINGS".equalsIgnoreCase(product.getAccountType()))
-                .filter(product -> "APPROVED".equalsIgnoreCase(product.getStatus()))
-                .filter(product -> product.getEffectiveFrom() != null && !product.getEffectiveFrom().isAfter(today))
-                .findFirst()
-                .map(BankingProductConfig::getEnabledFeatures)
-                .map(features -> features == null ? SavingsFeature.IDS : features)
-                .orElse(List.of());
+        BankingProductConfig product = productRepository
+                .findFirstByProductCodeIgnoreCaseAndAccountTypeIgnoreCaseAndStatusAndEffectiveFromLessThanEqualOrderByEffectiveFromDescCreatedAtDesc(
+                        productCode, "SAVINGS", "APPROVED", today);
+        List<String> enabledFeatures = product == null || product.getEnabledFeatures() == null
+                ? List.of() : product.getEnabledFeatures();
+        return SavingsFeature.IDS.stream().collect(Collectors.toMap(
+                Function.identity(), enabledFeatures::contains, (first, ignored) -> first, LinkedHashMap::new));
     }
 
     private Account requireSavingsAccount(String accountNumber) {
@@ -130,7 +138,12 @@ public class SavingsFeatureAccessService {
     }
 
     private String featureKey(String accountNumber, String feature) {
-        return accountNumber.trim().toUpperCase(Locale.ROOT) + ":" + feature;
+        return accountNumber.trim().toUpperCase(Locale.ROOT) + ":"
+                + feature.toUpperCase(Locale.ROOT);
+    }
+
+    private String featureKeyPrefix(String accountNumber) {
+        return accountNumber.trim().toUpperCase(Locale.ROOT) + ":";
     }
 
     private String normalizeFeature(String feature) {

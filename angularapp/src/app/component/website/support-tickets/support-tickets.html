@@ -67,9 +67,9 @@
         <textarea [(ngModel)]="ticketForm.description" rows="4" placeholder="Describe the issue in detail..."></textarea>
       </div>
       <div class="form-group full-width">
-        <label>Related Transaction ID <span class="optional-label">{{ ticketForm.category === 'TRANSACTION_FAILED' ? 'Required for this issue' : 'Optional' }}</span></label>
+        <label>Related Transaction / Payment ID <span class="optional-label">{{ ticketForm.category === 'TRANSACTION_FAILED' ? 'Required for this issue' : 'Optional' }}</span></label>
         <div class="transaction-verify-row">
-          <input type="text" [(ngModel)]="ticketForm.transactionId" (input)="verifiedTransaction = null; transactionVerificationError = ''" placeholder="Enter only a transaction from your account" />
+          <input type="text" [(ngModel)]="ticketForm.transactionId" (input)="verifiedTransaction = null; transactionVerificationError = ''" placeholder="Enter your UPI, transfer, loan/EMI, or other payment ID" />
           <button class="btn-secondary" type="button" (click)="verifyTransaction()" [disabled]="isVerifyingTransaction || !ticketForm.transactionId.trim()">
             {{ isVerifyingTransaction ? 'Checking...' : 'Verify Transaction' }}
           </button>

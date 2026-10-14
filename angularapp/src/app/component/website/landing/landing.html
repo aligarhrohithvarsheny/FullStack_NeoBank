@@ -352,10 +352,13 @@
           <div class="feature-list-item"><span class="check-icon">✓</span> Pay scheduled EMIs from your linked account</div>
           <div class="feature-list-item"><span class="check-icon">✓</span> Review available prepayment choices securely</div>
         </div>
-        <button class="btn-glow" (click)="goTo('website/user', $event)">Apply for Loan</button>
+        <div class="loan-landing-actions">
+          <button class="btn-glow" (click)="goTo('website/user', $event)">Apply for Loan</button>
+          <a class="btn-glow" href="#loan-repayment" aria-label="Go to loan payment">Pay Existing Loan</a>
+        </div>
       </div>
     </div>
-    <app-loan-repayment></app-loan-repayment>
+    <app-loan-repayment id="loan-repayment"></app-loan-repayment>
   </section>
 
   <!-- ========== 5. ZIGZAG: INSURANCE ========== -->
