@@ -1499,7 +1499,7 @@ export class ManagerDashboard implements OnInit, OnDestroy {
     this.filterFeatures();
     
     // Also try to load from backend
-    this.http.get(`${environment.apiBaseUrl}/api/admins/feature-access/${adminEmail}`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/api/admins/feature-access/${encodeURIComponent(adminEmail)}`).subscribe({
       next: (response: any) => {
         if (response && response.success && response.features && response.features.length > 0) {
           response.features.forEach((feature: any) => {
@@ -1590,39 +1590,29 @@ export class ManagerDashboard implements OnInit, OnDestroy {
     const adminEmail = this.selectedAdmin.email;
     const savedKey = `adminFeatureAccess_${adminEmail}`;
     
-    console.log(`Saving feature access for admin ${adminEmail}:`, featuresToSave);
-    localStorage.setItem(savedKey, JSON.stringify(featuresToSave));
-    
-    // Store in map
-    const featureMap = new Map<string, boolean>();
-    featuresToSave.forEach(f => {
-      featureMap.set(f.id, f.enabled);
-    });
-    this.adminFeatureAccess.set(adminEmail, featureMap);
-    
-    // Dispatch custom event to notify same-tab listeners (admin dashboard)
-    window.dispatchEvent(new CustomEvent('featureAccessUpdated', { 
-      detail: { adminEmail, features: featuresToSave } 
-    }));
-    
-    // Also save to backend
-    this.http.post(`${environment.apiBaseUrl}/api/admins/feature-access/${adminEmail}`, {
+    this.http.post(`${environment.apiBaseUrl}/api/admins/feature-access/${encodeURIComponent(adminEmail)}`, {
       features: featuresToSave
     }).subscribe({
       next: (response: any) => {
-        console.log('Feature access saved to backend:', response);
+        if (!response?.success) {
+          this.alertService.error('Save Failed', response?.message || 'Feature access could not be saved.');
+          return;
+        }
+
+        localStorage.setItem(savedKey, JSON.stringify(response.features || featuresToSave));
+        const featureMap = new Map<string, boolean>();
+        featuresToSave.forEach(f => featureMap.set(f.id, f.enabled));
+        this.adminFeatureAccess.set(adminEmail, featureMap);
+        window.dispatchEvent(new CustomEvent('featureAccessUpdated', {
+          detail: { adminEmail, features: response.features || featuresToSave }
+        }));
         this.alertService.success('Success', `Feature access updated successfully for ${this.selectedAdmin.name}! Admin dashboard will reflect changes on next page load.`);
         this.showReloadMessage();
-        // Reload manager accessible features after saving
         this.loadManagerAccessibleFeatures();
       },
       error: (err: any) => {
         console.error('Error saving feature access:', err);
-        // Still show success since it's saved locally
-        this.alertService.success('Success', `Feature access updated (saved locally) for ${this.selectedAdmin.name}. Admin dashboard will reflect changes on next page load.`);
-        this.showReloadMessage();
-        // Reload manager accessible features after saving
-        this.loadManagerAccessibleFeatures();
+        this.alertService.error('Save Failed', err.error?.message || 'Feature access was not saved. Check the server connection and try again.');
       }
     });
   }

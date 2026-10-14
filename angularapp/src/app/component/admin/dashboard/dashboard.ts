@@ -231,7 +231,7 @@ export class Dashboard implements OnInit, OnDestroy {
     { section: 'agent-management', icon: 'fa-user-tie', label: 'Agent Management', description: 'Manage field agents', gradient: 'linear-gradient(135deg, #a18cd1, #fbc2eb)', route: 'agent-management' },
     { section: 'subsidy-claims', icon: 'fa-graduation-cap', label: 'Subsidy Claims', description: 'Review education loan subsidy claims', gradient: 'linear-gradient(135deg, #fbc2eb, #a6c1ee)', featureKey: 'subsidy-claims', route: 'subsidy-claims' },
     { section: 'education-loans', icon: 'fa-university', label: 'Education Loans', description: 'Manage education loan applications', gradient: 'linear-gradient(135deg, #d4fc79, #96e6a1)', featureKey: 'education-loans', route: 'education-loan-applications' },
-    { section: 'support-tickets', icon: 'fa-comments', label: 'Customer Support', description: 'Respond to support tickets', gradient: 'linear-gradient(135deg, #f6d365, #fda085)' },
+    { section: 'support-tickets', icon: 'fa-comments', label: 'Customer Support', description: 'Respond to support tickets', gradient: 'linear-gradient(135deg, #f6d365, #fda085)', featureKey: 'support-tickets' },
     { section: 'passbook', icon: 'fa-book', label: 'Passbook Generation', description: 'Generate customer passbooks', gradient: 'linear-gradient(135deg, #ffecd2, #fcb69f)' },
     { section: 'ai-security', icon: 'fa-shield-alt', label: 'AI Security Center', description: 'Monitor AI-powered security', gradient: 'linear-gradient(135deg, #ff0844, #ffb199)', route: 'ai-security' },
     { section: 'biometric', icon: 'fa-camera', label: 'Face ID Auth', description: 'Manage biometric authentication', gradient: 'linear-gradient(135deg, #667eea, #764ba2)' },
@@ -437,7 +437,7 @@ export class Dashboard implements OnInit, OnDestroy {
         { section: 'agent-management', icon: 'fa-user-tie', label: 'Agent Management', action: () => this.navigateTo('agent-management') },
         { section: 'subsidy-claims', icon: 'fa-graduation-cap', label: 'Subsidy Claims', featureKey: 'subsidy-claims' },
         { section: 'education-loans', icon: 'fa-university', label: 'Education Loans', featureKey: 'education-loans' },
-        { section: 'support-tickets', icon: 'fa-comments', label: 'Customer Support', badge: () => this.supportTicketStats.openCount },
+        { section: 'support-tickets', icon: 'fa-comments', label: 'Customer Support', featureKey: 'support-tickets', badge: () => this.supportTicketStats.openCount },
         { section: 'passbook', icon: 'fa-book', label: 'Passbook Generation' },
         { section: 'payment-gateway', icon: 'fa-bolt', label: 'Payment Gateway' }
       ]
@@ -1731,7 +1731,7 @@ export class Dashboard implements OnInit, OnDestroy {
       'kyc': 'kyc',
       'subsidy-claims': 'subsidy-claims',
       'education-loans': 'education-loans',
-      'support-tickets': 'chat',
+      'support-tickets': 'support-tickets',
       'gold-loans': 'gold-loans',
       'home-loans': 'home-loans',
       'family-banking': 'family-banking',

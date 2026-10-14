@@ -1,5 +1,7 @@
 package com.neo.springapp.controller;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.neo.springapp.model.Admin;
 import com.neo.springapp.model.BranchCity;
 import com.neo.springapp.model.ProfileUpdateRequest;
@@ -30,6 +32,7 @@ import java.nio.file.StandardCopyOption;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.HashMap;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -42,6 +45,9 @@ public class AdminController {
 
     @Autowired
     private AdminService adminService;
+
+    @Autowired
+    private ObjectMapper objectMapper;
 
     @Autowired
     private com.neo.springapp.service.UserSessionTokenService userSessionTokenService;
@@ -930,20 +936,54 @@ public class AdminController {
     /**
      * Save admin feature access permissions
      */
-    @PostMapping("/feature-access")
-    @SuppressWarnings("unchecked")
-    public ResponseEntity<Map<String, Object>> saveFeatureAccess(@RequestBody Map<String, Object> request) {
+    @PostMapping("/feature-access/{email}")
+    public ResponseEntity<Map<String, Object>> saveFeatureAccess(
+            @PathVariable String email,
+            @RequestBody Map<String, Object> request) {
         try {
-            List<Map<String, Object>> features = (List<Map<String, Object>>) request.get("features");
-            
-            // Save to database or return success
-            // For now, we'll just return success (can be extended to save to database)
+            Object rawFeatures = request.get("features");
+            if (!(rawFeatures instanceof List<?> submittedFeatures)) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "success", false,
+                        "message", "Feature permissions must be provided as a list"));
+            }
+
+            List<Map<String, Object>> features = new ArrayList<>();
+            for (Object rawFeature : submittedFeatures) {
+                if (!(rawFeature instanceof Map<?, ?> feature)
+                        || !(feature.get("id") instanceof String id)
+                        || id.isBlank()
+                        || !(feature.get("enabled") instanceof Boolean enabled)) {
+                    return ResponseEntity.badRequest().body(Map.of(
+                            "success", false,
+                            "message", "Each feature must include an id and enabled status"));
+                }
+
+                Map<String, Object> normalizedFeature = new HashMap<>();
+                normalizedFeature.put("id", id);
+                normalizedFeature.put("enabled", enabled);
+                Object accessStatus = feature.get("accessStatus");
+                if (accessStatus instanceof String status
+                        && List.of("enabled", "disabled", "denied").contains(status)) {
+                    normalizedFeature.put("accessStatus", status);
+                }
+                features.add(normalizedFeature);
+            }
+
+            Admin admin = adminService.getAdminByEmail(email);
+            if (admin == null || !"ADMIN".equalsIgnoreCase(admin.getRole())) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of(
+                        "success", false,
+                        "message", "Admin account was not found"));
+            }
+
+            admin.setFeatureAccessJson(objectMapper.writeValueAsString(features));
+            adminService.saveAdmin(admin);
+
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);
             response.put("message", "Feature access updated successfully");
             response.put("features", features);
-            
-            System.out.println("Feature access updated: " + features.size() + " features");
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             Map<String, Object> response = new HashMap<>();
@@ -980,8 +1020,8 @@ public class AdminController {
     @GetMapping("/feature-access/{email}")
     public ResponseEntity<Map<String, Object>> getFeatureAccessForEmail(@PathVariable String email) {
         try {
-            // Basic validation to reject obviously corrupted values
-            if (email == null || email.isEmpty() || email.length() > 200 || email.contains("api") || email.contains("/")) {
+            if (email == null || email.isBlank() || email.length() > 200
+                    || email.contains("/") || !email.contains("@")) {
                 Map<String, Object> resp = new HashMap<>();
                 resp.put("success", false);
                 resp.put("message", "Invalid email parameter");
@@ -989,9 +1029,15 @@ public class AdminController {
                 return ResponseEntity.badRequest().body(resp);
             }
 
+            Admin admin = adminService.getAdminByEmail(email);
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);
-            response.put("features", new java.util.ArrayList<>());
+            List<Map<String, Object>> features = admin == null || admin.getFeatureAccessJson() == null
+                    ? new ArrayList<>()
+                    : objectMapper.readValue(
+                            admin.getFeatureAccessJson(),
+                            new TypeReference<List<Map<String, Object>>>() {});
+            response.put("features", features);
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             Map<String, Object> response = new HashMap<>();

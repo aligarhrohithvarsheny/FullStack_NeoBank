@@ -1,6 +1,7 @@
 package com.neo.springapp.model;
 
 import jakarta.persistence.*;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Data;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.time.LocalDateTime;
@@ -16,6 +17,10 @@ public class Admin {
 
     private String name;
     private String email;
+    @JsonIgnore
+    @Lob
+    @Column(name = "feature_access_json")
+    private String featureAccessJson;
     @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     private String password;
     private String role;
@@ -125,4 +130,3 @@ public class Admin {
         }
     }
 }
-
