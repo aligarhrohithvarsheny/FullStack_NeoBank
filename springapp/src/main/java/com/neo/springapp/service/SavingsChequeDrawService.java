@@ -90,6 +90,12 @@ public class SavingsChequeDrawService {
     @Autowired(required = false)
     private UserRepository userRepository;
 
+    @Autowired(required = false)
+    private CardRepository cardRepository;
+
+    @Autowired(required = false)
+    private SalaryNormalTransactionRepository salaryNormalTransactionRepository;
+
     private static final int MAX_CHEQUE_LEAVES = 30;
 
     @Value("${positivepay.minimum.amount:10000}")
@@ -264,7 +270,9 @@ public class SavingsChequeDrawService {
             if (aiPass) {
                 Map<String, Object> settled = approveChequeDrawRequest(
                         saved.getId(), "AI_VERIFIED", "AI auto-approved verified NeoBank cheque transfer",
-                        String.valueOf(payeeLookup.get("accountNumber")));
+                        String.valueOf(payeeLookup.get("settlementAccountNumber") != null
+                                ? payeeLookup.get("settlementAccountNumber")
+                                : payeeLookup.get("accountNumber")));
                 response.putAll(settled);
                 response.put("aiApproved", true);
                 response.put("success", true);
@@ -529,6 +537,18 @@ public class SavingsChequeDrawService {
                     current.getAccountNumber(), current.getStatus(), expectedPayeeName, current.getBusinessName());
         }
 
+        if (cardRepository != null) {
+            Card debit = cardRepository.findByCardNumber(raw);
+            if (debit == null) {
+                debit = cardRepository.findByCardNumber(identifier.trim());
+            }
+            if (debit != null) {
+                String linked = debit.getAccountNumber() != null ? debit.getAccountNumber() : debit.getCardNumber();
+                return payeeFound(result, "DebitCard", debit.getUserName(), debit.getCardNumber(),
+                        linked, debit.getStatus(), expectedPayeeName, "Debit card " + maskNumber(debit.getCardNumber()));
+            }
+        }
+
         if (creditCardRepository != null) {
             Optional<CreditCard> cardOpt = creditCardRepository.findByCardNumber(raw);
             if (cardOpt.isEmpty()) {
@@ -537,10 +557,11 @@ public class SavingsChequeDrawService {
             if (cardOpt.isPresent()) {
                 CreditCard card = cardOpt.get();
                 String masked = maskNumber(card.getCardNumber());
+                String linked = card.getAccountNumber() != null ? card.getAccountNumber() : card.getCardNumber();
                 result.put("outstanding", card.getCurrentBalance());
                 result.put("cardStatus", card.getStatus());
                 return payeeFound(result, "CreditCard", card.getUserName(), card.getCardNumber(),
-                        card.getAccountNumber(), card.getStatus(), expectedPayeeName, "Card " + masked);
+                        linked, card.getStatus(), expectedPayeeName, "Card " + masked);
             }
         }
 
@@ -617,6 +638,12 @@ public class SavingsChequeDrawService {
         }
 
         String payeeAccountType = (String) verification.get("accountType");
+        String creditTarget = verification.get("settlementAccountNumber") != null
+                ? String.valueOf(verification.get("settlementAccountNumber"))
+                : payeeAccountNumber.trim();
+        String displayPayee = verification.get("accountNumber") != null
+                ? String.valueOf(verification.get("accountNumber"))
+                : payeeAccountNumber.trim();
 
         Account senderAccount = accountRepository.findById(request.getAccountId())
                 .orElseThrow(() -> new RuntimeException("Savings account not found"));
@@ -635,7 +662,8 @@ public class SavingsChequeDrawService {
         senderAccount.setLastUpdated(LocalDateTime.now());
         accountRepository.save(senderAccount);
 
-        Double newPayeeBalance = creditChequeDestination(payeeAccountType, payeeAccountNumber, amount, senderAccount, request);
+        Double newPayeeBalance = creditChequeDestination(payeeAccountType, creditTarget, displayPayee,
+                amount, senderAccount, request);
 
         String txnRef = "SCHQ-TXN-" + System.currentTimeMillis();
 
@@ -651,7 +679,7 @@ public class SavingsChequeDrawService {
         senderTxn.setDescription("Savings Cheque " + request.getChequeNumber() + " to " + request.getPayeeName() + " | Ref: " + txnRef);
         senderTxn.setBalance(newSenderBalance.doubleValue());
         senderTxn.setUserName(senderAccount.getName());
-        senderTxn.setRecipientAccountNumber(payeeAccountNumber);
+        senderTxn.setRecipientAccountNumber(creditTarget);
         senderTxn.setRecipientName(request.getPayeeName());
         senderTxn.setStatus("Completed");
         senderTxn.setDate(LocalDateTime.now());
@@ -663,7 +691,7 @@ public class SavingsChequeDrawService {
         if ("Business".equals(payeeAccountType)) {
             BusinessTransaction payeeTxn = new BusinessTransaction();
             payeeTxn.setGlobalTransactionSequence(payeeGlobalTxnId);
-            payeeTxn.setAccountNumber(payeeAccountNumber);
+            payeeTxn.setAccountNumber(creditTarget);
             payeeTxn.setTxnType("Credit");
             payeeTxn.setAmount(amount.doubleValue());
             payeeTxn.setChargeAmount(0.0);
@@ -673,10 +701,10 @@ public class SavingsChequeDrawService {
             payeeTxn.setStatus("Completed");
             payeeTxn.setDate(LocalDateTime.now());
             businessTransactionRepository.save(payeeTxn);
-        } else {
+        } else if (!List.of("Salary", "CreditCard", "EMI", "GoldLoan", "HomeLoan", "Loan").contains(payeeAccountType)) {
             Transaction payeeTxn = new Transaction();
             payeeTxn.setGlobalTransactionSequence(payeeGlobalTxnId);
-            payeeTxn.setAccountNumber(payeeAccountNumber);
+            payeeTxn.setAccountNumber(creditTarget);
             payeeTxn.setMerchant("Savings Cheque Deposit");
             payeeTxn.setAmount(amount.doubleValue());
             payeeTxn.setType("Credit");
@@ -689,16 +717,23 @@ public class SavingsChequeDrawService {
             transactionRepository.save(payeeTxn);
         }
 
-        // Update cheque request
-        request.setStatus("APPROVED");
+        boolean aiApproval = "AI_VERIFIED".equalsIgnoreCase(adminEmail) || Boolean.TRUE.equals(request.getAiApproved());
+        if (aiApproval) {
+            request.setAiApproved(true);
+            request.setStatus("CLEARED");
+            request.setClearedAt(LocalDateTime.now());
+            request.setPickedUpAt(LocalDateTime.now());
+        } else {
+            request.setStatus("APPROVED");
+        }
         request.setApprovedBy(adminEmail);
         request.setApprovedAt(LocalDateTime.now());
-        request.setPayeeAccountNumber(payeeAccountNumber);
+        request.setPayeeAccountNumber(displayPayee);
         request.setPayeeAccountVerified(true);
         request.setPayeeAccountType(payeeAccountType);
         request.setTransactionReference(txnRef);
         request.setDebitedFromAccount(senderAccount.getAccountNumber());
-        request.setCreditedToAccount(payeeAccountNumber);
+        request.setCreditedToAccount(creditTarget);
         request.setUpdatedAt(LocalDateTime.now());
         chequeRequestRepository.save(request);
 
@@ -714,9 +749,9 @@ public class SavingsChequeDrawService {
         response.put("chequeNumber", request.getChequeNumber());
         response.put("transactionReference", txnRef);
         response.put("debitedFrom", senderAccount.getAccountNumber());
-        response.put("creditedTo", payeeAccountNumber);
+        response.put("creditedTo", creditTarget);
         response.put("newSenderBalance", newSenderBalance);
-        response.put("status", "APPROVED");
+        response.put("status", request.getStatus());
         response.put("chequeRequest", mapChequeRequestToAdminView(request));
         return response;
     }
@@ -813,11 +848,17 @@ public class SavingsChequeDrawService {
         long rejected = chequeRequestRepository.countByStatus("REJECTED");
 
         Map<String, Object> stats = new HashMap<>();
+        long cleared = chequeRequestRepository.countByStatus("CLEARED");
         stats.put("pendingApproval", pending);
+        stats.put("pendingRequests", pending);
         stats.put("approvedCount", approved);
+        stats.put("approvedRequests", approved);
         stats.put("completedCount", completed);
+        stats.put("completedRequests", completed);
         stats.put("rejectedCount", rejected);
-        stats.put("totalRequests", pending + approved + completed + rejected);
+        stats.put("rejectedRequests", rejected);
+        stats.put("clearedRequests", cleared);
+        stats.put("totalRequests", pending + approved + completed + rejected + cleared);
         return stats;
     }
 
@@ -1043,6 +1084,8 @@ public class SavingsChequeDrawService {
         map.put("debitedFromAccount", req.getDebitedFromAccount());
         map.put("creditedToAccount", req.getCreditedToAccount());
         map.put("approvedAt", req.getApprovedAt());
+        map.put("aiApproved", Boolean.TRUE.equals(req.getAiApproved()));
+        map.put("aiVerificationReport", req.getAiVerificationReport());
         return map;
     }
 
@@ -1068,6 +1111,8 @@ public class SavingsChequeDrawService {
         map.put("transactionReference", req.getTransactionReference());
         map.put("debitedFromAccount", req.getDebitedFromAccount());
         map.put("creditedToAccount", req.getCreditedToAccount());
+        map.put("aiApproved", Boolean.TRUE.equals(req.getAiApproved()));
+        map.put("aiVerificationReport", req.getAiVerificationReport());
         return map;
     }
 
@@ -1100,6 +1145,8 @@ public class SavingsChequeDrawService {
         map.put("transactionReference", req.getTransactionReference());
         map.put("debitedFromAccount", req.getDebitedFromAccount());
         map.put("creditedToAccount", req.getCreditedToAccount());
+        map.put("aiApproved", Boolean.TRUE.equals(req.getAiApproved()));
+        map.put("aiVerificationReport", req.getAiVerificationReport());
 
         // Look up savings account for user details
         try {
@@ -1133,5 +1180,249 @@ public class SavingsChequeDrawService {
         map.put("remarks", log.getRemarks());
         map.put("timestamp", log.getTimestamp());
         return map;
+    }
+
+    private Map<String, Object> payeeFound(Map<String, Object> result, String type, String name,
+                                           String displayNumber, String settlementNumber, String status,
+                                           String expectedPayeeName, String extra) {
+        boolean active = status == null
+                || status.equalsIgnoreCase("ACTIVE")
+                || status.equalsIgnoreCase("APPROVED")
+                || status.equalsIgnoreCase("Approved");
+        boolean nameMatch = expectedPayeeName == null || expectedPayeeName.isBlank() || name == null
+                || namesClose(expectedPayeeName, name);
+        result.put("found", true);
+        result.put("verified", active);
+        result.put("accountType", type);
+        result.put("accountHolderName", name);
+        result.put("name", name);
+        result.put("accountNumber", displayNumber);
+        result.put("settlementAccountNumber", settlementNumber != null ? settlementNumber : displayNumber);
+        result.put("status", status);
+        result.put("bankName", "NEO BANK");
+        result.put("ifscCode", "NEOB0001234");
+        result.put("extra", extra);
+        result.put("nameMatch", nameMatch);
+        result.put("message", active
+                ? "Verified NeoBank " + type + " account: " + (name != null ? name : displayNumber)
+                : "Account found but is not active (" + status + ")");
+        return result;
+    }
+
+    private boolean namesClose(String expected, String actual) {
+        String a = expected.trim().replaceAll("\\s+", " ").toLowerCase();
+        String b = actual.trim().replaceAll("\\s+", " ").toLowerCase();
+        return a.equals(b) || a.contains(b) || b.contains(a);
+    }
+
+    private String maskNumber(String value) {
+        if (value == null || value.length() < 4) return "****";
+        return "****" + value.substring(value.length() - 4);
+    }
+
+    private Map<String, Object> lookupEmiDestination(String raw, String original, String expectedPayeeName) {
+        if (emiPaymentRepository == null) return null;
+        EmiPayment emi = null;
+        try {
+            emi = emiPaymentRepository.findById(Long.parseLong(raw)).orElse(null);
+        } catch (NumberFormatException ignored) {}
+        if (emi == null) {
+            List<EmiPayment> byLoan = emiPaymentRepository.findByLoanAccountNumberOrderByEmiNumberAsc(raw);
+            if (byLoan == null || byLoan.isEmpty()) {
+                byLoan = emiPaymentRepository.findByLoanAccountNumberOrderByEmiNumberAsc(original);
+            }
+            if (byLoan != null) {
+                emi = byLoan.stream()
+                        .filter(e -> e.getStatus() != null && e.getStatus().equalsIgnoreCase("Pending"))
+                        .findFirst()
+                        .orElse(byLoan.isEmpty() ? null : byLoan.get(0));
+            }
+        }
+        if (emi == null) return null;
+        Map<String, Object> result = new HashMap<>();
+        result.put("emiNumber", emi.getEmiNumber());
+        result.put("emiAmount", emi.getTotalAmount());
+        result.put("emiStatus", emi.getStatus());
+        result.put("loanAccountNumber", emi.getLoanAccountNumber());
+        String holder = emi.getAccountNumber();
+        if (loanRepository != null && emi.getLoanAccountNumber() != null) {
+            loanRepository.findByLoanAccountNumber(emi.getLoanAccountNumber())
+                    .ifPresent(ln -> result.put("loanType", ln.getType()));
+        }
+        return payeeFound(result, "EMI", holder, String.valueOf(emi.getId()),
+                emi.getLoanAccountNumber(), emi.getStatus(), expectedPayeeName,
+                "EMI #" + emi.getEmiNumber() + " · " + emi.getLoanAccountNumber());
+    }
+
+    private Map<String, Object> runAiChequeVerification(Account sender, SavingsChequeRequest cheque,
+                                                        Map<String, Object> payeeLookup) {
+        Map<String, Object> ai = new LinkedHashMap<>();
+        List<String> checks = new ArrayList<>();
+        List<String> holds = new ArrayList<>();
+
+        boolean found = Boolean.TRUE.equals(payeeLookup.get("found"));
+        boolean verified = Boolean.TRUE.equals(payeeLookup.get("verified"));
+        String payeeStatus = String.valueOf(payeeLookup.getOrDefault("status", ""));
+        checks.add(found ? "PASS account_number_verify: NeoBank destination located"
+                : "FAIL account_number_verify: destination not found");
+        if (found && !verified) {
+            holds.add("Payee account status is " + payeeStatus);
+        }
+
+        BigDecimal available = BigDecimal.valueOf(sender.getBalance() != null ? sender.getBalance() : 0.0);
+        boolean fundsOk = available.compareTo(cheque.getAmount()) >= 0;
+        checks.add(fundsOk
+                ? "PASS amount_available: ₹" + cheque.getAmount() + " against ₹" + available
+                : "FAIL amount_available: insufficient funds");
+        if (!fundsOk) holds.add("Insufficient drawer balance");
+
+        String signatureResult = "PASS signature_verify: no rejected signature on drawer";
+        if (userRepository != null && sender.getAccountNumber() != null) {
+            Optional<User> drawer = userRepository.findByAccountNumber(sender.getAccountNumber());
+            if (drawer.isPresent()) {
+                String sig = drawer.get().getSignatureStatus();
+                if ("REJECTED".equalsIgnoreCase(sig)) {
+                    signatureResult = "FAIL signature_verify: drawer signature rejected";
+                    holds.add("Drawer signature is rejected");
+                } else if ("APPROVED".equalsIgnoreCase(sig)) {
+                    signatureResult = "PASS signature_verify: approved specimen on file";
+                } else {
+                    signatureResult = "PASS signature_verify: internal NeoBank transfer (specimen " + (sig == null ? "pending" : sig) + ")";
+                }
+            }
+        }
+        checks.add(signatureResult);
+
+        boolean sameAccount = sender.getAccountNumber() != null
+                && sender.getAccountNumber().equalsIgnoreCase(String.valueOf(payeeLookup.get("settlementAccountNumber")));
+        if (sameAccount) {
+            checks.add("FAIL fraud_check: source and destination are the same");
+            holds.add("Self-transfer blocked");
+        } else {
+            checks.add("PASS fraud_check: distinct NeoBank destination");
+        }
+
+        double amount = cheque.getAmount().doubleValue();
+        if (amount > 500000 && available.doubleValue() > 0 && amount / available.doubleValue() > 0.9) {
+            checks.add("HOLD fraud_check: high-value drain of more than 90% balance");
+            holds.add("High-value cheque held for admin review");
+        }
+
+        boolean approved = found && verified && fundsOk && holds.isEmpty();
+        String report = String.join(" | ", checks);
+        ai.put("approved", approved);
+        ai.put("accountVerified", found && verified);
+        ai.put("amountAvailable", fundsOk);
+        ai.put("signatureVerified", !holds.contains("Drawer signature is rejected"));
+        ai.put("fraudClear", holds.stream().noneMatch(h -> h.toLowerCase().contains("fraud") || h.contains("Self-transfer") || h.contains("High-value")));
+        ai.put("reason", approved ? "All AI checks passed" : String.join("; ", holds));
+        ai.put("report", report);
+        ai.put("checks", checks);
+        return ai;
+    }
+
+    private Double creditChequeDestination(String payeeAccountType, String creditTarget, String displayPayee,
+                                           BigDecimal amount, Account sender, SavingsChequeRequest request) {
+        String type = payeeAccountType == null ? "Savings" : payeeAccountType;
+        if ("Salary".equals(type)) {
+            SalaryAccount salary = salaryAccountRepository.findByAccountNumber(creditTarget);
+            if (salary == null) throw new RuntimeException("Salary payee account not found");
+            double prev = salary.getBalance() != null ? salary.getBalance() : 0.0;
+            double next = prev + amount.doubleValue();
+            salary.setBalance(next);
+            salaryAccountRepository.save(salary);
+            if (salaryNormalTransactionRepository != null) {
+                SalaryNormalTransaction txn = new SalaryNormalTransaction();
+                txn.setSalaryAccountId(salary.getId());
+                txn.setAccountNumber(salary.getAccountNumber());
+                txn.setType("Credit");
+                txn.setAmount(amount.doubleValue());
+                txn.setRecipientAccount(sender.getAccountNumber());
+                txn.setRemark("Savings cheque " + request.getChequeNumber() + " from " + sender.getName());
+                txn.setPreviousBalance(prev);
+                txn.setNewBalance(next);
+                txn.setStatus("Success");
+                try { txn.setGlobalTransactionSequence(globalTransactionIdGenerator.getNextTransactionId()); } catch (Exception ignored) {}
+                salaryNormalTransactionRepository.save(txn);
+            }
+            return next;
+        }
+        if ("Business".equals(type)) {
+            CurrentAccount current = currentAccountRepository.findByAccountNumber(creditTarget)
+                    .orElseThrow(() -> new RuntimeException("Current/business payee account not found"));
+            double next = (current.getBalance() != null ? current.getBalance() : 0.0) + amount.doubleValue();
+            current.setBalance(next);
+            currentAccountRepository.save(current);
+            return next;
+        }
+        if ("CreditCard".equals(type) && creditCardRepository != null) {
+            CreditCard card = creditCardRepository.findByCardNumber(displayPayee)
+                    .orElseGet(() -> creditCardRepository.findByCardNumber(creditTarget).orElse(null));
+            if (card == null) throw new RuntimeException("Credit card not found");
+            double outstanding = card.getCurrentBalance() != null ? card.getCurrentBalance() : 0.0;
+            double nextOutstanding = Math.max(0, outstanding - amount.doubleValue());
+            card.setCurrentBalance(nextOutstanding);
+            card.calculateAvailableLimit();
+            card.calculateUsageLimit();
+            creditCardRepository.save(card);
+            if (creditCardTransactionRepository != null) {
+                CreditCardTransaction txn = new CreditCardTransaction();
+                txn.setCreditCardId(card.getId());
+                txn.setCardNumber(card.getCardNumber());
+                txn.setAccountNumber(card.getAccountNumber());
+                txn.setUserName(card.getUserName());
+                txn.setTransactionType("Payment");
+                txn.setPaymentMethod("CHEQUE");
+                txn.setChequeNumber(request.getChequeNumber());
+                txn.setDebitAccountNumber(sender.getAccountNumber());
+                txn.setProcessedBy("AI_VERIFIED");
+                txn.setAmount(amount.doubleValue());
+                txn.setMerchant("NeoBank Cheque Payment");
+                txn.setDescription("Cheque " + request.getChequeNumber() + " card payment");
+                txn.setTransactionDate(LocalDateTime.now());
+                try { txn.setGlobalTransactionSequence(globalTransactionIdGenerator.getNextTransactionId()); } catch (Exception ignored) {}
+                creditCardTransactionRepository.save(txn);
+            }
+            return nextOutstanding;
+        }
+        if ("EMI".equals(type) && emiPaymentRepository != null) {
+            EmiPayment emi = null;
+            try { emi = emiPaymentRepository.findById(Long.parseLong(displayPayee)).orElse(null); } catch (Exception ignored) {}
+            if (emi == null) {
+                List<EmiPayment> list = emiPaymentRepository.findByLoanAccountNumberOrderByEmiNumberAsc(creditTarget);
+                emi = list.stream().filter(e -> "Pending".equalsIgnoreCase(e.getStatus())).findFirst().orElse(null);
+            }
+            if (emi != null) {
+                emi.setStatus("Paid");
+                emi.setPaymentDate(LocalDateTime.now());
+                emi.setTransactionId(request.getChequeNumber());
+                emiPaymentRepository.save(emi);
+                return emi.getRemainingPrincipal();
+            }
+        }
+        Account savingsPayee = accountRepository.findByAccountNumber(creditTarget);
+        if (savingsPayee == null) {
+            savingsPayee = accountRepository.findByAccountNumber(displayPayee);
+        }
+        if (savingsPayee != null) {
+            double next = (savingsPayee.getBalance() != null ? savingsPayee.getBalance() : 0.0) + amount.doubleValue();
+            savingsPayee.setBalance(next);
+            savingsPayee.setLastUpdated(LocalDateTime.now());
+            accountRepository.save(savingsPayee);
+            return next;
+        }
+        if ("GoldLoan".equals(type) || "HomeLoan".equals(type) || "Loan".equals(type) || "EMI".equals(type)) {
+            Transaction loanTxn = new Transaction();
+            loanTxn.setAccountNumber(creditTarget);
+            loanTxn.setMerchant("Cheque Loan Payment");
+            loanTxn.setAmount(amount.doubleValue());
+            loanTxn.setType("Credit");
+            loanTxn.setDescription("Cheque " + request.getChequeNumber() + " loan/EMI payment from " + sender.getAccountNumber());
+            loanTxn.setStatus("Completed");
+            loanTxn.setDate(LocalDateTime.now());
+            transactionRepository.save(loanTxn);
+            return amount.doubleValue();
+        }
+        throw new RuntimeException("Unable to credit destination account " + creditTarget);
     }
 }

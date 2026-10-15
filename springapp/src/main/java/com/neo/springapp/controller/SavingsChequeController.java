@@ -33,10 +33,11 @@ public class SavingsChequeController {
             String chequePurpose = (String) request.get("chequePurpose");
             String goldLoanAccountNumber = (String) request.get("goldLoanAccountNumber");
             String homeLoanAccountNumber = (String) request.get("homeLoanAccountNumber");
+            String payeeAccountNumber = (String) request.get("payeeAccountNumber");
 
             return ResponseEntity.ok(savingsChequeDrawService.applyChequeDrawRequest(
                     accountId, serialNumber, chequeDate, amount, payeeName, remarks,
-                    chequePurpose, goldLoanAccountNumber, homeLoanAccountNumber
+                    chequePurpose, goldLoanAccountNumber, homeLoanAccountNumber, payeeAccountNumber
             ));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(
@@ -89,6 +90,24 @@ public class SavingsChequeController {
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(
                     Map.of("success", false, "message", e.getMessage())
+            );
+        }
+    }
+
+    @PostMapping("/draw/lookup-payee")
+    public ResponseEntity<Map<String, Object>> lookupPayee(@RequestBody Map<String, Object> request) {
+        try {
+            String payeeAccountNumber = request != null ? (String) request.get("payeeAccountNumber") : null;
+            String payeeName = request != null ? (String) request.get("payeeName") : null;
+            if (payeeAccountNumber == null || payeeAccountNumber.trim().isEmpty()) {
+                return ResponseEntity.badRequest().body(
+                        Map.of("found", false, "verified", false, "message", "Enter a NeoBank account, card or EMI number")
+                );
+            }
+            return ResponseEntity.ok(savingsChequeDrawService.lookupPayeeDestination(payeeAccountNumber, payeeName));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(
+                    Map.of("found", false, "verified", false, "message", e.getMessage())
             );
         }
     }
@@ -159,13 +178,8 @@ public class SavingsChequeController {
                         Map.of("error", true, "message", "Payee account number is required")
                 );
             }
-            if (payeeName == null || payeeName.trim().isEmpty()) {
-                return ResponseEntity.badRequest().body(
-                        Map.of("error", true, "message", "Payee name is required")
-                );
-            }
-
-            return ResponseEntity.ok(savingsChequeDrawService.verifyPayeeAccount(payeeAccountNumber, payeeName));
+            return ResponseEntity.ok(savingsChequeDrawService.verifyPayeeAccount(
+                    payeeAccountNumber, payeeName == null ? "" : payeeName));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(
                     Map.of("error", true, "message", e.getMessage())
