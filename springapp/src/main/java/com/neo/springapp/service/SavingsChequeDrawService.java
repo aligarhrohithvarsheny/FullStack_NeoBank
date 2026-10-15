@@ -75,6 +75,21 @@ public class SavingsChequeDrawService {
     @Autowired
     private GlobalTransactionIdGenerator globalTransactionIdGenerator;
 
+    @Autowired(required = false)
+    private CreditCardRepository creditCardRepository;
+
+    @Autowired(required = false)
+    private CreditCardTransactionRepository creditCardTransactionRepository;
+
+    @Autowired(required = false)
+    private EmiPaymentRepository emiPaymentRepository;
+
+    @Autowired(required = false)
+    private LoanRepository loanRepository;
+
+    @Autowired(required = false)
+    private UserRepository userRepository;
+
     private static final int MAX_CHEQUE_LEAVES = 30;
 
     @Value("${positivepay.minimum.amount:10000}")
@@ -95,7 +110,7 @@ public class SavingsChequeDrawService {
                                                        String remarks, String chequePurpose,
                                                        String goldLoanAccountNumber) {
         return applyChequeDrawRequest(accountId, serialNumber, chequeDate, amount, payeeName,
-                remarks, chequePurpose, goldLoanAccountNumber, null);
+                remarks, chequePurpose, goldLoanAccountNumber, null, null);
     }
 
     @Transactional
@@ -103,6 +118,16 @@ public class SavingsChequeDrawService {
                                                        String chequeDate, Double amount, String payeeName,
                                                        String remarks, String chequePurpose,
                                                        String goldLoanAccountNumber, String homeLoanAccountNumber) {
+        return applyChequeDrawRequest(accountId, serialNumber, chequeDate, amount, payeeName,
+                remarks, chequePurpose, goldLoanAccountNumber, homeLoanAccountNumber, null);
+    }
+
+    @Transactional
+    public Map<String, Object> applyChequeDrawRequest(Long accountId, String serialNumber,
+                                                       String chequeDate, Double amount, String payeeName,
+                                                       String remarks, String chequePurpose,
+                                                       String goldLoanAccountNumber, String homeLoanAccountNumber,
+                                                       String payeeAccountNumber) {
         if (amount <= 0) throw new RuntimeException("Amount must be greater than 0");
         if (amount >= 50_00_000) throw new RuntimeException("Amount cannot exceed ₹50,00,000");
 
@@ -141,7 +166,11 @@ public class SavingsChequeDrawService {
                 throw new IllegalArgumentException("A Home Loan cheque requires an approved Home Loan");
             }
             payeeName = "NeoBank Home Loan Payment";
-        } else if (!"GENERAL".equals(purpose)) {
+        } else if ("FUND_TRANSFER".equals(purpose) || "GENERAL".equals(purpose)) {
+            if ("FUND_TRANSFER".equals(purpose) && (payeeAccountNumber == null || payeeAccountNumber.isBlank())) {
+                throw new IllegalArgumentException("Enter a NeoBank payee account / card / EMI number to transfer through cheque");
+            }
+        } else {
             throw new IllegalArgumentException("Unsupported cheque purpose");
         }
 
@@ -177,11 +206,34 @@ public class SavingsChequeDrawService {
         request.setHomeLoanAccountNumber(linkedHomeLoanNumber);
         request.setRemarks(remarks);
         boolean selfPayee = payeeName != null && payeeName.trim().equalsIgnoreCase("SELF");
-        boolean positivePayRequired = !selfPayee && BigDecimal.valueOf(amount).compareTo(positivePayMinimumAmount) >= 0;
+        boolean fundTransfer = "FUND_TRANSFER".equals(purpose) || (payeeAccountNumber != null && !payeeAccountNumber.isBlank() && "GENERAL".equals(purpose));
+        boolean positivePayRequired = !selfPayee && !fundTransfer && BigDecimal.valueOf(amount).compareTo(positivePayMinimumAmount) >= 0;
         request.setStatus(selfPayee ? "SELF_CASH" : (positivePayRequired ? "AWAITING_POSITIVE_PAY" : "PENDING"));
         if (selfPayee) request.setPayeeName("SELF");
         request.setCreatedAt(LocalDateTime.now());
         request.setUpdatedAt(LocalDateTime.now());
+
+        Map<String, Object> payeeLookup = null;
+        if (fundTransfer) {
+            payeeLookup = lookupPayeeDestination(payeeAccountNumber.trim(), payeeName);
+            if (!Boolean.TRUE.equals(payeeLookup.get("found"))) {
+                throw new RuntimeException(String.valueOf(payeeLookup.getOrDefault("message",
+                        "No verified NeoBank account found for that number")));
+            }
+            if (account.getAccountNumber() != null
+                    && account.getAccountNumber().equalsIgnoreCase(String.valueOf(payeeLookup.get("settlementAccountNumber")))) {
+                throw new RuntimeException("Cannot transfer a cheque to the same account it is drawn from");
+            }
+            request.setChequePurpose("FUND_TRANSFER");
+            request.setPayeeAccountNumber(String.valueOf(payeeLookup.get("accountNumber")));
+            request.setPayeeAccountType(String.valueOf(payeeLookup.get("accountType")));
+            request.setPayeeAccountVerified(true);
+            if (payeeName == null || payeeName.isBlank()
+                    || "GENERAL".equalsIgnoreCase(payeeName)
+                    || payeeLookup.get("accountHolderName") != null) {
+                request.setPayeeName(String.valueOf(payeeLookup.get("accountHolderName")));
+            }
+        }
 
         SavingsChequeRequest saved = chequeRequestRepository.save(request);
 
@@ -195,10 +247,36 @@ public class SavingsChequeDrawService {
         response.put("message", "Savings cheque draw request submitted successfully");
         response.put("chequeNumber", chequeNumber);
         response.put("requestId", saved.getId());
-        response.put("status", request.getStatus());
-        response.put("chequePurpose", purpose);
+        response.put("status", saved.getStatus());
+        response.put("chequePurpose", saved.getChequePurpose());
         response.put("goldLoanAccountNumber", linkedGoldLoanNumber);
         response.put("homeLoanAccountNumber", linkedHomeLoanNumber);
+
+        if (fundTransfer && payeeLookup != null) {
+            Map<String, Object> ai = runAiChequeVerification(account, saved, payeeLookup);
+            saved.setAiVerificationReport(String.valueOf(ai.get("report")));
+            boolean aiPass = Boolean.TRUE.equals(ai.get("approved"));
+            saved.setAiApproved(aiPass);
+            chequeRequestRepository.save(saved);
+            logAuditAction(saved.getId(), "AI_ENGINE", "AI_VERIFY", String.valueOf(ai.get("report")));
+            response.put("aiVerification", ai);
+
+            if (aiPass) {
+                Map<String, Object> settled = approveChequeDrawRequest(
+                        saved.getId(), "AI_VERIFIED", "AI auto-approved verified NeoBank cheque transfer",
+                        String.valueOf(payeeLookup.get("accountNumber")));
+                response.putAll(settled);
+                response.put("aiApproved", true);
+                response.put("success", true);
+                response.put("message", "Cheque transferred and AI-approved instantly. Funds are posted to all transaction records.");
+                return response;
+            }
+            response.put("aiApproved", false);
+            response.put("message", "Payee found but AI held this cheque for admin review: " + ai.get("reason"));
+            response.put("status", saved.getStatus());
+            return response;
+        }
+
         if (positivePayRequired) {
             response.put("positivePayRequired", true);
             response.put("positivePayMessage", "This cheque is ₹10,000 or above. Register it in Positive Pay before admin draw verification.");
@@ -406,89 +484,114 @@ public class SavingsChequeDrawService {
     }
 
     public Map<String, Object> verifyPayeeAccount(String payeeAccountNumber, String expectedPayeeName) {
+        return lookupPayeeDestination(payeeAccountNumber, expectedPayeeName);
+    }
+
+    /**
+     * Resolve a NeoBank savings / current / salary account, credit card or EMI identifier.
+     */
+    public Map<String, Object> lookupPayeeDestination(String identifier, String expectedPayeeName) {
         Map<String, Object> result = new HashMap<>();
+        String raw = identifier == null ? "" : identifier.trim().replace(" ", "");
+        if (raw.isEmpty()) {
+            result.put("found", false);
+            result.put("verified", false);
+            result.put("message", "Enter an account number, credit card number or EMI number");
+            return result;
+        }
 
-        // Check in savings accounts
-        Account savingsPayee = accountRepository.findByAccountNumber(payeeAccountNumber);
+        Account savingsPayee = accountRepository.findByAccountNumber(raw);
+        if (savingsPayee == null) {
+            savingsPayee = accountRepository.findByAccountNumber(identifier.trim());
+        }
         if (savingsPayee != null) {
-            String accountHolderName = savingsPayee.getName();
-            boolean nameMatch = accountHolderName != null &&
-                    accountHolderName.trim().equalsIgnoreCase(expectedPayeeName.trim());
-            result.put("found", true);
-            result.put("accountType", "Savings");
-            result.put("accountHolderName", accountHolderName);
-            result.put("accountNumber", payeeAccountNumber);
-            result.put("nameMatch", nameMatch);
-            result.put("verified", nameMatch);
-            if (!nameMatch) {
-                result.put("message", "Name mismatch: Account holder is '" + accountHolderName +
-                        "' but payee name is '" + expectedPayeeName + "'");
-            } else {
-                result.put("message", "Payee verified successfully");
-            }
-            return result;
+            return payeeFound(result, "Savings", savingsPayee.getName(), savingsPayee.getAccountNumber(),
+                    savingsPayee.getAccountNumber(), savingsPayee.getStatus(), expectedPayeeName, null);
         }
 
-        // Check in salary accounts
-        SalaryAccount salaryAccount = salaryAccountRepository.findByAccountNumber(payeeAccountNumber);
+        SalaryAccount salaryAccount = salaryAccountRepository.findByAccountNumber(raw);
+        if (salaryAccount == null) {
+            salaryAccount = salaryAccountRepository.findByAccountNumber(identifier.trim());
+        }
         if (salaryAccount != null) {
-            String accountHolderName = salaryAccount.getEmployeeName();
-            boolean nameMatch = accountHolderName != null &&
-                    accountHolderName.trim().equalsIgnoreCase(expectedPayeeName.trim());
-            result.put("found", true);
-            result.put("accountType", "Salary");
-            result.put("accountHolderName", accountHolderName);
-            result.put("accountNumber", payeeAccountNumber);
-            result.put("nameMatch", nameMatch);
-            result.put("verified", nameMatch);
-            if (!nameMatch) {
-                result.put("message", "Name mismatch: Account holder is '" + accountHolderName +
-                        "' but payee name is '" + expectedPayeeName + "'");
-            } else {
-                result.put("message", "Payee verified successfully");
-            }
-            return result;
+            return payeeFound(result, "Salary", salaryAccount.getEmployeeName(), salaryAccount.getAccountNumber(),
+                    salaryAccount.getAccountNumber(), salaryAccount.getStatus(), expectedPayeeName, salaryAccount.getCompanyName());
         }
 
-        // Check in current accounts
-        Optional<CurrentAccount> currentOpt = currentAccountRepository.findByAccountNumber(payeeAccountNumber);
+        Optional<CurrentAccount> currentOpt = currentAccountRepository.findByAccountNumber(raw);
+        if (currentOpt.isEmpty()) {
+            currentOpt = currentAccountRepository.findByAccountNumber(identifier.trim());
+        }
         if (currentOpt.isPresent()) {
             CurrentAccount current = currentOpt.get();
-            String accountHolderName = current.getOwnerName();
-            boolean nameMatch = accountHolderName != null &&
-                    accountHolderName.trim().equalsIgnoreCase(expectedPayeeName.trim());
-            result.put("found", true);
-            result.put("accountType", "Business");
-            result.put("accountHolderName", accountHolderName);
             result.put("businessName", current.getBusinessName());
-            result.put("accountNumber", payeeAccountNumber);
-            result.put("nameMatch", nameMatch);
-            result.put("verified", nameMatch);
-            if (!nameMatch) {
-                result.put("message", "Name mismatch: Account holder is '" + accountHolderName +
-                        "' but payee name is '" + expectedPayeeName + "'");
-            } else {
-                result.put("message", "Payee verified successfully");
+            return payeeFound(result, "Business", current.getOwnerName(), current.getAccountNumber(),
+                    current.getAccountNumber(), current.getStatus(), expectedPayeeName, current.getBusinessName());
+        }
+
+        if (creditCardRepository != null) {
+            Optional<CreditCard> cardOpt = creditCardRepository.findByCardNumber(raw);
+            if (cardOpt.isEmpty()) {
+                cardOpt = creditCardRepository.findByCardNumber(identifier.trim());
             }
-            return result;
+            if (cardOpt.isPresent()) {
+                CreditCard card = cardOpt.get();
+                String masked = maskNumber(card.getCardNumber());
+                result.put("outstanding", card.getCurrentBalance());
+                result.put("cardStatus", card.getStatus());
+                return payeeFound(result, "CreditCard", card.getUserName(), card.getCardNumber(),
+                        card.getAccountNumber(), card.getStatus(), expectedPayeeName, "Card " + masked);
+            }
+        }
+
+        Map<String, Object> emiHit = lookupEmiDestination(raw, identifier.trim(), expectedPayeeName);
+        if (emiHit != null) {
+            return emiHit;
+        }
+
+        if (goldLoanRepository != null) {
+            Optional<GoldLoan> gold = goldLoanRepository.findByLoanAccountNumber(raw);
+            if (gold.isPresent()) {
+                GoldLoan gl = gold.get();
+                return payeeFound(result, "GoldLoan", gl.getUserName(), gl.getLoanAccountNumber(),
+                        gl.getAccountNumber(), gl.getStatus(), expectedPayeeName, "Gold Loan " + gl.getLoanAccountNumber());
+            }
+        }
+        if (homeLoanRepository != null) {
+            Optional<HomeLoan> home = homeLoanRepository.findByLoanAccountNumber(raw);
+            if (home.isPresent()) {
+                HomeLoan hl = home.get();
+                return payeeFound(result, "HomeLoan", hl.getUserName(), hl.getLoanAccountNumber(),
+                        hl.getAccountNumber(), hl.getStatus(), expectedPayeeName, "Home Loan " + hl.getLoanAccountNumber());
+            }
+        }
+        if (loanRepository != null) {
+            Optional<Loan> loan = loanRepository.findByLoanAccountNumber(raw);
+            if (loan.isPresent()) {
+                Loan ln = loan.get();
+                return payeeFound(result, "Loan", ln.getUserName(), ln.getLoanAccountNumber(),
+                        ln.getAccountNumber(), ln.getStatus(), expectedPayeeName, "Loan " + ln.getLoanAccountNumber());
+            }
         }
 
         result.put("found", false);
         result.put("verified", false);
-        result.put("message", "No account found with number: " + payeeAccountNumber);
+        result.put("message", "No verified NeoBank savings, current, salary, credit card or EMI found for: " + identifier);
         return result;
     }
 
-        private void requirePositivePayApproval(String accountNumber, String chequeNumber, BigDecimal amount) {
+    private void requirePositivePayApproval(SavingsChequeRequest cheque, String accountNumber, BigDecimal amount) {
+        if ("FUND_TRANSFER".equalsIgnoreCase(cheque.getChequePurpose())) return;
+        if (Boolean.TRUE.equals(cheque.getAiApproved())) return;
         if (amount.compareTo(positivePayMinimumAmount) < 0) return;
         boolean approved = positivePayRequestRepository
-            .findFirstByAccountNumberAndChequeNumberAndStatusIn(accountNumber, chequeNumber,
+            .findFirstByAccountNumberAndChequeNumberAndStatusIn(accountNumber, cheque.getChequeNumber(),
                 List.of(PositivePayStatus.PENDING_ADMIN_APPROVAL, PositivePayStatus.APPROVED,
                     PositivePayStatus.MATCHED, PositivePayStatus.MISMATCH))
-            .map(request -> request.getStatus() == PositivePayStatus.APPROVED)
+            .map(req -> req.getStatus() == PositivePayStatus.APPROVED)
             .orElse(false);
         if (!approved) throw new RuntimeException("Positive Pay must be approved before cheque approval");
-        }
+    }
 
         @Transactional
         public Map<String, Object> approveChequeDrawRequest(Long id, String adminEmail, String remarks,
@@ -508,8 +611,8 @@ public class SavingsChequeDrawService {
             throw new RuntimeException("Payee account number is required for approval");
         }
 
-        Map<String, Object> verification = verifyPayeeAccount(payeeAccountNumber, request.getPayeeName());
-        if (!(Boolean) verification.get("verified")) {
+        Map<String, Object> verification = lookupPayeeDestination(payeeAccountNumber, request.getPayeeName());
+        if (!Boolean.TRUE.equals(verification.get("found"))) {
             throw new RuntimeException((String) verification.get("message"));
         }
 
@@ -519,7 +622,7 @@ public class SavingsChequeDrawService {
                 .orElseThrow(() -> new RuntimeException("Savings account not found"));
 
         BigDecimal amount = request.getAmount();
-        requirePositivePayApproval(senderAccount.getAccountNumber(), request.getChequeNumber(), amount);
+        requirePositivePayApproval(request, senderAccount.getAccountNumber(), amount);
         BigDecimal senderBalance = BigDecimal.valueOf(senderAccount.getBalance() != null ? senderAccount.getBalance() : 0.0);
 
         if (senderBalance.compareTo(amount) < 0) {
@@ -532,31 +635,7 @@ public class SavingsChequeDrawService {
         senderAccount.setLastUpdated(LocalDateTime.now());
         accountRepository.save(senderAccount);
 
-        // Credit to payee account
-        Double newPayeeBalance;
-        if ("Business".equals(payeeAccountType)) {
-            CurrentAccount payeeAccount = currentAccountRepository.findByAccountNumber(payeeAccountNumber)
-                    .orElseThrow(() -> new RuntimeException("Payee current account not found"));
-            BigDecimal payeeBalance = BigDecimal.valueOf(payeeAccount.getBalance() != null ? payeeAccount.getBalance() : 0.0);
-            newPayeeBalance = payeeBalance.add(amount).doubleValue();
-            payeeAccount.setBalance(newPayeeBalance);
-            payeeAccount.setLastUpdated(LocalDateTime.now());
-            currentAccountRepository.save(payeeAccount);
-        } else if ("Salary".equals(payeeAccountType)) {
-            SalaryAccount payeeAccount = salaryAccountRepository.findByAccountNumber(payeeAccountNumber);
-            BigDecimal payeeBalance = BigDecimal.valueOf(payeeAccount.getBalance() != null ? payeeAccount.getBalance() : 0.0);
-            newPayeeBalance = payeeBalance.add(amount).doubleValue();
-            payeeAccount.setBalance(newPayeeBalance);
-            payeeAccount.setUpdatedAt(LocalDateTime.now());
-            salaryAccountRepository.save(payeeAccount);
-        } else {
-            Account payeeAccount = accountRepository.findByAccountNumber(payeeAccountNumber);
-            double payeeBalance = payeeAccount.getBalance() != null ? payeeAccount.getBalance() : 0.0;
-            newPayeeBalance = payeeBalance + amount.doubleValue();
-            payeeAccount.setBalance(newPayeeBalance);
-            payeeAccount.setLastUpdated(LocalDateTime.now());
-            accountRepository.save(payeeAccount);
-        }
+        Double newPayeeBalance = creditChequeDestination(payeeAccountType, payeeAccountNumber, amount, senderAccount, request);
 
         String txnRef = "SCHQ-TXN-" + System.currentTimeMillis();
 

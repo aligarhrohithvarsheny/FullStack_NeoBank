@@ -334,14 +334,11 @@ export class AtmSimulatorComponent implements OnInit, OnDestroy {
   }
 
   get isPinSet(): boolean {
-    if (this.isSalaryAccount) {
-      return !!this.salaryAccountId;
-    }
     return !!this.debitCard?.pinSet;
   }
 
   private isSalaryPinSet(): boolean {
-    return this.isSalaryAccount && !!this.salaryAccountId;
+    return !!this.debitCard?.pinSet;
   }
 
   // === STEP NAVIGATION ===
@@ -363,7 +360,7 @@ export class AtmSimulatorComponent implements OnInit, OnDestroy {
                           'Your card is not active. Status: ' + this.debitCard.status;
       return;
     }
-    if (!this.isSalaryPinSet() && !this.debitCard.pinSet) {
+    if (!this.isSalaryPinSet()) {
       this.currentStep = 'error';
       this.errorMessage = this.isSalaryAccount
         ? 'ATM PIN not set. Please set your debit card PIN from the salary dashboard first.'

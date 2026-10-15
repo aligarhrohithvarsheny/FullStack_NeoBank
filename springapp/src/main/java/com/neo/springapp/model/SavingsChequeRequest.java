@@ -107,6 +107,12 @@ public class SavingsChequeRequest {
     @Column(name = "credited_to_account", length = 50)
     private String creditedToAccount;
 
+    @Column(name = "ai_approved")
+    private Boolean aiApproved = false;
+
+    @Column(name = "ai_verification_report", columnDefinition = "TEXT")
+    private String aiVerificationReport;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -220,6 +226,12 @@ public class SavingsChequeRequest {
 
     public String getCreditedToAccount() { return creditedToAccount; }
     public void setCreditedToAccount(String creditedToAccount) { this.creditedToAccount = creditedToAccount; }
+
+    public Boolean getAiApproved() { return aiApproved; }
+    public void setAiApproved(Boolean aiApproved) { this.aiApproved = aiApproved; }
+
+    public String getAiVerificationReport() { return aiVerificationReport; }
+    public void setAiVerificationReport(String aiVerificationReport) { this.aiVerificationReport = aiVerificationReport; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }

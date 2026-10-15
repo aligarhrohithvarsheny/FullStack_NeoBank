@@ -620,6 +620,12 @@ public class SalaryAccountController {
         return ResponseEntity.ok(salaryAccountService.setDebitCardPin(id, body.get("pin")));
     }
 
+    @GetMapping("/{id}/verify-debit-card-pin")
+    @PostMapping("/{id}/verify-debit-card-pin")
+    public ResponseEntity<Map<String, Object>> verifyDebitCardPin(@PathVariable Long id, @RequestParam String pin) {
+        return ResponseEntity.ok(salaryAccountService.verifyDebitCardPin(id, pin));
+    }
+
     @PostMapping("/debit-card/replace/{id}")
     public ResponseEntity<Map<String, Object>> replaceDebitCard(@PathVariable Long id) {
         return ResponseEntity.ok(salaryAccountService.replaceDebitCard(id));
