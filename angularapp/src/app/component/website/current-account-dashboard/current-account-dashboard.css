@@ -307,6 +307,24 @@
   background: rgba(255,255,255,0.06);
 }
 
+.ca-debit-card-button {
+  margin: -4px 0 24px;
+  padding: 11px 16px;
+  border: 0;
+  border-radius: 9px;
+  background: var(--ca-purple);
+  color: #fff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.2s;
+}
+.ca-debit-card-button:hover {
+  background: #6d28d9;
+  transform: translateY(-1px);
+}
+
 /* ══════════════════════════════════════════════
    OVERVIEW CARDS (Rocket style)
    ══════════════════════════════════════════════ */

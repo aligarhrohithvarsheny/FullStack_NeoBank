@@ -1,4 +1,4 @@
-import { Component, OnInit, Inject, PLATFORM_ID, ViewEncapsulation } from '@angular/core';
+import { Component, OnInit, Inject, PLATFORM_ID, ViewEncapsulation, Input } from '@angular/core';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
@@ -46,6 +46,12 @@ interface UserProfile {
   encapsulation: ViewEncapsulation.None
 })
 export class Card implements OnInit {
+  @Input() accountNumberInput = '';
+  @Input() accountNameInput = '';
+  @Input() accountEmailInput = '';
+  @Input() accountTypeInput = '';
+  @Input() embedded = false;
+
   showDetails: boolean = false;
   showCVV: boolean = false;
   newPin: string = '';
@@ -79,6 +85,17 @@ export class Card implements OnInit {
   ngOnInit() {
     // Only load in browser, not during SSR
     if (isPlatformBrowser(this.platformId)) {
+      if (this.accountNumberInput) {
+        this.userProfile = {
+          name: this.accountNameInput || 'Account Holder',
+          email: this.accountEmailInput || '',
+          accountNumber: this.accountNumberInput,
+          accountType: this.accountTypeInput || 'Account',
+          joinDate: new Date().toISOString().split('T')[0]
+        };
+        this.loadUserCard();
+        return;
+      }
       this.loadUserProfile();
       this.loadUserCard();
     }

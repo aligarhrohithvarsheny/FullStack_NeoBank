@@ -74,6 +74,8 @@ export class AtmSimulatorComponent implements OnInit, OnDestroy {
   debitCard: DebitCardData | null = null;
   cardLoading: boolean = false;
   cardLoadError: string = '';
+  private salaryAccountId: number | null = null;
+  private isSalaryAccount: boolean = false;
 
   quickAmounts = [500, 1000, 2000, 5000, 10000];
 
@@ -92,26 +94,29 @@ export class AtmSimulatorComponent implements OnInit, OnDestroy {
         const currentUser = JSON.parse(currentUserStr);
         this.accountNumber = this.accountNumberInput || currentUser.accountNumber || '';
         this.accountType = this.accountTypeInput || currentUser.accountType || 'SAVINGS';
-        this.username = this.userNameInput || currentUser.name || currentUser.email || '';
-        this.userEmail = this.userEmailInput || currentUser.email || '';
+      this.salaryAccountId = currentUser.salaryAccountId || currentUser.id || null;
+      this.username = this.userNameInput || currentUser.name || currentUser.email || '';
+      this.userEmail = this.userEmailInput || currentUser.email || '';
+    }
+    if (!this.accountNumber) this.accountNumber = this.accountNumberInput;
+    if (this.accountTypeInput) this.accountType = this.accountTypeInput;
+    if (this.userNameInput) this.username = this.userNameInput;
+    if (this.userEmailInput) this.userEmail = this.userEmailInput;
+    // Fallback to localStorage user_profile
+    if (!this.accountNumber) {
+      const profileStr = localStorage.getItem('user_profile');
+      if (profileStr) {
+        const profile = JSON.parse(profileStr);
+        this.accountNumber = profile.accountNumber || '';
+        this.username = profile.name || this.username;
+        this.accountType = profile.accountType || this.accountType;
+        this.salaryAccountId = profile.salaryAccountId || profile.id || this.salaryAccountId;
+        this.userEmail = profile.email || this.userEmail;
       }
-      if (!this.accountNumber) this.accountNumber = this.accountNumberInput;
-      if (this.accountTypeInput) this.accountType = this.accountTypeInput;
-      if (this.userNameInput) this.username = this.userNameInput;
-      if (this.userEmailInput) this.userEmail = this.userEmailInput;
-      // Fallback to localStorage user_profile
-      if (!this.accountNumber) {
-        const profileStr = localStorage.getItem('user_profile');
-        if (profileStr) {
-          const profile = JSON.parse(profileStr);
-          this.accountNumber = profile.accountNumber || '';
-          this.username = profile.name || this.username;
-          this.accountType = profile.accountType || this.accountType;
-          this.userEmail = profile.email || this.userEmail;
-        }
-      }
-      this.fetchBalance();
-      this.loadDebitCard();
+    }
+    this.isSalaryAccount = this.accountType?.toUpperCase() === 'SALARY';
+    this.fetchBalance();
+    this.loadDebitCard();
     }
   }
 
@@ -155,13 +160,59 @@ export class AtmSimulatorComponent implements OnInit, OnDestroy {
     }
     this.cardLoading = true;
     this.cardLoadError = '';
+
+    const isSalary = this.accountType?.toUpperCase() === 'SALARY';
+    this.isSalaryAccount = isSalary;
+
+    const loadSalaryCard = () => {
+      if (!this.salaryAccountId) {
+        this.cardLoading = false;
+        this.debitCard = null;
+        this.cardLoadError = 'Salary account debit card not available. Please set the debit card PIN from the salary dashboard.';
+        return;
+      }
+
+      this.http.get<any>(`${environment.apiBaseUrl}/api/salary-accounts/debit-card/${this.salaryAccountId}`).subscribe({
+        next: (res) => {
+          this.cardLoading = false;
+          const pinSet = !!res?.pinSet;
+          this.debitCard = {
+            id: this.salaryAccountId || 0,
+            cardNumber: res?.cardNumber || '',
+            cardType: 'Salary Debit',
+            cvv: res?.cvv || '',
+            userName: this.username,
+            expiryDate: res?.expiryDate || '12/28',
+            pinSet,
+            status: res?.status || 'Active',
+            accountNumber: this.accountNumber,
+            blocked: false,
+            deactivated: false
+          };
+          if (!pinSet) {
+            this.cardLoadError = 'Salary account debit card PIN not set. Please set it from the salary dashboard first.';
+          }
+        },
+        error: (err) => {
+          this.cardLoading = false;
+          this.debitCard = null;
+          console.error('ATM - Error loading salary debit card:', err);
+          this.cardLoadError = 'Unable to load salary debit card data. Please set the debit card PIN from the salary dashboard.';
+        }
+      });
+    };
+
+    if (isSalary) {
+      loadSalaryCard();
+      return;
+    }
+
     this.http.get<any>(`${environment.apiBaseUrl}/api/cards/account/${this.accountNumber}`).subscribe({
       next: (response) => {
         this.cardLoading = false;
         const cards = Array.isArray(response) ? response : (response ? [response] : []);
         console.log('ATM - Cards loaded:', cards.length, cards);
         if (cards.length > 0) {
-          // Find active debit card (try strict match first, fallback to any card)
           const debit = cards.find((c: any) =>
             (c.cardType?.toLowerCase().includes('debit') || c.cardType?.toLowerCase().includes('visa')) &&
             c.status === 'Active' && !c.blocked && !c.deactivated
@@ -283,7 +334,14 @@ export class AtmSimulatorComponent implements OnInit, OnDestroy {
   }
 
   get isPinSet(): boolean {
+    if (this.isSalaryAccount) {
+      return !!this.salaryAccountId;
+    }
     return !!this.debitCard?.pinSet;
+  }
+
+  private isSalaryPinSet(): boolean {
+    return this.isSalaryAccount && !!this.salaryAccountId;
   }
 
   // === STEP NAVIGATION ===
@@ -305,9 +363,11 @@ export class AtmSimulatorComponent implements OnInit, OnDestroy {
                           'Your card is not active. Status: ' + this.debitCard.status;
       return;
     }
-    if (!this.debitCard.pinSet) {
+    if (!this.isSalaryPinSet() && !this.debitCard.pinSet) {
       this.currentStep = 'error';
-      this.errorMessage = 'ATM PIN not set. Please set your ATM PIN from Card Management first.';
+      this.errorMessage = this.isSalaryAccount
+        ? 'ATM PIN not set. Please set your debit card PIN from the salary dashboard first.'
+        : 'ATM PIN not set. Please set your ATM PIN from Card Management first.';
       return;
     }
     this.currentStep = 'inserting-card';
@@ -373,10 +433,11 @@ export class AtmSimulatorComponent implements OnInit, OnDestroy {
     this.errorMessage = '';
     this.currentStep = 'processing';
 
-    // Verify PIN against backend
-    this.http.post<any>(
-      `${environment.apiBaseUrl}/api/cards/${this.debitCard.id}/verify-pin?pin=${encodeURIComponent(this.pin)}`, {}
-    ).subscribe({
+    const verifyUrl = this.isSalaryAccount && this.salaryAccountId
+      ? `${environment.apiBaseUrl}/api/salary-accounts/${this.salaryAccountId}/verify-debit-card-pin?pin=${encodeURIComponent(this.pin)}`
+      : `${environment.apiBaseUrl}/api/cards/${this.debitCard.id}/verify-pin?pin=${encodeURIComponent(this.pin)}`;
+
+    this.http.post<any>(verifyUrl, {}).subscribe({
       next: (res) => {
         if (res.success) {
           this.pinAttempts = 0;

@@ -1400,6 +1400,38 @@ public class SalaryAccountService {
         return result;
     }
 
+    public Map<String, Object> verifyDebitCardPin(Long accountId, String pin) {
+        Map<String, Object> result = new HashMap<>();
+        Optional<SalaryAccount> opt = salaryAccountRepository.findById(accountId);
+        if (opt.isEmpty()) {
+            result.put("success", false);
+            result.put("message", "Account not found");
+            return result;
+        }
+
+        SalaryAccount acc = opt.get();
+        if (!Boolean.TRUE.equals(acc.getDebitCardPinSet()) || acc.getDebitCardPin() == null || acc.getDebitCardPin().isBlank()) {
+            result.put("success", false);
+            result.put("message", "Salary account debit card PIN is not set. Please set it from the salary dashboard first.");
+            return result;
+        }
+        if (Boolean.TRUE.equals(acc.getDebitCardPinLocked())) {
+            result.put("success", false);
+            result.put("message", "Card PIN is locked. Contact support to unlock.");
+            return result;
+        }
+        if (pin == null || pin.isBlank()) {
+            result.put("success", false);
+            result.put("message", "PIN is required");
+            return result;
+        }
+
+        boolean isValid = passwordEncoder.matches(pin, acc.getDebitCardPin());
+        result.put("success", isValid);
+        result.put("message", isValid ? "Debit card PIN verified successfully" : "Invalid debit card PIN");
+        return result;
+    }
+
     public Map<String, Object> replaceDebitCard(Long accountId) {
         Map<String, Object> result = new HashMap<>();
         Optional<SalaryAccount> opt = salaryAccountRepository.findById(accountId);

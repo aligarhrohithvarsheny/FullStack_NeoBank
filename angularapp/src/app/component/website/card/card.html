@@ -1,5 +1,5 @@
 <section>
-  <div class="back-button">
+  <div class="back-button" *ngIf="!embedded">
     <button (click)="goBack()">⬅ Back to Dashboard</button>
     <button (click)="refreshCardData()" class="refresh-btn">Refresh Card Data</button>
   </div>

@@ -19,11 +19,12 @@ import { BusinessDrawChequeComponent } from './business-draw-cheque/business-dra
 import { CreditCardBillPay } from '../credit-card-bill-pay/credit-card-bill-pay';
 import { PaymentGatewayService } from '../../../service/payment-gateway.service';
 import { AtmSimulatorComponent } from '../atm-simulator/atm-simulator';
+import { Card } from '../card/card';
 
 @Component({
   selector: 'app-current-account-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule, BusinessDrawChequeComponent, CreditCardBillPay, AtmSimulatorComponent],
+  imports: [CommonModule, FormsModule, BusinessDrawChequeComponent, CreditCardBillPay, AtmSimulatorComponent, Card],
   templateUrl: './current-account-dashboard.html',
   styleUrls: ['./current-account-dashboard.css']
 })
@@ -37,6 +38,7 @@ export class CurrentAccountDashboard implements OnInit, OnDestroy {
   sidebarSearchQuery = '';
   currentMenuItems: { section: string; icon: string; label: string; action?: () => void }[] = [
     { section: 'dashboard', icon: '', label: 'Dashboard' },
+    { section: 'debit-card', icon: '', label: 'Debit Card Management' },
     { section: 'atm-simulator', icon: '', label: 'ATM Withdrawal' },
     { section: 'transfer', icon: '', label: 'Transfer Money' },
     { section: 'vendors', icon: '', label: 'Vendor Payments' },

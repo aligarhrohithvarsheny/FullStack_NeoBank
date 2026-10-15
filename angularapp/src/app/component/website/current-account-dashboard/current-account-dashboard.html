@@ -69,6 +69,7 @@
       <div class="welcome-bar">
         <p>Welcome, <strong>{{ account.ownerName }}</strong> — {{ account.businessName }}</p>
       </div>
+      <button *ngIf="!isTeamUser" type="button" class="ca-debit-card-button" (click)="setSection('debit-card')">💳 Add / Manage Debit Card</button>
 
       <!-- Overview Cards -->
       <div class="overview-cards">
@@ -156,6 +157,17 @@
         </div>
         <p *ngIf="transactions.length === 0" class="no-data">No recent transactions</p>
       </div>
+    </section>
+
+    <section *ngIf="activeSection === 'debit-card' && account && !isTeamUser" class="section">
+      <h2 class="section-title">Current Account Debit Card</h2>
+      <app-card
+        [accountNumberInput]="account.accountNumber || ''"
+        [accountNameInput]="account.ownerName"
+        [accountEmailInput]="account.email"
+        [accountTypeInput]="'CURRENT'"
+        [embedded]="true">
+      </app-card>
     </section>
 
     <section *ngIf="activeSection === 'atm-simulator' && account" class="section">
