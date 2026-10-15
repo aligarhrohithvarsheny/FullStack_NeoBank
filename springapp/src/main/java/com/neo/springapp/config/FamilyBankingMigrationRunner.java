@@ -35,10 +35,18 @@ public class FamilyBankingMigrationRunner implements ApplicationRunner {
                 """);
             create("minor_account_applications", """
                 id BIGINT AUTO_INCREMENT PRIMARY KEY, guardian_user_id BIGINT NOT NULL, minor_name VARCHAR(100) NOT NULL,
-                date_of_birth DATE NOT NULL, status VARCHAR(20) NOT NULL, monthly_limit DECIMAL(19,2) NOT NULL,
+                date_of_birth DATE NOT NULL, form60 VARCHAR(2000), status VARCHAR(20) NOT NULL, monthly_limit DECIMAL(19,2) NOT NULL,
                 daily_limit DECIMAL(19,2) NOT NULL, created_at DATETIME(6) NOT NULL, reviewed_at DATETIME(6) NULL,
-                reviewed_by VARCHAR(255), rejection_reason VARCHAR(500), INDEX idx_minor_guardian (guardian_user_id), INDEX idx_minor_status (status)
+                reviewed_by VARCHAR(255), rejection_reason VARCHAR(500), assigned_account_number VARCHAR(255),
+                assigned_customer_id VARCHAR(255), account_status VARCHAR(20),
+                INDEX idx_minor_guardian (guardian_user_id), INDEX idx_minor_status (status)
                 """);
+            ensureColumn("minor_account_applications", "form60", "VARCHAR(2000) NULL");
+            ensureColumn("minor_account_applications", "assigned_account_number", "VARCHAR(255) NULL");
+            ensureColumn("minor_account_applications", "assigned_customer_id", "VARCHAR(255) NULL");
+            ensureColumn("minor_account_applications", "account_status", "VARCHAR(20) NULL");
+            makeAccountPanOptional();
+            expandAccountForm60();
             create("guardian_links", """
                 id BIGINT AUTO_INCREMENT PRIMARY KEY, guardian_user_id BIGINT NOT NULL, child_user_id BIGINT NOT NULL,
                 status VARCHAR(20) NOT NULL, created_at DATETIME(6) NOT NULL,
@@ -63,5 +71,45 @@ public class FamilyBankingMigrationRunner implements ApplicationRunner {
     private void create(String table, String definition) {
         Integer count = jdbc.queryForObject("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?", Integer.class, table);
         if (count == null || count == 0) jdbc.execute("CREATE TABLE " + table + " (" + definition + ")");
+    }
+
+    private void ensureColumn(String table, String column, String definition) {
+        Integer count = jdbc.queryForObject("""
+                SELECT COUNT(*) FROM information_schema.columns
+                WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?
+                """, Integer.class, table, column);
+        if (count == null || count == 0) {
+            jdbc.execute("ALTER TABLE " + table + " ADD COLUMN " + column + " " + definition);
+        }
+    }
+
+    private void makeAccountPanOptional() {
+        Integer count = jdbc.queryForObject("""
+                SELECT COUNT(*) FROM information_schema.columns
+                WHERE table_schema = DATABASE() AND table_name = 'accounts' AND column_name = 'pan'
+                """, Integer.class);
+        if (count == null || count == 0) return;
+        String nullable = jdbc.queryForObject("""
+                SELECT is_nullable FROM information_schema.columns
+                WHERE table_schema = DATABASE() AND table_name = 'accounts' AND column_name = 'pan'
+                """, String.class);
+        if ("NO".equalsIgnoreCase(nullable)) {
+            jdbc.execute("ALTER TABLE accounts MODIFY COLUMN pan VARCHAR(255) NULL");
+        }
+    }
+
+    private void expandAccountForm60() {
+        Integer count = jdbc.queryForObject("""
+                SELECT COUNT(*) FROM information_schema.columns
+                WHERE table_schema = DATABASE() AND table_name = 'accounts' AND column_name = 'form60'
+                """, Integer.class);
+        if (count == null || count == 0) return;
+        Integer maxLength = jdbc.queryForObject("""
+                SELECT character_maximum_length FROM information_schema.columns
+                WHERE table_schema = DATABASE() AND table_name = 'accounts' AND column_name = 'form60'
+                """, Integer.class);
+        if (maxLength != null && maxLength < 2000) {
+            jdbc.execute("ALTER TABLE accounts MODIFY COLUMN form60 VARCHAR(2000) NULL");
+        }
     }
 }

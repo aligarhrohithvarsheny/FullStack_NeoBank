@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { forkJoin, Observable, of } from 'rxjs';
-import { catchError, map } from 'rxjs/operators';
+import { catchError, map, switchMap } from 'rxjs/operators';
 import { environment } from '../../../../environment/environment';
 
 interface CustomerSummary {
@@ -45,6 +45,7 @@ export class Customer360 implements OnInit {
   loans: any[] = [];
   nominees: any[] = [];
   linkedAccounts: any[] = [];
+  currentAccount: any | null = null;
   familyLinks: any[] = [];
   timeline: any[] = [];
   nomineeDraft = { nomineeName: '', relationship: '', sharePercentage: 100 };
@@ -116,6 +117,7 @@ export class Customer360 implements OnInit {
     this.isLoadingProfile = true;
     this.profileError = '';
     this.resourceErrors = {};
+    this.currentAccount = null;
     this.http.get<any>(`${environment.apiBaseUrl}/api/users/account/${encodeURIComponent(accountNumber)}`).subscribe({
       next: user => {
         this.selectedCustomer = this.toCustomer(user);
@@ -131,6 +133,7 @@ export class Customer360 implements OnInit {
 
   private loadRelatedData(accountNumber: string): void {
     const root = environment.apiBaseUrl;
+    const customerId = this.selectedCustomer?.account?.['customerId'];
     const requests: Record<string, Observable<CustomerResource>> = {
       transactions: this.resource(`${root}/api/transactions/account/${encodeURIComponent(accountNumber)}?page=0&size=100`,
         ['content', 'transactions']),
@@ -140,6 +143,10 @@ export class Customer360 implements OnInit {
       nominees: this.resource(`${root}/api/customer-nominees/account/${encodeURIComponent(accountNumber)}`, ['nominees']),
       currentAccounts: this.resource(`${root}/api/current-accounts/linked-accounts/by-savings/${encodeURIComponent(accountNumber)}`,
         ['accounts', 'linkedAccounts']),
+      currentAccount: customerId
+        ? this.resource(`${root}/api/current-accounts/customer/${encodeURIComponent(String(customerId))}`,
+          ['account'], undefined, true)
+        : of({ rows: [], error: '' }),
       salaryAccount: this.resource(`${root}/api/salary-accounts/number/${encodeURIComponent(accountNumber)}`, ['accounts']),
       family: this.resource(`${root}/api/family/account-lookup/${encodeURIComponent(accountNumber)}?userId=${encodeURIComponent(String(this.selectedCustomer?.id || ''))}`,
         ['accounts', 'linkedAccounts', 'familyAccounts']),
@@ -154,24 +161,44 @@ export class Customer360 implements OnInit {
       goldLoans: this.resource(`${root}/api/gold-loans/account/${encodeURIComponent(accountNumber)}`, ['loans'])
     };
 
-    forkJoin(requests).subscribe(resources => {
+    forkJoin(requests).pipe(
+      switchMap(resources => {
+        const linkedAccountNumber = resources['currentAccounts'].rows
+          .find(account => account.currentAccountNumber)?.currentAccountNumber;
+        if (resources['currentAccount'].rows.length || !linkedAccountNumber) {
+          return of({ resources, currentAccount: resources['currentAccount'] });
+        }
+        return this.resource(`${root}/api/current-accounts/number/${encodeURIComponent(linkedAccountNumber)}`,
+          ['account'], undefined, true).pipe(
+            map(currentAccount => ({
+              resources,
+              currentAccount: {
+                ...currentAccount,
+                error: currentAccount.error || resources['currentAccount'].error
+              }
+            }))
+          );
+      })
+    ).subscribe(({ resources, currentAccount }) => {
       this.transactions = resources['transactions'].rows;
       this.kycRecords = resources['kyc'].rows;
       this.complaints = resources['complaints'].rows;
       this.loans = [...resources['loans'].rows, ...resources['goldLoans'].rows];
       this.nominees = resources['nominees'].rows;
       this.linkedAccounts = [
-        ...resources['currentAccounts'].rows,
+        ...resources['currentAccounts'].rows.filter(account =>
+          account.currentAccountNumber !== currentAccount.rows[0]?.accountNumber),
         ...resources['salaryAccount'].rows,
         ...resources['fixedDeposits'].rows
       ];
+      this.currentAccount = currentAccount.rows[0] || null;
       this.familyLinks = resources['family'].rows;
       this.timeline = [
         ...resources['profileHistory'].rows,
         ...resources['currentAccountHistory'].rows,
         ...resources['familyHistory'].rows
       ].sort((first, second) => this.timestamp(second) - this.timestamp(first));
-      Object.entries(resources).forEach(([name, resource]) => {
+      Object.entries({ ...resources, currentAccount }).forEach(([name, resource]) => {
         if (resource.error) this.resourceErrors[name] = resource.error;
       });
       this.isLoadingProfile = false;
@@ -213,12 +240,19 @@ export class Customer360 implements OnInit {
     return this.resourceErrors[name] || '';
   }
 
-  private resource(url: string, keys: string[], headers?: Record<string, string>): Observable<CustomerResource> {
+  private resource(
+    url: string,
+    keys: string[],
+    headers?: Record<string, string>,
+    notFoundIsEmpty = false
+  ): Observable<CustomerResource> {
     return this.http.get<any>(url, headers ? { headers } : {}).pipe(
       map(value => ({ rows: this.toRows(value, keys), error: '' })),
       catchError(error => of({
         rows: [],
-        error: error?.error?.message || `Could not load ${keys[0]} data.`
+        error: notFoundIsEmpty && error?.status === 404
+          ? ''
+          : error?.error?.message || `Could not load ${keys[0]} data.`
       }))
     );
   }

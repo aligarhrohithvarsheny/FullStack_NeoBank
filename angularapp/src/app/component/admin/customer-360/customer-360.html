@@ -65,7 +65,7 @@
 
     <div class="profile-grid">
       <section class="data-card">
-        <div class="section-heading"><h2>Accounts & balances</h2><span>{{ linkedAccounts.length + 1 }} linked records</span></div>
+        <div class="section-heading"><h2>Accounts & balances</h2><span>{{ linkedAccounts.length + 1 + (currentAccount ? 1 : 0) }} account(s)</span></div>
         <article class="record-card">
           <strong>{{ customer.account?.['accountType'] || 'Primary account' }}</strong>
           <span>Account {{ customer.accountNumber || '—' }}</span>
@@ -73,8 +73,8 @@
           <span>Status {{ customer.account?.['status'] || customer.status || '—' }}</span>
         </article>
         <article class="record-card" *ngFor="let account of linkedAccounts">
-          <strong>{{ account.accountType || account.productName || account.type || 'Linked product' }}</strong>
-          <span>Account {{ account.accountNumber || account.fdAccountNumber || account.id || '—' }}</span>
+          <strong>{{ account.accountType || account.productName || account.type || (account.currentAccountNumber ? 'Current account' : 'Linked product') }}</strong>
+          <span>Account {{ account.currentAccountNumber || account.accountNumber || account.fdAccountNumber || account.id || '—' }}</span>
           <span *ngIf="account.balance !== undefined">Balance {{ account.balance | currency:'INR':'symbol':'1.2-2' }}</span>
           <span *ngIf="account.status">Status {{ account.status }}</span>
         </article>
@@ -82,6 +82,28 @@
         <p class="resource-error" *ngIf="resourceFailure('currentAccounts') || resourceFailure('salaryAccount') || resourceFailure('fixedDeposits')">
           Some linked-account data could not be loaded.
         </p>
+      </section>
+
+      <section class="data-card">
+        <div class="section-heading"><h2>Current account details</h2><span>{{ currentAccount ? currentAccount.status || 'Account found' : 'No current account' }}</span></div>
+        <ng-container *ngIf="currentAccount as account; else noCurrentAccount">
+          <article class="record-card">
+            <strong>{{ account.businessName || 'Business current account' }}</strong>
+            <span>Account {{ account.accountNumber || '—' }} · {{ account.businessType || 'Business type not recorded' }}</span>
+            <span>Balance {{ account.balance | currency:'INR':'symbol':'1.2-2' }} · Minimum balance {{ account.minimumBalance | currency:'INR':'symbol':'1.2-2' }}</span>
+            <span>Owner {{ account.ownerName || '—' }} · {{ account.mobile || 'No mobile recorded' }} · {{ account.email || 'No email recorded' }}</span>
+            <span>PAN {{ mask(account.panNumber) }} · Aadhaar {{ mask(account.aadharNumber) }}</span>
+            <span>GST {{ account.gstNumber || '—' }} · Registration {{ account.businessRegistrationNumber || '—' }}</span>
+            <span>Overdraft {{ account.overdraftEnabled ? 'Enabled' : 'Disabled' }} · Limit {{ account.overdraftLimit | currency:'INR':'symbol':'1.2-2' }}</span>
+            <span>Address {{ account.shopAddress || '—' }} · {{ account.city || '—' }}, {{ account.state || '—' }} {{ account.pincode || '' }}</span>
+            <span>Branch {{ account.branchName || '—' }} · IFSC {{ account.ifscCode || '—' }}</span>
+            <span>KYC {{ account.kycVerified ? 'Verified' : 'Not verified' }} · Opened {{ account.createdAt ? (account.createdAt | date:'mediumDate') : '—' }}</span>
+          </article>
+        </ng-container>
+        <ng-template #noCurrentAccount>
+          <p class="empty-state" *ngIf="!resourceFailure('currentAccount')">No current account is linked to this customer.</p>
+        </ng-template>
+        <p class="resource-error" *ngIf="resourceFailure('currentAccount')">{{ resourceFailure('currentAccount') }}</p>
       </section>
 
       <section class="data-card">

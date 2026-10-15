@@ -5,7 +5,7 @@ import { environment } from '../../environment/environment';
 
 export interface FamilyInvitation { id: number; accountNumber: string; inviterUserId: number; inviteeUserId: number; status: string; createdAt: string; }
 export interface JointTransfer { id: number; accountNumber: string; fromUserId: number; approverUserId: number; toAccountNumber: string; amount: number; status: string; note?: string; transactionReference?: string; }
-export interface MinorApplication { id: number; guardianUserId: number; minorName: string; dateOfBirth: string; monthlyLimit: number; dailyLimit: number; status: string; assignedAccountNumber?: string; assignedCustomerId?: string; }
+export interface MinorApplication { id: number; guardianUserId: number; minorName: string; dateOfBirth: string; monthlyLimit: number; dailyLimit: number; status: string; form60?: string; accountStatus?: string; assignedAccountNumber?: string; assignedCustomerId?: string; }
 export interface FamilyNotification { id: number; recipientUserId: number; type: string; title: string; message: string; createdAt: string; readAt?: string; }
 
 export interface JointAccountProfile {
@@ -42,7 +42,7 @@ export class FamilyBankingService {
   requestTransfer(userId: number, accountNumber: string, toAccountNumber: string, amount: number, note: string): Observable<JointTransfer> { return this.http.post<JointTransfer>(`${this.api}/transfers`, { userId, accountNumber, toAccountNumber, amount, note }); }
   decideTransfer(userId: number, id: number, approve: boolean): Observable<JointTransfer> { return this.http.post<JointTransfer>(`${this.api}/transfers/${id}/decide`, { userId, approve }); }
   applications(guardianUserId: number): Observable<MinorApplication[]> { return this.http.get<MinorApplication[]>(`${this.api}/minor-applications`, { params: { guardianUserId } }); }
-  applyMinor(data: { guardianUserId: number; minorName: string; dateOfBirth: string; monthlyLimit: number; dailyLimit: number }): Observable<MinorApplication> { return this.http.post<MinorApplication>(`${this.api}/minor-applications`, data); }
+  applyMinor(data: { guardianUserId: number; minorName: string; dateOfBirth: string; monthlyLimit: number; dailyLimit: number; form60: string }): Observable<MinorApplication> { return this.http.post<MinorApplication>(`${this.api}/minor-applications`, data); }
   guardianLinks(guardianUserId: number): Observable<any[]> { return this.http.get<any[]>(`${this.api}/guardian-links`, { params: { guardianUserId } }); }
   lookupAccount(userId: number, accountNumber: string): Observable<any> { return this.http.get<any>(`${this.api}/account-lookup/${encodeURIComponent(accountNumber)}`, { params: { userId } }); }
   jointAccounts(userId: number): Observable<JointAccountProfile[]> { return this.http.get<JointAccountProfile[]>(`${this.api}/joint-accounts?userId=${userId}`); }

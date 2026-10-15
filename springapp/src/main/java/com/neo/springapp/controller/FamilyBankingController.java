@@ -42,7 +42,7 @@ public class FamilyBankingController {
 
     @PostMapping("/minor-applications")
     public ResponseEntity<MinorAccountApplication> apply(@RequestBody MinorRequest request) {
-        return ResponseEntity.ok(service.applyForMinor(request.guardianUserId(), request.minorName(), request.dateOfBirth(), request.monthlyLimit(), request.dailyLimit()));
+        return ResponseEntity.ok(service.applyForMinor(request.guardianUserId(), request.minorName(), request.dateOfBirth(), request.monthlyLimit(), request.dailyLimit(), request.form60()));
     }
     @GetMapping("/minor-applications")
     public List<MinorAccountApplication> applications(@RequestParam Long guardianUserId) { return service.guardianApplications(guardianUserId); }
@@ -79,7 +79,22 @@ public class FamilyBankingController {
     @PostMapping("/admin/minor-applications/{id}/edit-and-review")
     public ResponseEntity<MinorAccountApplication> editAndReview(@PathVariable Long id, @RequestHeader("X-Admin-Email") String adminEmail, @RequestBody EditReviewRequest request) {
         return ResponseEntity.ok(service.reviewMinor(id, adminEmail, request.approve(), request.reason(),
-                request.minorName(), request.dateOfBirth(), request.monthlyLimit(), request.dailyLimit()));
+                request.minorName(), request.dateOfBirth(), request.monthlyLimit(), request.dailyLimit(), request.form60()));
+    }
+
+    @PostMapping("/admin/minor-accounts")
+    public ResponseEntity<MinorAccountApplication> createMinorAccount(
+            @RequestHeader("X-Admin-Email") String adminEmail, @RequestBody AdminMinorAccountRequest request) {
+        return ResponseEntity.ok(service.createMinorAccount(adminEmail, request.minorName(), request.dateOfBirth(),
+                request.fatherAccountNumber(), request.aadharNumber(), request.phone(), request.address(),
+                request.form60(), request.enabled()));
+    }
+
+    @PatchMapping("/admin/minor-applications/{id}/account-status")
+    public ResponseEntity<MinorAccountApplication> setMinorAccountStatus(
+            @PathVariable Long id, @RequestHeader("X-Admin-Email") String adminEmail,
+            @RequestBody MinorAccountStatusRequest request) {
+        return ResponseEntity.ok(service.setMinorAccountStatus(id, adminEmail, request.enabled()));
     }
 
     @GetMapping("/admin/minor-applications")
@@ -104,8 +119,11 @@ public class FamilyBankingController {
 
     public record InvitationRequest(Long userId, String accountNumber, String inviteeEmail, String expectedName) {}
     public record DecisionRequest(Long userId, boolean approve, String reason) {}
-    public record EditReviewRequest(boolean approve, String reason, String minorName, LocalDate dateOfBirth, Double monthlyLimit, Double dailyLimit) {}
+    public record EditReviewRequest(boolean approve, String reason, String minorName, LocalDate dateOfBirth, Double monthlyLimit, Double dailyLimit, String form60) {}
     public record TransferRequest(Long userId, String accountNumber, String toAccountNumber, Double amount, String note) {}
-    public record MinorRequest(Long guardianUserId, String minorName, LocalDate dateOfBirth, Double monthlyLimit, Double dailyLimit) {}
+    public record MinorRequest(Long guardianUserId, String minorName, LocalDate dateOfBirth, Double monthlyLimit, Double dailyLimit, String form60) {}
+    public record AdminMinorAccountRequest(String minorName, LocalDate dateOfBirth, String fatherAccountNumber,
+                                           String aadharNumber, String phone, String address, String form60, Boolean enabled) {}
+    public record MinorAccountStatusRequest(Boolean enabled) {}
     public record SettingsRequest(Long userId, String operatingMode) {}
 }

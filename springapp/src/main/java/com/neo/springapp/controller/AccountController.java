@@ -55,6 +55,21 @@ public class AccountController {
     public ResponseEntity<Map<String, Object>> createAccount(@RequestBody Account account) {
         try {
             Map<String, Object> response = new HashMap<>();
+            boolean minorAccount = account.isChildAccount()
+                    || "MINOR_SAVINGS".equalsIgnoreCase(account.getAccountType());
+
+            if (!minorAccount && (account.getPan() == null || account.getPan().isBlank())) {
+                response.put("success", false);
+                response.put("error", "PAN number is required for non-minor accounts.");
+                response.put("errorType", "PAN_REQUIRED");
+                return ResponseEntity.badRequest().body(response);
+            }
+            if (minorAccount && (account.getAge() >= 18 || account.getForm60() == null || account.getForm60().isBlank())) {
+                response.put("success", false);
+                response.put("error", "Minor accounts must be under 18 and include Form 60 details.");
+                response.put("errorType", "MINOR_KYC_REQUIRED");
+                return ResponseEntity.badRequest().body(response);
+            }
             
             // Validate unique fields - Aadhar
             if (account.getAadharNumber() != null && !account.getAadharNumber().isEmpty()) {

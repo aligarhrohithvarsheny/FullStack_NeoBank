@@ -20,6 +20,8 @@ public class MinorAccountApplication {
     private String minorName;
     @Column(nullable = false)
     private LocalDate dateOfBirth;
+    @Column(length = 2000)
+    private String form60;
     @Column(nullable = false, length = 20)
     private String status = "PENDING";
     @Column(nullable = false)
@@ -35,4 +37,6 @@ public class MinorAccountApplication {
     // Populated on approval so the admin/guardian can see the auto-generated minor account
     private String assignedAccountNumber;
     private String assignedCustomerId;
+    @Column(length = 20)
+    private String accountStatus;
 }

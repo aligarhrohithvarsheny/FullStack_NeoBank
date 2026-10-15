@@ -15,6 +15,7 @@
 .fb-field{margin-bottom:14px}
 .fb-field label{display:block;font-size:13px;font-weight:700;margin-bottom:6px;color:var(--ink)}
 .fb-field input{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;font-size:14px;box-sizing:border-box}
+.fb-field textarea{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;font-size:14px;box-sizing:border-box;resize:vertical;font:inherit}
 .fb-field-row{display:flex;gap:14px}
 .fb-field-row .fb-field{flex:1}
 .fb-note{font-size:12px;color:var(--muted);background:#f0f7f6;padding:10px 12px;border-radius:8px;margin-top:6px}
@@ -22,3 +23,9 @@
 .fb-approve{background:#208061;color:#fff}
 .fb-decline{background:#d95c4f;color:#fff}
 .fb-cancel{background:#e8f0ef;color:var(--ink)}
+.minor-create-form{max-width:780px;padding:22px;background:#fff;border:1px solid var(--line);border-radius:8px}
+.minor-create-form h2{margin-top:0}
+.create-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 16px}
+.account-enabled{display:flex;align-items:center;gap:8px;margin:8px 0 18px;font-size:14px}
+.account-enabled input{width:16px;height:16px}
+@media(max-width:700px){.create-grid{grid-template-columns:1fr}}

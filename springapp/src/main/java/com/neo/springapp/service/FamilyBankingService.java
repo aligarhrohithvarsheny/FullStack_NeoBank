@@ -7,6 +7,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.Period;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -187,13 +188,20 @@ public class FamilyBankingService {
     }
 
     @Transactional
-    public MinorAccountApplication applyForMinor(Long guardianId, String minorName, LocalDate dateOfBirth, Double monthlyLimit, Double dailyLimit) {
+    public MinorAccountApplication applyForMinor(Long guardianId, String minorName, LocalDate dateOfBirth, Double monthlyLimit, Double dailyLimit, String form60) {
         requireUser(guardianId);
-        if (dateOfBirth == null || !dateOfBirth.isAfter(LocalDate.now().minusYears(18))) throw new IllegalArgumentException("Applicant must be a minor");
+        validateMinorDetails(minorName, dateOfBirth, form60);
+        User guardian = userRepository.findById(guardianId)
+                .orElseThrow(() -> new SecurityException("Authenticated guardian is required"));
+        if (guardian.getAccount() == null || !isSavingsAccount(guardian.getAccount())
+                || !"ACTIVE".equalsIgnoreCase(guardian.getAccount().getStatus())) {
+            throw new IllegalArgumentException("An active NeoBank savings account is required to link a minor account");
+        }
         if (monthlyLimit == null || monthlyLimit <= 0 || dailyLimit == null || dailyLimit <= 0 || dailyLimit > monthlyLimit)
             throw new IllegalArgumentException("Invalid spending limits");
         MinorAccountApplication app = new MinorAccountApplication();
         app.setGuardianUserId(guardianId); app.setMinorName(minorName); app.setDateOfBirth(dateOfBirth);
+        app.setForm60(form60.trim());
         app.setMonthlyLimit(monthlyLimit); app.setDailyLimit(dailyLimit);
         MinorAccountApplication saved = minorRepository.save(app);
         audit(guardianId, "MINOR_APPLICATION_CREATED", "MINOR_APPLICATION", saved.getId(), minorName);
@@ -212,6 +220,14 @@ public class FamilyBankingService {
     @Transactional
     public MinorAccountApplication reviewMinor(Long applicationId, String adminEmail, boolean approve, String reason,
                                                String editedMinorName, LocalDate editedDob, Double editedMonthlyLimit, Double editedDailyLimit) {
+        return reviewMinor(applicationId, adminEmail, approve, reason, editedMinorName, editedDob,
+                editedMonthlyLimit, editedDailyLimit, null);
+    }
+
+    @Transactional
+    public MinorAccountApplication reviewMinor(Long applicationId, String adminEmail, boolean approve, String reason,
+                                               String editedMinorName, LocalDate editedDob, Double editedMonthlyLimit,
+                                               Double editedDailyLimit, String editedForm60) {
         if (adminEmail == null || adminEmail.isBlank()) throw new SecurityException("Admin identity is required");
         MinorAccountApplication app = minorRepository.findById(applicationId).orElseThrow(() -> new IllegalArgumentException("Application not found"));
         if (!"PENDING".equals(app.getStatus())) throw new IllegalArgumentException("Application is no longer pending");
@@ -223,11 +239,13 @@ public class FamilyBankingService {
             app.setMinorName(editedMinorName.trim());
         }
         if (editedDob != null && !editedDob.equals(app.getDateOfBirth())) {
-            if (!editedDob.isAfter(LocalDate.now().minusYears(18))) {
-                throw new IllegalArgumentException("Edited date of birth must still be a minor (under 18)");
-            }
+            validateMinorAge(editedDob);
             editDetails.append("dateOfBirth: ").append(app.getDateOfBirth()).append(" → ").append(editedDob).append("; ");
             app.setDateOfBirth(editedDob);
+        }
+        if (editedForm60 != null && !editedForm60.isBlank() && !editedForm60.equals(app.getForm60())) {
+            app.setForm60(editedForm60.trim());
+            editDetails.append("Form 60 details updated; ");
         }
         if (editedMonthlyLimit != null && editedMonthlyLimit > 0 && !editedMonthlyLimit.equals(app.getMonthlyLimit())) {
             editDetails.append("monthlyLimit: ").append(app.getMonthlyLimit()).append(" → ").append(editedMonthlyLimit).append("; ");
@@ -244,30 +262,40 @@ public class FamilyBankingService {
             audit(app.getGuardianUserId(), "MINOR_APPLICATION_EDITED", "MINOR_APPLICATION", applicationId,
                     "edited by " + adminEmail + " before review: " + editDetails.toString().trim());
         }
+        if (approve) validateMinorDetails(app.getMinorName(), app.getDateOfBirth(), app.getForm60());
 
         app.setStatus(approve ? "ACTIVE" : "DECLINED"); app.setReviewedBy(adminEmail); app.setReviewedAt(LocalDateTime.now()); app.setRejectionReason(reason);
         if (approve) {
             User guardian = userRepository.findById(app.getGuardianUserId()).orElseThrow();
             Account guardianAccount = guardian.getAccount();
+            if (guardianAccount == null || !isSavingsAccount(guardianAccount)
+                    || !"ACTIVE".equalsIgnoreCase(guardianAccount.getStatus())) {
+                throw new IllegalArgumentException("An active NeoBank savings account is required to link a minor account");
+            }
 
             // Auto-generate a real unique account number and customer ID for the minor
             String minorAccountNumber = accountService.generateUniqueAccountNumberForNewAccount();
 
             Account childAccount = new Account();
             childAccount.setAccountNumber(minorAccountNumber);
-            childAccount.setName(app.getMinorName()); childAccount.setDob(app.getDateOfBirth().toString()); childAccount.setAge(0);
+            childAccount.setName(app.getMinorName()); childAccount.setDob(app.getDateOfBirth().toString());
+            childAccount.setAge(Period.between(app.getDateOfBirth(), LocalDate.now()).getYears());
             childAccount.setAccountType("MINOR_SAVINGS"); childAccount.setStatus("ACTIVE"); childAccount.setBalance(0.0);
-            childAccount.setAadharNumber("MINOR-AADHAR-" + app.getId()); childAccount.setPan("MINORPAN" + String.format("%04d", app.getId() % 10000) + "X"); childAccount.setPhone("MINOR" + app.getId());
-            childAccount.setParentAccountId(guardianAccount == null ? null : guardianAccount.getId()); childAccount.setOccupation("Minor");
+            childAccount.setAadharNumber("MINOR-AADHAR-" + app.getId()); childAccount.setPan(null); childAccount.setPhone("MINOR" + app.getId());
+            childAccount.setParentAccountId(guardianAccount == null ? null : guardianAccount.getId());
+            childAccount.setOccupation("Minor"); childAccount.setChildAccount(true); childAccount.setForm60(app.getForm60());
             // Auto-generate unique 9-digit customer ID
             childAccount.setCustomerId(accountService.generateCustomerIdForAccount(childAccount));
             Account savedAccount = accountService.saveAccount(childAccount);
             app.setAssignedAccountNumber(savedAccount.getAccountNumber());
             app.setAssignedCustomerId(savedAccount.getCustomerId());
+            app.setAccountStatus(savedAccount.getStatus());
 
             // Auto-generate a unique login email for the minor (avoid unique constraint violations)
             String minorEmail = generateUniqueMinorEmail(app.getId(), app.getMinorName());
-            User child = new User(); child.setUsername(app.getMinorName()); child.setEmail(minorEmail); child.setStatus("APPROVED"); child.setAccount(savedAccount); child.setParentUser(guardian); userRepository.save(child);
+            User child = new User();             child.setUsername(app.getMinorName()); child.setEmail(minorEmail); child.setStatus("APPROVED");
+            child.setAccountNumber(savedAccount.getAccountNumber()); child.setAccount(savedAccount); child.setParentUser(guardian);
+            userRepository.save(child);
             GuardianLink link = new GuardianLink(); link.setGuardianUserId(app.getGuardianUserId()); link.setChildUserId(child.getId()); link.setStatus("ACTIVE"); guardianRepository.save(link);
         }
         MinorAccountApplication saved = minorRepository.save(app);
@@ -275,6 +303,138 @@ public class FamilyBankingService {
         audit(app.getGuardianUserId(), approve ? "MINOR_APPLICATION_APPROVED" : "MINOR_APPLICATION_DECLINED", "MINOR_APPLICATION", applicationId,
                 (approve ? "approved" : "declined") + " by " + adminEmail + (reason != null && !reason.isBlank() ? " (reason: " + reason + ")" : ""));
         return saved;
+    }
+
+    @Transactional
+    public MinorAccountApplication createMinorAccount(String adminEmail, String minorName, LocalDate dateOfBirth,
+                                                       String fatherAccountNumber, String aadharNumber, String phone,
+                                                       String address, String form60, Boolean enabled) {
+        if (adminEmail == null || adminEmail.isBlank()) throw new SecurityException("Admin identity is required");
+        if (enabled == null) throw new IllegalArgumentException("Account enabled status must be specified");
+        validateMinorDetails(minorName, dateOfBirth, form60);
+        if (fatherAccountNumber == null || fatherAccountNumber.isBlank()) {
+            throw new IllegalArgumentException("Father's NeoBank savings account number is required");
+        }
+        if (aadharNumber == null || aadharNumber.isBlank()) throw new IllegalArgumentException("Aadhaar number is required");
+        if (phone == null || phone.isBlank()) throw new IllegalArgumentException("Phone number is required");
+
+        String normalizedFatherAccount = fatherAccountNumber.trim();
+        Account fatherAccount = accountService.getAccountByNumber(normalizedFatherAccount);
+        if (fatherAccount == null || !isSavingsAccount(fatherAccount)) {
+            throw new IllegalArgumentException("Enter an existing NeoBank savings account for the father");
+        }
+        if (!"ACTIVE".equalsIgnoreCase(fatherAccount.getStatus())) {
+            throw new IllegalArgumentException("The father's savings account must be active");
+        }
+        User father = userRepository.findByAccount_AccountNumber(normalizedFatherAccount)
+                .or(() -> userRepository.findByAccountNumber(normalizedFatherAccount))
+                .orElseThrow(() -> new IllegalArgumentException("No NeoBank user is linked to the father's savings account"));
+        if (father.getAccount() == null || !normalizedFatherAccount.equals(father.getAccount().getAccountNumber())) {
+            throw new IllegalArgumentException("Father's NeoBank savings account could not be verified");
+        }
+        if (accountService.getAccountByAadhar(aadharNumber.trim()) != null) {
+            throw new IllegalArgumentException("Aadhaar number is already registered");
+        }
+        if (accountService.getAccountByPhone(phone.trim()) != null) {
+            throw new IllegalArgumentException("Phone number is already registered");
+        }
+
+        MinorAccountApplication app = new MinorAccountApplication();
+        app.setGuardianUserId(father.getId());
+        app.setMinorName(minorName.trim());
+        app.setDateOfBirth(dateOfBirth);
+        app.setForm60(form60.trim());
+        app.setStatus("ACTIVE");
+        app.setReviewedBy(adminEmail.trim());
+        app.setReviewedAt(LocalDateTime.now());
+        app.setAccountStatus(enabled ? "ACTIVE" : "INACTIVE");
+        MinorAccountApplication savedApplication = minorRepository.save(app);
+
+        Account childAccount = new Account();
+        childAccount.setAccountNumber(accountService.generateUniqueAccountNumberForNewAccount());
+        childAccount.setName(minorName.trim());
+        childAccount.setDob(dateOfBirth.toString());
+        childAccount.setAge(Period.between(dateOfBirth, LocalDate.now()).getYears());
+        childAccount.setOccupation("Minor");
+        childAccount.setAccountType("MINOR_SAVINGS");
+        childAccount.setStatus(enabled ? "ACTIVE" : "INACTIVE");
+        childAccount.setBalance(0.0);
+        childAccount.setAadharNumber(aadharNumber.trim());
+        childAccount.setPan(null);
+        childAccount.setPhone(phone.trim());
+        childAccount.setAddress(address == null || address.isBlank() ? null : address.trim());
+        childAccount.setParentAccountId(fatherAccount.getId());
+        childAccount.setChildAccount(true);
+        childAccount.setForm60(form60.trim());
+        childAccount.setCustomerId(accountService.generateCustomerIdForAccount(childAccount));
+        Account savedAccount = accountService.saveAccount(childAccount);
+
+        String minorEmail = generateUniqueMinorEmail(savedApplication.getId(), minorName);
+        User child = new User();
+        child.setUsername(minorName.trim());
+        child.setEmail(minorEmail);
+        child.setStatus("APPROVED");
+        child.setAccountNumber(savedAccount.getAccountNumber());
+        child.setAccount(savedAccount);
+        child.setParentUser(father);
+        User savedChild = userRepository.save(child);
+
+        GuardianLink link = new GuardianLink();
+        link.setGuardianUserId(father.getId());
+        link.setChildUserId(savedChild.getId());
+        link.setStatus("ACTIVE");
+        guardianRepository.save(link);
+
+        savedApplication.setAssignedAccountNumber(savedAccount.getAccountNumber());
+        savedApplication.setAssignedCustomerId(savedAccount.getCustomerId());
+        MinorAccountApplication result = minorRepository.save(savedApplication);
+        notify(father.getId(), "MINOR_ACCOUNT_CREATED", "Minor savings account created",
+                "A minor savings account for " + minorName.trim() + " was created and linked to your NeoBank account.");
+        audit(father.getId(), "MINOR_ACCOUNT_CREATED", "MINOR_ACCOUNT", result.getId(),
+                "created by " + adminEmail.trim() + "; account " + savedAccount.getAccountNumber()
+                        + " (" + savedAccount.getStatus() + ")");
+        return result;
+    }
+
+    @Transactional
+    public MinorAccountApplication setMinorAccountStatus(Long applicationId, String adminEmail, Boolean enabled) {
+        if (adminEmail == null || adminEmail.isBlank()) throw new SecurityException("Admin identity is required");
+        if (enabled == null) throw new IllegalArgumentException("Account enabled status must be specified");
+        MinorAccountApplication app = minorRepository.findById(applicationId)
+                .orElseThrow(() -> new IllegalArgumentException("Minor account not found"));
+        if (app.getAssignedAccountNumber() == null || !"ACTIVE".equals(app.getStatus())) {
+            throw new IllegalArgumentException("Only created minor accounts can be enabled or disabled");
+        }
+        Account account = accountService.getAccountByNumber(app.getAssignedAccountNumber());
+        if (account == null || !account.isChildAccount()) {
+            throw new IllegalArgumentException("Linked minor savings account could not be found");
+        }
+        account.setStatus(enabled ? "ACTIVE" : "INACTIVE");
+        accountService.saveAccount(account);
+        app.setAccountStatus(account.getStatus());
+        MinorAccountApplication saved = minorRepository.save(app);
+        audit(app.getGuardianUserId(), enabled ? "MINOR_ACCOUNT_ENABLED" : "MINOR_ACCOUNT_DISABLED",
+                "MINOR_ACCOUNT", app.getId(), "updated by " + adminEmail.trim());
+        return saved;
+    }
+
+    private void validateMinorDetails(String minorName, LocalDate dateOfBirth, String form60) {
+        if (minorName == null || minorName.isBlank()) throw new IllegalArgumentException("Minor name is required");
+        validateMinorAge(dateOfBirth);
+        if (form60 == null || form60.isBlank()) throw new IllegalArgumentException("Form 60 details are mandatory");
+        if (form60.length() > 2000) throw new IllegalArgumentException("Form 60 details cannot exceed 2000 characters");
+    }
+
+    private void validateMinorAge(LocalDate dateOfBirth) {
+        if (dateOfBirth == null || !dateOfBirth.isBefore(LocalDate.now())
+                || !dateOfBirth.isAfter(LocalDate.now().minusYears(18))) {
+            throw new IllegalArgumentException("Date of birth must be valid and the applicant must be under 18");
+        }
+    }
+
+    private boolean isSavingsAccount(Account account) {
+        return account.getAccountType() != null
+                && account.getAccountType().toUpperCase(java.util.Locale.ROOT).startsWith("SAVINGS");
     }
 
     // Generate a unique email for a minor's auto-created login account

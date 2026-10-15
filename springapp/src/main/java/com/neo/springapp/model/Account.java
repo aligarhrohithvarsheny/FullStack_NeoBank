@@ -29,7 +29,7 @@ public class Account {
     @Column(unique = true, nullable = false)
     private String aadharNumber;
 
-    @Column(unique = true, nullable = false)
+    @Column(unique = true, nullable = true)
     private String pan;
 
     @Column(unique = true)
@@ -81,6 +81,7 @@ public class Account {
     @Column(name = "parent_account_id")
     private Long parentAccountId; // Reference to parent account
     private String studies; // Child's studies/education details
+    @Column(length = 2000)
     private String form60; // Form 60 details for child account
     private String panChildForm; // PAN child form details
 
