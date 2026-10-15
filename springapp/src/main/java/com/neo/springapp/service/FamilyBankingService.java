@@ -212,6 +212,27 @@ public class FamilyBankingService {
         requireUser(guardianId); return minorRepository.findByGuardianUserIdOrderByCreatedAtDesc(guardianId);
     }
 
+    @Transactional(readOnly = true)
+    public FatherSavingsAccountDetails lookupFatherSavingsAccount(String accountNumber) {
+        if (accountNumber == null || accountNumber.isBlank()) {
+            throw new IllegalArgumentException("Father's savings account number is required");
+        }
+        String normalizedAccountNumber = accountNumber.trim();
+        Account account = accountService.getAccountByNumber(normalizedAccountNumber);
+        if (account == null || !isSavingsAccount(account)) {
+            throw new IllegalArgumentException("No NeoBank savings account was found for that account number");
+        }
+        User father = userRepository.findByAccount_AccountNumber(normalizedAccountNumber)
+                .or(() -> userRepository.findByAccountNumber(normalizedAccountNumber))
+                .orElseThrow(() -> new IllegalArgumentException("No NeoBank user is linked to that savings account"));
+        if (father.getAccount() == null || !normalizedAccountNumber.equals(father.getAccount().getAccountNumber())) {
+            throw new IllegalArgumentException("The savings account holder could not be verified");
+        }
+        return new FatherSavingsAccountDetails(father.getId(), account.getAccountNumber(), account.getName(),
+                account.getAccountType(), account.getStatus(), account.getCustomerId(), account.getPhone(),
+                father.getEmail(), account.getAddress(), account.getBalance());
+    }
+
     @Transactional
     public MinorAccountApplication reviewMinor(Long applicationId, String adminEmail, boolean approve, String reason) {
         return reviewMinor(applicationId, adminEmail, approve, reason, null, null, null, null);
@@ -344,6 +365,8 @@ public class FamilyBankingService {
         app.setMinorName(minorName.trim());
         app.setDateOfBirth(dateOfBirth);
         app.setForm60(form60.trim());
+        app.setMonthlyLimit(5000.0);
+        app.setDailyLimit(2000.0);
         app.setStatus("ACTIVE");
         app.setReviewedBy(adminEmail.trim());
         app.setReviewedAt(LocalDateTime.now());
@@ -436,6 +459,10 @@ public class FamilyBankingService {
         return account.getAccountType() != null
                 && account.getAccountType().toUpperCase(java.util.Locale.ROOT).startsWith("SAVINGS");
     }
+
+    public record FatherSavingsAccountDetails(Long userId, String accountNumber, String name,
+                                               String accountType, String status, String customerId,
+                                               String phone, String email, String address, Double balance) {}
 
     // Generate a unique email for a minor's auto-created login account
     private String generateUniqueMinorEmail(Long applicationId, String minorName) {

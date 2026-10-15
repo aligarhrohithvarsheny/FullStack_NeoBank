@@ -96,6 +96,8 @@ class FamilyBankingServiceTest {
         assertEquals("MINOR-100", result.getAssignedAccountNumber());
         assertEquals("INACTIVE", result.getAccountStatus());
         assertEquals("ACTIVE", result.getStatus());
+        assertEquals(5000.0, result.getMonthlyLimit());
+        assertEquals(2000.0, result.getDailyLimit());
         org.mockito.ArgumentCaptor<Account> accountCaptor = org.mockito.ArgumentCaptor.forClass(Account.class);
         verify(accountService).saveAccount(accountCaptor.capture());
         Account minorAccount = accountCaptor.getValue();
@@ -106,6 +108,32 @@ class FamilyBankingServiceTest {
         assertEquals("INACTIVE", minorAccount.getStatus());
         assertTrue(minorAccount.getAge() < 18);
         verify(guardianRepository).save(any());
+    }
+
+    @Test
+    void adminCanFetchFatherSavingsAccountDetailsBeforeLinking() {
+        Account fatherAccount = new Account();
+        fatherAccount.setAccountNumber("NEO-100");
+        fatherAccount.setName("Ravi Kumar");
+        fatherAccount.setAccountType("Savings");
+        fatherAccount.setStatus("ACTIVE");
+        fatherAccount.setPhone("9876543210");
+        fatherAccount.setCustomerId("123456789");
+        User father = new User();
+        father.setId(7L);
+        father.setEmail("ravi@example.com");
+        father.setAccount(fatherAccount);
+        when(accountService.getAccountByNumber("NEO-100")).thenReturn(fatherAccount);
+        when(userRepository.findByAccount_AccountNumber("NEO-100")).thenReturn(Optional.of(father));
+
+        FamilyBankingService.FatherSavingsAccountDetails details =
+                service.lookupFatherSavingsAccount(" NEO-100 ");
+
+        assertEquals("NEO-100", details.accountNumber());
+        assertEquals("Ravi Kumar", details.name());
+        assertEquals("Savings", details.accountType());
+        assertEquals("ravi@example.com", details.email());
+        assertEquals("ACTIVE", details.status());
     }
 
     @Test

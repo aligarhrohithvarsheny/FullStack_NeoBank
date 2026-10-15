@@ -5,6 +5,19 @@ import { FamilyBankingService, MinorApplication } from '../../../service/family-
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../../environment/environment';
 
+interface FatherSavingsAccountDetails {
+  userId: number;
+  accountNumber: string;
+  name: string;
+  accountType: string;
+  status: string;
+  customerId: string | null;
+  phone: string;
+  email: string;
+  address: string | null;
+  balance: number | null;
+}
+
 @Component({ selector: 'app-family-banking-admin', standalone: true, imports: [CommonModule, FormsModule], templateUrl: './family-banking-admin.html', styleUrls: ['./family-banking-admin.css'] })
 export class FamilyBankingAdminComponent implements OnInit {
   applications: MinorApplication[] = []; allApplications: MinorApplication[] = []; history: any[] = []; message = ''; error = ''; loading = false; busy = false;
@@ -13,6 +26,9 @@ export class FamilyBankingAdminComponent implements OnInit {
   editForm: any = { minorName: '', dateOfBirth: '', monthlyLimit: 0, dailyLimit: 0, form60: '', reason: '' };
   readonly today = new Date().toISOString().slice(0, 10);
   createForm = { minorName: '', dateOfBirth: '', fatherAccountNumber: '', aadharNumber: '', phone: '', address: '', form60: '', enabled: true };
+  fatherLookup: FatherSavingsAccountDetails | null = null;
+  fatherLookupLoading = false;
+  fatherLookupError = '';
 
   constructor(private family: FamilyBankingService, private http: HttpClient) {}
   ngOnInit(): void { this.load(); this.loadHistory(); }
@@ -34,7 +50,40 @@ export class FamilyBankingAdminComponent implements OnInit {
 
   setTab(tab: 'pending' | 'history' | 'create'): void { this.activeTab = tab; if (tab === 'history') this.loadHistory(); }
 
+  clearFatherLookup(): void {
+    this.fatherLookup = null;
+    this.fatherLookupError = '';
+  }
+
+  lookupFatherAccount(): void {
+    const accountNumber = this.createForm.fatherAccountNumber.trim();
+    if (!accountNumber) {
+      this.fatherLookupError = "Enter the father's NeoBank savings account number.";
+      return;
+    }
+    this.fatherLookup = null;
+    this.fatherLookupError = '';
+    this.fatherLookupLoading = true;
+    this.http.get<FatherSavingsAccountDetails>(
+      `${environment.apiBaseUrl}/api/family/admin/minor-accounts/father-lookup`,
+      { headers: this.headers(), params: { accountNumber } }
+    ).subscribe({
+      next: details => {
+        this.fatherLookupLoading = false;
+        this.fatherLookup = details;
+      },
+      error: e => {
+        this.fatherLookupLoading = false;
+        this.fatherLookupError = e?.error?.message || e?.error?.error || 'Could not find a linked NeoBank savings account.';
+      }
+    });
+  }
+
   createMinorAccount(): void {
+    if (!this.fatherLookup || this.fatherLookup.accountNumber !== this.createForm.fatherAccountNumber.trim()) {
+      this.error = 'Fetch and verify the father’s savings account details before creating the minor account.';
+      return;
+    }
     this.busy = true; this.error = ''; this.message = '';
     this.http.post<MinorApplication>(`${environment.apiBaseUrl}/api/family/admin/minor-accounts`, this.createForm, { headers: this.headers() })
       .subscribe({
@@ -42,6 +91,7 @@ export class FamilyBankingAdminComponent implements OnInit {
           this.busy = false;
           this.message = `Minor savings account ${result.assignedAccountNumber} created as ${result.accountStatus}`;
           this.createForm = { minorName: '', dateOfBirth: '', fatherAccountNumber: '', aadharNumber: '', phone: '', address: '', form60: '', enabled: true };
+          this.clearFatherLookup();
           this.loadHistory();
         },
         error: e => { this.busy = false; this.error = e?.error?.message || e?.error?.error || 'Unable to create minor account'; }

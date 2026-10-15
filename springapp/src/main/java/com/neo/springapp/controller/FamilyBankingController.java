@@ -90,6 +90,16 @@ public class FamilyBankingController {
                 request.form60(), request.enabled()));
     }
 
+    @GetMapping("/admin/minor-accounts/father-lookup")
+    public ResponseEntity<FamilyBankingService.FatherSavingsAccountDetails> lookupFatherSavingsAccount(
+            @RequestHeader(value = "X-Admin-Email", required = false) String adminEmail,
+            @RequestParam String accountNumber) {
+        if (adminEmail == null || adminEmail.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Admin identity is required. Please sign in again.");
+        }
+        return ResponseEntity.ok(service.lookupFatherSavingsAccount(accountNumber));
+    }
+
     @PatchMapping("/admin/minor-applications/{id}/account-status")
     public ResponseEntity<MinorAccountApplication> setMinorAccountStatus(
             @PathVariable Long id, @RequestHeader("X-Admin-Email") String adminEmail,

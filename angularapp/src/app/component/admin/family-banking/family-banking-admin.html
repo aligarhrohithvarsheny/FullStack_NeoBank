@@ -65,7 +65,7 @@
           <input name="dateOfBirth" type="date" [(ngModel)]="createForm.dateOfBirth" [max]="today" required>
         </label>
         <label class="fb-field">Father's NeoBank savings account number
-          <input name="fatherAccountNumber" [(ngModel)]="createForm.fatherAccountNumber" required>
+          <input name="fatherAccountNumber" [(ngModel)]="createForm.fatherAccountNumber" (ngModelChange)="clearFatherLookup()" required>
         </label>
         <label class="fb-field">Minor's Aadhaar number
           <input name="aadharNumber" [(ngModel)]="createForm.aadharNumber" required>
@@ -77,6 +77,27 @@
           <input name="address" [(ngModel)]="createForm.address">
         </label>
       </div>
+      <div class="father-lookup">
+        <button type="button" class="quiet" (click)="lookupFatherAccount()" [disabled]="fatherLookupLoading || !createForm.fatherAccountNumber.trim()">
+          {{ fatherLookupLoading ? 'Fetching account details…' : "Fetch father's account details" }}
+        </button>
+        <p class="notice error" *ngIf="fatherLookupError" role="alert">{{ fatherLookupError }}</p>
+        <section class="father-details" *ngIf="fatherLookup as father" aria-label="Verified father account details">
+          <h3>Verified father account</h3>
+          <dl>
+            <div><dt>Account holder</dt><dd>{{ father.name || 'Name unavailable' }}</dd></div>
+            <div><dt>Account number</dt><dd>{{ father.accountNumber }}</dd></div>
+            <div><dt>Account type</dt><dd>{{ father.accountType }}</dd></div>
+            <div><dt>Status</dt><dd>{{ father.status }}</dd></div>
+            <div><dt>Customer ID</dt><dd>{{ father.customerId || 'Not available' }}</dd></div>
+            <div><dt>Phone</dt><dd>{{ father.phone }}</dd></div>
+            <div><dt>Email</dt><dd>{{ father.email }}</dd></div>
+            <div><dt>Address</dt><dd>{{ father.address || 'Not available' }}</dd></div>
+            <div><dt>Balance</dt><dd>{{ father.balance === null ? 'Not available' : (father.balance | currency:'INR':'symbol':'1.2-2') }}</dd></div>
+          </dl>
+          <p *ngIf="father.status !== 'ACTIVE'" class="notice error">This father account is not active and cannot be used for account linkage.</p>
+        </section>
+      </div>
       <label class="fb-field">Form 60 details / reference
         <textarea name="form60" [(ngModel)]="createForm.form60" rows="4" maxlength="2000" required></textarea>
       </label>
@@ -84,7 +105,7 @@
         <input type="checkbox" name="enabled" [(ngModel)]="createForm.enabled">
         Create account as active (uncheck to create it disabled)
       </label>
-      <button type="submit" [disabled]="busy || !createForm.minorName.trim() || !createForm.dateOfBirth || !createForm.fatherAccountNumber.trim() || !createForm.aadharNumber.trim() || !createForm.phone.trim() || !createForm.form60.trim()">Create minor account</button>
+      <button type="submit" [disabled]="busy || !fatherLookup || fatherLookup.accountNumber !== createForm.fatherAccountNumber.trim() || fatherLookup.status !== 'ACTIVE' || !createForm.minorName.trim() || !createForm.dateOfBirth || !createForm.aadharNumber.trim() || !createForm.phone.trim() || !createForm.form60.trim()">Create minor account</button>
     </form>
   </ng-container>
 
