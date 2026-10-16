@@ -16,6 +16,7 @@ import com.neo.springapp.service.TransactionService;
 import com.neo.springapp.service.PdfService;
 import com.neo.springapp.service.EmailService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -56,6 +57,9 @@ public class GoldLoanController {
     
     @Autowired
     private EmailService emailService;
+
+    @Value("${app.upload-dir:uploads}")
+    private String uploadDirectory;
 
     @Autowired
     private com.neo.springapp.service.BranchAccountService branchAccountService;
@@ -124,7 +128,7 @@ public class GoldLoanController {
         GoldLoan loan = goldLoanService.getGoldLoanById(id);
         if (loan == null) return ResponseEntity.notFound().build();
         try {
-            Path directory = Paths.get("uploads/gold-loans");
+            Path directory = resolveUploadDirectory().resolve("gold-loans");
             Files.createDirectories(directory);
             if (imageOne != null && !imageOne.isEmpty()) loan.setGoldImageOnePath(saveJewelleryImage(directory, id, "one", imageOne));
             if (imageTwo != null && !imageTwo.isEmpty()) loan.setGoldImageTwoPath(saveJewelleryImage(directory, id, "two", imageTwo));
@@ -138,10 +142,26 @@ public class GoldLoanController {
     public ResponseEntity<?> viewJewelleryImage(@PathVariable Long id, @PathVariable String slot) {
         GoldLoan loan = goldLoanService.getGoldLoanById(id);
         if (loan == null) return ResponseEntity.notFound().build();
-        String storedPath = "one".equalsIgnoreCase(slot) ? loan.getGoldImageOnePath() : loan.getGoldImageTwoPath();
+        String storedPath;
+        if ("one".equalsIgnoreCase(slot)) {
+            storedPath = loan.getGoldImageOnePath();
+        } else if ("two".equalsIgnoreCase(slot)) {
+            storedPath = loan.getGoldImageTwoPath();
+        } else {
+            return ResponseEntity.badRequest().build();
+        }
         if (storedPath == null || storedPath.isBlank()) return ResponseEntity.notFound().build();
         try {
-            Path path = Paths.get(storedPath).normalize();
+            Path path = Paths.get(storedPath.replace('\\', '/')).normalize();
+            if (!path.isAbsolute()) {
+                if (path.getNameCount() > 0 && "gold-loans".equals(path.getName(0).toString())) {
+                    path = resolveUploadDirectory().resolve(path);
+                } else {
+                    // Older records store paths relative to the process working directory.
+                    path = Paths.get(System.getProperty("user.dir")).resolve(path);
+                }
+            }
+            path = path.normalize();
             Resource resource = new UrlResource(path.toUri());
             if (!resource.exists()) return ResponseEntity.notFound().build();
             String contentType = Files.probeContentType(path);
@@ -155,7 +175,12 @@ public class GoldLoanController {
         String extension = original.contains(".") ? original.substring(original.lastIndexOf('.')) : ".jpg";
         Path target = directory.resolve("gold_loan_" + id + "_" + slot + "_" + System.currentTimeMillis() + extension).normalize();
         Files.copy(file.getInputStream(), target, StandardCopyOption.REPLACE_EXISTING);
-        return target.toString();
+        return resolveUploadDirectory().relativize(target).toString();
+    }
+
+    private Path resolveUploadDirectory() {
+        Path configured = Paths.get(uploadDirectory == null || uploadDirectory.isBlank() ? "uploads" : uploadDirectory).normalize();
+        return (configured.isAbsolute() ? configured : Paths.get(System.getProperty("user.dir")).resolve(configured)).normalize();
     }
 
     // Get gold loans by status
