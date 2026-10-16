@@ -92,6 +92,10 @@ export class User implements OnInit, OnDestroy {
   unifiedAccountNumber: string = '';
   unifiedPassword: string = '';
   isUnifiedLoggingIn: boolean = false;
+  isMobileDobLogin: boolean = false;
+  mobileDobAccountType: 'savings' | 'salary' = 'savings';
+  mobileDobMobileNumber: string = '';
+  mobileDobDateOfBirth: string = '';
   loginOtpChallengeId: string | null = null;
   loginOtp: string = '';
   isVerifyingLoginOtp: boolean = false;
@@ -971,6 +975,7 @@ export class User implements OnInit, OnDestroy {
 
   switchToLogin() {
     this.currentPage = 'login';
+    this.isMobileDobLogin = false;
     this.clearMessages();
   }
 
@@ -1035,6 +1040,10 @@ export class User implements OnInit, OnDestroy {
 
   // ─── Unified Login (Auto-detect account type) ─────────────
   unifiedLogin() {
+    if (this.isMobileDobLogin) {
+      this.mobileDobLogin();
+      return;
+    }
     if (!this.unifiedAccountNumber || !this.unifiedPassword) {
       this.errorMessage = 'Please enter Account Number and Password';
       return;
@@ -1254,6 +1263,80 @@ export class User implements OnInit, OnDestroy {
         this.errorMessage = 'Login failed. Please try again.';
       }
     });
+  }
+
+  mobileDobLogin() {
+    if (!this.mobileDobMobileNumber.trim() || !this.mobileDobDateOfBirth) {
+      this.errorMessage = 'Please enter your mobile number and date of birth';
+      return;
+    }
+
+    this.isUnifiedLoggingIn = true;
+    this.errorMessage = '';
+    this.successMessage = '';
+    const loginRequest = this.mobileDobAccountType === 'salary'
+      ? this.salaryAccountService.loginWithMobileAndDob(this.mobileDobMobileNumber.trim(), this.mobileDobDateOfBirth)
+      : this.http.post<any>(`${environment.apiBaseUrl}/api/users/authenticate-mobile-dob`, {
+          mobileNumber: this.mobileDobMobileNumber.trim(),
+          dob: this.mobileDobDateOfBirth
+        });
+
+    loginRequest.subscribe({
+      next: (response: any) => {
+        this.isUnifiedLoggingIn = false;
+        if (!response.success) {
+          this.errorMessage = response.message || 'Unable to sign in with those details';
+          return;
+        }
+
+        if (this.mobileDobAccountType === 'salary' && response.account) {
+          const account = response.account;
+          const sessionData = {
+            id: account.id,
+            employeeName: account.employeeName,
+            accountNumber: account.accountNumber,
+            customerId: account.customerId,
+            companyName: account.companyName,
+            designation: account.designation,
+            email: account.email,
+            loginTime: new Date().toISOString()
+          };
+          sessionStorage.setItem('salaryEmployee', JSON.stringify(sessionData));
+          this.alertService.userSuccess('Login Successful', 'Welcome ' + account.employeeName);
+          this.router.navigate(['/website/salary-dashboard']);
+          return;
+        }
+
+        if (response.user) {
+          const user = response.user;
+          sessionStorage.setItem('currentUser', JSON.stringify({
+            id: user.id,
+            name: user.account?.name || user.username,
+            email: user.email,
+            accountNumber: user.accountNumber,
+            status: user.status,
+            passwordSet: user.passwordSet === true,
+            authToken: response.token,
+            loginTime: new Date().toISOString()
+          }));
+          this.alertService.userSuccess('Login Successful', `Welcome ${user.account?.name || user.username}!`);
+          this.navigateAfterUserLogin();
+          return;
+        }
+
+        this.errorMessage = 'Unable to sign in with those details';
+      },
+      error: (error: any) => {
+        this.isUnifiedLoggingIn = false;
+        this.errorMessage = error.error?.message || 'Unable to sign in with those details';
+      }
+    });
+  }
+
+  toggleMobileDobLogin() {
+    this.isMobileDobLogin = !this.isMobileDobLogin;
+    this.errorMessage = '';
+    this.successMessage = '';
   }
 
   // ─── Current Account Auth ─────────────────────────────────

@@ -331,6 +331,30 @@ public class SalaryAccountController {
         return ResponseEntity.ok(result);
     }
 
+    @PostMapping("/login-mobile-dob")
+    public ResponseEntity<Map<String, Object>> loginByMobileAndDob(@RequestBody Map<String, String> body,
+            @RequestHeader(value = "X-Forwarded-For", required = false) String forwardedFor,
+            @RequestHeader(value = "User-Agent", required = false) String userAgent) {
+        Map<String, Object> result = salaryAccountService.authenticateByMobileAndDob(
+                body.get("mobileNumber"), body.get("dob"));
+        if (Boolean.TRUE.equals(result.get("success"))) {
+            try {
+                String clientIp = forwardedFor != null ? forwardedFor.split(",")[0].trim() : "Unknown";
+                String deviceInfo = userAgent != null ? userAgent : "Unknown";
+                SalaryAccount account = (SalaryAccount) result.get("account");
+                sessionHistoryService.recordSalaryAccountLogin(
+                        account.getId(),
+                        account.getEmail() != null ? account.getEmail() : "",
+                        account.getAccountNumber(),
+                        account.getEmployeeName() != null ? account.getEmployeeName() : "Salary Account User",
+                        "Unknown", clientIp, deviceInfo, "MOBILE_DOB");
+            } catch (Exception e) {
+                System.err.println("Error recording salary account session: " + e.getMessage());
+            }
+        }
+        return ResponseEntity.ok(result);
+    }
+
     @GetMapping("/verify-customer/{customerId}")
     public ResponseEntity<Map<String, Object>> verifyCustomer(@PathVariable String customerId) {
         Map<String, Object> response = new HashMap<>();

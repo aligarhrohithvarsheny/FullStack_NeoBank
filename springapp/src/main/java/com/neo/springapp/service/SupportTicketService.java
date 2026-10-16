@@ -1,15 +1,17 @@
 package com.neo.springapp.service;
 
-import com.neo.springapp.model.SupportTicket;
-import com.neo.springapp.repository.SupportTicketRepository;
+import com.neo.springapp.model.BillPayment;
 import com.neo.springapp.model.CurrentAccountUpiPayment;
 import com.neo.springapp.model.EmiPayment;
 import com.neo.springapp.model.SavingsUpiTransaction;
+import com.neo.springapp.model.SupportTicket;
 import com.neo.springapp.model.Transaction;
 import com.neo.springapp.model.TransferRecord;
+import com.neo.springapp.repository.BillPaymentRepository;
 import com.neo.springapp.repository.CurrentAccountUpiPaymentRepository;
 import com.neo.springapp.repository.EmiPaymentRepository;
 import com.neo.springapp.repository.SavingsUpiTransactionRepository;
+import com.neo.springapp.repository.SupportTicketRepository;
 import com.neo.springapp.repository.TransactionRepository;
 import com.neo.springapp.repository.TransferRepository;
 import com.neo.springapp.model.User;
@@ -31,6 +33,9 @@ public class SupportTicketService {
 
     @Autowired
     private TransactionRepository transactionRepository;
+
+    @Autowired
+    private BillPaymentRepository billPaymentRepository;
 
     @Autowired
     private SavingsUpiTransactionRepository savingsUpiTransactionRepository;
@@ -108,6 +113,20 @@ public class SupportTicketService {
                     item.getStatus(),
                     item.getDate(),
                     item.getDescription() == null ? item.getMerchant() : item.getDescription()));
+        }
+
+        Optional<BillPayment> billPayment = billPaymentRepository.findByTransactionId(id)
+                .filter(item -> accountNumber.equals(item.getAccountNumber()));
+        if (billPayment.isPresent()) {
+            BillPayment item = billPayment.get();
+            return Optional.of(new VerifiedTransaction(
+                    item.getTransactionId(),
+                    item.getAccountNumber(),
+                    item.getAmount(),
+                    item.getBillType() == null ? "BILL PAYMENT" : item.getBillType(),
+                    item.getStatus(),
+                    item.getPaymentDate(),
+                    item.getDescription()));
         }
 
         Optional<SavingsUpiTransaction> savingsUpi = savingsUpiTransactionRepository.findByTransactionRef(id)

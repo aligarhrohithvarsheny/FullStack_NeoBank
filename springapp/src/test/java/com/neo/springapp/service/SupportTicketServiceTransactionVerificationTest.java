@@ -1,9 +1,11 @@
 package com.neo.springapp.service;
 
+import com.neo.springapp.model.BillPayment;
 import com.neo.springapp.model.EmiPayment;
 import com.neo.springapp.model.SavingsUpiTransaction;
 import com.neo.springapp.model.Transaction;
 import com.neo.springapp.model.TransferRecord;
+import com.neo.springapp.repository.BillPaymentRepository;
 import com.neo.springapp.repository.CurrentAccountUpiPaymentRepository;
 import com.neo.springapp.repository.EmiPaymentRepository;
 import com.neo.springapp.repository.SavingsUpiTransactionRepository;
@@ -30,6 +32,7 @@ class SupportTicketServiceTransactionVerificationTest {
 
     @Mock private SupportTicketRepository supportTicketRepository;
     @Mock private TransactionRepository transactionRepository;
+    @Mock private BillPaymentRepository billPaymentRepository;
     @Mock private SavingsUpiTransactionRepository savingsUpiTransactionRepository;
     @Mock private CurrentAccountUpiPaymentRepository currentAccountUpiPaymentRepository;
     @Mock private TransferRepository transferRepository;
@@ -43,6 +46,7 @@ class SupportTicketServiceTransactionVerificationTest {
         service = new SupportTicketService();
         ReflectionTestUtils.setField(service, "supportTicketRepository", supportTicketRepository);
         ReflectionTestUtils.setField(service, "transactionRepository", transactionRepository);
+        ReflectionTestUtils.setField(service, "billPaymentRepository", billPaymentRepository);
         ReflectionTestUtils.setField(service, "savingsUpiTransactionRepository", savingsUpiTransactionRepository);
         ReflectionTestUtils.setField(service, "currentAccountUpiPaymentRepository", currentAccountUpiPaymentRepository);
         ReflectionTestUtils.setField(service, "transferRepository", transferRepository);
@@ -135,6 +139,29 @@ class SupportTicketServiceTransactionVerificationTest {
 
         assertThat(own).isPresent();
         assertThat(own.get().type()).isEqualTo("Gold Loan Payment");
+        assertThat(unrelated).isEmpty();
+    }
+
+    @Test
+    void verifiesBillPaymentByItsPaymentIdOnlyForItsAccount() {
+        BillPayment billPayment = new BillPayment();
+        billPayment.setTransactionId("BILL-123");
+        billPayment.setAccountNumber("ACC-1");
+        billPayment.setBillType("Mobile Bill");
+        billPayment.setAmount(45.0);
+        billPayment.setStatus("Completed");
+        billPayment.setPaymentDate(LocalDateTime.now());
+        billPayment.setDescription("Mobile bill payment");
+        when(billPaymentRepository.findByTransactionId("BILL-123")).thenReturn(Optional.of(billPayment));
+
+        Optional<SupportTicketService.VerifiedTransaction> own =
+                service.getOwnTransaction("ACC-1", "BILL-123");
+        Optional<SupportTicketService.VerifiedTransaction> unrelated =
+                service.getOwnTransaction("ACC-2", "BILL-123");
+
+        assertThat(own).isPresent();
+        assertThat(own.get().type()).isEqualTo("Mobile Bill");
+        assertThat(own.get().amount()).isEqualTo(45.0);
         assertThat(unrelated).isEmpty();
     }
 }

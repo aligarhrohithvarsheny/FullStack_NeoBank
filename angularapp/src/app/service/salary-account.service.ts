@@ -107,6 +107,10 @@ export class SalaryAccountService {
     return this.http.post<any>(`${this.apiUrl}/login`, { accountNumber, password });
   }
 
+  loginWithMobileAndDob(mobileNumber: string, dob: string): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/login-mobile-dob`, { mobileNumber, dob });
+  }
+
   // Transfer Money
   transferMoney(accountId: number, recipientAccount: string, recipientIfsc: string, amount: number, remark: string, transactionPin: string): Observable<any> {
     return this.http.post<any>(`${this.apiUrl}/transfer/${accountId}`, { recipientAccount, recipientIfsc, amount, remark, transactionPin });

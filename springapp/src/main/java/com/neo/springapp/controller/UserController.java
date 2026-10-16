@@ -455,6 +455,68 @@ public class UserController {
         }
     }
 
+    @PostMapping("/authenticate-mobile-dob")
+    public ResponseEntity<Map<String, Object>> authenticateWithMobileAndDob(
+            @RequestBody Map<String, String> credentials,
+            @RequestHeader(value = "X-Forwarded-For", required = false) String forwardedFor,
+            @RequestHeader(value = "User-Agent", required = false) String userAgent) {
+        String mobileNumber = credentials.get("mobileNumber");
+        String dob = credentials.get("dob");
+        if (mobileNumber == null || mobileNumber.isBlank() || dob == null || dob.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "success", false, "message", "Mobile number and date of birth are required"));
+        }
+
+        Account account = accountService.getAccountByPhone(mobileNumber.trim());
+        if (account == null
+                || account.getDob() == null
+                || !account.getDob().trim().equals(dob.trim())
+                || account.getAccountType() == null
+                || !account.getAccountType().toLowerCase().contains("saving")) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "success", false, "message", "Invalid mobile number or date of birth"));
+        }
+
+        Optional<User> userOpt = userService.getUserByAccountNumber(account.getAccountNumber());
+        if (userOpt.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "success", false, "message", "Invalid mobile number or date of birth"));
+        }
+        User user = userOpt.get();
+        if (!"APPROVED".equalsIgnoreCase(user.getStatus())) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "success", false, "accountNotApproved", true,
+                    "message", "Your account is not approved for login."));
+        }
+        if (user.isAccountLocked()) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "success", false, "accountLocked", true,
+                    "message", "Account is locked due to multiple failed login attempts. Please use the unlock feature."));
+        }
+
+        try {
+            var savingsControl = netBankingServiceControlRepository.findByServiceType("SAVINGS_ACCOUNT");
+            if (savingsControl.isPresent() && !savingsControl.get().getEnabled()) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "success", false, "netBankingDisabled", true,
+                        "message", "Net Banking for Savings Account is currently disabled by the administrator. Please try again later."));
+            }
+            if (account.getNetBankingEnabled() != null && !account.getNetBankingEnabled()) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "success", false, "netBankingDisabled", true,
+                        "message", "Net Banking for your account has been disabled by the administrator. Please contact the bank for assistance."));
+            }
+        } catch (Exception e) {
+            System.err.println("Error checking savings net banking status: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(Map.of(
+                    "success", false, "message", "Unable to verify Savings Net Banking availability. Please try again."));
+        }
+
+        String clientIp = forwardedFor != null ? forwardedFor.split(",")[0].trim() : "Unknown";
+        String deviceInfo = userAgent != null ? userAgent : "Unknown";
+        return ResponseEntity.ok(beginLoginOtp(user, clientIp, deviceInfo, "IP: " + clientIp, "MOBILE_DOB", null));
+    }
+
     // SECURITY: Set password for approved accounts (required before first login)
     @PostMapping("/set-password")
     public ResponseEntity<Map<String, Object>> setPasswordForApprovedAccount(

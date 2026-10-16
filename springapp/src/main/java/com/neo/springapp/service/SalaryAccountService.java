@@ -652,6 +652,48 @@ public class SalaryAccountService {
         return result;
     }
 
+    public Map<String, Object> authenticateByMobileAndDob(String mobileNumber, String dob) {
+        Map<String, Object> result = new HashMap<>();
+        if (mobileNumber == null || mobileNumber.isBlank() || dob == null || dob.isBlank()) {
+            result.put("success", false);
+            result.put("message", "Mobile number and date of birth are required");
+            return result;
+        }
+
+        List<SalaryAccount> matches = salaryAccountRepository.findByMobileNumber(mobileNumber.trim()).stream()
+                .filter(account -> account.getDob() != null && account.getDob().trim().equals(dob.trim()))
+                .toList();
+        if (matches.size() != 1) {
+            result.put("success", false);
+            result.put("message", "Invalid mobile number or date of birth");
+            return result;
+        }
+
+        SalaryAccount account = matches.get(0);
+        if (!"Active".equalsIgnoreCase(account.getStatus())) {
+            result.put("success", false);
+            result.put("message", "Account is not active. Current status: " + account.getStatus());
+            return result;
+        }
+        if (Boolean.TRUE.equals(account.getAccountLocked())) {
+            result.put("success", false);
+            result.put("accountLocked", true);
+            result.put("message", "Account is locked due to multiple failed login attempts. Please contact manager to unlock.");
+            return result;
+        }
+        if (Boolean.FALSE.equals(account.getNetBankingEnabled())) {
+            result.put("success", false);
+            result.put("netBankingDisabled", true);
+            result.put("message", "Net Banking for this account is currently disabled. Please contact the bank for assistance.");
+            return result;
+        }
+
+        result.put("success", true);
+        result.put("message", "Login successful");
+        result.put("account", account);
+        return result;
+    }
+
     // ─── Transfer Money ─────────────────────────────────────
 
     public Map<String, Object> transferMoney(Long accountId, String recipientAccount, String recipientIfsc,

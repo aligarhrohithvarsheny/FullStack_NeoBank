@@ -28,55 +28,10 @@
       <div *ngIf="currentPage === 'login'" class="jpm-form-section">
         <!-- Account Type Hint -->
         <p class="jpm-account-hint">
-          Savings, Current or Salary — sign in with your Account Number / Email
+          Sign in with your account number/email and password, or with your mobile number and date of birth.
         </p>
 
-        <ng-container *ngIf="!loginOtpChallengeId; else savingsLoginOtp">
-        <div class="jpm-field">
-          <label class="jpm-label">Username</label>
-          <input
-            type="text"
-            class="jpm-input"
-            [(ngModel)]="unifiedAccountNumber"
-            name="unifiedAccountNumber"
-            placeholder=""
-            (keyup.enter)="unifiedLogin()"
-          />
-        </div>
-
-        <div class="jpm-remember">
-          <label class="jpm-checkbox-label">
-            <input type="checkbox" [(ngModel)]="rememberUsername" name="rememberUsername" />
-            <span>Remember username</span>
-          </label>
-        </div>
-
-        <div class="jpm-field">
-          <label class="jpm-label">Password</label>
-          <div class="jpm-password-wrapper">
-            <input
-              [type]="showPassword ? 'text' : 'password'"
-              class="jpm-input jpm-password-input"
-              [(ngModel)]="unifiedPassword"
-              name="unifiedPassword"
-              (keyup.enter)="unifiedLogin()"
-            />
-            <button type="button" class="jpm-show-btn" (click)="togglePasswordVisibility()">
-              {{ showPassword ? 'Hide' : 'Show' }}
-            </button>
-          </div>
-        </div>
-
-        <button
-          type="button"
-          class="jpm-signin-btn"
-          (click)="unifiedLogin()"
-          [disabled]="isUnifiedLoggingIn"
-        >
-          {{ isUnifiedLoggingIn ? 'Signing in...' : 'Sign in' }}
-        </button>
-        </ng-container>
-        <ng-template #savingsLoginOtp>
+        <ng-container *ngIf="loginOtpChallengeId; else loginMethods">
           <div class="jpm-field">
             <label class="jpm-label" for="savings-login-otp">Email OTP</label>
             <input id="savings-login-otp" type="text" class="jpm-input" [(ngModel)]="loginOtp" name="loginOtp" inputmode="numeric" autocomplete="one-time-code" maxlength="6" (keyup.enter)="verifySavingsLoginOtp()" />
@@ -89,6 +44,74 @@
             <span class="jpm-separator">|</span>
             <a href="javascript:void(0)" (click)="cancelSavingsLoginOtp()" class="jpm-link">Back to sign in</a>
           </div>
+        </ng-container>
+        <ng-template #loginMethods>
+          <ng-container *ngIf="!isMobileDobLogin; else mobileDobLoginForm">
+            <div class="jpm-field">
+              <label class="jpm-label">Username</label>
+              <input
+                type="text"
+                class="jpm-input"
+                [(ngModel)]="unifiedAccountNumber"
+                name="unifiedAccountNumber"
+                placeholder=""
+                (keyup.enter)="unifiedLogin()"
+              />
+            </div>
+
+            <div class="jpm-remember">
+              <label class="jpm-checkbox-label">
+                <input type="checkbox" [(ngModel)]="rememberUsername" name="rememberUsername" />
+                <span>Remember username</span>
+              </label>
+            </div>
+
+            <div class="jpm-field">
+              <label class="jpm-label">Password</label>
+              <div class="jpm-password-wrapper">
+                <input
+                  [type]="showPassword ? 'text' : 'password'"
+                  class="jpm-input jpm-password-input"
+                  [(ngModel)]="unifiedPassword"
+                  name="unifiedPassword"
+                  (keyup.enter)="unifiedLogin()"
+                />
+                <button type="button" class="jpm-show-btn" (click)="togglePasswordVisibility()">
+                  {{ showPassword ? 'Hide' : 'Show' }}
+                </button>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              class="jpm-signin-btn"
+              (click)="unifiedLogin()"
+              [disabled]="isUnifiedLoggingIn"
+            >
+              {{ isUnifiedLoggingIn ? 'Signing in...' : 'Sign in' }}
+            </button>
+          </ng-container>
+
+          <ng-template #mobileDobLoginForm>
+            <div class="jpm-field">
+              <label class="jpm-label" for="mobile-dob-account-type">Account type</label>
+              <select id="mobile-dob-account-type" class="jpm-input" [(ngModel)]="mobileDobAccountType" name="mobileDobAccountType">
+                <option value="savings">Savings Account</option>
+                <option value="salary">Salary Account</option>
+              </select>
+            </div>
+            <div class="jpm-field">
+              <label class="jpm-label" for="mobile-dob-mobile">Mobile number</label>
+              <input id="mobile-dob-mobile" type="tel" class="jpm-input" [(ngModel)]="mobileDobMobileNumber" name="mobileDobMobileNumber" autocomplete="tel" inputmode="tel" (keyup.enter)="mobileDobLogin()" />
+            </div>
+            <div class="jpm-field">
+              <label class="jpm-label" for="mobile-dob-date">Date of birth</label>
+              <input id="mobile-dob-date" type="date" class="jpm-input" [(ngModel)]="mobileDobDateOfBirth" name="mobileDobDateOfBirth" autocomplete="bday" (keyup.enter)="mobileDobLogin()" />
+            </div>
+            <button type="button" class="jpm-signin-btn" (click)="mobileDobLogin()" [disabled]="isUnifiedLoggingIn">
+              {{ isUnifiedLoggingIn ? 'Signing in...' : 'Sign in' }}
+            </button>
+          </ng-template>
         </ng-template>
         <div class="jpm-qr-login-actions">
           <button type="button" class="jpm-link-small" (click)="generateQrCode()">Show QR Login Code</button>
@@ -108,6 +131,11 @@
         </div>
 
         <!-- More Login Options -->
+        <div class="jpm-more-options" *ngIf="!loginOtpChallengeId">
+          <a href="javascript:void(0)" (click)="toggleMobileDobLogin()" class="jpm-link">
+            {{ isMobileDobLogin ? 'Sign in with account number and password' : 'Sign in with mobile number and date of birth' }}
+          </a>
+        </div>
         <div class="jpm-more-options">
           <a href="javascript:void(0)" (click)="showForgotPasswordModal()" class="jpm-link">Forgot Password?</a>
           <span class="jpm-separator">|</span>

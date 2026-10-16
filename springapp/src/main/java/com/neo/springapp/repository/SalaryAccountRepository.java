@@ -13,6 +13,8 @@ public interface SalaryAccountRepository extends JpaRepository<SalaryAccount, Lo
 
     SalaryAccount findByAccountNumber(String accountNumber);
 
+    List<SalaryAccount> findByMobileNumber(String mobileNumber);
+
     SalaryAccount findByBarcodeNumber(String barcodeNumber);
 
     SalaryAccount findByCustomerId(String customerId);
