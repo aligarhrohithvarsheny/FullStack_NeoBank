@@ -32,6 +32,9 @@ public class AdminCashTransactionService {
     @Autowired
     private SalaryAccountRepository salaryAccountRepository;
 
+    @Autowired
+    private GoldLoanService goldLoanService;
+
     // Account types whose balance is actually mutated by the quick-action deposit/withdraw form
     private static final List<String> BALANCE_BACKED_TYPES = List.of("regular", "salary", "current");
 
@@ -42,16 +45,26 @@ public class AdminCashTransactionService {
         return repository.findAllByOrderByPerformedAtDesc();
     }
 
+    @Transactional
     public AdminCashTransaction record(String accountType, Long accountId, String accountNumber, String accountHolderName,
             String operationType, Double amount, String description, Double balanceBefore, Double balanceAfter,
             String performedBy) {
+        String normalizedType = accountType == null ? "" : accountType.trim().toLowerCase();
+        String normalizedOperation = operationType != null ? operationType.toUpperCase() : "DEPOSIT";
+        if ("goldloan".equals(normalizedType)) {
+            Map<String, Double> updatedBalances = goldLoanService.processQuickAction(
+                    accountNumber, normalizedOperation, amount, performedBy);
+            balanceBefore = updatedBalances.get("balanceBefore");
+            balanceAfter = updatedBalances.get("balanceAfter");
+        }
+
         AdminCashTransaction txn = new AdminCashTransaction();
         txn.setRefId("ADMTXN" + System.currentTimeMillis());
-        txn.setAccountType(accountType);
+        txn.setAccountType(normalizedType);
         txn.setAccountId(accountId);
         txn.setAccountNumber(accountNumber);
         txn.setAccountHolderName(accountHolderName);
-        txn.setOperationType(operationType != null ? operationType.toUpperCase() : "DEPOSIT");
+        txn.setOperationType(normalizedOperation);
         txn.setAmount(amount);
         txn.setDescription(description);
         txn.setBalanceBefore(balanceBefore);
@@ -74,12 +87,14 @@ public class AdminCashTransactionService {
             throw new RuntimeException("Transaction can only be reverted within 24 hours");
         }
 
-        // Reverse the balance in real-time on the actual account, only for balance-backed account types.
-        // (loan/goldloan/cheque quick-actions never mutate a real backend balance, so nothing to reverse there.)
-        if (BALANCE_BACKED_TYPES.contains(txn.getAccountType())) {
+        String normalizedType = txn.getAccountType() == null ? "" : txn.getAccountType().toLowerCase();
+        if (BALANCE_BACKED_TYPES.contains(normalizedType)) {
             boolean wasDeposit = "DEPOSIT".equalsIgnoreCase(txn.getOperationType());
             double delta = wasDeposit ? -txn.getAmount() : txn.getAmount();
-            adjustBalance(txn.getAccountType(), txn.getAccountNumber(), txn.getAccountId(), delta);
+            adjustBalance(normalizedType, txn.getAccountNumber(), txn.getAccountId(), delta);
+        } else if ("goldloan".equals(normalizedType)) {
+            goldLoanService.restoreQuickActionBalance(txn.getAccountNumber(), txn.getAmount(),
+                    txn.getOperationType(), revertedBy);
         }
 
         txn.setStatus("REVERTED");

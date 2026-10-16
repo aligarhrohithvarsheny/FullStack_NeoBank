@@ -342,7 +342,11 @@ export class Dashboard implements OnInit, OnDestroy {
   supportTicketPollingInterval: any = null;
 
   // Net Banking Service Control
-  netBankingServices: any = { SAVINGS_ACCOUNT: { enabled: true, updatedBy: '', updatedAt: '' }, CURRENT_ACCOUNT: { enabled: true, updatedBy: '', updatedAt: '' } };
+  netBankingServices: any = {
+    SAVINGS_ACCOUNT: { enabled: true, updatedBy: '', updatedAt: '' },
+    CURRENT_ACCOUNT: { enabled: true, updatedBy: '', updatedAt: '' },
+    MOBILE_DOB_LOGIN: { enabled: true, updatedBy: '', updatedAt: '' }
+  };
   netBankingAuditHistory: any[] = [];
   isLoadingNetBankingStatus: boolean = false;
   isTogglingNetBanking: boolean = false;
@@ -2887,7 +2891,7 @@ export class Dashboard implements OnInit, OnDestroy {
           this.verifiedAccountDetails = {
             accountNumber: loan.loanAccountNumber || loan.accountNumber,
             accountHolderName: loan.userName,
-            balance: loan.loanAmount || 0,
+            balance: loan.remainingPrincipal ?? loan.loanAmount ?? 0,
             accountType: 'Gold Loan Account',
             type: 'goldloan',
             loanDetails: loan
@@ -2913,7 +2917,7 @@ export class Dashboard implements OnInit, OnDestroy {
                 this.verifiedAccountDetails = {
                   accountNumber: firstLoan.loanAccountNumber || accountNumber,
                   accountHolderName: firstLoan.userName,
-                  balance: firstLoan.loanAmount || 0,
+                  balance: firstLoan.remainingPrincipal ?? firstLoan.loanAmount ?? 0,
                   accountType: 'Gold Loan Account',
                   type: 'goldloan',
                   loanDetails: firstLoan
@@ -3195,18 +3199,34 @@ export class Dashboard implements OnInit, OnDestroy {
   }
 
   processGoldLoanAccountTransaction(accountNumber: string, userName: string, currentBalance: number) {
-    // Similar to loan accounts
-    const newBalance = this.operationType === 'deposit'
-      ? currentBalance + this.amount
-      : currentBalance - this.amount;
-
-    if (this.operationType === 'withdrawal' && newBalance < 0) {
-      this.errorMessage = 'Insufficient balance for withdrawal';
-      this.successMessage = '';
-      return;
-    }
-
-    this.completeTransaction(accountNumber, userName, newBalance, 'goldloan');
+    this.http.post<any>(`${environment.apiBaseUrl}/api/admin-cash-transactions/record`, {
+      accountType: 'goldloan',
+      accountId: this.verifiedAccountDetails?.loanDetails?.id || null,
+      accountNumber,
+      accountHolderName: userName,
+      operationType: this.operationType === 'deposit' ? 'DEPOSIT' : 'WITHDRAWAL',
+      amount: this.amount,
+      description: this.description,
+      balanceBefore: currentBalance,
+      performedBy: this.adminName
+    }).subscribe({
+      next: (response: any) => {
+        const newBalance = Number(response?.transaction?.balanceAfter);
+        if (!response?.success || !Number.isFinite(newBalance)) {
+          this.successMessage = '';
+          this.errorMessage = response?.message || 'Failed to update the gold loan.';
+          return;
+        }
+        if (this.verifiedAccountDetails) {
+          this.verifiedAccountDetails.balance = newBalance;
+        }
+        this.completeTransaction(accountNumber, userName, newBalance, 'goldloan', true);
+      },
+      error: (err: any) => {
+        this.successMessage = '';
+        this.errorMessage = err.error?.message || 'Failed to update the gold loan.';
+      }
+    });
   }
 
   processChequeAccountTransaction(accountNumber: string, userName: string) {
@@ -3264,7 +3284,7 @@ export class Dashboard implements OnInit, OnDestroy {
     });
   }
 
-  completeTransaction(accountNumber: string, userName: string, newBalance: number, accountType: string) {
+  completeTransaction(accountNumber: string, userName: string, newBalance: number, accountType: string, cashTransactionRecorded = false) {
     const transactionId = `TXN${Date.now()}`;
 
     // Prepare transaction data for backend (without id and date - backend handles these)
@@ -3299,7 +3319,9 @@ export class Dashboard implements OnInit, OnDestroy {
 
     const finishUp = () => {
       // Save to the real admin cash transaction history (backs history for ALL account types, with search + revert)
-      this.recordAdminCashTransaction(transactionId, accountNumber, userName, accountType, balanceBefore, newBalance);
+      if (!cashTransactionRecorded) {
+        this.recordAdminCashTransaction(transactionId, accountNumber, userName, accountType, balanceBefore, newBalance);
+      }
 
       // Generate receipt
       this.generateReceipt(transactionId, accountNumber, userName, newBalance, accountType);
@@ -7147,6 +7169,9 @@ export class Dashboard implements OnInit, OnDestroy {
         if (response.CURRENT_ACCOUNT) {
           this.netBankingServices.CURRENT_ACCOUNT = response.CURRENT_ACCOUNT;
         }
+        if (response.MOBILE_DOB_LOGIN) {
+          this.netBankingServices.MOBILE_DOB_LOGIN = response.MOBILE_DOB_LOGIN;
+        }
       },
       error: () => {
         this.isLoadingNetBankingStatus = false;
@@ -7195,6 +7220,7 @@ export class Dashboard implements OnInit, OnDestroy {
     switch (serviceType) {
       case 'SAVINGS_ACCOUNT': return 'Savings Account';
       case 'CURRENT_ACCOUNT': return 'Current Account';
+      case 'MOBILE_DOB_LOGIN': return 'Mobile Number + Date of Birth Login';
       default: return serviceType;
     }
   }

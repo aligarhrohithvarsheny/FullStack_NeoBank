@@ -2,16 +2,14 @@ import { Component, OnInit, Inject, PLATFORM_ID, ViewEncapsulation } from '@angu
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { AlertService } from '../../../service/alert.service';
 import { environment } from '../../../../environment/environment';
 
 interface CreditCardDetails {
   id: number;
   cardNumber: string;
-  cvv: string;
   expiryDate: string;
-  pin: string;
   pinSet: boolean;
   status: string;
   accountNumber: string;
@@ -21,6 +19,7 @@ interface CreditCardDetails {
   currentBalance: number;
   availableLimit: number;
   usageLimit: number;
+  userSetSpendingLimit?: number | null;
   overdueAmount: number;
   fine: number;
   penalty: number;
@@ -28,6 +27,11 @@ interface CreditCardDetails {
   approvalDate: string;
   closureDate?: string;
   lastPaidDate?: string;
+}
+
+interface CardEmergencyLockResponse {
+  controls: CardControls;
+  status: string;
 }
 
 interface UserProfile {
@@ -56,6 +60,16 @@ interface CreditCardTransaction {
   transactionDate: string;
   balanceAfter: number;
   status: string;
+}
+
+type TransactionTab = 'ALL' | 'UNBILLED' | 'BILLED' | 'EMI' | 'REFUNDS';
+
+interface CardControls {
+  onlineTransactionsEnabled: boolean;
+  posTransactionsEnabled: boolean;
+  contactlessEnabled: boolean;
+  atmWithdrawalsEnabled: boolean;
+  internationalTransactionsEnabled: boolean;
 }
 
 interface CreditCardBill {
@@ -93,7 +107,8 @@ interface EmiSettings {
 })
 export class CreditCard implements OnInit {
   showDetails: boolean = false;
-  showCVV: boolean = false;
+  showCardNumber = false;
+  private revealedCardNumber: string | null = null;
   userProfile: UserProfile | null = null;
   creditCards: CreditCardDetails[] = [];
   selectedCard: CreditCardDetails | null = null;
@@ -128,6 +143,35 @@ export class CreditCard implements OnInit {
   annualFee: number | null = null;
   showLimitModal: boolean = false;
   limitChangeAmount: number = 0;
+  activeTransactionTab: TransactionTab = 'ALL';
+  transactionSearch = '';
+  transactionCategoryFilter = '';
+  transactionStatusFilter = '';
+  transactionTypeFilter = '';
+  transactionStartDate = '';
+  transactionEndDate = '';
+  transactionMinAmount: number | null = null;
+  transactionMaxAmount: number | null = null;
+  billSearch = '';
+  statementStartDate = '';
+  statementEndDate = '';
+  selectedTransaction: CreditCardTransaction | null = null;
+  isUpdatingControls = false;
+  cardControls: CardControls = {
+    onlineTransactionsEnabled: true,
+    posTransactionsEnabled: true,
+    contactlessEnabled: true,
+    atmWithdrawalsEnabled: true,
+    internationalTransactionsEnabled: false
+  };
+  readonly cardControlKeys: Array<keyof CardControls> = [
+    'onlineTransactionsEnabled',
+    'posTransactionsEnabled',
+    'contactlessEnabled',
+    'atmWithdrawalsEnabled',
+    'internationalTransactionsEnabled'
+  ];
+  readonly transactionTabs: TransactionTab[] = ['ALL', 'UNBILLED', 'BILLED', 'EMI', 'REFUNDS'];
   // CIBIL Report Lookup
   cibilReportData: any = null;
   isLoadingCibilReport: boolean = false;
@@ -185,34 +229,132 @@ export class CreditCard implements OnInit {
     const user = JSON.parse(currentUser);
     this.isLoading = true;
     
-    this.http.get(`${environment.apiBaseUrl}/api/credit-cards/account/${user.accountNumber}`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/api/credit-cards/account/${user.accountNumber}`, this.authOptions()).subscribe({
       next: (cards: any) => {
         this.creditCards = Array.isArray(cards) ? cards : [];
-        if (this.creditCards.length > 0 && !this.selectedCard) {
-          this.selectedCard = this.creditCards[0];
-          this.loadCardDetails();
+        if (this.creditCards.length > 0) {
+          const selectedId = this.selectedCard?.id;
+          this.selectedCard = this.creditCards.find(card => card.id === selectedId) || this.creditCards[0];
+          if (!selectedId || !this.creditCards.some(card => card.id === selectedId)) {
+            this.loadCardDetails();
+          }
+        } else {
+          this.selectedCard = null;
         }
         this.isLoading = false;
       },
       error: (err: any) => {
         console.error('Error loading credit cards:', err);
         this.creditCards = [];
+        this.selectedCard = null;
         this.isLoading = false;
+        this.alertService.operationError('Credit cards', err.error?.message || 'Unable to load your credit cards');
       }
     });
   }
 
   loadCardDetails() {
     if (!this.selectedCard) return;
+    this.showCardNumber = false;
+    this.revealedCardNumber = null;
+    this.selectedTransaction = null;
+    this.cardControls = {
+      onlineTransactionsEnabled: true,
+      posTransactionsEnabled: true,
+      contactlessEnabled: true,
+      atmWithdrawalsEnabled: true,
+      internationalTransactionsEnabled: false
+    };
+    this.loadCardControls();
     this.loadTransactions();
     this.loadBills();
     this.loadEmiDetails();
   }
 
+  loadCardControls() {
+    if (!this.selectedCard) return;
+    this.http.get<CardControls>(
+      `${environment.apiBaseUrl}/api/credit-cards/${this.selectedCard.id}/controls`,
+      this.authOptions()
+    ).subscribe({
+      next: controls => this.cardControls = { ...this.cardControls, ...controls },
+      error: err => {
+        console.error('Error loading card controls:', err);
+        this.alertService.operationError('Card controls', err.error?.message || 'Unable to load your card controls');
+      }
+    });
+  }
+
+  toggleControl(control: keyof CardControls) {
+    if (!this.selectedCard || this.isUpdatingControls) return;
+    const previousValue = this.cardControls[control];
+    const label = this.controlLabel(control);
+    const nextValue = !previousValue;
+    if (!confirm(`${nextValue ? 'Enable' : 'Disable'} ${label.toLowerCase()}?`)) return;
+
+    this.isUpdatingControls = true;
+    this.http.put<CardControls>(
+      `${environment.apiBaseUrl}/api/credit-cards/${this.selectedCard.id}/controls`,
+      { [control]: nextValue },
+      this.authOptions()
+    ).subscribe({
+      next: controls => {
+        this.cardControls = { ...this.cardControls, ...controls };
+        this.isUpdatingControls = false;
+        this.alertService.success('Card control updated', `${label} ${nextValue ? 'enabled' : 'disabled'}.`);
+        this.loadCreditCards();
+      },
+      error: err => {
+        this.cardControls[control] = previousValue;
+        this.isUpdatingControls = false;
+        this.alertService.operationError('Card control', err.error?.message || 'Unable to update this control');
+      }
+    });
+  }
+
+  controlLabel(control: keyof CardControls): string {
+    const labels: Record<keyof CardControls, string> = {
+      onlineTransactionsEnabled: 'Online transactions',
+      posTransactionsEnabled: 'POS transactions',
+      contactlessEnabled: 'Contactless',
+      atmWithdrawalsEnabled: 'ATM withdrawals',
+      internationalTransactionsEnabled: 'International transactions'
+    };
+    return labels[control];
+  }
+
+  private authOptions() {
+    const token = isPlatformBrowser(this.platformId) ? sessionStorage.getItem('jwt') : null;
+    return {
+      headers: new HttpHeaders(token ? { Authorization: `Bearer ${token}` } : {})
+    };
+  }
+
+  emergencyLock() {
+    if (!this.selectedCard || !confirm('Emergency lock will block the card and disable every transaction channel. Continue?')) return;
+    this.isUpdatingControls = true;
+    this.http.post<CardEmergencyLockResponse>(
+      `${environment.apiBaseUrl}/api/credit-cards/${this.selectedCard.id}/emergency-lock`,
+      {},
+      this.authOptions()
+    ).subscribe({
+      next: response => {
+        this.cardControls = { ...response.controls };
+        this.isUpdatingControls = false;
+        this.alertService.success('Card locked', 'The card and all transaction channels have been locked.');
+        this.loadCreditCards();
+      },
+      error: err => {
+        this.isUpdatingControls = false;
+        this.alertService.operationError('Emergency card lock', err.error?.message || 'Unable to lock this card');
+      }
+    });
+  }
+
   loadTransactions() {
     if (!this.selectedCard) return;
     
-    this.http.get(`${environment.apiBaseUrl}/api/credit-cards/${this.selectedCard.id}/transactions`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/api/credit-cards/${this.selectedCard.id}/transactions`, this.authOptions()).subscribe({
       next: (transactions: any) => {
         this.transactions = Array.isArray(transactions) ? transactions : [];
       },
@@ -226,7 +368,7 @@ export class CreditCard implements OnInit {
   loadBills() {
     if (!this.selectedCard) return;
     
-    this.http.get(`${environment.apiBaseUrl}/api/credit-cards/${this.selectedCard.id}/bills`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/api/credit-cards/${this.selectedCard.id}/bills`, this.authOptions()).subscribe({
       next: (bills: any) => {
         this.bills = Array.isArray(bills) ? bills : [];
       },
@@ -249,7 +391,8 @@ export class CreditCard implements OnInit {
       }
     });
     this.http.get<CreditCardTransaction[]>(
-      `${environment.apiBaseUrl}/api/credit-cards/${cardId}/emi-eligible-transactions`
+      `${environment.apiBaseUrl}/api/credit-cards/${cardId}/emi-eligible-transactions`,
+      this.authOptions()
     ).subscribe({
       next: transactions => this.emiEligibleTransactions = Array.isArray(transactions) ? transactions : [],
       error: err => {
@@ -257,7 +400,7 @@ export class CreditCard implements OnInit {
         this.emiEligibleTransactions = [];
       }
     });
-    this.http.get<any[]>(`${environment.apiBaseUrl}/api/credit-cards/${cardId}/emi-plans`).subscribe({
+    this.http.get<any[]>(`${environment.apiBaseUrl}/api/credit-cards/${cardId}/emi-plans`, this.authOptions()).subscribe({
       next: plans => this.emiPlans = Array.isArray(plans) ? plans : [],
       error: err => {
         console.error('Error loading credit-card EMI plans:', err);
@@ -290,7 +433,8 @@ export class CreditCard implements OnInit {
     this.isConvertingToEmi = true;
     this.http.post<any>(
       `${environment.apiBaseUrl}/api/credit-cards/${this.selectedCard.id}/emi-conversions`,
-      { transactionIds: this.selectedEmiTransactionIds, tenureMonths: this.emiTenureMonths }
+      { transactionIds: this.selectedEmiTransactionIds, tenureMonths: this.emiTenureMonths },
+      this.authOptions()
     ).subscribe({
       next: plan => {
         this.isConvertingToEmi = false;
@@ -310,16 +454,22 @@ export class CreditCard implements OnInit {
 
   get fullNumber(): string {
     if (!this.selectedCard) return '';
-    return this.formatCardNumber(this.selectedCard.cardNumber);
+    const number = this.showCardNumber && this.revealedCardNumber
+      ? this.revealedCardNumber
+      : this.selectedCard.cardNumber || '';
+    return this.formatCardNumber(this.showCardNumber && this.revealedCardNumber
+      ? number
+      : this.maskCardNumber(number));
   }
 
-  get maskedCVV(): string {
-    return this.showCVV ? (this.selectedCard?.cvv || '') : '***';
+  maskCardNumber(number: string): string {
+    const digits = (number || '').replace(/\D/g, '');
+    return digits.length < 4 ? '•••• •••• •••• ••••' : `•••• •••• •••• ${digits.slice(-4)}`;
   }
 
   get statusClass(): string {
     if (!this.selectedCard) return '';
-    return this.selectedCard.status.toLowerCase();
+    return this.selectedCard.status.toLowerCase().replace(/[^a-z0-9]+/g, '-');
   }
 
   formatCardNumber(number: string): string {
@@ -327,12 +477,26 @@ export class CreditCard implements OnInit {
     return number.replace(/(\d{4})(?=\d)/g, '$1 ');
   }
 
-  flipCard() {
-    this.isCardFlipped = !this.isCardFlipped;
-  }
-
-  toggleCVV() {
-    this.showCVV = !this.showCVV;
+  toggleCardNumber() {
+    if (!this.selectedCard) return;
+    if (this.showCardNumber) {
+      this.showCardNumber = false;
+      this.revealedCardNumber = null;
+      return;
+    }
+    this.http.get<{ cardNumber: string }>(
+      `${environment.apiBaseUrl}/api/credit-cards/${this.selectedCard.id}/card-number`,
+      this.authOptions()
+    ).subscribe({
+      next: response => {
+        this.revealedCardNumber = response.cardNumber;
+        this.showCardNumber = true;
+      },
+      error: err => this.alertService.operationError(
+        'View card number',
+        err.error?.message || 'Unable to verify your session to view this card number'
+      )
+    });
   }
 
   toggleDetails() {
@@ -350,7 +514,11 @@ export class CreditCard implements OnInit {
       return;
     }
     
-    this.http.put(`${environment.apiBaseUrl}/api/credit-cards/${this.selectedCard.id}/set-pin`, { pin: this.pinForm.newPin }).subscribe({
+    this.http.put(
+      `${environment.apiBaseUrl}/api/credit-cards/${this.selectedCard.id}/set-pin`,
+      { pin: this.pinForm.newPin },
+      this.authOptions()
+    ).subscribe({
       next: () => {
         this.alertService.success('PIN Set', 'Credit card PIN has been set successfully');
         this.showPinForm = false;
@@ -378,13 +546,44 @@ export class CreditCard implements OnInit {
     return Math.max(0, this.billTotalDue(bill) - (bill.paidAmount || 0));
   }
 
+  get latestBill(): CreditCardBill | null {
+    return this.bills.length
+      ? [...this.bills].sort((a, b) => new Date(b.billGenerationDate).getTime() - new Date(a.billGenerationDate).getTime())[0]
+      : null;
+  }
+
+  get usedLimit(): number {
+    if (!this.selectedCard) return 0;
+    return Math.max(0, Number(this.selectedCard.approvedLimit || 0) - Number(this.selectedCard.availableLimit || 0));
+  }
+
+  get utilizationPercent(): number {
+    const limit = Number(this.selectedCard?.approvedLimit || 0);
+    return limit > 0 ? Math.min(100, (this.usedLimit / limit) * 100) : 0;
+  }
+
+  get remainingBill(): number {
+    return this.latestBill ? this.billOutstanding(this.latestBill) : 0;
+  }
+
+  setBillPaymentAmount(mode: 'full' | 'minimum') {
+    if (!this.selectedBill) return;
+    this.billPaymentAmount = mode === 'full'
+      ? this.billOutstanding(this.selectedBill)
+      : Math.min(Number(this.selectedBill.minimumDue || 0), this.billOutstanding(this.selectedBill));
+  }
+
   payBill() {
     if (!this.selectedBill || !this.billPaymentAmount) {
       this.alertService.validationError('Please enter payment amount');
       return;
     }
     
-    this.http.post(`${environment.apiBaseUrl}/api/credit-cards/bills/${this.selectedBill.id}/pay?amount=${this.billPaymentAmount}`, {}).subscribe({
+    this.http.post(
+      `${environment.apiBaseUrl}/api/credit-cards/bills/${this.selectedBill.id}/pay?amount=${this.billPaymentAmount}`,
+      {},
+      this.authOptions()
+    ).subscribe({
       next: (bill: any) => {
         this.alertService.success('Bill Paid', 'Bill payment processed successfully');
         this.showBillPaymentModal = false;
@@ -404,35 +603,28 @@ export class CreditCard implements OnInit {
   getStatement() {
     if (!this.selectedCard) return;
     
-    const endDate = new Date();
-    const startDate = new Date();
-    startDate.setMonth(startDate.getMonth() - 1);
+    const endDate = this.statementEndDate
+      ? new Date(`${this.statementEndDate}T23:59:59`)
+      : new Date();
+    const startDate = this.statementStartDate
+      ? new Date(`${this.statementStartDate}T00:00:00`)
+      : new Date(endDate);
+    if (!this.statementStartDate) startDate.setMonth(startDate.getMonth() - 1);
+    if (startDate > endDate) {
+      this.alertService.validationError('Statement start date must be before the end date');
+      return;
+    }
+    const startDateStr = `${this.localDatePart(startDate)}T00:00:00`;
+    const endDateStr = `${this.localDatePart(endDate)}T23:59:59`;
     
-    // Format dates as ISO strings without timezone issues
-    const startDateStr = startDate.toISOString().split('T')[0] + 'T00:00:00';
-    const endDateStr = endDate.toISOString().split('T')[0] + 'T23:59:59';
-    
-    this.http.get(`${environment.apiBaseUrl}/api/credit-cards/${this.selectedCard.id}/statement?startDate=${startDateStr}&endDate=${endDateStr}`).subscribe({
+    this.http.get(
+      `${environment.apiBaseUrl}/api/credit-cards/${this.selectedCard.id}/statement?startDate=${startDateStr}&endDate=${endDateStr}`,
+      this.authOptions()
+    ).subscribe({
       next: (transactions: any) => {
         if (Array.isArray(transactions) && transactions.length > 0) {
           // Create a downloadable statement
-          let statementText = `Credit Card Statement\n`;
-          statementText += `Card: ${this.selectedCard?.cardNumber}\n`;
-          statementText += `Period: ${startDate.toLocaleDateString()} to ${endDate.toLocaleDateString()}\n\n`;
-          statementText += `Total Transactions: ${transactions.length}\n\n`;
-          
-          transactions.forEach((t: any) => {
-            statementText += `${new Date(t.transactionDate).toLocaleDateString()} - ${t.transactionType} - ₹${t.amount} - ${t.merchant || t.description}\n`;
-          });
-          
-          // Create and download file
-          const blob = new Blob([statementText], { type: 'text/plain' });
-          const url = window.URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = `credit-card-statement-${Date.now()}.txt`;
-          a.click();
-          window.URL.revokeObjectURL(url);
+          this.downloadTransactionsCsv(transactions, `credit-card-statement-${Date.now()}.csv`);
           
           this.alertService.success('Statement Generated', `Statement downloaded with ${transactions.length} transactions`);
         } else {
@@ -444,6 +636,13 @@ export class CreditCard implements OnInit {
         this.alertService.operationError('Get Statement', err?.message || 'Failed to get statement');
       }
     });
+  }
+
+  private localDatePart(date: Date): string {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   }
 
   openApplyForm() {
@@ -546,94 +745,209 @@ export class CreditCard implements OnInit {
 
   blockCard() {
     if (!this.selectedCard) return;
-    
-    if (!confirm('Are you sure you want to block this credit card? This action will prevent all transactions.')) {
-      return;
+    this.emergencyLock();
+  }
+
+  transactionCategory(transaction: CreditCardTransaction): string {
+      const text = `${transaction.merchant || ''} ${transaction.description || ''}`.toLowerCase();
+      if (/food|restaurant|cafe|swiggy|zomato/.test(text)) return 'Food';
+      if (/fuel|petrol|diesel|shell|hpcl|iocl/.test(text)) return 'Fuel';
+      if (/flight|hotel|travel|airline|uber|ola/.test(text)) return 'Travel';
+      if (/movie|cinema|netflix|spotify|entertainment/.test(text)) return 'Entertainment';
+      if (/hospital|pharmacy|medical|health/.test(text)) return 'Healthcare';
+      if (/electric|water|utility|bill|recharge/.test(text)) return 'Bills';
+      if (/refund/.test(`${transaction.transactionType} ${text}`)) return 'Refunds';
+      if (/amazon|flipkart|shopping|store|retail/.test(text)) return 'Shopping';
+      return 'Other';
     }
 
-    const updateData = {
-      status: 'Blocked'
-    };
+  get filteredTransactions(): CreditCardTransaction[] {
+      const search = this.transactionSearch.trim().toLowerCase();
+      return this.transactions.filter(transaction => {
+        const type = (transaction.transactionType || '').toLowerCase();
+        const isRefund = type.includes('refund');
+        const matchesTab = this.activeTransactionTab === 'ALL'
+          || (this.activeTransactionTab === 'UNBILLED' && !transaction.billId && !transaction.emiPlanId)
+          || (this.activeTransactionTab === 'BILLED' && !!transaction.billId)
+          || (this.activeTransactionTab === 'EMI' && !!transaction.emiPlanId)
+          || (this.activeTransactionTab === 'REFUNDS' && isRefund);
+        const matchesSearch = !search || [
+          transaction.merchant, transaction.description, transaction.transactionType, transaction.status, String(transaction.id)
+        ].some(value => (value || '').toLowerCase().includes(search));
+        const matchesCategory = !this.transactionCategoryFilter
+          || this.transactionCategory(transaction) === this.transactionCategoryFilter;
+        const matchesStatus = !this.transactionStatusFilter
+          || (transaction.status || '').toLowerCase() === this.transactionStatusFilter.toLowerCase();
+        const transactionDate = (transaction.transactionDate || '').slice(0, 10);
+        const matchesStartDate = !this.transactionStartDate || transactionDate >= this.transactionStartDate;
+        const matchesEndDate = !this.transactionEndDate || transactionDate <= this.transactionEndDate;
+        const amount = Number(transaction.amount || 0);
+        const matchesMinAmount = this.transactionMinAmount == null || amount >= this.transactionMinAmount;
+        const matchesMaxAmount = this.transactionMaxAmount == null || amount <= this.transactionMaxAmount;
+        const matchesType = !this.transactionTypeFilter
+          || type === this.transactionTypeFilter.toLowerCase();
+        return matchesTab && matchesSearch && matchesCategory && matchesStatus
+          && matchesStartDate && matchesEndDate && matchesMinAmount && matchesMaxAmount && matchesType;
+      });
+    }
 
-    this.http.put(`${environment.apiBaseUrl}/api/credit-cards/${this.selectedCard.id}`, updateData).subscribe({
-      next: (updatedCard: any) => {
-        this.alertService.success('Card Blocked', 'Your credit card has been blocked successfully');
-        this.loadCreditCards();
-      },
-      error: (err: any) => {
-        console.error('Error blocking card:', err);
-        this.alertService.operationError('Block Card', err?.message || 'Failed to block card');
+  get spendingCategories(): Array<{ name: string; amount: number; percent: number }> {
+      const totals = new Map<string, number>();
+      for (const transaction of this.transactions) {
+        const amount = Number(transaction.amount || 0);
+        if (amount <= 0 || (transaction.transactionType || '').toLowerCase().includes('refund')) continue;
+        const category = this.transactionCategory(transaction);
+        totals.set(category, (totals.get(category) || 0) + amount);
       }
-    });
+      const maximum = Math.max(0, ...totals.values());
+      return [...totals.entries()]
+        .map(([name, amount]) => ({ name, amount, percent: maximum ? amount / maximum * 100 : 0 }))
+        .sort((a, b) => b.amount - a.amount);
+    }
+
+  get filteredBills(): CreditCardBill[] {
+    const search = this.billSearch.trim().toLowerCase();
+    return this.bills.filter(bill =>
+      !search || `${bill.billingPeriod} ${bill.status}`.toLowerCase().includes(search)
+    );
   }
+
+  get refundTransactions(): CreditCardTransaction[] {
+    return this.transactions.filter(transaction =>
+      (transaction.transactionType || '').toLowerCase().includes('refund')
+    );
+  }
+
+  get recurringPayments(): Array<{ merchant: string; amount: number; frequency: string; nextPayment: Date }> {
+    const purchases = this.transactions.filter(transaction =>
+      (transaction.transactionType || '').toLowerCase() === 'purchase'
+      && transaction.merchant
+      && Number(transaction.amount) > 0
+    );
+    const byMerchant = new Map<string, CreditCardTransaction[]>();
+    for (const transaction of purchases) {
+      const key = transaction.merchant.trim().toLowerCase();
+      byMerchant.set(key, [...(byMerchant.get(key) || []), transaction]);
+    }
+
+    const recurring: Array<{ merchant: string; amount: number; frequency: string; nextPayment: Date }> = [];
+    byMerchant.forEach(items => {
+      const ordered = [...items].sort((a, b) =>
+        new Date(a.transactionDate).getTime() - new Date(b.transactionDate).getTime()
+      );
+      if (ordered.length < 2) return;
+      const latest = ordered[ordered.length - 1];
+      const prior = ordered[ordered.length - 2];
+      const daysBetween = Math.abs(
+        new Date(latest.transactionDate).getTime() - new Date(prior.transactionDate).getTime()
+      ) / 86400000;
+      const frequency = daysBetween >= 25 && daysBetween <= 35
+        ? 'Monthly'
+        : daysBetween >= 350 && daysBetween <= 380 ? 'Yearly' : '';
+      if (!frequency) return;
+      const nextPayment = new Date(latest.transactionDate);
+      if (frequency === 'Monthly') nextPayment.setMonth(nextPayment.getMonth() + 1);
+      else nextPayment.setFullYear(nextPayment.getFullYear() + 1);
+      recurring.push({
+        merchant: latest.merchant,
+        amount: Number(latest.amount),
+        frequency,
+        nextPayment
+      });
+    });
+    return recurring.sort((a, b) => a.nextPayment.getTime() - b.nextPayment.getTime());
+  }
+
+  get estimatedMonthlySubscriptions(): number {
+    return this.recurringPayments.reduce((total, payment) =>
+      total + (payment.frequency === 'Monthly' ? payment.amount : payment.amount / 12), 0
+    );
+  }
+
+  exportTransactions() {
+      this.downloadTransactionsCsv(this.filteredTransactions, `credit-card-transactions-${Date.now()}.csv`);
+    }
+
+    exportBillTransactions(bill: CreditCardBill) {
+      const billTransactions = this.transactions.filter(transaction => transaction.billId === bill.id);
+      if (!billTransactions.length) {
+        this.alertService.info('No bill transactions', 'No transaction details are linked to this statement.');
+        return;
+      }
+      this.downloadTransactionsCsv(billTransactions, `credit-card-bill-${bill.id}.csv`);
+    }
+
+  private downloadTransactionsCsv(transactions: CreditCardTransaction[], filename: string) {
+      const columns = ['Date', 'Merchant', 'Description', 'Category', 'Type', 'Amount', 'Status', 'Bill', 'EMI'];
+      const escape = (value: unknown) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+      const rows = transactions.map(transaction => [
+        transaction.transactionDate,
+        transaction.merchant,
+        transaction.description,
+        this.transactionCategory(transaction),
+        transaction.transactionType,
+        transaction.amount,
+        transaction.status,
+        transaction.billId ? `Bill ${transaction.billId}` : '',
+        transaction.emiPlanId ? `EMI ${transaction.emiPlanId}` : ''
+      ].map(escape).join(','));
+      const blob = new Blob([[columns.map(escape).join(','), ...rows].join('\r\n')], { type: 'text/csv;charset=utf-8' });
+      const url = window.URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = filename;
+      anchor.click();
+      window.URL.revokeObjectURL(url);
+    }
 
   toggleCardStatus() {
     if (!this.selectedCard) return;
-    
-    const newStatus = this.selectedCard.status === 'Active' ? 'Deactivated' : 'Active';
-    const action = newStatus === 'Active' ? 'activate' : 'deactivate';
-    
-    if (!confirm(`Are you sure you want to ${action} this credit card?`)) {
-      return;
-    }
-
-    const updateData = {
-      status: newStatus
-    };
-
-    this.http.put(`${environment.apiBaseUrl}/api/credit-cards/${this.selectedCard.id}`, updateData).subscribe({
-      next: (updatedCard: any) => {
-        this.alertService.success('Status Updated', `Your credit card has been ${action}d successfully`);
+    if (!confirm('Unlock this credit card? Transaction channels will remain disabled until you turn them back on.')) return;
+    this.http.post<CreditCardDetails>(
+      `${environment.apiBaseUrl}/api/credit-cards/${this.selectedCard.id}/unlock`,
+      {},
+      this.authOptions()
+    ).subscribe({
+      next: card => {
+        this.selectedCard = card;
+        this.alertService.success('Card unlocked', 'The card is active. Review your card controls before using it.');
         this.loadCreditCards();
       },
-      error: (err: any) => {
-        console.error('Error toggling card status:', err);
-        this.alertService.operationError('Toggle Status', err?.message || 'Failed to update card status');
-      }
+      error: err => this.alertService.operationError('Unlock card', err.error?.message || 'Unable to unlock the card')
     });
   }
 
-  changeLimit(action: 'increase' | 'decrease') {
-    if (!this.selectedCard || !this.limitChangeAmount || this.limitChangeAmount <= 0) {
-      this.alertService.validationError('Please enter a valid amount');
+  changeLimit() {
+    if (!this.selectedCard || !Number.isFinite(this.limitChangeAmount) || this.limitChangeAmount <= 0) {
+      this.alertService.validationError('Enter a spending limit greater than zero');
       return;
     }
 
-    const currentLimit = this.selectedCard.approvedLimit;
-    let newLimit: number;
-
-    if (action === 'increase') {
-      newLimit = currentLimit + this.limitChangeAmount;
-    } else {
-      if (this.limitChangeAmount >= currentLimit) {
-        this.alertService.validationError('Decrease amount cannot be greater than or equal to current limit');
-        return;
-      }
-      newLimit = currentLimit - this.limitChangeAmount;
-      if (newLimit < 0) {
-        this.alertService.validationError('New limit cannot be negative');
-        return;
-      }
-    }
-
-    if (!confirm(`Are you sure you want to ${action} your credit limit from ₹${currentLimit.toFixed(2)} to ₹${newLimit.toFixed(2)}?`)) {
+    const currentLimit = Number(this.selectedCard.userSetSpendingLimit ?? this.selectedCard.approvedLimit ?? 0);
+    const maximumLimit = Number(this.selectedCard.approvedLimit || 0);
+    if (this.limitChangeAmount > maximumLimit) {
+      this.alertService.validationError('Spending limit cannot exceed your bank-approved credit limit');
       return;
     }
 
-    const updateData = {
-      approvedLimit: newLimit
-    };
+    if (!confirm(`Change your spending limit from ₹${currentLimit.toFixed(2)} to ₹${this.limitChangeAmount.toFixed(2)}?`)) {
+      return;
+    }
 
-    this.http.put(`${environment.apiBaseUrl}/api/credit-cards/${this.selectedCard.id}`, updateData).subscribe({
+    this.http.put<CreditCardDetails>(
+      `${environment.apiBaseUrl}/api/credit-cards/${this.selectedCard.id}/spending-limit`,
+      { spendingLimit: this.limitChangeAmount },
+      this.authOptions()
+    ).subscribe({
       next: (updatedCard: any) => {
-        this.alertService.success('Limit Updated', `Credit limit ${action === 'increase' ? 'increased' : 'decreased'} successfully from ₹${currentLimit.toFixed(2)} to ₹${newLimit.toFixed(2)}`);
+        this.alertService.success('Spending limit updated', `Your spending limit is now ₹${this.limitChangeAmount.toFixed(2)}.`);
         this.showLimitModal = false;
-        this.limitChangeAmount = 0;
+        this.selectedCard = { ...this.selectedCard!, ...updatedCard };
         this.loadCreditCards();
       },
       error: (err: any) => {
         console.error('Error updating limit:', err);
-        this.alertService.operationError('Update Limit', err?.message || 'Failed to update credit limit');
+        this.alertService.operationError('Update spending limit', err?.error?.message || err?.message || 'Failed to update spending limit');
       }
     });
   }

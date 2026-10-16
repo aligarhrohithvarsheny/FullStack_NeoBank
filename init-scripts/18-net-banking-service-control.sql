@@ -32,6 +32,10 @@ INSERT INTO net_banking_service_control (service_type, enabled, updated_by)
 VALUES ('CURRENT_ACCOUNT', TRUE, 'SYSTEM')
 ON DUPLICATE KEY UPDATE id=id;
 
+INSERT INTO net_banking_service_control (service_type, enabled, updated_by)
+VALUES ('MOBILE_DOB_LOGIN', TRUE, 'SYSTEM')
+ON DUPLICATE KEY UPDATE id=id;
+
 -- Per-customer net banking control columns on accounts table
 ALTER TABLE accounts ADD COLUMN IF NOT EXISTS net_banking_enabled BOOLEAN DEFAULT TRUE;
 ALTER TABLE accounts ADD COLUMN IF NOT EXISTS net_banking_toggled_by VARCHAR(100);

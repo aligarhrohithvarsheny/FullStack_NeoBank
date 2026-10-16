@@ -45,6 +45,10 @@ interface GoldLoan {
   remainingInterest?: number;
 }
 
+type GoldLoanPaymentHistoryEntry = FundTransferReceiptData & {
+  isQuickAction?: boolean;
+};
+
 interface GoldRate {
   id?: number;
   date: string;
@@ -97,7 +101,7 @@ export class Goldloan implements OnInit, OnDestroy {
   goldLoanOtpTimerRef: any = null;
   isSendingGoldLoanOtp: boolean = false;
   downloadingReceiptLoanIds = new Set<number>();
-  paymentHistoryByLoanId: Record<number, FundTransferReceiptData[]> = {};
+  paymentHistoryByLoanId: Record<number, GoldLoanPaymentHistoryEntry[]> = {};
   loadingPaymentHistoryLoanIds = new Set<number>();
   paymentHistoryLoadFailedLoanIds = new Set<number>();
   private paymentHistoryLoadedAt = new Map<number, number>();
@@ -424,7 +428,7 @@ export class Goldloan implements OnInit, OnDestroy {
       });
   }
 
-  printGoldLoanPaymentReceipt(payment: FundTransferReceiptData) {
+  printGoldLoanPaymentReceipt(payment: GoldLoanPaymentHistoryEntry) {
     if (!printFundTransferReceipt(payment)) {
       this.alertService.error('Receipt Unavailable', 'Please allow popups to print or save the receipt.');
     }

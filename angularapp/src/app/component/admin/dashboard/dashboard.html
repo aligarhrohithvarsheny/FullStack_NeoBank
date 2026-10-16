@@ -1580,7 +1580,7 @@
     </div>
 
     <p style="color:#666;margin-bottom:24px;font-size:14px;">
-      Control net banking login access for Savings and Current account holders. When turned OFF, users will not be able to login to net banking for that account type.
+      Control net banking login access for Savings and Current account holders, and manage the alternate mobile number + date of birth login option. Disabling the alternate option does not affect account number and password login.
     </p>
 
     <!-- Loading State -->
@@ -1669,6 +1669,45 @@
         <div style="margin-top:12px;font-size:12px;color:#999;" *ngIf="netBankingServices.CURRENT_ACCOUNT.updatedBy">
           Last updated by <strong>{{ netBankingServices.CURRENT_ACCOUNT.updatedBy }}</strong>
           <span *ngIf="netBankingServices.CURRENT_ACCOUNT.updatedAt"> at {{ netBankingServices.CURRENT_ACCOUNT.updatedAt | date:'dd MMM yyyy, hh:mm a' }}</span>
+        </div>
+      </div>
+
+      <!-- Mobile Number + DOB Login Toggle Card -->
+      <div style="background:linear-gradient(135deg,#fff 0%,#f8f9ff 100%);border-radius:16px;padding:28px;box-shadow:0 4px 20px rgba(0,0,0,0.08);border:1px solid #e8e8f0;transition:transform 0.2s;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+          <div style="display:flex;align-items:center;gap:14px;">
+            <div style="width:50px;height:50px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;"
+                 [style.background]="netBankingServices.MOBILE_DOB_LOGIN.enabled ? '#e8f5e9' : '#ffebee'"
+                 [style.color]="netBankingServices.MOBILE_DOB_LOGIN.enabled ? '#2e7d32' : '#c62828'">
+              <i class="fa fa-mobile-alt"></i>
+            </div>
+            <div>
+              <h4 style="margin:0;font-size:17px;font-weight:600;color:#1a1a2e;">Mobile Number + DOB Login</h4>
+              <span style="font-size:12px;color:#888;">Savings and Salary Accounts</span>
+            </div>
+          </div>
+          <label style="position:relative;display:inline-block;width:56px;height:30px;cursor:pointer;">
+            <input type="checkbox"
+                   [checked]="netBankingServices.MOBILE_DOB_LOGIN.enabled"
+                   (change)="toggleNetBanking('MOBILE_DOB_LOGIN', !netBankingServices.MOBILE_DOB_LOGIN.enabled)"
+                   [disabled]="isTogglingNetBanking"
+                   style="opacity:0;width:0;height:0;">
+            <span style="position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;border-radius:30px;transition:0.3s;"
+                  [style.background]="netBankingServices.MOBILE_DOB_LOGIN.enabled ? '#4caf50' : '#ccc'">
+              <span style="position:absolute;height:24px;width:24px;left:3px;bottom:3px;background:white;border-radius:50%;transition:0.3s;box-shadow:0 2px 4px rgba(0,0,0,0.2);"
+                    [style.transform]="netBankingServices.MOBILE_DOB_LOGIN.enabled ? 'translateX(26px)' : 'translateX(0)'"></span>
+            </span>
+          </label>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;padding:12px 16px;border-radius:10px;font-size:14px;font-weight:500;"
+             [style.background]="netBankingServices.MOBILE_DOB_LOGIN.enabled ? '#e8f5e9' : '#ffebee'"
+             [style.color]="netBankingServices.MOBILE_DOB_LOGIN.enabled ? '#2e7d32' : '#c62828'">
+          <i class="fa" [class.fa-check-circle]="netBankingServices.MOBILE_DOB_LOGIN.enabled" [class.fa-times-circle]="!netBankingServices.MOBILE_DOB_LOGIN.enabled"></i>
+          {{ netBankingServices.MOBILE_DOB_LOGIN.enabled ? 'ACTIVE - Mobile + DOB login allowed' : 'DISABLED - Mobile + DOB login blocked' }}
+        </div>
+        <div style="margin-top:12px;font-size:12px;color:#999;" *ngIf="netBankingServices.MOBILE_DOB_LOGIN.updatedBy">
+          Last updated by <strong>{{ netBankingServices.MOBILE_DOB_LOGIN.updatedBy }}</strong>
+          <span *ngIf="netBankingServices.MOBILE_DOB_LOGIN.updatedAt"> at {{ netBankingServices.MOBILE_DOB_LOGIN.updatedAt | date:'dd MMM yyyy, hh:mm a' }}</span>
         </div>
       </div>
     </div>

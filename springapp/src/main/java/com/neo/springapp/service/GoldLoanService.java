@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.ArrayList;
@@ -963,6 +964,170 @@ public class GoldLoanService {
     // Get EMI schedule for gold loan
     public List<EmiPayment> getEmiSchedule(String loanAccountNumber) {
         return emiPaymentRepository.findByLoanAccountNumberOrderByEmiNumberAsc(loanAccountNumber);
+    }
+
+    @Transactional
+    public Map<String, Double> processQuickAction(String loanAccountNumber, String operationType, Double amount,
+            String changedBy) {
+        if (amount == null || !Double.isFinite(amount) || amount <= 0) {
+            throw new IllegalArgumentException("Transaction amount must be greater than zero.");
+        }
+        if (!"DEPOSIT".equalsIgnoreCase(operationType) && !"WITHDRAWAL".equalsIgnoreCase(operationType)) {
+            throw new IllegalArgumentException("Operation type must be DEPOSIT or WITHDRAWAL.");
+        }
+
+        GoldLoan loan = goldLoanRepository.findByLoanAccountNumber(loanAccountNumber)
+                .orElseThrow(() -> new IllegalArgumentException("Gold loan account not found: " + loanAccountNumber));
+        if (!"Approved".equalsIgnoreCase(loan.getStatus())) {
+            throw new IllegalArgumentException("Quick transactions are available only for approved gold loans.");
+        }
+
+        List<EmiPayment> activeEmis = activeEmis(loanAccountNumber);
+        double oldBalance = currentOutstanding(loan, activeEmis);
+        boolean deposit = "DEPOSIT".equalsIgnoreCase(operationType);
+        if (deposit && amount > oldBalance) {
+            throw new IllegalArgumentException("Deposit exceeds the outstanding gold loan principal.");
+        }
+
+        double newBalance = roundCurrency(deposit ? oldBalance - amount : oldBalance + amount);
+        recalculateOutstanding(loan, activeEmis, newBalance);
+        if (deposit) {
+            loan.setPrincipalPaid(roundCurrency(valueOrZero(loan.getPrincipalPaid()) + amount));
+        }
+        goldLoanRepository.save(loan);
+
+        GoldLoanHistory history = new GoldLoanHistory();
+        history.setGoldLoanId(loan.getId());
+        history.setLoanAccountNumber(loan.getLoanAccountNumber());
+        history.setAction("QUICK_ACTION_" + operationType.toUpperCase());
+        history.setChangedBy(changedBy != null && !changedBy.isBlank() ? changedBy : "Admin");
+        history.setDetails(operationType.toUpperCase() + " of " + roundCurrency(amount)
+                + " applied to gold loan principal; outstanding principal " + oldBalance + " -> " + newBalance
+                + "; current EMI updated to " + valueOrZero(loan.getCurrentEmi()) + ".");
+        history.setOldAmount(oldBalance);
+        history.setNewAmount(newBalance);
+        goldLoanHistoryRepository.save(history);
+
+        Map<String, Double> balances = new HashMap<>();
+        balances.put("balanceBefore", oldBalance);
+        balances.put("balanceAfter", newBalance);
+        return balances;
+    }
+
+    @Transactional
+    public void restoreQuickActionBalance(String loanAccountNumber, Double amount,
+            String operationType, String changedBy) {
+        if (amount == null || !Double.isFinite(amount) || amount <= 0) {
+            throw new IllegalArgumentException("Transaction amount must be greater than zero.");
+        }
+        GoldLoan loan = goldLoanRepository.findByLoanAccountNumber(loanAccountNumber)
+                .orElseThrow(() -> new IllegalArgumentException("Gold loan account not found: " + loanAccountNumber));
+        if (!"Approved".equalsIgnoreCase(loan.getStatus())) {
+            throw new IllegalArgumentException("Only approved gold loans can have quick actions reverted.");
+        }
+        List<EmiPayment> activeEmis = activeEmis(loanAccountNumber);
+        double oldBalance = currentOutstanding(loan, activeEmis);
+        boolean wasDeposit = "DEPOSIT".equalsIgnoreCase(operationType);
+        if (!wasDeposit && amount > oldBalance) {
+            throw new IllegalArgumentException("Cannot revert this withdrawal because the available loan principal is insufficient.");
+        }
+        double restoredBalance = roundCurrency(wasDeposit ? oldBalance + amount : oldBalance - amount);
+        recalculateOutstanding(loan, activeEmis, restoredBalance);
+        if (wasDeposit) {
+            loan.setPrincipalPaid(roundCurrency(Math.max(0.0,
+                    valueOrZero(loan.getPrincipalPaid()) - valueOrZero(amount))));
+        }
+        goldLoanRepository.save(loan);
+
+        GoldLoanHistory history = new GoldLoanHistory();
+        history.setGoldLoanId(loan.getId());
+        history.setLoanAccountNumber(loan.getLoanAccountNumber());
+        history.setAction("QUICK_ACTION_REVERTED");
+        history.setChangedBy(changedBy != null && !changedBy.isBlank() ? changedBy : "Admin");
+        history.setDetails("Quick-action transaction reverted; outstanding principal " + oldBalance + " -> "
+                + restoredBalance + "; current EMI recalculated to " + valueOrZero(loan.getCurrentEmi()) + ".");
+        history.setOldAmount(oldBalance);
+        history.setNewAmount(restoredBalance);
+        goldLoanHistoryRepository.save(history);
+    }
+
+    private List<EmiPayment> activeEmis(String loanAccountNumber) {
+        return emiPaymentRepository.findByLoanAccountNumberOrderByEmiNumberAsc(loanAccountNumber).stream()
+                .filter(emi -> "Pending".equalsIgnoreCase(emi.getStatus())
+                        || "Overdue".equalsIgnoreCase(emi.getStatus()))
+                .toList();
+    }
+
+    private double currentOutstanding(GoldLoan loan, List<EmiPayment> activeEmis) {
+        if (!activeEmis.isEmpty()) {
+            return roundCurrency(activeEmis.stream()
+                    .mapToDouble(emi -> valueOrZero(emi.getPrincipalAmount()))
+                    .sum());
+        }
+        if (loan.getRemainingPrincipal() != null) {
+            return roundCurrency(loan.getRemainingPrincipal());
+        }
+        return roundCurrency(valueOrZero(loan.getLoanAmount()));
+    }
+
+    private void recalculateOutstanding(GoldLoan loan, List<EmiPayment> activeEmis, double principal) {
+        double monthlyRate = valueOrZero(loan.getInterestRate()) / 1200.0;
+        int remainingMonths = activeEmis.isEmpty()
+                ? Math.max(0, loan.getRemainingTenure() != null && loan.getRemainingTenure() > 0
+                        ? loan.getRemainingTenure() : (loan.getTenure() == null ? 0 : loan.getTenure()))
+                : activeEmis.size();
+        double emiAmount = monthlyPayment(principal, monthlyRate, remainingMonths);
+        double balance = principal;
+        double remainingInterest = 0.0;
+
+        for (int i = 0; i < activeEmis.size(); i++) {
+            EmiPayment emi = activeEmis.get(i);
+            double interest = roundCurrency(balance * monthlyRate);
+            double principalPart = roundCurrency(emiAmount - interest);
+            double total = emiAmount;
+            if (i == activeEmis.size() - 1) {
+                principalPart = balance;
+                total = roundCurrency(principalPart + interest);
+            }
+            principalPart = Math.max(0.0, Math.min(balance, principalPart));
+            emi.setPrincipalAmount(roundCurrency(principalPart));
+            emi.setInterestAmount(interest);
+            emi.setTotalAmount(total);
+            balance = roundCurrency(Math.max(0.0, balance - principalPart));
+            emi.setRemainingPrincipal(balance);
+            remainingInterest += interest;
+        }
+
+        if (!activeEmis.isEmpty()) {
+            emiPaymentRepository.saveAll(activeEmis);
+        }
+        loan.setRemainingPrincipal(principal);
+        loan.setRemainingInterest(roundCurrency(remainingInterest));
+        loan.setCurrentEmi(activeEmis.isEmpty() ? emiAmount : activeEmis.get(0).getTotalAmount());
+        loan.setRemainingTenure(remainingMonths);
+    }
+
+    private double monthlyPayment(double principal, double monthlyRate, int months) {
+        if (principal <= 0 || months <= 0) {
+            return 0.0;
+        }
+        if (monthlyRate <= 0) {
+            return roundCurrency(principal / months);
+        }
+        double factor = Math.pow(1 + monthlyRate, months);
+        return roundCurrency(principal * monthlyRate * factor / (factor - 1));
+    }
+
+    private double roundCurrency(double amount) {
+        return Math.round(amount * 100.0) / 100.0;
+    }
+
+    private double valueOrZero(Integer value) {
+        return value == null ? 0.0 : value.doubleValue();
+    }
+
+    private double valueOrZero(Double value) {
+        return value == null ? 0.0 : value;
     }
 
     // Update gold loan interest rate

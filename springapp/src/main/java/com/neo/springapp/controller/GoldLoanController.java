@@ -4,11 +4,14 @@ import com.neo.springapp.model.GoldLoan;
 import com.neo.springapp.model.GoldRate;
 import com.neo.springapp.model.Transaction;
 import com.neo.springapp.model.Account;
+import com.neo.springapp.model.AdminCashTransaction;
+import com.neo.springapp.model.AdminFundTransfer;
 import com.neo.springapp.model.SalaryAccount;
 import com.neo.springapp.model.SalaryNormalTransaction;
 import com.neo.springapp.repository.SalaryAccountRepository;
 import com.neo.springapp.repository.SalaryNormalTransactionRepository;
 import com.neo.springapp.repository.AdminFundTransferRepository;
+import com.neo.springapp.repository.AdminCashTransactionRepository;
 import com.neo.springapp.service.GoldLoanService;
 import com.neo.springapp.service.GoldRateService;
 import com.neo.springapp.service.AccountService;
@@ -27,6 +30,8 @@ import org.springframework.http.MediaType;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -75,6 +80,9 @@ public class GoldLoanController {
 
     @Autowired
     private AdminFundTransferRepository adminFundTransferRepository;
+
+    @Autowired
+    private AdminCashTransactionRepository adminCashTransactionRepository;
 
     // Apply for gold loan.
     @PostMapping
@@ -592,9 +600,46 @@ public class GoldLoanController {
         if (loan.getAccountNumber() == null || !loan.getAccountNumber().trim().equalsIgnoreCase(accountNumber.trim())) {
             return ResponseEntity.status(403).body(Map.of("success", false, "message", "You are not allowed to view these loan payments."));
         }
-        return ResponseEntity.ok(adminFundTransferRepository
+        List<Object> payments = new ArrayList<>();
+        payments.addAll(adminFundTransferRepository
                 .findByLoanAccountNumberAndTransferCategoryOrderByPerformedAtDesc(
                         loan.getLoanAccountNumber(), "GOLD_LOAN"));
+        for (AdminCashTransaction transaction : adminCashTransactionRepository
+                .findByAccountTypeAndAccountNumberOrderByPerformedAtDesc("goldloan", loan.getLoanAccountNumber())) {
+            Map<String, Object> payment = new HashMap<>();
+            payment.put("transferId", transaction.getRefId());
+            payment.put("loanAccountNumber", loan.getLoanAccountNumber());
+            payment.put("loanPaymentType", "DEPOSIT".equalsIgnoreCase(transaction.getOperationType())
+                    ? "Quick-action deposit" : "Quick-action withdrawal");
+            payment.put("transferCategory", "GOLD_LOAN");
+            payment.put("amount", transaction.getAmount());
+            payment.put("status", transaction.getStatus());
+            payment.put("performedBy", transaction.getPerformedBy());
+            payment.put("performedAt", transaction.getPerformedAt());
+            payment.put("description", transaction.getDescription());
+            payment.put("outstandingPrincipalBefore", transaction.getBalanceBefore());
+            payment.put("outstandingPrincipalAfter", transaction.getBalanceAfter());
+            payment.put("principalPaid", "DEPOSIT".equalsIgnoreCase(transaction.getOperationType())
+                    ? transaction.getAmount() : 0.0);
+            payment.put("isQuickAction", true);
+            payments.add(payment);
+        }
+        payments.sort(Comparator.comparing(GoldLoanController::paymentDate,
+                Comparator.nullsLast(Comparator.reverseOrder())));
+        return ResponseEntity.ok(payments);
+    }
+
+    private static LocalDateTime paymentDate(Object payment) {
+        if (payment instanceof AdminFundTransfer transfer) {
+            return transfer.getPerformedAt();
+        }
+        if (payment instanceof AdminCashTransaction transaction) {
+            return transaction.getPerformedAt();
+        }
+        if (payment instanceof Map<?, ?> map && map.get("performedAt") instanceof LocalDateTime date) {
+            return date;
+        }
+        return null;
     }
 
     // Download receipt for approved gold loan

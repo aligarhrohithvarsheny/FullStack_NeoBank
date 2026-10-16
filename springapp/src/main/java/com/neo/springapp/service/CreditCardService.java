@@ -40,6 +40,7 @@ public class CreditCardService {
     private final CurrentAccountRepository currentAccountRepository;
     private final CreditCardEmiPlanRepository emiPlanRepository;
     private final CreditCardEmiInstallmentRepository emiInstallmentRepository;
+    private final PasswordService passwordService;
 
     public CreditCardService(
             CreditCardRepository creditCardRepository,
@@ -56,7 +57,8 @@ public class CreditCardService {
             SalaryAccountRepository salaryAccountRepository,
             CurrentAccountRepository currentAccountRepository,
             CreditCardEmiPlanRepository emiPlanRepository,
-            CreditCardEmiInstallmentRepository emiInstallmentRepository) {
+            CreditCardEmiInstallmentRepository emiInstallmentRepository,
+            PasswordService passwordService) {
         this.creditCardRepository = creditCardRepository;
         this.transactionRepository = transactionRepository;
         this.billRepository = billRepository;
@@ -72,6 +74,7 @@ public class CreditCardService {
         this.currentAccountRepository = currentAccountRepository;
         this.emiPlanRepository = emiPlanRepository;
         this.emiInstallmentRepository = emiInstallmentRepository;
+        this.passwordService = passwordService;
     }
 
     /** Normalized cheque lookup result spanning savings (Cheque), salary (ChequeRequest), and current (BusinessChequeRequest) cheques. */
@@ -252,7 +255,7 @@ public class CreditCardService {
         Optional<CreditCard> cardOpt = creditCardRepository.findById(creditCardId);
         if (cardOpt.isPresent()) {
             CreditCard card = cardOpt.get();
-            card.setPin(pin);
+            card.setPin(passwordService.encryptPin(pin));
             card.setPinSet(true);
             creditCardRepository.save(card);
             return true;
@@ -263,24 +266,67 @@ public class CreditCardService {
     // Add transaction
     @Transactional
     public CreditCardTransaction addTransaction(CreditCardTransaction transaction) {
-        // Update credit card balance
-        Optional<CreditCard> cardOpt = creditCardRepository.findById(transaction.getCreditCardId());
-        if (cardOpt.isPresent()) {
-            CreditCard card = cardOpt.get();
-            if ("Purchase".equals(transaction.getTransactionType())) {
-                card.setCurrentBalance(card.getCurrentBalance() + transaction.getAmount());
-            } else if ("Payment".equals(transaction.getTransactionType())) {
-                card.setCurrentBalance(Math.max(0, card.getCurrentBalance() - transaction.getAmount()));
-                card.setLastPaidDate(LocalDateTime.now());
-            }
-            card.calculateAvailableLimit();
-            card.calculateUsageLimit();
-            creditCardRepository.save(card);
-            
-            transaction.setBalanceAfter(card.getCurrentBalance());
+        if (transaction.getCreditCardId() == null
+                || transaction.getAmount() == null
+                || !Double.isFinite(transaction.getAmount())
+                || transaction.getAmount() <= 0) {
+            throw new IllegalArgumentException("A valid card and positive transaction amount are required");
         }
+        Optional<CreditCard> cardOpt = creditCardRepository.findById(transaction.getCreditCardId());
+        if (cardOpt.isEmpty()) {
+            throw new IllegalArgumentException("Credit card was not found");
+        }
+
+        CreditCard card = cardOpt.get();
+        if ("Purchase".equalsIgnoreCase(transaction.getTransactionType())) {
+            if (!"Active".equalsIgnoreCase(card.getStatus()) || card.isBlocked() || card.isDeactivated()) {
+                throw new IllegalArgumentException("Transactions are disabled for this card");
+            }
+            enforceCardTransactionControl(card, transaction);
+            double newBalance = roundMoney(value(card.getCurrentBalance()) + transaction.getAmount());
+            double cardSpendingLimit = card.getUserSetSpendingLimit() == null
+                    ? value(card.getApprovedLimit()) : card.getUserSetSpendingLimit();
+            if (newBalance > cardSpendingLimit) {
+                throw new IllegalArgumentException("Transaction exceeds the card spending limit");
+            }
+            card.setCurrentBalance(newBalance);
+        } else if ("Payment".equalsIgnoreCase(transaction.getTransactionType())) {
+            card.setCurrentBalance(roundMoney(Math.max(0, value(card.getCurrentBalance()) - transaction.getAmount())));
+            card.setLastPaidDate(LocalDateTime.now());
+        }
+
+        card.calculateAvailableLimit();
+        card.calculateUsageLimit();
+        creditCardRepository.save(card);
+        transaction.setBalanceAfter(card.getCurrentBalance());
         
         return transactionRepository.save(transaction);
+    }
+
+    private void enforceCardTransactionControl(CreditCard card, CreditCardTransaction transaction) {
+        String channel = (String.valueOf(transaction.getTransactionType()) + " "
+                + String.valueOf(transaction.getMerchant()) + " "
+                + String.valueOf(transaction.getDescription())).toLowerCase(Locale.ROOT);
+        if ((channel.contains("online") || channel.contains("e-commerce") || channel.contains("ecommerce"))
+                && !card.isOnlineTransactionsEnabled()) {
+            throw new IllegalArgumentException("Online transactions are disabled for this card");
+        }
+        if ((channel.contains("pos") || channel.contains("point of sale"))
+                && !card.isPosTransactionsEnabled()) {
+            throw new IllegalArgumentException("POS transactions are disabled for this card");
+        }
+        if ((channel.contains("contactless") || channel.contains("tap to pay") || channel.contains("nfc"))
+                && !card.isContactlessEnabled()) {
+            throw new IllegalArgumentException("Contactless transactions are disabled for this card");
+        }
+        if ((channel.contains("atm") || channel.contains("cash withdrawal"))
+                && !card.isAtmWithdrawalsEnabled()) {
+            throw new IllegalArgumentException("ATM withdrawals are disabled for this card");
+        }
+        if ((channel.contains("international") || channel.contains("cross-border") || channel.contains("foreign"))
+                && !card.isInternationalTransactionsEnabled()) {
+            throw new IllegalArgumentException("International transactions are disabled for this card");
+        }
     }
 
     // Get transactions

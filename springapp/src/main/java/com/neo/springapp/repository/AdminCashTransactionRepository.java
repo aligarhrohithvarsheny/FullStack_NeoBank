@@ -12,6 +12,9 @@ public interface AdminCashTransactionRepository extends JpaRepository<AdminCashT
 
     List<AdminCashTransaction> findAllByOrderByPerformedAtDesc();
 
+    List<AdminCashTransaction> findByAccountTypeAndAccountNumberOrderByPerformedAtDesc(
+            String accountType, String accountNumber);
+
     @Query("SELECT UPPER(t.operationType), COALESCE(SUM(t.amount), 0) FROM AdminCashTransaction t " +
            "WHERE UPPER(t.status) = 'COMPLETED' GROUP BY UPPER(t.operationType)")
     List<Object[]> summarizeCompletedOperations();

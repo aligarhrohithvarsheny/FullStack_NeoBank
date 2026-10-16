@@ -460,6 +460,20 @@ public class UserController {
             @RequestBody Map<String, String> credentials,
             @RequestHeader(value = "X-Forwarded-For", required = false) String forwardedFor,
             @RequestHeader(value = "User-Agent", required = false) String userAgent) {
+        try {
+            var mobileLoginControl = netBankingServiceControlRepository.findByServiceType("MOBILE_DOB_LOGIN");
+            if (mobileLoginControl.isPresent() && !mobileLoginControl.get().getEnabled()) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "success", false,
+                        "mobileDobLoginDisabled", true,
+                        "message", "Mobile number and date of birth login is currently disabled by the administrator."));
+            }
+        } catch (Exception e) {
+            System.err.println("Error checking mobile/DOB login status: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(Map.of(
+                    "success", false, "message", "Unable to verify mobile login availability. Please try again."));
+        }
+
         String mobileNumber = credentials.get("mobileNumber");
         String dob = credentials.get("dob");
         if (mobileNumber == null || mobileNumber.isBlank() || dob == null || dob.isBlank()) {
@@ -1091,7 +1105,7 @@ public class UserController {
                     response.put("success", true);
                     response.put("activationCompleted", true);
                     response.put("message", "Password set successfully! You can now sign in with your email and password.");
-                    response.put("user", saved);
+                    response.put("user", createUserResponse(saved));
                     return ResponseEntity.ok(response);
                 }
             }
@@ -1169,7 +1183,7 @@ public class UserController {
             }
             
             response.put("success", true);
-            response.put("user", savedUser);
+            response.put("user", createUserResponse(savedUser));
             
             return ResponseEntity.ok(response);
         } catch (Exception e) {
@@ -1208,9 +1222,9 @@ public class UserController {
     }
 
     @GetMapping("/username/{username}")
-    public ResponseEntity<User> getUserByUsername(@PathVariable String username) {
+    public ResponseEntity<Map<String, Object>> getUserByUsername(@PathVariable String username) {
         Optional<User> user = userService.getUserByUsername(username);
-        return user.map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
+        return user.map(u -> ResponseEntity.ok(createUserResponse(u))).orElse(ResponseEntity.notFound().build());
     }
 
     // Test endpoint to check data persistence
@@ -1258,9 +1272,9 @@ public class UserController {
     }
 
     @GetMapping("/email/{email}")
-    public ResponseEntity<User> getUserByEmail(@PathVariable String email) {
+    public ResponseEntity<Map<String, Object>> getUserByEmail(@PathVariable String email) {
         Optional<User> user = userService.getUserByEmail(email);
-        return user.map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
+        return user.map(u -> ResponseEntity.ok(createUserResponse(u))).orElse(ResponseEntity.notFound().build());
     }
 
     @PutMapping("/update/{id}")
@@ -1283,7 +1297,7 @@ public class UserController {
             if (updatedUser != null) {
                 Map<String, Object> response = new HashMap<>();
                 response.put("success", true);
-                response.put("user", updatedUser);
+                response.put("user", createUserResponse(updatedUser));
                 response.put("message", "User updated successfully");
                 return ResponseEntity.ok(response);
             } else {
@@ -1365,7 +1379,7 @@ public class UserController {
             
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);
-            response.put("user", updatedUser);
+            response.put("user", createUserResponse(updatedUser));
             response.put("message", "Email updated successfully");
             System.out.println("✅ Email updated successfully for user ID: " + id);
             return ResponseEntity.ok(response);
@@ -1394,7 +1408,7 @@ public class UserController {
 
     // Pagination and sorting
     @GetMapping("/all")
-    public ResponseEntity<Page<User>> getAllUsers(
+    public ResponseEntity<Page<Map<String, Object>>> getAllUsers(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "joinDate") String sortBy,
@@ -1410,25 +1424,25 @@ public class UserController {
             page = 0;
         }
         Page<User> users = userService.getAllUsersWithPagination(page, size, sortBy, sortDir);
-        // Note: This endpoint returns Page<User> which may include byte arrays
-        // For admin dashboard, use /api/users/admin/all instead which excludes byte arrays
-        return ResponseEntity.ok(users);
+        Page<Map<String, Object>> sanitized = users.map(this::createUserResponse);
+        return ResponseEntity.ok(sanitized);
     }
 
     // Status-based operations
     @GetMapping("/status/{status}")
-    public ResponseEntity<List<User>> getUsersByStatus(@PathVariable String status) {
+    public ResponseEntity<List<Map<String, Object>>> getUsersByStatus(@PathVariable String status) {
         List<User> users = userService.getUsersByStatus(status);
-        return ResponseEntity.ok(users);
+        List<Map<String, Object>> sanitized = users.stream().map(this::createUserResponse).collect(Collectors.toList());
+        return ResponseEntity.ok(sanitized);
     }
 
     @GetMapping("/status/{status}/paginated")
-    public ResponseEntity<Page<User>> getUsersByStatusWithPagination(
+    public ResponseEntity<Page<Map<String, Object>>> getUsersByStatusWithPagination(
             @PathVariable String status,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         Page<User> users = userService.getUsersByStatusWithPagination(status, page, size);
-        return ResponseEntity.ok(users);
+        return ResponseEntity.ok(users.map(this::createUserResponse));
     }
 
     @PutMapping("/approve/{id}")
@@ -1478,7 +1492,7 @@ public class UserController {
                 
                 Map<String, Object> response = new HashMap<>();
                 response.put("success", true);
-                response.put("user", approvedUser);
+                response.put("user", createUserResponse(approvedUser));
                 response.put("message", "User approved successfully");
                 response.put("accountNumber", approvedUser.getAccountNumber());
                 
@@ -1522,7 +1536,7 @@ public class UserController {
                 System.out.println("⚠️ Audit check failed: " + ex.getMessage());
             }
             User closedUser = userService.closeUserAccount(id, adminName, adminAccountNumber);
-            return closedUser != null ? ResponseEntity.ok(closedUser) : ResponseEntity.notFound().build();
+            return closedUser != null ? ResponseEntity.ok(createUserResponse(closedUser)) : ResponseEntity.notFound().build();
         } catch (Exception e) {
             Map<String, Object> error = new HashMap<>();
             error.put("success", false);
@@ -1533,44 +1547,44 @@ public class UserController {
 
     // Search operations
     @GetMapping("/search")
-    public ResponseEntity<Page<User>> searchUsers(
+    public ResponseEntity<Page<Map<String, Object>>> searchUsers(
             @RequestParam String searchTerm,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         Page<User> users = userService.searchUsers(searchTerm, page, size);
-        return ResponseEntity.ok(users);
+        return ResponseEntity.ok(users.map(this::createUserResponse));
     }
 
     // Filter operations
     @GetMapping("/filter/income")
-    public ResponseEntity<List<User>> getUsersByIncomeRange(
+    public ResponseEntity<List<Map<String, Object>>> getUsersByIncomeRange(
             @RequestParam Double minIncome,
             @RequestParam Double maxIncome) {
         List<User> users = userService.getUsersByIncomeRange(minIncome, maxIncome);
-        return ResponseEntity.ok(users);
+        return ResponseEntity.ok(users.stream().map(this::createUserResponse).collect(Collectors.toList()));
     }
 
     @GetMapping("/filter/occupation/{occupation}")
-    public ResponseEntity<List<User>> getUsersByOccupation(@PathVariable String occupation) {
+    public ResponseEntity<List<Map<String, Object>>> getUsersByOccupation(@PathVariable String occupation) {
         List<User> users = userService.getUsersByOccupation(occupation);
-        return ResponseEntity.ok(users);
+        return ResponseEntity.ok(users.stream().map(this::createUserResponse).collect(Collectors.toList()));
     }
 
     @GetMapping("/filter/account-type/{accountType}")
-    public ResponseEntity<List<User>> getUsersByAccountType(@PathVariable String accountType) {
+    public ResponseEntity<List<Map<String, Object>>> getUsersByAccountType(@PathVariable String accountType) {
         List<User> users = userService.getUsersByAccountType(accountType);
-        return ResponseEntity.ok(users);
+        return ResponseEntity.ok(users.stream().map(this::createUserResponse).collect(Collectors.toList()));
     }
 
     @GetMapping("/filter/join-date")
-    public ResponseEntity<List<User>> getUsersByJoinDateRange(
+    public ResponseEntity<List<Map<String, Object>>> getUsersByJoinDateRange(
             @RequestParam String startDate,
             @RequestParam String endDate) {
         // Parse dates and call service
         LocalDateTime start = LocalDateTime.parse(startDate);
         LocalDateTime end = LocalDateTime.parse(endDate);
         List<User> users = userService.getUsersByJoinDateRange(start, end);
-        return ResponseEntity.ok(users);
+        return ResponseEntity.ok(users.stream().map(this::createUserResponse).collect(Collectors.toList()));
     }
 
     // Statistics endpoints
@@ -1586,9 +1600,9 @@ public class UserController {
     }
 
     @GetMapping("/recent")
-    public ResponseEntity<List<User>> getRecentUsers(@RequestParam(defaultValue = "5") int limit) {
+    public ResponseEntity<List<Map<String, Object>>> getRecentUsers(@RequestParam(defaultValue = "5") int limit) {
         List<User> users = userService.getRecentUsers(limit);
-        return ResponseEntity.ok(users);
+        return ResponseEntity.ok(users.stream().map(this::createUserResponse).collect(Collectors.toList()));
     }
 
     // Validation endpoints
@@ -2171,7 +2185,7 @@ public class UserController {
             
             response.put("success", true);
             response.put("message", "Profile photo uploaded successfully");
-            response.put("user", savedUser);
+            response.put("user", createUserResponse(savedUser));
             return ResponseEntity.ok(response);
             
         } catch (Exception e) {
@@ -2246,7 +2260,7 @@ public class UserController {
             
             response.put("success", true);
             response.put("message", "Signature uploaded successfully. Waiting for admin approval.");
-            response.put("user", savedUser);
+            response.put("user", createUserResponse(savedUser));
             return ResponseEntity.ok(response);
             
         } catch (Exception e) {
@@ -2278,9 +2292,9 @@ public class UserController {
 
     // Admin: Get all users with pending signatures
     @GetMapping("/pending-signatures")
-    public ResponseEntity<List<User>> getUsersWithPendingSignatures() {
+    public ResponseEntity<List<Map<String, Object>>> getUsersWithPendingSignatures() {
         List<User> users = userService.getUsersWithPendingSignatures();
-        return ResponseEntity.ok(users);
+        return ResponseEntity.ok(users.stream().map(this::createUserResponse).collect(Collectors.toList()));
     }
 
     // Admin: Approve signature
@@ -2314,7 +2328,7 @@ public class UserController {
             
             response.put("success", true);
             response.put("message", "Signature approved successfully");
-            response.put("user", savedUser);
+            response.put("user", createUserResponse(savedUser));
             return ResponseEntity.ok(response);
             
         } catch (Exception e) {
@@ -2356,7 +2370,7 @@ public class UserController {
             
             response.put("success", true);
             response.put("message", "Signature rejected");
-            response.put("user", savedUser);
+            response.put("user", createUserResponse(savedUser));
             return ResponseEntity.ok(response);
             
         } catch (Exception e) {
@@ -2564,7 +2578,7 @@ public class UserController {
             
             response.put("success", true);
             response.put("message", "User updated successfully");
-            response.put("user", savedUser);
+            response.put("user", createUserResponse(savedUser));
             return ResponseEntity.ok(response);
             
         } catch (Exception e) {

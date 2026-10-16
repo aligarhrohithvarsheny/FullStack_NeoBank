@@ -10,6 +10,7 @@ import com.neo.springapp.model.SalaryFraudAlert;
 import com.neo.springapp.model.SalaryAccountEditHistory;
 import com.neo.springapp.service.SalaryAccountService;
 import com.neo.springapp.service.SessionHistoryService;
+import com.neo.springapp.repository.NetBankingServiceControlRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -28,6 +29,9 @@ public class SalaryAccountController {
 
     @Autowired
     private SessionHistoryService sessionHistoryService;
+
+    @Autowired
+    private NetBankingServiceControlRepository netBankingServiceControlRepository;
 
     // ─── Create ──────────────────────────────────────────────
 
@@ -335,6 +339,20 @@ public class SalaryAccountController {
     public ResponseEntity<Map<String, Object>> loginByMobileAndDob(@RequestBody Map<String, String> body,
             @RequestHeader(value = "X-Forwarded-For", required = false) String forwardedFor,
             @RequestHeader(value = "User-Agent", required = false) String userAgent) {
+        try {
+            var mobileLoginControl = netBankingServiceControlRepository.findByServiceType("MOBILE_DOB_LOGIN");
+            if (mobileLoginControl.isPresent() && !mobileLoginControl.get().getEnabled()) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "success", false,
+                        "mobileDobLoginDisabled", true,
+                        "message", "Mobile number and date of birth login is currently disabled by the administrator."));
+            }
+        } catch (Exception e) {
+            System.err.println("Error checking mobile/DOB login status: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(Map.of(
+                    "success", false, "message", "Unable to verify mobile login availability. Please try again."));
+        }
+
         Map<String, Object> result = salaryAccountService.authenticateByMobileAndDob(
                 body.get("mobileNumber"), body.get("dob"));
         if (Boolean.TRUE.equals(result.get("success"))) {

@@ -2,7 +2,7 @@ import { Component, OnInit, OnDestroy, Inject, PLATFORM_ID } from '@angular/core
 import { Router } from '@angular/router';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { environment } from '../../../../environment/environment';
 import { AlertService } from '../../../service/alert.service';
 
@@ -105,9 +105,14 @@ export class CreditCards implements OnInit, OnDestroy {
     if (this.refreshTimer) clearInterval(this.refreshTimer);
   }
 
+  private authOptions() {
+    const token = sessionStorage.getItem('adminSessionToken');
+    return { headers: new HttpHeaders(token ? { Authorization: `Bearer ${token}` } : {}) };
+  }
+
   // Keeps card list, balances, bills and transactions live (e.g. user-side bill payments)
   private silentRefresh() {
-    this.http.get(`${environment.apiBaseUrl}/api/credit-cards/all`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/api/credit-cards/all`, this.authOptions()).subscribe({
       next: (response: any) => {
         this.creditCards = Array.isArray(response) ? response : (response.content || []);
         this.filterCreditCards();
@@ -136,7 +141,7 @@ export class CreditCards implements OnInit, OnDestroy {
     if (!isPlatformBrowser(this.platformId)) return;
     
     this.isLoadingCreditCards = true;
-    this.http.get(`${environment.apiBaseUrl}/api/credit-cards/all`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/api/credit-cards/all`, this.authOptions()).subscribe({
       next: (response: any) => {
         console.log('Credit cards response:', response);
         this.creditCards = Array.isArray(response) ? response : (response.content || []);
@@ -206,7 +211,7 @@ export class CreditCards implements OnInit, OnDestroy {
     }
 
     // Load transactions
-    this.http.get(`${environment.apiBaseUrl}/api/credit-cards/${numericCardId}/transactions`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/api/credit-cards/${numericCardId}/transactions`, this.authOptions()).subscribe({
       next: (transactions: any) => {
         this.creditCardTransactions = Array.isArray(transactions) ? transactions : [];
       },
@@ -218,7 +223,7 @@ export class CreditCards implements OnInit, OnDestroy {
     });
 
     // Load bills
-    this.http.get(`${environment.apiBaseUrl}/api/credit-cards/${numericCardId}/bills`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/api/credit-cards/${numericCardId}/bills`, this.authOptions()).subscribe({
       next: (bills: any) => {
         this.creditCardBills = Array.isArray(bills) ? bills : [];
       },
@@ -291,7 +296,11 @@ export class CreditCards implements OnInit, OnDestroy {
       approvedLimit: newLimit
     };
 
-    this.http.put(`${environment.apiBaseUrl}/api/credit-cards/${this.selectedCreditCard.id}`, updateData).subscribe({
+    this.http.put(
+      `${environment.apiBaseUrl}/api/credit-cards/${this.selectedCreditCard.id}`,
+      updateData,
+      this.authOptions()
+    ).subscribe({
       next: (updatedCard: any) => {
         // Save limit change history
         this.saveLimitChangeHistory(this.selectedCreditCard.id, {
@@ -367,7 +376,10 @@ export class CreditCards implements OnInit, OnDestroy {
     const startDateStr = startDate.toISOString().split('T')[0] + 'T00:00:00';
     const endDateStr = endDate.toISOString().split('T')[0] + 'T23:59:59';
     
-    this.http.get(`${environment.apiBaseUrl}/api/credit-cards/${numericCardId}/statement?startDate=${startDateStr}&endDate=${endDateStr}`).subscribe({
+    this.http.get(
+      `${environment.apiBaseUrl}/api/credit-cards/${numericCardId}/statement?startDate=${startDateStr}&endDate=${endDateStr}`,
+      this.authOptions()
+    ).subscribe({
       next: (transactions: any) => {
         // Display statement - you can create a modal or download as PDF
         console.log('Statement:', transactions);
@@ -603,7 +615,11 @@ export class CreditCards implements OnInit, OnDestroy {
       this.saveCloseCardDocument(numericCardId, documentData);
       
       // Then close the card
-      this.http.put(`${environment.apiBaseUrl}/api/credit-cards/${numericCardId}/close`, {}).subscribe({
+      this.http.put(
+        `${environment.apiBaseUrl}/api/credit-cards/${numericCardId}/close`,
+        {},
+        this.authOptions()
+      ).subscribe({
         next: (response: any) => {
           this.alertService.success('Success', 'Credit card closed successfully with document uploaded');
           this.showCloseCardModal = false;

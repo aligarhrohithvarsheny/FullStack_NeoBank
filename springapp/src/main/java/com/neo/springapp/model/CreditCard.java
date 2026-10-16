@@ -1,5 +1,6 @@
 package com.neo.springapp.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.Data;
 import java.time.LocalDateTime;
@@ -15,8 +16,10 @@ public class CreditCard {
 
     // Card Information
     private String cardNumber;
+    @JsonIgnore
     private String cvv;
     private String expiryDate;
+    @JsonIgnore
     private String pin;
     private boolean pinSet = false;
     private String status = "Active"; // Active / Blocked / Closed
@@ -51,6 +54,11 @@ public class CreditCard {
     private LocalDateTime lastUsed;
     private boolean blocked = false;
     private boolean deactivated = false;
+    private boolean onlineTransactionsEnabled = true;
+    private boolean posTransactionsEnabled = true;
+    private boolean contactlessEnabled = true;
+    private boolean atmWithdrawalsEnabled = true;
+    private boolean internationalTransactionsEnabled = false;
 
     public CreditCard() {
         this.issueDate = LocalDateTime.now();

@@ -43,82 +43,92 @@
       </select>
     </div>
 
-    <div class="card" [ngClass]="statusClass" [class.flipped]="isCardFlipped" (click)="flipCard()">
+    <div class="card" [ngClass]="statusClass">
       <!-- Front view -->
       <div class="view front">
-        <div class="debit">Credit Card</div>
-        <div class="bank">NeoBank</div>
+        <div class="card-brand">
+          <div>
+            <div class="debit">NEOBANK · CREDIT</div>
+            <div class="bank">NeoBank</div>
+          </div>
+          <span class="status-badge card-status" [ngClass]="statusClass">{{ selectedCard.status }}</span>
+        </div>
+        <div class="card-chip" aria-hidden="true"></div>
         <div class="number">{{ fullNumber }}</div>
         <div class="valid">
           <span>VALID THRU</span>
           <span>{{ selectedCard.expiryDate }}</span>
         </div>
         <div class="cardHolder">{{ selectedCard.userName }}</div>
-        <div class="status-indicator">
-          <span class="status-badge">{{ selectedCard.status }}</span>
-        </div>
       </div>
 
-      <!-- Back view -->
-      <div class="view back">
-        <div class="blackbar"></div>
-        <div class="cvvtext">
-          <h5>CVV</h5>
-          <div class="whiteBar"></div>
-          <div class="cvv">{{ maskedCVV }}</div>
-        </div>
-        <div class="text">
-          Use responsibly. Cardholder agrees to terms.
-        </div>
-      </div>
+      <button type="button" class="number-visibility" (click)="toggleCardNumber()">
+        {{ showCardNumber ? 'Hide card number' : 'View card number' }}
+      </button>
     </div>
 
     <!-- Card Details -->
     <div class="card-details">
-      <h4>Credit Card Information</h4>
-      <div class="detail-grid">
+      <div class="summary-heading">
+        <div>
+          <span class="eyebrow">CREDIT OVERVIEW</span>
+          <h4>Your credit at a glance</h4>
+        </div>
+        <span class="summary-status" [ngClass]="statusClass">{{ selectedCard.status }}</span>
+      </div>
+      <div class="credit-metrics">
+        <div class="credit-metric primary">
+          <span class="label">Total credit limit</span>
+          <strong>₹{{ selectedCard.approvedLimit | number:'1.2-2' }}</strong>
+        </div>
+        <div class="credit-metric">
+          <span class="label">Available</span>
+          <strong>₹{{ selectedCard.availableLimit | number:'1.2-2' }}</strong>
+        </div>
+        <div class="credit-metric">
+          <span class="label">Used</span>
+          <strong>₹{{ usedLimit | number:'1.2-2' }}</strong>
+        </div>
+        <div class="credit-metric">
+          <span class="label">Outstanding bill</span>
+          <strong>₹{{ remainingBill | number:'1.2-2' }}</strong>
+        </div>
+      </div>
+      <div class="utilization">
+        <div class="utilization-label">
+          <span>Credit utilization</span>
+          <strong>{{ utilizationPercent | number:'1.1-1' }}%</strong>
+        </div>
+        <div class="utilization-track" role="progressbar" aria-label="Credit utilization"
+          [attr.aria-valuenow]="utilizationPercent" aria-valuemin="0" aria-valuemax="100">
+          <span [style.width.%]="utilizationPercent"></span>
+        </div>
+      </div>
+      <div class="due-summary" *ngIf="latestBill as bill">
+        <div>
+          <span class="label">Minimum due</span>
+          <strong>₹{{ bill.minimumDue | number:'1.2-2' }}</strong>
+        </div>
+        <div>
+          <span class="label">Payment due</span>
+          <strong>{{ bill.dueDate | date:'dd MMM yyyy' }}</strong>
+        </div>
+        <button class="pay-btn" (click)="openBillPayment(bill)" [disabled]="billOutstanding(bill) === 0">
+          Pay bill
+        </button>
+      </div>
+      <div class="detail-grid compact-details">
         <div class="detail-item">
-          <span class="label">Card Number:</span>
-          <span class="value">{{ fullNumber }}</span>
+          <span class="label">Cardholder</span>
+          <span class="value">{{ selectedCard.userName }}</span>
         </div>
         <div class="detail-item">
-          <span class="label">Card Type:</span>
-          <span class="value">Credit Card</span>
-        </div>
-        <div class="detail-item">
-          <span class="label">Expiry Date:</span>
+          <span class="label">Expiry date</span>
           <span class="value">{{ selectedCard.expiryDate }}</span>
         </div>
         <div class="detail-item">
-          <span class="label">CVV:</span>
-          <span class="value">{{ maskedCVV }}</span>
-          <button (click)="toggleCVV()" class="cvv-toggle-btn">
-            {{ showCVV ? 'Hide CVV' : 'Show CVV' }}
-          </button>
-        </div>
-        <div class="detail-item">
-          <span class="label">Status:</span>
-          <span class="value status-value" [ngClass]="statusClass">{{ selectedCard.status }}</span>
-        </div>
-        <div class="detail-item">
-          <span class="label">PIN Status:</span>
-          <span class="value">{{ selectedCard.pinSet ? 'Set' : 'Not Set' }}</span>
-        </div>
-        <div class="detail-item">
-          <span class="label">Approved Limit:</span>
-          <span class="value amount">₹{{ selectedCard.approvedLimit | number:'1.2-2' }}</span>
-        </div>
-        <div class="detail-item">
-          <span class="label">Current Balance:</span>
-          <span class="value amount">₹{{ selectedCard.currentBalance | number:'1.2-2' }}</span>
-        </div>
-        <div class="detail-item">
-          <span class="label">Available Limit:</span>
-          <span class="value amount">₹{{ selectedCard.availableLimit | number:'1.2-2' }}</span>
-        </div>
-        <div class="detail-item">
-          <span class="label">Usage:</span>
-          <span class="value">{{ selectedCard.usageLimit | number:'1.2-2' }}%</span>
+          <span class="label">PIN status</span>
+          <span class="value">{{ selectedCard.pinSet ? 'Set' : 'Not set' }}</span>
         </div>
         <div class="detail-item" *ngIf="selectedCard.overdueAmount > 0">
           <span class="label">Overdue:</span>
@@ -197,78 +207,158 @@
         <button (click)="blockCard()" class="block-btn" [disabled]="selectedCard.status === 'Blocked'">
           {{ selectedCard.status === 'Blocked' ? 'Card Blocked' : 'Block Card' }}
         </button>
-        <button (click)="toggleCardStatus()" class="toggle-status-btn" [ngClass]="{'active': selectedCard.status === 'Active', 'inactive': selectedCard.status !== 'Active'}">
-          {{ selectedCard.status === 'Active' ? 'Turn Off' : 'Turn On' }}
+        <button *ngIf="selectedCard.status === 'Blocked' || selectedCard.status === 'Temporarily Locked'"
+          (click)="toggleCardStatus()" class="toggle-status-btn inactive">
+          Unlock Card
         </button>
       </div>
 
       <div class="action-group">
-        <h5 class="group-title">Limit Management</h5>
-        <button (click)="showLimitModal = true" class="limit-btn">
-          Change Limit
+        <h5 class="group-title">Spending limit</h5>
+        <button (click)="showLimitModal = true; limitChangeAmount = selectedCard.userSetSpendingLimit ?? selectedCard.approvedLimit" class="limit-btn">
+          Change spending limit
         </button>
-        <div *ngIf="showLimitModal" class="limit-form">
-          <label>Current Limit: ₹{{ selectedCard.approvedLimit | number:'1.2-2' }}</label>
-          <label>Change Amount (Enter amount to add or subtract):</label>
-          <input 
-            type="number" 
-            [(ngModel)]="limitChangeAmount" 
-            placeholder="Enter amount"
-            min="0"
-            class="limit-input"
-          >
-          <div class="limit-preview" *ngIf="limitChangeAmount && limitChangeAmount > 0">
-            <p class="preview-text">
-              <span *ngIf="limitChangeAmount < selectedCard.approvedLimit">
-                New limit after decrease: ₹{{ (selectedCard.approvedLimit - limitChangeAmount) | number:'1.2-2' }}
-              </span>
-              <span>
-                New limit after increase: ₹{{ (selectedCard.approvedLimit + limitChangeAmount) | number:'1.2-2' }}
-              </span>
-            </p>
-          </div>
-          <div class="limit-buttons">
-            <button (click)="changeLimit('increase')" class="increase-btn" [disabled]="!limitChangeAmount || limitChangeAmount <= 0">
-              Increase Limit
-            </button>
-            <button (click)="changeLimit('decrease')" class="decrease-btn" [disabled]="!limitChangeAmount || limitChangeAmount <= 0 || limitChangeAmount >= selectedCard.approvedLimit">
-              Decrease Limit
-            </button>
-          </div>
-          <button (click)="showLimitModal = false; limitChangeAmount = 0" class="cancel-btn">Cancel</button>
-        </div>
       </div>
     </div>
   </div>
 
+  <section class="portal-section controls-section" *ngIf="selectedCard">
+    <div class="section-heading">
+      <div><span class="eyebrow">PERSONALIZE</span><h4>Card controls</h4></div>
+      <button type="button" class="emergency-lock" (click)="emergencyLock()" [disabled]="isUpdatingControls">
+        Emergency card lock
+      </button>
+    </div>
+    <div class="controls-grid">
+      <label class="control-row" *ngFor="let control of cardControlKeys">
+        <span><strong>{{ controlLabel(control) }}</strong><small>Manage this transaction channel</small></span>
+        <input type="checkbox" [checked]="cardControls[control]"
+          (change)="toggleControl(control)" [disabled]="isUpdatingControls"
+          [attr.aria-label]="controlLabel(control)">
+      </label>
+    </div>
+  </section>
+
   <!-- Transactions Section -->
   <div class="transactions-section" *ngIf="selectedCard">
-    <h4>Recent Transactions</h4>
-    <table class="data-table" *ngIf="transactions.length > 0">
+    <div class="section-heading">
+      <div><span class="eyebrow">ACTIVITY</span><h4>Transactions</h4></div>
+      <button type="button" class="statement-btn" (click)="exportTransactions()" [disabled]="!filteredTransactions.length">
+        Export CSV
+      </button>
+    </div>
+    <nav class="transaction-tabs" aria-label="Transaction filters">
+      <button *ngFor="let tab of transactionTabs"
+        [class.active]="activeTransactionTab === tab" (click)="activeTransactionTab = tab">{{ tab }}</button>
+    </nav>
+    <div class="transaction-filters">
+      <input type="search" [(ngModel)]="transactionSearch" placeholder="Search merchant or transaction">
+      <select [(ngModel)]="transactionCategoryFilter" aria-label="Filter by category">
+        <option value="">All categories</option>
+        <option *ngFor="let category of ['Shopping', 'Food', 'Fuel', 'Travel', 'Entertainment', 'Bills', 'Healthcare', 'Other', 'Refunds']" [value]="category">{{ category }}</option>
+      </select>
+      <select [(ngModel)]="transactionStatusFilter" aria-label="Filter by status">
+        <option value="">All statuses</option><option value="Completed">Completed</option>
+        <option value="Pending">Pending</option><option value="Failed">Failed</option>
+      </select>
+      <select [(ngModel)]="transactionTypeFilter" aria-label="Filter by transaction type">
+        <option value="">All transaction types</option>
+        <option *ngFor="let type of ['Purchase', 'Payment', 'Refund', 'Interest', 'Fee']" [value]="type">{{ type }}</option>
+      </select>
+      <input type="date" [(ngModel)]="transactionStartDate" aria-label="Start date">
+      <input type="date" [(ngModel)]="transactionEndDate" aria-label="End date">
+      <input type="number" [(ngModel)]="transactionMinAmount" min="0" placeholder="Minimum amount" aria-label="Minimum transaction amount">
+      <input type="number" [(ngModel)]="transactionMaxAmount" min="0" placeholder="Maximum amount" aria-label="Maximum transaction amount">
+    </div>
+    <table class="data-table" *ngIf="filteredTransactions.length > 0">
       <thead>
         <tr>
           <th>Date</th>
-          <th>Type</th>
           <th>Merchant</th>
-          <th>Bill receipt</th>
+          <th>Receipt / bill</th>
+          <th>Category</th>
+          <th>Type</th>
           <th>Amount</th>
-          <th>Balance After</th>
           <th>Status</th>
+          <th>Available credit after</th>
         </tr>
       </thead>
       <tbody>
-        <tr *ngFor="let transaction of transactions">
-          <td>{{ transaction.transactionDate | date:'dd/MM/yyyy HH:mm' }}</td>
-          <td>{{ transaction.transactionType }}</td>
-          <td>{{ transaction.merchant || transaction.description || '-' }}</td>
-          <td>{{ transaction.billId ? 'Bill #' + transaction.billId : '—' }}</td>
-          <td>₹{{ transaction.amount | number:'1.2-2' }}</td>
-          <td>₹{{ transaction.balanceAfter | number:'1.2-2' }}</td>
-          <td><span class="status-badge" [ngClass]="transaction.status.toLowerCase()">{{ transaction.status }}</span></td>
+        <tr *ngFor="let transaction of filteredTransactions" class="transaction-row" (click)="selectedTransaction = transaction">
+          <td data-label="Date">{{ transaction.transactionDate | date:'dd/MM/yyyy HH:mm' }}</td>
+          <td data-label="Merchant">{{ transaction.merchant || transaction.description || '-' }}</td>
+          <td data-label="Receipt / bill">{{ transaction.billId ? 'Bill #' + transaction.billId : '—' }}</td>
+          <td data-label="Category">{{ transactionCategory(transaction) }}</td>
+          <td data-label="Type">{{ transaction.transactionType }}</td>
+          <td data-label="Amount">₹{{ transaction.amount | number:'1.2-2' }}</td>
+          <td data-label="Status"><span class="status-badge" [ngClass]="transaction.status.toLowerCase()">{{ transaction.status }}</span></td>
+          <td data-label="Available credit after">₹{{ (selectedCard.approvedLimit - transaction.balanceAfter) | number:'1.2-2' }}</td>
         </tr>
       </tbody>
     </table>
-    <p *ngIf="transactions.length === 0" class="no-data">No transactions found</p>
+    <p *ngIf="filteredTransactions.length === 0" class="no-data">No transactions match these filters.</p>
+  </div>
+
+  <div class="portal-section analytics-section" *ngIf="selectedCard">
+    <div class="section-heading">
+      <div><span class="eyebrow">BASED ON YOUR TRANSACTIONS</span><h4>Spending by category</h4></div>
+    </div>
+    <div class="category-bars" *ngIf="spendingCategories.length; else noSpendingData">
+      <div class="category-bar" *ngFor="let category of spendingCategories">
+        <div class="category-label"><span>{{ category.name }}</span><strong>₹{{ category.amount | number:'1.2-2' }}</strong></div>
+        <div class="utilization-track"><span [style.width.%]="category.percent"></span></div>
+      </div>
+    </div>
+    <ng-template #noSpendingData><p class="no-data">Spending insights will appear when this card has purchase transactions.</p></ng-template>
+    <p class="analytics-note">Categories are estimated from merchant and transaction descriptions.</p>
+  </div>
+
+  <div class="portal-section" *ngIf="selectedCard">
+    <div class="section-heading"><div><span class="eyebrow">CREDIT HEALTH</span><h4>Credit snapshot</h4></div></div>
+    <p class="health-copy" *ngIf="utilizationPercent < 30">Your current credit utilization is low. Continue monitoring your balance and payment dates.</p>
+    <p class="health-copy" *ngIf="utilizationPercent >= 30 && utilizationPercent < 70">Your current credit utilization is moderate. Staying within your planned spending limit can help keep it steady.</p>
+    <p class="health-copy" *ngIf="utilizationPercent >= 70">Your current credit utilization is high. Consider reducing the outstanding balance when convenient.</p>
+    <small class="analytics-note">Informational snapshot based on this NeoBank card only; not an official credit bureau score or advice.</small>
+  </div>
+
+  <div class="modal-overlay" *ngIf="selectedTransaction" (click)="selectedTransaction = null">
+    <aside class="transaction-drawer" (click)="$event.stopPropagation()">
+      <button type="button" class="drawer-close" (click)="selectedTransaction = null" aria-label="Close transaction details">×</button>
+      <span class="eyebrow">TRANSACTION DETAILS</span>
+      <h3>{{ selectedTransaction.merchant || selectedTransaction.description || 'Card transaction' }}</h3>
+      <strong class="drawer-amount">₹{{ selectedTransaction.amount | number:'1.2-2' }}</strong>
+      <dl>
+        <dt>Date and time</dt><dd>{{ selectedTransaction.transactionDate | date:'dd MMM yyyy, HH:mm' }}</dd>
+        <dt>Transaction ID</dt><dd>{{ selectedTransaction.id }}</dd>
+        <dt>Category</dt><dd>{{ transactionCategory(selectedTransaction) }}</dd>
+        <dt>Type</dt><dd>{{ selectedTransaction.transactionType }}</dd>
+        <dt>Status</dt><dd>{{ selectedTransaction.status }}</dd>
+        <dt>Bill</dt><dd>{{ selectedTransaction.billId ? '#' + selectedTransaction.billId : 'Unbilled' }}</dd>
+        <dt>Available credit after transaction</dt><dd>₹{{ ((selectedCard?.approvedLimit ?? 0) - selectedTransaction.balanceAfter) | number:'1.2-2' }}</dd>
+      </dl>
+    </aside>
+  </div>
+
+  <div class="modal-overlay" *ngIf="showLimitModal && selectedCard" (click)="showLimitModal = false">
+    <div class="modal limit-management-modal" (click)="$event.stopPropagation()">
+      <span class="eyebrow">CARD MANAGEMENT</span>
+      <h3>Change spending limit</h3>
+      <div class="limit-summary">
+        <span>Current spending limit<strong>₹{{ (selectedCard.userSetSpendingLimit ?? selectedCard.approvedLimit) | number:'1.2-2' }}</strong></span>
+        <span>Available credit<strong>₹{{ selectedCard.availableLimit | number:'1.2-2' }}</strong></span>
+        <span>Used credit<strong>₹{{ usedLimit | number:'1.2-2' }}</strong></span>
+      </div>
+      <label for="newSpendingLimit">New spending limit (maximum ₹{{ selectedCard.approvedLimit | number:'1.2-2' }})</label>
+      <input id="newSpendingLimit" type="number" [(ngModel)]="limitChangeAmount" min="0.01"
+        [max]="selectedCard.approvedLimit" step="0.01" inputmode="decimal">
+      <p class="limit-preview" *ngIf="limitChangeAmount > selectedCard.approvedLimit">
+        The new spending limit cannot exceed the approved limit.
+      </p>
+      <div class="modal-actions">
+        <button class="pay-btn" (click)="changeLimit()" [disabled]="!limitChangeAmount || limitChangeAmount > selectedCard.approvedLimit">Save limit</button>
+        <button class="cancel-btn" (click)="showLimitModal = false">Cancel</button>
+      </div>
+    </div>
   </div>
 
   <div class="bills-section" *ngIf="selectedCard">
@@ -347,8 +437,16 @@
 
   <!-- Bills Section -->
   <div class="bills-section" *ngIf="selectedCard">
-    <h4>Bills</h4>
-    <table class="data-table" *ngIf="bills.length > 0">
+    <div class="section-heading">
+      <div><span class="eyebrow">STATEMENTS &amp; BILLS</span><h4>Statement history</h4></div>
+      <input class="bill-search" type="search" [(ngModel)]="billSearch" placeholder="Search period or status">
+    </div>
+    <div class="statement-range">
+      <label>From <input type="date" [(ngModel)]="statementStartDate"></label>
+      <label>To <input type="date" [(ngModel)]="statementEndDate"></label>
+      <button type="button" class="statement-btn" (click)="getStatement()">Download statement CSV</button>
+    </div>
+    <table class="data-table" *ngIf="filteredBills.length > 0">
       <thead>
         <tr>
           <th>Bill Date</th>
@@ -366,7 +464,7 @@
         </tr>
       </thead>
       <tbody>
-        <tr *ngFor="let bill of bills">
+        <tr *ngFor="let bill of filteredBills">
           <td>{{ bill.billGenerationDate | date:'dd/MM/yyyy HH:mm' }}</td>
           <td [ngClass]="{'overdue': bill.status === 'Overdue'}">{{ bill.dueDate | date:'dd/MM/yyyy' }}</td>
           <td>₹{{ (bill.regularAmount ?? bill.totalAmount) | number:'1.2-2' }}</td>
@@ -383,12 +481,60 @@
               Pay Bill
             </button>
             <span *ngIf="bill.status === 'Paid'">Paid on {{ bill.paidDate | date:'dd/MM/yyyy' }}</span>
+            <button type="button" class="statement-btn" (click)="exportBillTransactions(bill)">Download CSV</button>
           </td>
         </tr>
       </tbody>
     </table>
-    <p *ngIf="bills.length === 0" class="no-data">No bills found</p>
+    <p *ngIf="filteredBills.length === 0" class="no-data">No statements match this search.</p>
   </div>
+
+  <section class="portal-section" *ngIf="selectedCard">
+    <div class="section-heading">
+      <div><span class="eyebrow">LATEST STATEMENT</span><h4>Billing timeline</h4></div>
+      <span *ngIf="latestBill" class="status-badge" [ngClass]="latestBill.status.toLowerCase()">{{ latestBill.status }}</span>
+    </div>
+    <div class="billing-timeline" *ngIf="latestBill as bill">
+      <div class="timeline-item"><span class="timeline-dot"></span><div><strong>Statement generated</strong><small>{{ bill.billGenerationDate | date:'dd MMM yyyy' }}</small></div></div>
+      <div class="timeline-item"><span class="timeline-dot"></span><div><strong>Statement balance</strong><small>₹{{ billTotalDue(bill) | number:'1.2-2' }} · Regular ₹{{ (bill.regularAmount ?? bill.totalAmount) | number:'1.2-2' }} · EMI ₹{{ (bill.emiAmount || 0) | number:'1.2-2' }}</small></div></div>
+      <div class="timeline-item"><span class="timeline-dot"></span><div><strong>Payments received</strong><small>₹{{ bill.paidAmount | number:'1.2-2' }} · Remaining ₹{{ billOutstanding(bill) | number:'1.2-2' }}</small></div></div>
+      <div class="timeline-item due"><span class="timeline-dot"></span><div><strong>Payment due</strong><small>{{ bill.dueDate | date:'dd MMM yyyy' }} · Minimum ₹{{ bill.minimumDue | number:'1.2-2' }}</small></div></div>
+    </div>
+    <p class="no-data" *ngIf="!latestBill">A billing timeline will appear after a statement is generated.</p>
+  </section>
+
+  <section class="portal-section" *ngIf="selectedCard">
+    <div class="section-heading"><div><span class="eyebrow">TRANSACTION INSIGHTS</span><h4>Recurring payments</h4></div></div>
+    <div class="recurring-summary">
+      <span>Estimated monthly subscriptions</span>
+      <strong>₹{{ estimatedMonthlySubscriptions | number:'1.2-2' }}</strong>
+    </div>
+    <div class="recurring-list" *ngIf="recurringPayments.length; else noRecurring">
+      <div class="recurring-row" *ngFor="let payment of recurringPayments">
+        <div><strong>{{ payment.merchant }}</strong><small>{{ payment.frequency }} · Next expected {{ payment.nextPayment | date:'dd MMM yyyy' }}</small></div>
+        <strong>₹{{ payment.amount | number:'1.2-2' }}</strong>
+      </div>
+    </div>
+    <ng-template #noRecurring><p class="no-data">Recurring payments appear after similar merchant purchases are observed in the available transaction history.</p></ng-template>
+    <small class="analytics-note">Recurring payments are estimated from merchant and transaction dates; verify subscriptions with the merchant.</small>
+  </section>
+
+  <section class="portal-section" *ngIf="selectedCard">
+    <div class="section-heading"><div><span class="eyebrow">REFUNDS</span><h4>Card refunds</h4></div></div>
+    <table class="data-table" *ngIf="refundTransactions.length">
+      <thead><tr><th>Merchant</th><th>Transaction date</th><th>Amount</th><th>Status</th><th>Bill</th></tr></thead>
+      <tbody>
+        <tr *ngFor="let refund of refundTransactions">
+          <td>{{ refund.merchant || refund.description || 'Refund' }}</td>
+          <td>{{ refund.transactionDate | date:'dd MMM yyyy, HH:mm' }}</td>
+          <td>₹{{ refund.amount | number:'1.2-2' }}</td>
+          <td><span class="status-badge" [ngClass]="refund.status.toLowerCase()">{{ refund.status }}</span></td>
+          <td>{{ refund.billId ? '#' + refund.billId : '—' }}</td>
+        </tr>
+      </tbody>
+    </table>
+    <p *ngIf="!refundTransactions.length" class="no-data">No refunds are present in this card's transaction history.</p>
+  </section>
 
   <!-- Apply Credit Card Modal -->
   <div *ngIf="showApplyForm" class="modal-overlay" (click)="closeApplyForm()">
@@ -599,6 +745,11 @@
         </div>
         <label>Payment Amount:</label>
         <input type="number" [(ngModel)]="billPaymentAmount" [min]="0.01" [max]="billOutstanding(selectedBill)" />
+        <div class="payment-presets">
+          <button type="button" (click)="setBillPaymentAmount('full')">Pay full amount</button>
+          <button type="button" (click)="setBillPaymentAmount('minimum')">Pay minimum due</button>
+        </div>
+        <p class="payment-method-note">Payment is processed through NeoBank's existing credit-card bill payment service. No OTP is requested here.</p>
         <div class="modal-actions">
           <button (click)="payBill()" class="pay-btn" [disabled]="billPaymentAmount <= 0 || billPaymentAmount > billOutstanding(selectedBill)">Pay Bill</button>
           <button (click)="showBillPaymentModal = false" class="cancel-btn">Cancel</button>

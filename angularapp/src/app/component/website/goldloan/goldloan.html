@@ -329,6 +329,10 @@
               <strong>{{ payment.loanPaymentType }} · ₹{{ payment.amount | number:'1.2-2' }}</strong>
               <span>{{ payment.performedAt | date:'dd/MM/yyyy, h:mm a' }}</span>
             </div>
+            <p *ngIf="payment.isQuickAction">
+              Admin quick action · {{ payment.status }}
+              <span *ngIf="payment.performedBy"> · Processed by {{ payment.performedBy }}</span>
+            </p>
             <p *ngIf="payment.prepaymentAdjustment">
               {{ payment.prepaymentAdjustment === 'REDUCE_EMI' ? 'Reduced EMI' : 'Reduced tenure' }}
               <span *ngIf="payment.emiAmountBefore != null"> · EMI ₹{{ payment.emiAmountBefore | number:'1.2-2' }} → ₹{{ payment.emiAmountAfter | number:'1.2-2' }}</span>

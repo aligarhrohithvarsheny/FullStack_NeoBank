@@ -1,8 +1,11 @@
 package com.neo.springapp.controller;
 
 import com.neo.springapp.model.*;
+import com.neo.springapp.repository.CreditCardAuditLogRepository;
+import com.neo.springapp.repository.CreditCardBillRepository;
 import com.neo.springapp.service.CreditCardService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -14,6 +17,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.ArrayList;
+import org.springframework.security.core.Authentication;
+import org.springframework.transaction.annotation.Transactional;
+import com.neo.springapp.service.UserSessionTokenService;
 
 @RestController
 @RequestMapping("/api/credit-cards")
@@ -22,6 +28,236 @@ public class CreditCardController {
 
     @Autowired
     private CreditCardService creditCardService;
+
+    @Autowired
+    private CreditCardAuditLogRepository creditCardAuditLogRepository;
+
+    @Autowired
+    private CreditCardBillRepository creditCardBillRepository;
+
+    private Optional<CreditCard> getOwnedCard(Long id, Authentication authentication) {
+        if (authentication == null
+                || !(authentication.getPrincipal() instanceof UserSessionTokenService.SessionPrincipal principal)
+                || !"USER".equals(principal.scope())) {
+            return Optional.empty();
+        }
+        return creditCardService.getCreditCardById(id)
+                .filter(card -> principal.accountNumber().equals(card.getAccountNumber()));
+    }
+
+    private boolean isStaff(Authentication authentication) {
+        return authentication != null
+                && authentication.getPrincipal() instanceof UserSessionTokenService.SessionPrincipal principal
+                && ("ADMIN".equals(principal.scope()) || "MANAGER".equals(principal.scope()));
+    }
+
+    private boolean canAccessCard(Long id, Authentication authentication) {
+        return isStaff(authentication) || getOwnedCard(id, authentication).isPresent();
+    }
+
+    private void addAuditLog(CreditCard card, String action, String previousValue, String newValue) {
+        CreditCardAuditLog entry = new CreditCardAuditLog();
+        entry.setCreditCardId(card.getId());
+        entry.setAccountNumber(card.getAccountNumber());
+        entry.setAction(action);
+        entry.setPreviousValue(previousValue);
+        entry.setNewValue(newValue);
+        creditCardAuditLogRepository.save(entry);
+    }
+
+    private Map<String, Boolean> cardControls(CreditCard card) {
+        Map<String, Boolean> controls = new HashMap<>();
+        controls.put("onlineTransactionsEnabled", card.isOnlineTransactionsEnabled());
+        controls.put("posTransactionsEnabled", card.isPosTransactionsEnabled());
+        controls.put("contactlessEnabled", card.isContactlessEnabled());
+        controls.put("atmWithdrawalsEnabled", card.isAtmWithdrawalsEnabled());
+        controls.put("internationalTransactionsEnabled", card.isInternationalTransactionsEnabled());
+        return controls;
+    }
+
+    private Map<String, Object> customerCardSummary(CreditCard card) {
+        Map<String, Object> summary = new HashMap<>();
+        summary.put("id", card.getId());
+        summary.put("cardNumber", card.getMaskedCardNumber());
+        summary.put("expiryDate", card.getExpiryDate());
+        summary.put("pinSet", card.isPinSet());
+        summary.put("status", card.getStatus());
+        summary.put("accountNumber", card.getAccountNumber());
+        summary.put("userName", card.getUserName());
+        summary.put("userEmail", card.getUserEmail());
+        summary.put("approvedLimit", card.getApprovedLimit());
+        summary.put("currentBalance", card.getCurrentBalance());
+        summary.put("availableLimit", card.getAvailableLimit());
+        summary.put("usageLimit", card.getUsageLimit());
+        summary.put("userSetSpendingLimit", card.getUserSetSpendingLimit());
+        summary.put("overdueAmount", card.getOverdueAmount());
+        summary.put("fine", card.getFine());
+        summary.put("penalty", card.getPenalty());
+        summary.put("appliedDate", card.getAppliedDate());
+        summary.put("approvalDate", card.getApprovalDate());
+        summary.put("closureDate", card.getClosureDate());
+        summary.put("lastPaidDate", card.getLastPaidDate());
+        return summary;
+    }
+
+    private Map<String, Object> customerTransactionSummary(CreditCardTransaction transaction) {
+        Map<String, Object> summary = new HashMap<>();
+        summary.put("id", transaction.getId());
+        summary.put("cardNumber", transaction.getCardNumber() == null
+                ? null : "**** **** **** " + transaction.getCardNumber().substring(Math.max(0, transaction.getCardNumber().length() - 4)));
+        summary.put("billId", transaction.getBillId());
+        summary.put("emiPlanId", transaction.getEmiPlanId());
+        summary.put("transactionType", transaction.getTransactionType());
+        summary.put("amount", transaction.getAmount());
+        summary.put("merchant", transaction.getMerchant());
+        summary.put("description", transaction.getDescription());
+        summary.put("transactionDate", transaction.getTransactionDate());
+        summary.put("balanceAfter", transaction.getBalanceAfter());
+        summary.put("status", transaction.getStatus());
+        return summary;
+    }
+
+    private Map<String, Object> customerBillSummary(CreditCardBill bill) {
+        Map<String, Object> summary = new HashMap<>();
+        summary.put("id", bill.getId());
+        summary.put("cardNumber", bill.getCardNumber() == null
+                ? null : "**** **** **** " + bill.getCardNumber().substring(Math.max(0, bill.getCardNumber().length() - 4)));
+        summary.put("billGenerationDate", bill.getBillGenerationDate());
+        summary.put("dueDate", bill.getDueDate());
+        summary.put("paidDate", bill.getPaidDate());
+        summary.put("totalAmount", bill.getTotalAmount());
+        summary.put("regularAmount", bill.getRegularAmount());
+        summary.put("emiAmount", bill.getEmiAmount());
+        summary.put("minimumDue", bill.getMinimumDue());
+        summary.put("paidAmount", bill.getPaidAmount());
+        summary.put("overdueAmount", bill.getOverdueAmount());
+        summary.put("fine", bill.getFine());
+        summary.put("penalty", bill.getPenalty());
+        summary.put("status", bill.getStatus());
+        summary.put("billingPeriod", bill.getBillingPeriod());
+        return summary;
+    }
+
+    @GetMapping("/{id}/card-number")
+    public ResponseEntity<?> getCardNumber(@PathVariable Long id, Authentication authentication) {
+        Optional<CreditCard> card = getOwnedCard(id, authentication);
+        if (card.isEmpty()) return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        return ResponseEntity.ok(Map.of("cardNumber", card.get().getCardNumber()));
+    }
+
+    @GetMapping("/{id}/controls")
+    public ResponseEntity<?> getCardControls(@PathVariable Long id, Authentication authentication) {
+        Optional<CreditCard> card = getOwnedCard(id, authentication);
+        if (card.isEmpty()) return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        return ResponseEntity.ok(cardControls(card.get()));
+    }
+
+    @PutMapping("/{id}/controls")
+    @Transactional
+    public ResponseEntity<?> updateCardControls(
+            @PathVariable Long id,
+            @RequestBody Map<String, Boolean> updates,
+            Authentication authentication) {
+        Optional<CreditCard> cardOpt = getOwnedCard(id, authentication);
+        if (cardOpt.isEmpty()) return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        CreditCard card = cardOpt.get();
+        Map<String, Boolean> previous = cardControls(card);
+        Map<String, Boolean> supported = new HashMap<>();
+        supported.put("onlineTransactionsEnabled", updates.get("onlineTransactionsEnabled"));
+        supported.put("posTransactionsEnabled", updates.get("posTransactionsEnabled"));
+        supported.put("contactlessEnabled", updates.get("contactlessEnabled"));
+        supported.put("atmWithdrawalsEnabled", updates.get("atmWithdrawalsEnabled"));
+        supported.put("internationalTransactionsEnabled", updates.get("internationalTransactionsEnabled"));
+        if (supported.values().stream().allMatch(value -> value == null)) {
+            return ResponseEntity.badRequest().body(Map.of("message", "At least one card control must be provided"));
+        }
+        if (!"Active".equalsIgnoreCase(card.getStatus())
+                && supported.values().stream().anyMatch(Boolean.TRUE::equals)) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Unlock the card before enabling transaction controls"));
+        }
+
+        if (updates.get("onlineTransactionsEnabled") != null) card.setOnlineTransactionsEnabled(updates.get("onlineTransactionsEnabled"));
+        if (updates.get("posTransactionsEnabled") != null) card.setPosTransactionsEnabled(updates.get("posTransactionsEnabled"));
+        if (updates.get("contactlessEnabled") != null) card.setContactlessEnabled(updates.get("contactlessEnabled"));
+        if (updates.get("atmWithdrawalsEnabled") != null) card.setAtmWithdrawalsEnabled(updates.get("atmWithdrawalsEnabled"));
+        if (updates.get("internationalTransactionsEnabled") != null) card.setInternationalTransactionsEnabled(updates.get("internationalTransactionsEnabled"));
+
+        creditCardService.updateCreditCard(card);
+        for (String control : supported.keySet()) {
+            Boolean next = supported.get(control);
+            if (next != null && !next.equals(previous.get(control))) {
+                addAuditLog(card, "CARD_CONTROL_UPDATED:" + control, String.valueOf(previous.get(control)), String.valueOf(next));
+            }
+        }
+        return ResponseEntity.ok(cardControls(card));
+    }
+
+    @PostMapping("/{id}/emergency-lock")
+    @Transactional
+    public ResponseEntity<?> emergencyLock(@PathVariable Long id, Authentication authentication) {
+        Optional<CreditCard> cardOpt = getOwnedCard(id, authentication);
+        if (cardOpt.isEmpty()) return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        CreditCard card = cardOpt.get();
+        card.setStatus("Blocked");
+        card.setBlocked(true);
+        card.setDeactivated(true);
+        card.setOnlineTransactionsEnabled(false);
+        card.setPosTransactionsEnabled(false);
+        card.setContactlessEnabled(false);
+        card.setAtmWithdrawalsEnabled(false);
+        card.setInternationalTransactionsEnabled(false);
+        creditCardService.updateCreditCard(card);
+        addAuditLog(card, "EMERGENCY_CARD_LOCK", "UNLOCKED", "LOCKED_ALL_CHANNELS");
+        return ResponseEntity.ok(Map.of("controls", cardControls(card), "status", card.getStatus()));
+    }
+
+    @PostMapping("/{id}/unlock")
+    @Transactional
+    public ResponseEntity<?> unlockCard(@PathVariable Long id, Authentication authentication) {
+        Optional<CreditCard> cardOpt = getOwnedCard(id, authentication);
+        if (cardOpt.isEmpty()) return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        CreditCard card = cardOpt.get();
+        if ("Closed".equalsIgnoreCase(card.getStatus())) {
+            return ResponseEntity.badRequest().body(Map.of("message", "A closed card cannot be unlocked"));
+        }
+        card.setStatus("Active");
+        card.setBlocked(false);
+        card.setDeactivated(false);
+        creditCardService.updateCreditCard(card);
+        addAuditLog(card, "CARD_UNLOCKED", "BLOCKED", "ACTIVE");
+        return ResponseEntity.ok(customerCardSummary(card));
+    }
+
+    @PutMapping("/{id}/spending-limit")
+    @Transactional
+    public ResponseEntity<?> updateSpendingLimit(
+            @PathVariable Long id,
+            @RequestBody Map<String, Object> request,
+            Authentication authentication) {
+        Optional<CreditCard> cardOpt = getOwnedCard(id, authentication);
+        if (cardOpt.isEmpty()) return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        Object rawLimit = request.get("spendingLimit");
+        if (!(rawLimit instanceof Number number)) {
+            return ResponseEntity.badRequest().body(Map.of("message", "A numeric spendingLimit is required"));
+        }
+        double limit = number.doubleValue();
+        CreditCard card = cardOpt.get();
+        if (!Double.isFinite(limit) || limit <= 0) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Spending limit must be greater than zero"));
+        }
+        if (card.getApprovedLimit() == null || limit > card.getApprovedLimit()) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "message", "Spending limit cannot exceed the bank-approved limit",
+                    "approvedLimit", card.getApprovedLimit() == null ? 0 : card.getApprovedLimit()));
+        }
+        Double previousLimit = card.getUserSetSpendingLimit();
+        card.setUserSetSpendingLimit(limit);
+        CreditCard updatedCard = creditCardService.updateCreditCard(card);
+        addAuditLog(card, "SPENDING_LIMIT_UPDATED",
+                String.valueOf(previousLimit == null ? card.getApprovedLimit() : previousLimit),
+                String.valueOf(limit));
+        return ResponseEntity.ok(customerCardSummary(updatedCard));
+    }
 
     @GetMapping("/bill-pay/balance/{accountNumber}")
     public ResponseEntity<?> getPayerBalance(@PathVariable String accountNumber) {
@@ -56,26 +292,41 @@ public class CreditCardController {
 
     // Admin: Get all credit cards
     @GetMapping("/all")
-    public ResponseEntity<List<CreditCard>> getAllCreditCards() {
+    public ResponseEntity<?> getAllCreditCards(Authentication authentication) {
+        if (!isStaff(authentication)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         return ResponseEntity.ok(creditCardService.getAllCreditCards());
     }
 
     // User: Get credit cards by account number
     @GetMapping("/account/{accountNumber}")
-    public ResponseEntity<List<CreditCard>> getCreditCardsByAccount(@PathVariable String accountNumber) {
-        return ResponseEntity.ok(creditCardService.getCreditCardsByAccount(accountNumber));
+    public ResponseEntity<?> getCreditCardsByAccount(
+            @PathVariable String accountNumber,
+            Authentication authentication) {
+        if (authentication == null
+                || !(authentication.getPrincipal() instanceof UserSessionTokenService.SessionPrincipal principal)
+                || !"USER".equals(principal.scope())
+                || !principal.accountNumber().equals(accountNumber)) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        }
+        return ResponseEntity.ok(creditCardService.getCreditCardsByAccount(accountNumber).stream()
+                .map(this::customerCardSummary)
+                .toList());
     }
 
     // Get credit card by ID
     @GetMapping("/{id}")
-    public ResponseEntity<CreditCard> getCreditCardById(@PathVariable Long id) {
-        Optional<CreditCard> card = creditCardService.getCreditCardById(id);
-        return card.map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
+    public ResponseEntity<?> getCreditCardById(@PathVariable Long id, Authentication authentication) {
+        Optional<CreditCard> card = getOwnedCard(id, authentication);
+        return card.<ResponseEntity<?>>map(value -> ResponseEntity.ok(customerCardSummary(value)))
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     // Create credit card from approved request
     @PostMapping("/create")
-    public ResponseEntity<CreditCard> createCreditCard(@RequestBody CreditCardRequest request) {
+    public ResponseEntity<?> createCreditCard(
+            @RequestBody CreditCardRequest request,
+            Authentication authentication) {
+        if (!isStaff(authentication)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         // Generate card details
         String cardNumber = generateCardNumber();
         String cvv = String.format("%03d", (int)(Math.random() * 1000));
@@ -89,7 +340,11 @@ public class CreditCardController {
 
     // Update credit card
     @PutMapping("/{id}")
-    public ResponseEntity<?> updateCreditCard(@PathVariable Long id, @RequestBody Map<String, Object> updateData) {
+    public ResponseEntity<?> updateCreditCard(
+            @PathVariable Long id,
+            @RequestBody Map<String, Object> updateData,
+            Authentication authentication) {
+        if (!isStaff(authentication)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         Optional<CreditCard> existingCardOpt = creditCardService.getCreditCardById(id);
         if (existingCardOpt.isEmpty()) {
             return ResponseEntity.notFound().build();
@@ -133,10 +388,14 @@ public class CreditCardController {
 
     // Set PIN
     @PutMapping("/{id}/set-pin")
-    public ResponseEntity<?> setPin(@PathVariable Long id, @RequestBody Map<String, String> request) {
+    public ResponseEntity<?> setPin(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> request,
+            Authentication authentication) {
+        if (getOwnedCard(id, authentication).isEmpty()) return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         String pin = request.get("pin");
-        if (pin == null || pin.isEmpty()) {
-            return ResponseEntity.badRequest().body("PIN is required");
+        if (pin == null || !pin.matches("\\d{4}")) {
+            return ResponseEntity.badRequest().body("PIN must contain exactly 4 digits");
         }
         boolean success = creditCardService.setPin(id, pin);
         return success ? ResponseEntity.ok().build() : ResponseEntity.notFound().build();
@@ -144,8 +403,11 @@ public class CreditCardController {
 
     // Get transactions
     @GetMapping("/{id}/transactions")
-    public ResponseEntity<List<CreditCardTransaction>> getTransactions(@PathVariable Long id) {
-        return ResponseEntity.ok(creditCardService.getTransactionsByCardId(id));
+    public ResponseEntity<?> getTransactions(@PathVariable Long id, Authentication authentication) {
+        if (!canAccessCard(id, authentication)) return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        return ResponseEntity.ok(creditCardService.getTransactionsByCardId(id).stream()
+                .map(this::customerTransactionSummary)
+                .toList());
     }
 
     @GetMapping("/transactions/{transactionId}/cheque-image")
@@ -183,8 +445,11 @@ public class CreditCardController {
 
     // Get bills
     @GetMapping("/{id}/bills")
-    public ResponseEntity<List<CreditCardBill>> getBills(@PathVariable Long id) {
-        return ResponseEntity.ok(creditCardService.getBillsByCardId(id));
+    public ResponseEntity<?> getBills(@PathVariable Long id, Authentication authentication) {
+        if (!canAccessCard(id, authentication)) return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        return ResponseEntity.ok(creditCardService.getBillsByCardId(id).stream()
+                .map(this::customerBillSummary)
+                .toList());
     }
 
     @GetMapping("/emi-settings")
@@ -207,16 +472,23 @@ public class CreditCardController {
     }
 
     @GetMapping("/{id}/emi-eligible-transactions")
-    public ResponseEntity<?> getEmiEligibleTransactions(@PathVariable Long id) {
+    public ResponseEntity<?> getEmiEligibleTransactions(@PathVariable Long id, Authentication authentication) {
+        if (getOwnedCard(id, authentication).isEmpty()) return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         try {
-            return ResponseEntity.ok(creditCardService.getEmiEligibleTransactions(id));
+            return ResponseEntity.ok(creditCardService.getEmiEligibleTransactions(id).stream()
+                    .map(this::customerTransactionSummary)
+                    .toList());
         } catch (IllegalArgumentException exception) {
             return ResponseEntity.badRequest().body(Map.of("message", exception.getMessage()));
         }
     }
 
     @PostMapping("/{id}/emi-conversions")
-    public ResponseEntity<?> convertToEmi(@PathVariable Long id, @RequestBody Map<String, Object> request) {
+    public ResponseEntity<?> convertToEmi(
+            @PathVariable Long id,
+            @RequestBody Map<String, Object> request,
+            Authentication authentication) {
+        if (getOwnedCard(id, authentication).isEmpty()) return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         try {
             Object rawIds = request.get("transactionIds");
             List<Long> transactionIds = new ArrayList<>();
@@ -237,7 +509,8 @@ public class CreditCardController {
     }
 
     @GetMapping("/{id}/emi-plans")
-    public ResponseEntity<?> getEmiPlans(@PathVariable Long id) {
+    public ResponseEntity<?> getEmiPlans(@PathVariable Long id, Authentication authentication) {
+        if (getOwnedCard(id, authentication).isEmpty()) return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         try {
             return ResponseEntity.ok(creditCardService.getEmiPlans(id));
         } catch (IllegalArgumentException exception) {
@@ -257,9 +530,20 @@ public class CreditCardController {
 
     // Pay bill
     @PostMapping("/bills/{billId}/pay")
-    public ResponseEntity<CreditCardBill> payBill(@PathVariable Long billId, @RequestParam Double amount) {
-        CreditCardBill bill = creditCardService.payBill(billId, amount);
-        return bill != null ? ResponseEntity.ok(bill) : ResponseEntity.notFound().build();
+    public ResponseEntity<?> payBill(
+            @PathVariable Long billId,
+            @RequestParam Double amount,
+            Authentication authentication) {
+        CreditCardBill existingBill = creditCardBillRepository.findById(billId).orElse(null);
+        if (existingBill == null || getOwnedCard(existingBill.getCreditCardId(), authentication).isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        }
+        try {
+            CreditCardBill bill = creditCardService.payBill(billId, amount);
+            return bill != null ? ResponseEntity.ok(customerBillSummary(bill)) : ResponseEntity.notFound().build();
+        } catch (IllegalArgumentException exception) {
+            return ResponseEntity.badRequest().body(Map.of("message", exception.getMessage()));
+        }
     }
 
     // Admin: pay a bill by cash, user account debit, or cheque
@@ -313,18 +597,23 @@ public class CreditCardController {
 
     // Get statement
     @GetMapping("/{id}/statement")
-    public ResponseEntity<List<CreditCardTransaction>> getStatement(
+    public ResponseEntity<?> getStatement(
             @PathVariable Long id,
             @RequestParam(required = false) String startDate,
-            @RequestParam(required = false) String endDate) {
+            @RequestParam(required = false) String endDate,
+            Authentication authentication) {
+        if (!canAccessCard(id, authentication)) return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         LocalDateTime start = startDate != null ? LocalDateTime.parse(startDate) : LocalDateTime.now().minusMonths(1);
         LocalDateTime end = endDate != null ? LocalDateTime.parse(endDate) : LocalDateTime.now();
-        return ResponseEntity.ok(creditCardService.getStatement(id, start, end));
+        return ResponseEntity.ok(creditCardService.getStatement(id, start, end).stream()
+                .map(this::customerTransactionSummary)
+                .toList());
     }
 
     // Close credit card
     @PutMapping("/{id}/close")
-    public ResponseEntity<?> closeCreditCard(@PathVariable Long id) {
+    public ResponseEntity<?> closeCreditCard(@PathVariable Long id, Authentication authentication) {
+        if (!canAccessCard(id, authentication)) return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         boolean success = creditCardService.closeCreditCard(id);
         if (success) {
             return ResponseEntity.ok().build();
