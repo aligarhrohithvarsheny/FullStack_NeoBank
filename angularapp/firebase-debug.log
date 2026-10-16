@@ -1,0 +1,28 @@
+[debug] [2026-10-16T18:32:34.251Z] ----------------------------------------------------------------------
+[debug] [2026-10-16T18:32:34.253Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\sairo\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js deploy --only hosting
+[debug] [2026-10-16T18:32:34.254Z] CLI Version:   15.15.0
+[debug] [2026-10-16T18:32:34.254Z] Platform:      win32
+[debug] [2026-10-16T18:32:34.254Z] Node Version:  v22.18.0
+[debug] [2026-10-16T18:32:34.254Z] Time:          Sat Oct 17 2026 00:02:34 GMT+0530 (India Standard Time)
+[debug] [2026-10-16T18:32:34.254Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-10-16T18:32:38.931Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-10-16T18:32:38.932Z] > authorizing via signed-in user (sairohith669@gmail.com)
+[debug] [2026-10-16T18:32:38.933Z] [iam] checking project neo-bank-669 for permissions ["firebase.projects.get","firebasehosting.sites.update"]
+[debug] [2026-10-16T18:32:38.936Z] Checked if tokens are valid: true, expires at: 1792177830298
+[debug] [2026-10-16T18:32:38.936Z] Checked if tokens are valid: true, expires at: 1792177830298
+[debug] [2026-10-16T18:32:38.938Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/neo-bank-669:testIamPermissions [none]
+[debug] [2026-10-16T18:32:38.938Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/neo-bank-669:testIamPermissions  x-goog-user-project=neo-bank-669
+[debug] [2026-10-16T18:32:38.938Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/neo-bank-669:testIamPermissions {"permissions":["firebase.projects.get","firebasehosting.sites.update"]}
+[debug] [2026-10-16T18:32:40.404Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/neo-bank-669:testIamPermissions 200
+[debug] [2026-10-16T18:32:40.404Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/neo-bank-669:testIamPermissions {"permissions":["firebase.projects.get","firebasehosting.sites.update"]}
+[debug] [2026-10-16T18:32:40.405Z] Checked if tokens are valid: true, expires at: 1792177830298
+[debug] [2026-10-16T18:32:40.405Z] Checked if tokens are valid: true, expires at: 1792177830298
+[debug] [2026-10-16T18:32:40.406Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/neo-bank-669 [none]
+[debug] [2026-10-16T18:32:40.877Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects/neo-bank-669 200
+[debug] [2026-10-16T18:32:40.877Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects/neo-bank-669 {"projectId":"neo-bank-669","projectNumber":"777219590514","displayName":"neo-bank-669","name":"projects/neo-bank-669","resources":{"hostingSite":"neo-bank-669"},"state":"ACTIVE","labels":{"firebase":"enabled"},"etag":"1_9ad97d0b-2eaf-4537-ab8f-bc9f61f5837b"}
+[info] 
+[info] === Deploying to 'neo-bank-669'...
+[info] 
+[info] i  deploying hosting 
+[info] Running command: npm run build:prod

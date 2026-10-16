@@ -1,5 +1,5 @@
 import { FirebaseApp, initializeApp } from 'firebase/app';
-import { Analytics, getAnalytics, isSupported } from 'firebase/analytics';
+import type { Analytics } from 'firebase/analytics';
 
 const firebaseConfig = {
   apiKey: 'AIzaSyBLheKxiTOgczWWY5Gz7ziJiiuxDnws7FI',
@@ -23,6 +23,7 @@ export const initFirebase = async (): Promise<{
   }
 
   if (!analyticsInstance && typeof window !== 'undefined') {
+    const { getAnalytics, isSupported } = await import('firebase/analytics');
     const supported = await isSupported().catch(() => false);
     if (supported) {
       analyticsInstance = getAnalytics(firebaseApp);
@@ -33,6 +34,5 @@ export const initFirebase = async (): Promise<{
 };
 
 export { firebaseConfig };
-
 
 
