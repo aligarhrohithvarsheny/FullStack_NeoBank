@@ -157,6 +157,30 @@ export class CreditCard implements OnInit {
   statementEndDate = '';
   selectedTransaction: CreditCardTransaction | null = null;
   isUpdatingControls = false;
+  customerRequests: any[] = [];
+  requestType = 'Transaction Dispute';
+  requestCategory = 'Unauthorized transaction';
+  disputeTransactionId: number | null = null;
+  requestDescription = '';
+  requestedCreditLimit: number | null = null;
+  creditLimitIncreaseCeiling: number | null = null;
+  isSubmittingRequest = false;
+  readonly customerRequestTypes = [
+    'Card Replacement',
+    'Credit Limit Increase',
+    'Statement Request',
+    'Billing Issue',
+    'Reward Issue',
+    'EMI Issue',
+    'Transaction Dispute',
+    'Address Update',
+    'Card Closure'
+  ];
+  readonly transactionDisputeCategories = [
+    'Unauthorized transaction', 'Duplicate transaction', 'Incorrect amount',
+    'Refund not received', 'Merchant dispute', 'Cash withdrawal issue'
+  ];
+  readonly cardReplacementReasons = ['Lost', 'Stolen', 'Damaged', 'Expired'];
   cardControls: CardControls = {
     onlineTransactionsEnabled: true,
     posTransactionsEnabled: true,
@@ -269,6 +293,8 @@ export class CreditCard implements OnInit {
     this.loadTransactions();
     this.loadBills();
     this.loadEmiDetails();
+    this.loadCustomerRequests();
+    this.loadRequestConfiguration();
   }
 
   loadCardControls() {
@@ -407,6 +433,100 @@ export class CreditCard implements OnInit {
         this.emiPlans = [];
       }
     });
+  }
+
+  loadRequestConfiguration() {
+    this.http.get<any>(`${environment.apiBaseUrl}/api/credit-card-requests/configuration`, this.authOptions()).subscribe({
+      next: configuration => {
+        this.creditLimitIncreaseCeiling = configuration.creditLimitIncreaseEnabled
+          ? Number(configuration.creditLimitIncreaseCeiling)
+          : null;
+      },
+      error: err => {
+        console.error('Error loading card request configuration:', err);
+        this.creditLimitIncreaseCeiling = null;
+      }
+    });
+  }
+
+  loadCustomerRequests() {
+    this.http.get<any[]>(`${environment.apiBaseUrl}/api/credit-card-requests/mine`, this.authOptions()).subscribe({
+      next: requests => {
+        this.customerRequests = (Array.isArray(requests) ? requests : [])
+          .filter(request => request.creditCardId === this.selectedCard?.id);
+      },
+      error: err => {
+        console.error('Error loading credit-card service requests:', err);
+        this.alertService.operationError('Service requests', err.error?.message || 'Unable to load your requests');
+      }
+    });
+  }
+
+  submitCustomerRequest() {
+    if (!this.selectedCard || this.isSubmittingRequest) return;
+    const description = this.requestDescription.trim();
+    if (description.length < 8) {
+      this.alertService.error('Request details required', 'Please provide at least 8 characters describing your request.');
+      return;
+    }
+    if (this.requestType === 'Transaction Dispute' && !this.disputeTransactionId) {
+      this.alertService.error('Transaction required', 'Select the transaction you want to dispute.');
+      return;
+    }
+    if (this.requestType === 'Credit Limit Increase'
+      && (!this.creditLimitIncreaseCeiling || this.requestedCreditLimit == null
+        || !Number.isFinite(this.requestedCreditLimit)
+        || this.requestedCreditLimit > this.creditLimitIncreaseCeiling
+        || this.requestedCreditLimit <= this.selectedCard.approvedLimit)) {
+      this.alertService.error('Invalid requested limit', 'Enter a limit above your current approved limit and at or below the bank-configured ceiling.');
+      return;
+    }
+    const willLockCard = this.requestType === 'Card Replacement'
+      && ['Lost', 'Stolen'].includes(this.requestCategory);
+    const confirmation = willLockCard
+      ? `Report this ${this.requestCategory.toLowerCase()} card and immediately lock it with all transaction channels disabled?`
+      : `Submit ${this.requestType.toLowerCase()} request?`;
+    if (!confirm(confirmation)) return;
+
+    this.isSubmittingRequest = true;
+    this.http.post<any>(`${environment.apiBaseUrl}/api/credit-card-requests`, {
+      creditCardId: this.selectedCard.id,
+      requestType: this.requestType,
+      category: ['Transaction Dispute', 'Card Replacement'].includes(this.requestType) ? this.requestCategory : null,
+      description,
+      requestedLimit: this.requestType === 'Credit Limit Increase' ? this.requestedCreditLimit : null,
+      transactionId: this.requestType === 'Transaction Dispute' ? this.disputeTransactionId : null
+    }, this.authOptions()).subscribe({
+      next: request => {
+        this.isSubmittingRequest = false;
+        this.requestDescription = '';
+        this.requestedCreditLimit = null;
+        this.alertService.success('Request submitted', `Your request ${request.requestNumber} has been recorded.`);
+        this.loadCustomerRequests();
+        if (willLockCard) this.loadCreditCards();
+      },
+      error: err => {
+        this.isSubmittingRequest = false;
+        this.alertService.operationError('Service request', err.error?.message || 'Unable to submit your request');
+      }
+    });
+  }
+
+  onRequestTypeChange(type: string) {
+    this.requestType = type;
+    this.requestCategory = type === 'Card Replacement' ? 'Lost' : 'Unauthorized transaction';
+    if (type !== 'Transaction Dispute') this.disputeTransactionId = null;
+  }
+
+  disputeTransaction(transaction: CreditCardTransaction) {
+    this.requestType = 'Transaction Dispute';
+    this.requestCategory = 'Unauthorized transaction';
+    this.disputeTransactionId = transaction.id;
+    this.requestDescription = `Please investigate transaction ${transaction.id} (${transaction.merchant || transaction.description || 'Card purchase'}) for ₹${Number(transaction.amount).toFixed(2)}. `;
+    this.selectedTransaction = null;
+    if (isPlatformBrowser(this.platformId)) {
+      document.getElementById('cardRequestCenter')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   }
 
   toggleEmiTransaction(transactionId: number, checked: boolean) {
@@ -815,6 +935,12 @@ export class CreditCard implements OnInit {
   get refundTransactions(): CreditCardTransaction[] {
     return this.transactions.filter(transaction =>
       (transaction.transactionType || '').toLowerCase().includes('refund')
+    );
+  }
+
+  get failedTransactions(): CreditCardTransaction[] {
+    return this.transactions.filter(transaction =>
+      (transaction.status || '').toLowerCase() === 'failed'
     );
   }
 

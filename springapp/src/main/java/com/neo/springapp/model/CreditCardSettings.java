@@ -2,6 +2,7 @@ package com.neo.springapp.model;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /** Single-row admin-configurable settings for credit card operations (e.g. transfer-to-account fee). */
@@ -22,6 +23,9 @@ public class CreditCardSettings {
 
     /** One-time processing fee for new credit-card EMI plans. Must be at least 8%. */
     private Double emiProcessingFeePercent = 8.0;
+
+    /** Optional bank-configured ceiling for customer credit-limit increase requests. */
+    private BigDecimal creditLimitIncreaseCeiling;
 
     private String updatedBy;
     private LocalDateTime updatedAt;

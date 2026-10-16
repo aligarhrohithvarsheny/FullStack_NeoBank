@@ -321,6 +321,96 @@
     <small class="analytics-note">Informational snapshot based on this NeoBank card only; not an official credit bureau score or advice.</small>
   </div>
 
+  <section class="portal-section security-section" *ngIf="selectedCard">
+    <div class="section-heading">
+      <div><span class="eyebrow">SECURITY CENTER</span><h4>Card security</h4></div>
+      <span class="status-badge" [ngClass]="statusClass">{{ selectedCard.status }}</span>
+    </div>
+    <div class="security-summary">
+      <div><span>Failed transactions</span><strong>{{ failedTransactions.length }}</strong></div>
+      <div><span>Online usage</span><strong>{{ cardControls.onlineTransactionsEnabled ? 'Enabled' : 'Disabled' }}</strong></div>
+      <div><span>International usage</span><strong>{{ cardControls.internationalTransactionsEnabled ? 'Enabled' : 'Disabled' }}</strong></div>
+      <div><span>ATM withdrawals</span><strong>{{ cardControls.atmWithdrawalsEnabled ? 'Enabled' : 'Disabled' }}</strong></div>
+    </div>
+    <p class="analytics-note">Login, device and fraud-monitoring events are not available from the current card backend.</p>
+    <button type="button" class="emergency-lock" (click)="emergencyLock()" [disabled]="isUpdatingControls">
+      Emergency card lock
+    </button>
+  </section>
+
+  <section class="portal-section" *ngIf="selectedCard">
+    <div class="section-heading"><div><span class="eyebrow">REWARDS</span><h4>Rewards center</h4></div></div>
+    <p class="no-data">Rewards are not enabled for this card because no bank-configured rewards policy or points ledger is available. Points and redemption options will appear once configured.</p>
+  </section>
+
+  <section class="portal-section" *ngIf="selectedCard">
+    <div class="section-heading"><div><span class="eyebrow">SUPPLEMENTARY CARDS</span><h4>Add-on cards</h4></div></div>
+    <p class="no-data">No add-on card records are available for this account. Add-on cards cannot be requested until ownership and spending-limit rules are configured.</p>
+  </section>
+
+  <section id="cardRequestCenter" class="portal-section request-center" *ngIf="selectedCard">
+    <div class="section-heading">
+      <div><span class="eyebrow">SUPPORT &amp; DISPUTES</span><h4>Dispute and service request center</h4></div>
+    </div>
+    <div class="request-form">
+      <label for="cardRequestType">Request type</label>
+      <select id="cardRequestType" [ngModel]="requestType" (ngModelChange)="onRequestTypeChange($event)">
+        <option *ngFor="let type of customerRequestTypes" [ngValue]="type">{{ type }}</option>
+      </select>
+      <ng-container *ngIf="requestType === 'Transaction Dispute' || requestType === 'Card Replacement'">
+        <label for="cardRequestCategory">{{ requestType === 'Transaction Dispute' ? 'Dispute reason' : 'Replacement reason' }}</label>
+        <select id="cardRequestCategory" [(ngModel)]="requestCategory">
+          <option *ngFor="let category of (requestType === 'Transaction Dispute' ? transactionDisputeCategories : cardReplacementReasons)"
+            [ngValue]="category">{{ category }}</option>
+        </select>
+      </ng-container>
+      <ng-container *ngIf="requestType === 'Transaction Dispute'">
+        <label for="disputeTransaction">Transaction to dispute</label>
+        <select id="disputeTransaction" [(ngModel)]="disputeTransactionId">
+          <option [ngValue]="null">Choose a transaction</option>
+          <option *ngFor="let transaction of transactions" [ngValue]="transaction.id">
+            {{ transaction.transactionDate | date:'dd MMM yyyy' }} · {{ transaction.merchant || transaction.description || 'Card transaction' }} · ₹{{ transaction.amount | number:'1.2-2' }}
+          </option>
+        </select>
+      </ng-container>
+      <label for="cardRequestDescription">Details</label>
+      <textarea id="cardRequestDescription" [(ngModel)]="requestDescription" maxlength="2000"
+        placeholder="Describe the issue or request (8–2000 characters)"></textarea>
+      <ng-container *ngIf="requestType === 'Credit Limit Increase'">
+        <p *ngIf="!creditLimitIncreaseCeiling" class="no-data">Limit-increase requests are disabled until the bank configures an approved ceiling.</p>
+        <label for="requestedCreditLimit">Desired approved limit</label>
+        <input id="requestedCreditLimit" type="number" min="0.01" step="0.01"
+          [max]="creditLimitIncreaseCeiling || null" [(ngModel)]="requestedCreditLimit"
+          [disabled]="!creditLimitIncreaseCeiling">
+        <small *ngIf="creditLimitIncreaseCeiling">Current approved limit: ₹{{ selectedCard.approvedLimit | number:'1.2-2' }} · Bank ceiling: ₹{{ creditLimitIncreaseCeiling | number:'1.2-2' }}</small>
+      </ng-container>
+      <button type="button" class="pay-btn" (click)="submitCustomerRequest()"
+        [disabled]="isSubmittingRequest || (requestType === 'Credit Limit Increase' && !creditLimitIncreaseCeiling)">
+        {{ isSubmittingRequest ? 'Submitting…' : 'Submit request' }}
+      </button>
+    </div>
+
+    <div class="request-list" *ngIf="customerRequests.length; else noCardRequests">
+      <article class="request-card" *ngFor="let request of customerRequests">
+        <div class="request-card-heading">
+          <div><strong>{{ request.requestType }}<span *ngIf="request.category"> · {{ request.category }}</span></strong><small>{{ request.requestNumber }} · {{ request.createdAt | date:'dd MMM yyyy, HH:mm' }}</small></div>
+          <span class="status-badge">{{ request.status }}</span>
+        </div>
+        <p>{{ request.description }}</p>
+        <p *ngIf="request.transactionId"><strong>Transaction:</strong> #{{ request.transactionId }}</p>
+        <p *ngIf="request.requestedLimit > 0"><strong>Requested limit:</strong> ₹{{ request.requestedLimit | number:'1.2-2' }}</p>
+        <p *ngIf="request.resolution"><strong>Resolution:</strong> {{ request.resolution }}</p>
+        <ol class="request-timeline">
+          <li *ngFor="let event of request.timeline">
+            <strong>{{ event.status }}</strong><span>{{ event.note }}</span>
+            <small>{{ event.createdAt | date:'dd MMM yyyy, HH:mm' }}</small>
+          </li>
+        </ol>
+      </article>
+    </div>
+    <ng-template #noCardRequests><p class="no-data">No support requests have been submitted for this card.</p></ng-template>
+  </section>
+
   <div class="modal-overlay" *ngIf="selectedTransaction" (click)="selectedTransaction = null">
     <aside class="transaction-drawer" (click)="$event.stopPropagation()">
       <button type="button" class="drawer-close" (click)="selectedTransaction = null" aria-label="Close transaction details">×</button>
@@ -336,6 +426,7 @@
         <dt>Bill</dt><dd>{{ selectedTransaction.billId ? '#' + selectedTransaction.billId : 'Unbilled' }}</dd>
         <dt>Available credit after transaction</dt><dd>₹{{ ((selectedCard?.approvedLimit ?? 0) - selectedTransaction.balanceAfter) | number:'1.2-2' }}</dd>
       </dl>
+      <button type="button" class="pay-btn" (click)="disputeTransaction(selectedTransaction)">Dispute this transaction</button>
     </aside>
   </div>
 

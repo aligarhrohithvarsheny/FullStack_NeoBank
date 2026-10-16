@@ -34,11 +34,68 @@
           </button>
           <small>Changes apply to new plans only; existing schedules stay fixed.</small>
         </div>
+        <div class="fee-setting-box">
+          <label>Credit-limit request ceiling (₹):</label>
+          <input type="number" min="0.01" step="1000" [(ngModel)]="creditLimitIncreaseCeiling" />
+          <button class="btn-secondary" (click)="saveCreditLimitIncreaseCeiling()" [disabled]="isSavingCreditLimitCeiling">
+            {{ isSavingCreditLimitCeiling ? 'Saving...' : 'Save ceiling' }}
+          </button>
+          <small>Requests above this amount are rejected; approvals are staff-reviewed.</small>
+        </div>
         <button class="btn-primary" (click)="loadCreditCards()">
           <i class="fa fa-sync-alt"></i> Refresh
         </button>
       </div>
     </div>
+
+    <section class="admin-card-section customer-service-requests">
+      <div class="section-header">
+        <h3>Customer disputes and service requests</h3>
+        <button class="btn-secondary" (click)="loadCustomerServiceRequests()" [disabled]="isLoadingServiceRequests">
+          {{ isLoadingServiceRequests ? 'Loading...' : 'Refresh requests' }}
+        </button>
+      </div>
+      <div *ngIf="isLoadingServiceRequests" class="loading-state">Loading customer requests...</div>
+      <p *ngIf="!isLoadingServiceRequests && customerServiceRequests.length === 0" class="no-data">
+        No customer service requests have been submitted.
+      </p>
+      <div class="table-responsive" *ngIf="customerServiceRequests.length">
+        <table class="data-table">
+          <thead>
+            <tr><th>Request</th><th>Account</th><th>Details</th><th>Timeline</th><th>Review</th></tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let request of customerServiceRequests">
+              <td>
+                <strong>{{ request.requestNumber }}</strong>
+                <div>{{ request.requestType }}<span *ngIf="request.category"> · {{ request.category }}</span></div>
+                <small>{{ request.createdAt | date:'dd MMM yyyy, HH:mm' }}</small>
+                <div class="status-badge">{{ request.status }}</div>
+              </td>
+              <td>{{ request.accountNumber }}</td>
+              <td>
+                <p>{{ request.description }}</p>
+                <strong *ngIf="request.requestedLimit > 0">Requested limit: ₹{{ request.requestedLimit | number:'1.2-2' }}</strong>
+                <p *ngIf="request.resolution">Resolution: {{ request.resolution }}</p>
+              </td>
+              <td>
+                <ul><li *ngFor="let event of request.timeline">{{ event.status }} · {{ event.createdAt | date:'dd MMM, HH:mm' }}</li></ul>
+              </td>
+              <td>
+                <select [(ngModel)]="request.nextStatus" [disabled]="['Approved', 'Resolved', 'Rejected'].includes(request.status)">
+                  <option *ngFor="let status of ['Under Review', 'Investigation', 'Approved', 'Resolved', 'Rejected']" [ngValue]="status">{{ status }}</option>
+                </select>
+                <textarea [(ngModel)]="request.resolution" maxlength="2000" placeholder="Decision / resolution"></textarea>
+                <button class="btn-primary" (click)="updateCustomerServiceRequest(request, request.nextStatus)"
+                  [disabled]="['Approved', 'Resolved', 'Rejected'].includes(request.status) || request.nextStatus === request.status">
+                  Update status
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
 
     <div class="filters-bar">
       <select [(ngModel)]="creditCardStatusFilter" (change)="filterCreditCards()">
@@ -74,11 +131,11 @@
         <div class="card-body">
           <div class="card-info-row">
             <label>Card Number:</label>
-            <span>{{ card.maskedCardNumber || card.cardNumber }}</span>
+            <span>{{ maskCardNumber(card.maskedCardNumber || card.cardNumber) }}</span>
           </div>
           <div class="card-info-row">
             <label>Account Number:</label>
-            <span>{{ card.accountNumber }}</span>
+            <span>{{ maskAccountNumber(card.accountNumber) }}</span>
           </div>
           <div class="card-info-row">
             <label>Approved Limit:</label>
@@ -125,7 +182,7 @@
             <div class="info-grid">
               <div class="info-item">
                 <label>Card Number:</label>
-                <span>{{ selectedCreditCard.cardNumber }}</span>
+                <span>{{ maskCardNumber(selectedCreditCard.maskedCardNumber || selectedCreditCard.cardNumber) }}</span>
               </div>
               <div class="info-item">
                 <label>Expiry:</label>
@@ -217,7 +274,7 @@
             <h4>EMI plans and installment history</h4>
             <article class="admin-emi-plan" *ngFor="let plan of creditCardEmiPlans">
               <div class="info-grid">
-                <div class="info-item"><label>Plan / Customer:</label><span>#{{ plan.id }} · {{ plan.userName }} ({{ plan.accountNumber }})</span></div>
+                <div class="info-item"><label>Plan / Customer:</label><span>#{{ plan.id }} · {{ plan.userName }} ({{ maskAccountNumber(plan.accountNumber) }})</span></div>
                 <div class="info-item"><label>Card:</label><span>{{ plan.maskedCardNumber }}</span></div>
                 <div class="info-item"><label>Status / Tenure:</label><span>{{ plan.status }} · {{ plan.tenureMonths }} months</span></div>
                 <div class="info-item"><label>Principal:</label><span>₹{{ plan.principalAmount | number:'1.2-2' }}</span></div>
@@ -292,12 +349,108 @@
           </div>
 
           <div class="details-section">
-            <h4>Transactions</h4>
-            <table class="data-table">
+            <div class="transaction-section-heading">
+              <div>
+                <h4>Transactions</h4>
+                <p>Transaction activity for this card. Sensitive card and account numbers remain masked.</p>
+              </div>
+              <button class="btn-secondary" type="button" (click)="exportTransactionsCsv()" [disabled]="!filteredTransactions.length">
+                <i class="fa fa-download"></i> Export filtered CSV
+              </button>
+            </div>
+
+            <div class="transaction-summary-grid">
+              <article><span>Today</span><strong>{{ todayTransactionCount }}</strong><small>Transactions</small></article>
+              <article><span>Successful</span><strong>{{ successfulTransactionCount }}</strong><small>Backend status</small></article>
+              <article><span>Pending</span><strong>{{ getTransactionStatusCount('Pending') }}</strong><small>Backend status</small></article>
+              <article><span>Failed</span><strong>{{ getTransactionStatusCount('Failed') }}</strong><small>Backend status</small></article>
+              <article><span>Refunded</span><strong>{{ getTransactionStatusCount('Refunded') }}</strong><small>Backend status</small></article>
+              <article><span>Disputed</span><strong>{{ getTransactionStatusCount('Disputed') }}</strong><small>Backend status</small></article>
+            </div>
+
+            <div class="transaction-search">
+              <label for="transaction-search">Search transactions</label>
+              <input
+                id="transaction-search"
+                type="search"
+                [(ngModel)]="transactionSearchQuery"
+                (ngModelChange)="transactionPage = 1; applyTransactionFilters()"
+                placeholder="Transaction ID, customer/account reference, merchant, card reference, account, reference or cheque number"
+                autocomplete="off" />
+              <small>PIN and CVV are never searched.</small>
+            </div>
+
+            <div class="transaction-filters">
+              <label>Date from<input type="date" [(ngModel)]="transactionFilters.startDate" /></label>
+              <label>Date to<input type="date" [(ngModel)]="transactionFilters.endDate" /></label>
+              <label>Transaction type
+                <select [(ngModel)]="transactionFilters.type">
+                  <option value="">All types</option>
+                  <option *ngFor="let type of getTransactionTypes()" [value]="type">{{ type }}</option>
+                </select>
+              </label>
+              <label>Payment method
+                <select [(ngModel)]="transactionFilters.paymentMethod">
+                  <option value="">All methods</option>
+                  <option *ngFor="let method of getTransactionPaymentMethods()" [value]="method">{{ method }}</option>
+                </select>
+              </label>
+              <label>Status
+                <select [(ngModel)]="transactionFilters.status">
+                  <option value="">All statuses</option>
+                  <option *ngFor="let status of getTransactionStatuses()" [value]="status">{{ status }}</option>
+                </select>
+              </label>
+              <label>Merchant<input type="search" [(ngModel)]="transactionFilters.merchant" placeholder="Merchant name" /></label>
+              <label>Minimum amount<input type="number" min="0" step="0.01" [(ngModel)]="transactionFilters.minAmount" /></label>
+              <label>Maximum amount<input type="number" min="0" step="0.01" [(ngModel)]="transactionFilters.maxAmount" /></label>
+              <label>Category
+                <select [(ngModel)]="transactionFilters.category" [disabled]="!getTransactionCategories().length">
+                  <option value="">All categories</option>
+                  <option *ngFor="let category of getTransactionCategories()" [value]="category">{{ category }}</option>
+                </select>
+              </label>
+              <label>Processed by
+                <select [(ngModel)]="transactionFilters.processedBy" [disabled]="!getProcessedByOptions().length">
+                  <option value="">All processors</option>
+                  <option *ngFor="let processor of getProcessedByOptions()" [value]="processor">{{ processor }}</option>
+                </select>
+              </label>
+              <label>Region
+                <select [(ngModel)]="transactionFilters.region" [disabled]="!hasInternationalTransactionData()">
+                  <option value="">Domestic &amp; international</option>
+                  <option value="DOMESTIC">Domestic</option>
+                  <option value="INTERNATIONAL">International</option>
+                </select>
+              </label>
+              <div class="transaction-filter-actions">
+                <button class="btn-primary" type="button" (click)="transactionPage = 1; applyTransactionFilters()">Apply filters</button>
+                <button class="btn-secondary" type="button" (click)="clearTransactionFilters()">Clear filters</button>
+              </div>
+            </div>
+
+            <div class="transaction-table-toolbar">
+              <span>{{ filteredTransactions.length }} matching transaction{{ filteredTransactions.length === 1 ? '' : 's' }}</span>
+              <label>Rows per page
+                <select [(ngModel)]="transactionPageSize" (change)="transactionPage = 1">
+                  <option [ngValue]="10">10</option>
+                  <option [ngValue]="25">25</option>
+                  <option [ngValue]="50">50</option>
+                  <option [ngValue]="100">100</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="table-responsive transaction-table-wrap">
+            <table class="data-table transaction-table">
               <thead>
                 <tr>
-                  <th>Date</th>
-                  <th>Type</th>
+                  <th>Transaction ID</th>
+                  <th>Card Reference</th>
+                  <th>Masked Card Number</th>
+                  <th>Customer / Account</th>
+                  <th>Date &amp; Time</th>
+                  <th>Transaction Type</th>
                   <th>Merchant</th>
                   <th>Payment Method</th>
                   <th>Cheque Number</th>
@@ -305,31 +458,63 @@
                   <th>Cheque Image</th>
                   <th>Processed By</th>
                   <th>Amount</th>
+                  <th>Debit / Credit</th>
+                  <th>Category</th>
+                  <th>Authorization</th>
+                  <th>Settlement</th>
+                  <th>Reference</th>
                   <th>Balance After</th>
                   <th>Status</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                <tr *ngFor="let transaction of creditCardTransactions">
+                <tr *ngFor="let transaction of paginatedTransactions" class="transaction-row" (click)="viewTransactionDetails(transaction)">
+                  <td>{{ transaction.globalTransactionSequence || transaction.id }}</td>
+                  <td>{{ transaction.cardReference || transaction.creditCardId || selectedCreditCard.id }}</td>
+                  <td>{{ maskCardNumber(transaction.cardNumber || selectedCreditCard.maskedCardNumber || selectedCreditCard.cardNumber) }}</td>
+                  <td>{{ transaction.customerReference || '-' }}</td>
                   <td>{{ transaction.transactionDate | date:'dd/MM/yyyy HH:mm' }}</td>
-                  <td>{{ transaction.transactionType }}</td>
+                  <td>{{ transaction.transactionType || '-' }}</td>
                   <td>{{ transaction.merchant || '-' }}</td>
                   <td>{{ transaction.paymentMethod || '-' }}</td>
                   <td>{{ transaction.chequeNumber || '-' }}</td>
                   <td>{{ transaction.debitAccountNumber || '-' }}</td>
                   <td>
-                    <button class="btn-download" *ngIf="transaction.chequeImage" (click)="downloadChequeImage(transaction)">
+                    <button class="btn-download" *ngIf="transaction.chequeImage" (click)="$event.stopPropagation(); downloadChequeImage(transaction)">
                       <i class="fa fa-download"></i> Download
                     </button>
                     <span *ngIf="!transaction.chequeImage">-</span>
                   </td>
                   <td>{{ transaction.processedBy || '-' }}</td>
                   <td>₹{{ transaction.amount | number:'1.2-2' }}</td>
+                  <td>{{ transaction.direction || '-' }}</td>
+                  <td>{{ transaction.category || '-' }}</td>
+                  <td>{{ transaction.authorizationStatus || '-' }}</td>
+                  <td>{{ transaction.settlementStatus || '-' }}</td>
+                  <td>{{ transaction.referenceNumber || '-' }}</td>
                   <td>₹{{ transaction.balanceAfter | number:'1.2-2' }}</td>
-                  <td><span class="status-badge" [ngClass]="transaction.status?.toLowerCase()">{{ transaction.status }}</span></td>
+                  <td><span class="status-badge" [ngClass]="transactionStatusClass(transaction.status)">{{ transaction.status || 'Unknown' }}</span></td>
+                  <td><button class="btn-secondary btn-compact" type="button" (click)="$event.stopPropagation(); viewTransactionDetails(transaction)">View details</button></td>
+                </tr>
+                <tr *ngIf="!paginatedTransactions.length">
+                  <td colspan="21" class="transaction-empty">
+                    <i class="fa fa-receipt"></i>
+                    <strong>No transactions match these filters</strong>
+                    <span>Adjust your search or clear filters to see transactions.</span>
+                  </td>
                 </tr>
               </tbody>
             </table>
+            </div>
+            <div class="transaction-pagination">
+              <span>Showing {{ transactionPageStart }}–{{ transactionPageEnd }} of {{ filteredTransactions.length }} transactions</span>
+              <div>
+                <button class="btn-secondary" type="button" (click)="transactionPage = transactionPage - 1" [disabled]="transactionPage <= 1">Previous</button>
+                <span>Page {{ transactionPage }} of {{ transactionPageCount }}</span>
+                <button class="btn-secondary" type="button" (click)="transactionPage = transactionPage + 1" [disabled]="transactionPage >= transactionPageCount">Next</button>
+              </div>
+            </div>
           </div>
 
           <div class="modal-actions">
@@ -375,6 +560,41 @@
       </div>
     </div>
 
+    <div class="transaction-drawer-backdrop" *ngIf="selectedTransaction" (click)="selectedTransaction = null">
+      <aside class="transaction-drawer" role="dialog" aria-modal="true" aria-label="Transaction details" (click)="$event.stopPropagation()">
+        <header>
+          <div>
+            <span class="drawer-eyebrow">Credit card transaction</span>
+            <h3>Transaction details</h3>
+          </div>
+          <button class="close-btn" type="button" aria-label="Close details" (click)="selectedTransaction = null">&times;</button>
+        </header>
+        <div class="drawer-status">
+          <span class="status-badge" [ngClass]="transactionStatusClass(selectedTransaction.status)">{{ selectedTransaction.status || 'Unknown' }}</span>
+          <strong>₹{{ selectedTransaction.amount | number:'1.2-2' }}</strong>
+        </div>
+        <dl class="transaction-detail-list">
+          <div><dt>Transaction ID</dt><dd>{{ selectedTransaction.globalTransactionSequence || selectedTransaction.id }}</dd></div>
+          <div><dt>Customer / Account reference</dt><dd>{{ selectedTransaction.customerReference || '-' }}</dd></div>
+          <div><dt>Card reference</dt><dd>{{ selectedTransaction.cardReference || selectedTransaction.creditCardId || selectedCreditCard?.id }}</dd></div>
+          <div><dt>Masked card number</dt><dd>{{ maskCardNumber(selectedTransaction.cardNumber || selectedCreditCard?.maskedCardNumber || selectedCreditCard?.cardNumber) }}</dd></div>
+          <div><dt>Date &amp; time</dt><dd>{{ selectedTransaction.transactionDate | date:'dd/MM/yyyy HH:mm:ss' }}</dd></div>
+          <div><dt>Merchant</dt><dd>{{ selectedTransaction.merchant || '-' }}</dd></div>
+          <div><dt>Transaction type</dt><dd>{{ selectedTransaction.transactionType || '-' }}</dd></div>
+          <div><dt>Payment method</dt><dd>{{ selectedTransaction.paymentMethod || '-' }}</dd></div>
+          <div><dt>Debited account</dt><dd>{{ selectedTransaction.debitAccountNumber || '-' }}</dd></div>
+          <div><dt>Cheque number</dt><dd>{{ selectedTransaction.chequeNumber || '-' }}</dd></div>
+          <div><dt>Reference number</dt><dd>{{ selectedTransaction.referenceNumber || '-' }}</dd></div>
+          <div><dt>Authorization status</dt><dd>{{ selectedTransaction.authorizationStatus || 'Not supplied by transaction service' }}</dd></div>
+          <div><dt>Settlement status</dt><dd>{{ selectedTransaction.settlementStatus || 'Not supplied by transaction service' }}</dd></div>
+          <div><dt>Processed by</dt><dd>{{ selectedTransaction.processedBy || '-' }}</dd></div>
+          <div><dt>Recorded at</dt><dd>{{ selectedTransaction.transactionDate | date:'dd/MM/yyyy HH:mm:ss' }}</dd></div>
+          <div><dt>Balance after</dt><dd>{{ selectedTransaction.balanceAfter != null ? ('₹' + (selectedTransaction.balanceAfter | number:'1.2-2')) : '-' }}</dd></div>
+        </dl>
+        <p class="drawer-security-note"><i class="fa fa-shield-alt"></i> CVV, PIN, passwords, and authentication secrets are never displayed.</p>
+      </aside>
+    </div>
+
     <!-- Admin Bill Payment Modal -->
     <div class="modal-overlay" *ngIf="showBillPaymentModal" (click)="showBillPaymentModal = false">
       <div class="modal-content" (click)="$event.stopPropagation()">
@@ -385,7 +605,7 @@
         <div class="modal-body" *ngIf="selectedBillForPayment">
           <div class="info-grid">
             <div class="info-item"><label>Card Holder:</label><span>{{ selectedCreditCard?.userName }}</span></div>
-            <div class="info-item"><label>Card Number:</label><span>{{ selectedCreditCard?.maskedCardNumber || selectedCreditCard?.cardNumber }}</span></div>
+            <div class="info-item"><label>Card Number:</label><span>{{ maskCardNumber(selectedCreditCard?.maskedCardNumber || selectedCreditCard?.cardNumber) }}</span></div>
             <div class="info-item"><label>Bill Number:</label><span>#{{ selectedBillForPayment.id }}</span></div>
             <div class="info-item"><label>Outstanding:</label><span class="amount">₹{{ ((selectedBillForPayment.totalAmount || 0) + (selectedBillForPayment.fine || 0) + (selectedBillForPayment.penalty || 0) - (selectedBillForPayment.paidAmount || 0)) | number:'1.2-2' }}</span></div>
           </div>
@@ -406,7 +626,7 @@
             <input type="text" [(ngModel)]="billPaymentForm.debitAccountNumber" (blur)="loadPaymentAccountDetails()" placeholder="Any account to debit" />
             <div class="info-box" *ngIf="paymentAccountDetails">
               <strong>{{ paymentAccountDetails.name }}</strong>
-              <span>Account: {{ paymentAccountDetails.accountNumber }}</span>
+              <span>Account: {{ maskAccountNumber(paymentAccountDetails.accountNumber) }}</span>
               <span>Type: {{ paymentAccountDetails.accountType }}</span>
               <span>Balance: ₹{{ paymentAccountDetails.balance | number:'1.2-2' }}</span>
             </div>
@@ -421,7 +641,7 @@
               <strong>{{ chequeVerification.valid ? '✅ Valid & Unused' : '❌ Invalid' }}</strong>
               <span>Cheque Number: {{ chequeVerification.chequeNumber }}</span>
               <span>Account Holder: {{ chequeVerification.accountHolderName }}</span>
-              <span>Account Number: {{ chequeVerification.accountNumber }}</span>
+              <span>Account Number: {{ maskAccountNumber(chequeVerification.accountNumber) }}</span>
               <span>Status: {{ chequeVerification.status }}</span>
               <span>{{ chequeVerification.message }}</span>
             </div>
@@ -449,7 +669,7 @@
         <div class="modal-body" *ngIf="selectedCreditCard">
           <div class="info-grid">
             <div class="info-item"><label>Card Holder:</label><span>{{ selectedCreditCard.userName }}</span></div>
-            <div class="info-item"><label>Card Number:</label><span>{{ selectedCreditCard.maskedCardNumber || selectedCreditCard.cardNumber }}</span></div>
+            <div class="info-item"><label>Card Number:</label><span>{{ maskCardNumber(selectedCreditCard.maskedCardNumber || selectedCreditCard.cardNumber) }}</span></div>
             <div class="info-item"><label>Available Limit:</label><span class="amount">₹{{ selectedCreditCard.availableLimit | number:'1.2-2' }}</span></div>
             <div class="info-item"><label>Fee:</label><span>{{ transferFeePercent }}% (admin configurable)</span></div>
           </div>
@@ -577,7 +797,7 @@
         <div class="modal-body">
           <div class="form-group">
             <label>Card Number:</label>
-            <span>{{ selectedCreditCard?.maskedCardNumber || selectedCreditCard?.cardNumber }}</span>
+            <span>{{ maskCardNumber(selectedCreditCard?.maskedCardNumber || selectedCreditCard?.cardNumber) }}</span>
           </div>
           <div class="form-group">
             <label>Account Holder:</label>

@@ -20,7 +20,25 @@ export class CreditCards implements OnInit, OnDestroy {
   isLoadingCreditCards: boolean = false;
   selectedCreditCard: any = null;
   creditCardTransactions: any[] = [];
+  filteredTransactions: any[] = [];
   creditCardBills: any[] = [];
+  selectedTransaction: any = null;
+  transactionSearchQuery = '';
+  transactionPageSize = 10;
+  transactionPage = 1;
+  transactionFilters = {
+    startDate: '',
+    endDate: '',
+    type: '',
+    paymentMethod: '',
+    status: '',
+    merchant: '',
+    minAmount: null as number | null,
+    maxAmount: null as number | null,
+    category: '',
+    processedBy: '',
+    region: ''
+  };
   creditCardSearchQuery: string = '';
   creditCardStatusFilter: string = 'ALL';
   showApplyCreditCardModal: boolean = false;
@@ -74,6 +92,10 @@ export class CreditCards implements OnInit, OnDestroy {
   emiProcessingFeePercent = 8;
   creditCardEmiPlans: any[] = [];
   isSavingEmiSettings = false;
+  creditLimitIncreaseCeiling = 0;
+  isSavingCreditLimitCeiling = false;
+  customerServiceRequests: any[] = [];
+  isLoadingServiceRequests = false;
 
   constructor(
     private router: Router,
@@ -97,6 +119,8 @@ export class CreditCards implements OnInit, OnDestroy {
       this.loadCreditCards();
       this.loadTransferFeePercent();
       this.loadEmiSettings();
+      this.loadCreditLimitIncreaseCeiling();
+      this.loadCustomerServiceRequests();
       this.refreshTimer = setInterval(() => this.silentRefresh(), 10000);
     }
   }
@@ -197,6 +221,8 @@ export class CreditCards implements OnInit, OnDestroy {
       return;
     }
     this.selectedCreditCard = card;
+    this.selectedTransaction = null;
+    this.clearTransactionFilters();
     this.loadCreditCardDetails(card.id);
     this.loadEmiPlans();
   }
@@ -214,10 +240,12 @@ export class CreditCards implements OnInit, OnDestroy {
     this.http.get(`${environment.apiBaseUrl}/api/credit-cards/${numericCardId}/transactions`, this.authOptions()).subscribe({
       next: (transactions: any) => {
         this.creditCardTransactions = Array.isArray(transactions) ? transactions : [];
+        this.applyTransactionFilters();
       },
       error: (err: any) => {
         console.error('Error loading transactions:', err);
         this.creditCardTransactions = [];
+        this.filteredTransactions = [];
         // Don't show error alert for transactions/bills as they're secondary data
       }
     });
@@ -233,6 +261,196 @@ export class CreditCards implements OnInit, OnDestroy {
         // Don't show error alert for transactions/bills as they're secondary data
       }
     });
+  }
+
+  maskAccountNumber(accountNumber: string | null | undefined): string {
+    if (!accountNumber) return '—';
+    return `****${accountNumber.slice(-4)}`;
+  }
+
+  maskCardNumber(cardNumber: string | null | undefined): string {
+    if (!cardNumber) return '—';
+    if (cardNumber.includes('*')) return cardNumber;
+    return `**** **** **** ${cardNumber.replace(/\D/g, '').slice(-4)}`;
+  }
+
+  applyTransactionFilters() {
+    const query = this.transactionSearchQuery.trim().toLowerCase();
+    const startDate = this.transactionFilters.startDate ? new Date(`${this.transactionFilters.startDate}T00:00:00`) : null;
+    const endDate = this.transactionFilters.endDate ? new Date(`${this.transactionFilters.endDate}T23:59:59.999`) : null;
+
+    this.filteredTransactions = this.creditCardTransactions.filter(transaction => {
+      const transactionDate = transaction.transactionDate ? new Date(transaction.transactionDate) : null;
+      const amount = Number(transaction.amount);
+      const safeSearchFields = [
+        transaction.id,
+        transaction.globalTransactionSequence,
+        transaction.userName,
+        transaction.accountNumber,
+        transaction.customerReference,
+        this.selectedCreditCard?.accountNumber,
+        transaction.creditCardId,
+        transaction.cardReference,
+        transaction.cardNumber,
+        transaction.merchant,
+        transaction.debitAccountNumber,
+        transaction.referenceNumber,
+        transaction.chequeNumber
+      ];
+
+      if (query && !safeSearchFields.some(value => String(value ?? '').toLowerCase().includes(query))) return false;
+      if (startDate && (!transactionDate || Number.isNaN(transactionDate.getTime()) || transactionDate < startDate)) return false;
+      if (endDate && (!transactionDate || Number.isNaN(transactionDate.getTime()) || transactionDate > endDate)) return false;
+      if (this.transactionFilters.type && transaction.transactionType !== this.transactionFilters.type) return false;
+      if (this.transactionFilters.paymentMethod && transaction.paymentMethod !== this.transactionFilters.paymentMethod) return false;
+      if (this.transactionFilters.status && String(transaction.status || '').toLowerCase() !== this.transactionFilters.status.toLowerCase()) return false;
+      if (this.transactionFilters.merchant && !String(transaction.merchant || '').toLowerCase().includes(this.transactionFilters.merchant.toLowerCase())) return false;
+      if (this.transactionFilters.minAmount !== null && (!Number.isFinite(amount) || amount < this.transactionFilters.minAmount)) return false;
+      if (this.transactionFilters.maxAmount !== null && (!Number.isFinite(amount) || amount > this.transactionFilters.maxAmount)) return false;
+      if (this.transactionFilters.category && transaction.category !== this.transactionFilters.category) return false;
+      if (this.transactionFilters.processedBy && transaction.processedBy !== this.transactionFilters.processedBy) return false;
+      if (this.transactionFilters.region) {
+        const isInternational = transaction.isInternational === true || String(transaction.isInternational).toLowerCase() === 'true';
+        if ((this.transactionFilters.region === 'INTERNATIONAL') !== isInternational) return false;
+      }
+      return true;
+    });
+
+    this.transactionPage = Math.min(this.transactionPage, this.transactionPageCount);
+    if (this.transactionPage < 1) this.transactionPage = 1;
+  }
+
+  clearTransactionFilters() {
+    this.transactionSearchQuery = '';
+    this.transactionFilters = {
+      startDate: '',
+      endDate: '',
+      type: '',
+      paymentMethod: '',
+      status: '',
+      merchant: '',
+      minAmount: null,
+      maxAmount: null,
+      category: '',
+      processedBy: '',
+      region: ''
+    };
+    this.transactionPage = 1;
+    this.applyTransactionFilters();
+  }
+
+  get transactionPageCount(): number {
+    return Math.max(1, Math.ceil(this.filteredTransactions.length / this.transactionPageSize));
+  }
+
+  get paginatedTransactions(): any[] {
+    const start = (this.transactionPage - 1) * this.transactionPageSize;
+    return this.filteredTransactions.slice(start, start + this.transactionPageSize);
+  }
+
+  get transactionPageStart(): number {
+    return this.filteredTransactions.length ? (this.transactionPage - 1) * this.transactionPageSize + 1 : 0;
+  }
+
+  get transactionPageEnd(): number {
+    return Math.min(this.transactionPage * this.transactionPageSize, this.filteredTransactions.length);
+  }
+
+  get successfulTransactionCount(): number {
+    return this.creditCardTransactions.filter(transaction =>
+      ['completed', 'successful', 'success'].includes(String(transaction.status || '').toLowerCase())
+    ).length;
+  }
+
+  get todayTransactionCount(): number {
+    const today = new Date().toDateString();
+    return this.creditCardTransactions.filter(transaction =>
+      transaction.transactionDate && new Date(transaction.transactionDate).toDateString() === today
+    ).length;
+  }
+
+  get todaySuccessfulTransactionCount(): number {
+    const today = new Date().toDateString();
+    return this.creditCardTransactions.filter(transaction =>
+      transaction.transactionDate &&
+      new Date(transaction.transactionDate).toDateString() === today &&
+      ['completed', 'successful', 'success'].includes(String(transaction.status || '').toLowerCase())
+    ).length;
+  }
+
+  getTransactionStatusCount(status: string): number {
+    return this.creditCardTransactions.filter(transaction =>
+      String(transaction.status || '').toLowerCase() === status.toLowerCase()
+    ).length;
+  }
+
+  getTransactionTypes(): string[] {
+    return [...new Set(this.creditCardTransactions.map(transaction => transaction.transactionType).filter(Boolean))].sort();
+  }
+
+  getTransactionPaymentMethods(): string[] {
+    return [...new Set(this.creditCardTransactions.map(transaction => transaction.paymentMethod).filter(Boolean))].sort();
+  }
+
+  getTransactionStatuses(): string[] {
+    return [...new Set(this.creditCardTransactions.map(transaction => transaction.status).filter(Boolean))].sort();
+  }
+
+  getTransactionCategories(): string[] {
+    return [...new Set(this.creditCardTransactions.map(transaction => transaction.category).filter(Boolean))].sort();
+  }
+
+  getProcessedByOptions(): string[] {
+    return [...new Set(this.creditCardTransactions.map(transaction => transaction.processedBy).filter(Boolean))].sort();
+  }
+
+  hasInternationalTransactionData(): boolean {
+    return this.creditCardTransactions.some(transaction => transaction.isInternational !== undefined && transaction.isInternational !== null);
+  }
+
+  transactionStatusClass(status: string): string {
+    const normalized = String(status || '').toLowerCase();
+    if (['completed', 'successful', 'success'].includes(normalized)) return 'successful';
+    if (['pending', 'failed', 'reversed', 'refunded', 'disputed', 'blocked'].includes(normalized)) return normalized;
+    return 'neutral';
+  }
+
+  viewTransactionDetails(transaction: any) {
+    this.selectedTransaction = transaction;
+  }
+
+  exportTransactionsCsv() {
+    const columns = [
+      ['Transaction ID', (transaction: any) => transaction.globalTransactionSequence ?? transaction.id],
+      ['Card Reference', (transaction: any) => transaction.cardReference ?? transaction.creditCardId ?? this.selectedCreditCard?.id],
+      ['Masked Card Number', (transaction: any) => this.maskCardNumber(transaction.cardNumber || this.selectedCreditCard?.maskedCardNumber || this.selectedCreditCard?.cardNumber)],
+      ['Date & Time', (transaction: any) => transaction.transactionDate],
+      ['Type', (transaction: any) => transaction.transactionType],
+      ['Merchant', (transaction: any) => transaction.merchant],
+      ['Payment Method', (transaction: any) => transaction.paymentMethod],
+      ['Amount', (transaction: any) => transaction.amount],
+      ['Status', (transaction: any) => transaction.status],
+      ['Processed By', (transaction: any) => transaction.processedBy],
+      ['Reference Number', (transaction: any) => transaction.referenceNumber],
+      ['Cheque Number', (transaction: any) => transaction.chequeNumber]
+    ] as const;
+    const escapeCell = (value: unknown) => {
+      let text = String(value ?? '');
+      if (/^[\s]*[=+\-@]/.test(text)) text = `'${text}`;
+      return `"${text.replace(/"/g, '""')}"`;
+    };
+    const csv = [
+      columns.map(([label]) => escapeCell(label)).join(','),
+      ...this.filteredTransactions.map(transaction =>
+        columns.map(([, value]) => escapeCell(value(transaction))).join(',')
+      )
+    ].join('\r\n');
+    const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `credit-card-transactions-${this.selectedCreditCard?.id || 'filtered'}.csv`;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 0);
   }
 
   submitCreditCardApplication() {
@@ -609,7 +827,7 @@ export class CreditCards implements OnInit, OnDestroy {
         documentType: this.closeCardDocument!.type,
         closedBy: this.adminName,
         closedDate: new Date().toISOString(),
-        cardNumber: this.selectedCreditCard?.cardNumber || this.selectedCreditCard?.maskedCardNumber
+        cardNumber: this.maskCardNumber(this.selectedCreditCard?.maskedCardNumber || this.selectedCreditCard?.cardNumber)
       };
       
       this.saveCloseCardDocument(numericCardId, documentData);
@@ -916,6 +1134,81 @@ export class CreditCards implements OnInit, OnDestroy {
         this.isSavingEmiSettings = false;
         this.alertService.error('Error', err.error?.message || 'Unable to save EMI rates');
       }
+    });
+  }
+
+  loadCreditLimitIncreaseCeiling() {
+    this.http.get<any>(`${environment.apiBaseUrl}/api/credit-cards/credit-limit-increase-ceiling`, this.authOptions()).subscribe({
+      next: response => this.creditLimitIncreaseCeiling = Number(response.ceiling || 0),
+      error: err => {
+        console.error('Error loading credit-limit increase ceiling:', err);
+        this.alertService.operationError('Credit-limit configuration', 'Unable to load the configured request ceiling');
+      }
+    });
+  }
+
+  saveCreditLimitIncreaseCeiling() {
+    if (!Number.isFinite(this.creditLimitIncreaseCeiling) || this.creditLimitIncreaseCeiling <= 0) {
+      this.alertService.error('Validation Error', 'Set a credit-limit increase ceiling greater than zero');
+      return;
+    }
+    this.isSavingCreditLimitCeiling = true;
+    this.http.put<any>(
+      `${environment.apiBaseUrl}/api/credit-cards/credit-limit-increase-ceiling`,
+      { ceiling: this.creditLimitIncreaseCeiling },
+      this.authOptions()
+    ).subscribe({
+      next: response => {
+        this.creditLimitIncreaseCeiling = Number(response.ceiling);
+        this.isSavingCreditLimitCeiling = false;
+        this.alertService.success('Saved', 'The customer credit-limit request ceiling was updated.');
+      },
+      error: err => {
+        this.isSavingCreditLimitCeiling = false;
+        this.alertService.operationError('Credit-limit configuration', err.error?.message || 'Unable to save the request ceiling');
+      }
+    });
+  }
+
+  loadCustomerServiceRequests() {
+    this.isLoadingServiceRequests = true;
+    this.http.get<any>(`${environment.apiBaseUrl}/api/credit-card-requests/all`, this.authOptions()).subscribe({
+      next: response => {
+        this.customerServiceRequests = Array.isArray(response?.content)
+          ? response.content.map((request: any) => ({
+            ...request,
+            nextStatus: request.status,
+            resolution: request.resolution || ''
+          }))
+          : [];
+        this.isLoadingServiceRequests = false;
+      },
+      error: err => {
+        this.isLoadingServiceRequests = false;
+        console.error('Error loading customer credit-card requests:', err);
+        this.alertService.operationError('Customer requests', err.error?.message || 'Unable to load customer requests');
+      }
+    });
+  }
+
+  updateCustomerServiceRequest(request: any, status: string) {
+    const resolution = String(request.resolution || '').trim();
+    if (['Approved', 'Resolved', 'Rejected'].includes(status) && resolution.length < 5) {
+      this.alertService.error('Resolution required', 'Enter at least 5 characters describing the decision.');
+      return;
+    }
+    if (!confirm(`Change ${request.requestNumber} to ${status}?`)) return;
+    this.http.put(
+      `${environment.apiBaseUrl}/api/credit-card-requests/${request.id}/status`,
+      { status, resolution },
+      this.authOptions()
+    ).subscribe({
+      next: () => {
+        this.alertService.success('Request updated', `${request.requestNumber} is now ${status.toLowerCase()}.`);
+        this.loadCustomerServiceRequests();
+        if (request.requestType === 'Credit Limit Increase' && status === 'Approved') this.loadCreditCards();
+      },
+      error: err => this.alertService.operationError('Request update', err.error?.message || 'Unable to update this request')
     });
   }
 

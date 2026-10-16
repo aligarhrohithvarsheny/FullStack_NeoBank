@@ -3,6 +3,7 @@ package com.neo.springapp.controller;
 import com.neo.springapp.model.*;
 import com.neo.springapp.repository.CreditCardAuditLogRepository;
 import com.neo.springapp.repository.CreditCardBillRepository;
+import com.neo.springapp.repository.CreditCardSettingsRepository;
 import com.neo.springapp.service.CreditCardService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -11,6 +12,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
@@ -34,6 +36,9 @@ public class CreditCardController {
 
     @Autowired
     private CreditCardBillRepository creditCardBillRepository;
+
+    @Autowired
+    private CreditCardSettingsRepository creditCardSettingsRepository;
 
     private Optional<CreditCard> getOwnedCard(Long id, Authentication authentication) {
         if (authentication == null
@@ -75,10 +80,15 @@ public class CreditCardController {
         return controls;
     }
 
+    private String maskCardNumber(String cardNumber) {
+        if (cardNumber == null || cardNumber.isBlank()) return null;
+        return "**** **** **** " + cardNumber.substring(Math.max(0, cardNumber.length() - 4));
+    }
+
     private Map<String, Object> customerCardSummary(CreditCard card) {
         Map<String, Object> summary = new HashMap<>();
         summary.put("id", card.getId());
-        summary.put("cardNumber", card.getMaskedCardNumber());
+        summary.put("cardNumber", maskCardNumber(card.getCardNumber()));
         summary.put("expiryDate", card.getExpiryDate());
         summary.put("pinSet", card.isPinSet());
         summary.put("status", card.getStatus());
@@ -100,11 +110,27 @@ public class CreditCardController {
         return summary;
     }
 
+    private Map<String, Object> adminCardSummary(CreditCard card) {
+        Map<String, Object> summary = customerCardSummary(card);
+        summary.put("maskedCardNumber", maskCardNumber(card.getCardNumber()));
+        summary.put("expiryDateTime", card.getExpiryDateTime());
+        summary.put("issueDate", card.getIssueDate());
+        summary.put("lastUsed", card.getLastUsed());
+        summary.put("nextBillingDate", card.getNextBillingDate());
+        summary.put("blocked", card.isBlocked());
+        summary.put("deactivated", card.isDeactivated());
+        summary.put("onlineTransactionsEnabled", card.isOnlineTransactionsEnabled());
+        summary.put("posTransactionsEnabled", card.isPosTransactionsEnabled());
+        summary.put("contactlessEnabled", card.isContactlessEnabled());
+        summary.put("atmWithdrawalsEnabled", card.isAtmWithdrawalsEnabled());
+        summary.put("internationalTransactionsEnabled", card.isInternationalTransactionsEnabled());
+        return summary;
+    }
+
     private Map<String, Object> customerTransactionSummary(CreditCardTransaction transaction) {
         Map<String, Object> summary = new HashMap<>();
         summary.put("id", transaction.getId());
-        summary.put("cardNumber", transaction.getCardNumber() == null
-                ? null : "**** **** **** " + transaction.getCardNumber().substring(Math.max(0, transaction.getCardNumber().length() - 4)));
+        summary.put("cardNumber", maskCardNumber(transaction.getCardNumber()));
         summary.put("billId", transaction.getBillId());
         summary.put("emiPlanId", transaction.getEmiPlanId());
         summary.put("transactionType", transaction.getTransactionType());
@@ -117,11 +143,30 @@ public class CreditCardController {
         return summary;
     }
 
+    private String maskAccountNumber(String accountNumber) {
+        if (accountNumber == null || accountNumber.isBlank()) return null;
+        int visibleDigits = Math.min(4, accountNumber.length());
+        return "****" + accountNumber.substring(accountNumber.length() - visibleDigits);
+    }
+
+    private Map<String, Object> adminTransactionSummary(CreditCardTransaction transaction) {
+        Map<String, Object> summary = customerTransactionSummary(transaction);
+        summary.put("globalTransactionSequence", transaction.getGlobalTransactionSequence());
+        summary.put("cardReference", transaction.getCreditCardId());
+        summary.put("customerReference", maskAccountNumber(transaction.getAccountNumber()));
+        summary.put("paymentMethod", transaction.getPaymentMethod());
+        summary.put("chequeNumber", transaction.getChequeNumber());
+        summary.put("debitAccountNumber", maskAccountNumber(transaction.getDebitAccountNumber()));
+        summary.put("processedBy", transaction.getProcessedBy());
+        summary.put("chequeImage", transaction.getChequeImage() != null && transaction.getChequeImage().length > 0);
+        summary.put("chequeImageName", transaction.getChequeImageName());
+        return summary;
+    }
+
     private Map<String, Object> customerBillSummary(CreditCardBill bill) {
         Map<String, Object> summary = new HashMap<>();
         summary.put("id", bill.getId());
-        summary.put("cardNumber", bill.getCardNumber() == null
-                ? null : "**** **** **** " + bill.getCardNumber().substring(Math.max(0, bill.getCardNumber().length() - 4)));
+        summary.put("cardNumber", maskCardNumber(bill.getCardNumber()));
         summary.put("billGenerationDate", bill.getBillGenerationDate());
         summary.put("dueDate", bill.getDueDate());
         summary.put("paidDate", bill.getPaidDate());
@@ -294,7 +339,9 @@ public class CreditCardController {
     @GetMapping("/all")
     public ResponseEntity<?> getAllCreditCards(Authentication authentication) {
         if (!isStaff(authentication)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
-        return ResponseEntity.ok(creditCardService.getAllCreditCards());
+        return ResponseEntity.ok(creditCardService.getAllCreditCards().stream()
+                .map(this::adminCardSummary)
+                .toList());
     }
 
     // User: Get credit cards by account number
@@ -405,6 +452,11 @@ public class CreditCardController {
     @GetMapping("/{id}/transactions")
     public ResponseEntity<?> getTransactions(@PathVariable Long id, Authentication authentication) {
         if (!canAccessCard(id, authentication)) return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        if (isStaff(authentication)) {
+            return ResponseEntity.ok(creditCardService.getTransactionsByCardId(id).stream()
+                    .map(this::adminTransactionSummary)
+                    .toList());
+        }
         return ResponseEntity.ok(creditCardService.getTransactionsByCardId(id).stream()
                 .map(this::customerTransactionSummary)
                 .toList());
@@ -455,6 +507,34 @@ public class CreditCardController {
     @GetMapping("/emi-settings")
     public ResponseEntity<?> getEmiSettings() {
         return ResponseEntity.ok(creditCardService.getEmiSettings());
+    }
+
+    @GetMapping("/credit-limit-increase-ceiling")
+    public ResponseEntity<?> getCreditLimitIncreaseCeiling(Authentication authentication) {
+        if (!isStaff(authentication)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        BigDecimal ceiling = creditCardSettingsRepository.findAll().stream().findFirst()
+                .map(CreditCardSettings::getCreditLimitIncreaseCeiling).orElse(null);
+        return ResponseEntity.ok(Map.of("ceiling", ceiling == null ? 0 : ceiling));
+    }
+
+    @PutMapping("/credit-limit-increase-ceiling")
+    @Transactional
+    public ResponseEntity<?> updateCreditLimitIncreaseCeiling(
+            @RequestBody Map<String, Object> request,
+            Authentication authentication) {
+        if (!isStaff(authentication)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        Object rawCeiling = request.get("ceiling");
+        if (!(rawCeiling instanceof Number number) || !Double.isFinite(number.doubleValue())
+                || number.doubleValue() <= 0) {
+            return ResponseEntity.badRequest().body(Map.of("message", "The credit-limit ceiling must be greater than zero"));
+        }
+        CreditCardSettings settings = creditCardSettingsRepository.findAll().stream().findFirst()
+                .orElseGet(CreditCardSettings::new);
+        settings.setCreditLimitIncreaseCeiling(new BigDecimal(number.toString()));
+        settings.setUpdatedBy(authentication.getName());
+        settings.setUpdatedAt(LocalDateTime.now());
+        creditCardSettingsRepository.save(settings);
+        return ResponseEntity.ok(Map.of("ceiling", settings.getCreditLimitIncreaseCeiling()));
     }
 
     @PutMapping("/emi-settings")
