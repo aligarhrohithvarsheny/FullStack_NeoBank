@@ -421,7 +421,7 @@ public class CreditCardService {
         result.put("processingFeePercent", settings.getEmiProcessingFeePercent() == null
                 ? 8.0 : settings.getEmiProcessingFeePercent());
         result.put("minimumTransactionAmount", 3000.0);
-        result.put("tenuresMonths", List.of(3, 6, 9, 12));
+        result.put("tenuresMonths", List.of(3, 6, 9, 12, 18, 24));
         result.put("updatedBy", settings.getUpdatedBy());
         result.put("updatedAt", settings.getUpdatedAt());
         return result;
@@ -473,8 +473,8 @@ public class CreditCardService {
         if (transactionIds == null || transactionIds.isEmpty()) {
             throw new IllegalArgumentException("Select at least one eligible transaction");
         }
-        if (tenureMonths == null || !Set.of(3, 6, 9, 12).contains(tenureMonths)) {
-            throw new IllegalArgumentException("Choose a 3, 6, 9, or 12 month EMI tenure");
+        if (tenureMonths == null || !Set.of(3, 6, 9, 12, 18, 24).contains(tenureMonths)) {
+            throw new IllegalArgumentException("Choose a 3, 6, 9, 12, 18, or 24 month EMI tenure");
         }
         CreditCard card = creditCardRepository.findById(creditCardId)
                 .orElseThrow(() -> new IllegalArgumentException("Credit card not found"));

@@ -130,6 +130,7 @@ public class CreditCardController {
     private Map<String, Object> customerTransactionSummary(CreditCardTransaction transaction) {
         Map<String, Object> summary = new HashMap<>();
         summary.put("id", transaction.getId());
+        summary.put("globalTransactionSequence", transaction.getGlobalTransactionSequence());
         summary.put("cardNumber", maskCardNumber(transaction.getCardNumber()));
         summary.put("billId", transaction.getBillId());
         summary.put("emiPlanId", transaction.getEmiPlanId());
@@ -140,6 +141,7 @@ public class CreditCardController {
         summary.put("transactionDate", transaction.getTransactionDate());
         summary.put("balanceAfter", transaction.getBalanceAfter());
         summary.put("status", transaction.getStatus());
+        summary.put("paymentMethod", transaction.getPaymentMethod());
         return summary;
     }
 
@@ -195,6 +197,20 @@ public class CreditCardController {
         Optional<CreditCard> card = getOwnedCard(id, authentication);
         if (card.isEmpty()) return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         return ResponseEntity.ok(cardControls(card.get()));
+    }
+
+    @GetMapping("/{id}/security-events")
+    public ResponseEntity<?> getCardSecurityEvents(@PathVariable Long id, Authentication authentication) {
+        Optional<CreditCard> card = getOwnedCard(id, authentication);
+        if (card.isEmpty()) return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        return ResponseEntity.ok(creditCardAuditLogRepository
+                .findByCreditCardIdOrderByCreatedAtDesc(id).stream()
+                .map(event -> Map.of(
+                        "action", event.getAction() == null ? "" : event.getAction(),
+                        "previousValue", event.getPreviousValue() == null ? "" : event.getPreviousValue(),
+                        "newValue", event.getNewValue() == null ? "" : event.getNewValue(),
+                        "createdAt", event.getCreatedAt()))
+                .toList());
     }
 
     @PutMapping("/{id}/controls")

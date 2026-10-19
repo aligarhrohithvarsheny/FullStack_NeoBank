@@ -51,6 +51,7 @@ interface UserProfile {
 
 interface CreditCardTransaction {
   id: number;
+  globalTransactionSequence?: number;
   billId?: number | null;
   emiPlanId?: number | null;
   transactionType: string;
@@ -60,9 +61,11 @@ interface CreditCardTransaction {
   transactionDate: string;
   balanceAfter: number;
   status: string;
+  paymentMethod?: string | null;
 }
 
 type TransactionTab = 'ALL' | 'UNBILLED' | 'BILLED' | 'EMI' | 'REFUNDS';
+type StatementPeriodFilter = 'ALL' | 'MONTHLY' | 'FINANCIAL_YEAR';
 
 interface CardControls {
   onlineTransactionsEnabled: boolean;
@@ -153,11 +156,24 @@ export class CreditCard implements OnInit {
   transactionMinAmount: number | null = null;
   transactionMaxAmount: number | null = null;
   billSearch = '';
+  statementPeriodFilter: StatementPeriodFilter = 'ALL';
+  selectedFinancialYear = this.financialYearLabel(new Date());
+  selectedStatementMonth = '';
   statementStartDate = '';
   statementEndDate = '';
   selectedTransaction: CreditCardTransaction | null = null;
   isUpdatingControls = false;
+  paymentConfirmation: {
+    billId: number;
+    amount: number;
+    paymentMethod: string;
+    reference: string;
+    date: string;
+    status: string;
+  } | null = null;
   customerRequests: any[] = [];
+  cardSecurityEvents: any[] = [];
+  isLoadingSecurityEvents = false;
   requestType = 'Transaction Dispute';
   requestCategory = 'Unauthorized transaction';
   disputeTransactionId: number | null = null;
@@ -196,6 +212,9 @@ export class CreditCard implements OnInit {
     'internationalTransactionsEnabled'
   ];
   readonly transactionTabs: TransactionTab[] = ['ALL', 'UNBILLED', 'BILLED', 'EMI', 'REFUNDS'];
+  readonly statementPeriodFilters: StatementPeriodFilter[] = ['ALL', 'MONTHLY', 'FINANCIAL_YEAR'];
+  readonly analyticsPeriods = ['THIS_MONTH', 'PREVIOUS_MONTH', 'CURRENT_CYCLE', 'PREVIOUS_CYCLE'] as const;
+  analyticsPeriod: typeof this.analyticsPeriods[number] = 'THIS_MONTH';
   // CIBIL Report Lookup
   cibilReportData: any = null;
   isLoadingCibilReport: boolean = false;
@@ -295,6 +314,7 @@ export class CreditCard implements OnInit {
     this.loadEmiDetails();
     this.loadCustomerRequests();
     this.loadRequestConfiguration();
+    this.loadSecurityEvents();
   }
 
   loadCardControls() {
@@ -383,6 +403,21 @@ export class CreditCard implements OnInit {
     this.http.get(`${environment.apiBaseUrl}/api/credit-cards/${this.selectedCard.id}/transactions`, this.authOptions()).subscribe({
       next: (transactions: any) => {
         this.transactions = Array.isArray(transactions) ? transactions : [];
+        if (this.paymentConfirmation) {
+          const payment = this.transactions.find(transaction =>
+            transaction.billId === this.paymentConfirmation?.billId
+            && transaction.transactionType?.toLowerCase() === 'payment'
+            && Number(transaction.amount) === this.paymentConfirmation?.amount
+          );
+          if (payment) {
+            this.paymentConfirmation = {
+              ...this.paymentConfirmation,
+              paymentMethod: payment.paymentMethod || 'ACCOUNT',
+              reference: this.transactionReference(payment),
+              date: payment.transactionDate
+            };
+          }
+        }
       },
       error: (err: any) => {
         console.error('Error loading transactions:', err);
@@ -397,6 +432,10 @@ export class CreditCard implements OnInit {
     this.http.get(`${environment.apiBaseUrl}/api/credit-cards/${this.selectedCard.id}/bills`, this.authOptions()).subscribe({
       next: (bills: any) => {
         this.bills = Array.isArray(bills) ? bills : [];
+        if (this.availableFinancialYears.length
+          && !this.availableFinancialYears.includes(this.selectedFinancialYear)) {
+          this.selectedFinancialYear = this.availableFinancialYears[0];
+        }
       },
       error: (err: any) => {
         console.error('Error loading bills:', err);
@@ -458,6 +497,25 @@ export class CreditCard implements OnInit {
       error: err => {
         console.error('Error loading credit-card service requests:', err);
         this.alertService.operationError('Service requests', err.error?.message || 'Unable to load your requests');
+      }
+    });
+  }
+
+  loadSecurityEvents() {
+    if (!this.selectedCard) return;
+    this.isLoadingSecurityEvents = true;
+    this.http.get<any[]>(
+      `${environment.apiBaseUrl}/api/credit-cards/${this.selectedCard.id}/security-events`,
+      this.authOptions()
+    ).subscribe({
+      next: events => {
+        this.cardSecurityEvents = Array.isArray(events) ? events : [];
+        this.isLoadingSecurityEvents = false;
+      },
+      error: err => {
+        this.isLoadingSecurityEvents = false;
+        console.error('Error loading card security events:', err);
+        this.cardSecurityEvents = [];
       }
     });
   }
@@ -524,15 +582,18 @@ export class CreditCard implements OnInit {
     this.disputeTransactionId = transaction.id;
     this.requestDescription = `Please investigate transaction ${transaction.id} (${transaction.merchant || transaction.description || 'Card purchase'}) for ₹${Number(transaction.amount).toFixed(2)}. `;
     this.selectedTransaction = null;
-    if (isPlatformBrowser(this.platformId)) {
-      document.getElementById('cardRequestCenter')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
+    this.scrollTo('supportCenter');
   }
 
   toggleEmiTransaction(transactionId: number, checked: boolean) {
     this.selectedEmiTransactionIds = checked
       ? [...new Set([...this.selectedEmiTransactionIds, transactionId])]
       : this.selectedEmiTransactionIds.filter(id => id !== transactionId);
+  }
+
+  get selectedTransactionIsEmiEligible(): boolean {
+    return !!this.selectedTransaction
+      && this.emiEligibleTransactions.some(transaction => transaction.id === this.selectedTransaction?.id);
   }
 
   selectedEmiPrincipal(): number {
@@ -543,9 +604,22 @@ export class CreditCard implements OnInit {
 
   estimatedEmi(): number {
     const principal = this.selectedEmiPrincipal();
+    return this.estimateMonthlyEmi(principal, this.emiTenureMonths);
+  }
+
+  estimateMonthlyEmi(principal: number, months: number): number {
     const annualRate = (this.emiSettings?.annualInterestPercent || 0) / 1200;
-    if (!principal || !annualRate || !this.emiTenureMonths) return 0;
-    return principal * annualRate / (1 - Math.pow(1 + annualRate, -this.emiTenureMonths));
+    if (!principal || !months) return 0;
+    if (!annualRate) return principal / months;
+    return principal * annualRate / (1 - Math.pow(1 + annualRate, -months));
+  }
+
+  estimateEmiInterest(principal: number, months: number): number {
+    return Math.max(0, this.estimateMonthlyEmi(principal, months) * months - principal);
+  }
+
+  get emiTenureOptions(): number[] {
+    return this.emiSettings?.tenuresMonths || [3, 6, 9, 12, 18, 24];
   }
 
   convertToEmi() {
@@ -658,6 +732,29 @@ export class CreditCard implements OnInit {
     this.showBillPaymentModal = true;
   }
 
+  scrollTo(sectionId: string) {
+    if (isPlatformBrowser(this.platformId)) {
+      document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }
+
+  securityActionLabel(action: string): string {
+    return String(action || '').replace(/_/g, ' ');
+  }
+
+  openReplacementRequest(reason: string = 'Lost') {
+    this.onRequestTypeChange('Card Replacement');
+    this.requestCategory = reason;
+    this.scrollTo('supportCenter');
+  }
+
+  openFraudReport() {
+    this.onRequestTypeChange('Transaction Dispute');
+    this.requestCategory = 'Unauthorized transaction';
+    this.disputeTransactionId = null;
+    this.scrollTo('supportCenter');
+  }
+
   billTotalDue(bill: CreditCardBill): number {
     return (bill.totalAmount || 0) + (bill.fine || 0) + (bill.penalty || 0);
   }
@@ -705,6 +802,14 @@ export class CreditCard implements OnInit {
       this.authOptions()
     ).subscribe({
       next: (bill: any) => {
+        this.paymentConfirmation = {
+          billId: this.selectedBill!.id,
+          amount: Number(this.billPaymentAmount),
+          paymentMethod: 'ACCOUNT',
+          reference: 'Processing',
+          date: new Date().toISOString(),
+          status: 'Completed'
+        };
         this.alertService.success('Bill Paid', 'Bill payment processed successfully');
         this.showBillPaymentModal = false;
         this.selectedBill = null;
@@ -912,10 +1017,12 @@ export class CreditCard implements OnInit {
     }
 
   get spendingCategories(): Array<{ name: string; amount: number; percent: number }> {
-      const totals = new Map<string, number>();
+      const categoryNames = ['Shopping', 'Food', 'Fuel', 'Travel', 'Entertainment', 'Bills', 'Healthcare', 'Other'];
+      const totals = new Map<string, number>(categoryNames.map(category => [category, 0] as [string, number]));
       for (const transaction of this.transactions) {
         const amount = Number(transaction.amount || 0);
-        if (amount <= 0 || (transaction.transactionType || '').toLowerCase().includes('refund')) continue;
+        if (amount <= 0 || !this.isPurchase(transaction)) continue;
+        if (!this.matchesSelectedAnalyticsPeriod(transaction)) continue;
         const category = this.transactionCategory(transaction);
         totals.set(category, (totals.get(category) || 0) + amount);
       }
@@ -925,11 +1032,82 @@ export class CreditCard implements OnInit {
         .sort((a, b) => b.amount - a.amount);
     }
 
+  get hasPurchasesForSelectedPeriod(): boolean {
+    return this.transactions.some(transaction =>
+      this.isPurchase(transaction) && this.matchesSelectedAnalyticsPeriod(transaction));
+  }
+
   get filteredBills(): CreditCardBill[] {
     const search = this.billSearch.trim().toLowerCase();
-    return this.bills.filter(bill =>
-      !search || `${bill.billingPeriod} ${bill.status}`.toLowerCase().includes(search)
-    );
+    return this.bills.filter(bill => {
+      const periodDate = new Date(bill.billGenerationDate);
+      const monthLabel = periodDate.toLocaleString('en', { month: 'long', year: 'numeric' });
+      const financialYear = this.financialYearLabel(periodDate);
+      const matchesSearch = !search
+        || `${bill.billingPeriod} ${bill.status} ${monthLabel} ${financialYear}`.toLowerCase().includes(search);
+      const matchesPeriod = this.statementPeriodFilter !== 'FINANCIAL_YEAR'
+        ? this.statementPeriodFilter !== 'MONTHLY'
+          || !this.selectedStatementMonth
+          || this.statementMonthKey(periodDate) === this.selectedStatementMonth
+        : financialYear === this.selectedFinancialYear;
+      return matchesSearch && matchesPeriod;
+    });
+  }
+
+  get availableFinancialYears(): string[] {
+    return [...new Set(this.bills.map(bill => this.financialYearLabel(new Date(bill.billGenerationDate))))]
+      .sort((left, right) => right.localeCompare(left));
+  }
+
+  get availableStatementMonths(): Array<{ key: string; label: string }> {
+    const months = new Map<string, string>();
+    for (const bill of this.bills) {
+      const date = new Date(bill.billGenerationDate);
+      months.set(this.statementMonthKey(date), date.toLocaleString('en', { month: 'long', year: 'numeric' }));
+    }
+    return [...months.entries()]
+      .map(([key, label]) => ({ key, label }))
+      .sort((left, right) => right.key.localeCompare(left.key));
+  }
+
+  private statementMonthKey(date: Date): string {
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+  }
+
+  billStatusClass(bill: CreditCardBill): string {
+    return this.billPaymentStatus(bill).toLowerCase().replace(/\s+/g, '-');
+  }
+
+  statementLabel(bill: CreditCardBill): string {
+    const date = new Date(bill.billGenerationDate);
+    return date.toLocaleString('en', { month: 'long', year: 'numeric' });
+  }
+
+  statementFinancialYear(bill: CreditCardBill): string {
+    return this.financialYearLabel(new Date(bill.billGenerationDate));
+  }
+
+  financialYearLabel(date: Date): string {
+    const startYear = date.getMonth() >= 3 ? date.getFullYear() : date.getFullYear() - 1;
+    return `FY ${startYear}-${String(startYear + 1).slice(-2)}`;
+  }
+
+  billPaymentStatus(bill: CreditCardBill): string {
+    const outstanding = this.billOutstanding(bill);
+    if (outstanding <= 0) return 'Paid';
+    const dueDate = new Date(bill.dueDate);
+    if (dueDate.getTime() < Date.now()) return 'Overdue';
+    return Number(bill.paidAmount || 0) > 0 ? 'Partially Paid' : 'Unpaid';
+  }
+
+  billTransactions(bill: CreditCardBill): CreditCardTransaction[] {
+    return this.transactions.filter(transaction => transaction.billId === bill.id);
+  }
+
+  billTransactionAmount(bill: CreditCardBill, type: string): number {
+    return this.billTransactions(bill)
+      .filter(transaction => (transaction.transactionType || '').toLowerCase() === type.toLowerCase())
+      .reduce((total, transaction) => total + Number(transaction.amount || 0), 0);
   }
 
   get refundTransactions(): CreditCardTransaction[] {
@@ -938,10 +1116,286 @@ export class CreditCard implements OnInit {
     );
   }
 
+  probableOriginalTransaction(refund: CreditCardTransaction): CreditCardTransaction | null {
+    const merchant = (refund.merchant || '').trim().toLowerCase();
+    if (!merchant) return null;
+    return this.transactions
+      .filter(transaction => transaction.id !== refund.id
+        && (transaction.merchant || '').trim().toLowerCase() === merchant
+        && !String(transaction.transactionType || '').toLowerCase().includes('refund')
+        && new Date(transaction.transactionDate).getTime() <= new Date(refund.transactionDate).getTime())
+      .sort((left, right) =>
+        new Date(right.transactionDate).getTime() - new Date(left.transactionDate).getTime())[0] || null;
+  }
+
   get failedTransactions(): CreditCardTransaction[] {
     return this.transactions.filter(transaction =>
       (transaction.status || '').toLowerCase() === 'failed'
     );
+  }
+
+  private transactionDate(transaction: CreditCardTransaction): Date {
+    return new Date(transaction.transactionDate);
+  }
+
+  private matchesSelectedAnalyticsPeriod(transaction: CreditCardTransaction): boolean {
+    if (this.analyticsPeriod === 'CURRENT_CYCLE') {
+      return !transaction.billId && !transaction.emiPlanId;
+    }
+    if (this.analyticsPeriod === 'PREVIOUS_CYCLE') {
+      return !!this.latestBill && transaction.billId === this.latestBill.id;
+    }
+    const date = this.transactionDate(transaction);
+    const now = new Date();
+    const targetMonth = this.analyticsPeriod === 'PREVIOUS_MONTH'
+      ? new Date(now.getFullYear(), now.getMonth() - 1, 1)
+      : now;
+    return date.getFullYear() === targetMonth.getFullYear()
+      && date.getMonth() === targetMonth.getMonth();
+  }
+
+  private isPurchase(transaction: CreditCardTransaction): boolean {
+    const type = (transaction.transactionType || '').toLowerCase();
+    return (type === 'purchase' || type === 'fee' || type === 'interest')
+      && !type.includes('refund')
+      && Number(transaction.amount) > 0;
+  }
+
+  private transactionSpend(transactions: CreditCardTransaction[]): number {
+    return transactions.filter(transaction => this.isPurchase(transaction))
+      .reduce((total, transaction) => total + Number(transaction.amount || 0), 0);
+  }
+
+  get thisMonthSpend(): number {
+    const now = new Date();
+    return this.transactionSpend(this.transactions.filter(transaction => {
+      const date = this.transactionDate(transaction);
+      return date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth();
+    }));
+  }
+
+  get previousMonthSpend(): number {
+    const now = new Date();
+    const previous = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    return this.transactionSpend(this.transactions.filter(transaction => {
+      const date = this.transactionDate(transaction);
+      return date.getFullYear() === previous.getFullYear() && date.getMonth() === previous.getMonth();
+    }));
+  }
+
+  get currentCycleSpend(): number {
+    return this.transactionSpend(this.transactions.filter(transaction => !transaction.billId && !transaction.emiPlanId));
+  }
+
+  get previousCycleSpend(): number {
+    const latestBill = this.latestBill;
+    if (!latestBill) return 0;
+    return this.transactionSpend(this.transactions.filter(transaction => transaction.billId === latestBill.id));
+  }
+
+  get selectedAnalyticsSpend(): number {
+    switch (this.analyticsPeriod) {
+      case 'PREVIOUS_MONTH': return this.previousMonthSpend;
+      case 'CURRENT_CYCLE': return this.currentCycleSpend;
+      case 'PREVIOUS_CYCLE': return this.previousCycleSpend;
+      default: return this.thisMonthSpend;
+    }
+  }
+
+  get averageMonthlySpend(): number {
+    const byMonth = new Map<string, number>();
+    for (const transaction of this.transactions) {
+      if (!this.isPurchase(transaction)) continue;
+      const date = this.transactionDate(transaction);
+      const key = `${date.getFullYear()}-${date.getMonth()}`;
+      byMonth.set(key, (byMonth.get(key) || 0) + Number(transaction.amount || 0));
+    }
+    const monthValues = [...byMonth.values()];
+    return monthValues.length
+      ? monthValues.reduce((total, amount) => total + amount, 0) / monthValues.length
+      : 0;
+  }
+
+  get monthlySpendTrend(): Array<{ label: string; amount: number; percent: number }> {
+    const today = new Date();
+    const months = Array.from({ length: 6 }, (_, index) => new Date(today.getFullYear(), today.getMonth() - (5 - index), 1));
+    const totals = months.map(month => {
+      const amount = this.transactionSpend(this.transactions.filter(transaction => {
+        const date = this.transactionDate(transaction);
+        return date.getFullYear() === month.getFullYear() && date.getMonth() === month.getMonth();
+      }));
+      return { label: month.toLocaleString('en', { month: 'short' }), amount };
+    });
+    const maximum = Math.max(0, ...totals.map(item => item.amount));
+    return totals.map(item => ({ ...item, percent: maximum ? item.amount / maximum * 100 : 0 }));
+  }
+
+  get topMerchants(): Array<{ merchant: string; amount: number }> {
+    const totals = new Map<string, number>();
+    for (const transaction of this.transactions) {
+      if (!this.isPurchase(transaction) || !this.matchesSelectedAnalyticsPeriod(transaction)) continue;
+      const merchant = (transaction.merchant || transaction.description || 'Other').trim();
+      totals.set(merchant, (totals.get(merchant) || 0) + Number(transaction.amount || 0));
+    }
+    return [...totals.entries()]
+      .map(([merchant, amount]) => ({ merchant, amount }))
+      .sort((left, right) => right.amount - left.amount)
+      .slice(0, 5);
+  }
+
+  get cardHealthScore(): number | null {
+    if (!this.bills.length || !this.selectedCard) return null;
+    const paidBills = this.bills.filter(bill => this.billOutstanding(bill) <= 0).length;
+    const paymentConsistency = (paidBills / this.bills.length) * 100;
+    const utilization = this.utilizationPercent;
+    const failedRate = this.transactions.length
+      ? (this.failedTransactions.length / this.transactions.length) * 100
+      : 0;
+    const emiBurden = this.emiPlans.reduce((total, plan) =>
+      total + Number(plan.monthlyEmi || 0), 0);
+    const limit = Number(this.selectedCard.approvedLimit || 0);
+    const emiBurdenPercent = limit > 0 ? Math.min(100, emiBurden / limit * 100) : 100;
+    return Math.round(Math.max(0, Math.min(100,
+      (100 - utilization) * 0.4
+      + paymentConsistency * 0.3
+      + (100 - utilization) * 0.15
+      + (100 - emiBurdenPercent) * 0.1
+      + (100 - failedRate) * 0.05)));
+  }
+
+  get cardHealthFactors(): Array<{ label: string; score: number }> {
+    if (this.cardHealthScore == null) return [];
+    const paidBills = this.bills.filter(bill => this.billOutstanding(bill) <= 0).length;
+    const limit = Number(this.selectedCard?.approvedLimit || 0);
+    const emiBurden = this.emiPlans.reduce((total, plan) => total + Number(plan.monthlyEmi || 0), 0);
+    return [
+      { label: 'Credit utilization', score: Math.round(100 - this.utilizationPercent) },
+      { label: 'Payment consistency', score: Math.round(paidBills / this.bills.length * 100) },
+      { label: 'Outstanding balance', score: Math.round(limit ? 100 - Math.min(100, this.remainingBill / limit * 100) : 0) },
+      { label: 'EMI burden', score: Math.round(limit ? 100 - Math.min(100, emiBurden / limit * 100) : 0) },
+      { label: 'Transaction health', score: Math.round(100 - (this.transactions.length ? this.failedTransactions.length / this.transactions.length * 100 : 0)) }
+    ];
+  }
+
+  get emiInstallmentCounts(): { active: number; completed: number; upcoming: number } {
+    let active = 0;
+    let completed = 0;
+    let upcoming = 0;
+    for (const plan of this.emiPlans) {
+      const status = String(plan.status || '').toLowerCase();
+      if (status === 'completed' || Number(plan.outstandingPrincipal || 0) <= 0) completed++;
+      else active++;
+      for (const installment of (plan.installments || [])) {
+        const due = new Date(installment.dueDate).getTime();
+        if (due >= Date.now() && String(installment.status || '').toLowerCase() !== 'paid') upcoming++;
+      }
+    }
+    return { active, completed, upcoming };
+  }
+
+  transactionReference(transaction: CreditCardTransaction): string {
+    return transaction.globalTransactionSequence
+      ? String(transaction.globalTransactionSequence)
+      : `CC-${transaction.id}`;
+  }
+
+  selectTransactionForEmi(transaction: CreditCardTransaction) {
+    if (!this.emiEligibleTransactions.some(item => item.id === transaction.id)) {
+      this.alertService.info('Not eligible for EMI', 'This purchase is not currently eligible for conversion.');
+      return;
+    }
+    if (!this.selectedEmiTransactionIds.includes(transaction.id)) {
+      this.toggleEmiTransaction(transaction.id, true);
+    }
+    this.selectedTransaction = null;
+    this.scrollTo('emiCenter');
+  }
+
+  downloadBillStatement(bill: CreditCardBill, format: 'CSV' | 'PDF') {
+    if (format === 'CSV') {
+      const billTransactions = this.transactions.filter(transaction => transaction.billId === bill.id);
+      const columns = ['Statement', 'Due date', 'Total', 'Paid', 'Remaining', 'Minimum due', 'Status'];
+      const summary = [
+        this.statementLabel(bill), bill.dueDate, this.billTotalDue(bill), bill.paidAmount,
+        this.billOutstanding(bill), bill.minimumDue, this.billPaymentStatus(bill)
+      ];
+      const escape = (value: unknown) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+      const billRow = columns.map((column, index) => `${escape(column)},${escape(summary[index])}`).join('\r\n');
+      const csv = billTransactions.length
+        ? billRow + '\r\n\r\n' + this.csvRows(billTransactions)
+        : billRow;
+      this.downloadCsv(csv, `credit-card-statement-${bill.id}.csv`);
+      return;
+    }
+    this.printStatement(bill);
+  }
+
+  private csvRows(transactions: CreditCardTransaction[]): string {
+    const columns = ['Date', 'Merchant', 'Description', 'Category', 'Type', 'Amount', 'Status', 'Bill', 'EMI'];
+    const escape = (value: unknown) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+    const rows = transactions.map(transaction => [
+      transaction.transactionDate,
+      transaction.merchant,
+      transaction.description,
+      this.transactionCategory(transaction),
+      transaction.transactionType,
+      transaction.amount,
+      transaction.status,
+      transaction.billId ? `Bill ${transaction.billId}` : '',
+      transaction.emiPlanId ? `EMI ${transaction.emiPlanId}` : ''
+    ].map(escape).join(','));
+    return [columns.map(escape).join(','), ...rows].join('\r\n');
+  }
+
+  private downloadCsv(content: string, filename: string) {
+    const blob = new Blob([content], { type: 'text/csv;charset=utf-8' });
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = filename;
+    anchor.click();
+    window.URL.revokeObjectURL(url);
+  }
+
+  private printStatement(bill: CreditCardBill) {
+    const transactions = this.transactions.filter(transaction => transaction.billId === bill.id);
+    const popup = window.open('', '_blank');
+    if (!popup) {
+      this.alertService.operationError('Statement PDF', 'Allow pop-ups to print or save this statement as PDF.');
+      return;
+    }
+    const rows = transactions.map(transaction =>
+      `<tr><td>${this.escapeHtml(new Date(transaction.transactionDate).toLocaleString())}</td><td>${this.escapeHtml(transaction.merchant || '')}</td><td>${this.escapeHtml(transaction.description || '')}</td><td>₹${Number(transaction.amount || 0).toFixed(2)}</td></tr>`
+    ).join('');
+    popup.document.write(`<html><head><title>NeoBank card statement</title><style>body{font:14px Arial,sans-serif;padding:32px;color:#172033}h1{color:#173a74}table{width:100%;border-collapse:collapse;margin-top:24px}td,th{border:1px solid #d5dbe5;padding:8px;text-align:left}.summary{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:20px}.muted{color:#596579}</style></head><body><h1>NeoBank Credit Card Statement</h1><p class="muted">${this.escapeHtml(this.statementLabel(bill))}</p><div class="summary"><span>Total: ₹${this.billTotalDue(bill).toFixed(2)}</span><span>Paid: ₹${Number(bill.paidAmount || 0).toFixed(2)}</span><span>Remaining: ₹${this.billOutstanding(bill).toFixed(2)}</span><span>Minimum due: ₹${Number(bill.minimumDue || 0).toFixed(2)}</span><span>Due date: ${this.escapeHtml(new Date(bill.dueDate).toLocaleDateString())}</span><span>Status: ${this.escapeHtml(this.billPaymentStatus(bill))}</span></div><table><thead><tr><th>Date</th><th>Merchant</th><th>Description</th><th>Amount</th></tr></thead><tbody>${rows}</tbody></table></body></html>`);
+    popup.document.close();
+    popup.focus();
+    popup.print();
+  }
+
+  private escapeHtml(value: string): string {
+    return value.replace(/[&<>"']/g, character => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    })[character] || character);
+  }
+
+  downloadCurrentBill(format: 'CSV' | 'PDF') {
+    const bill = this.latestBill;
+    if (!bill) {
+      this.alertService.info('No current bill', 'A statement is not available to download yet.');
+      return;
+    }
+    this.downloadBillStatement(bill, format);
+  }
+
+  downloadPreviousBill(format: 'CSV' | 'PDF') {
+    const previous = [...this.bills]
+      .sort((left, right) => new Date(right.billGenerationDate).getTime() - new Date(left.billGenerationDate).getTime())[1];
+    if (!previous) {
+      this.alertService.info('No previous bill', 'There is no earlier statement available to download.');
+      return;
+    }
+    this.downloadBillStatement(previous, format);
   }
 
   get recurringPayments(): Array<{ merchant: string; amount: number; frequency: string; nextPayment: Date }> {
