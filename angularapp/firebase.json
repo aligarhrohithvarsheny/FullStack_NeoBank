@@ -1,7 +1,7 @@
 {
   "hosting": {
     "predeploy": [
-      "./firebase-predeploy.cmd"
+      "npm run build:prod"
     ],
     "public": "dist/angularapp/browser",
     "ignore": [

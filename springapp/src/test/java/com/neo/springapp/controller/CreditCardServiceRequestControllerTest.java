@@ -103,9 +103,32 @@ class CreditCardServiceRequestControllerTest {
         verify(historyRepository).save(any());
     }
 
+    @Test
+    void cards360SessionCanSubmitRequestOnlyForItsAccountCard() {
+        CreditCard card = new CreditCard();
+        card.setId(10L);
+        card.setAccountNumber("CUSTOMER");
+        when(cardRepository.findById(10L)).thenReturn(Optional.of(card));
+        when(requestRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(historyRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var response = controller.createRequest(
+                new CreditCardServiceRequestController.CreateRequest(
+                        10L, "Billing Issue", null, "Please review this card charge", null, null),
+                session("CUSTOMER", "CARD360"));
+
+        assertEquals(HttpStatus.CREATED, response.getStatusCode());
+        verify(requestRepository).save(any());
+        verify(historyRepository).save(any());
+    }
+
     private Authentication user(String accountNumber) {
+        return session(accountNumber, "USER");
+    }
+
+    private Authentication session(String accountNumber, String scope) {
         return new UsernamePasswordAuthenticationToken(
-                new UserSessionTokenService.SessionPrincipal(1L, accountNumber, "USER"),
+                new UserSessionTokenService.SessionPrincipal(1L, accountNumber, scope),
                 null);
     }
 }

@@ -60,19 +60,44 @@
           <ng-template #noCards><p class="c360-muted">{{ loading ? 'Loading cards…' : 'No cards are linked to this account yet.' }}</p></ng-template>
         </section>
 
-        <section class="c360-section" *ngIf="selectedCard as card">
+        <section class="c360-section" id="c360-card-details" *ngIf="selectedCard as card">
           <div class="c360-detail-heading">
             <div><span class="c360-eyebrow">CARD DETAILS</span><h2>{{ card.cardType }}</h2></div>
             <button class="c360-secondary" type="button" (click)="showOverview()">Back to all cards</button>
           </div>
+          <article class="c360-credit-preview" *ngIf="card.type === 'credit'">
+            <div class="c360-credit-preview-top"><strong>NEOBANK</strong><span>NEO · CREDIT</span></div>
+            <div class="c360-chip" aria-hidden="true"></div>
+            <strong class="c360-preview-number">{{ card.fullCardNumber || card.maskedNumber }}</strong>
+            <div class="c360-preview-bottom">
+              <span>{{ card.cardholderName || 'CARDHOLDER' }}<small>CARDHOLDER</small></span>
+              <span>{{ card.expiryDate || '—' }}<small>VALID THRU</small></span>
+              <span class="c360-preview-status">{{ card.status }}</span>
+            </div>
+          </article>
           <div class="c360-detail-grid">
             <div><span>Card number</span><strong>{{ card.fullCardNumber || card.maskedNumber }}</strong></div>
             <div><span>Expiry date</span><strong>{{ card.expiryDate || '—' }}</strong></div>
-            <div><span>Status</span><strong>{{ card.status }}</strong></div>
+            <div><span>Status</span><strong class="c360-card-status" [ngClass]="card.status.toLowerCase().replace(' ', '-')">{{ card.status }}</strong></div>
+            <div *ngIf="card.type === 'credit'"><span>Cardholder</span><strong>{{ card.cardholderName || 'Primary cardholder' }}</strong></div>
             <div *ngIf="card.type === 'credit'"><span>Approved limit</span><strong>₹{{ card.approvedLimit ?? 0 }}</strong></div>
             <div *ngIf="card.type === 'credit'"><span>Available limit</span><strong>₹{{ card.availableLimit ?? 0 }}</strong></div>
+            <div *ngIf="card.type === 'credit'"><span>Used limit</span><strong>₹{{ usedLimit | number:'1.2-2' }}</strong></div>
             <div *ngIf="card.type === 'credit'"><span>Outstanding bill</span><strong>₹{{ billOutstanding(card) | number:'1.2-2' }}</strong></div>
             <div *ngIf="card.type === 'credit'"><span>Spending limit</span><strong>₹{{ card.spendingLimit ?? card.approvedLimit ?? 0 }}</strong></div>
+          </div>
+          <div class="c360-utilization" *ngIf="card.type === 'credit'">
+            <div><span>Credit utilization</span><strong>{{ utilizationPercent | number:'1.1-1' }}%</strong></div>
+            <div class="c360-progress" role="progressbar" aria-label="Credit utilization"
+              [attr.aria-valuenow]="utilizationPercent" aria-valuemin="0" aria-valuemax="100">
+              <span [style.width.%]="utilizationPercent"></span>
+            </div>
+            <div class="c360-due-card" *ngIf="card.type === 'credit' && card.billDueDate">
+              <div><span>Outstanding bill</span><strong>₹{{ billOutstanding(card) | number:'1.2-2' }}</strong></div>
+              <div><span>Minimum due</span><strong>₹{{ card.billMinimumDue ?? 0 | number:'1.2-2' }}</strong></div>
+              <div><span>Payment due</span><strong>{{ card.billDueDate | date:'dd MMM yyyy' }}</strong></div>
+              <button class="c360-primary" type="button" (click)="beginBillPayment(card)" [disabled]="billOutstanding(card) <= 0">Pay bill</button>
+            </div>
           </div>
           <div class="c360-bill-summary" *ngIf="card.type === 'credit' && card.billGenerationDate">
             <h3>Latest bill breakdown</h3>
@@ -84,6 +109,19 @@
             <div><span>Paid</span><strong>₹{{ (card.billPaidAmount ?? 0) | number:'1.2-2' }}</strong></div>
             <div><span>Minimum due</span><strong>₹{{ (card.billMinimumDue ?? 0) | number:'1.2-2' }}</strong></div>
             <div><span>Status</span><strong>{{ card.billStatus || 'Generated' }}</strong></div>
+            <div *ngIf="latestBill"><span>Statement period</span><strong>{{ latestBill.billingPeriod }}</strong></div>
+            <div *ngIf="latestBill"><span>Purchases in loaded history</span><strong>₹{{ billTransactionAmount(latestBill, 'Purchase') | number:'1.2-2' }}</strong></div>
+            <div *ngIf="latestBill"><span>Payments in loaded history</span><strong>₹{{ billTransactionAmount(latestBill, 'Payment') | number:'1.2-2' }}</strong></div>
+            <div *ngIf="latestBill"><span>Refunds in loaded history</span><strong>₹{{ billTransactionAmount(latestBill, 'Refund') | number:'1.2-2' }}</strong></div>
+            <div *ngIf="latestBill"><span>Fees / interest in loaded history</span><strong>₹{{ (billTransactionAmount(latestBill, 'Fee') + billTransactionAmount(latestBill, 'Interest')) | number:'1.2-2' }}</strong></div>
+            <div *ngIf="latestBill"><span>Remaining due</span><strong>₹{{ billRemaining(latestBill) | number:'1.2-2' }}</strong></div>
+          </div>
+          <p class="c360-muted" *ngIf="card.type === 'credit'">The previous balance is not supplied by the Cards360 billing API. Transaction-category figures use the transactions returned for this card and may be limited to the latest 100 entries.</p>
+          <div class="c360-bill-timeline" *ngIf="latestBill">
+            <div><i></i><span><strong>Statement generated</strong><small>{{ latestBill.billGenerationDate | date:'dd MMM yyyy' }}</small></span></div>
+            <div><i></i><span><strong>Purchases and payments</strong><small>From the recorded card transaction history</small></span></div>
+            <div><i></i><span><strong>Bill generated</strong><small>{{ latestBill.billingPeriod }}</small></span></div>
+            <div><i></i><span><strong>Payment due</strong><small>{{ latestBill.dueDate | date:'dd MMM yyyy' }} · {{ billPaymentStatus(latestBill) }}</small></span></div>
           </div>
           <div class="c360-detail-actions">
             <button *ngIf="card.type === 'credit'" class="c360-secondary" type="button"
@@ -97,11 +135,37 @@
             <button *ngIf="card.type === 'credit'" class="c360-secondary" type="button" (click)="beginLimitEdit(card)">Change spending limit</button>
             <button *ngIf="card.type === 'credit'" class="c360-secondary" type="button" (click)="beginBillPayment(card)"
               [disabled]="card.blocked || billOutstanding(card) <= 0">Pay bill</button>
+            <button *ngIf="card.type === 'credit'" class="c360-secondary" type="button" (click)="showPinForm = !showPinForm">
+              {{ card.pinSet ? 'Change PIN' : 'Set PIN' }}
+            </button>
+            <button *ngIf="card.type === 'credit'" class="c360-secondary" type="button" (click)="openReplacementRequest('Damaged')">Replace card</button>
+            <button *ngIf="card.type === 'credit'" class="c360-secondary" type="button" (click)="openReplacementRequest('Lost')">Report lost / stolen</button>
             <button *ngIf="card.type === 'credit' && !card.closureRequestStatus && card.status !== 'Closed'"
               class="c360-secondary" type="button" (click)="requestingClosureFor = card.id; error = ''">
               Request card closure
             </button>
           </div>
+          <nav class="c360-section-nav" *ngIf="card.type === 'credit'" aria-label="Credit card dashboard sections">
+            <button type="button" (click)="scrollToSection('c360-controls')">Controls</button>
+            <button type="button" (click)="scrollToSection('c360-bills')">Bills &amp; statements</button>
+            <button type="button" (click)="scrollToSection('c360-transactions')">Transactions</button>
+            <button type="button" (click)="scrollToSection('c360-emi')">EMI center</button>
+            <button type="button" (click)="scrollToSection('c360-analytics')">Spend analyzer</button>
+            <button type="button" (click)="scrollToSection('c360-rewards')">Rewards</button>
+            <button type="button" (click)="scrollToSection('c360-security')">Security</button>
+            <button type="button" (click)="scrollToSection('c360-support')">Support</button>
+          </nav>
+          <form *ngIf="showPinForm && card.type === 'credit'" class="c360-pin-form" (ngSubmit)="setCardPin()">
+            <label for="c360-new-pin">New four-digit PIN</label>
+            <input id="c360-new-pin" name="newPin" type="password" inputmode="numeric" autocomplete="new-password"
+              maxlength="4" pattern="[0-9]{4}" [(ngModel)]="pinForm.newPin" required>
+            <label for="c360-confirm-pin">Confirm PIN</label>
+            <input id="c360-confirm-pin" name="confirmPin" type="password" inputmode="numeric" autocomplete="new-password"
+              maxlength="4" pattern="[0-9]{4}" [(ngModel)]="pinForm.confirmPin" required>
+            <button class="c360-primary" type="submit">Save PIN</button>
+            <button class="c360-text-button" type="button" (click)="showPinForm = false; pinForm = { newPin: '', confirmPin: '' }">Cancel</button>
+            <small>PIN changes are protected by your Cards360 authenticated session. No OTP is used or stored in the browser after submission.</small>
+          </form>
           <p class="c360-notice" *ngIf="card.closureRequestStatus">Card closure request is pending admin review.</p>
           <form *ngIf="requestingClosureFor === card.id" class="c360-close-request"
             (ngSubmit)="submitClosureRequest(card)">
@@ -119,8 +183,49 @@
           </div>
         </section>
 
-        <section class="c360-section" *ngIf="selectedCard?.type === 'credit'">
+        <section class="c360-section" id="c360-controls" *ngIf="selectedCard as card">
+          <ng-container *ngIf="card.type === 'credit'">
+          <div class="c360-section-heading">
+            <div><span class="c360-eyebrow">CARD CONTROLS</span><h2>Manage transaction channels</h2></div>
+            <button class="c360-danger" type="button" (click)="emergencyLock()" [disabled]="card.blocked">Emergency card lock</button>
+          </div>
+          <label class="c360-control-row" *ngFor="let key of cardControlKeys">
+            <span><strong>{{ controlLabel(key) }}</strong><small>Allow or block this transaction channel</small></span>
+            <span class="c360-control-state">{{ card[key] ? 'ON' : 'OFF' }}</span>
+            <input type="checkbox" [checked]="!!card[key]" (change)="toggleControl(key)" [attr.aria-label]="controlLabel(key)">
+          </label>
+          </ng-container>
+        </section>
+
+        <section class="c360-section" id="c360-bills" *ngIf="selectedCard?.type === 'credit'">
           <h2>Statements and bills</h2>
+          <div class="c360-bill-filter">
+            <input type="search" [(ngModel)]="billSearch" placeholder="Search statements">
+            <select [(ngModel)]="statementPeriodFilter" aria-label="Statement period">
+              <option value="ALL">All statements</option><option value="MONTHLY">Monthly</option>
+              <option value="FINANCIAL_YEAR">Financial year</option>
+            </select>
+            <select *ngIf="statementPeriodFilter === 'MONTHLY'" [(ngModel)]="selectedStatementMonth" aria-label="Select month">
+              <option value="">All months</option><option *ngFor="let month of statementMonths" [value]="month.key">{{ month.label }}</option>
+            </select>
+            <select *ngIf="statementPeriodFilter === 'FINANCIAL_YEAR'" [(ngModel)]="selectedFinancialYear" aria-label="Select financial year">
+              <option value="">All financial years</option><option *ngFor="let year of statementYears" [value]="year">{{ year }}</option>
+            </select>
+          </div>
+          <div class="c360-bill-history" *ngIf="filteredBills.length">
+            <article class="c360-bill-item" *ngFor="let bill of filteredBills">
+              <div><strong>{{ bill.billingPeriod || (bill.billGenerationDate | date:'MMMM yyyy') }}</strong>
+                <small>Generated {{ bill.billGenerationDate | date:'dd MMM yyyy' }} · Due {{ bill.dueDate | date:'dd MMM yyyy' }}</small></div>
+              <strong>₹{{ bill.totalAmount | number:'1.2-2' }}</strong>
+              <span class="c360-status">{{ billPaymentStatus(bill) }}</span>
+              <span>Remaining ₹{{ billRemaining(bill) | number:'1.2-2' }}</span>
+              <div class="c360-bill-downloads">
+                <button class="c360-secondary" type="button" (click)="downloadBill(bill)" [disabled]="downloadingStatement">PDF</button>
+                <button class="c360-secondary" type="button" (click)="downloadBillCsv(bill)" [disabled]="downloadingStatement">CSV</button>
+              </div>
+            </article>
+          </div>
+          <p class="c360-muted" *ngIf="!filteredBills.length">No statements match this filter.</p>
           <div class="c360-statement-actions">
             <button class="c360-secondary" type="button" (click)="downloadCurrentBill()"
               [disabled]="downloadingStatement || !cardBills.length">
@@ -139,27 +244,55 @@
             <input id="c360-statement-end" name="statementEndDate" type="date"
               [(ngModel)]="statementEndDate" [min]="statementStartDate" required>
             <button class="c360-primary" type="submit" [disabled]="downloadingStatement">
-              {{ downloadingStatement ? 'Preparing…' : 'Download custom statement' }}
+              {{ downloadingStatement ? 'Preparing…' : 'Download statement PDF' }}
+            </button>
+            <button class="c360-secondary" type="button" (click)="downloadCustomStatement('csv')" [disabled]="downloadingStatement">
+              Download statement CSV
             </button>
           </form>
           <p class="c360-muted">Statement downloads contain this credit card’s activity only. Card numbers remain masked in downloaded statements.</p>
           <p class="c360-muted" *ngIf="!cardBills.length && selectedCard">No bill is available to download yet.</p>
         </section>
 
-        <section class="c360-section c360-transactions" *ngIf="selectedCard as card">
+        <section class="c360-section c360-transactions" id="c360-transactions" *ngIf="selectedCard as card">
           <h2>Transactions · {{ card.maskedNumber }}</h2>
           <p class="c360-muted" *ngIf="card.type === 'debit' && !loadingTransactions">
             Debit card transactions are not available because the transaction ledger does not associate entries with individual debit cards.
           </p>
+          <ng-container *ngIf="card.type === 'credit'">
+            <div class="c360-transaction-toolbar">
+              <nav class="c360-tabs" aria-label="Filter transactions">
+                <button type="button" *ngFor="let tab of transactionTabs" [class.active]="activeTransactionTab === tab"
+                  (click)="activeTransactionTab = tab">{{ tab }}</button>
+              </nav>
+              <button class="c360-secondary" type="button" (click)="exportTransactions()" [disabled]="!filteredTransactions.length">Export transactions</button>
+            </div>
+            <div class="c360-filters">
+              <input type="search" [(ngModel)]="transactionSearch" placeholder="Search transactions">
+              <select [(ngModel)]="transactionCategoryFilter"><option value="">All categories</option>
+                <option *ngFor="let category of ['Shopping','Food','Fuel','Travel','Entertainment','Bills','Healthcare','Other','Refunds']" [value]="category">{{ category }}</option></select>
+              <select [(ngModel)]="transactionStatusFilter"><option value="">All statuses</option>
+                <option value="Completed">Completed</option><option value="Pending">Pending</option><option value="Failed">Failed</option></select>
+              <select [(ngModel)]="transactionTypeFilter"><option value="">All types</option>
+                <option *ngFor="let type of ['Purchase','Payment','Refund','Interest','Fee','Transfer']" [value]="type">{{ type }}</option></select>
+              <input type="date" [(ngModel)]="transactionStartDate" aria-label="From date">
+              <input type="date" [(ngModel)]="transactionEndDate" aria-label="To date">
+              <input type="number" min="0" [(ngModel)]="transactionMinAmount" placeholder="Min amount">
+              <input type="number" min="0" [(ngModel)]="transactionMaxAmount" placeholder="Max amount">
+            </div>
+          </ng-container>
           <div class="c360-table-wrap" *ngIf="card.type === 'credit'">
             <table>
-              <thead><tr><th>Date</th><th>Receipt / bill</th><th>Details</th><th>Type</th><th>Status</th><th>Amount</th></tr></thead>
+              <thead><tr><th>Date</th><th>Merchant</th><th>Receipt / bill</th><th>Description</th><th>Category</th><th>Type</th><th>Status</th><th>Amount</th><th>Available after</th></tr></thead>
               <tbody>
-                <tr *ngFor="let transaction of selectedTransactions">
-                  <td>{{ transaction.date | date:'medium' }}</td><td>{{ transaction.receipt }}</td><td>{{ transaction.description }}</td>
-                  <td>{{ transaction.type }}</td><td>{{ transaction.status }}</td><td>₹{{ transaction.amount }}</td>
+                <tr *ngFor="let transaction of filteredTransactions" class="c360-clickable-row" (click)="selectedTransaction = transaction">
+                  <td data-label="Date">{{ transaction.date | date:'medium' }}</td><td data-label="Merchant">{{ transaction.merchant || '—' }}</td>
+                  <td data-label="Receipt / bill">{{ transaction.receipt }}</td><td data-label="Description">{{ transaction.description }}</td>
+                  <td data-label="Category">{{ transactionCategory(transaction) }}</td><td data-label="Type">{{ transaction.type }}</td>
+                  <td data-label="Status">{{ transaction.status }}</td><td data-label="Amount">₹{{ transaction.amount | number:'1.2-2' }}</td>
+                  <td data-label="Available after">{{ transaction.balanceAfter == null ? '—' : ('₹' + ((card.approvedLimit ?? 0) - transaction.balanceAfter | number:'1.2-2')) }}</td>
                 </tr>
-                <tr *ngIf="!selectedTransactions.length"><td colspan="6" class="c360-muted">
+                <tr *ngIf="!filteredTransactions.length"><td colspan="9" class="c360-muted">
                   {{ loadingTransactions ? 'Loading this card’s transactions…' : 'No transactions for this card.' }}
                 </td></tr>
               </tbody>
@@ -168,6 +301,245 @@
         </section>
       </div>
     </div>
+
+    <div class="c360-drawer-backdrop" *ngIf="selectedTransaction" (click)="selectedTransaction = null">
+      <aside class="c360-transaction-drawer" (click)="$event.stopPropagation()">
+        <button type="button" class="c360-drawer-close" (click)="selectedTransaction = null" aria-label="Close transaction details">×</button>
+        <span class="c360-eyebrow">TRANSACTION DETAILS</span>
+        <h2>{{ selectedTransaction.merchant || selectedTransaction.description || 'Card transaction' }}</h2>
+        <strong class="c360-drawer-amount">₹{{ selectedTransaction.amount | number:'1.2-2' }}</strong>
+        <dl>
+          <dt>Date and time</dt><dd>{{ selectedTransaction.date | date:'dd MMM yyyy, HH:mm' }}</dd>
+          <dt>Transaction ID</dt><dd>{{ selectedTransaction.id }}</dd>
+          <dt>Reference</dt><dd>{{ selectedTransaction.receipt }}</dd>
+          <dt>Category</dt><dd>{{ transactionCategory(selectedTransaction) }}</dd>
+          <dt>Type</dt><dd>{{ selectedTransaction.type }}</dd>
+          <dt>Status</dt><dd>{{ selectedTransaction.status }}</dd>
+          <dt>Card</dt><dd>{{ selectedCard?.maskedNumber }}</dd>
+          <dt>Payment method</dt><dd>{{ selectedTransaction.paymentMethod || 'Card transaction' }}</dd>
+          <dt>Available credit after transaction</dt>
+          <dd>{{ selectedTransaction.balanceAfter == null ? 'Not available' : ('₹' + ((selectedCard?.approvedLimit ?? 0) - selectedTransaction.balanceAfter | number:'1.2-2')) }}</dd>
+        </dl>
+        <div class="c360-drawer-actions">
+          <button class="c360-primary" type="button" (click)="reportTransaction(selectedTransaction)">Report / dispute transaction</button>
+          <button class="c360-secondary" type="button" *ngIf="selectedTransactionEmiEligible"
+            (click)="selectTransactionForEmi(selectedTransaction)">Convert eligible purchase to EMI</button>
+        </div>
+      </aside>
+    </div>
+
+    <section class="c360-section c360-emi-section" id="c360-emi" *ngIf="selectedCard?.type === 'credit'">
+      <div class="c360-section-heading">
+        <div><span class="c360-eyebrow">EMI CENTER</span><h2>Flexible purchase plans</h2></div>
+        <span>{{ emiPlans.length }} plan(s)</span>
+      </div>
+      <p class="c360-muted" *ngIf="!emiSettings?.enabled">EMI conversion is unavailable until the bank configures its interest and fee policy.</p>
+      <div class="c360-emi-table" *ngIf="emiSettings?.enabled && emiEligibleTransactions.length">
+        <h3>Eligible purchases</h3>
+        <table>
+          <thead><tr><th>Select</th><th>Purchase</th><th>Date</th><th>Amount</th></tr></thead>
+          <tbody><tr *ngFor="let transaction of emiEligibleTransactions">
+            <td><input #emiChoice type="checkbox" [checked]="selectedEmiTransactionIds.includes(transaction.id)"
+              (change)="toggleEmiSelection(transaction.id, emiChoice.checked)"></td>
+            <td>{{ transaction.merchant || transaction.description }}</td><td>{{ transaction.transactionDate | date:'dd MMM yyyy' }}</td>
+            <td>₹{{ transaction.amount | number:'1.2-2' }}</td>
+          </tr></tbody>
+        </table>
+        <div class="c360-emi-options" *ngIf="selectedEmiTransactionIds.length">
+          <label>Tenure
+            <select [(ngModel)]="emiTenureMonths">
+              <option *ngFor="let months of (emiSettings?.tenuresMonths || [3,6,9,12,18,24])" [ngValue]="months">{{ months }} months</option>
+            </select>
+          </label>
+          <span>Principal <strong>₹{{ selectedEmiPrincipal | number:'1.2-2' }}</strong></span>
+          <span>Estimated monthly EMI <strong>₹{{ estimateMonthlyEmi(selectedEmiPrincipal, emiTenureMonths) | number:'1.2-2' }}</strong></span>
+          <button class="c360-primary" type="button" (click)="convertToEmi()" [disabled]="convertingToEmi">
+            {{ convertingToEmi ? 'Processing…' : 'Convert to EMI' }}
+          </button>
+        </div>
+        <div class="c360-table-wrap" *ngIf="selectedEmiTransactionIds.length">
+          <h3>Tenure estimates</h3>
+          <table>
+            <thead><tr><th>Tenure</th><th>Monthly EMI</th><th>Interest</th><th>Processing fee</th><th>Total payable</th></tr></thead>
+            <tbody><tr *ngFor="let months of (emiSettings?.tenuresMonths || [3,6,9,12,18,24])">
+              <td>{{ months }} months</td>
+              <td>₹{{ estimateMonthlyEmi(selectedEmiPrincipal, months) | number:'1.2-2' }}</td>
+              <td>₹{{ estimateEmiInterest(selectedEmiPrincipal, months) | number:'1.2-2' }}</td>
+              <td>₹{{ estimateEmiProcessingFee(selectedEmiPrincipal) | number:'1.2-2' }}</td>
+              <td>₹{{ (selectedEmiPrincipal + estimateEmiInterest(selectedEmiPrincipal, months) + estimateEmiProcessingFee(selectedEmiPrincipal)) | number:'1.2-2' }}</td>
+            </tr></tbody>
+          </table>
+          <small class="c360-muted">Estimates are indicative; the server validates final fees and repayment schedule.</small>
+        </div>
+      </div>
+      <p class="c360-muted" *ngIf="emiSettings?.enabled && !emiEligibleTransactions.length">
+        {{ loadingEmi ? 'Loading eligible purchases…' : 'No eligible unbilled purchases are available.' }}
+      </p>
+      <div class="c360-active-emi" *ngIf="emiPlans.length">
+        <h3>Active and completed EMIs</h3>
+        <article *ngFor="let plan of emiPlans">
+          <strong>Plan #{{ plan.id }} · {{ plan.status }}</strong>
+          <span>{{ plan.tenureMonths }} months · Principal ₹{{ plan.principalAmount | number:'1.2-2' }}</span>
+          <span>Monthly EMI ₹{{ plan.monthlyEmi | number:'1.2-2' }} · Remaining ₹{{ plan.outstandingPrincipal | number:'1.2-2' }}</span>
+          <div class="c360-emi-schedule" *ngIf="plan.installments?.length">
+            <h4>Installment schedule</h4>
+            <div *ngFor="let installment of plan.installments">
+              <span>#{{ installment.installmentNumber }} · {{ installment.dueDate | date:'dd MMM yyyy' }}</span>
+              <strong>₹{{ installment.totalAmount | number:'1.2-2' }} · {{ installment.status }}</strong>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="c360-section c360-analytics" id="c360-analytics" *ngIf="selectedCard?.type === 'credit'">
+      <span class="c360-eyebrow">SPEND ANALYZER</span><h2>Spending from your card activity</h2>
+      <div class="c360-period-tabs">
+        <button type="button" *ngFor="let period of ['THIS_MONTH','PREVIOUS_MONTH','CURRENT_CYCLE','PREVIOUS_CYCLE']"
+          [class.active]="analyticsPeriod === period" (click)="analyticsPeriod = $any(period)">
+          {{ period.replace('_',' ') }}
+        </button>
+      </div>
+      <div class="c360-analytics-summary">
+        <article><span>Selected period spend</span><strong>₹{{ selectedPeriodSpend | number:'1.2-2' }}</strong></article>
+        <article><span>Average month (loaded history)</span><strong>₹{{ averageMonthlySpend | number:'1.2-2' }}</strong></article>
+        <article><span>NeoBank informational score</span><strong>{{ neoBankHealthScore }} / 100</strong></article>
+      </div>
+      <div class="c360-chart-columns">
+        <div><h3>Category spend</h3><div class="c360-bar-row" *ngFor="let category of spendingCategories">
+          <span>{{ category.name }}</span><div class="c360-bar"><i [style.width.%]="category.percent"></i></div>
+          <strong>₹{{ category.amount | number:'1.0-0' }}</strong>
+        </div></div>
+        <div><h3>Recent monthly trend</h3><div class="c360-trend-row" *ngFor="let month of monthlyTrend">
+          <span>{{ month.label }}</span><div class="c360-bar"><i [style.width.%]="month.percent"></i></div>
+          <strong>₹{{ month.amount | number:'1.0-0' }}</strong>
+        </div></div>
+      </div>
+      <div class="c360-merchant-spend" *ngIf="topMerchants.length">
+        <h3>Top merchants this period</h3>
+        <div *ngFor="let merchant of topMerchants"><span>{{ merchant.merchant }}</span><strong>₹{{ merchant.amount | number:'1.2-2' }}</strong></div>
+      </div>
+      <p class="c360-muted">Charts use transactions currently loaded for this card (up to the latest 100). Categories and recurring-payment estimates are based on merchant descriptions and are informational.</p>
+    </section>
+
+    <section class="c360-section c360-health" id="c360-health" *ngIf="selectedCard?.type === 'credit'">
+      <span class="c360-eyebrow">CREDIT HEALTH</span><h2>{{ neoBankHealthScore }} / 100</h2>
+      <p>This is a NeoBank informational indicator, not an official credit bureau score.</p>
+      <ul>
+        <li>Credit utilization: {{ utilizationPercent | number:'1.1-1' }}%</li>
+        <li>Outstanding balance: ₹{{ billOutstanding(selectedCard!) | number:'1.2-2' }}</li>
+        <li>Payment status: {{ latestBill ? billPaymentStatus(latestBill) : 'No statement yet' }}</li>
+      </ul>
+      <div class="c360-health-factors"><div *ngFor="let factor of healthFactors">
+        <span>{{ factor.name }}</span><div class="c360-bar"><i [style.width.%]="factor.score"></i></div><strong>{{ factor.score }}/100</strong>
+      </div></div>
+      <p class="c360-muted">Keeping utilization manageable and paying at least the required amount by the due date can help avoid overdue charges.</p>
+    </section>
+
+    <section class="c360-section" *ngIf="selectedCard?.type === 'credit'">
+      <span class="c360-eyebrow">RECURRING PAYMENTS</span><h2>Subscription manager</h2>
+      <p class="c360-subscription-total">Estimated monthly subscription total <strong>₹{{ monthlySubscriptionTotal | number:'1.2-2' }}</strong></p>
+      <div class="c360-subscription-list" *ngIf="subscriptionEstimates.length">
+        <article *ngFor="let subscription of subscriptionEstimates">
+          <strong>{{ subscription.merchant }}</strong><span>₹{{ subscription.amount | number:'1.2-2' }} · {{ subscription.frequency }}</span>
+          <span>Next estimated payment {{ subscription.nextDate | date:'dd MMM yyyy' }}</span>
+        </article>
+      </div>
+      <p class="c360-muted" *ngIf="!subscriptionEstimates.length">No recurring merchant charges could be inferred from the available transaction history.</p>
+    </section>
+
+    <section class="c360-section" *ngIf="selectedCard?.type === 'credit'">
+      <span class="c360-eyebrow">REFUNDS</span><h2>Card refunds</h2>
+      <div class="c360-refund-list" *ngIf="refundTransactions.length">
+        <article *ngFor="let refund of refundTransactions">
+          <strong>{{ refund.merchant || refund.description || 'Card refund' }}</strong>
+          <span>Transaction {{ refund.receipt }} · {{ refund.date | date:'dd MMM yyyy' }}</span>
+          <strong>₹{{ refund.amount | number:'1.2-2' }} · {{ refund.status }}</strong>
+        </article>
+      </div>
+      <p class="c360-muted" *ngIf="!refundTransactions.length">No refunds are present in this card's available transaction history.</p>
+    </section>
+
+    <section class="c360-section c360-placeholder-grid" id="c360-rewards" *ngIf="selectedCard?.type === 'credit'">
+      <article><span class="c360-eyebrow">REWARDS</span><h2>Rewards center</h2>
+        <p class="c360-muted">Points, reward history and redemption are unavailable because no rewards ledger or bank-configured rewards policy is exposed to Cards360.</p></article>
+      <article><span class="c360-eyebrow">ADD-ON CARDS</span><h2>Supplementary cards</h2>
+        <p class="c360-muted">No supplementary-card records or add-on card management service are available for this account.</p></article>
+      <article><span class="c360-eyebrow">CREDIT LIMIT</span><h2>Limit increase</h2>
+        <p class="c360-muted">Approved limit ₹{{ selectedCard?.approvedLimit ?? 0 | number:'1.2-2' }} · Current spending limit ₹{{ selectedCard?.spendingLimit ?? selectedCard?.approvedLimit ?? 0 | number:'1.2-2' }}</p>
+        <p class="c360-muted" *ngIf="!creditLimitIncreaseEnabled">Credit-limit increase is unavailable because the bank has not configured a higher eligibility ceiling.</p>
+        <button class="c360-secondary" type="button" *ngIf="creditLimitIncreaseEnabled"
+          (click)="changeRequestType('Credit Limit Increase'); scrollToSection('c360-support')">Request limit increase</button>
+        <small *ngIf="creditLimitIncreaseEnabled">Maximum request ₹{{ creditLimitIncreaseCeiling | number:'1.2-2' }}</small>
+      </article>
+    </section>
+
+    <section class="c360-section" id="c360-security" *ngIf="selectedCard?.type === 'credit'">
+      <span class="c360-eyebrow">SECURITY CENTER</span><h2>Card security</h2>
+      <p>Card status: <strong>{{ selectedCard?.status }}</strong></p>
+      <h3>Recent card security events</h3>
+      <div class="c360-security-events" *ngIf="securityEvents.length">
+        <article *ngFor="let event of securityEvents">
+          <strong>{{ event.action }}</strong><span>{{ event.createdAt | date:'dd MMM yyyy, HH:mm' }}</span>
+          <small *ngIf="event.newValue">{{ event.newValue }}</small>
+        </article>
+      </div>
+      <p class="c360-muted" *ngIf="!securityEvents.length">No card security events are available for this card.</p>
+      <h3>Failed transactions</h3>
+      <div class="c360-security-events" *ngIf="failedTransactions.length">
+        <article *ngFor="let transaction of failedTransactions">
+          <strong>{{ transaction.merchant || transaction.description }}</strong>
+          <span>{{ transaction.date | date:'dd MMM yyyy, HH:mm' }} · ₹{{ transaction.amount | number:'1.2-2' }}</span>
+        </article>
+      </div>
+      <p class="c360-muted" *ngIf="!failedTransactions.length">No failed transactions in the available card history.</p>
+      <p class="c360-muted">Device sessions and login history are not exposed by the Cards360 service. Use card controls above to disable a channel or apply an emergency lock.</p>
+      <button class="c360-danger" type="button" (click)="emergencyLock()" [disabled]="selectedCard?.blocked">Lock card and disable all controls</button>
+    </section>
+
+    <section class="c360-section" id="c360-support" *ngIf="selectedCard?.type === 'credit'">
+      <span class="c360-eyebrow">SERVICE REQUESTS</span><h2>Support &amp; disputes</h2>
+      <form class="c360-service-request" (ngSubmit)="submitServiceRequest()">
+        <label for="c360-request-type">Request type</label>
+        <select id="c360-request-type" name="requestType" [(ngModel)]="requestType" (ngModelChange)="changeRequestType($event)">
+          <option *ngFor="let type of customerRequestTypes" [value]="type">{{ type }}</option>
+        </select>
+        <label *ngIf="requestType === 'Transaction Dispute' || requestType === 'Card Replacement'" for="c360-request-category">Category / reason</label>
+        <select *ngIf="requestType === 'Transaction Dispute' || requestType === 'Card Replacement'"
+          id="c360-request-category" name="requestCategory" [(ngModel)]="requestCategory">
+          <option *ngFor="let category of (requestType === 'Transaction Dispute' ? disputeCategories : replacementReasons)" [value]="category">{{ category }}</option>
+        </select>
+        <label *ngIf="requestType === 'Transaction Dispute'" for="c360-dispute-transaction">Transaction</label>
+        <select *ngIf="requestType === 'Transaction Dispute'" id="c360-dispute-transaction" name="requestTransactionId" [(ngModel)]="requestTransactionId">
+          <option [ngValue]="null">Select a transaction</option>
+          <option *ngFor="let transaction of selectedTransactions" [ngValue]="transaction.id">
+            {{ transaction.merchant || transaction.description }} · ₹{{ transaction.amount | number:'1.2-2' }} · {{ transaction.date | date:'dd MMM yyyy' }}
+          </option>
+        </select>
+        <label *ngIf="requestType === 'Credit Limit Increase'" for="c360-requested-limit">Desired approved limit</label>
+        <input *ngIf="requestType === 'Credit Limit Increase'" id="c360-requested-limit" name="requestedCreditLimit"
+          type="number" min="{{ (selectedCard?.approvedLimit ?? 0) + 0.01 }}" [max]="creditLimitIncreaseCeiling"
+          [(ngModel)]="requestedCreditLimit" [disabled]="!creditLimitIncreaseEnabled">
+        <small *ngIf="requestType === 'Credit Limit Increase'">Current limit ₹{{ selectedCard?.approvedLimit ?? 0 | number:'1.2-2' }} · Bank ceiling ₹{{ creditLimitIncreaseCeiling ?? 0 | number:'1.2-2' }}</small>
+        <label for="c360-request-description">Details</label>
+        <textarea id="c360-request-description" name="requestDescription" [(ngModel)]="requestDescription"
+          minlength="8" maxlength="2000" required placeholder="Describe what you need help with"></textarea>
+        <button class="c360-primary" type="submit" [disabled]="submittingRequest || (requestType === 'Credit Limit Increase' && !creditLimitIncreaseEnabled)">
+          {{ submittingRequest ? 'Submitting…' : 'Submit request' }}
+        </button>
+      </form>
+      <h3>Your request history</h3>
+      <div class="c360-request-history" *ngIf="requestsForSelectedCard.length">
+        <article *ngFor="let request of requestsForSelectedCard">
+          <div class="c360-request-heading"><strong>{{ request.requestNumber }} · {{ request.requestType }}</strong><span class="c360-status">{{ request.status }}</span></div>
+          <p>{{ request.category || request.description }}</p>
+          <small>Created {{ request.createdAt | date:'dd MMM yyyy' }} · Updated {{ request.updatedAt | date:'dd MMM yyyy' }}</small>
+          <p *ngIf="request.resolution"><strong>Resolution:</strong> {{ request.resolution }}</p>
+          <ol><li *ngFor="let event of request.timeline">{{ event.status }} · {{ event.createdAt | date:'dd MMM yyyy, HH:mm' }} <span *ngIf="event.note">— {{ event.note }}</span></li></ol>
+        </article>
+      </div>
+      <p class="c360-muted" *ngIf="!requestsForSelectedCard.length">No service requests have been submitted for this card.</p>
+    </section>
 
     <section class="c360-section c360-payment-panel" *ngIf="selectedBillCardId !== null">
       <div>
@@ -188,6 +560,9 @@
           <button class="c360-secondary" type="button" (click)="billPaymentAmount = selectedBillCard ? billOutstanding(selectedBillCard) : 0">
             Pay full outstanding
           </button>
+          <button class="c360-secondary" type="button" (click)="selectedBillCard && payMinimumDue(selectedBillCard)">
+            Pay minimum due
+          </button>
           <button class="c360-primary" type="submit" [disabled]="payingBill || !paymentAccount || paymentAccount.balance < billPaymentAmount">
             {{ payingBill ? 'Processing…' : 'Pay securely' }}
           </button>
@@ -196,6 +571,17 @@
         <p class="c360-muted" *ngIf="paymentAccount && paymentAccount.balance < billPaymentAmount">
           Payment amount exceeds the primary savings balance.
         </p>
+        <p class="c360-muted" *ngIf="selectedBillCard">
+          Outstanding ₹{{ billOutstanding(selectedBillCard) | number:'1.2-2' }}
+          · Minimum due ₹{{ selectedBillCard.billMinimumDue ?? 0 | number:'1.2-2' }}
+          · Due {{ selectedBillCard.billDueDate | date:'dd MMM yyyy' }}
+        </p>
+        <div class="c360-payment-receipt" *ngIf="lastPayment">
+          <strong>Payment {{ lastPayment.status }}</strong>
+          <span>Amount ₹{{ lastPayment.amount | number:'1.2-2' }} · From savings account</span>
+          <span>Reference {{ lastPayment.reference }}</span>
+          <span>{{ lastPayment.date | date:'dd MMM yyyy, HH:mm' }}</span>
+        </div>
       </form>
     </section>
 

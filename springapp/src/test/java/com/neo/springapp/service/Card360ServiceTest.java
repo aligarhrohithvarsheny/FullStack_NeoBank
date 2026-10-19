@@ -202,6 +202,91 @@ class Card360ServiceTest {
     }
 
     @Test
+    void customerCanUpdateOnlySupportedControlsForOwnedCreditCard() {
+        Card360Access access = new Card360Access();
+        access.setAccountNumber("ACC123");
+        access.setEnabled(true);
+        CreditCard card = new CreditCard();
+        card.setId(29L);
+        card.setAccountNumber("ACC123");
+        when(accessRepository.findByAccountNumber("ACC123")).thenReturn(Optional.of(access));
+        when(userRepository.findByAccountNumber("ACC123")).thenReturn(Optional.of(approvedUser()));
+        when(creditCardRepository.findById(29L)).thenReturn(Optional.of(card));
+
+        Map<String, Boolean> result = service.updateCreditCardControls(
+                "ACC123", 29L, Map.of("onlineTransactionsEnabled", false));
+
+        assertThat(result).containsEntry("onlineTransactionsEnabled", false);
+        assertThat(card.isOnlineTransactionsEnabled()).isFalse();
+        org.mockito.Mockito.verify(creditCardRepository).save(card);
+    }
+
+    @Test
+    void emergencyLockDisablesAllCreditCardChannelsAndBlocksCard() {
+        Card360Access access = new Card360Access();
+        access.setAccountNumber("ACC123");
+        access.setEnabled(true);
+        CreditCard card = new CreditCard();
+        card.setId(29L);
+        card.setAccountNumber("ACC123");
+        when(accessRepository.findByAccountNumber("ACC123")).thenReturn(Optional.of(access));
+        when(userRepository.findByAccountNumber("ACC123")).thenReturn(Optional.of(approvedUser()));
+        when(creditCardRepository.findById(29L)).thenReturn(Optional.of(card));
+
+        Map<String, Object> result = service.emergencyLockCreditCard("ACC123", 29L);
+
+        assertThat(result.get("status")).isEqualTo("Blocked");
+        assertThat(card.isBlocked()).isTrue();
+        assertThat(card.isOnlineTransactionsEnabled()).isFalse();
+        assertThat(card.isPosTransactionsEnabled()).isFalse();
+        assertThat(card.isContactlessEnabled()).isFalse();
+        assertThat(card.isAtmWithdrawalsEnabled()).isFalse();
+        assertThat(card.isInternationalTransactionsEnabled()).isFalse();
+    }
+
+    @Test
+    void emergencyLockCanBeCustomerUnlockedButDeactivatedLostCardCannot() {
+        Card360Access access = new Card360Access();
+        access.setAccountNumber("ACC123");
+        access.setEnabled(true);
+        CreditCard card = new CreditCard();
+        card.setId(29L);
+        card.setAccountNumber("ACC123");
+        card.setBlocked(true);
+        card.setDeactivated(true);
+        com.neo.springapp.model.Card360Audit audit = new com.neo.springapp.model.Card360Audit();
+        audit.setAction("EMERGENCY_CARD_LOCK");
+        audit.setChangedBy("CUSTOMER:ACC123");
+        when(accessRepository.findByAccountNumber("ACC123")).thenReturn(Optional.of(access));
+        when(userRepository.findByAccountNumber("ACC123")).thenReturn(Optional.of(approvedUser()));
+        when(auditRepository.findFirstByAccountNumberAndCardTypeAndCardIdOrderByCreatedAtDesc(
+                "ACC123", "credit", 29L)).thenReturn(Optional.of(audit));
+        when(creditCardRepository.findById(29L)).thenReturn(Optional.of(card));
+
+        assertThatThrownBy(() -> service.updateCardStatus("ACC123", "credit", 29L, false))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Contact NeoBank to unblock a deactivated card");
+    }
+
+    @Test
+    void card360PinChangeUsesExistingEncryptedPinServiceAndOwnerCheck() {
+        Card360Access access = new Card360Access();
+        access.setAccountNumber("ACC123");
+        access.setEnabled(true);
+        CreditCard card = new CreditCard();
+        card.setId(29L);
+        card.setAccountNumber("ACC123");
+        when(accessRepository.findByAccountNumber("ACC123")).thenReturn(Optional.of(access));
+        when(userRepository.findByAccountNumber("ACC123")).thenReturn(Optional.of(approvedUser()));
+        when(creditCardRepository.findById(29L)).thenReturn(Optional.of(card));
+        when(creditCardService.setPin(29L, "1234")).thenReturn(true);
+
+        service.setCreditCardPin("ACC123", 29L, "1234");
+
+        org.mockito.Mockito.verify(creditCardService).setPin(29L, "1234");
+    }
+
+    @Test
     void debitCardTransactionsDoNotIncludeAccountWideActivity() {
         Card360Access access = new Card360Access();
         access.setAccountNumber("ACC123");

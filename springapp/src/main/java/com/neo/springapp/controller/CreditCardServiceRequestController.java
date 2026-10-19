@@ -302,7 +302,7 @@ public class CreditCardServiceRequestController {
     private UserSessionTokenService.SessionPrincipal userPrincipal(Authentication authentication) {
         if (authentication == null
                 || !(authentication.getPrincipal() instanceof UserSessionTokenService.SessionPrincipal principal)
-                || !"USER".equals(principal.scope())) return null;
+                || !Set.of("USER", "CARD360").contains(principal.scope())) return null;
         return principal;
     }
 

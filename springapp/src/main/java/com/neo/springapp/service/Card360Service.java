@@ -49,7 +49,8 @@ public class Card360Service {
         return auditRepository.findFirstByAccountNumberAndCardTypeAndCardIdOrderByCreatedAtDesc(
                         accountNumber, type.toLowerCase(Locale.ROOT), id)
                 .filter(audit -> "CARD_BLOCKED".equals(audit.getAction())
-                        && ("CUSTOMER:" + accountNumber).equals(audit.getChangedBy()))
+                        || "EMERGENCY_CARD_LOCK".equals(audit.getAction()))
+                .filter(audit -> ("CUSTOMER:" + accountNumber).equals(audit.getChangedBy()))
                 .isPresent();
     }
 
@@ -160,6 +161,9 @@ public class Card360Service {
         if ("debit".equalsIgnoreCase(type)) {
             Card card = cardRepository.findById(id).filter(c -> accountNumber.equals(c.getAccountNumber()))
                     .orElseThrow(() -> new IllegalArgumentException("Card not found"));
+            if (!blocked && card.isDeactivated()) {
+                throw new IllegalArgumentException("Contact NeoBank to unblock a deactivated card");
+            }
             oldStatus = card.getStatus();
             card.setBlocked(blocked);
             card.setDeactivated(false);
@@ -168,6 +172,9 @@ public class Card360Service {
         } else if ("credit".equalsIgnoreCase(type)) {
             CreditCard card = creditCardRepository.findById(id).filter(c -> accountNumber.equals(c.getAccountNumber()))
                     .orElseThrow(() -> new IllegalArgumentException("Card not found"));
+            if (!blocked && card.isDeactivated()) {
+                throw new IllegalArgumentException("Contact NeoBank to unblock a deactivated card");
+            }
             oldStatus = card.getStatus();
             card.setBlocked(blocked);
             card.setDeactivated(false);
@@ -197,6 +204,128 @@ public class Card360Service {
         return Map.of("success", true, "spendingLimit", limit);
     }
 
+    @Transactional
+    public Map<String, Boolean> updateCreditCardControls(String accountNumber, long id,
+                                                          Map<String, Boolean> updates) {
+        requireEnabled(accountNumber);
+        CreditCard card = ownedCreditCard(accountNumber, id);
+        if (updates == null || updates.isEmpty()) {
+            throw new IllegalArgumentException("Select at least one card control to update");
+        }
+        Map<String, Boolean> controls = new HashMap<>();
+        setControl(updates, controls, "onlineTransactionsEnabled",
+                card::setOnlineTransactionsEnabled);
+        setControl(updates, controls, "posTransactionsEnabled",
+                card::setPosTransactionsEnabled);
+        setControl(updates, controls, "contactlessEnabled",
+                card::setContactlessEnabled);
+        setControl(updates, controls, "atmWithdrawalsEnabled",
+                card::setAtmWithdrawalsEnabled);
+        setControl(updates, controls, "internationalTransactionsEnabled",
+                card::setInternationalTransactionsEnabled);
+        if (controls.isEmpty()) {
+            throw new IllegalArgumentException("No supported card control was supplied");
+        }
+        creditCardRepository.save(card);
+        record(accountNumber, "credit", id, "CARD_CONTROLS_CHANGED", null,
+                controls.toString(), "CUSTOMER:" + accountNumber);
+        return controls;
+    }
+
+    @Transactional
+    public void setCreditCardPin(String accountNumber, long id, String pin) {
+        requireEnabled(accountNumber);
+        ownedCreditCard(accountNumber, id);
+        if (pin == null || !pin.matches("\\d{4}")) {
+            throw new IllegalArgumentException("PIN must contain exactly 4 digits");
+        }
+        if (!creditCardService.setPin(id, pin)) {
+            throw new IllegalArgumentException("Card not found");
+        }
+        record(accountNumber, "credit", id, "CARD_PIN_CHANGED", null,
+                "PIN updated", "CUSTOMER:" + accountNumber);
+    }
+
+    @Transactional
+    public Map<String, Object> emergencyLockCreditCard(String accountNumber, long id) {
+        requireEnabled(accountNumber);
+        CreditCard card = ownedCreditCard(accountNumber, id);
+        Map<String, Boolean> controls = Map.of(
+                "onlineTransactionsEnabled", false,
+                "posTransactionsEnabled", false,
+                "contactlessEnabled", false,
+                "atmWithdrawalsEnabled", false,
+                "internationalTransactionsEnabled", false);
+        card.setOnlineTransactionsEnabled(false);
+        card.setPosTransactionsEnabled(false);
+        card.setContactlessEnabled(false);
+        card.setAtmWithdrawalsEnabled(false);
+        card.setInternationalTransactionsEnabled(false);
+        card.setBlocked(true);
+        card.setDeactivated(false);
+        card.setStatus("Blocked");
+        creditCardRepository.save(card);
+        record(accountNumber, "credit", id, "EMERGENCY_CARD_LOCK", null,
+                controls.toString(), "CUSTOMER:" + accountNumber);
+        return Map.of("status", card.getStatus(), "controls", controls);
+    }
+
+    @Transactional(readOnly = true)
+    public Map<String, Object> getEmiSettingsForCustomer() {
+        return creditCardService.getEmiSettings();
+    }
+
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> getCardSecurityEvents(String accountNumber, long id) {
+        requireEnabled(accountNumber);
+        ownedCreditCard(accountNumber, id);
+        return auditRepository.findTop200ByAccountNumberOrderByCreatedAtDesc(accountNumber).stream()
+                .filter(event -> "credit".equalsIgnoreCase(event.getCardType())
+                        && Objects.equals(event.getCardId(), id))
+                .map(event -> {
+                    Map<String, Object> result = new HashMap<>();
+                    result.put("action", event.getAction());
+                    result.put("previousValue", Objects.toString(event.getOldValue(), ""));
+                    result.put("newValue", Objects.toString(event.getNewValue(), ""));
+                    result.put("createdAt", event.getCreatedAt());
+                    return result;
+                }).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> getEmiEligibleTransactions(String accountNumber, long id) {
+        requireEnabled(accountNumber);
+        ownedCreditCard(accountNumber, id);
+        return creditCardService.getEmiEligibleTransactions(id).stream().map(transaction -> {
+            Map<String, Object> result = new HashMap<>();
+            result.put("id", transaction.getId());
+            result.put("merchant", Objects.toString(transaction.getMerchant(), ""));
+            result.put("description", Objects.toString(transaction.getDescription(), ""));
+            result.put("amount", transaction.getAmount());
+            result.put("transactionDate", transaction.getTransactionDate());
+            result.put("status", transaction.getStatus());
+            return result;
+        }).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> getEmiPlans(String accountNumber, long id) {
+        requireEnabled(accountNumber);
+        ownedCreditCard(accountNumber, id);
+        return creditCardService.getEmiPlans(id);
+    }
+
+    @Transactional
+    public Map<String, Object> convertTransactionsToEmi(String accountNumber, long id,
+                                                         List<Long> transactionIds, Integer tenureMonths) {
+        requireEnabled(accountNumber);
+        ownedCreditCard(accountNumber, id);
+        Map<String, Object> result = creditCardService.convertTransactionsToEmi(id, transactionIds, tenureMonths);
+        record(accountNumber, "credit", id, "EMI_PLAN_CREATED", null,
+                Objects.toString(result.get("id"), "Created"), "CUSTOMER:" + accountNumber);
+        return result;
+    }
+
     @Transactional(readOnly = true)
     public Map<String, Object> getPaymentAccount(String accountNumber) {
         requireEnabled(accountNumber);
@@ -224,15 +353,24 @@ public class Card360Service {
                     .sorted(Comparator.comparing(CreditCardTransaction::getTransactionDate,
                             Comparator.nullsLast(Comparator.reverseOrder())))
                     .limit(100)
-                    .forEach(tx -> items.add(Map.of(
-                            "date", Objects.toString(tx.getTransactionDate(), ""),
-                            "description", Objects.toString(tx.getDescription(),
-                                    Objects.toString(tx.getMerchant(), "Card transaction")),
-                            "amount", Objects.toString(tx.getAmount(), "0"),
-                            "type", Objects.toString(tx.getTransactionType(), ""),
-                            "status", Objects.toString(tx.getStatus(), ""),
-                            "receipt", Objects.toString(tx.getGlobalTransactionSequence(),
-                                    tx.getBillId() == null ? "—" : "Bill #" + tx.getBillId()))));
+                    .forEach(tx -> {
+                        Map<String, Object> item = new HashMap<>();
+                        item.put("id", tx.getId());
+                        item.put("date", tx.getTransactionDate());
+                        item.put("description", Objects.toString(tx.getDescription(),
+                                Objects.toString(tx.getMerchant(), "Card transaction")));
+                        item.put("merchant", Objects.toString(tx.getMerchant(), ""));
+                        item.put("amount", tx.getAmount());
+                        item.put("type", Objects.toString(tx.getTransactionType(), ""));
+                        item.put("status", Objects.toString(tx.getStatus(), ""));
+                        item.put("receipt", Objects.toString(tx.getGlobalTransactionSequence(),
+                                tx.getBillId() == null ? "—" : "Bill #" + tx.getBillId()));
+                        item.put("billId", tx.getBillId());
+                        item.put("emiPlanId", tx.getEmiPlanId());
+                        item.put("balanceAfter", tx.getBalanceAfter());
+                        item.put("paymentMethod", tx.getPaymentMethod());
+                        items.add(item);
+                    });
             return items;
         }
         if ("debit".equalsIgnoreCase(type)) {
@@ -470,8 +608,10 @@ public class Card360Service {
         result.put("id", card.getId());
         result.put("type", "credit");
         result.put("cardType", "Credit Card");
+        result.put("cardholderName", Objects.toString(card.getUserName(), ""));
         result.put("maskedNumber", mask(card.getCardNumber()));
         result.put("status", Objects.toString(card.getStatus(), "Unknown"));
+        result.put("pinSet", card.isPinSet());
         result.put("expiryDate", Objects.toString(card.getExpiryDate(), ""));
         result.put("blocked", card.isBlocked());
         result.put("approvedLimit", card.getApprovedLimit());
@@ -479,6 +619,11 @@ public class Card360Service {
         result.put("spendingLimit", card.getUserSetSpendingLimit());
         result.put("outstandingBalance", card.getCurrentBalance());
         result.put("canUnblock", customerCanUnblock(card.getAccountNumber(), "credit", card.getId()));
+        result.put("onlineTransactionsEnabled", card.isOnlineTransactionsEnabled());
+        result.put("posTransactionsEnabled", card.isPosTransactionsEnabled());
+        result.put("contactlessEnabled", card.isContactlessEnabled());
+        result.put("atmWithdrawalsEnabled", card.isAtmWithdrawalsEnabled());
+        result.put("internationalTransactionsEnabled", card.isInternationalTransactionsEnabled());
         result.put("fine", card.getFine());
         result.put("penalty", card.getPenalty());
         closureRequestRepository.findFirstByCreditCardIdAndStatusOrderByRequestedAtDesc(card.getId(), "Pending")
@@ -498,6 +643,21 @@ public class Card360Service {
                     result.put("billStatus", bill.getStatus());
                 });
         return result;
+    }
+
+    private CreditCard ownedCreditCard(String accountNumber, long id) {
+        return creditCardRepository.findById(id)
+                .filter(card -> accountNumber.equals(card.getAccountNumber()))
+                .orElseThrow(() -> new IllegalArgumentException("Card not found"));
+    }
+
+    private void setControl(Map<String, Boolean> updates, Map<String, Boolean> controls,
+                            String key, java.util.function.Consumer<Boolean> setter) {
+        if (!updates.containsKey(key)) return;
+        Boolean enabled = updates.get(key);
+        if (enabled == null) throw new IllegalArgumentException(key + " must be true or false");
+        setter.accept(enabled);
+        controls.put(key, enabled);
     }
 
     private String mask(String number) {

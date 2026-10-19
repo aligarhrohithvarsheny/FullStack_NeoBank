@@ -9,6 +9,8 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -148,9 +150,118 @@ public class Card360Controller {
         SessionPrincipal principal = card360Principal(authentication);
         if (principal == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         try {
+            if (request == null) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Spending limit is required"));
+            }
             Number limit = request.get("spendingLimit");
             if (limit == null) return ResponseEntity.badRequest().body(Map.of("message", "Spending limit is required"));
             return ResponseEntity.ok(card360Service.updateCreditLimit(principal.accountNumber(), id, limit.doubleValue()));
+        } catch (IllegalArgumentException exception) {
+            return ResponseEntity.badRequest().body(Map.of("message", exception.getMessage()));
+        }
+    }
+
+    @PutMapping("/cards/credit/{id}/controls")
+    public ResponseEntity<?> updateCardControls(@PathVariable Long id,
+                                                @RequestBody Map<String, Boolean> request,
+                                                Authentication authentication) {
+        SessionPrincipal principal = card360Principal(authentication);
+        if (principal == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        try {
+            return ResponseEntity.ok(card360Service.updateCreditCardControls(
+                    principal.accountNumber(), id, request));
+        } catch (IllegalArgumentException exception) {
+            return ResponseEntity.badRequest().body(Map.of("message", exception.getMessage()));
+        }
+    }
+
+    @PostMapping("/cards/credit/{id}/emergency-lock")
+    public ResponseEntity<?> emergencyLock(@PathVariable Long id, Authentication authentication) {
+        SessionPrincipal principal = card360Principal(authentication);
+        if (principal == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        try {
+            return ResponseEntity.ok(card360Service.emergencyLockCreditCard(principal.accountNumber(), id));
+        } catch (IllegalArgumentException exception) {
+            return ResponseEntity.badRequest().body(Map.of("message", exception.getMessage()));
+        }
+    }
+
+    @PutMapping("/cards/credit/{id}/pin")
+    public ResponseEntity<?> setCardPin(@PathVariable Long id, @RequestBody Map<String, String> request,
+                                        Authentication authentication) {
+        SessionPrincipal principal = card360Principal(authentication);
+        if (principal == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        try {
+            if (request == null || request.get("pin") == null) {
+                return ResponseEntity.badRequest().body(Map.of("message", "PIN is required"));
+            }
+            card360Service.setCreditCardPin(principal.accountNumber(), id, request.get("pin"));
+            return ResponseEntity.ok(Map.of("success", true));
+        } catch (IllegalArgumentException exception) {
+            return ResponseEntity.badRequest().body(Map.of("message", exception.getMessage()));
+        }
+    }
+
+    @GetMapping("/emi-settings")
+    public ResponseEntity<?> emiSettings(Authentication authentication) {
+        if (card360Principal(authentication) == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        return ResponseEntity.ok(card360Service.getEmiSettingsForCustomer());
+    }
+
+    @GetMapping("/cards/credit/{id}/security-events")
+    public ResponseEntity<?> cardSecurityEvents(@PathVariable Long id, Authentication authentication) {
+        SessionPrincipal principal = card360Principal(authentication);
+        if (principal == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        try {
+            return ResponseEntity.ok(card360Service.getCardSecurityEvents(principal.accountNumber(), id));
+        } catch (IllegalArgumentException exception) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", exception.getMessage()));
+        }
+    }
+
+    @GetMapping("/cards/credit/{id}/emi-eligible-transactions")
+    public ResponseEntity<?> eligibleEmiTransactions(@PathVariable Long id, Authentication authentication) {
+        SessionPrincipal principal = card360Principal(authentication);
+        if (principal == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        try {
+            return ResponseEntity.ok(card360Service.getEmiEligibleTransactions(principal.accountNumber(), id));
+        } catch (IllegalArgumentException exception) {
+            return ResponseEntity.badRequest().body(Map.of("message", exception.getMessage()));
+        }
+    }
+
+    @GetMapping("/cards/credit/{id}/emi-plans")
+    public ResponseEntity<?> emiPlans(@PathVariable Long id, Authentication authentication) {
+        SessionPrincipal principal = card360Principal(authentication);
+        if (principal == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        try {
+            return ResponseEntity.ok(card360Service.getEmiPlans(principal.accountNumber(), id));
+        } catch (IllegalArgumentException exception) {
+            return ResponseEntity.badRequest().body(Map.of("message", exception.getMessage()));
+        }
+    }
+
+    @PostMapping("/cards/credit/{id}/emi-conversions")
+    public ResponseEntity<?> convertToEmi(@PathVariable Long id, @RequestBody Map<String, Object> request,
+                                          Authentication authentication) {
+        SessionPrincipal principal = card360Principal(authentication);
+        if (principal == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        if (request == null) return ResponseEntity.badRequest().body(Map.of("message", "EMI conversion details are required"));
+        List<Long> transactionIds = new ArrayList<>();
+        Object rawIds = request.get("transactionIds");
+        if (rawIds instanceof List<?> ids) {
+            for (Object rawId : ids) {
+                if (!(rawId instanceof Number number)) {
+                    return ResponseEntity.badRequest().body(Map.of("message", "Transaction IDs must be numeric"));
+                }
+                transactionIds.add(number.longValue());
+            }
+        }
+        Object rawTenure = request.get("tenureMonths");
+        Integer tenure = rawTenure instanceof Number number ? number.intValue() : null;
+        try {
+            return ResponseEntity.ok(card360Service.convertTransactionsToEmi(
+                    principal.accountNumber(), id, transactionIds, tenure));
         } catch (IllegalArgumentException exception) {
             return ResponseEntity.badRequest().body(Map.of("message", exception.getMessage()));
         }

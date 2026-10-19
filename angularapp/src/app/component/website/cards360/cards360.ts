@@ -13,6 +13,7 @@ interface Card360Card {
   status: string;
   expiryDate: string;
   blocked: boolean;
+  pinSet?: boolean;
   canUnblock?: boolean;
   approvedLimit?: number;
   availableLimit?: number;
@@ -29,15 +30,27 @@ interface Card360Card {
   billStatus?: string;
   fullCardNumber?: string;
   closureRequestStatus?: string;
+  cardholderName?: string;
+  onlineTransactionsEnabled?: boolean;
+  posTransactionsEnabled?: boolean;
+  contactlessEnabled?: boolean;
+  atmWithdrawalsEnabled?: boolean;
+  internationalTransactionsEnabled?: boolean;
 }
 
 interface Card360Transaction {
+  id: number;
   date: string;
   description: string;
-  amount: string;
+  merchant: string;
+  amount: number;
   type: string;
   status: string;
   receipt: string;
+  billId?: number | null;
+  emiPlanId?: number | null;
+  balanceAfter?: number | null;
+  paymentMethod?: string | null;
 }
 
 interface Cards360PaymentAccount {
@@ -59,6 +72,35 @@ interface Card360Bill {
   status: string;
   billingPeriod: string;
 }
+
+interface Card360SecurityEvent {
+  action: string;
+  createdAt: string;
+  newValue: string;
+}
+
+interface Card360RequestTimelineEvent {
+  status: string;
+  createdAt: string;
+  note: string;
+}
+
+interface Card360ServiceRequest {
+  id: number;
+  creditCardId: number;
+  requestNumber: string;
+  requestType: string;
+  category: string;
+  description: string;
+  requestedLimit: number;
+  status: string;
+  resolution: string;
+  createdAt: string;
+  updatedAt: string;
+  timeline: Card360RequestTimelineEvent[];
+}
+
+type Card360TransactionTab = 'ALL' | 'UNBILLED' | 'BILLED' | 'EMI' | 'REFUNDS';
 
 @Component({
   selector: 'app-cards360',
@@ -84,6 +126,7 @@ export class Cards360 implements OnInit {
   selectedBillCardId: number | null = null;
   billPaymentAmount = 0;
   payingBill = false;
+  lastPayment: { amount: number; reference: string; date: Date; status: string } | null = null;
   cardBills: Card360Bill[] = [];
   statementStartDate = '';
   statementEndDate = '';
@@ -91,6 +134,56 @@ export class Cards360 implements OnInit {
   requestingClosureFor: number | null = null;
   submittingClosureRequest = false;
   downloadingStatement = false;
+  activeTransactionTab: Card360TransactionTab = 'ALL';
+  readonly transactionTabs: Card360TransactionTab[] = ['ALL', 'UNBILLED', 'BILLED', 'EMI', 'REFUNDS'];
+  transactionSearch = '';
+  transactionStatusFilter = '';
+  transactionTypeFilter = '';
+  transactionCategoryFilter = '';
+  transactionStartDate = '';
+  transactionEndDate = '';
+  transactionMinAmount: number | null = null;
+  transactionMaxAmount: number | null = null;
+  selectedTransaction: Card360Transaction | null = null;
+  billSearch = '';
+  statementPeriodFilter: 'ALL' | 'MONTHLY' | 'FINANCIAL_YEAR' = 'ALL';
+  selectedStatementMonth = '';
+  selectedFinancialYear = '';
+  analyticsPeriod: 'THIS_MONTH' | 'PREVIOUS_MONTH' | 'CURRENT_CYCLE' | 'PREVIOUS_CYCLE' = 'THIS_MONTH';
+  emiSettings: { enabled: boolean; annualInterestPercent: number; processingFeePercent: number; tenuresMonths: number[] } | null = null;
+  emiEligibleTransactions: Array<{ id: number; merchant: string; description: string; amount: number; transactionDate: string }> = [];
+  emiPlans: any[] = [];
+  selectedEmiTransactionIds: number[] = [];
+  emiTenureMonths = 3;
+  convertingToEmi = false;
+  loadingEmi = false;
+  customerRequests: Card360ServiceRequest[] = [];
+  securityEvents: Card360SecurityEvent[] = [];
+  creditLimitIncreaseCeiling: number | null = null;
+  requestType = 'Transaction Dispute';
+  requestCategory = 'Unauthorized transaction';
+  requestDescription = '';
+  requestTransactionId: number | null = null;
+  requestedCreditLimit: number | null = null;
+  submittingRequest = false;
+  showPinForm = false;
+  pinForm = { newPin: '', confirmPin: '' };
+  readonly customerRequestTypes = [
+    'Card Replacement', 'Credit Limit Increase', 'Statement Request', 'Billing Issue',
+    'Reward Issue', 'EMI Issue', 'Transaction Dispute', 'Address Update', 'Card Closure'
+  ];
+  readonly disputeCategories = [
+    'Unauthorized transaction', 'Duplicate transaction', 'Incorrect amount',
+    'Refund not received', 'Merchant dispute', 'Cash withdrawal issue'
+  ];
+  readonly replacementReasons = ['Lost', 'Stolen', 'Damaged', 'Expired'];
+  readonly cardControlKeys = [
+    'onlineTransactionsEnabled',
+    'posTransactionsEnabled',
+    'contactlessEnabled',
+    'atmWithdrawalsEnabled',
+    'internationalTransactionsEnabled'
+  ] as const;
 
   private readonly tokenKey = 'card360Token';
   private readonly api = `${environment.apiBaseUrl}/api/card360`;
@@ -112,6 +205,210 @@ export class Cards360 implements OnInit {
 
   get selectedCard(): Card360Card | undefined {
     return this.cards.find(card => this.cardKey(card) === this.selectedCardKey);
+  }
+
+  get usedLimit(): number {
+    const card = this.selectedCard;
+    return card ? Math.max(0, (card.approvedLimit ?? 0) - (card.availableLimit ?? 0)) : 0;
+  }
+
+  get utilizationPercent(): number {
+    const limit = this.selectedCard?.approvedLimit ?? 0;
+    return limit > 0 ? Math.min(100, this.usedLimit / limit * 100) : 0;
+  }
+
+  get latestBill(): Card360Bill | undefined {
+    return this.cardBills[0];
+  }
+
+  get filteredTransactions(): Card360Transaction[] {
+    const search = this.transactionSearch.trim().toLowerCase();
+    return this.selectedTransactions.filter(transaction => {
+      const type = (transaction.type || '').toLowerCase();
+      const isRefund = type.includes('refund');
+      const date = (transaction.date || '').slice(0, 10);
+      const amount = Number(transaction.amount || 0);
+      const category = this.transactionCategory(transaction).toLowerCase();
+      const searchMatch = !search || [
+        transaction.merchant, transaction.description, transaction.type, transaction.status,
+        transaction.receipt, String(transaction.id)
+      ].some(value => (value || '').toLowerCase().includes(search));
+      return searchMatch
+        && (this.activeTransactionTab === 'ALL'
+          || (this.activeTransactionTab === 'UNBILLED' && !transaction.billId && !transaction.emiPlanId)
+          || (this.activeTransactionTab === 'BILLED' && !!transaction.billId)
+          || (this.activeTransactionTab === 'EMI' && !!transaction.emiPlanId)
+          || (this.activeTransactionTab === 'REFUNDS' && isRefund))
+        && (!this.transactionStatusFilter || transaction.status.toLowerCase() === this.transactionStatusFilter.toLowerCase())
+        && (!this.transactionTypeFilter || type === this.transactionTypeFilter.toLowerCase())
+        && (!this.transactionCategoryFilter || category === this.transactionCategoryFilter.toLowerCase())
+        && (!this.transactionStartDate || date >= this.transactionStartDate)
+        && (!this.transactionEndDate || date <= this.transactionEndDate)
+        && (this.transactionMinAmount == null || amount >= this.transactionMinAmount)
+        && (this.transactionMaxAmount == null || amount <= this.transactionMaxAmount);
+    });
+  }
+
+  get filteredBills(): Card360Bill[] {
+    const query = this.billSearch.trim().toLowerCase();
+    return this.cardBills.filter(bill => {
+      const date = new Date(bill.billGenerationDate);
+      const month = this.statementMonthKey(date);
+      const year = this.financialYearLabel(date);
+      return (!query || `${bill.billingPeriod} ${bill.status} ${month} ${year}`.toLowerCase().includes(query))
+        && (this.statementPeriodFilter !== 'MONTHLY' || !this.selectedStatementMonth || month === this.selectedStatementMonth)
+        && (this.statementPeriodFilter !== 'FINANCIAL_YEAR' || !this.selectedFinancialYear || year === this.selectedFinancialYear);
+    });
+  }
+
+  get statementMonths(): Array<{ key: string; label: string }> {
+    return [...new Map(this.cardBills.map(bill => {
+      const date = new Date(bill.billGenerationDate);
+      return [this.statementMonthKey(date), date.toLocaleString('en', { month: 'long', year: 'numeric' })] as const;
+    })).entries()].map(([key, label]) => ({ key, label }));
+  }
+
+  get statementYears(): string[] {
+    return [...new Set(this.cardBills.map(bill => this.financialYearLabel(new Date(bill.billGenerationDate))))]
+      .sort((a, b) => b.localeCompare(a));
+  }
+
+  get spendingCategories(): Array<{ name: string; amount: number; percent: number }> {
+    const categories = ['Shopping', 'Food', 'Fuel', 'Travel', 'Entertainment', 'Bills', 'Healthcare', 'Other'];
+    const amounts = new Map(categories.map(name => [name, 0]));
+    for (const transaction of this.analyticsTransactions()) {
+      const type = transaction.type.toLowerCase();
+      if (!['purchase', 'fee', 'interest'].includes(type) || Number(transaction.amount) <= 0) continue;
+      const category = this.transactionCategory(transaction);
+      amounts.set(category, (amounts.get(category) ?? 0) + Number(transaction.amount));
+    }
+    const peak = Math.max(0, ...amounts.values());
+    return [...amounts.entries()].map(([name, amount]) => ({
+      name, amount, percent: peak ? amount / peak * 100 : 0
+    })).sort((a, b) => b.amount - a.amount);
+  }
+
+  get selectedPeriodSpend(): number {
+    return this.analyticsTransactions().filter(transaction =>
+      ['purchase', 'fee', 'interest'].includes(transaction.type.toLowerCase()))
+      .reduce((sum, transaction) => sum + Number(transaction.amount || 0), 0);
+  }
+
+  get averageMonthlySpend(): number {
+    const monthlyTotals = new Map<string, number>();
+    this.selectedTransactions.forEach(transaction => {
+      if (!['purchase', 'fee', 'interest'].includes(transaction.type.toLowerCase())) return;
+      const date = new Date(transaction.date);
+      const key = `${date.getFullYear()}-${date.getMonth()}`;
+      monthlyTotals.set(key, (monthlyTotals.get(key) ?? 0) + Number(transaction.amount || 0));
+    });
+    return monthlyTotals.size
+      ? [...monthlyTotals.values()].reduce((sum, amount) => sum + amount, 0) / monthlyTotals.size
+      : 0;
+  }
+
+  get monthlyTrend(): Array<{ label: string; amount: number; percent: number }> {
+    const now = new Date();
+    const months = Array.from({ length: 6 }, (_, index) =>
+      new Date(now.getFullYear(), now.getMonth() - (5 - index), 1));
+    const totals = months.map(month => this.selectedTransactions
+      .filter(transaction => {
+        const date = new Date(transaction.date);
+        return date.getFullYear() === month.getFullYear() && date.getMonth() === month.getMonth()
+          && ['purchase', 'fee', 'interest'].includes(transaction.type.toLowerCase());
+      })
+      .reduce((sum, transaction) => sum + Number(transaction.amount || 0), 0));
+    const peak = Math.max(0, ...totals);
+    return months.map((month, index) => ({
+      label: month.toLocaleString('en', { month: 'short' }),
+      amount: totals[index],
+      percent: peak ? totals[index] / peak * 100 : 0
+    }));
+  }
+
+  get refundTransactions(): Card360Transaction[] {
+    return this.selectedTransactions.filter(transaction => transaction.type.toLowerCase().includes('refund'));
+  }
+
+  get failedTransactions(): Card360Transaction[] {
+    return this.selectedTransactions.filter(transaction => transaction.status.toLowerCase() === 'failed');
+  }
+
+  get subscriptionEstimates(): Array<{ merchant: string; amount: number; frequency: string; nextDate: Date }> {
+    const groups = new Map<string, Card360Transaction[]>();
+    this.selectedTransactions.filter(transaction => transaction.type.toLowerCase() === 'purchase')
+      .forEach(transaction => {
+        const merchant = (transaction.merchant || transaction.description || '').trim();
+        if (!merchant) return;
+        groups.set(merchant, [...(groups.get(merchant) ?? []), transaction]);
+      });
+    return [...groups.entries()].flatMap(([merchant, transactions]) => {
+      if (transactions.length < 2) return [];
+      const ordered = [...transactions].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      const intervals = ordered.slice(1).map((transaction, index) =>
+        (new Date(transaction.date).getTime() - new Date(ordered[index].date).getTime()) / 86400000);
+      const averageInterval = intervals.reduce((sum, days) => sum + days, 0) / intervals.length;
+      const frequency = averageInterval >= 25 && averageInterval <= 40 ? 'Monthly'
+        : averageInterval >= 330 && averageInterval <= 400 ? 'Yearly' : '';
+      if (!frequency) return [];
+      const latest = ordered[ordered.length - 1];
+      const nextDate = new Date(latest.date);
+      nextDate.setDate(nextDate.getDate() + Math.round(averageInterval));
+      return [{ merchant, amount: Number(latest.amount), frequency, nextDate }];
+    });
+  }
+
+  get monthlySubscriptionTotal(): number {
+    return this.subscriptionEstimates.reduce((sum, subscription) =>
+      sum + subscription.amount / (subscription.frequency === 'Yearly' ? 12 : 1), 0);
+  }
+
+  get topMerchants(): Array<{ merchant: string; amount: number }> {
+    const totals = new Map<string, number>();
+    this.analyticsTransactions().filter(transaction => transaction.type.toLowerCase() === 'purchase')
+      .forEach(transaction => {
+        const merchant = (transaction.merchant || transaction.description || 'Other').trim();
+        totals.set(merchant, (totals.get(merchant) ?? 0) + Number(transaction.amount || 0));
+      });
+    return [...totals.entries()].map(([merchant, amount]) => ({ merchant, amount }))
+      .sort((left, right) => right.amount - left.amount).slice(0, 5);
+  }
+
+  get healthFactors(): Array<{ name: string; score: number }> {
+    const limit = this.selectedCard?.approvedLimit ?? 0;
+    const outstanding = this.currentCardOutstanding;
+    const failed = this.selectedTransactions.filter(transaction => transaction.status.toLowerCase() === 'failed').length;
+    const failureRate = this.selectedTransactions.length ? failed / this.selectedTransactions.length * 100 : 0;
+    const emiOutstanding = this.emiPlans
+      .filter(plan => !['completed', 'closed'].includes(String(plan.status).toLowerCase()))
+      .reduce((sum, plan) => sum + Number(plan.outstandingPrincipal || 0), 0);
+    const scoreForRatio = (amount: number): number => limit > 0
+      ? Math.max(0, Math.min(100, 100 - amount / limit * 100)) : 100;
+    return [
+      { name: 'Credit utilization', score: Math.round(Math.max(0, 100 - this.utilizationPercent)) },
+      { name: 'Payment consistency', score: Math.round(Math.max(0, 100 - failureRate * 2 - (this.latestBill && this.billPaymentStatus(this.latestBill) === 'Overdue' ? 30 : 0))) },
+      { name: 'Outstanding balance', score: Math.round(scoreForRatio(outstanding)) },
+      { name: 'EMI burden', score: Math.round(scoreForRatio(emiOutstanding)) },
+      { name: 'Spending pattern', score: Math.round(scoreForRatio(this.averageMonthlySpend)) }
+    ];
+  }
+
+  get neoBankHealthScore(): number {
+    const factors = this.healthFactors;
+    return factors.length
+      ? Math.round(factors.reduce((sum, factor) => sum + factor.score, 0) / factors.length)
+      : 0;
+  }
+
+  get selectedEmiPrincipal(): number {
+    return this.emiEligibleTransactions
+      .filter(transaction => this.selectedEmiTransactionIds.includes(transaction.id))
+      .reduce((sum, transaction) => sum + Number(transaction.amount || 0), 0);
+  }
+
+  get selectedTransactionEmiEligible(): boolean {
+    return !!this.selectedTransaction
+      && this.emiEligibleTransactions.some(transaction => transaction.id === this.selectedTransaction?.id);
   }
 
   billOutstanding(card: Card360Card): number {
@@ -172,6 +469,8 @@ export class Cards360 implements OnInit {
     this.cards.forEach(item => item.fullCardNumber = undefined);
     this.selectedTransactions = [];
     this.cardBills = [];
+    this.selectedTransaction = null;
+    this.selectedEmiTransactionIds = [];
     this.loadingTransactions = true;
     this.error = '';
     this.http.get<Card360Transaction[]>(
@@ -190,16 +489,201 @@ export class Cards360 implements OnInit {
     if (card.type === 'credit') {
       this.http.get<Card360Bill[]>(`${this.api}/cards/credit/${card.id}/bills`, { headers: this.headers() })
         .subscribe({
-          next: bills => this.cardBills = bills || [],
+          next: bills => {
+            this.cardBills = bills || [];
+            this.selectedCardKey = this.cardKey(card);
+          },
           error: err => this.handleProtectedError(err)
         });
+      this.loadEmiData(card.id);
+      this.loadCustomerRequests();
+      this.loadSecurityEvents(card.id);
     }
+  }
+
+  get requestsForSelectedCard(): Card360ServiceRequest[] {
+    return this.customerRequests.filter(request => request.creditCardId === this.selectedCard?.id);
+  }
+
+  get creditLimitIncreaseEnabled(): boolean {
+    return this.creditLimitIncreaseCeiling != null && this.creditLimitIncreaseCeiling > (this.selectedCard?.approvedLimit ?? 0);
+  }
+
+  loadCustomerRequests(): void {
+    this.http.get<Card360ServiceRequest[]>(`${environment.apiBaseUrl}/api/credit-card-requests/mine`,
+      { headers: this.headers() }).subscribe({
+        next: requests => this.customerRequests = requests || [],
+        error: err => this.error = err.error?.message || 'Unable to load card service requests.'
+      });
+    this.http.get<{ creditLimitIncreaseEnabled: boolean; creditLimitIncreaseCeiling: number }>(
+      `${environment.apiBaseUrl}/api/credit-card-requests/configuration`, { headers: this.headers() }
+    ).subscribe({
+      next: config => this.creditLimitIncreaseCeiling = config.creditLimitIncreaseEnabled
+        ? Number(config.creditLimitIncreaseCeiling) : null,
+      error: err => {
+        this.creditLimitIncreaseCeiling = null;
+        this.error = err.error?.message || 'Unable to load credit-limit request eligibility.';
+      }
+    });
+  }
+
+  loadSecurityEvents(cardId: number): void {
+    this.http.get<Card360SecurityEvent[]>(
+      `${this.api}/cards/credit/${cardId}/security-events`, { headers: this.headers() }
+    ).subscribe({
+      next: events => this.securityEvents = events || [],
+      error: err => {
+        this.securityEvents = [];
+        this.error = err.error?.message || 'Unable to load card security events.';
+      }
+    });
+  }
+
+  changeRequestType(type: string): void {
+    this.requestType = type;
+    this.requestCategory = type === 'Card Replacement' ? 'Lost' : 'Unauthorized transaction';
+    if (type !== 'Transaction Dispute') this.requestTransactionId = null;
+    if (type !== 'Credit Limit Increase') this.requestedCreditLimit = null;
+  }
+
+  submitServiceRequest(): void {
+    const card = this.selectedCard;
+    const description = this.requestDescription.trim();
+    if (!card || card.type !== 'credit' || this.submittingRequest) return;
+    if (description.length < 8) {
+      this.error = 'Please describe your request using at least 8 characters.';
+      return;
+    }
+    if (this.requestType === 'Transaction Dispute' && !this.requestTransactionId) {
+      this.error = 'Select the transaction you want to dispute.';
+      return;
+    }
+    if (this.requestType === 'Credit Limit Increase'
+        && (!this.creditLimitIncreaseEnabled || this.requestedCreditLimit == null
+          || !Number.isFinite(this.requestedCreditLimit)
+          || this.requestedCreditLimit <= (card.approvedLimit ?? 0)
+          || this.requestedCreditLimit > (this.creditLimitIncreaseCeiling ?? 0))) {
+      this.error = 'Enter a requested limit above your current approved limit and within the bank-configured ceiling.';
+      return;
+    }
+    const lostOrStolen = this.requestType === 'Card Replacement'
+      && ['Lost', 'Stolen'].includes(this.requestCategory);
+    if (!confirm(lostOrStolen
+      ? `Report this ${this.requestCategory.toLowerCase()} card and immediately block it with all channels disabled?`
+      : `Submit this ${this.requestType.toLowerCase()} request?`)) return;
+
+    this.submittingRequest = true;
+    this.http.post<Card360ServiceRequest>(`${environment.apiBaseUrl}/api/credit-card-requests`, {
+      creditCardId: card.id,
+      requestType: this.requestType,
+      category: ['Card Replacement', 'Transaction Dispute'].includes(this.requestType) ? this.requestCategory : null,
+      description,
+      transactionId: this.requestType === 'Transaction Dispute' ? this.requestTransactionId : null,
+      requestedLimit: this.requestType === 'Credit Limit Increase' ? this.requestedCreditLimit : null
+    }, { headers: this.headers() }).subscribe({
+      next: request => {
+        this.submittingRequest = false;
+        this.requestDescription = '';
+        this.requestedCreditLimit = null;
+        this.requestTransactionId = null;
+        this.notice = `Request ${request.requestNumber} submitted. Status: ${request.status}.`;
+        this.error = '';
+        this.loadCustomerRequests();
+        if (lostOrStolen) this.loadDashboard();
+      },
+      error: err => {
+        this.submittingRequest = false;
+        this.error = err.error?.message || 'Unable to submit the service request.';
+      }
+    });
+  }
+
+  reportTransaction(transaction: Card360Transaction): void {
+    this.changeRequestType('Transaction Dispute');
+    this.requestCategory = 'Unauthorized transaction';
+    this.requestTransactionId = transaction.id;
+    this.requestDescription = `Please investigate transaction ${transaction.receipt} (${transaction.merchant || transaction.description}) for ₹${Number(transaction.amount).toFixed(2)}. `;
+    this.selectedTransaction = null;
+    this.scrollToSection('c360-support');
+  }
+
+  openReplacementRequest(reason: string): void {
+    this.changeRequestType('Card Replacement');
+    this.requestCategory = reason;
+    this.requestDescription = `${reason} card replacement request. `;
+    this.scrollToSection('c360-support');
+  }
+
+  setCardPin(): void {
+    const card = this.selectedCard;
+    if (!card || card.type !== 'credit') return;
+    if (!/^\d{4}$/.test(this.pinForm.newPin) || this.pinForm.newPin !== this.pinForm.confirmPin) {
+      this.error = 'Enter and confirm the same four-digit PIN.';
+      return;
+    }
+    if (!confirm(`${card.pinSet ? 'Change' : 'Set'} this card PIN?`)) return;
+    this.http.put<{ success: boolean }>(`${this.api}/cards/credit/${card.id}/pin`,
+      { pin: this.pinForm.newPin }, { headers: this.headers() }).subscribe({
+        next: () => {
+          card.pinSet = true;
+          this.pinForm = { newPin: '', confirmPin: '' };
+          this.showPinForm = false;
+          this.notice = 'Card PIN updated securely.';
+          this.error = '';
+        },
+        error: err => this.error = err.error?.message || 'Unable to update the card PIN.'
+      });
+  }
+
+  selectTransactionForEmi(transaction: Card360Transaction): void {
+    const eligible = this.emiEligibleTransactions.find(item => item.id === transaction.id);
+    if (!eligible) {
+      this.error = 'This transaction is not currently eligible for EMI conversion.';
+      return;
+    }
+    this.selectedEmiTransactionIds = [eligible.id];
+    this.selectedTransaction = null;
+    this.scrollToSection('c360-emi');
+  }
+
+  private loadEmiData(cardId: number): void {
+    this.loadingEmi = true;
+    this.http.get<typeof this.emiSettings>(`${this.api}/emi-settings`, { headers: this.headers() }).subscribe({
+      next: settings => this.emiSettings = settings,
+      error: err => {
+        this.emiSettings = null;
+        this.error = err.error?.message || 'Unable to load EMI configuration.';
+      }
+    });
+    this.http.get<typeof this.emiEligibleTransactions>(
+      `${this.api}/cards/credit/${cardId}/emi-eligible-transactions`, { headers: this.headers() }
+    ).subscribe({
+      next: eligible => this.emiEligibleTransactions = eligible || [],
+      error: err => {
+        this.emiEligibleTransactions = [];
+        this.error = err.error?.message || 'Unable to load EMI-eligible transactions.';
+      }
+    });
+    this.http.get<any[]>(`${this.api}/cards/credit/${cardId}/emi-plans`, { headers: this.headers() }).subscribe({
+      next: plans => {
+        this.emiPlans = plans || [];
+        this.loadingEmi = false;
+      },
+      error: err => {
+        this.emiPlans = [];
+        this.loadingEmi = false;
+        this.error = err.error?.message || 'Unable to load EMI plans.';
+      }
+    });
   }
 
   showOverview(): void {
     this.selectedCardKey = '';
     this.selectedTransactions = [];
     this.cardBills = [];
+    this.selectedTransaction = null;
+    this.emiEligibleTransactions = [];
+    this.emiPlans = [];
     this.cards.forEach(card => card.fullCardNumber = undefined);
   }
 
@@ -249,7 +733,7 @@ export class Cards360 implements OnInit {
     if (previousBill) this.downloadBill(previousBill);
   }
 
-  downloadCustomStatement(): void {
+  downloadCustomStatement(format: 'pdf' | 'csv' = 'pdf'): void {
     if (!this.selectedCard || this.selectedCard.type !== 'credit') return;
     if (!this.statementStartDate || !this.statementEndDate
         || this.statementEndDate < this.statementStartDate) {
@@ -257,7 +741,7 @@ export class Cards360 implements OnInit {
       return;
     }
     this.downloadStatement(this.selectedCard, this.statementStartDate, this.statementEndDate,
-      `card-statement-${this.statementStartDate}-to-${this.statementEndDate}`);
+      `card-statement-${this.statementStartDate}-to-${this.statementEndDate}`, undefined, format);
   }
 
   linkCard(): void {
@@ -298,6 +782,12 @@ export class Cards360 implements OnInit {
   }
 
   saveLimit(card: Card360Card): void {
+    if (!Number.isFinite(this.spendingLimit) || this.spendingLimit < 0
+        || this.spendingLimit > (card.approvedLimit ?? 0)) {
+      this.error = 'Enter a spending limit between zero and the approved credit limit.';
+      return;
+    }
+    if (!confirm(`Set this card's spending limit to ₹${this.spendingLimit.toFixed(2)}?`)) return;
     this.http.put<{ spendingLimit: number }>(`${this.api}/cards/credit/${card.id}/limit`,
       { spendingLimit: this.spendingLimit }, { headers: this.headers() }).subscribe({
         next: result => {
@@ -311,8 +801,15 @@ export class Cards360 implements OnInit {
 
   beginBillPayment(card: Card360Card): void {
     this.error = '';
+    this.lastPayment = null;
     this.selectedBillCardId = card.id;
     this.billPaymentAmount = this.billOutstanding(card);
+  }
+
+  payMinimumDue(card: Card360Card): void {
+    this.lastPayment = null;
+    this.selectedBillCardId = card.id;
+    this.billPaymentAmount = Math.min(this.billOutstanding(card), card.billMinimumDue ?? 0);
   }
 
   payCreditCardBill(): void {
@@ -324,7 +821,7 @@ export class Cards360 implements OnInit {
       return;
     }
     this.payingBill = true;
-    this.http.post<{ paidAmount: number; remainingOutstanding: number; accountBalanceAfter: number }>(
+    this.http.post<{ paidAmount: number; remainingOutstanding: number; accountBalanceAfter: number; transactionId?: number }>(
       `${this.api}/credit-card-bill`,
       { creditCardId: this.selectedBillCardId, amount: this.billPaymentAmount },
       { headers: this.headers() }
@@ -332,6 +829,12 @@ export class Cards360 implements OnInit {
       next: result => {
         this.payingBill = false;
         this.notice = `Payment of ₹${result.paidAmount.toFixed(2)} completed. Remaining card balance: ₹${result.remainingOutstanding.toFixed(2)}.`;
+        this.lastPayment = {
+          amount: result.paidAmount,
+          reference: result.transactionId ? `CC-${result.transactionId}` : 'Reference unavailable',
+          date: new Date(),
+          status: 'Completed'
+        };
         if (this.paymentAccount) this.paymentAccount.balance = result.accountBalanceAfter;
         this.loadDashboard();
       },
@@ -348,11 +851,20 @@ export class Cards360 implements OnInit {
     this.selectedTransactions = [];
     this.selectedCardKey = '';
     this.cardBills = [];
+    this.selectedTransaction = null;
     this.cards.forEach(card => card.fullCardNumber = undefined);
     this.router.navigate(['/website/cards360']);
   }
 
-  private downloadBill(bill: Card360Bill): void {
+  downloadBill(bill: Card360Bill): void {
+    this.downloadBillFormat(bill, 'pdf');
+  }
+
+  downloadBillCsv(bill: Card360Bill): void {
+    this.downloadBillFormat(bill, 'csv');
+  }
+
+  private downloadBillFormat(bill: Card360Bill, format: 'pdf' | 'csv'): void {
     if (!this.selectedCard) return;
     const previousBill = this.cardBills.find(candidate =>
       new Date(candidate.billGenerationDate) < new Date(bill.billGenerationDate));
@@ -362,11 +874,11 @@ export class Cards360 implements OnInit {
       ? new Date(new Date(`${previousDate}T00:00:00Z`).getTime() + 86400000).toISOString().slice(0, 10)
       : `${billDate.slice(0, 7)}-01`;
     const end = billDate;
-    this.downloadStatement(this.selectedCard, start, end, `credit-card-bill-${bill.id}`, bill);
+    this.downloadStatement(this.selectedCard, start, end, `credit-card-bill-${bill.id}`, bill, format);
   }
 
   private downloadStatement(card: Card360Card, startDate: string, endDate: string,
-                            fileName: string, bill?: Card360Bill): void {
+                            fileName: string, bill?: Card360Bill, format: 'pdf' | 'csv' = 'pdf'): void {
     this.downloadingStatement = true;
     this.error = '';
     const params = new URLSearchParams({ startDate, endDate });
@@ -378,6 +890,26 @@ export class Cards360 implements OnInit {
       next: async statement => {
         this.downloadingStatement = false;
         try {
+          if (format === 'csv') {
+            const rows = [
+              ['Date', 'Description', 'Type', 'Amount', 'Balance after', 'Bill ID'],
+              ...statement.transactions.map(transaction => [
+                transaction.date, transaction.description, transaction.type,
+                Number(transaction.amount || 0).toFixed(2),
+                Number(transaction.balanceAfter || 0).toFixed(2), transaction.billId ?? ''
+              ])
+            ];
+            const csv = rows.map(row => row
+              .map(value => `"${String(value ?? '').replace(/"/g, '""')}"`).join(',')).join('\r\n');
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `${fileName}.csv`;
+            link.click();
+            URL.revokeObjectURL(url);
+            return;
+          }
           const { jsPDF } = await import('jspdf');
           const pdf = new jsPDF();
           pdf.setFontSize(18);
@@ -424,6 +956,188 @@ export class Cards360 implements OnInit {
         this.error = err.error?.message || 'Unable to load statement data.';
       }
     });
+  }
+
+  scrollToSection(id: string): void {
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  controlLabel(key: keyof Pick<Card360Card,
+    'onlineTransactionsEnabled' | 'posTransactionsEnabled' | 'contactlessEnabled'
+    | 'atmWithdrawalsEnabled' | 'internationalTransactionsEnabled'>): string {
+    const labels: Record<typeof key, string> = {
+      onlineTransactionsEnabled: 'Online transactions',
+      posTransactionsEnabled: 'POS transactions',
+      contactlessEnabled: 'Contactless',
+      atmWithdrawalsEnabled: 'ATM / cash withdrawal',
+      internationalTransactionsEnabled: 'International transactions'
+    };
+    return labels[key];
+  }
+
+  toggleControl(key: keyof Pick<Card360Card,
+    'onlineTransactionsEnabled' | 'posTransactionsEnabled' | 'contactlessEnabled'
+    | 'atmWithdrawalsEnabled' | 'internationalTransactionsEnabled'>): void {
+    const card = this.selectedCard;
+    if (!card) return;
+    const enabled = !card[key];
+    if (!confirm(`${enabled ? 'Enable' : 'Disable'} ${this.controlLabel(key).toLowerCase()}?`)) return;
+    this.http.put<Record<string, boolean>>(
+      `${this.api}/cards/credit/${card.id}/controls`,
+      { [key]: enabled },
+      { headers: this.headers() }
+    ).subscribe({
+      next: result => {
+        card[key] = result[key];
+        this.notice = `${this.controlLabel(key)} ${enabled ? 'enabled' : 'disabled'}.`;
+        this.error = '';
+      },
+      error: err => this.error = err.error?.message || 'Unable to update this card control.'
+    });
+  }
+
+  emergencyLock(): void {
+    const card = this.selectedCard;
+    if (!card || card.type !== 'credit' || !confirm('Emergency lock will block the card and turn off every transaction channel. Continue?')) {
+      return;
+    }
+    this.http.post<{ status: string; controls: Record<string, boolean> }>(
+      `${this.api}/cards/credit/${card.id}/emergency-lock`, {}, { headers: this.headers() }
+    ).subscribe({
+      next: result => {
+        card.status = result.status;
+        card.blocked = true;
+        this.cardControlKeys.forEach(key => card[key] = false);
+        this.notice = 'Card locked. All transaction channels are disabled.';
+        this.error = '';
+      },
+      error: err => this.error = err.error?.message || 'Unable to lock this card.'
+    });
+  }
+
+  transactionCategory(transaction: Card360Transaction): string {
+    const text = `${transaction.merchant || ''} ${transaction.description || ''}`.toLowerCase();
+    if (transaction.type.toLowerCase().includes('refund') || /refund/.test(text)) return 'Refunds';
+    if (/food|restaurant|cafe|swiggy|zomato/.test(text)) return 'Food';
+    if (/fuel|petrol|diesel|shell|hpcl|iocl/.test(text)) return 'Fuel';
+    if (/flight|hotel|travel|airline|uber|ola/.test(text)) return 'Travel';
+    if (/movie|cinema|netflix|spotify|entertainment/.test(text)) return 'Entertainment';
+    if (/hospital|pharmacy|medical|health/.test(text)) return 'Healthcare';
+    if (/electric|water|utility|bill|recharge/.test(text)) return 'Bills';
+    if (/amazon|flipkart|shopping|store|retail/.test(text)) return 'Shopping';
+    return 'Other';
+  }
+
+  billRemaining(bill: Card360Bill): number {
+    return Math.max(0, bill.totalAmount + bill.fine + bill.penalty - bill.paidAmount);
+  }
+
+  billPaymentStatus(bill: Card360Bill): string {
+    const remaining = this.billRemaining(bill);
+    if (remaining === 0) return 'Paid';
+    if (new Date(bill.dueDate) < new Date()) return 'Overdue';
+    return bill.paidAmount > 0 ? 'Partially Paid' : 'Unpaid';
+  }
+
+  billTransactionAmount(bill: Card360Bill, type: string): number {
+    return this.selectedTransactions
+      .filter(transaction => transaction.billId === bill.id
+        && transaction.type.toLowerCase() === type.toLowerCase())
+      .reduce((sum, transaction) => sum + Math.abs(Number(transaction.amount || 0)), 0);
+  }
+
+  toggleEmiSelection(id: number, checked: boolean): void {
+    this.selectedEmiTransactionIds = checked
+      ? [...new Set([...this.selectedEmiTransactionIds, id])]
+      : this.selectedEmiTransactionIds.filter(item => item !== id);
+  }
+
+  estimateMonthlyEmi(principal: number, months: number): number {
+    const monthlyRate = (this.emiSettings?.annualInterestPercent ?? 0) / 1200;
+    if (!principal || !months) return 0;
+    return monthlyRate ? principal * monthlyRate / (1 - Math.pow(1 + monthlyRate, -months)) : principal / months;
+  }
+
+  estimateEmiInterest(principal: number, months: number): number {
+    return Math.max(0, this.estimateMonthlyEmi(principal, months) * months - principal);
+  }
+
+  estimateEmiProcessingFee(principal: number): number {
+    return principal * (this.emiSettings?.processingFeePercent ?? 0) / 100;
+  }
+
+  convertToEmi(): void {
+    const card = this.selectedCard;
+    if (!card || !this.selectedEmiTransactionIds.length || !this.emiSettings?.enabled) return;
+    if (!confirm(`Convert the selected purchase(s) to a ${this.emiTenureMonths}-month EMI plan?`)) return;
+    this.convertingToEmi = true;
+    this.http.post(`${this.api}/cards/credit/${card.id}/emi-conversions`, {
+      transactionIds: this.selectedEmiTransactionIds,
+      tenureMonths: this.emiTenureMonths
+    }, { headers: this.headers() }).subscribe({
+      next: () => {
+        this.convertingToEmi = false;
+        this.selectedEmiTransactionIds = [];
+        this.notice = 'EMI conversion completed.';
+        this.selectCard(card);
+      },
+      error: err => {
+        this.convertingToEmi = false;
+        this.error = err.error?.message || 'Unable to convert the selected purchases to EMI.';
+      }
+    });
+  }
+
+  exportTransactions(): void {
+    if (!this.filteredTransactions.length) return;
+    const columns = ['Date', 'Merchant', 'Receipt/Bill', 'Description', 'Category', 'Type',
+      'Amount', 'Status', 'Available Limit'];
+    const rows = this.filteredTransactions.map(transaction => [
+      transaction.date,
+      transaction.merchant,
+      transaction.receipt,
+      transaction.description,
+      this.transactionCategory(transaction),
+      transaction.type,
+      Number(transaction.amount || 0).toFixed(2),
+      transaction.status,
+      this.selectedCard?.approvedLimit != null && transaction.balanceAfter != null
+        ? (this.selectedCard.approvedLimit - Number(transaction.balanceAfter)).toFixed(2) : ''
+    ]);
+    const csv = [columns, ...rows].map(row =>
+      row.map(value => `"${String(value ?? '').replace(/"/g, '""')}"`).join(',')).join('\r\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `card-transactions-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
+  get currentCardOutstanding(): number {
+    return this.selectedCard ? this.billOutstanding(this.selectedCard) : 0;
+  }
+
+  private analyticsTransactions(): Card360Transaction[] {
+    const now = new Date();
+    return this.selectedTransactions.filter(transaction => {
+      if (this.analyticsPeriod === 'CURRENT_CYCLE') return !transaction.billId && !transaction.emiPlanId;
+      if (this.analyticsPeriod === 'PREVIOUS_CYCLE') return !!this.latestBill && transaction.billId === this.latestBill.id;
+      const date = new Date(transaction.date);
+      const target = this.analyticsPeriod === 'PREVIOUS_MONTH'
+        ? new Date(now.getFullYear(), now.getMonth() - 1, 1) : now;
+      return date.getFullYear() === target.getFullYear() && date.getMonth() === target.getMonth();
+    });
+  }
+
+  private statementMonthKey(date: Date): string {
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+  }
+
+  private financialYearLabel(date: Date): string {
+    const startYear = date.getMonth() >= 3 ? date.getFullYear() : date.getFullYear() - 1;
+    return `FY ${startYear}-${String(startYear + 1).slice(-2)}`;
   }
 
   private cardKey(card: Card360Card): string {
