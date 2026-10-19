@@ -2,6 +2,7 @@ package com.neo.springapp.controller;
 
 import com.neo.springapp.model.CreditCard;
 import com.neo.springapp.model.CreditCardSettings;
+import com.neo.springapp.model.CreditCardServiceRequest;
 import com.neo.springapp.repository.CreditCardAuditLogRepository;
 import com.neo.springapp.repository.CreditCardRepository;
 import com.neo.springapp.repository.CreditCardServiceRequestHistoryRepository;
@@ -120,6 +121,53 @@ class CreditCardServiceRequestControllerTest {
         assertEquals(HttpStatus.CREATED, response.getStatusCode());
         verify(requestRepository).save(any());
         verify(historyRepository).save(any());
+    }
+
+    @Test
+    void staffCanReplyWithoutChangingRequestStatus() {
+        CreditCardServiceRequest request = new CreditCardServiceRequest();
+        request.setId(22L);
+        request.setStatus("Submitted");
+        when(requestRepository.findById(22L)).thenReturn(Optional.of(request));
+        when(requestRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(historyRepository.findByServiceRequestIdOrderByCreatedAtAsc(22L)).thenReturn(List.of());
+
+        var response = controller.replyToRequest(
+                22L,
+                new CreditCardServiceRequestController.Reply("We are reviewing your billing issue."),
+                session("STAFF", "ADMIN"));
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals("Submitted", request.getStatus());
+        assertEquals("We are reviewing your billing issue.", request.getResolution());
+        verify(historyRepository).save(argThat(event ->
+                "Submitted".equals(event.getStatus())
+                        && "We are reviewing your billing issue.".equals(event.getNote())));
+    }
+
+    @Test
+    void staffCanCloseRequestWithResolutionAndClosedRequestCannotBeReopened() {
+        CreditCardServiceRequest request = new CreditCardServiceRequest();
+        request.setId(23L);
+        request.setStatus("Under Review");
+        when(requestRepository.findById(23L)).thenReturn(Optional.of(request));
+        when(requestRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(historyRepository.findByServiceRequestIdOrderByCreatedAtAsc(23L)).thenReturn(List.of());
+
+        var closeResponse = controller.updateStatus(
+                23L,
+                new CreditCardServiceRequestController.UpdateStatus("Closed", "Issue resolved after account review."),
+                session("STAFF", "ADMIN"));
+
+        assertEquals(HttpStatus.OK, closeResponse.getStatusCode());
+        assertEquals("Closed", request.getStatus());
+
+        var reopenResponse = controller.updateStatus(
+                23L,
+                new CreditCardServiceRequestController.UpdateStatus("Under Review", ""),
+                session("STAFF", "ADMIN"));
+
+        assertEquals(HttpStatus.BAD_REQUEST, reopenResponse.getStatusCode());
     }
 
     private Authentication user(String accountNumber) {

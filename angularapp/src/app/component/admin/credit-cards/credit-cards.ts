@@ -96,6 +96,9 @@ export class CreditCards implements OnInit, OnDestroy {
   isSavingCreditLimitCeiling = false;
   customerServiceRequests: any[] = [];
   isLoadingServiceRequests = false;
+  serviceRequestPage = 0;
+  serviceRequestTotalPages = 1;
+  serviceRequestTotalElements = 0;
 
   constructor(
     private router: Router,
@@ -148,6 +151,7 @@ export class CreditCards implements OnInit, OnDestroy {
       },
       error: () => {}
     });
+    this.loadCustomerServiceRequests(this.serviceRequestPage, true);
   }
 
   goBack() {
@@ -1170,30 +1174,41 @@ export class CreditCards implements OnInit, OnDestroy {
     });
   }
 
-  loadCustomerServiceRequests() {
+  loadCustomerServiceRequests(page = 0, silent = false) {
     this.isLoadingServiceRequests = true;
-    this.http.get<any>(`${environment.apiBaseUrl}/api/credit-card-requests/all`, this.authOptions()).subscribe({
+    this.http.get<any>(
+      `${environment.apiBaseUrl}/api/credit-card-requests/all?page=${page}&size=50`,
+      this.authOptions()
+    ).subscribe({
       next: response => {
+        const previous = new Map(this.customerServiceRequests.map(request => [request.id, request]));
         this.customerServiceRequests = Array.isArray(response?.content)
           ? response.content.map((request: any) => ({
             ...request,
-            nextStatus: request.status,
-            resolution: request.resolution || ''
+            nextStatus: previous.get(request.id)?.nextStatus === previous.get(request.id)?.status
+              ? request.status
+              : previous.get(request.id)?.nextStatus || request.status,
+            responseDraft: previous.get(request.id)?.responseDraft || ''
           }))
           : [];
+        this.serviceRequestPage = Number(response?.page ?? page);
+        this.serviceRequestTotalPages = Math.max(1, Number(response?.totalPages || 1));
+        this.serviceRequestTotalElements = Number(response?.totalElements || 0);
         this.isLoadingServiceRequests = false;
       },
       error: err => {
         this.isLoadingServiceRequests = false;
         console.error('Error loading customer credit-card requests:', err);
-        this.alertService.operationError('Customer requests', err.error?.message || 'Unable to load customer requests');
+        if (!silent) {
+          this.alertService.operationError('Customer requests', err.error?.message || 'Unable to load customer requests');
+        }
       }
     });
   }
 
   updateCustomerServiceRequest(request: any, status: string) {
-    const resolution = String(request.resolution || '').trim();
-    if (['Approved', 'Resolved', 'Rejected'].includes(status) && resolution.length < 5) {
+    const resolution = String(request.responseDraft || '').trim();
+    if (['Approved', 'Resolved', 'Rejected', 'Closed'].includes(status) && resolution.length < 5) {
       this.alertService.error('Resolution required', 'Enter at least 5 characters describing the decision.');
       return;
     }
@@ -1205,11 +1220,37 @@ export class CreditCards implements OnInit, OnDestroy {
     ).subscribe({
       next: () => {
         this.alertService.success('Request updated', `${request.requestNumber} is now ${status.toLowerCase()}.`);
-        this.loadCustomerServiceRequests();
+        request.responseDraft = '';
+        this.loadCustomerServiceRequests(this.serviceRequestPage);
         if (request.requestType === 'Credit Limit Increase' && status === 'Approved') this.loadCreditCards();
       },
       error: err => this.alertService.operationError('Request update', err.error?.message || 'Unable to update this request')
     });
+  }
+
+  replyToCustomerServiceRequest(request: any) {
+    const message = String(request.responseDraft || '').trim();
+    if (message.length < 5) {
+      this.alertService.error('Reply required', 'Enter at least 5 characters for the customer response.');
+      return;
+    }
+    this.http.put(
+      `${environment.apiBaseUrl}/api/credit-card-requests/${request.id}/reply`,
+      { message },
+      this.authOptions()
+    ).subscribe({
+      next: () => {
+        request.responseDraft = '';
+        this.alertService.success('Response sent', `A response was added to ${request.requestNumber}.`);
+        this.loadCustomerServiceRequests(this.serviceRequestPage);
+      },
+      error: err => this.alertService.operationError('Customer response', err.error?.message || 'Unable to send this response')
+    });
+  }
+
+  changeServiceRequestPage(page: number) {
+    if (page < 0 || page >= this.serviceRequestTotalPages || page === this.serviceRequestPage) return;
+    this.loadCustomerServiceRequests(page);
   }
 
   loadEmiPlans() {

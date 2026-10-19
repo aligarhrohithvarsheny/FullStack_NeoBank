@@ -1,4 +1,4 @@
-import { Component, OnInit, Inject, PLATFORM_ID } from '@angular/core';
+import { Component, OnInit, OnDestroy, Inject, PLATFORM_ID } from '@angular/core';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
@@ -83,6 +83,7 @@ interface Card360RequestTimelineEvent {
   status: string;
   createdAt: string;
   note: string;
+  updatedBy: string;
 }
 
 interface Card360ServiceRequest {
@@ -91,6 +92,7 @@ interface Card360ServiceRequest {
   requestNumber: string;
   requestType: string;
   category: string;
+  transactionId: number | null;
   description: string;
   requestedLimit: number;
   status: string;
@@ -109,7 +111,7 @@ type Card360TransactionTab = 'ALL' | 'UNBILLED' | 'BILLED' | 'EMI' | 'REFUNDS';
   templateUrl: './cards360.html',
   styleUrl: './cards360.css'
 })
-export class Cards360 implements OnInit {
+export class Cards360 implements OnInit, OnDestroy {
   cardNumber = '';
   email = '';
   linkCardNumber = '';
@@ -187,6 +189,7 @@ export class Cards360 implements OnInit {
 
   private readonly tokenKey = 'card360Token';
   private readonly api = `${environment.apiBaseUrl}/api/card360`;
+  private requestRefreshTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor(
     private readonly http: HttpClient,
@@ -196,7 +199,14 @@ export class Cards360 implements OnInit {
 
   ngOnInit(): void {
     if (!isPlatformBrowser(this.platformId)) return;
-    if (this.router.url.includes('/dashboard')) this.loadDashboard();
+    if (this.router.url.includes('/dashboard')) {
+      this.loadDashboard();
+      this.requestRefreshTimer = setInterval(() => this.refreshCustomerRequestHistory(), 15000);
+    }
+  }
+
+  ngOnDestroy(): void {
+    if (this.requestRefreshTimer) clearInterval(this.requestRefreshTimer);
   }
 
   get selectedBillCard(): Card360Card | undefined {
@@ -525,6 +535,15 @@ export class Cards360 implements OnInit {
         this.error = err.error?.message || 'Unable to load credit-limit request eligibility.';
       }
     });
+  }
+
+  private refreshCustomerRequestHistory(): void {
+    if (this.selectedCard?.type !== 'credit') return;
+    this.http.get<Card360ServiceRequest[]>(`${environment.apiBaseUrl}/api/credit-card-requests/mine`,
+      { headers: this.headers() }).subscribe({
+        next: requests => this.customerRequests = requests || [],
+        error: err => this.error = err.error?.message || 'Unable to refresh card service request updates.'
+      });
   }
 
   loadSecurityEvents(cardId: number): void {

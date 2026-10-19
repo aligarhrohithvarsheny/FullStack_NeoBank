@@ -532,10 +532,17 @@
       <div class="c360-request-history" *ngIf="requestsForSelectedCard.length">
         <article *ngFor="let request of requestsForSelectedCard">
           <div class="c360-request-heading"><strong>{{ request.requestNumber }} · {{ request.requestType }}</strong><span class="c360-status">{{ request.status }}</span></div>
-          <p>{{ request.category || request.description }}</p>
+          <p *ngIf="request.category"><strong>Category / reason:</strong> {{ request.category }}</p>
+          <p><strong>Request details:</strong> {{ request.description }}</p>
+          <p *ngIf="request.requestedLimit > 0"><strong>Requested limit:</strong> ₹{{ request.requestedLimit | number:'1.2-2' }}</p>
+          <p *ngIf="request.transactionId"><strong>Related transaction:</strong> #{{ request.transactionId }}</p>
           <small>Created {{ request.createdAt | date:'dd MMM yyyy' }} · Updated {{ request.updatedAt | date:'dd MMM yyyy' }}</small>
-          <p *ngIf="request.resolution"><strong>Resolution:</strong> {{ request.resolution }}</p>
-          <ol><li *ngFor="let event of request.timeline">{{ event.status }} · {{ event.createdAt | date:'dd MMM yyyy, HH:mm' }} <span *ngIf="event.note">— {{ event.note }}</span></li></ol>
+          <p *ngIf="request.resolution"><strong>Latest staff response:</strong> {{ request.resolution }}</p>
+          <ol><li *ngFor="let event of request.timeline">
+            <strong>{{ event.status }}</strong> · {{ event.createdAt | date:'dd MMM yyyy, HH:mm' }}
+            <span *ngIf="event.updatedBy"> · {{ event.updatedBy }}</span>
+            <span *ngIf="event.note"> — {{ event.note }}</span>
+          </li></ol>
         </article>
       </div>
       <p class="c360-muted" *ngIf="!requestsForSelectedCard.length">No service requests have been submitted for this card.</p>

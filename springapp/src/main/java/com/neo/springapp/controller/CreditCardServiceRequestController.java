@@ -38,7 +38,9 @@ public class CreditCardServiceRequestController {
             "Billing Issue", "Reward Issue", "EMI Issue", "Transaction Dispute",
             "Address Update", "Card Closure");
     private static final Set<String> REQUEST_STATUSES = Set.of(
-            "Under Review", "Investigation", "Approved", "Resolved", "Rejected");
+            "Under Review", "Investigation", "Approved", "Resolved", "Rejected", "Closed");
+    private static final Set<String> TERMINAL_STATUSES = Set.of(
+            "Approved", "Resolved", "Rejected", "Closed");
     private static final Set<String> DISPUTE_CATEGORIES = Set.of(
             "Unauthorized transaction", "Duplicate transaction", "Incorrect amount",
             "Refund not received", "Merchant dispute", "Cash withdrawal issue");
@@ -222,11 +224,11 @@ public class CreditCardServiceRequestController {
         }
         CreditCardServiceRequest request = requestRepository.findById(id).orElse(null);
         if (request == null) return ResponseEntity.notFound().build();
-        if (Set.of("Resolved", "Rejected", "Approved").contains(request.getStatus())) {
+        if (TERMINAL_STATUSES.contains(request.getStatus())) {
             return ResponseEntity.badRequest().body(Map.of("message", "A completed request cannot be changed"));
         }
         String resolution = body.resolution() == null ? "" : body.resolution().trim();
-        if (Set.of("Resolved", "Rejected", "Approved").contains(body.status())
+        if (TERMINAL_STATUSES.contains(body.status())
                 && resolution.length() < 5) {
             return ResponseEntity.badRequest().body(Map.of("message", "Provide a resolution of at least 5 characters"));
         }
@@ -256,10 +258,34 @@ public class CreditCardServiceRequestController {
         }
 
         request.setStatus(body.status());
-        request.setResolution(resolution.isEmpty() ? null : resolution);
+        if (!resolution.isEmpty()) request.setResolution(resolution);
         request.setUpdatedAt(LocalDateTime.now());
         CreditCardServiceRequest saved = requestRepository.save(request);
         addHistory(saved.getId(), saved.getStatus(), resolution, staffName(authentication));
+        return ResponseEntity.ok(requestSummary(saved));
+    }
+
+    @PutMapping("/{id}/reply")
+    @Transactional
+    public ResponseEntity<?> replyToRequest(
+            @PathVariable Long id,
+            @RequestBody Reply body,
+            Authentication authentication) {
+        if (!isStaff(authentication)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        CreditCardServiceRequest request = requestRepository.findById(id).orElse(null);
+        if (request == null) return ResponseEntity.notFound().build();
+        if (TERMINAL_STATUSES.contains(request.getStatus())) {
+            return ResponseEntity.badRequest().body(Map.of("message", "A completed request cannot receive a reply"));
+        }
+        String message = body == null || body.message() == null ? "" : body.message().trim();
+        if (message.length() < 5 || message.length() > 2000) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Reply must contain 5 to 2000 characters"));
+        }
+
+        request.setResolution(message);
+        request.setUpdatedAt(LocalDateTime.now());
+        CreditCardServiceRequest saved = requestRepository.save(request);
+        addHistory(saved.getId(), saved.getStatus(), message, staffName(authentication));
         return ResponseEntity.ok(requestSummary(saved));
     }
 
@@ -269,6 +295,7 @@ public class CreditCardServiceRequestController {
                 .map(event -> Map.<String, Object>of(
                         "status", event.getStatus(),
                         "note", event.getNote() == null ? "" : event.getNote(),
+                        "updatedBy", event.getUpdatedBy() == null ? "" : event.getUpdatedBy(),
                         "createdAt", event.getCreatedAt()))
                 .toList();
         Map<String, Object> summary = new HashMap<>();
@@ -324,4 +351,5 @@ public class CreditCardServiceRequestController {
             BigDecimal requestedLimit,
             Long transactionId) {}
     public record UpdateStatus(String status, String resolution) {}
+    public record Reply(String message) {}
 }

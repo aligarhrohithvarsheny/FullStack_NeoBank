@@ -59,6 +59,15 @@
       <p *ngIf="!isLoadingServiceRequests && customerServiceRequests.length === 0" class="no-data">
         No customer service requests have been submitted.
       </p>
+      <div class="service-request-pagination" *ngIf="serviceRequestTotalElements > 0">
+        <span>{{ serviceRequestTotalElements }} request(s) · Page {{ serviceRequestPage + 1 }} of {{ serviceRequestTotalPages }}</span>
+        <div>
+          <button class="btn-secondary" type="button" (click)="changeServiceRequestPage(serviceRequestPage - 1)"
+            [disabled]="serviceRequestPage === 0 || isLoadingServiceRequests">Previous</button>
+          <button class="btn-secondary" type="button" (click)="changeServiceRequestPage(serviceRequestPage + 1)"
+            [disabled]="serviceRequestPage + 1 >= serviceRequestTotalPages || isLoadingServiceRequests">Next</button>
+        </div>
+      </div>
       <div class="table-responsive" *ngIf="customerServiceRequests.length">
         <table class="data-table">
           <thead>
@@ -71,6 +80,7 @@
                 <div>{{ request.requestType }}<span *ngIf="request.category"> · {{ request.category }}</span></div>
                 <small>{{ request.createdAt | date:'dd MMM yyyy, HH:mm' }}</small>
                 <div class="status-badge">{{ request.status }}</div>
+                <small>Card ID: {{ request.creditCardId }}<span *ngIf="request.transactionId"> · Transaction: {{ request.transactionId }}</span></small>
               </td>
               <td>{{ request.accountNumber }}</td>
               <td>
@@ -79,16 +89,24 @@
                 <p *ngIf="request.resolution">Resolution: {{ request.resolution }}</p>
               </td>
               <td>
-                <ul><li *ngFor="let event of request.timeline">{{ event.status }} · {{ event.createdAt | date:'dd MMM, HH:mm' }}</li></ul>
+                <ul><li *ngFor="let event of request.timeline">
+                  <strong>{{ event.status }}</strong> · {{ event.createdAt | date:'dd MMM, HH:mm' }}
+                  <span *ngIf="event.updatedBy"> · {{ event.updatedBy }}</span>
+                  <p *ngIf="event.note">{{ event.note }}</p>
+                </li></ul>
               </td>
               <td>
-                <select [(ngModel)]="request.nextStatus" [disabled]="['Approved', 'Resolved', 'Rejected'].includes(request.status)">
-                  <option *ngFor="let status of ['Under Review', 'Investigation', 'Approved', 'Resolved', 'Rejected']" [ngValue]="status">{{ status }}</option>
+                <select [(ngModel)]="request.nextStatus" [disabled]="['Approved', 'Resolved', 'Rejected', 'Closed'].includes(request.status)">
+                  <option *ngFor="let status of ['Under Review', 'Investigation', 'Approved', 'Resolved', 'Rejected', 'Closed']" [ngValue]="status">{{ status }}</option>
                 </select>
-                <textarea [(ngModel)]="request.resolution" maxlength="2000" placeholder="Decision / resolution"></textarea>
+                <textarea [(ngModel)]="request.responseDraft" maxlength="2000" placeholder="Reply to customer or enter the closing decision"></textarea>
+                <button class="btn-secondary" (click)="replyToCustomerServiceRequest(request)"
+                  [disabled]="['Approved', 'Resolved', 'Rejected', 'Closed'].includes(request.status)">
+                  Send response
+                </button>
                 <button class="btn-primary" (click)="updateCustomerServiceRequest(request, request.nextStatus)"
-                  [disabled]="['Approved', 'Resolved', 'Rejected'].includes(request.status) || request.nextStatus === request.status">
-                  Update status
+                  [disabled]="['Approved', 'Resolved', 'Rejected', 'Closed'].includes(request.status) || request.nextStatus === request.status">
+                  Update / close ticket
                 </button>
               </td>
             </tr>
