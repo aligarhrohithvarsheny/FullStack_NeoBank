@@ -19,3 +19,8 @@
 [debug] [2026-10-21T17:42:51.251Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/neo-bank-669:testIamPermissions [none]
 [debug] [2026-10-21T17:42:51.251Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/neo-bank-669:testIamPermissions  x-goog-user-project=neo-bank-669
 [debug] [2026-10-21T17:42:51.251Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/neo-bank-669:testIamPermissions {"permissions":["firebase.projects.get","firebasehosting.sites.update"]}
+[debug] [2026-10-21T17:42:52.585Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/neo-bank-669:testIamPermissions 200
+[debug] [2026-10-21T17:42:52.585Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/neo-bank-669:testIamPermissions {"permissions":["firebase.projects.get","firebasehosting.sites.update"]}
+[debug] [2026-10-21T17:42:52.586Z] Checked if tokens are valid: true, expires at: 1792608170241
+[debug] [2026-10-21T17:42:52.586Z] Checked if tokens are valid: true, expires at: 1792608170241
+[debug] [2026-10-21T17:42:52.587Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/neo-bank-669 [none]
