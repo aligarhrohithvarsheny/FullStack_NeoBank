@@ -28,6 +28,26 @@
       <button class="quick-action-btn" (click)="sendQuickMessage('Account details')" title="Account Info">
         🏦 Account
       </button>
+      <button class="quick-action-btn" (click)="openDashboardFeature('credit-card')" title="Open Credit Cards">
+        💳 Credit Cards
+      </button>
+      <button class="quick-action-btn" (click)="loadCreditCardBills()" title="Show bills for all linked credit cards">
+        🧾 Card Bills
+      </button>
+      <button class="quick-action-btn" (click)="loadGoldLoanDetails()" title="Show your gold loan details">
+        🪙 Gold Loan Details
+      </button>
+      <button class="quick-action-btn" (click)="toggleMoreServices()"
+        [attr.aria-expanded]="showMoreServices" aria-controls="chat-service-shortcuts">
+        {{ showMoreServices ? '− Less' : '+ More Services' }}
+      </button>
+    </div>
+
+    <div id="chat-service-shortcuts" class="service-shortcuts" *ngIf="isOpen && showMoreServices">
+      <button type="button" *ngFor="let shortcut of serviceShortcuts"
+        (click)="openDashboardFeature(shortcut.feature)">
+        {{ shortcut.label }}
+      </button>
     </div>
 
     <div class="chat-messages" #chatContainer>
@@ -95,4 +115,3 @@
     </div>
   </div>
 </div>
-

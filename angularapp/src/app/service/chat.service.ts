@@ -17,6 +17,7 @@ export interface ChatMessage {
   attachmentUrl?: string;
   attachmentType?: string;
   attachmentName?: string;
+  localOnly?: boolean;
 }
 
 @Injectable({
@@ -98,4 +99,3 @@ export class ChatService {
     this.messageSubject.next(message);
   }
 }
-

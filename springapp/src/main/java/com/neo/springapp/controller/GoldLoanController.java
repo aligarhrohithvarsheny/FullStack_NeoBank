@@ -18,9 +18,12 @@ import com.neo.springapp.service.AccountService;
 import com.neo.springapp.service.TransactionService;
 import com.neo.springapp.service.PdfService;
 import com.neo.springapp.service.EmailService;
+import com.neo.springapp.service.UserSessionTokenService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.core.io.Resource;
@@ -116,6 +119,33 @@ public class GoldLoanController {
     @GetMapping("/account/{accountNumber}")
     public ResponseEntity<List<GoldLoan>> getGoldLoansByAccountNumber(@PathVariable String accountNumber) {
         List<GoldLoan> loans = goldLoanService.getGoldLoansByAccountNumber(accountNumber);
+        return ResponseEntity.ok(loans);
+    }
+
+    @GetMapping("/mine")
+    public ResponseEntity<?> getMyGoldLoans(Authentication authentication) {
+        if (authentication == null
+                || !(authentication.getPrincipal() instanceof UserSessionTokenService.SessionPrincipal principal)
+                || !"USER".equals(principal.scope())) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        List<Map<String, Object>> loans = goldLoanService
+                .getGoldLoansByAccountNumber(principal.accountNumber()).stream()
+                .map(loan -> {
+                    Map<String, Object> summary = new HashMap<>();
+                    summary.put("loanAccountNumber", loan.getLoanAccountNumber());
+                    summary.put("loanAmount", loan.getLoanAmount());
+                    summary.put("status", loan.getStatus());
+                    summary.put("interestRate", loan.getInterestRate());
+                    summary.put("tenure", loan.getTenure());
+                    summary.put("currentEmi", loan.getCurrentEmi());
+                    summary.put("remainingPrincipal", loan.getRemainingPrincipal());
+                    summary.put("remainingInterest", loan.getRemainingInterest());
+                    summary.put("remainingTenure", loan.getRemainingTenure());
+                    summary.put("applicationDate", loan.getApplicationDate());
+                    summary.put("approvalDate", loan.getApprovalDate());
+                    return summary;
+                }).toList();
         return ResponseEntity.ok(loans);
     }
 

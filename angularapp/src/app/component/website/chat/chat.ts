@@ -1,6 +1,7 @@
-import { Component, OnInit, OnDestroy, ViewChild, ElementRef, Inject, PLATFORM_ID } from '@angular/core';
+import { Component, OnInit, OnDestroy, ViewChild, ElementRef, Inject, PLATFORM_ID, Output, EventEmitter } from '@angular/core';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { ChatService, ChatMessage } from '../../../service/chat.service';
 import { AlertService } from '../../../service/alert.service';
 import { environment } from '../../../../environment/environment';
@@ -14,6 +15,7 @@ import { environment } from '../../../../environment/environment';
 })
 export class Chat implements OnInit, OnDestroy {
   @ViewChild('chatContainer') chatContainer!: ElementRef;
+  @Output() navigateToFeature = new EventEmitter<string>();
   
   messages: ChatMessage[] = [];
   newMessage: string = '';
@@ -22,13 +24,16 @@ export class Chat implements OnInit, OnDestroy {
   userName: string = '';
   isOpen: boolean = false;
   isLoading: boolean = false;
+  showMoreServices = false;
   selectedFile: File | null = null;
   private messageSubscription: any;
   private pollingInterval: any;
+  serviceShortcuts: Array<{ label: string; feature: string }> = [];
 
   constructor(
     private chatService: ChatService,
     private alertService: AlertService,
+    private http: HttpClient,
     @Inject(PLATFORM_ID) private platformId: Object
   ) {}
 
@@ -95,11 +100,11 @@ export class Chat implements OnInit, OnDestroy {
       this.chatService.getChatHistory(this.sessionId).subscribe({
         next: (messages) => {
           // Only update if we have new messages (check by message count or last message timestamp)
-          const lastMessageId = this.messages.length > 0 ? this.messages[this.messages.length - 1].id : 0;
+          const lastMessageId = [...this.messages].reverse().find(message => message.id)?.id || 0;
           const newMessages = messages.filter(m => !m.id || m.id > (lastMessageId || 0));
           
           if (newMessages.length > 0 || this.messages.length !== messages.length) {
-            this.messages = messages;
+            this.messages = [...messages, ...this.messages.filter(message => message.localOnly)];
             this.scrollToBottom();
           }
         },
@@ -285,6 +290,101 @@ export class Chat implements OnInit, OnDestroy {
   sendQuickMessage(message: string) {
     this.newMessage = message;
     this.sendMessage();
+  }
+
+  loadCreditCardBills(): void {
+    this.loadCustomerData('bills');
+  }
+
+  loadGoldLoanDetails(): void {
+    this.loadCustomerData('gold-loans');
+  }
+
+  toggleMoreServices(): void {
+    this.showMoreServices = !this.showMoreServices;
+    if (this.showMoreServices && !this.serviceShortcuts.length) {
+      import('./chat-account-data').then(({ serviceShortcuts }) => this.serviceShortcuts = serviceShortcuts)
+        .catch(error => {
+          console.error('Unable to load dashboard service shortcuts.', error);
+          this.addLocalBotMessage('Dashboard services are unavailable right now. Please use the menu to browse services.');
+        });
+    }
+  }
+
+  private loadCustomerData(type: 'bills' | 'gold-loans'): void {
+    const credentials = this.getCustomerCredentials();
+    if (!credentials) return;
+    if (this.isLoading) return;
+
+    this.isLoading = true;
+    import('./chat-account-data').then(data => {
+      const request = type === 'bills'
+        ? data.loadCreditCardBillsMessage(this.http, credentials.accountNumber, credentials.headers)
+        : data.loadGoldLoanDetailsMessage(this.http, credentials.headers);
+      request.subscribe({
+        next: message => this.addLocalBotMessage(message),
+        error: error => {
+          console.error(`Unable to load ${type} for chat.`, error);
+          this.addLocalBotMessage(this.getAccountDataError(error, type === 'bills' ? 'credit card bills' : 'gold loan details'));
+        },
+        complete: () => this.isLoading = false
+      });
+    }).catch(error => {
+      console.error(`Unable to initialize ${type} lookup.`, error);
+      this.addLocalBotMessage(`NeoBank could not load your ${type === 'bills' ? 'credit card bills' : 'gold loan details'} right now. Please retry shortly.`);
+      this.isLoading = false;
+    });
+  }
+
+  openDashboardFeature(feature: string): void {
+    this.showMoreServices = false;
+    this.isOpen = false;
+    this.navigateToFeature.emit(feature);
+  }
+
+  private getCustomerCredentials(): { accountNumber: string; headers: HttpHeaders } | null {
+    if (!isPlatformBrowser(this.platformId)) return null;
+    let user: any;
+    try {
+      user = JSON.parse(sessionStorage.getItem('currentUser') || '{}');
+    } catch (error) {
+      console.error('Unable to read the customer session for chat account details.', error);
+      this.addLocalBotMessage('Your sign-in session could not be read. Please sign in again to view account details.');
+      return null;
+    }
+    const token = user.authToken || sessionStorage.getItem('jwt');
+    const accountNumber = String(user.accountNumber || '').trim();
+    if (!token || !accountNumber) {
+      this.addLocalBotMessage('Please sign in again to securely view your account details.');
+      return null;
+    }
+    return {
+      accountNumber,
+      headers: new HttpHeaders({ Authorization: `Bearer ${token}` })
+    };
+  }
+
+  private addLocalBotMessage(message: string): void {
+    this.messages.push({
+      sessionId: this.sessionId,
+      userId: this.userId,
+      userName: 'Bot',
+      message,
+      sender: 'BOT',
+      timestamp: new Date().toISOString(),
+      localOnly: true
+    });
+    this.scrollToBottom();
+  }
+
+  private getAccountDataError(error: any, label: string): string {
+    if (error?.status === 401 || error?.status === 403) {
+      return `Your session is not authorized to view ${label}. Please sign in again and retry.`;
+    }
+    if (error?.status === 0) {
+      return `Could not connect to NeoBank to load ${label}. Check your connection and retry.`;
+    }
+    return `NeoBank could not load ${label} right now. Please retry shortly.`;
   }
   
   getAttachmentUrl(attachmentUrl?: string): string {
