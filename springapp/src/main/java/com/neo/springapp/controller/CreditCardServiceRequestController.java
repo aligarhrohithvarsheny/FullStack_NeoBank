@@ -212,6 +212,16 @@ public class CreditCardServiceRequestController {
                 "totalPages", requests.getTotalPages()));
     }
 
+    @GetMapping("/card/{cardId}")
+    public ResponseEntity<?> getRequestsForCard(
+            @PathVariable Long cardId,
+            Authentication authentication) {
+        if (!isStaff(authentication)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        if (!cardRepository.existsById(cardId)) return ResponseEntity.notFound().build();
+        return ResponseEntity.ok(requestRepository.findByCreditCardIdOrderByCreatedAtDesc(cardId)
+                .stream().map(this::requestSummary).toList());
+    }
+
     @PutMapping("/{id}/status")
     @Transactional
     public ResponseEntity<?> updateStatus(

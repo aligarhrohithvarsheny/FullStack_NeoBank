@@ -98,11 +98,9 @@ export class CreditCards implements OnInit, OnDestroy {
   isSavingEmiSettings = false;
   creditLimitIncreaseCeiling = 0;
   isSavingCreditLimitCeiling = false;
-  customerServiceRequests: any[] = [];
-  isLoadingServiceRequests = false;
-  serviceRequestPage = 0;
-  serviceRequestTotalPages = 1;
-  serviceRequestTotalElements = 0;
+  selectedCardServiceRequests: any[] = [];
+  isLoadingCardServiceRequests = false;
+  cardServiceRequestError = '';
 
   constructor(
     private router: Router,
@@ -128,7 +126,6 @@ export class CreditCards implements OnInit, OnDestroy {
       this.loadTransferFeePercent();
       this.loadEmiSettings();
       this.loadCreditLimitIncreaseCeiling();
-      this.loadCustomerServiceRequests();
       this.refreshTimer = setInterval(() => this.silentRefresh(), 10000);
     }
   }
@@ -156,7 +153,6 @@ export class CreditCards implements OnInit, OnDestroy {
       },
       error: () => {}
     });
-    this.loadCustomerServiceRequests(this.serviceRequestPage, true);
   }
 
   goBack() {
@@ -232,14 +228,20 @@ export class CreditCards implements OnInit, OnDestroy {
     this.hideRevealedCardNumber();
     this.selectedCreditCard = card;
     this.selectedTransaction = null;
+    this.selectedCardServiceRequests = [];
+    this.cardServiceRequestError = '';
     this.clearTransactionFilters();
     this.loadCreditCardDetails(card.id);
+    this.loadCardServiceRequests(card.id);
     this.loadEmiPlans();
   }
 
   closeCreditCardDetails() {
     this.hideRevealedCardNumber();
     this.selectedCreditCard = null;
+    this.selectedCardServiceRequests = [];
+    this.cardServiceRequestError = '';
+    this.isLoadingCardServiceRequests = false;
   }
 
   toggleCardNumberReveal() {
@@ -1234,34 +1236,34 @@ export class CreditCards implements OnInit, OnDestroy {
     });
   }
 
-  loadCustomerServiceRequests(page = 0, silent = false) {
-    this.isLoadingServiceRequests = true;
-    this.http.get<any>(
-      `${environment.apiBaseUrl}/api/credit-card-requests/all?page=${page}&size=50`,
+  loadCardServiceRequests(cardId: string | number, silent = false) {
+    const numericCardId = Number(cardId);
+    if (!Number.isInteger(numericCardId) || numericCardId <= 0) {
+      this.cardServiceRequestError = 'Invalid card selected for loading requests.';
+      return;
+    }
+
+    this.isLoadingCardServiceRequests = true;
+    this.cardServiceRequestError = '';
+    this.http.get<any[]>(
+      `${environment.apiBaseUrl}/api/credit-card-requests/card/${numericCardId}`,
       this.authOptions()
     ).subscribe({
       next: response => {
-        const previous = new Map(this.customerServiceRequests.map(request => [request.id, request]));
-        this.customerServiceRequests = Array.isArray(response?.content)
-          ? response.content.map((request: any) => ({
-            ...request,
-            nextStatus: previous.get(request.id)?.nextStatus === previous.get(request.id)?.status
-              ? request.status
-              : previous.get(request.id)?.nextStatus || request.status,
-            responseDraft: previous.get(request.id)?.responseDraft || ''
-          }))
-          : [];
-        this.serviceRequestPage = Number(response?.page ?? page);
-        this.serviceRequestTotalPages = Math.max(1, Number(response?.totalPages || 1));
-        this.serviceRequestTotalElements = Number(response?.totalElements || 0);
-        this.isLoadingServiceRequests = false;
+        if (Number(this.selectedCreditCard?.id) !== numericCardId) return;
+        this.selectedCardServiceRequests = (Array.isArray(response) ? response : []).map(request => ({
+          ...request,
+          nextStatus: request.status,
+          responseDraft: ''
+        }));
+        this.isLoadingCardServiceRequests = false;
       },
       error: err => {
-        this.isLoadingServiceRequests = false;
-        console.error('Error loading customer credit-card requests:', err);
-        if (!silent) {
-          this.alertService.operationError('Customer requests', err.error?.message || 'Unable to load customer requests');
-        }
+        if (Number(this.selectedCreditCard?.id) !== numericCardId) return;
+        this.isLoadingCardServiceRequests = false;
+        this.cardServiceRequestError = err.error?.message || 'Unable to load requests for this card.';
+        console.error('Error loading card service requests:', err);
+        if (!silent) this.alertService.operationError('Card requests', this.cardServiceRequestError);
       }
     });
   }
@@ -1281,7 +1283,7 @@ export class CreditCards implements OnInit, OnDestroy {
       next: () => {
         this.alertService.success('Request updated', `${request.requestNumber} is now ${status.toLowerCase()}.`);
         request.responseDraft = '';
-        this.loadCustomerServiceRequests(this.serviceRequestPage);
+        if (this.selectedCreditCard?.id) this.loadCardServiceRequests(this.selectedCreditCard.id, true);
         if (request.requestType === 'Credit Limit Increase' && status === 'Approved') this.loadCreditCards();
       },
       error: err => this.alertService.operationError('Request update', err.error?.message || 'Unable to update this request')
@@ -1302,15 +1304,85 @@ export class CreditCards implements OnInit, OnDestroy {
       next: () => {
         request.responseDraft = '';
         this.alertService.success('Response sent', `A response was added to ${request.requestNumber}.`);
-        this.loadCustomerServiceRequests(this.serviceRequestPage);
+        if (this.selectedCreditCard?.id) this.loadCardServiceRequests(this.selectedCreditCard.id, true);
       },
       error: err => this.alertService.operationError('Customer response', err.error?.message || 'Unable to send this response')
     });
   }
 
-  changeServiceRequestPage(page: number) {
-    if (page < 0 || page >= this.serviceRequestTotalPages || page === this.serviceRequestPage) return;
-    this.loadCustomerServiceRequests(page);
+  getCardServiceRequestActions(request: any): string[] {
+    const requestType = String(request.requestType || '').toLowerCase();
+    const requestText = `${requestType} ${request.category || ''} ${request.description || ''}`.toLowerCase();
+    const actions: string[] = [];
+
+    if (/\b(block|lock|freeze|lost|stolen|fraud|unauthori[sz]ed)\b/.test(requestText)) {
+      actions.push('BLOCK_CARD');
+    }
+    if (requestType.includes('replacement')) actions.push('REVIEW_REPLACEMENT');
+    if (requestType.includes('statement')) actions.push('VIEW_STATEMENT');
+    if (requestType.includes('billing') || /\b(due|overdue|bill|payment)\b/.test(requestText)) {
+      actions.push('VIEW_DUES');
+    }
+    if (/\b(details?|information|summary)\b/.test(requestText)) actions.push('VIEW_DETAILS');
+    if (requestType.includes('dispute') || request.transactionId
+      || /\b(analy[sz]e|review transaction|charge|merchant)\b/.test(requestText)) {
+      actions.push('ANALYZE');
+    }
+
+    return [...new Set(actions)];
+  }
+
+  runCardServiceRequestAction(request: any, action: string) {
+    const cardId = Number(this.selectedCreditCard?.id);
+    if (!Number.isInteger(cardId) || cardId <= 0) return;
+
+    if (action === 'BLOCK_CARD') {
+      if (String(this.selectedCreditCard?.status || '').toLowerCase() === 'blocked') {
+        this.alertService.info('Card already blocked', 'This card is already blocked.');
+        return;
+      }
+      if (!confirm(`Block card ${this.maskCardNumber(this.selectedCreditCard?.maskedCardNumber || this.selectedCreditCard?.cardNumber)} and disable all transaction channels?`)) return;
+      this.http.post(
+        `${environment.apiBaseUrl}/api/credit-cards/${cardId}/emergency-lock`,
+        {},
+        this.authOptions()
+      ).subscribe({
+        next: () => {
+          this.selectedCreditCard.status = 'Blocked';
+          this.selectedCreditCard.blocked = true;
+          this.alertService.success('Card blocked', 'The card was blocked and its transaction channels were disabled.');
+          this.loadCreditCards();
+        },
+        error: err => this.alertService.operationError('Block card', err.error?.message || 'Unable to block this card')
+      });
+      return;
+    }
+
+    if (action === 'REVIEW_REPLACEMENT') {
+      this.updateCustomerServiceRequest(request, 'Under Review');
+      return;
+    }
+    if (action === 'VIEW_STATEMENT') {
+      this.getStatement(cardId);
+      return;
+    }
+    if (action === 'VIEW_DUES') {
+      this.scrollToCardDetailSection('credit-card-bills');
+      return;
+    }
+    if (action === 'VIEW_DETAILS') {
+      this.scrollToCardDetailSection('credit-card-information');
+      return;
+    }
+    if (action === 'ANALYZE') {
+      this.transactionSearchQuery = request.transactionId ? String(request.transactionId) : '';
+      this.applyTransactionFilters();
+      this.scrollToCardDetailSection('credit-card-transactions');
+    }
+  }
+
+  private scrollToCardDetailSection(sectionId: string) {
+    setTimeout(() => document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
   }
 
   loadEmiPlans() {

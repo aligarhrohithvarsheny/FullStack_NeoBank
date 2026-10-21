@@ -269,10 +269,23 @@ export class CreditCard implements OnInit {
     const currentUser = sessionStorage.getItem('currentUser');
     if (!currentUser) return;
     
-    const user = JSON.parse(currentUser);
+    let user: any;
+    try {
+      user = JSON.parse(currentUser);
+    } catch (error) {
+      console.error('Unable to read user session for credit cards:', error);
+      this.alertService.operationError('Credit cards', 'Unable to verify your session. Please sign in again.');
+      return;
+    }
+    const accountNumber = String(user.accountNumber || '').trim();
+    const token = user.authToken || sessionStorage.getItem('jwt');
+    if (!accountNumber || !token) {
+      this.alertService.operationError('Credit cards', 'Your customer session is incomplete. Please sign in again.');
+      return;
+    }
     this.isLoading = true;
     
-    this.http.get(`${environment.apiBaseUrl}/api/credit-cards/account/${user.accountNumber}`, this.authOptions()).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/api/credit-cards/account/${encodeURIComponent(accountNumber)}`, this.authOptions()).subscribe({
       next: (cards: any) => {
         this.creditCards = Array.isArray(cards) ? cards : [];
         if (this.creditCards.length > 0) {
@@ -370,7 +383,14 @@ export class CreditCard implements OnInit {
   }
 
   private authOptions() {
-    const token = isPlatformBrowser(this.platformId) ? sessionStorage.getItem('jwt') : null;
+    let token = isPlatformBrowser(this.platformId) ? sessionStorage.getItem('jwt') : null;
+    if (!token && isPlatformBrowser(this.platformId)) {
+      try {
+        token = JSON.parse(sessionStorage.getItem('currentUser') || '{}').authToken || null;
+      } catch (error) {
+        console.error('Unable to read user session token:', error);
+      }
+    }
     return {
       headers: new HttpHeaders(token ? { Authorization: `Bearer ${token}` } : {})
     };

@@ -8,5 +8,6 @@ import java.util.Optional;
 
 public interface CreditCardServiceRequestRepository extends JpaRepository<CreditCardServiceRequest, Long> {
     List<CreditCardServiceRequest> findByAccountNumberOrderByCreatedAtDesc(String accountNumber);
+    List<CreditCardServiceRequest> findByCreditCardIdOrderByCreatedAtDesc(Long creditCardId);
     Optional<CreditCardServiceRequest> findByRequestNumber(String requestNumber);
 }

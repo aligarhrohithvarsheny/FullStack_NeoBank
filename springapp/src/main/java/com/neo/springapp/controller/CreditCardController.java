@@ -295,7 +295,9 @@ public class CreditCardController {
     @PostMapping("/{id}/emergency-lock")
     @Transactional
     public ResponseEntity<?> emergencyLock(@PathVariable Long id, Authentication authentication) {
-        Optional<CreditCard> cardOpt = getOwnedCard(id, authentication);
+        Optional<CreditCard> cardOpt = isStaff(authentication)
+                ? creditCardService.getCreditCardById(id)
+                : getOwnedCard(id, authentication);
         if (cardOpt.isEmpty()) return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         CreditCard card = cardOpt.get();
         card.setStatus("Blocked");

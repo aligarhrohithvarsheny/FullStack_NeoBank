@@ -1519,6 +1519,9 @@
           <div class="sdash-spinner"></div>
           <span>Loading your credit card...</span>
         </div>
+        <p *ngIf="!isLoadingMyCreditCards && myCreditCardAccessMessage" class="sdash-card sdash-mb">
+          {{ myCreditCardAccessMessage }}
+        </p>
 
         <div *ngIf="!isLoadingMyCreditCards && myCreditCards.length > 0" class="sdash-card sdash-mb" style="padding:28px;">
           <h2><i class="fa fa-credit-card"></i> My Credit Card</h2>

@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { AlertService } from '../../../service/alert.service';
 import { environment } from '../../../../environment/environment';
 
@@ -16,6 +16,7 @@ export class BillPayment implements OnInit {
   userAccountNumber: string = '';
   userName: string = '';
   userEmail: string = '';
+  private userAuthToken = '';
   
   // Bill payment form
   billForm = {
@@ -77,6 +78,7 @@ export class BillPayment implements OnInit {
         this.userAccountNumber = user.accountNumber || '';
         this.userName = user.name || user.username || '';
         this.userEmail = user.email || '';
+        this.userAuthToken = user.authToken || sessionStorage.getItem('jwt') || '';
       } catch (e) {
         console.error('Error parsing user session:', e);
       }
@@ -84,10 +86,11 @@ export class BillPayment implements OnInit {
   }
 
   loadCreditCards() {
-    if (!this.userAccountNumber) return;
+    if (!this.userAccountNumber || !this.userAuthToken) return;
     
     this.isLoadingCards = true;
-    this.http.get(`${environment.apiBaseUrl}/api/credit-cards/account/${this.userAccountNumber}`).subscribe({
+    const headers = new HttpHeaders({ Authorization: `Bearer ${this.userAuthToken}` });
+    this.http.get(`${environment.apiBaseUrl}/api/credit-cards/account/${encodeURIComponent(this.userAccountNumber)}`, { headers }).subscribe({
       next: (cards: any) => {
         this.creditCards = Array.isArray(cards) ? cards.filter((c: any) => c.status === 'Active') : [];
         if (this.creditCards.length > 0 && !this.selectedCreditCard) {

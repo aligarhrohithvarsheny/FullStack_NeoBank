@@ -98,7 +98,6 @@ export class Userdashboard implements OnInit, OnDestroy {
   isSavingsAccount = false;
   savingsFeatureAccessLoaded = false;
   savingsFeatureAccess: Record<string, boolean> = {};
-  savingsFeatureAccessError = '';
   private savingsFeatureAccessRequestInFlight = false;
   loading: boolean = false;
   error: string = '';
@@ -809,6 +808,7 @@ export class Userdashboard implements OnInit, OnDestroy {
     this.isSidebarOpen = false;
     const featureId = feature === 'cards360' ? 'card' : feature;
     if (featureId && !this.isSavingsFeatureEnabled(featureId)) {
+      if (!this.savingsFeatureAccessLoaded) this.loadSavingsFeatureAccess();
       this.showTemporaryError(this.savingsFeatureAccessLoaded
         ? 'This feature is disabled for your savings account.'
         : 'Savings feature access is being checked. Please try again shortly.');
@@ -840,16 +840,12 @@ export class Userdashboard implements OnInit, OnDestroy {
       || (this.savingsFeatureAccessLoaded && this.savingsFeatureAccess[featureId] === true);
   }
 
-  retrySavingsFeatureAccess(): void {
-    this.loadSavingsFeatureAccess();
-  }
-
   private loadSavingsFeatureAccess(): void {
     if (!this.isSavingsAccount || !this.userAccountNumber || this.savingsFeatureAccessRequestInFlight) return;
     const rawUser = sessionStorage.getItem('currentUser');
     if (!rawUser) {
       this.savingsFeatureAccessLoaded = false;
-      this.savingsFeatureAccessError = 'Unable to verify savings feature access. Please sign in again.';
+      console.error('Savings feature access check skipped: no customer session is available.');
       return;
     }
     let user: any;
@@ -858,18 +854,17 @@ export class Userdashboard implements OnInit, OnDestroy {
     } catch (error) {
       console.error('Unable to read customer session for feature access.', error);
       this.savingsFeatureAccessLoaded = false;
-      this.savingsFeatureAccessError = 'Unable to verify savings feature access. Please sign in again.';
       return;
     }
-    if (!user.authToken) {
+    const token = user.authToken || sessionStorage.getItem('jwt');
+    if (!token || String(user.accountNumber || '').toUpperCase() !== this.userAccountNumber.toUpperCase()) {
       this.savingsFeatureAccessLoaded = false;
-      this.savingsFeatureAccessError = 'Unable to verify savings feature access. Please sign in again.';
+      console.error('Savings feature access check skipped: customer token or account binding is unavailable.');
       return;
     }
 
     this.savingsFeatureAccessRequestInFlight = true;
-    this.savingsFeatureAccessError = '';
-    const headers = new HttpHeaders({ Authorization: `Bearer ${user.authToken}` });
+    const headers = new HttpHeaders({ Authorization: `Bearer ${token}` });
     this.http.get<any>(
       `${environment.apiBaseUrl}/api/accounts/${encodeURIComponent(this.userAccountNumber)}/features`,
       { headers }
@@ -883,7 +878,6 @@ export class Userdashboard implements OnInit, OnDestroy {
         }
         this.savingsFeatureAccess = nextAccess;
         this.savingsFeatureAccessLoaded = true;
-        this.savingsFeatureAccessError = '';
         if (this.selectedFeature && !this.isSavingsFeatureEnabled(this.selectedFeature)) {
           this.selectedFeature = null;
           this.stopUpiPolling();
@@ -892,7 +886,7 @@ export class Userdashboard implements OnInit, OnDestroy {
         this.savingsFeatureAccessRequestInFlight = false;
       },
       error: error => {
-        this.savingsFeatureAccessError = 'Unable to verify savings feature access. Disabled features remain protected; retry shortly.';
+        this.savingsFeatureAccessLoaded = false;
         this.savingsFeatureAccessRequestInFlight = false;
         console.error('Unable to refresh savings feature access.', error);
       }
@@ -1470,9 +1464,19 @@ export class Userdashboard implements OnInit, OnDestroy {
 
   // Credit Card Methods
   loadCreditCards() {
-    if (!this.userAccountNumber) return;
+    if (!this.userAccountNumber || this.userAccountNumber === 'ACC001') return;
+    let user: any;
+    try {
+      user = JSON.parse(sessionStorage.getItem('currentUser') || '{}');
+    } catch (error) {
+      console.error('Unable to read user session for credit cards:', error);
+      return;
+    }
+    const token = user.authToken || sessionStorage.getItem('jwt');
+    if (!token || user.accountNumber !== this.userAccountNumber) return;
+    const headers = new HttpHeaders({ Authorization: `Bearer ${token}` });
     this.isLoadingCreditCards = true;
-    this.http.get(`${environment.apiBaseUrl}/api/credit-cards/account/${this.userAccountNumber}`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/api/credit-cards/account/${encodeURIComponent(this.userAccountNumber)}`, { headers }).subscribe({
       next: (cards: any) => {
         this.creditCards = Array.isArray(cards) ? cards : [];
         if (this.creditCards.length > 0) {

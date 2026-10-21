@@ -10,11 +10,6 @@
     <p>{{ error }}</p>
     <small>Click to dismiss</small>
   </div>
-  <div *ngIf="isSavingsAccount && savingsFeatureAccessError" class="ud-toast ud-toast-error" role="alert">
-    <p>{{ savingsFeatureAccessError }}</p>
-    <button type="button" (click)="retrySavingsFeatureAccess()">Retry</button>
-  </div>
-
   <!-- ═══ TOP NAVBAR (Canara Bank Style) ═══ -->
   <nav class="cb-topnav">
     <div class="cb-topnav-inner">

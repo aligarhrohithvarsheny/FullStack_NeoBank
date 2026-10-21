@@ -48,73 +48,6 @@
       </div>
     </div>
 
-    <section class="admin-card-section customer-service-requests">
-      <div class="section-header">
-        <h3>Customer disputes and service requests</h3>
-        <button class="btn-secondary" (click)="loadCustomerServiceRequests()" [disabled]="isLoadingServiceRequests">
-          {{ isLoadingServiceRequests ? 'Loading...' : 'Refresh requests' }}
-        </button>
-      </div>
-      <div *ngIf="isLoadingServiceRequests" class="loading-state">Loading customer requests...</div>
-      <p *ngIf="!isLoadingServiceRequests && customerServiceRequests.length === 0" class="no-data">
-        No customer service requests have been submitted.
-      </p>
-      <div class="service-request-pagination" *ngIf="serviceRequestTotalElements > 0">
-        <span>{{ serviceRequestTotalElements }} request(s) · Page {{ serviceRequestPage + 1 }} of {{ serviceRequestTotalPages }}</span>
-        <div>
-          <button class="btn-secondary" type="button" (click)="changeServiceRequestPage(serviceRequestPage - 1)"
-            [disabled]="serviceRequestPage === 0 || isLoadingServiceRequests">Previous</button>
-          <button class="btn-secondary" type="button" (click)="changeServiceRequestPage(serviceRequestPage + 1)"
-            [disabled]="serviceRequestPage + 1 >= serviceRequestTotalPages || isLoadingServiceRequests">Next</button>
-        </div>
-      </div>
-      <div class="table-responsive" *ngIf="customerServiceRequests.length">
-        <table class="data-table">
-          <thead>
-            <tr><th>Request</th><th>Account</th><th>Details</th><th>Timeline</th><th>Review</th></tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let request of customerServiceRequests">
-              <td>
-                <strong>{{ request.requestNumber }}</strong>
-                <div>{{ request.requestType }}<span *ngIf="request.category"> · {{ request.category }}</span></div>
-                <small>{{ request.createdAt | date:'dd MMM yyyy, HH:mm' }}</small>
-                <div class="status-badge">{{ request.status }}</div>
-                <small>Card ID: {{ request.creditCardId }}<span *ngIf="request.transactionId"> · Transaction: {{ request.transactionId }}</span></small>
-              </td>
-              <td>{{ request.accountNumber }}</td>
-              <td>
-                <p>{{ request.description }}</p>
-                <strong *ngIf="request.requestedLimit > 0">Requested limit: ₹{{ request.requestedLimit | number:'1.2-2' }}</strong>
-                <p *ngIf="request.resolution">Resolution: {{ request.resolution }}</p>
-              </td>
-              <td>
-                <ul><li *ngFor="let event of request.timeline">
-                  <strong>{{ event.status }}</strong> · {{ event.createdAt | date:'dd MMM, HH:mm' }}
-                  <span *ngIf="event.updatedBy"> · {{ event.updatedBy }}</span>
-                  <p *ngIf="event.note">{{ event.note }}</p>
-                </li></ul>
-              </td>
-              <td>
-                <select [(ngModel)]="request.nextStatus" [disabled]="['Approved', 'Resolved', 'Rejected', 'Closed'].includes(request.status)">
-                  <option *ngFor="let status of ['Under Review', 'Investigation', 'Approved', 'Resolved', 'Rejected', 'Closed']" [ngValue]="status">{{ status }}</option>
-                </select>
-                <textarea [(ngModel)]="request.responseDraft" maxlength="2000" placeholder="Reply to customer or enter the closing decision"></textarea>
-                <button class="btn-secondary" (click)="replyToCustomerServiceRequest(request)"
-                  [disabled]="['Approved', 'Resolved', 'Rejected', 'Closed'].includes(request.status)">
-                  Send response
-                </button>
-                <button class="btn-primary" (click)="updateCustomerServiceRequest(request, request.nextStatus)"
-                  [disabled]="['Approved', 'Resolved', 'Rejected', 'Closed'].includes(request.status) || request.nextStatus === request.status">
-                  Update / close ticket
-                </button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
-
     <div class="filters-bar">
       <select [(ngModel)]="creditCardStatusFilter" (change)="filterCreditCards()">
         <option value="ALL">All Status</option>
@@ -198,7 +131,84 @@
           <button class="close-btn" (click)="closeCreditCardDetails()">&times;</button>
         </div>
         <div class="modal-body">
-          <div class="details-section">
+          <section class="details-section card-service-requests">
+            <div class="card-requests-heading">
+              <div>
+                <h4>Customer requests for this card</h4>
+                <p>Requests are shown only for {{ selectedCreditCard.userName }} · Card #{{ selectedCreditCard.id }}.</p>
+              </div>
+              <button class="btn-secondary" type="button"
+                (click)="loadCardServiceRequests(selectedCreditCard.id)"
+                [disabled]="isLoadingCardServiceRequests">
+                {{ isLoadingCardServiceRequests ? 'Loading…' : 'Refresh requests' }}
+              </button>
+            </div>
+            <p *ngIf="isLoadingCardServiceRequests" class="loading-state">Loading card requests…</p>
+            <p *ngIf="cardServiceRequestError" class="request-error" role="alert">{{ cardServiceRequestError }}</p>
+            <p *ngIf="!isLoadingCardServiceRequests && !cardServiceRequestError && !selectedCardServiceRequests.length"
+              class="no-data">No service requests have been submitted for this card.</p>
+
+            <article class="card-request-ticket" *ngFor="let request of selectedCardServiceRequests">
+              <header>
+                <div>
+                  <strong>{{ request.requestNumber }}</strong>
+                  <span>{{ request.requestType }}<ng-container *ngIf="request.category"> · {{ request.category }}</ng-container></span>
+                </div>
+                <span class="status-badge">{{ request.status }}</span>
+              </header>
+              <p>{{ request.description }}</p>
+              <small>Submitted {{ request.createdAt | date:'dd MMM yyyy, HH:mm' }}
+                <ng-container *ngIf="request.transactionId"> · Transaction #{{ request.transactionId }}</ng-container>
+              </small>
+              <strong *ngIf="request.requestedLimit > 0">
+                Requested limit: ₹{{ request.requestedLimit | number:'1.2-2' }}
+              </strong>
+              <p *ngIf="request.resolution" class="request-resolution">Latest response: {{ request.resolution }}</p>
+
+              <div class="ticket-actions" *ngIf="getCardServiceRequestActions(request).length">
+                <button *ngFor="let action of getCardServiceRequestActions(request)" type="button"
+                  class="btn-secondary"
+                  [disabled]="action === 'BLOCK_CARD' && selectedCreditCard.status?.toLowerCase() === 'blocked'"
+                  (click)="runCardServiceRequestAction(request, action)">
+                  <ng-container [ngSwitch]="action">
+                    <span *ngSwitchCase="'BLOCK_CARD'">{{ selectedCreditCard.status?.toLowerCase() === 'blocked' ? 'Card already blocked' : 'Block card' }}</span>
+                    <span *ngSwitchCase="'REVIEW_REPLACEMENT'">Review replacement</span>
+                    <span *ngSwitchCase="'VIEW_STATEMENT'">View statement</span>
+                    <span *ngSwitchCase="'VIEW_DUES'">View due / bills</span>
+                    <span *ngSwitchCase="'VIEW_DETAILS'">View card details</span>
+                    <span *ngSwitchCase="'ANALYZE'">Analyze transaction</span>
+                  </ng-container>
+                </button>
+              </div>
+
+              <details class="ticket-timeline" *ngIf="request.timeline?.length">
+                <summary>Request timeline ({{ request.timeline.length }})</summary>
+                <ul>
+                  <li *ngFor="let event of request.timeline">
+                    <strong>{{ event.status }}</strong> · {{ event.createdAt | date:'dd MMM, HH:mm' }}
+                    <span *ngIf="event.updatedBy"> · {{ event.updatedBy }}</span>
+                    <p *ngIf="event.note">{{ event.note }}</p>
+                  </li>
+                </ul>
+              </details>
+
+              <div class="ticket-review" *ngIf="!['Approved', 'Resolved', 'Rejected', 'Closed'].includes(request.status)">
+                <select [(ngModel)]="request.nextStatus">
+                  <option *ngFor="let status of ['Under Review', 'Investigation', 'Approved', 'Resolved', 'Rejected', 'Closed']" [ngValue]="status">{{ status }}</option>
+                </select>
+                <textarea [(ngModel)]="request.responseDraft" maxlength="2000"
+                  placeholder="Reply to customer or enter the closing decision"></textarea>
+                <div>
+                  <button class="btn-secondary" type="button" (click)="replyToCustomerServiceRequest(request)">Send reply</button>
+                  <button class="btn-primary" type="button"
+                    (click)="updateCustomerServiceRequest(request, request.nextStatus)"
+                    [disabled]="request.nextStatus === request.status">Update status</button>
+                </div>
+              </div>
+            </article>
+          </section>
+
+          <div class="details-section" id="credit-card-information">
             <h4>Card Information</h4>
             <div class="info-grid">
               <div class="info-item">
@@ -341,7 +351,7 @@
             <p *ngIf="!creditCardEmiPlans.length" class="no-data">No EMI plans for this card.</p>
           </div>
 
-          <div class="details-section">
+          <div class="details-section" id="credit-card-bills">
             <h4>Bills</h4>
             <table class="data-table">
               <thead>
@@ -383,7 +393,7 @@
             </table>
           </div>
 
-          <div class="details-section">
+          <div class="details-section" id="credit-card-transactions">
             <div class="transaction-section-heading">
               <div>
                 <h4>Transactions</h4>

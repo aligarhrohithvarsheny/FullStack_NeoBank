@@ -2,7 +2,7 @@ import { Component, OnInit, OnDestroy, Inject, PLATFORM_ID } from '@angular/core
 import { isPlatformBrowser, CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { SalaryAccountService } from '../../../service/salary-account.service';
 import { AlertService } from '../../../service/alert.service';
 import { PaymentGatewayService } from '../../../service/payment-gateway.service';
@@ -187,6 +187,7 @@ export class SalaryDashboard implements OnInit, OnDestroy {
   myCreditCards: any[] = [];
   isLoadingMyCreditCards = false;
   selectedMyCreditCard: any = null;
+  myCreditCardAccessMessage = '';
   myCreditCardTransactions: any[] = [];
   myCreditCardBills: any[] = [];
   isLoadingMyCreditCardDetails = false;
@@ -380,8 +381,20 @@ export class SalaryDashboard implements OnInit, OnDestroy {
 
   loadMyCreditCards(): void {
     if (!this.account?.accountNumber) return;
+    const requestOptions = this.myCreditCardRequestOptions();
+    if (!requestOptions) {
+      this.myCreditCards = [];
+      this.selectedMyCreditCard = null;
+      this.isLoadingMyCreditCards = false;
+      this.myCreditCardAccessMessage = 'Sign in to the linked customer account to view its credit cards.';
+      return;
+    }
+    this.myCreditCardAccessMessage = '';
     this.isLoadingMyCreditCards = true;
-    this.http.get<any[]>(`${environment.apiBaseUrl}/api/credit-cards/account/${this.account.accountNumber}`).subscribe({
+    this.http.get<any[]>(
+      `${environment.apiBaseUrl}/api/credit-cards/account/${encodeURIComponent(this.account.accountNumber)}`,
+      requestOptions
+    ).subscribe({
       next: (cards) => {
         this.myCreditCards = (cards || []).filter(c => c.status !== 'Closed');
         this.isLoadingMyCreditCards = false;
@@ -391,16 +404,29 @@ export class SalaryDashboard implements OnInit, OnDestroy {
     });
   }
 
+  private myCreditCardRequestOptions(): { headers: HttpHeaders } | null {
+    try {
+      const user = JSON.parse(sessionStorage.getItem('currentUser') || '{}');
+      const token = user.authToken || sessionStorage.getItem('jwt');
+      if (!token || String(user.accountNumber || '') !== String(this.account?.accountNumber || '')) return null;
+      return { headers: new HttpHeaders({ Authorization: `Bearer ${token}` }) };
+    } catch (error) {
+      console.error('Unable to read customer session for salary-dashboard credit cards:', error);
+      return null;
+    }
+  }
+
   selectMyCreditCard(card: any): void {
     this.selectedMyCreditCard = card;
     this.showMyCreditCardNumber = false;
-    if (!card?.id) return;
+    const requestOptions = this.myCreditCardRequestOptions();
+    if (!card?.id || !requestOptions) return;
     this.isLoadingMyCreditCardDetails = true;
-    this.http.get<any[]>(`${environment.apiBaseUrl}/api/credit-cards/${card.id}/transactions`).subscribe({
+    this.http.get<any[]>(`${environment.apiBaseUrl}/api/credit-cards/${card.id}/transactions`, requestOptions).subscribe({
       next: (txns) => { this.myCreditCardTransactions = txns || []; },
       error: () => { this.myCreditCardTransactions = []; }
     });
-    this.http.get<any[]>(`${environment.apiBaseUrl}/api/credit-cards/${card.id}/bills`).subscribe({
+    this.http.get<any[]>(`${environment.apiBaseUrl}/api/credit-cards/${card.id}/bills`, requestOptions).subscribe({
       next: (bills) => { this.myCreditCardBills = bills || []; this.isLoadingMyCreditCardDetails = false; },
       error: () => { this.myCreditCardBills = []; this.isLoadingMyCreditCardDetails = false; }
     });
@@ -424,8 +450,13 @@ export class SalaryDashboard implements OnInit, OnDestroy {
       this.alertService.userError('Validation', 'PINs do not match');
       return;
     }
+    const requestOptions = this.myCreditCardRequestOptions();
+    if (!requestOptions) {
+      this.alertService.userError('Session required', 'Sign in to the linked customer account to manage this card.');
+      return;
+    }
     this.isSettingMyCreditCardPin = true;
-    this.http.put(`${environment.apiBaseUrl}/api/credit-cards/${card.id}/set-pin`, { pin: this.newMyCreditCardPin }).subscribe({
+    this.http.put(`${environment.apiBaseUrl}/api/credit-cards/${card.id}/set-pin`, { pin: this.newMyCreditCardPin }, requestOptions).subscribe({
       next: () => {
         this.isSettingMyCreditCardPin = false;
         this.showMyCreditCardPinForm = false;
@@ -440,8 +471,13 @@ export class SalaryDashboard implements OnInit, OnDestroy {
     const card = this.selectedMyCreditCard;
     if (!card?.id) return;
     const newStatus = card.status === 'Blocked' ? 'Active' : 'Blocked';
+    const requestOptions = this.myCreditCardRequestOptions();
+    if (!requestOptions) {
+      this.alertService.userError('Session required', 'Sign in to the linked customer account to manage this card.');
+      return;
+    }
     this.isTogglingMyCreditCardBlock = true;
-    this.http.put(`${environment.apiBaseUrl}/api/credit-cards/${card.id}`, { status: newStatus }).subscribe({
+    this.http.put(`${environment.apiBaseUrl}/api/credit-cards/${card.id}`, { status: newStatus }, requestOptions).subscribe({
       next: () => {
         this.isTogglingMyCreditCardBlock = false;
         card.status = newStatus;
@@ -458,8 +494,13 @@ export class SalaryDashboard implements OnInit, OnDestroy {
   closeMyCreditCard() {
     const card = this.selectedMyCreditCard;
     if (!card?.id || !this.canCloseMyCreditCard(card)) return;
+    const requestOptions = this.myCreditCardRequestOptions();
+    if (!requestOptions) {
+      this.alertService.userError('Session required', 'Sign in to the linked customer account to manage this card.');
+      return;
+    }
     this.isClosingMyCreditCard = true;
-    this.http.put(`${environment.apiBaseUrl}/api/credit-cards/${card.id}/close`, {}).subscribe({
+    this.http.put(`${environment.apiBaseUrl}/api/credit-cards/${card.id}/close`, {}, requestOptions).subscribe({
       next: () => {
         this.isClosingMyCreditCard = false;
         this.alertService.userSuccess('Card Closed', 'Your credit card has been closed.');
@@ -482,8 +523,13 @@ export class SalaryDashboard implements OnInit, OnDestroy {
       this.alertService.userError('Validation', 'Enter a valid payment amount');
       return;
     }
+    const requestOptions = this.myCreditCardRequestOptions();
+    if (!requestOptions) {
+      this.alertService.userError('Session required', 'Sign in to the linked customer account to pay this bill.');
+      return;
+    }
     this.isPayingMyBill = true;
-    this.http.post(`${environment.apiBaseUrl}/api/credit-cards/bills/${bill.id}/pay?amount=${this.myBillPaymentAmount}`, {}).subscribe({
+    this.http.post(`${environment.apiBaseUrl}/api/credit-cards/bills/${bill.id}/pay?amount=${this.myBillPaymentAmount}`, {}, requestOptions).subscribe({
       next: () => {
         this.isPayingMyBill = false;
         this.selectedBillForMyPayment = null;
