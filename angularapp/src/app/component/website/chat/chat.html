@@ -10,6 +10,10 @@
     <div class="chat-header">
       <div class="chat-header-content">
         <span class="chat-title">💬 Customer Support</span>
+        <button *ngIf="isAuthenticated" class="pin-chat-btn" (click)="togglePinnedChat()"
+          [attr.aria-pressed]="isPinned" [title]="isPinned ? 'Unpin saved conversation' : 'Pin saved conversation'">
+          {{ isPinned ? '📌 Pinned' : '📍 Pin chat' }}
+        </button>
         <button class="close-btn" (click)="toggleChat()">×</button>
       </div>
     </div>

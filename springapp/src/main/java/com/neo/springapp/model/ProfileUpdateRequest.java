@@ -1,5 +1,6 @@
 package com.neo.springapp.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.Data;
 import java.time.LocalDateTime;
@@ -25,6 +26,7 @@ public class ProfileUpdateRequest {
     private String newValue; // Requested new value
     
     // OTP verification
+    @JsonIgnore
     private String otp;
     private LocalDateTime otpSentAt;
     private Boolean otpVerified = false;

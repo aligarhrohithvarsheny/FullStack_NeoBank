@@ -19,6 +19,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -1321,75 +1322,21 @@ public class UserController {
 
     // Dedicated endpoint for updating email
     @PutMapping("/update-email/{id}")
-    public ResponseEntity<Map<String, Object>> updateEmail(@PathVariable Long id, @RequestBody Map<String, String> request) {
-        try {
-            String newEmail = request.get("email");
-            
-            if (newEmail == null || newEmail.trim().isEmpty()) {
-                Map<String, Object> response = new HashMap<>();
-                response.put("success", false);
-                response.put("message", "Email is required");
-                return ResponseEntity.badRequest().body(response);
-            }
-            
-            // Validate email format (basic validation)
-            if (!newEmail.matches("^[A-Za-z0-9+_.-]+@(.+)$")) {
-                Map<String, Object> response = new HashMap<>();
-                response.put("success", false);
-                response.put("message", "Invalid email format");
-                return ResponseEntity.badRequest().body(response);
-            }
-            
-            Optional<User> userOpt = userService.getUserById(id);
-            if (!userOpt.isPresent()) {
-                Map<String, Object> response = new HashMap<>();
-                response.put("success", false);
-                response.put("message", "User not found");
-                return ResponseEntity.status(404).body(response);
-            }
-            
-            User user = userOpt.get();
-
-            String normalizedNew = UserService.normalizeEmail(newEmail);
-            if (normalizedNew == null) {
-                Map<String, Object> response = new HashMap<>();
-                response.put("success", false);
-                response.put("message", "Email is required");
-                return ResponseEntity.badRequest().body(response);
-            }
-
-            String normalizedCurrent = UserService.normalizeEmail(user.getEmail());
-            if (normalizedNew.equals(normalizedCurrent)) {
-                Map<String, Object> response = new HashMap<>();
-                response.put("success", false);
-                response.put("message", "New email is the same as current email");
-                return ResponseEntity.badRequest().body(response);
-            }
-            
-            if (!userService.isEmailUnique(normalizedNew, user.getId())) {
-                Map<String, Object> response = new HashMap<>();
-                response.put("success", false);
-                response.put("message", "Email already exists. Please use a different email.");
-                return ResponseEntity.badRequest().body(response);
-            }
-            
-            userService.retireEmail(user.getId(), normalizedCurrent);
-            user.setEmail(normalizedNew);
-            User updatedUser = userService.saveUser(user);
-            
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", true);
-            response.put("user", createUserResponse(updatedUser));
-            response.put("message", "Email updated successfully");
-            System.out.println("✅ Email updated successfully for user ID: " + id);
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", false);
-            response.put("message", "Failed to update email: " + e.getMessage());
-            System.out.println("❌ Email update failed: " + e.getMessage());
-            return ResponseEntity.internalServerError().body(response);
+    public ResponseEntity<Map<String, Object>> updateEmail(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> request,
+            @AuthenticationPrincipal com.neo.springapp.service.UserSessionTokenService.SessionPrincipal principal) {
+        if (principal == null || !"USER".equals(principal.scope())) {
+            return ResponseEntity.status(401).body(Map.of("success", false, "message", "User login is required"));
         }
+        if (!id.equals(principal.userId())) {
+            return ResponseEntity.status(403).body(Map.of("success", false, "message", "You can only update your own profile"));
+        }
+        Map<String, Object> response = profileUpdateService.requestProfileUpdate(
+                id, "EMAIL", request == null ? null : request.get("email"));
+        return Boolean.TRUE.equals(response.get("success"))
+                ? ResponseEntity.ok(response)
+                : ResponseEntity.badRequest().body(response);
     }
 
 
@@ -2884,7 +2831,14 @@ public class UserController {
     public ResponseEntity<Map<String, Object>> requestProfileUpdate(
             @RequestParam Long userId,
             @RequestParam String field,
-            @RequestParam String newValue) {
+            @RequestParam String newValue,
+            @AuthenticationPrincipal com.neo.springapp.service.UserSessionTokenService.SessionPrincipal principal) {
+        if (principal == null || !"USER".equals(principal.scope())) {
+            return ResponseEntity.status(401).body(Map.of("success", false, "message", "User login is required"));
+        }
+        if (!userId.equals(principal.userId())) {
+            return ResponseEntity.status(403).body(Map.of("success", false, "message", "You can only update your own profile"));
+        }
         Map<String, Object> response = profileUpdateService.requestProfileUpdate(userId, field, newValue);
         return ResponseEntity.ok(response);
     }
@@ -2893,36 +2847,70 @@ public class UserController {
     @PostMapping("/profile-update/verify-otp")
     public ResponseEntity<Map<String, Object>> verifyOtpAndSubmitRequest(
             @RequestParam Long requestId,
-            @RequestParam String otp) {
-        Map<String, Object> response = profileUpdateService.verifyOtpAndSubmitRequest(requestId, otp);
+            @RequestParam String otp,
+            @AuthenticationPrincipal com.neo.springapp.service.UserSessionTokenService.SessionPrincipal principal) {
+        if (principal == null || !"USER".equals(principal.scope())) {
+            return ResponseEntity.status(401).body(Map.of("success", false, "message", "User login is required"));
+        }
+        Map<String, Object> response = profileUpdateService.verifyOtpAndSubmitRequest(requestId, otp, principal.userId());
         return ResponseEntity.ok(response);
     }
 
     // Resend OTP for profile update request
     @PostMapping("/profile-update/resend-otp")
-    public ResponseEntity<Map<String, Object>> resendOtp(@RequestParam Long requestId) {
-        Map<String, Object> response = profileUpdateService.resendOtp(requestId);
+    public ResponseEntity<Map<String, Object>> resendOtp(
+            @RequestParam Long requestId,
+            @AuthenticationPrincipal com.neo.springapp.service.UserSessionTokenService.SessionPrincipal principal) {
+        if (principal == null || !"USER".equals(principal.scope())) {
+            return ResponseEntity.status(401).body(Map.of("success", false, "message", "User login is required"));
+        }
+        Map<String, Object> response = profileUpdateService.resendOtp(requestId, principal.userId());
         return ResponseEntity.ok(response);
     }
 
     // Get update requests by user ID
     @GetMapping("/profile-update/requests/{userId}")
-    public ResponseEntity<List<ProfileUpdateRequest>> getUpdateRequestsByUser(@PathVariable Long userId) {
+    public ResponseEntity<List<ProfileUpdateRequest>> getUpdateRequestsByUser(
+            @PathVariable Long userId,
+            @AuthenticationPrincipal com.neo.springapp.service.UserSessionTokenService.SessionPrincipal principal) {
+        if (principal == null) return ResponseEntity.status(401).build();
+        if (!isProfileOwnerOrStaff(principal, userId)) return ResponseEntity.status(403).build();
         List<ProfileUpdateRequest> requests = profileUpdateService.getUpdateRequestsByUser(userId);
         return ResponseEntity.ok(requests);
     }
 
     // Get update history by user ID
     @GetMapping("/profile-update/history/{userId}")
-    public ResponseEntity<List<ProfileUpdateHistory>> getUpdateHistoryByUser(@PathVariable Long userId) {
+    public ResponseEntity<List<ProfileUpdateHistory>> getUpdateHistoryByUser(
+            @PathVariable Long userId,
+            @AuthenticationPrincipal com.neo.springapp.service.UserSessionTokenService.SessionPrincipal principal) {
+        if (principal == null) return ResponseEntity.status(401).build();
+        if (!isProfileOwnerOrStaff(principal, userId)) return ResponseEntity.status(403).build();
         List<ProfileUpdateHistory> history = profileUpdateService.getUpdateHistoryByUser(userId);
         return ResponseEntity.ok(history);
     }
 
     // Get update history by account number
     @GetMapping("/profile-update/history/account/{accountNumber}")
-    public ResponseEntity<List<ProfileUpdateHistory>> getUpdateHistoryByAccount(@PathVariable String accountNumber) {
+    public ResponseEntity<List<ProfileUpdateHistory>> getUpdateHistoryByAccount(
+            @PathVariable String accountNumber,
+            @AuthenticationPrincipal com.neo.springapp.service.UserSessionTokenService.SessionPrincipal principal) {
+        if (principal == null) return ResponseEntity.status(401).build();
+        boolean ownAccount = "USER".equals(principal.scope())
+                && principal.accountNumber() != null
+                && principal.accountNumber().equalsIgnoreCase(accountNumber);
+        if (!ownAccount && !isStaff(principal)) return ResponseEntity.status(403).build();
         List<ProfileUpdateHistory> history = profileUpdateService.getUpdateHistoryByAccount(accountNumber);
         return ResponseEntity.ok(history);
+    }
+
+    private boolean isProfileOwnerOrStaff(
+            com.neo.springapp.service.UserSessionTokenService.SessionPrincipal principal, Long userId) {
+        return isStaff(principal)
+                || ("USER".equals(principal.scope()) && userId.equals(principal.userId()));
+    }
+
+    private boolean isStaff(com.neo.springapp.service.UserSessionTokenService.SessionPrincipal principal) {
+        return "ADMIN".equals(principal.scope()) || "MANAGER".equals(principal.scope());
     }
 }

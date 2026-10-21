@@ -45,6 +45,8 @@ public class GoldLoanService {
     private final TransactionService transactionService;
     @Autowired
     private BranchAccountService branchAccountService;
+    @Autowired
+    private CustomerEventNotificationService notificationService;
 
     public GoldLoanService(GoldLoanRepository goldLoanRepository, 
                           GoldRateService goldRateService,
@@ -120,6 +122,8 @@ public class GoldLoanService {
     }
 
     private GoldLoan applyGoldLoanInternal(GoldLoan goldLoan) {
+        goldLoan.setUserEmail(userService.getUserByAccountNumber(goldLoan.getAccountNumber())
+                .map(user -> user.getEmail()).orElse(null));
         // Get current gold rate
         Double currentRate = goldRateService.getCurrentGoldRate().getRatePerGram();
         goldLoan.setGoldRatePerGram(currentRate);
@@ -145,7 +149,13 @@ public class GoldLoanService {
             goldLoan.setTenure(12); // 12 months default
         }
         
-        return goldLoanRepository.save(goldLoan);
+        GoldLoan savedLoan = goldLoanRepository.save(goldLoan);
+        notificationService.notifyForAccount(savedLoan.getAccountNumber(), "Gold loan application", "Submitted",
+                savedLoan.getLoanAccountNumber(), Map.of(
+                        "Requested amount", String.valueOf(savedLoan.getLoanAmount()),
+                        "Gold weight (grams)", String.valueOf(savedLoan.getGoldGrams()),
+                        "Application date", String.valueOf(savedLoan.getApplicationDate())));
+        return savedLoan;
     }
 
     // Get all gold loans (enriched with customerId from account for admin display)
@@ -208,6 +218,8 @@ public class GoldLoanService {
     public GoldLoan approveGoldLoan(Long id, String status, String approvedBy, Map<String, Object> goldDetails) {
         GoldLoan goldLoan = goldLoanRepository.findById(id).orElse(null);
         if (goldLoan != null) {
+            goldLoan.setUserEmail(userService.getUserByAccountNumber(goldLoan.getAccountNumber())
+                    .map(user -> user.getEmail()).orElse(null));
             Long allocationId = null;
             Long performedByAdminId = null;
             if ("Approved".equals(status)) {

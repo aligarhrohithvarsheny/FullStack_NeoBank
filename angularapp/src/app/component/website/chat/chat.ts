@@ -24,6 +24,10 @@ export class Chat implements OnInit, OnDestroy {
   userName: string = '';
   isOpen: boolean = false;
   isLoading: boolean = false;
+  isAuthenticated = false;
+  isPinned = false;
+  private authErrorShown = false;
+  private attachmentObjectUrls: string[] = [];
   showMoreServices = false;
   selectedFile: File | null = null;
   private messageSubscription: any;
@@ -51,14 +55,23 @@ export class Chat implements OnInit, OnDestroy {
           const user = JSON.parse(currentUser);
           this.userId = user.accountNumber || user.email;
           this.userName = user.name || user.username;
+          this.isAuthenticated = !!(user.authToken || sessionStorage.getItem('jwt'));
         } catch (e) {
           console.error('Error parsing user data:', e);
         }
       }
     }
 
-    // Generate session ID
-    this.sessionId = this.generateSessionId();
+    if (!this.isAuthenticated || !this.userId) {
+      this.sendWelcomeMessage();
+      this.addLocalBotMessage('Please sign in to start or continue a saved support conversation.');
+      return;
+    }
+
+    const sessionKey = `neobank-chat-session:${this.userId}`;
+    this.sessionId = localStorage.getItem(sessionKey) || this.generateSessionId();
+    localStorage.setItem(sessionKey, this.sessionId);
+    this.isPinned = localStorage.getItem(`neobank-chat-pinned:${this.userId}`) === this.sessionId;
     
     // Load chat history
     this.loadChatHistory();
@@ -89,6 +102,7 @@ export class Chat implements OnInit, OnDestroy {
     if (this.pollingInterval) {
       clearInterval(this.pollingInterval);
     }
+    this.attachmentObjectUrls.forEach(url => URL.revokeObjectURL(url));
   }
 
   generateSessionId(): string {
@@ -105,11 +119,18 @@ export class Chat implements OnInit, OnDestroy {
           
           if (newMessages.length > 0 || this.messages.length !== messages.length) {
             this.messages = [...messages, ...this.messages.filter(message => message.localOnly)];
+            this.loadAttachmentPreviews(messages);
             this.scrollToBottom();
           }
         },
         error: (err) => {
           console.error('Error loading chat history:', err);
+          if (err.status === 401 && !this.authErrorShown) {
+            this.authErrorShown = true;
+            this.isAuthenticated = false;
+            if (this.pollingInterval) clearInterval(this.pollingInterval);
+            this.alertService.userError('Session expired', 'Sign in again to continue this saved support chat.');
+          }
         }
       });
     }
@@ -134,7 +155,23 @@ export class Chat implements OnInit, OnDestroy {
     }
   }
 
+  togglePinnedChat(): void {
+    if (!this.userId || !this.sessionId) return;
+    const key = `neobank-chat-pinned:${this.userId}`;
+    if (this.isPinned) {
+      localStorage.removeItem(key);
+      this.isPinned = false;
+    } else {
+      localStorage.setItem(key, this.sessionId);
+      this.isPinned = true;
+    }
+  }
+
   connectToAgent() {
+    if (!this.isAuthenticated) {
+      this.alertService.userError('Sign in required', 'Please sign in to connect with a support agent.');
+      return;
+    }
     this.isOpen = true;
     setTimeout(() => {
       this.sendQuickMessage('Please connect me to a live support agent.');
@@ -142,6 +179,10 @@ export class Chat implements OnInit, OnDestroy {
   }
 
   sendMessage() {
+    if (!this.isAuthenticated) {
+      this.alertService.userError('Sign in required', 'Please sign in to send a support message.');
+      return;
+    }
     if ((!this.newMessage.trim() && !this.selectedFile) || this.isLoading) {
       return;
     }
@@ -163,7 +204,7 @@ export class Chat implements OnInit, OnDestroy {
     this.isLoading = true;
     this.scrollToBottom();
 
-    this.chatService.sendMessage(this.sessionId, this.userId, this.userName, messageText, fileToSend || undefined).subscribe({
+    this.chatService.sendMessage(this.sessionId, this.userName, messageText, fileToSend || undefined).subscribe({
       next: (response: any) => {
         this.isLoading = false;
         console.log('Chat response received:', response);
@@ -214,6 +255,11 @@ export class Chat implements OnInit, OnDestroy {
         }
         
         this.alertService.userError('Error', errorMessage);
+        if (err.status === 401 && !this.authErrorShown) {
+          this.authErrorShown = true;
+          this.isAuthenticated = false;
+          this.alertService.userError('Session expired', 'Sign in again to continue this saved support chat.');
+        }
         
         // Show a fallback bot response if server error
         if (err.status === 0 || err.status >= 500) {
@@ -392,9 +438,25 @@ export class Chat implements OnInit, OnDestroy {
   
   getAttachmentUrl(attachmentUrl?: string): string {
     if (!attachmentUrl) return '';
-    if (attachmentUrl.startsWith('http')) {
-      return attachmentUrl;
-    }
-    return `${environment.apiBaseUrl}${attachmentUrl}`;
+    return this.messages.find(message => message.attachmentUrl === attachmentUrl)?.renderedAttachmentUrl || '';
+  }
+
+  private loadAttachmentPreviews(messages: ChatMessage[]): void {
+    messages.filter(message => message.attachmentUrl && !message.renderedAttachmentUrl).forEach(message => {
+      this.chatService.getAttachment(message.attachmentUrl!).subscribe({
+        next: blob => {
+          const objectUrl = URL.createObjectURL(blob);
+          this.attachmentObjectUrls.push(objectUrl);
+          message.renderedAttachmentUrl = objectUrl;
+        },
+        error: error => {
+          console.error('Unable to load chat attachment.', error);
+          if (error.status === 401 && !this.authErrorShown) {
+            this.authErrorShown = true;
+            this.isAuthenticated = false;
+          }
+        }
+      });
+    });
   }
 }

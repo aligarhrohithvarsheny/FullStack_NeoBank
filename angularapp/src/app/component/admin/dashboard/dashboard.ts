@@ -332,6 +332,7 @@ export class Dashboard implements OnInit, OnDestroy {
 
   // Support Tickets
   supportTickets: any[] = [];
+  private supportAuthRedirecting = false;
   filteredSupportTickets: any[] = [];
   supportTicketStats: any = { openCount: 0, inProgressCount: 0, resolvedCount: 0, totalCount: 0 };
   supportTicketFilter: string = 'ALL';
@@ -3957,7 +3958,8 @@ export class Dashboard implements OnInit, OnDestroy {
   }
 
   approveProfileUpdate(request: any) {
-    if (!confirm(`Approve ${request.fieldToUpdate === 'ADDRESS' ? 'address' : 'phone number'} update for ${request.userName}?`)) return;
+    const fieldLabel = this.getProfileUpdateFieldLabel(request.fieldToUpdate).toLowerCase();
+    if (!confirm(`Approve ${fieldLabel} update for ${request.userName}?`)) return;
 
     const adminData = sessionStorage.getItem('admin');
     const adminName = adminData ? (JSON.parse(adminData).username || JSON.parse(adminData).name || 'Admin') : 'Admin';
@@ -4020,6 +4022,16 @@ export class Dashboard implements OnInit, OnDestroy {
       case 'OTP_VERIFIED': case 'PENDING': return 'status-pending';
       case 'REJECTED': return 'status-rejected';
       default: return 'status-default';
+    }
+  }
+
+  getProfileUpdateFieldLabel(field: string): string {
+    switch (field?.toUpperCase()) {
+      case 'ADDRESS': return 'Address';
+      case 'PHONE': return 'Phone Number';
+      case 'NAME': return 'Name';
+      case 'EMAIL': return 'Email Address';
+      default: return 'Profile';
     }
   }
 
@@ -7023,10 +7035,7 @@ export class Dashboard implements OnInit, OnDestroy {
         this.isLoadingSupportTickets = false;
       },
       error: (err: any) => {
-        this.alertService.error(
-          'Error',
-          err.error?.message || 'Failed to load support tickets. Please sign in again and retry.'
-        );
+        this.handleSupportTicketError(err, 'Failed to load support tickets.');
         this.isLoadingSupportTickets = false;
       }
     });
@@ -7045,8 +7054,20 @@ export class Dashboard implements OnInit, OnDestroy {
           totalCount: res.totalCount || 0
         };
       },
-      error: () => {}
+      error: (err: any) => this.handleSupportTicketError(err, 'Failed to load support ticket statistics.')
     });
+  }
+
+  private handleSupportTicketError(err: any, fallbackMessage: string): void {
+    if (err?.status === 401) {
+      if (this.supportAuthRedirecting) return;
+      this.supportAuthRedirecting = true;
+      sessionStorage.removeItem('adminSessionToken');
+      this.alertService.error('Admin session expired', 'Please sign in again to access customer support.');
+      void this.router.navigate(['/admin/login']);
+      return;
+    }
+    this.alertService.error('Support error', err?.error?.message || fallbackMessage);
   }
 
   filterSupportTickets() {

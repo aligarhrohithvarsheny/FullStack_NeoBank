@@ -42,6 +42,8 @@ public class TransferController {
     private final UserService userService;
     @Autowired
     private com.neo.springapp.service.EmergencyControlService emergencyControlService;
+    @Autowired
+    private com.neo.springapp.service.CustomerEventNotificationService notificationService;
     private final Map<String, PendingTransferOtp> pendingTransferOtps = new ConcurrentHashMap<>();
 
     private static class PendingTransferOtp {
@@ -317,6 +319,8 @@ public class TransferController {
                     );
                 }
 
+                notifyTransfer(savedTransfer, "Completed");
+
                 // Prepare response
                 Map<String, Object> response = new HashMap<>();
                 response.put("id", savedTransfer.getId());
@@ -352,6 +356,8 @@ public class TransferController {
                     "Debit", 
                     newBalance
                 );
+
+                notifyTransfer(savedTransfer, "Pending");
 
                 // Prepare response
                 Map<String, Object> response = new HashMap<>();
@@ -398,6 +404,8 @@ public class TransferController {
                         newRecipientBalance
                     );
                 }
+
+                notifyTransfer(savedTransfer, "Completed");
 
                 // Prepare response
                 Map<String, Object> response = new HashMap<>();
@@ -786,6 +794,7 @@ public class TransferController {
                                 refundedBalance);
                         transfer.setStatus("Failed");
                         transferService.saveTransfer(transfer);
+                        notifyTransfer(transfer, "Failed");
                         return;
                     }
                     
@@ -812,6 +821,7 @@ public class TransferController {
                         transfer.setStatus("Completed");
                         transfer.setProcessedAt(LocalDateTime.now());
                         transferService.saveTransfer(transfer);
+                        notifyTransfer(transfer, "Completed");
                     }
                 }
             } catch (Exception e) {
@@ -819,5 +829,19 @@ public class TransferController {
                 e.printStackTrace();
             }
         }, 2, TimeUnit.HOURS);
+    }
+
+    private void notifyTransfer(TransferRecord transfer, String status) {
+        notificationService.notifyForAccount(transfer.getSenderAccountNumber(), "Funds transfer", status,
+                String.valueOf(transfer.getId()), Map.of(
+                        "Amount", String.valueOf(transfer.getAmount()),
+                        "Transfer type", String.valueOf(transfer.getTransferType()),
+                        "Destination account", maskAccount(transfer.getRecipientAccountNumber()),
+                        "Date", String.valueOf(transfer.getDate())));
+    }
+
+    private String maskAccount(String accountNumber) {
+        if (accountNumber == null || accountNumber.length() < 4) return "****";
+        return "****" + accountNumber.substring(accountNumber.length() - 4);
     }
 }

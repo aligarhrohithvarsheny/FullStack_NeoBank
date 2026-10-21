@@ -188,12 +188,41 @@
       <div class="details-grid">
         <div class="detail-item">
           <label>Full Name</label>
-          <p>{{ userProfile.name }}</p>
+          <div *ngIf="!editingName" class="email-display">
+            <p>{{ userProfile.name }}</p>
+            <button class="edit-btn-small" (click)="startEditingName()" type="button">Update</button>
+          </div>
+          <div *ngIf="editingName" class="email-edit">
+            <input
+              type="text"
+              [(ngModel)]="newName"
+              class="email-input"
+              placeholder="Enter your full name"
+              [disabled]="isRequestingUpdate"
+            />
+            <div class="error-message" *ngIf="updateError">{{ updateError }}</div>
+            <div class="email-actions">
+              <button class="save-email-btn" (click)="requestNameUpdate()" [disabled]="isRequestingUpdate" type="button">
+                {{ isRequestingUpdate ? 'Requesting...' : 'Request Update' }}
+              </button>
+              <button class="cancel-email-btn" (click)="cancelEditingName()" [disabled]="isRequestingUpdate" type="button">
+                Cancel
+              </button>
+            </div>
+          </div>
         </div>
         <div class="detail-item">
           <label>Email Address</label>
           <div *ngIf="!editingEmail" class="email-display">
             <p>{{ userProfile.email }}</p>
+            <button
+              *ngIf="currentUpdateRequestId && currentUpdateField === 'EMAIL'"
+              class="edit-email-btn"
+              (click)="resumeOtpModal()"
+              type="button"
+            >
+              Continue verification
+            </button>
             <button class="edit-email-btn" (click)="startEditingEmail()" type="button">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
@@ -390,7 +419,11 @@
       <div *ngIf="!isLoadingUpdateHistory" class="update-history-list">
         <div *ngFor="let history of updateHistory" class="update-history-item">
           <div class="history-header">
-            <span class="field-name">{{ history.fieldUpdated === 'ADDRESS' ? 'Address' : 'Phone Number' }}</span>
+            <span class="field-name">
+              {{ history.fieldUpdated === 'ADDRESS' ? 'Address' :
+                 history.fieldUpdated === 'PHONE' ? 'Phone Number' :
+                 history.fieldUpdated === 'NAME' ? 'Name' : 'Email Address' }}
+            </span>
             <span class="update-date">{{ history.updateDate | date:'dd/MM/yyyy HH:mm' }}</span>
           </div>
           <div class="history-changes">
@@ -423,6 +456,43 @@
         <span *ngIf="generatingPassbook" class="button-icon">⏳</span>
         <span *ngIf="generatingPassbook">Generating...</span>
       </button>
+    </div>
+  </div>
+
+  <div *ngIf="showOtpModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="profile-otp-title">
+    <div class="modal-content otp-modal">
+      <div class="modal-header">
+        <h3 id="profile-otp-title">Verify new email</h3>
+        <button class="close-btn" (click)="hideOtpModal()" type="button" aria-label="Close verification dialog">×</button>
+      </div>
+      <div class="modal-body">
+        <p class="otp-info">Enter the 6-digit verification code sent to <strong>{{ otpDestination }}</strong>. The email change will take effect only after admin approval.</p>
+        <div class="otp-input-group">
+          <input
+            class="otp-input"
+            type="text"
+            inputmode="numeric"
+            autocomplete="one-time-code"
+            maxlength="6"
+            [(ngModel)]="otpInput"
+            (input)="onOtpInput($event)"
+            [disabled]="isVerifyingOtp"
+            placeholder="000000"
+            aria-label="Email verification code"
+          />
+          <div class="otp-timer" [class.expired]="otpTimer <= 0">
+            <span *ngIf="otpTimer > 0">Code expires in {{ formatOtpTime() }}</span>
+            <span *ngIf="otpTimer <= 0" class="expired-text">Code expired. Request a new one.</span>
+          </div>
+        </div>
+        <div class="error-message" *ngIf="otpError">{{ otpError }}</div>
+        <div class="otp-actions">
+          <button class="verify-btn" (click)="verifyOtpAndSubmit()" [disabled]="isVerifyingOtp || !otpInput">
+            {{ isVerifyingOtp ? 'Verifying...' : 'Verify email' }}
+          </button>
+          <button class="resend-btn" (click)="resendOtp()" [disabled]="isVerifyingOtp">Resend code</button>
+        </div>
+      </div>
     </div>
   </div>
 

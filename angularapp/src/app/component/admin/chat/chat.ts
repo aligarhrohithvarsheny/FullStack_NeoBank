@@ -6,7 +6,6 @@ import { AlertService } from '../../../service/alert.service';
 import { UserService } from '../../../service/user';
 import { AccountService } from '../../../service/account';
 import { Router } from '@angular/router';
-import { environment } from '../../../../environment/environment';
 
 @Component({
   selector: 'app-admin-chat',
@@ -22,12 +21,14 @@ export class AdminChat implements OnInit, OnDestroy {
   selectedSessionId: string = '';
   selectedChatMessages: ChatMessage[] = [];
   newMessage: string = '';
-  adminId: string = 'admin';
   isLoading: boolean = false;
   selectedFile: File | null = null;
   showAccountDetails: boolean = false;
   customerDetails: any = null;
   isLoadingCustomerDetails: boolean = false;
+  pinnedSessionIds: string[] = [];
+  private supportAuthRedirecting = false;
+  private attachmentObjectUrls: string[] = [];
   private refreshInterval: any;
 
   constructor(
@@ -42,6 +43,7 @@ export class AdminChat implements OnInit, OnDestroy {
   ngOnInit() {
     // Only make API calls in the browser, not during SSR
     if (isPlatformBrowser(this.platformId)) {
+    this.loadPinnedChats();
     this.loadEscalatedChats();
     
     // Refresh escalated chats every 5 seconds
@@ -58,6 +60,7 @@ export class AdminChat implements OnInit, OnDestroy {
     if (this.refreshInterval) {
       clearInterval(this.refreshInterval);
     }
+    this.attachmentObjectUrls.forEach(url => URL.revokeObjectURL(url));
   }
 
   loadEscalatedChats() {
@@ -83,6 +86,7 @@ export class AdminChat implements OnInit, OnDestroy {
       },
       error: (err) => {
         console.error('Error loading escalated chats:', err);
+        this.handleChatAuthError(err);
       }
     });
   }
@@ -94,7 +98,8 @@ export class AdminChat implements OnInit, OnDestroy {
     this.loadChatHistory(sessionId);
     
     // Take over the chat
-    this.chatService.adminTakeover(sessionId, this.adminId).subscribe({
+    const chat = this.escalatedChats.find(item => item.sessionId === sessionId);
+    if (chat?.status !== 'IN_PROGRESS') this.chatService.adminTakeover(sessionId).subscribe({
       next: (response) => {
         if (response.success) {
           this.alertService.success('Chat', 'You have taken over this chat');
@@ -102,6 +107,7 @@ export class AdminChat implements OnInit, OnDestroy {
       },
       error: (err) => {
         console.error('Error taking over chat:', err);
+        this.handleChatAuthError(err);
       }
     });
   }
@@ -109,17 +115,19 @@ export class AdminChat implements OnInit, OnDestroy {
   loadChatHistory(sessionId: string) {
     if (!isPlatformBrowser(this.platformId)) return;
     
-    this.chatService.getChatHistory(sessionId).subscribe({
+    this.chatService.getChatHistory(sessionId, true).subscribe({
       next: (messages) => {
         // Deduplicate messages by ID to prevent duplicates
         const uniqueMessages = messages.filter((msg, index, self) => 
           index === self.findIndex((m) => m.id === msg.id)
         );
         this.selectedChatMessages = uniqueMessages;
+        this.loadAttachmentPreviews(uniqueMessages);
         this.scrollToBottom();
       },
       error: (err) => {
         console.error('Error loading chat history:', err);
+        this.handleChatAuthError(err);
       }
     });
   }
@@ -137,7 +145,7 @@ export class AdminChat implements OnInit, OnDestroy {
     this.selectedFile = null;
     this.isLoading = true;
 
-    this.chatService.adminSendMessage(this.selectedSessionId, this.adminId, messageText, fileToSend || undefined).subscribe({
+    this.chatService.adminSendMessage(this.selectedSessionId, messageText, fileToSend || undefined).subscribe({
       next: (response: any) => {
         this.isLoading = false;
         if (response.success) {
@@ -152,6 +160,7 @@ export class AdminChat implements OnInit, OnDestroy {
         this.isLoading = false;
         console.error('Error sending message:', err);
         this.alertService.error('Error', 'Failed to send message. Please try again.');
+        this.handleChatAuthError(err);
       }
     });
   }
@@ -187,12 +196,20 @@ export class AdminChat implements OnInit, OnDestroy {
   
   getAttachmentUrl(attachmentUrl?: string): string {
     if (!attachmentUrl) return '';
-    if (attachmentUrl.startsWith('http')) {
-      return attachmentUrl;
-    }
-    // Extract filename from path
-    const filename = attachmentUrl.split('/').pop() || '';
-    return `${environment.apiBaseUrl}/api/chat/attachment/${filename}`;
+    return this.selectedChatMessages.find(message => message.attachmentUrl === attachmentUrl)?.renderedAttachmentUrl || '';
+  }
+
+  private loadAttachmentPreviews(messages: ChatMessage[]): void {
+    messages.filter(message => message.attachmentUrl && !message.renderedAttachmentUrl).forEach(message => {
+      this.chatService.getAttachment(message.attachmentUrl!, true).subscribe({
+        next: blob => {
+          const objectUrl = URL.createObjectURL(blob);
+          this.attachmentObjectUrls.push(objectUrl);
+          message.renderedAttachmentUrl = objectUrl;
+        },
+        error: error => this.handleChatAuthError(error)
+      });
+    });
   }
 
   scrollToBottom() {
@@ -254,6 +271,69 @@ export class AdminChat implements OnInit, OnDestroy {
   getUserName(sessionId: string): string {
     const chat = this.escalatedChats.find(c => c.sessionId === sessionId);
     return chat?.userName || 'User';
+  }
+
+  getOrderedChats(): ChatMessage[] {
+    return [...this.escalatedChats].sort((first, second) => {
+      const firstPinned = this.pinnedSessionIds.includes(first.sessionId);
+      const secondPinned = this.pinnedSessionIds.includes(second.sessionId);
+      if (firstPinned !== secondPinned) return firstPinned ? -1 : 1;
+      return new Date(second.timestamp || 0).getTime() - new Date(first.timestamp || 0).getTime();
+    });
+  }
+
+  isChatPinned(sessionId: string): boolean {
+    return this.pinnedSessionIds.includes(sessionId);
+  }
+
+  togglePinnedChat(sessionId: string, event?: Event): void {
+    event?.stopPropagation();
+    this.pinnedSessionIds = this.isChatPinned(sessionId)
+      ? this.pinnedSessionIds.filter(id => id !== sessionId)
+      : [sessionId, ...this.pinnedSessionIds];
+    if (isPlatformBrowser(this.platformId)) {
+      const adminKey = this.getAdminPinStorageKey();
+      localStorage.setItem(`neobank-admin-pinned-chats:${adminKey}`, JSON.stringify(this.pinnedSessionIds));
+    }
+  }
+
+  openCustomer360(): void {
+    const accountNumber = this.getCurrentCustomerUserId();
+    if (!accountNumber) {
+      this.alertService.error('Customer unavailable', 'This conversation is not linked to an account.');
+      return;
+    }
+    void this.router.navigate(['/admin/customer-360'], { state: { accountNumber } });
+  }
+
+  private loadPinnedChats(): void {
+    try {
+      const adminKey = this.getAdminPinStorageKey();
+      const stored = JSON.parse(localStorage.getItem(`neobank-admin-pinned-chats:${adminKey}`) || '[]');
+      this.pinnedSessionIds = Array.isArray(stored)
+        ? stored.filter((sessionId: unknown): sessionId is string => typeof sessionId === 'string')
+        : [];
+    } catch (error) {
+      console.error('Unable to load pinned support chats.', error);
+      this.pinnedSessionIds = [];
+    }
+  }
+
+  private getAdminPinStorageKey(): string {
+    try {
+      const admin = JSON.parse(sessionStorage.getItem('admin') || '{}');
+      return String(admin.id || admin.username || 'admin');
+    } catch {
+      return 'admin';
+    }
+  }
+
+  private handleChatAuthError(err: any): void {
+    if (err?.status !== 401 || this.supportAuthRedirecting) return;
+    this.supportAuthRedirecting = true;
+    sessionStorage.removeItem('adminSessionToken');
+    this.alertService.error('Admin session expired', 'Sign in again to continue customer support.');
+    void this.router.navigate(['/admin/login']);
   }
 
   formatMessage(message: string): string {
@@ -345,4 +425,3 @@ export class AdminChat implements OnInit, OnDestroy {
     this.customerDetails = null;
   }
 }
-

@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 @SuppressWarnings("null")
@@ -318,22 +319,14 @@ public class ChatService {
     }
     
     public List<ChatMessage> getEscalatedChats() {
-        // Get all escalated messages - these are the ones that need admin attention
-        List<ChatMessage> escalatedMessages = chatMessageRepository.findByStatusOrderByTimestampDesc("ESCALATED");
-        
-        // Log to verify user messages are being saved
-        System.out.println("Found " + escalatedMessages.size() + " escalated messages");
-        for (ChatMessage msg : escalatedMessages) {
-            System.out.println("Escalated message - Session: " + msg.getSessionId() + 
-                             ", Sender: " + msg.getSender() + 
-                             ", UserId: " + msg.getUserId() + 
-                             ", Message: " + (msg.getMessage() != null ? msg.getMessage().substring(0, Math.min(50, msg.getMessage().length())) : "null"));
-        }
-        
-        return escalatedMessages;
+        return chatMessageRepository.findByStatusInOrderByTimestampDesc(List.of("ESCALATED", "IN_PROGRESS"));
     }
     
     public List<ChatMessage> getAdminChats(String adminId) {
         return chatMessageRepository.findByAdminIdOrderByTimestampDesc(adminId);
+    }
+
+    public Optional<ChatMessage> getMessageByAttachmentUrl(String attachmentUrl) {
+        return chatMessageRepository.findFirstByAttachmentUrl(attachmentUrl);
     }
 }

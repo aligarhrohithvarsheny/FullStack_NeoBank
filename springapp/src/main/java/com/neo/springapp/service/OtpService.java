@@ -62,16 +62,15 @@ public class OtpService {
         String otp = generateOtp();
         storeOtp(normalizedEmail, otp);
 
-        System.out.println("🔔 OTP API flow trigger [" + purpose + "] for email: " + normalizedEmail);
-        System.out.println("🔐 OTP generated for [" + purpose + "] (masked): ****" + otp.substring(otp.length() - 2));
+        System.out.println("OTP email delivery requested for purpose [" + purpose + "] to " + maskEmail(normalizedEmail));
 
-        boolean sent = emailService.sendOtpEmail(normalizedEmail, otp);
+        boolean sent = emailService.sendOtpEmailWithReason(normalizedEmail, otp, purpose);
         if (!sent) {
             removeOtp(normalizedEmail);
             throw new IllegalStateException("Unable to deliver OTP email. Check the backend mail configuration.");
         }
 
-        System.out.println("✅ OTP ready for [" + purpose + "] to " + normalizedEmail);
+        System.out.println("OTP delivery completed for [" + purpose + "] to " + maskEmail(normalizedEmail));
         return otp;
     }
 
@@ -96,8 +95,7 @@ public class OtpService {
         String otp = generateOtp();
         storeOtpForKey(key, otp);
 
-        System.out.println("🔔 OTP API flow trigger [" + purpose + "] for email: " + normalizedEmail + " key: " + key);
-        System.out.println("🔐 OTP generated for [" + purpose + "] (masked): ****" + otp.substring(otp.length() - 2));
+        System.out.println("Key-based OTP delivery requested for purpose [" + purpose + "] to " + maskEmail(normalizedEmail));
 
         boolean sent = emailService.sendOtpEmailWithReason(normalizedEmail, otp, purpose);
         if (!sent) {
@@ -105,7 +103,7 @@ public class OtpService {
             throw new IllegalStateException("Unable to deliver OTP email. Check the backend mail configuration.");
         }
 
-        System.out.println("✅ OTP ready for [" + purpose + "] to " + normalizedEmail);
+        System.out.println("OTP delivery completed for [" + purpose + "] to " + maskEmail(normalizedEmail));
         return otp;
     }
 
@@ -133,8 +131,7 @@ public class OtpService {
         
         OtpData otpData = new OtpData(otp.trim(), System.currentTimeMillis());
         otpStore.put(normalizedEmail, otpData);
-        
-        System.out.println("✅ OTP stored for email: " + normalizedEmail + " (OTP: " + otp + ")");
+        System.out.println("OTP stored for registered email " + maskEmail(normalizedEmail));
         
         // Clean up expired OTPs periodically (simple approach)
         cleanupExpiredOtps();
@@ -151,15 +148,14 @@ public class OtpService {
         String trimmedOtp = otp != null ? otp.trim() : null;
         
         if (normalizedEmail == null || trimmedOtp == null) {
-            System.out.println("❌ OTP verification failed: Email or OTP is null");
+            System.out.println("OTP verification failed: email or code is missing");
             return false;
         }
         
         OtpData otpData = otpStore.get(normalizedEmail);
         
         if (otpData == null) {
-            System.out.println("❌ No OTP found for email: " + normalizedEmail);
-            System.out.println("   Available emails in store: " + otpStore.keySet());
+            System.out.println("No active OTP found for registered email " + maskEmail(normalizedEmail));
             return false;
         }
         
@@ -167,8 +163,7 @@ public class OtpService {
         long currentTime = System.currentTimeMillis();
         long timeElapsed = currentTime - otpData.getTimestamp();
         if (timeElapsed > OTP_EXPIRATION_TIME) {
-            System.out.println("❌ OTP expired for email: " + normalizedEmail);
-            System.out.println("   Time elapsed: " + (timeElapsed / 1000) + " seconds (max: " + (OTP_EXPIRATION_TIME / 1000) + " seconds)");
+            System.out.println("OTP expired for registered email " + maskEmail(normalizedEmail));
             otpStore.remove(normalizedEmail);
             return false;
         }
@@ -177,25 +172,20 @@ public class OtpService {
         String storedOtp = otpData.getOtp();
         boolean isValid = storedOtp.equals(trimmedOtp);
         
-        // Debug logging
-        System.out.println("🔍 OTP Verification Debug:");
-        System.out.println("   Email: " + normalizedEmail);
-        System.out.println("   Stored OTP: " + storedOtp + " (length: " + storedOtp.length() + ")");
-        System.out.println("   Received OTP: " + trimmedOtp + " (length: " + trimmedOtp.length() + ")");
-        System.out.println("   Match: " + isValid);
-        System.out.println("   Time remaining: " + ((OTP_EXPIRATION_TIME - timeElapsed) / 1000) + " seconds");
-        
         if (isValid) {
             // Remove OTP after successful verification
             otpStore.remove(normalizedEmail);
-            System.out.println("✅ OTP verified successfully for email: " + normalizedEmail);
         } else {
-            System.out.println("❌ Invalid OTP for email: " + normalizedEmail);
-            System.out.println("   Expected: '" + storedOtp + "'");
-            System.out.println("   Received: '" + trimmedOtp + "'");
+            System.out.println("Invalid OTP supplied for registered email " + maskEmail(normalizedEmail));
         }
         
         return isValid;
+    }
+
+    private String maskEmail(String email) {
+        int separator = email.indexOf('@');
+        if (separator <= 0) return "***";
+        return email.charAt(0) + "***" + email.substring(separator);
     }
     
     /**
@@ -299,4 +289,3 @@ public class OtpService {
         }
     }
 }
-

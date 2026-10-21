@@ -15,6 +15,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
+import java.util.LinkedHashMap;
 
 @Service
 public class PdfService {
@@ -1640,6 +1641,35 @@ public class PdfService {
             .append("</div></div></body></html>");
 
         return html.toString();
+    }
+
+    public byte[] generateCustomerEventSummary(String event, String status, String reference,
+                                               Map<String, String> details) throws IOException {
+        StringBuilder rows = new StringBuilder();
+        if (details != null) {
+            for (Map.Entry<String, String> entry : new LinkedHashMap<>(details).entrySet()) {
+                rows.append("<tr><th>").append(escapeHtml(entry.getKey())).append("</th><td>")
+                        .append(escapeHtml(entry.getValue())).append("</td></tr>");
+            }
+        }
+        String html = """
+                <!DOCTYPE html><html><head><meta charset="UTF-8"><style>
+                body{font-family:Arial,sans-serif;color:#172033;padding:32px}
+                main{max-width:680px;margin:auto;border:1px solid #dbe3ef;border-radius:12px;padding:28px}
+                h1{color:#075985;margin-bottom:4px}.muted{color:#64748b}
+                table{width:100%%;border-collapse:collapse;margin-top:22px}
+                th,td{text-align:left;padding:11px 8px;border-bottom:1px solid #e2e8f0;vertical-align:top}
+                th{width:36%%;color:#475569}.footer{margin-top:24px;font-size:12px;color:#64748b}
+                </style></head><body><main><h1>NeoBank</h1>
+                <div class="muted">Customer activity notification</div>
+                <h2>%s</h2><p>Status: <strong>%s</strong></p>
+                <p>Reference: %s</p><table>%s</table>
+                <div class="footer">This is an automatically generated notification. Never share your PIN, CVV, password, or OTP.</div>
+                </main></body></html>
+                """.formatted(escapeHtml(event), escapeHtml(status), escapeHtml(reference), rows);
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        HtmlConverter.convertToPdf(html, outputStream);
+        return outputStream.toByteArray();
     }
 
     private String escapeHtml(String input) {

@@ -12,11 +12,12 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
     List<ChatMessage> findBySessionIdOrderByTimestampAsc(String sessionId);
     List<ChatMessage> findByUserIdOrderByTimestampDesc(String userId);
     List<ChatMessage> findByStatusOrderByTimestampDesc(String status);
+    List<ChatMessage> findByStatusInOrderByTimestampDesc(List<String> statuses);
     List<ChatMessage> findByAdminIdOrderByTimestampDesc(String adminId);
     Optional<ChatMessage> findFirstBySessionIdOrderByTimestampDesc(String sessionId);
+    Optional<ChatMessage> findFirstByAttachmentUrl(String attachmentUrl);
     Long countByStatusAndIsRead(String status, Boolean isRead);
 }
-
 
 
 

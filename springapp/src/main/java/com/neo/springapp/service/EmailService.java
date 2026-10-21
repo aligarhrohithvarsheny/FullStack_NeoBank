@@ -8,14 +8,19 @@ import org.springframework.mail.MailAuthenticationException;
 import org.springframework.mail.MailSendException;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.stereotype.Service;
 import jakarta.mail.AuthenticationFailedException;
 
 import java.lang.reflect.Method;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Service
 @SuppressWarnings("null")
 public class EmailService {
+    private static final Logger logger = LoggerFactory.getLogger(EmailService.class);
 
     @Autowired(required = false)
     private GmailApiOtpService gmailApiOtpService;
@@ -106,10 +111,10 @@ public class EmailService {
         }
         try {
             gmailApiOtpService.sendPlainTextEmail(toEmail.trim(), subject, body);
-            System.out.println("✅ OTP email sent via Gmail API to " + toEmail);
+            System.out.println("OTP email sent via Gmail API to " + maskEmailAddress(toEmail));
             return true;
         } catch (GmailApiException e) {
-            System.err.println("❌ Gmail API OTP send failed [" + e.getOAuthError() + "]: " + e.getMessage());
+            System.err.println("Gmail API OTP delivery failed [" + e.getOAuthError() + "]");
             return false;
         }
     }
@@ -145,23 +150,31 @@ public class EmailService {
             message.setFrom(fromEmail);
             message.setSubject(subject);
             message.setText(body);
-            System.out.println("📨 Sending OTP email via SMTP to " + toEmail + " from " + fromEmail);
+            System.out.println("Sending OTP email via SMTP to " + maskEmailAddress(toEmail));
             javaMailSender.send(message);
-            System.out.println("✅ OTP email sent via SMTP to " + toEmail);
+            System.out.println("OTP email sent via SMTP to " + maskEmailAddress(toEmail));
             return true;
         } catch (MailAuthenticationException e) {
-            System.err.println("❌ SMTP authentication failed for OTP to " + toEmail + ": " + e.getMessage());
+            System.err.println("SMTP authentication failed for OTP delivery");
         } catch (MailSendException e) {
-            System.err.println("❌ SMTP send failed for OTP to " + toEmail + ": " + e.getMessage());
+            System.err.println("SMTP send failed for OTP delivery to " + maskEmailAddress(toEmail));
         } catch (Exception e) {
-            System.err.println("❌ SMTP OTP error for " + toEmail + ": " + e.getMessage());
+            System.err.println("SMTP OTP delivery error for " + maskEmailAddress(toEmail));
         }
         return false;
     }
 
     private void logOtpDeliveryFailure(String toEmail) {
-        System.err.println("OTP email delivery failed for " + toEmail + ". Check Gmail API or SMTP configuration and provider logs.");
+        System.err.println("OTP email delivery failed for " + maskEmailAddress(toEmail)
+                + ". Check Gmail API or SMTP configuration and provider logs.");
         systemMonitoringService.recordNotificationFailure("OTP email");
+    }
+
+    private String maskEmailAddress(String email) {
+        if (email == null) return "***";
+        int separator = email.indexOf('@');
+        if (separator <= 0) return "***";
+        return email.charAt(0) + "***" + email.substring(separator);
     }
     
     /**
@@ -537,7 +550,7 @@ public class EmailService {
                 System.out.println("==========================================");
                 return true; // Return true for development
             }
-            
+
             System.out.println("Attempting to send bank statement email with attachment...");
             System.out.println("Mail sender class: " + mailSender.getClass().getName());
             
@@ -1022,66 +1035,13 @@ public class EmailService {
      * Send gold loan receipt PDF via email
      */
     public boolean sendGoldLoanReceiptEmail(String toEmail, String loanAccountNumber, String userName, byte[] pdfBytes) {
-        initializeMailSender();
-        
-        try {
-            if (!mailAvailable || mailSender == null) {
-                System.out.println("==========================================");
-                System.out.println("GOLD LOAN RECEIPT EMAIL (Mail not configured - Development Mode)");
-                System.out.println("To: " + toEmail);
-                System.out.println("Loan Account Number: " + loanAccountNumber);
-                System.out.println("User Name: " + userName);
-                System.out.println("PDF Size: " + (pdfBytes != null ? pdfBytes.length + " bytes" : "null"));
-                System.out.println("==========================================");
-                return true;
-            }
-            
-            Class<?> mimeMessageClass = Class.forName("javax.mail.internet.MimeMessage");
-            Class<?> mimeMessageHelperClass = Class.forName("org.springframework.mail.javamail.MimeMessageHelper");
-            Class<?> dataSourceClass = Class.forName("javax.activation.DataSource");
-            
-            Class<?> byteArrayDataSourceClass = null;
-            try {
-                byteArrayDataSourceClass = Class.forName("org.springframework.mail.javamail.ByteArrayDataSource");
-            } catch (ClassNotFoundException e) {
-                byteArrayDataSourceClass = Class.forName("javax.activation.ByteArrayDataSource");
-            }
-            
-            Method createMimeMessageMethod = mailSender.getClass().getMethod("createMimeMessage");
-            Object mimeMessage = createMimeMessageMethod.invoke(mailSender);
-            
-            Object helper = mimeMessageHelperClass.getConstructor(mimeMessageClass, boolean.class)
-                .newInstance(mimeMessage, true);
-            
-            Method setToMethod = mimeMessageHelperClass.getMethod("setTo", String.class);
-            Method setSubjectMethod = mimeMessageHelperClass.getMethod("setSubject", String.class);
-            Method setTextMethod = mimeMessageHelperClass.getMethod("setText", String.class, boolean.class);
-            Method setFromMethod = mimeMessageHelperClass.getMethod("setFrom", String.class);
-            Method addAttachmentMethod = mimeMessageHelperClass.getMethod("addAttachment", String.class, dataSourceClass);
-            
-            String fromEmail = getFromEmail();
-            setFromMethod.invoke(helper, fromEmail);
-            setToMethod.invoke(helper, toEmail);
-            setSubjectMethod.invoke(helper, "NeoBank - Gold Loan Receipt");
-            setTextMethod.invoke(helper, buildGoldLoanReceiptEmailBody(userName, loanAccountNumber), true);
-            
-            Object dataSource = byteArrayDataSourceClass.getConstructor(byte[].class, String.class)
-                .newInstance(pdfBytes, "application/pdf");
-            
-            String fileName = "Gold_Loan_Receipt_" + loanAccountNumber + "_" + 
-                            java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd")) + ".pdf";
-            addAttachmentMethod.invoke(helper, fileName, dataSource);
-            
-            Method sendMimeMessageMethod = mailSender.getClass().getMethod("send", mimeMessageClass);
-            sendMimeMessageMethod.invoke(mailSender, mimeMessage);
-            
-            System.out.println("✅ Gold loan receipt email sent successfully to: " + toEmail);
-            return true;
-        } catch (Exception e) {
-            System.err.println("Error sending gold loan receipt email: " + e.getMessage());
-            e.printStackTrace();
-            return false;
-        }
+        String body = "Dear " + (userName == null || userName.isBlank() ? "Customer" : userName) + ",\n\n"
+                + "Your gold loan application has been approved. The receipt for loan account "
+                + (loanAccountNumber == null ? "N/A" : loanAccountNumber)
+                + " is attached.\n\nNeoBank Customer Service";
+        String safeLoanReference = loanAccountNumber == null ? "gold_loan" : loanAccountNumber;
+        return sendEmailWithPdfAttachment(toEmail, "NeoBank - Gold Loan Receipt", body,
+                "Gold_Loan_Receipt_" + safeLoanReference + ".pdf", pdfBytes);
     }
 
     /**
@@ -1338,5 +1298,57 @@ public class EmailService {
                "Thank you for using NeoBank FASTag Services!\n\n" +
                "Best regards,\n" +
                "NeoBank FASTag Team";
+    }
+
+    public boolean sendEmailWithPdfAttachment(String toEmail, String subject, String body,
+                                              String fileName, byte[] pdfBytes) {
+        if (toEmail == null || toEmail.isBlank() || pdfBytes == null || pdfBytes.length == 0) {
+            logger.error("Customer notification email not sent: recipient or PDF attachment is missing");
+            recordCustomerNotificationFailure();
+            return false;
+        }
+
+        if (gmailApiOtpService != null && gmailApiOtpService.isConfigured()) {
+            try {
+                gmailApiOtpService.sendPdfEmail(toEmail.trim(), subject, body, fileName, pdfBytes);
+                return true;
+            } catch (GmailApiException e) {
+                logger.error("Customer notification delivery via Gmail API failed [{}]", e.getOAuthError());
+            }
+        }
+
+        initializeMailSender();
+        JavaMailSender sender = javaMailSender != null
+                ? javaMailSender
+                : mailSender instanceof JavaMailSender resolvedSender ? resolvedSender : null;
+        if (sender == null) {
+            logger.error("Customer notification email not sent: SMTP mail sender is not configured");
+            recordCustomerNotificationFailure();
+            return false;
+        }
+
+        try {
+            var message = sender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            helper.setFrom(getFromEmail());
+            helper.setTo(toEmail.trim());
+            helper.setSubject(subject);
+            helper.setText(body, false);
+            helper.addAttachment(fileName, new ByteArrayResource(pdfBytes), "application/pdf");
+            sender.send(message);
+            return true;
+        } catch (Exception e) {
+            logger.error("Customer notification email delivery failed", e);
+            recordCustomerNotificationFailure();
+            return false;
+        }
+    }
+
+    private void recordCustomerNotificationFailure() {
+        try {
+            systemMonitoringService.recordNotificationFailure("Customer event PDF email");
+        } catch (RuntimeException e) {
+            logger.error("Could not record customer notification failure in monitoring", e);
+        }
     }
 }

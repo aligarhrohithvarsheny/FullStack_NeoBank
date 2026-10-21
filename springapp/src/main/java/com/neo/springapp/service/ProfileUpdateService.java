@@ -32,22 +32,32 @@ public class ProfileUpdateService {
     private OtpService otpService;
 
     @Autowired
-    private EmailService emailService;
+    private UserService userService;
+
+    @Autowired
+    private CustomerEventNotificationService notificationService;
 
     /**
-     * Request profile update (address or phone) with OTP verification
+     * Request a profile update. A new email must be verified before admin approval.
      */
     @Transactional
     public Map<String, Object> requestProfileUpdate(Long userId, String field, String newValue) {
         Map<String, Object> response = new HashMap<>();
+        ProfileUpdateRequest savedRequest = null;
         
         try {
-            // Validate field
-            if (!"ADDRESS".equals(field) && !"PHONE".equals(field)) {
+            String normalizedField = field == null ? "" : field.trim().toUpperCase();
+            if (!List.of("ADDRESS", "PHONE", "NAME", "EMAIL").contains(normalizedField)) {
                 response.put("success", false);
-                response.put("message", "Invalid field. Only ADDRESS and PHONE can be updated.");
+                response.put("message", "Invalid field. ADDRESS, PHONE, NAME, and EMAIL can be updated.");
                 return response;
             }
+            if (newValue == null || newValue.isBlank()) {
+                response.put("success", false);
+                response.put("message", "A new value is required.");
+                return response;
+            }
+            newValue = newValue.trim();
 
             // Get user
             Optional<User> userOpt = userRepository.findById(userId);
@@ -67,14 +77,32 @@ public class ProfileUpdateService {
 
             // Get current value
             String oldValue = null;
-            if ("ADDRESS".equals(field)) {
+            if ("ADDRESS".equals(normalizedField)) {
                 oldValue = account.getAddress();
-            } else if ("PHONE".equals(field)) {
+            } else if ("PHONE".equals(normalizedField)) {
                 oldValue = account.getPhone();
+            } else if ("NAME".equals(normalizedField)) {
+                oldValue = account.getName();
+            } else if ("EMAIL".equals(normalizedField)) {
+                oldValue = user.getEmail();
+                newValue = UserService.normalizeEmail(newValue);
+                if (newValue == null || !newValue.matches("^[A-Za-z0-9+_.-]+@[^\\s@]+\\.[^\\s@]+$")) {
+                    response.put("success", false);
+                    response.put("message", "Enter a valid email address.");
+                    return response;
+                }
+                if (!userService.isEmailUnique(newValue, userId)) {
+                    response.put("success", false);
+                    response.put("message", "Email already exists. Please use a different email.");
+                    return response;
+                }
             }
 
             // Check if new value is different
-            if (newValue != null && newValue.equals(oldValue)) {
+            boolean unchanged = "EMAIL".equals(normalizedField)
+                    ? oldValue != null && newValue.equalsIgnoreCase(oldValue)
+                    : newValue.equals(oldValue);
+            if (unchanged) {
                 response.put("success", false);
                 response.put("message", "New value is the same as current value");
                 return response;
@@ -102,24 +130,38 @@ public class ProfileUpdateService {
             request.setAccountNumber(user.getAccountNumber());
             request.setUserName(account.getName());
             request.setUserEmail(userEmail);
-            request.setFieldToUpdate(field);
+            request.setFieldToUpdate(normalizedField);
             request.setOldValue(oldValue);
             request.setNewValue(newValue);
-            request.setOtp(null);
-            request.setOtpSentAt(null);
-            request.setOtpVerified(true);
-            request.setStatus("OTP_VERIFIED");
+            request.setOtpVerified(!"EMAIL".equals(normalizedField));
+            request.setStatus("EMAIL".equals(normalizedField) ? "PENDING" : "OTP_VERIFIED");
 
-            ProfileUpdateRequest savedRequest = requestRepository.save(request);
+            savedRequest = requestRepository.save(request);
+            if ("EMAIL".equals(normalizedField)) {
+                otpService.sendOtp(newValue, "Profile email change verification");
+                savedRequest.setOtpSentAt(LocalDateTime.now());
+                requestRepository.save(savedRequest);
+            }
+
+            notificationService.notifyToEmail(userEmail, "Profile update request", "Submitted",
+                    String.valueOf(savedRequest.getId()), Map.of(
+                            "Field", normalizedField,
+                            "Previous value", oldValue == null ? "Not provided" : oldValue,
+                            "Requested value", newValue));
 
             response.put("success", true);
-            response.put("message", "Profile update request submitted for admin approval.");
+            response.put("message", "EMAIL".equals(normalizedField)
+                    ? "Verification code sent to the new email address."
+                    : "Profile update request submitted for admin approval.");
             response.put("requestId", savedRequest.getId());
             
         } catch (Exception e) {
+            if (savedRequest != null && "PENDING".equals(savedRequest.getStatus())) {
+                requestRepository.delete(savedRequest);
+            }
             response.put("success", false);
-            response.put("message", "Failed to create update request: " + e.getMessage());
-            e.printStackTrace();
+            response.put("message", "Failed to create update request. Please try again.");
+            System.err.println("Profile update request failed: " + e.getMessage());
         }
         
         return response;
@@ -129,7 +171,7 @@ public class ProfileUpdateService {
      * Verify OTP and submit profile update request
      */
     @Transactional
-    public Map<String, Object> verifyOtpAndSubmitRequest(Long requestId, String otp) {
+    public Map<String, Object> verifyOtpAndSubmitRequest(Long requestId, String otp, Long requesterUserId) {
         Map<String, Object> response = new HashMap<>();
         
         try {
@@ -141,6 +183,11 @@ public class ProfileUpdateService {
                 response.put("message", "Update request not found");
                 return response;
             }
+            if (!java.util.Objects.equals(request.getUserId(), requesterUserId)) {
+                response.put("success", false);
+                response.put("message", "You can only verify your own profile update request.");
+                return response;
+            }
 
             if (!"PENDING".equals(request.getStatus())) {
                 response.put("success", false);
@@ -149,7 +196,9 @@ public class ProfileUpdateService {
             }
 
             // Verify OTP
-            boolean otpValid = otpService.verifyOtp(request.getUserEmail(), otp);
+            String otpEmail = "EMAIL".equals(request.getFieldToUpdate())
+                    ? request.getNewValue() : request.getUserEmail();
+            boolean otpValid = otpService.verifyOtp(otpEmail, otp);
             if (!otpValid) {
                 response.put("success", false);
                 response.put("message", "Invalid or expired OTP");
@@ -160,6 +209,11 @@ public class ProfileUpdateService {
             request.setOtpVerified(true);
             request.setStatus("OTP_VERIFIED");
             requestRepository.save(request);
+            notificationService.notifyToEmail(request.getUserEmail(), "Profile update request", "Submitted",
+                    String.valueOf(request.getId()), Map.of(
+                            "Field", request.getFieldToUpdate(),
+                            "Previous value", request.getOldValue() == null ? "Not provided" : request.getOldValue(),
+                            "Requested value", request.getNewValue()));
 
             response.put("success", true);
             response.put("message", "OTP verified. Update request submitted for admin approval.");
@@ -178,7 +232,7 @@ public class ProfileUpdateService {
      * Resend OTP for profile update request
      */
     @Transactional
-    public Map<String, Object> resendOtp(Long requestId) {
+    public Map<String, Object> resendOtp(Long requestId, Long requesterUserId) {
         Map<String, Object> response = new HashMap<>();
         
         try {
@@ -190,6 +244,11 @@ public class ProfileUpdateService {
                 response.put("message", "Update request not found");
                 return response;
             }
+            if (!java.util.Objects.equals(request.getUserId(), requesterUserId)) {
+                response.put("success", false);
+                response.put("message", "You can only resend a code for your own profile update request.");
+                return response;
+            }
 
             if (!"PENDING".equals(request.getStatus())) {
                 response.put("success", false);
@@ -198,18 +257,12 @@ public class ProfileUpdateService {
             }
 
             // Generate and send new OTP
-            String otp = otpService.generateOtp();
-            otpService.storeOtp(request.getUserEmail(), otp);
-            boolean emailSent = emailService.sendOtpEmail(request.getUserEmail(), otp);
-
-            if (!emailSent) {
-                response.put("success", false);
-                response.put("message", "Failed to send OTP. Please try again.");
-                return response;
-            }
+            String otpEmail = "EMAIL".equals(request.getFieldToUpdate())
+                    ? request.getNewValue() : request.getUserEmail();
+            otpService.sendOtp(otpEmail, "Profile update verification");
 
             // Update request with new OTP
-            request.setOtp(otp);
+            request.setOtp(null);
             request.setOtpSentAt(LocalDateTime.now());
             requestRepository.save(request);
 
@@ -272,11 +325,18 @@ public class ProfileUpdateService {
                 return response;
             }
 
-            // Update the field
-            if ("ADDRESS".equals(request.getFieldToUpdate())) {
+            String field = request.getFieldToUpdate();
+            String oldEmail = user.getEmail();
+            if ("ADDRESS".equals(field)) {
                 account.setAddress(request.getNewValue());
-            } else if ("PHONE".equals(request.getFieldToUpdate())) {
+            } else if ("PHONE".equals(field)) {
                 account.setPhone(request.getNewValue());
+            } else if ("NAME".equals(field)) {
+                account.setName(request.getNewValue());
+            } else if ("EMAIL".equals(field)) {
+                userService.retireEmail(user.getId(), oldEmail);
+                user.setEmail(request.getNewValue());
+                userRepository.save(user);
             }
 
             account.setLastUpdated(LocalDateTime.now());
@@ -302,6 +362,18 @@ public class ProfileUpdateService {
             request.setApprovedBy(approvedBy);
             request.setCompletionDate(LocalDateTime.now());
             requestRepository.save(request);
+
+            Map<String, String> changeDetails = Map.of(
+                    "Field", field,
+                    "Previous value", request.getOldValue() == null ? "Not provided" : request.getOldValue(),
+                    "New value", request.getNewValue(),
+                    "Approved by", approvedBy == null ? "Admin" : approvedBy);
+            notificationService.notifyToEmail(oldEmail, "Profile update", "Approved",
+                    String.valueOf(requestId), changeDetails);
+            if ("EMAIL".equals(field) && !oldEmail.equalsIgnoreCase(request.getNewValue())) {
+                notificationService.notifyToEmail(request.getNewValue(), "Profile update", "Approved",
+                        String.valueOf(requestId), changeDetails);
+            }
 
             response.put("success", true);
             response.put("message", "Profile update approved and completed successfully");

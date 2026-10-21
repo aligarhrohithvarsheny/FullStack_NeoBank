@@ -3571,7 +3571,7 @@
             <div class="request-details">
               <div class="detail-row">
                 <span class="detail-label">Field to Update:</span>
-                <span class="detail-value">{{ request.fieldToUpdate === 'ADDRESS' ? 'Address' : 'Phone Number' }}</span>
+                <span class="detail-value">{{ getProfileUpdateFieldLabel(request.fieldToUpdate) }}</span>
               </div>
               <div class="detail-row">
                 <span class="detail-label">Current Value:</span>
@@ -3653,7 +3653,7 @@
                     <span class="separator">|</span>
                     <i class="fa fa-clock"></i> {{ formatLoginDateTime(history.updateDate) }}
                     <span class="separator">|</span>
-                    <i class="fa fa-tag"></i> {{ history.fieldUpdated === 'ADDRESS' ? 'Address' : 'Phone Number' }}
+                    <i class="fa fa-tag"></i> {{ getProfileUpdateFieldLabel(history.fieldUpdated) }}
                   </p>
                 </div>
               </div>
@@ -3661,7 +3661,7 @@
               <div class="history-changes">
                 <div class="change-item">
                   <div class="change-field">
-                    <span class="field-name">{{ history.fieldUpdated === 'ADDRESS' ? 'Address' : 'Phone Number' }}:</span>
+                    <span class="field-name">{{ getProfileUpdateFieldLabel(history.fieldUpdated) }}:</span>
                   </div>
                   <div class="change-values">
                     <span class="old-value">

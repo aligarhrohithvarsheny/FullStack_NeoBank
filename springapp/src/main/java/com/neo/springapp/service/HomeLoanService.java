@@ -42,6 +42,8 @@ public class HomeLoanService {
     @Autowired private TransactionService transactionService;
     @Autowired private HomeLoanAnalysisService analysisService;
     @Autowired private BranchAccountService branchAccountService;
+    @Autowired private CustomerEventNotificationService notificationService;
+    @Autowired private UserService userService;
 
     private static double n(Double v) { return v == null ? 0.0 : v; }
     private static double r2(double v) { return Math.round(v * 100.0) / 100.0; }
@@ -61,7 +63,8 @@ public class HomeLoanService {
         HomeLoan h = new HomeLoan();
         h.setAccountNumber(in.getAccountNumber());
         h.setUserName(account.getName());
-        h.setUserEmail(in.getUserEmail());
+        h.setUserEmail(userService.getUserByAccountNumber(in.getAccountNumber())
+                .map(user -> user.getEmail()).orElse(null));
         h.setPan(account.getPan());
         h.setAmount(in.getAmount());
         h.setTenure(in.getTenure());
@@ -81,6 +84,11 @@ public class HomeLoanService {
         h = repo.save(h);
         event(h, "SUBMITTED", h.getUserName(), "Home loan application " + h.getApplicationId() + " submitted for "
                 + r2(h.getAmount()) + " over " + h.getTenure() + " months @ " + h.getInterestRate() + "%", null, null, null, null);
+        notificationService.notifyForAccount(h.getAccountNumber(), "Home loan application", "Submitted",
+                h.getApplicationId(), Map.of(
+                        "Requested amount", String.valueOf(h.getAmount()),
+                        "Tenure (months)", String.valueOf(h.getTenure()),
+                        "Application date", String.valueOf(h.getApplicationDate())));
         return h;
     }
 
@@ -308,6 +316,12 @@ public class HomeLoanService {
         event(h, "DISBURSED", admin, "Approved. Sanctioned " + r2(amount) + ", charges deducted " + total
                 + " (fee " + fee + " + GST " + gst + " + legal " + LEGAL_CHARGES + "), net credited " + h.getNetDisbursed(),
                 null, h.getNetDisbursed(), null, null, amount);
+        notificationService.notifyForAccount(h.getAccountNumber(), "Home loan application", "Approved",
+                h.getApplicationId(), Map.of(
+                        "Approved amount", String.valueOf(h.getAmount()),
+                        "Net disbursed", String.valueOf(h.getNetDisbursed()),
+                        "Loan account", String.valueOf(h.getLoanAccountNumber()),
+                        "Approved by", admin == null ? "Admin" : admin));
         return h;
     }
 

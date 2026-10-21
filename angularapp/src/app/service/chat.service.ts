@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Observable, Subject } from 'rxjs';
 import { environment } from '../../environment/environment';
 
@@ -17,6 +17,7 @@ export interface ChatMessage {
   attachmentUrl?: string;
   attachmentType?: string;
   attachmentName?: string;
+  renderedAttachmentUrl?: string;
   localOnly?: boolean;
 }
 
@@ -39,11 +40,26 @@ export class ChatService {
     // For now, we'll use HTTP polling, but WebSocket can be added later
   }
 
-  sendMessage(sessionId: string, userId: string, userName: string, message: string, file?: File): Observable<any> {
+  private getAuthOptions(admin = false): { headers: HttpHeaders } {
+    if (typeof sessionStorage === 'undefined') {
+      return { headers: new HttpHeaders() };
+    }
+    let token = admin ? sessionStorage.getItem('adminSessionToken') || '' : '';
+    if (!admin) {
+      try {
+        const currentUser = JSON.parse(sessionStorage.getItem('currentUser') || '{}');
+        token = currentUser.authToken || sessionStorage.getItem('jwt') || '';
+      } catch {
+        token = sessionStorage.getItem('jwt') || '';
+      }
+    }
+    return { headers: new HttpHeaders(token ? { Authorization: 'Bearer ' + token } : {}) };
+  }
+
+  sendMessage(sessionId: string, userName: string, message: string, file?: File): Observable<any> {
     const url = `${this.apiUrl}/send`;
     const formData = new FormData();
     formData.append('sessionId', sessionId);
-    formData.append('userId', userId);
     formData.append('userName', userName);
     if (message) {
       formData.append('message', message);
@@ -54,14 +70,13 @@ export class ChatService {
     
     console.log('Sending message to:', url);
     
-    return this.http.post<any>(url, formData);
+    return this.http.post<any>(url, formData, this.getAuthOptions());
   }
 
-  adminSendMessage(sessionId: string, adminId: string, message: string, file?: File): Observable<any> {
+  adminSendMessage(sessionId: string, message: string, file?: File): Observable<any> {
     const url = `${this.apiUrl}/admin/send`;
     const formData = new FormData();
     formData.append('sessionId', sessionId);
-    formData.append('adminId', adminId);
     if (message) {
       formData.append('message', message);
     }
@@ -69,30 +84,34 @@ export class ChatService {
       formData.append('file', file);
     }
     
-    return this.http.post<any>(url, formData);
+    return this.http.post<any>(url, formData, this.getAuthOptions(true));
   }
   
-  getAttachmentUrl(filename: string): string {
-    return `${this.apiUrl}/attachment/${filename}`;
+  getAttachment(filename: string, admin = false): Observable<Blob> {
+    const safeFilename = filename.split('/').pop() || filename;
+    return this.http.get(`${this.apiUrl}/attachment/${encodeURIComponent(safeFilename)}`, {
+      ...this.getAuthOptions(admin),
+      responseType: 'blob'
+    });
   }
 
-  getChatHistory(sessionId: string): Observable<ChatMessage[]> {
-    return this.http.get<ChatMessage[]>(`${this.apiUrl}/history/${sessionId}`);
+  getChatHistory(sessionId: string, admin = false): Observable<ChatMessage[]> {
+    return this.http.get<ChatMessage[]>(
+      `${this.apiUrl}/history/${encodeURIComponent(sessionId)}`,
+      this.getAuthOptions(admin)
+    );
   }
 
   getEscalatedChats(): Observable<ChatMessage[]> {
-    return this.http.get<ChatMessage[]>(`${this.apiUrl}/admin/escalated`);
+    return this.http.get<ChatMessage[]>(`${this.apiUrl}/admin/escalated`, this.getAuthOptions(true));
   }
 
   getAllChats(): Observable<any> {
-    return this.http.get(`${this.apiUrl}/admin/all`);
+    return this.http.get(`${this.apiUrl}/admin/all`, this.getAuthOptions(true));
   }
 
-  adminTakeover(sessionId: string, adminId: string): Observable<any> {
-    return this.http.post(`${this.apiUrl}/admin/takeover`, {
-      sessionId,
-      adminId
-    });
+  adminTakeover(sessionId: string): Observable<any> {
+    return this.http.post(`${this.apiUrl}/admin/takeover`, { sessionId }, this.getAuthOptions(true));
   }
 
   emitMessage(message: ChatMessage) {

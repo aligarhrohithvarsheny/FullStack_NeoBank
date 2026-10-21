@@ -2,9 +2,12 @@ package com.neo.springapp.controller;
 
 import com.neo.springapp.model.ChatMessage;
 import com.neo.springapp.service.ChatService;
+import com.neo.springapp.service.UserSessionTokenService.SessionPrincipal;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -17,7 +20,7 @@ import java.nio.file.StandardCopyOption;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/chat")
@@ -59,12 +62,16 @@ public class ChatController {
     @PostMapping("/admin/send")
     public ResponseEntity<Map<String, Object>> adminSendMessage(
             @RequestParam("sessionId") String sessionId,
-            @RequestParam("adminId") String adminId,
             @RequestParam(value = "message", required = false) String message,
-            @RequestParam(value = "file", required = false) MultipartFile file) {
+            @RequestParam(value = "file", required = false) MultipartFile file,
+            @AuthenticationPrincipal SessionPrincipal principal) {
         Map<String, Object> response = new HashMap<>();
-        
+        if (!isAdmin(principal)) return unauthorized();
+
         try {
+            if (sessionId == null || !sessionId.matches("[A-Za-z0-9_-]{1,100}")) {
+                return ResponseEntity.badRequest().body(Map.of("success", false, "message", "A valid chat session is required"));
+            }
             // Get user info from session
             List<ChatMessage> chatHistory = chatService.getChatHistory(sessionId);
             if (chatHistory.isEmpty()) {
@@ -83,7 +90,7 @@ public class ChatController {
             adminMessage.setUserName("Admin");
             adminMessage.setMessage(message != null ? message : "");
             adminMessage.setSender("ADMIN");
-            adminMessage.setAdminId(adminId);
+            adminMessage.setAdminId(String.valueOf(principal.userId()));
             adminMessage.setStatus("RESOLVED");
             adminMessage.setIsRead(true);
             // Explicitly set timestamp to ensure it's saved
@@ -115,6 +122,8 @@ public class ChatController {
             response.put("message", savedMessage);
             
             return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", e.getMessage()));
         } catch (Exception e) {
             e.printStackTrace();
             response.put("success", false);
@@ -127,19 +136,31 @@ public class ChatController {
     @PostMapping("/send")
     public ResponseEntity<Map<String, Object>> sendMessage(
             @RequestParam("sessionId") String sessionId,
-            @RequestParam("userId") String userId,
-            @RequestParam("userName") String userName,
+            @RequestParam(value = "userName", required = false) String userName,
             @RequestParam(value = "message", required = false) String message,
-            @RequestParam(value = "file", required = false) MultipartFile file) {
+            @RequestParam(value = "file", required = false) MultipartFile file,
+            @AuthenticationPrincipal SessionPrincipal principal) {
         Map<String, Object> response = new HashMap<>();
-        
+        if (principal == null || !"USER".equals(principal.scope())
+                || principal.accountNumber() == null || principal.accountNumber().isBlank()) {
+            return unauthorized();
+        }
+
         try {
-            if (sessionId == null || sessionId.isEmpty()) {
-                sessionId = UUID.randomUUID().toString();
+            if (sessionId == null || !sessionId.matches("[A-Za-z0-9_-]{1,100}")) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "success", false, "message", "A valid chat session is required"));
+            }
+            List<ChatMessage> existingMessages = chatService.getChatHistory(sessionId);
+            if (!existingMessages.isEmpty() && !ownsSession(sessionId, principal.accountNumber())) {
+                return forbidden();
             }
             
             // Process message and get bot response
-            ChatMessage botResponse = chatService.processMessage(sessionId, userId, userName, message != null ? message : "");
+            ChatMessage botResponse = chatService.processMessage(
+                    sessionId, principal.accountNumber(),
+                    userName != null && !userName.isBlank() ? userName : "Customer",
+                    message != null ? message : "");
             
             // Handle file upload if present
             if (file != null && !file.isEmpty()) {
@@ -181,6 +202,8 @@ public class ChatController {
             response.put("botResponse", botResponse);
             
             return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", e.getMessage()));
         } catch (Exception e) {
             System.err.println("Error in sendMessage: " + e.getMessage());
             e.printStackTrace();
@@ -193,19 +216,19 @@ public class ChatController {
     
     // Helper method to save chat attachments
     private String saveChatAttachment(MultipartFile file, String sessionId) throws IOException {
+        if (file.getSize() > 5 * 1024 * 1024) {
+            throw new IllegalArgumentException("Chat attachments must be 5 MB or smaller");
+        }
+        String extension = switch (file.getContentType() == null ? "" : file.getContentType().toLowerCase()) {
+            case "image/jpeg" -> ".jpg";
+            case "image/png" -> ".png";
+            case "application/pdf" -> ".pdf";
+            default -> throw new IllegalArgumentException("Only JPEG, PNG, and PDF attachments are allowed");
+        };
         // Create uploads directory if it doesn't exist
         String uploadDir = "uploads/chat";
         File dir = new File(uploadDir);
-        if (!dir.exists()) {
-            dir.mkdirs();
-        }
-        
-        // Generate unique filename
-        String originalFilename = file.getOriginalFilename();
-        String extension = "";
-        if (originalFilename != null && originalFilename.contains(".")) {
-            extension = originalFilename.substring(originalFilename.lastIndexOf("."));
-        }
+        Files.createDirectories(dir.toPath());
         String filename = "chat_" + sessionId + "_" + System.currentTimeMillis() + extension;
         
         // Save file
@@ -218,8 +241,19 @@ public class ChatController {
     
     // Serve chat attachments
     @GetMapping("/attachment/{filename}")
-    public ResponseEntity<byte[]> getAttachment(@PathVariable String filename) {
+    public ResponseEntity<byte[]> getAttachment(
+            @PathVariable String filename,
+            @AuthenticationPrincipal SessionPrincipal principal) {
+        if (principal == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        if (!filename.matches("[A-Za-z0-9._-]+")) return ResponseEntity.badRequest().build();
         try {
+            Optional<ChatMessage> attachedMessage = chatService.getMessageByAttachmentUrl(
+                    "/api/chat/attachment/" + filename);
+            if (attachedMessage.isEmpty()
+                    || (!isAdmin(principal) && !ownsSession(
+                            attachedMessage.get().getSessionId(), principal.accountNumber()))) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+            }
             Path filePath = Paths.get("uploads/chat", filename);
             byte[] fileContent = Files.readAllBytes(filePath);
             
@@ -238,21 +272,31 @@ public class ChatController {
 
     // Get chat history
     @GetMapping("/history/{sessionId}")
-    public ResponseEntity<List<ChatMessage>> getChatHistory(@PathVariable String sessionId) {
+    public ResponseEntity<List<ChatMessage>> getChatHistory(
+            @PathVariable String sessionId,
+            @AuthenticationPrincipal SessionPrincipal principal) {
+        if (principal == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        if (!isAdmin(principal) && !ownsSession(sessionId, principal.accountNumber())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
         List<ChatMessage> messages = chatService.getChatHistory(sessionId);
         return ResponseEntity.ok(messages);
     }
 
     // Get escalated chats for admin
     @GetMapping("/admin/escalated")
-    public ResponseEntity<List<ChatMessage>> getEscalatedChats() {
+    public ResponseEntity<List<ChatMessage>> getEscalatedChats(
+            @AuthenticationPrincipal SessionPrincipal principal) {
+        if (!isAdmin(principal)) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         List<ChatMessage> chats = chatService.getEscalatedChats();
         return ResponseEntity.ok(chats);
     }
 
     // Get all chats for admin dashboard
     @GetMapping("/admin/all")
-    public ResponseEntity<Map<String, Object>> getAllChats() {
+    public ResponseEntity<Map<String, Object>> getAllChats(
+            @AuthenticationPrincipal SessionPrincipal principal) {
+        if (!isAdmin(principal)) return unauthorized();
         Map<String, Object> response = new HashMap<>();
         List<ChatMessage> escalated = chatService.getEscalatedChats();
         response.put("escalated", escalated);
@@ -262,15 +306,25 @@ public class ChatController {
 
     // Admin takes over a chat
     @PostMapping("/admin/takeover")
-    public ResponseEntity<Map<String, Object>> adminTakeover(@RequestBody Map<String, String> request) {
+    public ResponseEntity<Map<String, Object>> adminTakeover(
+            @RequestBody Map<String, String> request,
+            @AuthenticationPrincipal SessionPrincipal principal) {
         Map<String, Object> response = new HashMap<>();
+        if (!isAdmin(principal)) return unauthorized();
         
         try {
             String sessionId = request.get("sessionId");
-            String adminId = request.get("adminId");
+            String adminId = String.valueOf(principal.userId());
+            if (sessionId == null || !sessionId.matches("[A-Za-z0-9_-]{1,100}")) {
+                return ResponseEntity.badRequest().body(Map.of("success", false, "message", "A valid chat session is required"));
+            }
             
             // Update all messages in session to assign admin
             List<ChatMessage> messages = chatService.getChatHistory(sessionId);
+            if (messages.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of(
+                        "success", false, "message", "Chat session not found"));
+            }
             for (ChatMessage msg : messages) {
                 if ("ESCALATED".equals(msg.getStatus())) {
                     msg.setAdminId(adminId);
@@ -304,6 +358,27 @@ public class ChatController {
             return ResponseEntity.internalServerError().body(response);
         }
     }
+
+    private boolean isAdmin(SessionPrincipal principal) {
+        return principal != null && "ADMIN".equals(principal.scope());
+    }
+
+    private boolean ownsSession(String sessionId, String accountNumber) {
+        if (sessionId == null || accountNumber == null) return false;
+        List<ChatMessage> messages = chatService.getChatHistory(sessionId);
+        return !messages.isEmpty() && messages.stream()
+                .anyMatch(message -> accountNumber.equals(message.getUserId()));
+    }
+
+    private ResponseEntity<Map<String, Object>> unauthorized() {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of(
+                "success", false, "message", "A valid signed-in session is required"));
+    }
+
+    private ResponseEntity<Map<String, Object>> forbidden() {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of(
+                "success", false, "message", "This chat session does not belong to your account"));
+    }
     
     // Helper method to send WebSocket messages safely
     private void sendWebSocketMessage(String destination, Object message) {
@@ -321,4 +396,3 @@ public class ChatController {
         }
     }
 }
-

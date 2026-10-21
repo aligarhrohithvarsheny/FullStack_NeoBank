@@ -49,6 +49,9 @@ public class SignatureManagementController {
     @Autowired
     private CurrentAccountRepository currentAccountRepository;
 
+    @Autowired
+    private com.neo.springapp.service.CustomerEventNotificationService notificationService;
+
     // Inner class to track form downloads
     private static class FormDownloadRecord {
         String accountNumber;
@@ -466,6 +469,10 @@ public class SignatureManagementController {
                 default:
                     return ResponseEntity.badRequest().body(Map.of("error", "Invalid account type: " + accountType));
             }
+            notificationService.notifyForAccount(
+                    String.valueOf(matchResult.get("accountNumber")),
+                    "Signature update", "Uploaded", String.valueOf(accountId),
+                    Map.of("Account type", accountType, "Review status", "Pending verification"));
 
             // Build success response with validation details
             Map<String, Object> successResponse = new HashMap<>();
@@ -497,7 +504,8 @@ public class SignatureManagementController {
             @PathVariable Long accountId,
             @RequestBody Map<String, String> body) {
 
-        String verifiedBy = body.getOrDefault("verifiedBy", "Admin");
+        String verifiedBy = body.get("verifiedBy");
+        if (verifiedBy == null || verifiedBy.isBlank()) verifiedBy = "Admin";
 
         switch (accountType) {
             case "savings":
@@ -508,6 +516,8 @@ public class SignatureManagementController {
                 savings.setSignatureVerifiedBy(verifiedBy);
                 savings.setSignatureVerifiedAt(LocalDateTime.now());
                 accountRepository.save(savings);
+                notificationService.notifyForAccount(savings.getAccountNumber(), "Signature update", "Verified",
+                        String.valueOf(accountId), Map.of("Account type", "Savings", "Verified by", verifiedBy));
                 return ResponseEntity.ok(Map.of("message", "Signature verified successfully"));
             case "salary":
                 SalaryAccount salary = salaryAccountRepository.findById(accountId).orElse(null);
@@ -517,6 +527,8 @@ public class SignatureManagementController {
                 salary.setSignatureVerifiedBy(verifiedBy);
                 salary.setSignatureVerifiedAt(LocalDateTime.now());
                 salaryAccountRepository.save(salary);
+                notificationService.notifyForAccount(salary.getAccountNumber(), "Signature update", "Verified",
+                        String.valueOf(accountId), Map.of("Account type", "Salary", "Verified by", verifiedBy));
                 return ResponseEntity.ok(Map.of("message", "Signature verified successfully"));
             case "business":
                 CurrentAccount business = currentAccountRepository.findById(accountId).orElse(null);
@@ -526,6 +538,8 @@ public class SignatureManagementController {
                 business.setSignatureVerifiedBy(verifiedBy);
                 business.setSignatureVerifiedAt(LocalDateTime.now());
                 currentAccountRepository.save(business);
+                notificationService.notifyForAccount(business.getAccountNumber(), "Signature update", "Verified",
+                        String.valueOf(accountId), Map.of("Account type", "Business", "Verified by", verifiedBy));
                 return ResponseEntity.ok(Map.of("message", "Signature verified successfully"));
             default:
                 return ResponseEntity.badRequest().body(Map.of("error", "Invalid account type: " + accountType));

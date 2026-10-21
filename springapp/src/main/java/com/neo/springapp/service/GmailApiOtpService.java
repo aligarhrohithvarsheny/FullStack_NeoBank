@@ -2,8 +2,12 @@ package com.neo.springapp.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.mail.Session;
+import jakarta.mail.internet.MimeMessage;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.web.client.RestTemplateBuilder;
+import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -16,12 +20,14 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
 import java.nio.charset.StandardCharsets;
+import java.io.ByteArrayOutputStream;
+import java.util.Properties;
 import java.time.Duration;
 import java.util.Base64;
 import java.util.Objects;
 
 /**
- * Sends plain-text mail via Gmail API (users.messages.send) using OAuth2 refresh-token flow.
+ * Sends email via Gmail API (users.messages.send) using OAuth2 refresh-token flow.
  * Configure with env: GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN, GMAIL_FROM_EMAIL.
  */
 @Service
@@ -198,9 +204,43 @@ public class GmailApiOtpService {
 
         String access = fetchAccessToken();
         String rawMime = buildRfc2822Message(sanitizeHeader(fromEmail), sanitizeHeader(to), subject, textBody);
-        String rawBase64Url = Base64.getUrlEncoder().withoutPadding()
-                .encodeToString(rawMime.getBytes(StandardCharsets.UTF_8));
+        sendRawMime(rawMime.getBytes(StandardCharsets.UTF_8), access);
+    }
 
+    public void sendPdfEmail(String to, String subject, String textBody,
+                             String fileName, byte[] pdfBytes) {
+        Objects.requireNonNull(to, "to");
+        Objects.requireNonNull(subject, "subject");
+        Objects.requireNonNull(textBody, "textBody");
+        Objects.requireNonNull(fileName, "fileName");
+        Objects.requireNonNull(pdfBytes, "pdfBytes");
+
+        if (!isConfigured()) {
+            throw new GmailApiException("missing_config", "Gmail API is not configured");
+        }
+
+        try {
+            MimeMessage message = new MimeMessage(Session.getInstance(new Properties()));
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, StandardCharsets.UTF_8.name());
+            helper.setFrom(sanitizeHeader(fromEmail));
+            helper.setTo(sanitizeHeader(to));
+            helper.setSubject(subject);
+            helper.setText(textBody, false);
+            helper.addAttachment(fileName, new ByteArrayResource(pdfBytes), "application/pdf");
+            message.saveChanges();
+
+            ByteArrayOutputStream rawMessage = new ByteArrayOutputStream();
+            message.writeTo(rawMessage);
+            sendRawMime(rawMessage.toByteArray(), fetchAccessToken());
+        } catch (GmailApiException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new GmailApiException("mime_encode_error", "Could not build PDF email message", e);
+        }
+    }
+
+    private void sendRawMime(byte[] rawMime, String accessToken) {
+        String rawBase64Url = Base64.getUrlEncoder().withoutPadding().encodeToString(rawMime);
         String payload;
         try {
             payload = objectMapper.writeValueAsString(objectMapper.createObjectNode().put("raw", rawBase64Url));
@@ -209,35 +249,27 @@ public class GmailApiOtpService {
         }
 
         HttpHeaders headers = new HttpHeaders();
-        headers.setBearerAuth(access);
+        headers.setBearerAuth(accessToken);
         headers.setContentType(MediaType.APPLICATION_JSON);
-
         try {
             ResponseEntity<String> response = restTemplate.postForEntity(
-                    GMAIL_SEND_URL,
-                    new HttpEntity<>(payload, headers),
-                    String.class);
-
+                    GMAIL_SEND_URL, new HttpEntity<>(payload, headers), String.class);
             if (!response.getStatusCode().is2xxSuccessful()) {
                 throw new GmailApiException("send_failed", "Gmail send returned " + response.getStatusCode());
             }
         } catch (HttpClientErrorException e) {
             if (e.getStatusCode().value() == 401) {
                 invalidateTokenCache();
-                // one retry with fresh token
-                access = fetchAccessToken();
-                headers.setBearerAuth(access);
+                headers.setBearerAuth(fetchAccessToken());
                 try {
                     ResponseEntity<String> retry = restTemplate.postForEntity(
-                            GMAIL_SEND_URL,
-                            new HttpEntity<>(payload, headers),
-                            String.class);
+                            GMAIL_SEND_URL, new HttpEntity<>(payload, headers), String.class);
                     if (!retry.getStatusCode().is2xxSuccessful()) {
                         throw new GmailApiException("send_failed", "Gmail send returned " + retry.getStatusCode(), e);
                     }
                     return;
-                } catch (HttpClientErrorException e2) {
-                    throw mapGmailSendError(e2);
+                } catch (HttpClientErrorException retryException) {
+                    throw mapGmailSendError(retryException);
                 }
             }
             throw mapGmailSendError(e);

@@ -14,14 +14,21 @@
       
       <div class="chat-items">
         <div 
-          *ngFor="let chat of escalatedChats" 
+          *ngFor="let chat of getOrderedChats()"
           class="chat-item"
           [class.active]="chat.sessionId === selectedSessionId"
           (click)="selectChat(chat.sessionId)"
         >
           <div class="chat-item-header">
             <span class="user-name">{{ getUserName(chat.sessionId) }}</span>
-            <span class="chat-time">{{ formatTime(chat.timestamp) }}</span>
+            <span class="chat-item-actions">
+              <span class="chat-time">{{ formatTime(chat.timestamp) }}</span>
+              <button type="button" class="pin-chat-btn" (click)="togglePinnedChat(chat.sessionId, $event)"
+                [attr.aria-pressed]="isChatPinned(chat.sessionId)"
+                [title]="isChatPinned(chat.sessionId) ? 'Unpin chat' : 'Pin chat'">
+                {{ isChatPinned(chat.sessionId) ? '📌' : '📍' }}
+              </button>
+            </span>
           </div>
           <div class="chat-preview">{{ getChatPreview(chat.sessionId) }}</div>
         </div>
@@ -41,6 +48,9 @@
         </div>
         <button (click)="viewCustomerAccountDetails()" class="view-account-btn" title="View Customer Account Details">
           👤 View Account Details
+        </button>
+        <button (click)="openCustomer360()" class="view-account-btn" title="Open authorized Customer 360">
+          Open Customer 360
         </button>
       </div>
 
@@ -234,4 +244,3 @@
     </div>
   </div>
 </div>
-

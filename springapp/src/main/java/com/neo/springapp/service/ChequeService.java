@@ -54,6 +54,8 @@ public class ChequeService {
 
     private final ChequeRequestRepository chequeRequestRepository;
     private final BusinessChequeRequestRepository businessChequeRequestRepository;
+    @Autowired
+    private CustomerEventNotificationService notificationService;
 
     @Autowired
     private SalaryAccountRepository salaryAccountRepository;
@@ -891,7 +893,13 @@ public class ChequeService {
         }
         cheque.requestDraw(requestedBy);
         cheque.setDrawRequestOtpVerified(false);
-        return chequeRepository.save(cheque);
+        Cheque savedCheque = chequeRepository.save(cheque);
+        notificationService.notifyForAccount(savedCheque.getAccountNumber(), "Cheque draw request", "Submitted",
+                savedCheque.getChequeNumber(), Map.of(
+                        "Cheque number", String.valueOf(savedCheque.getChequeNumber()),
+                        "Amount", String.valueOf(savedCheque.getAmount()),
+                        "Payee", savedCheque.getAccountHolderName() == null ? "N/A" : savedCheque.getAccountHolderName()));
+        return savedCheque;
     }
 
     // Approve cheque request and draw - Admin only
@@ -909,7 +917,14 @@ public class ChequeService {
         cheque = chequeRepository.save(cheque);
         
         // Automatically draw the cheque after approval
-        return drawCheque(cheque.getChequeNumber(), approvedBy);
+        Cheque drawnCheque = drawCheque(cheque.getChequeNumber(), approvedBy);
+        notificationService.notifyForAccount(drawnCheque.getAccountNumber(), "Cheque draw request", "Approved",
+                drawnCheque.getChequeNumber(), Map.of(
+                        "Cheque number", String.valueOf(drawnCheque.getChequeNumber()),
+                        "Amount", String.valueOf(drawnCheque.getAmount()),
+                        "Drawn on", String.valueOf(drawnCheque.getDrawnDate()),
+                        "Processed by", approvedBy == null ? "Admin" : approvedBy));
+        return drawnCheque;
     }
 
     // Reject cheque request - Admin only
@@ -1119,4 +1134,3 @@ public class ChequeService {
         return stats;
     }
 }
-

@@ -24,6 +24,8 @@ import java.math.RoundingMode;
 @Service
 @SuppressWarnings("null")
 public class CreditCardService {
+    @org.springframework.beans.factory.annotation.Autowired
+    private CustomerEventNotificationService notificationService;
 
     private final CreditCardRepository creditCardRepository;
     private final CreditCardTransactionRepository transactionRepository;
@@ -1003,6 +1005,14 @@ public class CreditCardService {
         accountTx.setBalance(accountBalanceAfter);
         accountTx.setStatus("Completed");
         transactionService.saveTransaction(accountTx);
+
+        notificationService.notifyForAccount(card.getAccountNumber(), "Credit card bill payment", "Completed",
+                String.valueOf(globalSequence), Map.of(
+                        "Paid amount", String.valueOf(amount),
+                        "Remaining card outstanding", String.valueOf(cardBalanceAfter),
+                        "Payment method", "ACCOUNT",
+                        "Card reference", String.valueOf(card.getMaskedCardNumber()),
+                        "Payment date", String.valueOf(card.getLastPaidDate())));
 
         Map<String, Object> result = new HashMap<>();
         result.put("success", true);

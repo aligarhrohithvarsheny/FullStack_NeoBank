@@ -62,6 +62,8 @@ export class Profile implements OnInit, AfterViewInit {
   newEmail: string = '';
   emailError: string = '';
   updatingEmail: boolean = false;
+  editingName: boolean = false;
+  newName: string = '';
   currentUserId: number | null = null;
   
   // Aadhaar verification
@@ -81,6 +83,7 @@ export class Profile implements OnInit, AfterViewInit {
   isVerifyingOtp: boolean = false;
   currentUpdateRequestId: number | null = null;
   currentUpdateField: string = '';
+  otpDestination: string = '';
   otpTimer: number = 120; // 2 minutes
   otpTimerInterval: any = null;
   updateHistory: any[] = [];
@@ -655,13 +658,23 @@ export class Profile implements OnInit, AfterViewInit {
     this.http.post(`${environment.apiBaseUrl}/api/users/profile-update/verify-otp`, null, { params }).subscribe({
       next: (response: any) => {
         if (response.success) {
-          this.alertService.success('Request Submitted', 'OTP verified. Your update request has been submitted for admin approval.');
-          this.closeOtpModal();
-          if (this.currentUpdateField === 'ADDRESS') {
+          const updateField = this.currentUpdateField;
+          this.alertService.success(
+            'Request Submitted',
+            updateField === 'EMAIL'
+              ? 'New email verified. The change is now waiting for admin approval.'
+              : 'OTP verified. Your update request has been submitted for admin approval.'
+          );
+          if (updateField === 'NAME') {
+            this.cancelEditingName();
+          } else if (updateField === 'EMAIL') {
+            this.cancelEditingEmail();
+          } else if (updateField === 'ADDRESS') {
             this.cancelEditingAddress();
-          } else {
+          } else if (updateField === 'PHONE') {
             this.cancelEditingPhone();
           }
+          this.closeOtpModal();
           this.loadUpdateHistory();
         } else {
           this.otpError = response.message || 'Invalid or expired OTP';
@@ -703,7 +716,18 @@ export class Profile implements OnInit, AfterViewInit {
     this.otpError = '';
     this.currentUpdateRequestId = null;
     this.currentUpdateField = '';
+    this.otpDestination = '';
     this.stopOtpTimer();
+  }
+
+  hideOtpModal() {
+    this.showOtpModal = false;
+    this.stopOtpTimer();
+  }
+
+  resumeOtpModal() {
+    this.showOtpModal = true;
+    this.startOtpTimer();
   }
   
   startOtpTimer() {
@@ -715,6 +739,12 @@ export class Profile implements OnInit, AfterViewInit {
         this.stopOtpTimer();
       }
     }, 1000);
+  }
+
+  formatOtpTime(): string {
+    const minutes = Math.floor(this.otpTimer / 60);
+    const seconds = this.otpTimer % 60;
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   }
   
   stopOtpTimer() {
@@ -732,11 +762,29 @@ export class Profile implements OnInit, AfterViewInit {
       next: (history: any) => {
         this.updateHistory = history || [];
         this.isLoadingUpdateHistory = false;
+        this.loadPendingEmailUpdate();
       },
       error: (err: any) => {
         console.error('Error loading update history:', err);
         this.isLoadingUpdateHistory = false;
       }
+    });
+  }
+
+  private loadPendingEmailUpdate() {
+    if (!this.currentUserId || this.currentUpdateRequestId) return;
+    this.http.get<any[]>(`${environment.apiBaseUrl}/api/users/profile-update/requests/${this.currentUserId}`).subscribe({
+      next: (requests) => {
+        const pending = requests?.find((request: any) =>
+          request.fieldToUpdate === 'EMAIL' && request.status === 'PENDING');
+        if (!pending) return;
+        this.currentUpdateRequestId = pending.id;
+        this.currentUpdateField = 'EMAIL';
+        this.otpDestination = pending.newValue;
+        this.showOtpModal = true;
+        this.startOtpTimer();
+      },
+      error: (err) => console.error('Error restoring pending email verification:', err)
     });
   }
   
@@ -769,6 +817,31 @@ export class Profile implements OnInit, AfterViewInit {
     this.editingEmail = true;
     this.newEmail = this.userProfile.email;
     this.emailError = '';
+  }
+
+  startEditingName() {
+    this.editingName = true;
+    this.newName = this.userProfile.name;
+    this.updateError = '';
+  }
+
+  cancelEditingName() {
+    this.editingName = false;
+    this.newName = '';
+    this.updateError = '';
+  }
+
+  requestNameUpdate() {
+    const value = this.newName.trim();
+    if (!value) {
+      this.updateError = 'Name is required';
+      return;
+    }
+    if (value === this.userProfile.name) {
+      this.updateError = 'New name is the same as the current name';
+      return;
+    }
+    this.requestProfileUpdate('NAME', value, 'Your name update was submitted for admin approval.');
   }
 
   cancelEditingEmail() {
@@ -808,32 +881,62 @@ export class Profile implements OnInit, AfterViewInit {
     this.updatingEmail = true;
     this.emailError = '';
 
-    // Call the backend API to update email
-    this.http.put(`${environment.apiBaseUrl}/api/users/update-email/${this.currentUserId}`, { email: this.newEmail }).subscribe({
+    const requestedEmail = this.newEmail.trim().toLowerCase();
+    const params = new HttpParams()
+      .set('userId', this.currentUserId.toString())
+      .set('field', 'EMAIL')
+      .set('newValue', requestedEmail);
+    this.http.post(`${environment.apiBaseUrl}/api/users/profile-update/request`, null, { params }).subscribe({
       next: (response: any) => {
         if (response.success) {
-          this.userProfile.email = this.newEmail;
+          this.currentUpdateRequestId = response.requestId;
+          this.currentUpdateField = 'EMAIL';
+          this.otpDestination = requestedEmail;
+          this.showOtpModal = true;
+          this.startOtpTimer();
           this.editingEmail = false;
           this.newEmail = '';
           this.updatingEmail = false;
-          this.alertService.success('Email Updated', 'Your email has been updated successfully!');
-          
-          // Update session storage with new email
-          const currentUser = sessionStorage.getItem('currentUser');
-          if (currentUser) {
-            const user = JSON.parse(currentUser);
-            user.email = this.newEmail;
-            sessionStorage.setItem('currentUser', JSON.stringify(user));
-          }
+          this.alertService.success('Verify New Email', 'A verification code was sent to the new email address. The change takes effect after admin approval.');
         } else {
-          this.emailError = response.message || 'Failed to update email';
+          this.emailError = response.message || 'Failed to request email update';
           this.updatingEmail = false;
         }
       },
       error: (err: any) => {
-        console.error('Error updating email:', err);
-        this.emailError = err.error?.message || 'Failed to update email. Please try again.';
+        console.error('Error requesting email update:', err);
+        this.emailError = err.error?.message || 'Failed to request email update. Please try again.';
         this.updatingEmail = false;
+      }
+    });
+  }
+
+  private requestProfileUpdate(field: string, value: string, successMessage: string) {
+    if (!this.currentUserId) {
+      this.updateError = 'User ID not found. Please refresh the page.';
+      return;
+    }
+    this.isRequestingUpdate = true;
+    this.updateError = '';
+    const params = new HttpParams()
+      .set('userId', this.currentUserId.toString())
+      .set('field', field)
+      .set('newValue', value);
+    this.http.post(`${environment.apiBaseUrl}/api/users/profile-update/request`, null, { params }).subscribe({
+      next: (response: any) => {
+        if (response.success) {
+          this.alertService.success('Update Submitted', successMessage);
+          this.cancelEditingName();
+          this.loadUpdateHistory();
+        } else {
+          this.updateError = response.message || 'Failed to request update';
+        }
+        this.isRequestingUpdate = false;
+      },
+      error: (err: any) => {
+        console.error('Error requesting profile update:', err);
+        this.updateError = err.error?.message || 'Failed to request update. Please try again.';
+        this.isRequestingUpdate = false;
       }
     });
   }
