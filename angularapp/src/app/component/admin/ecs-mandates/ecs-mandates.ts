@@ -51,8 +51,13 @@ import { environment } from '../../../../environment/environment';
 
   <div class="card">
     <div class="filters">
-      <select [(ngModel)]="statusFilter"><option>ALL</option><option>ACTIVE</option><option>PAUSED</option><option>CANCELLED</option><option>CANCEL_REQUESTED</option></select>
-      <input [(ngModel)]="search" placeholder="Search loan / savings account / name" />
+      <select aria-label="Filter mandates by status" [(ngModel)]="statusFilter">
+        <option>ALL</option><option>ACTIVE</option><option>PAUSED</option><option>CANCELLED</option><option>CANCEL_REQUESTED</option>
+      </select>
+      <input type="search" aria-label="Search ECS mandates" [(ngModel)]="search"
+        placeholder="Search mandate, customer, account, amount, schedule, status, activity, or date" />
+      <button *ngIf="search" type="button" class="clear-search" (click)="search = ''">Clear search</button>
+      <span class="match-count">{{ filtered().length }} of {{ mandates.length }} mandates</span>
     </div>
     <table>
       <thead><tr><th>Mandate</th><th>Loan / Card No.</th><th>Savings A/c</th><th>Customer</th><th>Day</th><th>Due</th><th>Limit</th><th>Status</th><th>Debits</th><th>Last debit</th><th>Actions</th></tr></thead>
@@ -72,7 +77,9 @@ import { environment } from '../../../../environment/environment';
             <button *ngIf="m.cancelRequested && m.status!=='CANCELLED'" (click)="reject(m)">Reject request</button>
           </td>
         </tr>
-        <tr *ngIf="!filtered().length"><td colspan="11" style="text-align:center">No mandates</td></tr>
+        <tr *ngIf="!filtered().length"><td colspan="11" style="text-align:center">
+          {{ mandates.length ? 'No mandates match your search and status filter.' : 'No mandates found.' }}
+        </td></tr>
       </tbody>
     </table>
   </div>
@@ -122,7 +129,7 @@ input,select{padding:7px;border:1px solid #cbd5e1;border-radius:6px}
 .btn,button{padding:6px 12px;border:1px solid #cbd5e1;border-radius:6px;background:#f8fafc;cursor:pointer;margin:2px}
 .btn.primary{background:#2563eb;color:#fff;border-color:#2563eb}.danger{color:#dc2626}
 .fetched{margin-top:10px;padding:10px;background:#f1f5f9;border-radius:8px;display:grid;gap:4px}
-.filters{display:flex;gap:10px;margin-bottom:10px}.filters input{flex:1}
+.filters{display:flex;gap:10px;margin-bottom:10px;align-items:center;flex-wrap:wrap}.filters input{flex:1;min-width:240px}.filters select{min-width:150px}.clear-search{white-space:nowrap}.match-count{margin-left:auto;color:#64748b;font-size:12px;white-space:nowrap}
 table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:7px;border-bottom:1px solid #e5e7eb;text-align:left}
 .pill{padding:2px 8px;border-radius:10px;font-size:11px;color:#fff;margin-right:3px}
 .ACTIVE{background:#16a34a}.PAUSED{background:#d97706}.CANCELLED{background:#6b7280}.REQ{background:#dc2626}
@@ -174,14 +181,40 @@ export class EcsMandates implements OnInit, OnDestroy {
   cancelRequests() { return this.mandates.filter(m => m.cancelRequested && m.status !== 'CANCELLED').length; }
 
   filtered() {
-    const q = this.search.trim().toLowerCase();
+    const q = this.normalizeSearch(this.search);
     return this.mandates.filter(m => {
       const st = this.statusFilter === 'ALL' || (this.statusFilter === 'CANCEL_REQUESTED'
         ? m.cancelRequested && m.status !== 'CANCELLED' : m.status === this.statusFilter);
-      const hit = !q || [m.loanAccountNumber, m.savingsAccountNumber, m.customerName, m.mandateId]
-        .some(v => (v || '').toLowerCase().includes(q));
+      const values = [
+        m.id, m.mandateId, m.loanAccountNumber, m.loanType, m.savingsAccountNumber,
+        m.customerName, m.customerId, m.debitDay, m.emiAmount, m.amountLimit,
+        m.status, m.pausedBy, m.cancelRequested, m.cancelReason, m.cancelRequestedAt,
+        m.cancelRejectionNote, m.createdBy, m.cancelledBy, m.cancelledAt,
+        m.lastAttemptDate, m.lastDebitAt, m.lastDebitStatus, m.lastDebitMessage,
+        m.successfulDebits, m.failedDebits, m.createdAt, m.updatedAt
+      ];
+      const searchText = this.normalizeSearch(values.map(value => this.searchableValue(value)).join(' '));
+      const hit = !q || searchText.includes(q);
       return st && hit;
     });
+  }
+
+  private normalizeSearch(value: string): string {
+    return value.trim().toLowerCase().replace(/[₹,]/g, '');
+  }
+
+  private searchableValue(value: unknown): string {
+    if (value === null || value === undefined) return '';
+    if (typeof value === 'number') {
+      return `${value} ${value.toLocaleString('en-IN')} ${value.toFixed(2)}`;
+    }
+    if (typeof value === 'boolean') return value ? 'true yes requested' : 'false no not requested';
+    const text = String(value);
+    const date = new Date(text);
+    if (!Number.isNaN(date.getTime()) && /[-T:]/.test(text)) {
+      return `${text} ${date.toLocaleDateString()} ${date.toLocaleDateString('en-GB')} ${date.toLocaleString()}`;
+    }
+    return text;
   }
 
   private err(e: any, fallback: string) {

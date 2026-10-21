@@ -31,6 +31,32 @@
     <p class="c360-error" *ngIf="error" role="alert">{{ error }}</p>
     <p class="c360-notice" *ngIf="notice" role="status">{{ notice }}</p>
 
+    <section class="c360-global-search" aria-label="Search Cards360">
+      <label for="c360-global-search-input">Search your Cards360 activity</label>
+      <div class="c360-global-search-input">
+        <span aria-hidden="true">⌕</span>
+        <input id="c360-global-search-input" type="search" autocomplete="off"
+          [(ngModel)]="dashboardSearch" (ngModelChange)="onDashboardSearchChanged()"
+          placeholder="Search tickets, merchants, amounts, transactions, bills, or card details">
+        <button *ngIf="dashboardSearch" type="button" (click)="dashboardSearch = ''; updateDashboardSearchResults()"
+          aria-label="Clear search">Clear</button>
+      </div>
+      <small>Searches every linked card's transactions and bills, your service requests, card details, and loaded EMI or security records.</small>
+      <div class="c360-global-search-results" *ngIf="dashboardSearch.trim()" role="region" aria-live="polite">
+        <button type="button" *ngFor="let result of dashboardSearchResults"
+          (click)="openDashboardSearchResult(result)">
+          <span class="c360-search-result-kind">{{ result.kind }}</span>
+          <strong>{{ result.title }}</strong>
+          <small>{{ result.detail }}</small>
+        </button>
+        <p class="c360-muted" *ngIf="!dashboardSearchResults.length && dashboardSearchLoading">Searching linked card activity…</p>
+        <p class="c360-error" *ngIf="dashboardSearchError" role="alert">{{ dashboardSearchError }}</p>
+        <p class="c360-muted" *ngIf="!dashboardSearchResults.length && !dashboardSearchLoading && !dashboardSearchError">
+          No matches found in the Cards360 data available to your account.
+        </p>
+      </div>
+    </section>
+
     <div class="c360-workspace">
       <aside class="c360-sidebar" aria-label="Cards navigation">
         <span class="c360-sidebar-heading">YOUR CARDS</span>

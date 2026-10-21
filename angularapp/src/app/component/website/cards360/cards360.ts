@@ -102,6 +102,14 @@ interface Card360ServiceRequest {
   timeline: Card360RequestTimelineEvent[];
 }
 
+interface Card360SearchResult {
+  title: string;
+  detail: string;
+  kind: string;
+  cardKey: string;
+  sectionId: string;
+}
+
 type Card360TransactionTab = 'ALL' | 'UNBILLED' | 'BILLED' | 'EMI' | 'REFUNDS';
 
 @Component({
@@ -116,6 +124,10 @@ export class Cards360 implements OnInit, OnDestroy {
   email = '';
   linkCardNumber = '';
   cards: Card360Card[] = [];
+  dashboardSearch = '';
+  dashboardSearchResults: Card360SearchResult[] = [];
+  dashboardSearchLoading = false;
+  dashboardSearchError = '';
   selectedTransactions: Card360Transaction[] = [];
   selectedCardKey = '';
   loadingTransactions = false;
@@ -188,8 +200,12 @@ export class Cards360 implements OnInit, OnDestroy {
   ] as const;
 
   private readonly tokenKey = 'card360Token';
+  private readonly expiredSessionMessageKey = 'card360SessionExpiredMessage';
   private readonly api = `${environment.apiBaseUrl}/api/card360`;
   private requestRefreshTimer: ReturnType<typeof setInterval> | null = null;
+  private sessionExpiryTimer: ReturnType<typeof setTimeout> | null = null;
+  private handlingExpiredSession = false;
+  private readonly searchActivityByCard = new Map<string, { transactions: Card360Transaction[]; bills: Card360Bill[] }>();
 
   constructor(
     private readonly http: HttpClient,
@@ -200,13 +216,24 @@ export class Cards360 implements OnInit, OnDestroy {
   ngOnInit(): void {
     if (!isPlatformBrowser(this.platformId)) return;
     if (this.router.url.includes('/dashboard')) {
+      const token = sessionStorage.getItem(this.tokenKey);
+      if (!token || !this.startSessionMonitoring(token)) {
+        if (!token) void this.router.navigate(['/website/cards360']);
+        return;
+      }
       this.loadDashboard();
-      this.requestRefreshTimer = setInterval(() => this.refreshCustomerRequestHistory(), 15000);
+    } else {
+      const expiredMessage = sessionStorage.getItem(this.expiredSessionMessageKey);
+      if (expiredMessage) {
+        this.error = expiredMessage;
+        sessionStorage.removeItem(this.expiredSessionMessageKey);
+      }
     }
   }
 
   ngOnDestroy(): void {
     if (this.requestRefreshTimer) clearInterval(this.requestRefreshTimer);
+    if (this.sessionExpiryTimer) clearTimeout(this.sessionExpiryTimer);
   }
 
   get selectedBillCard(): Card360Card | undefined {
@@ -438,9 +465,12 @@ export class Cards360 implements OnInit, OnDestroy {
     }).subscribe({
       next: response => {
         sessionStorage.setItem(this.tokenKey, response.token);
+        sessionStorage.removeItem(this.expiredSessionMessageKey);
+        this.handlingExpiredSession = false;
         this.cardNumber = '';
         this.email = '';
         this.loading = false;
+        if (!this.startSessionMonitoring(response.token)) return;
         void this.router.navigate(['/website/cards360/dashboard']).then(navigated => {
           if (navigated) this.loadDashboard();
         });
@@ -454,15 +484,21 @@ export class Cards360 implements OnInit, OnDestroy {
 
   loadDashboard(): void {
     if (!isPlatformBrowser(this.platformId)) return;
-    if (!sessionStorage.getItem(this.tokenKey)) {
+    const token = sessionStorage.getItem(this.tokenKey);
+    if (!token) {
       this.router.navigate(['/website/cards360']);
       return;
     }
+    if (!this.sessionExpiryTimer && !this.startSessionMonitoring(token)) return;
     this.loading = true;
     this.http.get<{ cards: Card360Card[] }>(`${this.api}/cards`, { headers: this.headers() }).subscribe({
       next: result => {
         this.cards = result.cards || [];
         this.loading = false;
+        this.searchActivityByCard.clear();
+        this.updateDashboardSearchResults();
+        this.loadSearchActivityForCards();
+        this.loadCustomerRequests();
         if (this.selectedCardKey && this.selectedCard) this.selectCard(this.selectedCard);
         else if (this.selectedCardKey) this.showOverview();
       },
@@ -480,7 +516,11 @@ export class Cards360 implements OnInit, OnDestroy {
     this.selectedTransactions = [];
     this.cardBills = [];
     this.selectedTransaction = null;
+    this.emiPlans = [];
+    this.emiEligibleTransactions = [];
+    this.securityEvents = [];
     this.selectedEmiTransactionIds = [];
+    this.updateDashboardSearchResults();
     this.loadingTransactions = true;
     this.error = '';
     this.http.get<Card360Transaction[]>(
@@ -489,7 +529,11 @@ export class Cards360 implements OnInit, OnDestroy {
     ).subscribe({
       next: result => {
         this.selectedTransactions = result || [];
+        const activity = this.searchActivityByCard.get(this.cardKey(card)) || { transactions: [], bills: [] };
+        activity.transactions = this.selectedTransactions;
+        this.searchActivityByCard.set(this.cardKey(card), activity);
         this.loadingTransactions = false;
+        this.updateDashboardSearchResults();
       },
       error: err => {
         this.loadingTransactions = false;
@@ -501,7 +545,11 @@ export class Cards360 implements OnInit, OnDestroy {
         .subscribe({
           next: bills => {
             this.cardBills = bills || [];
+            const activity = this.searchActivityByCard.get(this.cardKey(card)) || { transactions: [], bills: [] };
+            activity.bills = this.cardBills;
+            this.searchActivityByCard.set(this.cardKey(card), activity);
             this.selectedCardKey = this.cardKey(card);
+            this.updateDashboardSearchResults();
           },
           error: err => this.handleProtectedError(err)
         });
@@ -522,8 +570,11 @@ export class Cards360 implements OnInit, OnDestroy {
   loadCustomerRequests(): void {
     this.http.get<Card360ServiceRequest[]>(`${environment.apiBaseUrl}/api/credit-card-requests/mine`,
       { headers: this.headers() }).subscribe({
-        next: requests => this.customerRequests = requests || [],
-        error: err => this.error = err.error?.message || 'Unable to load card service requests.'
+        next: requests => {
+          this.customerRequests = requests || [];
+          this.updateDashboardSearchResults();
+        },
+        error: err => this.handleProtectedError(err, 'Unable to load card service requests.')
       });
     this.http.get<{ creditLimitIncreaseEnabled: boolean; creditLimitIncreaseCeiling: number }>(
       `${environment.apiBaseUrl}/api/credit-card-requests/configuration`, { headers: this.headers() }
@@ -532,7 +583,7 @@ export class Cards360 implements OnInit, OnDestroy {
         ? Number(config.creditLimitIncreaseCeiling) : null,
       error: err => {
         this.creditLimitIncreaseCeiling = null;
-        this.error = err.error?.message || 'Unable to load credit-limit request eligibility.';
+        this.handleProtectedError(err, 'Unable to load credit-limit request eligibility.');
       }
     });
   }
@@ -541,19 +592,216 @@ export class Cards360 implements OnInit, OnDestroy {
     if (this.selectedCard?.type !== 'credit') return;
     this.http.get<Card360ServiceRequest[]>(`${environment.apiBaseUrl}/api/credit-card-requests/mine`,
       { headers: this.headers() }).subscribe({
-        next: requests => this.customerRequests = requests || [],
-        error: err => this.error = err.error?.message || 'Unable to refresh card service request updates.'
+        next: requests => {
+          this.customerRequests = requests || [];
+          this.updateDashboardSearchResults();
+        },
+        error: err => this.handleProtectedError(err, 'Unable to refresh card service request updates.')
       });
+  }
+
+  updateDashboardSearchResults(): void {
+    const query = this.normalizeSearchText(this.dashboardSearch);
+    if (!query) {
+      this.dashboardSearchResults = [];
+      this.dashboardSearchError = '';
+      return;
+    }
+    const results: Card360SearchResult[] = [];
+    const matches = (values: unknown[]): boolean =>
+      values.some(value => this.normalizeSearchText(String(value ?? '')).includes(query));
+    const add = (title: string, detail: string, kind: string, cardKey: string, sectionId: string) => {
+      results.push({ title, detail, kind, cardKey, sectionId });
+    };
+
+    for (const card of this.cards) {
+      if (matches([
+        card.cardType, card.maskedNumber, card.status, card.expiryDate, card.cardholderName,
+        card.approvedLimit, card.availableLimit, card.spendingLimit,
+        card.outstandingBalance, card.billTotalAmount, card.billMinimumDue, card.billStatus,
+        this.searchableAmount(card.approvedLimit), this.searchableAmount(card.availableLimit),
+        this.searchableAmount(card.outstandingBalance), this.searchableAmount(card.billTotalAmount)
+      ])) {
+        add(`${card.cardType} · ${card.maskedNumber}`,
+          `${card.status} · Available limit ₹${card.availableLimit ?? '—'} · Outstanding ₹${card.outstandingBalance ?? '—'}`,
+          'Card', this.cardKey(card), 'c360-card-details');
+      }
+    }
+
+    const activityByCard = this.cards.map(card => {
+      const cardKey = this.cardKey(card);
+      const cached = this.searchActivityByCard.get(cardKey);
+      return {
+        cardKey,
+        transactions: cached?.transactions ?? (cardKey === this.selectedCardKey ? this.selectedTransactions : []),
+        bills: cached?.bills ?? (cardKey === this.selectedCardKey ? this.cardBills : [])
+      };
+    });
+    for (const activity of activityByCard) {
+      for (const transaction of activity.transactions) {
+        if (matches([
+          transaction.merchant, transaction.description, transaction.type,
+          transaction.status, transaction.receipt, transaction.id, transaction.billId,
+          transaction.emiPlanId, transaction.amount, transaction.date,
+          this.searchableAmount(transaction.amount), this.transactionCategory(transaction),
+          new Date(transaction.date).toLocaleDateString()
+        ])) {
+          add(transaction.merchant || transaction.description || 'Card transaction',
+            `${transaction.type} · ${transaction.status} · ₹${transaction.amount} · ${transaction.date}`,
+            'Transaction', activity.cardKey, 'c360-transactions');
+        }
+      }
+
+      for (const bill of activity.bills) {
+        if (matches([
+          bill.id, bill.billingPeriod, bill.status, bill.totalAmount, bill.regularAmount,
+          bill.emiAmount, bill.minimumDue, bill.paidAmount, bill.fine, bill.penalty,
+          bill.billGenerationDate, bill.dueDate,
+          this.searchableAmount(bill.totalAmount), this.searchableAmount(bill.minimumDue),
+          this.searchableAmount(this.billRemaining(bill)),
+          new Date(bill.billGenerationDate).toLocaleDateString()
+        ])) {
+          add(bill.billingPeriod || `Statement #${bill.id}`,
+            `${this.billPaymentStatus(bill)} · Bill ₹${bill.totalAmount} · Remaining ₹${this.billRemaining(bill)}`,
+            'Statement / bill', activity.cardKey, 'c360-bills');
+        }
+      }
+    }
+
+    const activeCardKey = this.selectedCardKey;
+    for (const plan of this.emiPlans) {
+      if (matches([
+        plan.id, plan.status, plan.tenureMonths, plan.principalAmount, plan.monthlyEmi,
+        plan.outstandingPrincipal, this.searchableAmount(plan.principalAmount),
+        this.searchableAmount(plan.monthlyEmi), this.searchableAmount(plan.outstandingPrincipal),
+        ...(plan.installments || []).flatMap((item: any) => [
+          item.installmentNumber, item.dueDate, item.status, item.totalAmount,
+          this.searchableAmount(item.totalAmount)
+        ])
+      ])) {
+        add(`EMI plan #${plan.id}`,
+          `${plan.status} · ${plan.tenureMonths} months · Monthly ₹${plan.monthlyEmi}`,
+          'EMI', activeCardKey, 'c360-emi');
+      }
+    }
+
+    for (const eligible of this.emiEligibleTransactions) {
+      if (matches([
+        eligible.merchant, eligible.description, eligible.id, eligible.amount,
+        this.searchableAmount(eligible.amount), eligible.transactionDate
+      ])) {
+        add(eligible.merchant || eligible.description || 'EMI-eligible purchase',
+          `Eligible purchase · ₹${eligible.amount} · ${eligible.transactionDate}`,
+          'EMI-eligible purchase', activeCardKey, 'c360-emi');
+      }
+    }
+
+    for (const event of this.securityEvents) {
+      if (matches([event.action, event.createdAt, event.newValue])) {
+        add(event.action, `${event.createdAt} · ${event.newValue}`, 'Security event', activeCardKey, 'c360-security');
+      }
+    }
+
+    for (const request of this.customerRequests) {
+      if (!matches([
+        request.requestNumber, request.id, request.creditCardId, request.transactionId,
+        request.requestType, request.category, request.description, request.requestedLimit,
+        request.status, request.resolution, request.createdAt, request.updatedAt,
+        ...request.timeline.flatMap(event => [event.status, event.note, event.updatedBy, event.createdAt])
+      ])) continue;
+      const card = this.cards.find(item => item.type === 'credit' && item.id === request.creditCardId);
+      if (card) {
+        add(`${request.requestNumber} · ${request.requestType}`,
+          `${request.status}${request.category ? ` · ${request.category}` : ''} · ${request.description}`,
+          'Ticket', this.cardKey(card), 'c360-support');
+      }
+    }
+    this.dashboardSearchResults = results.slice(0, 30);
+  }
+
+  onDashboardSearchChanged(): void {
+    this.dashboardSearchError = '';
+    this.updateDashboardSearchResults();
+  }
+
+  private loadSearchActivityForCards(): void {
+    const cardsToLoad = this.cards.filter(card => !this.searchActivityByCard.has(this.cardKey(card)));
+    const requestCount = cardsToLoad.reduce((total, card) => total + (card.type === 'credit' ? 2 : 1), 0);
+    if (!requestCount) {
+      this.dashboardSearchLoading = false;
+      return;
+    }
+    this.dashboardSearchLoading = true;
+    this.dashboardSearchError = '';
+    let remaining = requestCount;
+    const finishRequest = () => {
+      remaining--;
+      if (remaining === 0) this.dashboardSearchLoading = false;
+    };
+
+    for (const card of cardsToLoad) {
+      const cardKey = this.cardKey(card);
+      const activity = { transactions: [] as Card360Transaction[], bills: [] as Card360Bill[] };
+      this.searchActivityByCard.set(cardKey, activity);
+      this.http.get<Card360Transaction[]>(
+        `${this.api}/cards/${card.type}/${card.id}/transactions`, { headers: this.headers() }
+      ).subscribe({
+        next: transactions => {
+          activity.transactions = transactions || [];
+          this.updateDashboardSearchResults();
+          finishRequest();
+        },
+        error: err => {
+          this.dashboardSearchError = err.error?.message || `Unable to load search activity for ${card.cardType}.`;
+          finishRequest();
+        }
+      });
+      if (card.type === 'credit') {
+        this.http.get<Card360Bill[]>(
+          `${this.api}/cards/credit/${card.id}/bills`, { headers: this.headers() }
+        ).subscribe({
+          next: bills => {
+            activity.bills = bills || [];
+            this.updateDashboardSearchResults();
+            finishRequest();
+          },
+          error: err => {
+            this.dashboardSearchError = err.error?.message || `Unable to load statements for ${card.cardType}.`;
+            finishRequest();
+          }
+        });
+      }
+    }
+  }
+
+  openDashboardSearchResult(result: Card360SearchResult): void {
+    const card = this.cards.find(item => this.cardKey(item) === result.cardKey);
+    if (!card) return;
+    this.dashboardSearch = '';
+    this.dashboardSearchResults = [];
+    this.selectCard(card);
+    setTimeout(() => this.scrollToSection(result.sectionId));
+  }
+
+  private normalizeSearchText(value: string): string {
+    return value.toLocaleLowerCase().replace(/[₹,\s]/g, '').trim();
+  }
+
+  private searchableAmount(value: number | null | undefined): string {
+    return value == null || !Number.isFinite(Number(value)) ? '' : Number(value).toFixed(2);
   }
 
   loadSecurityEvents(cardId: number): void {
     this.http.get<Card360SecurityEvent[]>(
       `${this.api}/cards/credit/${cardId}/security-events`, { headers: this.headers() }
     ).subscribe({
-      next: events => this.securityEvents = events || [],
+      next: events => {
+        this.securityEvents = events || [];
+        this.updateDashboardSearchResults();
+      },
       error: err => {
         this.securityEvents = [];
-        this.error = err.error?.message || 'Unable to load card security events.';
+        this.handleProtectedError(err, 'Unable to load card security events.');
       }
     });
   }
@@ -671,27 +919,31 @@ export class Cards360 implements OnInit, OnDestroy {
       next: settings => this.emiSettings = settings,
       error: err => {
         this.emiSettings = null;
-        this.error = err.error?.message || 'Unable to load EMI configuration.';
+        this.handleProtectedError(err, 'Unable to load EMI configuration.');
       }
     });
     this.http.get<typeof this.emiEligibleTransactions>(
       `${this.api}/cards/credit/${cardId}/emi-eligible-transactions`, { headers: this.headers() }
     ).subscribe({
-      next: eligible => this.emiEligibleTransactions = eligible || [],
+     next: eligible => {
+       this.emiEligibleTransactions = eligible || [];
+       this.updateDashboardSearchResults();
+     },
       error: err => {
         this.emiEligibleTransactions = [];
-        this.error = err.error?.message || 'Unable to load EMI-eligible transactions.';
+        this.handleProtectedError(err, 'Unable to load EMI-eligible transactions.');
       }
     });
     this.http.get<any[]>(`${this.api}/cards/credit/${cardId}/emi-plans`, { headers: this.headers() }).subscribe({
       next: plans => {
         this.emiPlans = plans || [];
         this.loadingEmi = false;
+        this.updateDashboardSearchResults();
       },
       error: err => {
         this.emiPlans = [];
         this.loadingEmi = false;
-        this.error = err.error?.message || 'Unable to load EMI plans.';
+        this.handleProtectedError(err, 'Unable to load EMI plans.');
       }
     });
   }
@@ -703,7 +955,9 @@ export class Cards360 implements OnInit, OnDestroy {
     this.selectedTransaction = null;
     this.emiEligibleTransactions = [];
     this.emiPlans = [];
+    this.securityEvents = [];
     this.cards.forEach(card => card.fullCardNumber = undefined);
+    this.updateDashboardSearchResults();
   }
 
   toggleFullCardNumber(card: Card360Card): void {
@@ -865,11 +1119,17 @@ export class Cards360 implements OnInit, OnDestroy {
   }
 
   signOut(): void {
+    this.clearSessionTimers();
     sessionStorage.removeItem(this.tokenKey);
+    sessionStorage.removeItem(this.expiredSessionMessageKey);
+    this.handlingExpiredSession = false;
     this.cards = [];
     this.selectedTransactions = [];
     this.selectedCardKey = '';
     this.cardBills = [];
+    this.customerRequests = [];
+    this.dashboardSearch = '';
+    this.dashboardSearchResults = [];
     this.selectedTransaction = null;
     this.cards.forEach(card => card.fullCardNumber = undefined);
     this.router.navigate(['/website/cards360']);
@@ -1163,17 +1423,74 @@ export class Cards360 implements OnInit, OnDestroy {
     return `${card.type}-${card.id}`;
   }
 
+  private startSessionMonitoring(token: string): boolean {
+    const expiresAt = this.getSessionExpiry(token);
+    if (expiresAt !== null) {
+      const remaining = expiresAt - Date.now() - 5000;
+      if (remaining <= 0) {
+        this.expireSession();
+        return false;
+      }
+      if (this.sessionExpiryTimer) clearTimeout(this.sessionExpiryTimer);
+      this.sessionExpiryTimer = setTimeout(() => this.expireSession(), remaining);
+    }
+    if (!this.requestRefreshTimer) {
+      this.requestRefreshTimer = setInterval(() => this.refreshCustomerRequestHistory(), 15000);
+    }
+    return true;
+  }
+
+  private getSessionExpiry(token: string): number | null {
+    const payload = token.split('.')[0];
+    if (!payload) return null;
+    try {
+      const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
+      const decoded = atob(base64.padEnd(Math.ceil(base64.length / 4) * 4, '='));
+      const expiresAtSeconds = Number(decoded.split('|')[2]);
+      return Number.isFinite(expiresAtSeconds) ? expiresAtSeconds * 1000 : null;
+    } catch {
+      return null;
+    }
+  }
+
+  private clearSessionTimers(): void {
+    if (this.requestRefreshTimer) clearInterval(this.requestRefreshTimer);
+    if (this.sessionExpiryTimer) clearTimeout(this.sessionExpiryTimer);
+    this.requestRefreshTimer = null;
+    this.sessionExpiryTimer = null;
+  }
+
+  private expireSession(): void {
+    if (this.handlingExpiredSession) return;
+    this.handlingExpiredSession = true;
+    this.clearSessionTimers();
+    sessionStorage.removeItem(this.tokenKey);
+    this.cards = [];
+    this.selectedTransactions = [];
+    this.cardBills = [];
+    this.customerRequests = [];
+    this.emiPlans = [];
+    this.emiEligibleTransactions = [];
+    this.securityEvents = [];
+    this.selectedTransaction = null;
+    this.error = 'Your Cards360 session expired. Sign in again to continue.';
+    sessionStorage.setItem(this.expiredSessionMessageKey, this.error);
+    void this.router.navigate(['/website/cards360']);
+  }
+
   private headers(): HttpHeaders {
     return new HttpHeaders({ Authorization: `Bearer ${sessionStorage.getItem(this.tokenKey) || ''}` });
   }
 
-  private handleProtectedError(err: { status?: number; error?: { message?: string } }): void {
+  private handleProtectedError(
+    err: { status?: number; error?: { message?: string } },
+    fallback = 'Unable to load Card360. Please try again.'
+  ): void {
     this.loading = false;
-    if (err.status === 401 || err.status === 403) {
-      sessionStorage.removeItem(this.tokenKey);
-      this.router.navigate(['/website/cards360']);
+    if (err.status === 401) {
+      this.expireSession();
       return;
     }
-    this.error = err.error?.message || 'Unable to load Card360. Please try again.';
+    this.error = err.error?.message || fallback;
   }
 }
