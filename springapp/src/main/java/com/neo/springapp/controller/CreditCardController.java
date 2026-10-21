@@ -1,6 +1,7 @@
 package com.neo.springapp.controller;
 
 import com.neo.springapp.model.*;
+import com.neo.springapp.repository.AdminAuditLogRepository;
 import com.neo.springapp.repository.CreditCardAuditLogRepository;
 import com.neo.springapp.repository.CreditCardBillRepository;
 import com.neo.springapp.repository.CreditCardSettingsRepository;
@@ -8,6 +9,7 @@ import com.neo.springapp.service.CreditCardService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.CacheControl;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
@@ -32,6 +34,9 @@ public class CreditCardController {
     private CreditCardService creditCardService;
 
     @Autowired
+    private AdminAuditLogRepository adminAuditLogRepository;
+
+    @Autowired
     private CreditCardAuditLogRepository creditCardAuditLogRepository;
 
     @Autowired
@@ -54,6 +59,12 @@ public class CreditCardController {
         return authentication != null
                 && authentication.getPrincipal() instanceof UserSessionTokenService.SessionPrincipal principal
                 && ("ADMIN".equals(principal.scope()) || "MANAGER".equals(principal.scope()));
+    }
+
+    private boolean isAdmin(Authentication authentication) {
+        return authentication != null
+                && authentication.getPrincipal() instanceof UserSessionTokenService.SessionPrincipal principal
+                && "ADMIN".equals(principal.scope());
     }
 
     private boolean canAccessCard(Long id, Authentication authentication) {
@@ -190,6 +201,34 @@ public class CreditCardController {
         Optional<CreditCard> card = getOwnedCard(id, authentication);
         if (card.isEmpty()) return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         return ResponseEntity.ok(Map.of("cardNumber", card.get().getCardNumber()));
+    }
+
+    @GetMapping("/{id}/admin/card-number")
+    @Transactional
+    public ResponseEntity<?> revealAdminCardNumber(@PathVariable Long id, Authentication authentication) {
+        if (!isAdmin(authentication)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("message", "Only authorized administrators may reveal card numbers"));
+        }
+
+        Optional<CreditCard> card = creditCardService.getCreditCardById(id);
+        if (card.isEmpty() || card.get().getCardNumber() == null || card.get().getCardNumber().isBlank()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        UserSessionTokenService.SessionPrincipal principal =
+                (UserSessionTokenService.SessionPrincipal) authentication.getPrincipal();
+        AdminAuditLog audit = new AdminAuditLog(
+                principal.userId(), principal.accountNumber(), "SENSITIVE_CARD_PAN_REVEAL_ADMIN", "CREDIT_CARD", id);
+        audit.setEntityName("Credit card PAN");
+        audit.setReasonForChange("ADMIN requested card-number reveal");
+        audit.setStatus("COMPLETED");
+        adminAuditLogRepository.save(audit);
+
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noStore())
+                .header(HttpHeaders.PRAGMA, "no-cache")
+                .body(Map.of("cardNumber", card.get().getCardNumber()));
     }
 
     @GetMapping("/{id}/controls")

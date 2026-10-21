@@ -18,6 +18,10 @@ export class CreditCards implements OnInit, OnDestroy {
   creditCards: any[] = [];
   filteredCreditCards: any[] = [];
   isLoadingCreditCards: boolean = false;
+  canRevealCardNumber = false;
+  isRevealingCardNumber = false;
+  revealedCreditCardId: number | null = null;
+  revealedCardNumber = '';
   selectedCreditCard: any = null;
   creditCardTransactions: any[] = [];
   filteredTransactions: any[] = [];
@@ -110,11 +114,12 @@ export class CreditCards implements OnInit, OnDestroy {
   ngOnInit() {
     if (isPlatformBrowser(this.platformId)) {
       // Get admin name from sessionStorage
-      const adminData = sessionStorage.getItem('adminData');
+      const adminData = sessionStorage.getItem('admin') || sessionStorage.getItem('adminData');
       if (adminData) {
         try {
           const admin = JSON.parse(adminData);
           this.adminName = admin.name || admin.username || 'Admin';
+          this.canRevealCardNumber = String(admin.role || sessionStorage.getItem('userRole') || '').toUpperCase() === 'ADMIN';
         } catch (e) {
           console.error('Error parsing admin data:', e);
         }
@@ -224,11 +229,65 @@ export class CreditCards implements OnInit, OnDestroy {
       this.alertService.error('Error', 'Invalid card selected');
       return;
     }
+    this.hideRevealedCardNumber();
     this.selectedCreditCard = card;
     this.selectedTransaction = null;
     this.clearTransactionFilters();
     this.loadCreditCardDetails(card.id);
     this.loadEmiPlans();
+  }
+
+  closeCreditCardDetails() {
+    this.hideRevealedCardNumber();
+    this.selectedCreditCard = null;
+  }
+
+  toggleCardNumberReveal() {
+    const cardId = Number(this.selectedCreditCard?.id);
+    if (!Number.isInteger(cardId) || cardId <= 0 || !this.canRevealCardNumber || this.isRevealingCardNumber) return;
+
+    if (this.revealedCreditCardId === cardId && this.revealedCardNumber) {
+      this.hideRevealedCardNumber();
+      return;
+    }
+
+    this.isRevealingCardNumber = true;
+    this.http.get<{ cardNumber: string }>(
+      `${environment.apiBaseUrl}/api/credit-cards/${cardId}/admin/card-number`,
+      this.authOptions()
+    ).subscribe({
+      next: response => {
+        if (Number(this.selectedCreditCard?.id) !== cardId) return;
+        if (!response?.cardNumber) {
+          this.isRevealingCardNumber = false;
+          this.alertService.operationError('Card number reveal', 'The server returned no card number');
+          return;
+        }
+        this.revealedCreditCardId = cardId;
+        this.revealedCardNumber = response.cardNumber;
+        this.isRevealingCardNumber = false;
+      },
+      error: err => {
+        if (Number(this.selectedCreditCard?.id) !== cardId) return;
+        this.isRevealingCardNumber = false;
+        this.alertService.operationError('Card number reveal', err.error?.message || 'Unable to reveal this card number');
+      }
+    });
+  }
+
+  hideRevealedCardNumber() {
+    this.revealedCreditCardId = null;
+    this.revealedCardNumber = '';
+    this.isRevealingCardNumber = false;
+  }
+
+  openAccount360(accountNumber: string | null | undefined, event?: Event) {
+    event?.stopPropagation();
+    if (!accountNumber) {
+      this.alertService.error('Account unavailable', 'No linked account number is available for this card.');
+      return;
+    }
+    void this.router.navigate(['/admin/customer-360'], { state: { accountNumber } });
   }
 
   loadCreditCardDetails(cardId: string | number) {
@@ -848,6 +907,7 @@ export class CreditCards implements OnInit, OnDestroy {
           this.closeCardDocument = null;
           this.closeCardDocumentName = '';
           this.isUploadingDocument = false;
+          this.hideRevealedCardNumber();
           this.selectedCreditCard = null;
           this.loadCreditCards();
         },

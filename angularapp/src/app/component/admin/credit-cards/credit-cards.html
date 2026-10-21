@@ -153,7 +153,10 @@
           </div>
           <div class="card-info-row">
             <label>Account Number:</label>
-            <span>{{ maskAccountNumber(card.accountNumber) }}</span>
+            <button type="button" class="account-number-link" (click)="openAccount360(card.accountNumber, $event)"
+              [disabled]="!card.accountNumber" aria-label="Open customer 360 account details">
+              {{ card.accountNumber || '—' }} <i class="fa fa-external-link-alt" aria-hidden="true"></i>
+            </button>
           </div>
           <div class="card-info-row">
             <label>Approved Limit:</label>
@@ -188,11 +191,11 @@
     </div>
 
     <!-- Credit Card Details Modal -->
-    <div class="modal-overlay" *ngIf="selectedCreditCard" (click)="selectedCreditCard = null">
+    <div class="modal-overlay" *ngIf="selectedCreditCard" (click)="closeCreditCardDetails()">
       <div class="modal-content" (click)="$event.stopPropagation()">
         <div class="modal-header">
           <h3>Credit Card Details - {{ selectedCreditCard.userName }}</h3>
-          <button class="close-btn" (click)="selectedCreditCard = null">&times;</button>
+          <button class="close-btn" (click)="closeCreditCardDetails()">&times;</button>
         </div>
         <div class="modal-body">
           <div class="details-section">
@@ -200,7 +203,21 @@
             <div class="info-grid">
               <div class="info-item">
                 <label>Card Number:</label>
-                <span>{{ maskCardNumber(selectedCreditCard.maskedCardNumber || selectedCreditCard.cardNumber) }}</span>
+                <div class="sensitive-value">
+                  <span>{{ revealedCreditCardId === selectedCreditCard.id ? revealedCardNumber : maskCardNumber(selectedCreditCard.maskedCardNumber || selectedCreditCard.cardNumber) }}</span>
+                  <button *ngIf="canRevealCardNumber" type="button" class="sensitive-action"
+                    (click)="toggleCardNumberReveal()" [disabled]="isRevealingCardNumber">
+                    {{ isRevealingCardNumber ? 'Loading…' : (revealedCreditCardId === selectedCreditCard.id ? 'Hide number' : 'Reveal full number') }}
+                  </button>
+                </div>
+              </div>
+              <div class="info-item">
+                <label>Account Number:</label>
+                <button type="button" class="account-number-link"
+                  (click)="openAccount360(selectedCreditCard.accountNumber, $event)"
+                  [disabled]="!selectedCreditCard.accountNumber">
+                  {{ selectedCreditCard.accountNumber || '—' }} <i class="fa fa-external-link-alt" aria-hidden="true"></i>
+                </button>
               </div>
               <div class="info-item">
                 <label>Expiry:</label>

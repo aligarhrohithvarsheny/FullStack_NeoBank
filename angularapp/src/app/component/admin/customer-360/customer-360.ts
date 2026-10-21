@@ -56,6 +56,14 @@ export class Customer360 implements OnInit {
 
   ngOnInit(): void {
     this.loadCustomers();
+    const navigationState = this.router.getCurrentNavigation()?.extras.state as { accountNumber?: unknown } | undefined;
+    const accountNumber = typeof navigationState?.accountNumber === 'string'
+      ? navigationState.accountNumber.trim()
+      : '';
+    if (accountNumber) {
+      this.searchQuery = accountNumber;
+      this.loadByAccountNumber(accountNumber);
+    }
   }
 
   goBack(): void {
