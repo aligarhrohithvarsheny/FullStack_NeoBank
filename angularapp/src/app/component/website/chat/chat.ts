@@ -378,6 +378,9 @@ export class Chat implements OnInit, OnDestroy {
   }
 
   private getAccountDataError(error: any, label: string): string {
+    if (error?.status === 423) {
+      return `Access to ${label} is currently disabled for your account. Contact NeoBank support if you need help.`;
+    }
     if (error?.status === 401 || error?.status === 403) {
       return `Your session is not authorized to view ${label}. Please sign in again and retry.`;
     }

@@ -1329,9 +1329,7 @@
   </div>
 
   <!-- Chat -->
-  @defer (on idle) {
-    <app-chat (navigateToFeature)="selectFeature($event)"></app-chat>
-  }
+  <ng-container #chatOutlet></ng-container>
 
   <!-- ═══ CREATE PIN MODAL ═══ -->
   <div *ngIf="showPinModal" class="ud-modal-overlay" (click)="closeCreatePinModal()">

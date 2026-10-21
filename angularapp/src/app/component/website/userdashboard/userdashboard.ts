@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, Inject, PLATFORM_ID, ViewChild } from '@angular/core';
+import { AfterViewInit, Component, OnInit, OnDestroy, Inject, PLATFORM_ID, ViewChild, ViewContainerRef } from '@angular/core';
 import { Router } from '@angular/router';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -8,7 +8,7 @@ import { FasttagService } from '../../../service/fasttag.service';
 import { CurrentAccountService } from '../../../service/current-account.service';
 import { LinkedAccount } from '../../../model/current-account/current-account.model';
 import { environment } from '../../../../environment/environment';
-import { Chat } from '../chat/chat';
+import type { Chat } from '../chat/chat';
 import { AIAssistant } from '../ai-assistant/ai-assistant';
 import { Transferfunds } from '../transferfunds/transferfunds';
 import { Transaction } from '../transaction/transaction';
@@ -56,7 +56,6 @@ interface CancelledChequeAccount {
   imports: [
     CommonModule, 
     FormsModule, 
-    Chat, 
     AIAssistant,
     Transferfunds,
     Transaction,
@@ -86,8 +85,10 @@ interface CancelledChequeAccount {
   templateUrl: './userdashboard.html',
   styleUrls: ['./userdashboard.css']
 })
-export class Userdashboard implements OnInit, OnDestroy {
-  @ViewChild(Chat) private chatWidget?: Chat;
+export class Userdashboard implements OnInit, OnDestroy, AfterViewInit {
+  @ViewChild('chatOutlet', { read: ViewContainerRef }) private chatOutlet?: ViewContainerRef;
+  private chatWidget?: Chat;
+  private dashboardDestroyed = false;
 
   username: string = 'User'; // default
   selectedFeature: string | null = null;
@@ -675,6 +676,24 @@ export class Userdashboard implements OnInit, OnDestroy {
     }
   }
 
+  ngAfterViewInit(): void {
+    if (isPlatformBrowser(this.platformId)) {
+      setTimeout(() => void this.loadChatWidget(), 0);
+    }
+  }
+
+  private async loadChatWidget(): Promise<void> {
+    try {
+      const { Chat } = await import('../chat/chat');
+      if (this.dashboardDestroyed || !this.chatOutlet) return;
+      const chatComponent = this.chatOutlet.createComponent(Chat);
+      this.chatWidget = chatComponent.instance;
+      this.chatWidget.navigateToFeature.subscribe(feature => this.handleChatNavigation(feature));
+    } catch (error) {
+      console.error('Unable to load the customer-support chat widget.', error);
+    }
+  }
+
   loadFasttag() {
     if (!isPlatformBrowser(this.platformId)) return;
     const currentUserRaw = sessionStorage.getItem('currentUser');
@@ -895,6 +914,18 @@ export class Userdashboard implements OnInit, OnDestroy {
 
   openCards360(): void {
     this.router.navigate(['/website/cards360']);
+  }
+
+  private handleChatNavigation(feature: string): void {
+    if (feature === 'insurance') {
+      this.goToInsurance();
+      return;
+    }
+    if (feature === 'cards360') {
+      this.openCards360();
+      return;
+    }
+    this.selectFeature(feature);
   }
 
   openSupportAgentChat() {
@@ -1934,6 +1965,7 @@ export class Userdashboard implements OnInit, OnDestroy {
   }
 
   ngOnDestroy() {
+    this.dashboardDestroyed = true;
     if (this.liveDataInterval) { clearInterval(this.liveDataInterval); this.liveDataInterval = null; }
     this.stopQrScanner();
     this.stopUpiPolling();

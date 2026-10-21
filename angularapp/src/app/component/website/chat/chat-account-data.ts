@@ -8,6 +8,9 @@ export const serviceShortcuts = [
   { label: 'Transactions', feature: 'transaction' },
   { label: 'Fund Transfer', feature: 'transferfunds' },
   { label: 'Scheduled Payments', feature: 'scheduled-payments' },
+  { label: 'Demand Draft', feature: 'demand-draft' },
+  { label: 'ATM Withdrawal', feature: 'atm-simulator' },
+  { label: 'Cash Deposit Slip', feature: 'deposit-request' },
   { label: 'Cheque Management', feature: 'cheque' },
   { label: 'Positive Pay', feature: 'positive-pay' },
   { label: 'Debit Card', feature: 'card' },
@@ -15,15 +18,26 @@ export const serviceShortcuts = [
   { label: 'Card Bill Pay', feature: 'credit-card-bill' },
   { label: 'Virtual Card', feature: 'virtual-card' },
   { label: 'Personal Loans', feature: 'loan' },
+  { label: 'Loan Repayment', feature: 'loan-payment' },
   { label: 'Gold Loans', feature: 'goldloan' },
   { label: 'Home Loans', feature: 'homeloan' },
+  { label: 'Loan Eligibility', feature: 'ml-loan-prediction' },
   { label: 'ECS Mandates', feature: 'ecs-mandate' },
+  { label: 'EMI Monitoring', feature: 'emi-monitoring' },
   { label: 'Bill Payments', feature: 'bill-payment' },
   { label: 'Fixed Deposits', feature: 'fixed-deposits' },
   { label: 'Investments', feature: 'investments' },
+  { label: 'Education Subsidy', feature: 'subsidy-claim' },
   { label: 'Fastag', feature: 'fasttag' },
   { label: 'Family Banking', feature: 'family-banking' },
-  { label: 'Support Tickets', feature: 'support-tickets' }
+  { label: 'UPI Payments', feature: 'upi-pay' },
+  { label: 'Beneficiaries', feature: 'beneficiary-management' },
+  { label: 'KYC Update', feature: 'kycupdate' },
+  { label: 'Bank Messages', feature: 'bank-messages' },
+  { label: 'Support Tickets', feature: 'support-tickets' },
+  { label: 'AI Assistant', feature: 'ai-assistant' },
+  { label: 'Insurance', feature: 'insurance' },
+  { label: 'Cards360', feature: 'cards360' }
 ];
 
 function formatCurrency(value: unknown): string {
