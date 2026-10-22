@@ -355,13 +355,22 @@ export class Homeloan implements OnInit, OnDestroy {
   private poll: any;
   adjustment = 'REDUCE_TENURE';
   step = 1; agreed = false; uploading = '';
+  loanTypeFor(loan: any): string {
+    const type = String(loan?.loanType || '').toUpperCase();
+    if (type && type !== 'HOME') return type;
+    const applicationId = String(loan?.applicationId || '').toUpperCase();
+    if (applicationId.startsWith('CL')) return 'CAR';
+    if (applicationId.startsWith('FL')) return 'FARMER';
+    if (applicationId.startsWith('CR')) return 'CROP';
+    return type || 'HOME';
+  }
   loanTypeLabel(type?: string): string {
     const loanType = type || this.form.loanType;
     return ({ HOME: 'Home Loan', CAR: 'Car Loan', FARMER: 'Farmer Loan', CROP: 'Crop Loan' } as Record<string, string>)[loanType] || 'Home Loan';
   }
-  documentsFor(loan: any) { return this.documentSets[loan.loanType || 'HOME']; }
+  documentsFor(loan: any) { return this.documentSets[this.loanTypeFor(loan)] || this.documentSets['HOME']; }
   documentNames(loan: any, type: string): string[] {
-    const path = this.documentSets[loan.loanType || 'HOME'].find((d: any) => d.key === type)?.path;
+    const path = this.documentsFor(loan).find((d: any) => d.key === type)?.path;
     const value = path ? loan[path] : '';
     return value ? String(value).split(',').filter(Boolean) : [];
   }
@@ -442,7 +451,10 @@ export class Homeloan implements OnInit, OnDestroy {
   }
   load() {
     if (!this.user.accountNumber) return;
-    this.http.get<any[]>(`${this.api}/account/${this.user.accountNumber}`).subscribe({ next: r => { this.loans = r; if (this.sel) this.sel = r.find(x => x.id === this.sel.id) || null; }, error: e => this.fail(e) });
+    this.http.get<any[]>(`${this.api}/account/${this.user.accountNumber}`).subscribe({ next: r => {
+      this.loans = r.map(loan => ({ ...loan, loanType: this.loanTypeFor(loan) }));
+      if (this.sel) this.sel = this.loans.find(x => x.id === this.sel.id) || null;
+    }, error: e => this.fail(e) });
   }
   submit() {
     this.busy = true;

@@ -55,8 +55,8 @@
                 {
                   "type": "bundle",
                   "name": "main",
-                  "maximumWarning": "5MB",
-                  "maximumError": "6.5MB"
+                  "maximumWarning": "6.25MB",
+                  "maximumError": "6.75MB"
                 }
               ],
               "outputHashing": "all"

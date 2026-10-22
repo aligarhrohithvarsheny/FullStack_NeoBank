@@ -70,7 +70,7 @@ import { environment } from '../../../../environment/environment';
       <thead><tr><th>Application</th><th>Applicant</th><th>Amount</th><th>Tenure</th><th>Rate</th><th>Status</th><th>AI score</th><th></th></tr></thead>
       <tbody>
         <tr *ngFor="let l of filtered()">
-          <td><b>{{l.applicationId}}</b><small>{{l.applicationDate | date:'mediumDate'}}</small><span class="product">{{loanTypeLabel(l.loanType)}}</span></td>
+          <td><b>{{l.applicationId}}</b><small>{{l.applicationDate | date:'mediumDate'}}</small><span class="product">{{loanTypeLabel(loanTypeFor(l))}}</span></td>
           <td>{{l.userName}}<small>A/c {{l.accountNumber}}</small></td>
           <td>₹{{l.amount|number}}</td><td>{{l.tenure}} m</td><td>{{l.interestRate}}%</td>
           <td><span class="badge" [attr.data-s]="l.status">{{l.status}}</span></td>
@@ -107,19 +107,19 @@ import { environment } from '../../../../environment/environment';
           <label>Amount (₹)<input type="number" [(ngModel)]="edit.amount" [disabled]="live(sel)"></label>
           <label>Tenure (months)<input type="number" [(ngModel)]="edit.tenure" [disabled]="live(sel)"></label>
           <label>Interest % p.a.<input type="number" step="0.05" [(ngModel)]="edit.interestRate" [disabled]="sel.status==='Closed'||sel.status==='Rejected'||sel.status==='Cancelled'"></label>
-          <label *ngIf="sel.loanType==='HOME'">Property value (₹)<input type="number" [(ngModel)]="edit.propertyValue"></label>
-          <label *ngIf="sel.loanType==='HOME' || sel.loanType==='CROP'">Purpose<input [(ngModel)]="edit.purpose"></label>
-          <label *ngIf="sel.loanType==='HOME'">Property address<input [(ngModel)]="edit.propertyAddress"></label>
+          <label *ngIf="loanTypeFor(sel)==='HOME'">Property value (₹)<input type="number" [(ngModel)]="edit.propertyValue"></label>
+          <label *ngIf="loanTypeFor(sel)==='HOME' || loanTypeFor(sel)==='CROP'">Purpose<input [(ngModel)]="edit.purpose"></label>
+          <label *ngIf="loanTypeFor(sel)==='HOME'">Property address<input [(ngModel)]="edit.propertyAddress"></label>
           <label class="wide">Admin notes<input [(ngModel)]="edit.adminNotes"></label>
         </div>
-        <div class="kpis" *ngIf="sel.loanType==='CAR'">
+        <div class="kpis" *ngIf="loanTypeFor(sel)==='CAR'">
           <div><small>Vehicle</small><b>{{sel.vehicleMakeModel}} · {{sel.vehicleCondition}}</b></div>
           <div><small>Manufacturing year</small><b>{{sel.vehicleYear}}</b></div>
           <div><small>Car price</small><b>₹{{sel.vehiclePrice|number}}</b></div>
           <div><small>Dealer / seller</small><b>{{sel.vehicleDealer}}</b></div>
           <div><small>Registration</small><b>{{sel.vehicleRegistrationNumber||'Not provided'}}</b></div>
         </div>
-        <div class="kpis" *ngIf="sel.loanType==='FARMER' || sel.loanType==='CROP'">
+        <div class="kpis" *ngIf="loanTypeFor(sel)==='FARMER' || loanTypeFor(sel)==='CROP'">
           <div><small>Farm location</small><b>{{sel.farmLocation}}</b></div>
           <div><small>Crop / season</small><b>{{sel.cropName}} · {{sel.cropSeason}}</b></div>
           <div><small>Land area</small><b>{{sel.landArea}} {{sel.landAreaUnit}}</b></div>
@@ -369,10 +369,19 @@ export class AdminHomeLoans implements OnInit, OnDestroy {
   private adm() { return encodeURIComponent(this.admin); }
   private flash(ok: string, bad = '') { this.msg = ok; this.err = bad; setTimeout(() => { this.msg = ''; this.err = ''; }, 5000); }
   private fail(e: any) { this.busy = false; this.flash('', e?.error?.message || 'Request failed'); }
+  loanTypeFor(loan: any): string {
+    const type = String(loan?.loanType || '').toUpperCase();
+    if (type && type !== 'HOME') return type;
+    const applicationId = String(loan?.applicationId || '').toUpperCase();
+    if (applicationId.startsWith('CL')) return 'CAR';
+    if (applicationId.startsWith('FL')) return 'FARMER';
+    if (applicationId.startsWith('CR')) return 'CROP';
+    return type || 'HOME';
+  }
   loanTypeLabel(type: string): string {
     return ({ HOME: 'Home Loan', CAR: 'Car Loan', FARMER: 'Farmer Loan', CROP: 'Crop Loan' } as Record<string, string>)[type] || 'Home Loan';
   }
-  documentsFor(loan: any) { return this.documentSets[loan?.loanType || 'HOME']; }
+  documentsFor(loan: any) { return this.documentSets[this.loanTypeFor(loan)] || this.documentSets['HOME']; }
   documentItems(type: string): string[] {
     const doc = this.documentsFor(this.sel).find((item: any) => item.key === type);
     const value = doc ? this.sel?.[doc.path] : '';
@@ -446,7 +455,13 @@ export class AdminHomeLoans implements OnInit, OnDestroy {
   }
 
   load() {
-    this.http.get<any[]>(this.api).subscribe({ next: r => { this.loans = r; if (this.sel) { const f = r.find(x => x.id === this.sel.id); if (f) { this.sel = f; this.refreshEvents(); } } }, error: e => this.fail(e) });
+    this.http.get<any[]>(this.api).subscribe({ next: r => {
+      this.loans = r.map(loan => ({ ...loan, loanType: this.loanTypeFor(loan) }));
+      if (this.sel) {
+        const f = this.loans.find(x => x.id === this.sel.id);
+        if (f) { this.sel = f; this.refreshEvents(); }
+      }
+    }, error: e => this.fail(e) });
   }
   private refreshEvents() { if (this.sel) this.http.get<any>(`${this.api}/${this.sel.id}/statement`).subscribe({ next: s => this.events = s.entries, error: () => {} }); }
   private fillEdit(l: any) {

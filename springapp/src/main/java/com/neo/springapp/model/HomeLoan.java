@@ -127,4 +127,13 @@ public class HomeLoan {
         this.applicationDate = LocalDateTime.now();
         this.lastUpdated = LocalDateTime.now();
     }
+
+    @PostLoad
+    private void restoreLoanTypeFromApplicationId() {
+        if (loanType != null && !"HOME".equalsIgnoreCase(loanType)) return;
+        if (applicationId == null) return;
+        if (applicationId.startsWith("CL")) loanType = "CAR";
+        else if (applicationId.startsWith("FL")) loanType = "FARMER";
+        else if (applicationId.startsWith("CR")) loanType = "CROP";
+    }
 }
