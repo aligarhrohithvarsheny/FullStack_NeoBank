@@ -9,11 +9,13 @@ import com.neo.springapp.model.CurrentAccountBusinessUser;
 import com.neo.springapp.model.LinkedAccount;
 import com.neo.springapp.service.CurrentAccountService;
 import com.neo.springapp.service.SessionHistoryService;
+import com.neo.springapp.service.UserSessionTokenService.SessionPrincipal;
 import com.neo.springapp.repository.NetBankingServiceControlRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -114,10 +116,18 @@ public class CurrentAccountController {
     }
 
     @GetMapping("/customer/{customerId}")
-    public ResponseEntity<CurrentAccount> getAccountByCustomerId(@PathVariable String customerId) {
+    public ResponseEntity<?> getAccountByCustomerId(
+            @PathVariable String customerId,
+            @AuthenticationPrincipal SessionPrincipal principal) {
+        if (principal == null) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        if (!isStaff(principal)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         return currentAccountService.getAccountByCustomerId(customerId)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+    private boolean isStaff(SessionPrincipal principal) {
+        return "ADMIN".equals(principal.scope()) || "MANAGER".equals(principal.scope());
     }
 
     @GetMapping("/status/{status}")

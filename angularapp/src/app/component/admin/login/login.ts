@@ -71,9 +71,9 @@ export class Login {
             return;
           }
 
-          if (role === 'ADMIN' && !response.sessionToken) {
+          if (!response.sessionToken) {
             this.errorMessage =
-              'Admin login succeeded, but the backend did not provide an admin session token. Update the Spring backend and try again.';
+              `${role === 'MANAGER' ? 'Manager' : 'Admin'} login succeeded, but the backend did not provide a staff session token. Update the Spring backend and try again.`;
             return;
           }
 
@@ -83,9 +83,7 @@ export class Login {
             // so guarded routes like /admin/complete-profile can open.
             sessionStorage.setItem('admin', JSON.stringify(serverAdmin));
             sessionStorage.setItem('userRole', role);
-            if (role === 'ADMIN') {
-              sessionStorage.setItem('adminSessionToken', response.sessionToken);
-            }
+            sessionStorage.setItem('adminSessionToken', response.sessionToken);
             try {
               sessionStorage.setItem('adminLoginTime', new Date().toISOString());
             } catch (e) {

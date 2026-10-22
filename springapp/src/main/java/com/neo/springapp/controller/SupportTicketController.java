@@ -63,7 +63,14 @@ public class SupportTicketController {
             @PathVariable String accountNumber,
             @AuthenticationPrincipal SessionPrincipal principal) {
         if (principal == null) return unauthorized();
-        if (!principal.accountNumber().equals(accountNumber)) {
+        if ("ADMIN".equals(principal.scope()) || "MANAGER".equals(principal.scope())) {
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "tickets", supportTicketService.getTicketsByAccountNumber(accountNumber)));
+        }
+        if (!"USER".equals(principal.scope())
+                || principal.accountNumber() == null
+                || !principal.accountNumber().equalsIgnoreCase(accountNumber)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of(
                     "success", false, "message", "You can only view your own support requests"));
         }

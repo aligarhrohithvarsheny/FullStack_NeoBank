@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { forkJoin, Observable, of } from 'rxjs';
 import { catchError, map, switchMap } from 'rxjs/operators';
@@ -51,10 +51,18 @@ export class Customer360 implements OnInit {
   nomineeDraft = { nomineeName: '', relationship: '', sharePercentage: 100 };
   savingNominee = false;
   nomineeError = '';
+  private authRedirecting = false;
 
   constructor(private http: HttpClient, private router: Router) {}
 
   ngOnInit(): void {
+    if (typeof sessionStorage === 'undefined') return;
+    if (!sessionStorage.getItem('adminSessionToken')) {
+      void this.router.navigate(['/admin/login'], {
+        queryParams: { role: sessionStorage.getItem('userRole') || 'ADMIN' }
+      });
+      return;
+    }
     this.loadCustomers();
     const navigationState = this.router.getCurrentNavigation()?.extras.state as { accountNumber?: unknown } | undefined;
     const accountNumber = typeof navigationState?.accountNumber === 'string'
@@ -85,7 +93,7 @@ export class Customer360 implements OnInit {
 
   loadCustomers(): void {
     this.isLoadingCustomers = true;
-    this.http.get<any>(`${environment.apiBaseUrl}/api/users/admin/all?page=0&size=500`).subscribe({
+    this.http.get<any>(`${environment.apiBaseUrl}/api/users/admin/all?page=0&size=500`, this.adminRequestOptions()).subscribe({
       next: result => {
         const rows = Array.isArray(result) ? result : result?.content || [];
         this.customers = rows.map((row: any) => this.toCustomer(row));
@@ -93,6 +101,7 @@ export class Customer360 implements OnInit {
       },
       error: error => {
         this.isLoadingCustomers = false;
+        this.handleAdminAuthError(error);
         this.profileError = error?.error?.message || 'Unable to load the customer directory.';
       }
     });
@@ -126,7 +135,10 @@ export class Customer360 implements OnInit {
     this.profileError = '';
     this.resourceErrors = {};
     this.currentAccount = null;
-    this.http.get<any>(`${environment.apiBaseUrl}/api/users/account/${encodeURIComponent(accountNumber)}`).subscribe({
+    this.http.get<any>(
+      `${environment.apiBaseUrl}/api/users/account/${encodeURIComponent(accountNumber)}`,
+      this.adminRequestOptions()
+    ).subscribe({
       next: user => {
         this.selectedCustomer = this.toCustomer(user);
         this.loadRelatedData(accountNumber);
@@ -134,6 +146,7 @@ export class Customer360 implements OnInit {
       error: error => {
         this.selectedCustomer = null;
         this.isLoadingProfile = false;
+        this.handleAdminAuthError(error);
         this.profileError = error?.error?.message || 'No customer profile was found for that account number.';
       }
     });
@@ -221,13 +234,14 @@ export class Customer360 implements OnInit {
     this.http.post<any>(`${environment.apiBaseUrl}/api/customer-nominees`, {
       accountNumber,
       ...this.nomineeDraft
-    }).subscribe({
+    }, this.adminRequestOptions()).subscribe({
       next: nominee => {
         this.nominees = [nominee, ...this.nominees];
         this.nomineeDraft = { nomineeName: '', relationship: '', sharePercentage: 100 };
         this.savingNominee = false;
       },
       error: error => {
+        this.handleAdminAuthError(error);
         this.nomineeError = error?.error?.message || 'Unable to save nominee details.';
         this.savingNominee = false;
       }
@@ -254,15 +268,41 @@ export class Customer360 implements OnInit {
     headers?: Record<string, string>,
     notFoundIsEmpty = false
   ): Observable<CustomerResource> {
-    return this.http.get<any>(url, headers ? { headers } : {}).pipe(
+    const requestHeaders = this.adminRequestHeaders(headers);
+    return this.http.get<any>(url, { headers: requestHeaders }).pipe(
       map(value => ({ rows: this.toRows(value, keys), error: '' })),
-      catchError(error => of({
-        rows: [],
-        error: notFoundIsEmpty && error?.status === 404
-          ? ''
-          : error?.error?.message || `Could not load ${keys[0]} data.`
-      }))
+      catchError(error => {
+        this.handleAdminAuthError(error);
+        return of({
+          rows: [],
+          error: notFoundIsEmpty && error?.status === 404
+            ? ''
+            : error?.error?.message || `Could not load ${keys[0]} data.`
+        });
+      })
     );
+  }
+
+  private adminRequestOptions(headers?: Record<string, string>): { headers: HttpHeaders } {
+    return { headers: this.adminRequestHeaders(headers) };
+  }
+
+  private adminRequestHeaders(headers?: Record<string, string>): HttpHeaders {
+    let requestHeaders = new HttpHeaders(headers || {});
+    if (typeof sessionStorage !== 'undefined') {
+      const token = sessionStorage.getItem('adminSessionToken');
+      if (token) requestHeaders = requestHeaders.set('Authorization', `Bearer ${token}`);
+    }
+    return requestHeaders;
+  }
+
+  private handleAdminAuthError(error: any): void {
+    if (error?.status !== 401 || this.authRedirecting) return;
+    this.authRedirecting = true;
+    sessionStorage.removeItem('adminSessionToken');
+    void this.router.navigate(['/admin/login'], {
+      queryParams: { role: sessionStorage.getItem('userRole') || 'ADMIN' }
+    });
   }
 
   private getAdminEmail(): string {

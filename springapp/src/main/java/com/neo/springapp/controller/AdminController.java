@@ -794,7 +794,7 @@ public class AdminController {
                 response.put("success", true);
                 response.put("role", userRole);
                 response.put("admin", adminResponse);
-                if ("ADMIN".equalsIgnoreCase(userRole)) {
+                if ("ADMIN".equalsIgnoreCase(userRole) || "MANAGER".equalsIgnoreCase(userRole)) {
                     response.put("sessionToken", userSessionTokenService.issueAdmin(
                             loggedInAdmin.getId(), loggedInAdmin.getEmail(), userRole));
                 }
