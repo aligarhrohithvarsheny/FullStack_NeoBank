@@ -3,11 +3,13 @@ package com.neo.springapp.controller;
 import com.neo.springapp.model.HomeLoan;
 import com.neo.springapp.service.HomeLoanAnalysisService;
 import com.neo.springapp.service.HomeLoanService;
+import com.neo.springapp.service.UserSessionTokenService.SessionPrincipal;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -42,6 +44,17 @@ public class HomeLoanController {
 
     @PostMapping
     public ResponseEntity<?> submit(@RequestBody HomeLoan loan) { return run(() -> service.submit(loan)); }
+
+    @PostMapping("/admin")
+    public ResponseEntity<?> submitByAdmin(
+            @RequestBody HomeLoan loan,
+            @AuthenticationPrincipal SessionPrincipal principal) {
+        if (principal == null || !("ADMIN".equals(principal.scope()) || "MANAGER".equals(principal.scope()))) {
+            return ResponseEntity.status(org.springframework.http.HttpStatus.FORBIDDEN)
+                    .body(Map.of("success", false, "message", "Staff sign-in is required to submit an application for a customer"));
+        }
+        return run(() -> service.submitAdmin(loan, principal.scope() + " " + principal.userId()));
+    }
 
     @GetMapping
     public ResponseEntity<?> all() { return run(service::all); }
@@ -104,9 +117,12 @@ public class HomeLoanController {
     }
 
     @GetMapping("/{id}/documents/{type}/file")
-    public ResponseEntity<?> file(@PathVariable Long id, @PathVariable String type) {
+    public ResponseEntity<?> file(
+            @PathVariable Long id,
+            @PathVariable String type,
+            @RequestParam(required = false) Integer index) {
         try {
-            Path p = (Path) service.documentFile(id, type).get("path");
+            Path p = (Path) service.documentFile(id, type, index).get("path");
             String ct = Files.probeContentType(p);
             return ResponseEntity.ok()
                     .contentType(MediaType.parseMediaType(ct == null ? "application/octet-stream" : ct))

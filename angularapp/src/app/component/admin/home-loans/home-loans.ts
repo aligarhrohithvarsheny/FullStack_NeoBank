@@ -1,7 +1,8 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { concatMap, from, toArray } from 'rxjs';
 import { printHomeLoanDocuments, printHomeLoanNoc } from '../../../service/home-loan-documents';
 import { environment } from '../../../../environment/environment';
 
@@ -12,7 +13,7 @@ import { environment } from '../../../../environment/environment';
   template: `
 <div class="ah">
   <header class="hero">
-    <div><h2>🏠 Home Loan Dashboard</h2><p>Review applications, verify documents, top-up, close loans and issue NOC</p></div>
+    <div><h2>🏦 Loan Operations</h2><p>Review home, car, farmer and crop loan applications, documents, approvals and repayments</p></div>
     <input class="search" placeholder="🔍 Search application ID / account / name" [(ngModel)]="q">
   </header>
   <div class="msg ok" *ngIf="msg && !sel">{{msg}}</div>
@@ -24,12 +25,52 @@ import { environment } from '../../../../environment/environment';
     </button>
   </div>
 
+  <section class="sec direct">
+    <div class="direct-head">
+      <div><h3>Direct customer application</h3><p class="muted">Submit through the existing loan application workflow; required product details are validated by the server.</p></div>
+      <button class="b p" (click)="showDirectApply=!showDirectApply">{{showDirectApply ? 'Hide form' : '＋ New application'}}</button>
+    </div>
+    <div *ngIf="showDirectApply" class="grid">
+      <label>Customer account number<input [(ngModel)]="directForm.accountNumber" placeholder="Customer account"></label>
+      <label>Loan product<select [(ngModel)]="directForm.loanType">
+        <option value="HOME">Home Loan</option><option value="CAR">Car Loan</option>
+        <option value="FARMER">Farmer Loan</option><option value="CROP">Crop Loan</option>
+      </select></label>
+      <label>Requested amount (₹)<input type="number" [(ngModel)]="directForm.amount" min="100000"></label>
+      <label>Tenure (months)<input type="number" [(ngModel)]="directForm.tenure" min="12" max="360"></label>
+      <label>Indicative interest rate (% p.a.)<input type="number" [(ngModel)]="directForm.interestRate" min="0.1" max="30" step="0.05"></label>
+      <ng-container *ngIf="directForm.loanType==='HOME'">
+        <label>Property value (₹)<input type="number" [(ngModel)]="directForm.propertyValue"></label>
+        <label>Purpose<input [(ngModel)]="directForm.purpose"></label>
+        <label>Property address<input [(ngModel)]="directForm.propertyAddress"></label>
+      </ng-container>
+      <ng-container *ngIf="directForm.loanType==='CAR'">
+        <label>Car make and model<input [(ngModel)]="directForm.vehicleMakeModel"></label>
+        <label>Vehicle condition<select [(ngModel)]="directForm.vehicleCondition"><option value="NEW">New</option><option value="USED">Used</option></select></label>
+        <label>Manufacturing year<input type="number" [(ngModel)]="directForm.vehicleYear"></label>
+        <label>Car price (₹)<input type="number" [(ngModel)]="directForm.vehiclePrice"></label>
+        <label>Dealer / seller<input [(ngModel)]="directForm.vehicleDealer"></label>
+        <label>Registration (if available)<input [(ngModel)]="directForm.vehicleRegistrationNumber"></label>
+      </ng-container>
+      <ng-container *ngIf="directForm.loanType==='FARMER' || directForm.loanType==='CROP'">
+        <label>Farm location<input [(ngModel)]="directForm.farmLocation"></label>
+        <label>Crop name<input [(ngModel)]="directForm.cropName"></label>
+        <label>Crop season<input [(ngModel)]="directForm.cropSeason"></label>
+        <label>Land area<input type="number" [(ngModel)]="directForm.landArea"></label>
+        <label>Area unit<select [(ngModel)]="directForm.landAreaUnit"><option value="ACRE">Acres</option><option value="HECTARE">Hectares</option></select></label>
+        <label>Estimated cultivation cost (₹)<input type="number" [(ngModel)]="directForm.cultivationCostEstimate"></label>
+        <label *ngIf="directForm.loanType==='CROP'">Purpose<input [(ngModel)]="directForm.purpose"></label>
+      </ng-container>
+      <div class="wide"><button class="b p" (click)="submitDirectApplication()" [disabled]="busy">{{busy ? 'Submitting...' : 'Submit application'}}</button></div>
+    </div>
+  </section>
+
   <div class="tw card">
     <table class="lt">
       <thead><tr><th>Application</th><th>Applicant</th><th>Amount</th><th>Tenure</th><th>Rate</th><th>Status</th><th>AI score</th><th></th></tr></thead>
       <tbody>
         <tr *ngFor="let l of filtered()">
-          <td><b>{{l.applicationId}}</b><small>{{l.applicationDate | date:'mediumDate'}}</small></td>
+          <td><b>{{l.applicationId}}</b><small>{{l.applicationDate | date:'mediumDate'}}</small><span class="product">{{loanTypeLabel(l.loanType)}}</span></td>
           <td>{{l.userName}}<small>A/c {{l.accountNumber}}</small></td>
           <td>₹{{l.amount|number}}</td><td>{{l.tenure}} m</td><td>{{l.interestRate}}%</td>
           <td><span class="badge" [attr.data-s]="l.status">{{l.status}}</span></td>
@@ -66,10 +107,23 @@ import { environment } from '../../../../environment/environment';
           <label>Amount (₹)<input type="number" [(ngModel)]="edit.amount" [disabled]="live(sel)"></label>
           <label>Tenure (months)<input type="number" [(ngModel)]="edit.tenure" [disabled]="live(sel)"></label>
           <label>Interest % p.a.<input type="number" step="0.05" [(ngModel)]="edit.interestRate" [disabled]="sel.status==='Closed'||sel.status==='Rejected'||sel.status==='Cancelled'"></label>
-          <label>Property value (₹)<input type="number" [(ngModel)]="edit.propertyValue"></label>
-          <label>Purpose<input [(ngModel)]="edit.purpose"></label>
-          <label>Property address<input [(ngModel)]="edit.propertyAddress"></label>
+          <label *ngIf="sel.loanType==='HOME'">Property value (₹)<input type="number" [(ngModel)]="edit.propertyValue"></label>
+          <label *ngIf="sel.loanType==='HOME' || sel.loanType==='CROP'">Purpose<input [(ngModel)]="edit.purpose"></label>
+          <label *ngIf="sel.loanType==='HOME'">Property address<input [(ngModel)]="edit.propertyAddress"></label>
           <label class="wide">Admin notes<input [(ngModel)]="edit.adminNotes"></label>
+        </div>
+        <div class="kpis" *ngIf="sel.loanType==='CAR'">
+          <div><small>Vehicle</small><b>{{sel.vehicleMakeModel}} · {{sel.vehicleCondition}}</b></div>
+          <div><small>Manufacturing year</small><b>{{sel.vehicleYear}}</b></div>
+          <div><small>Car price</small><b>₹{{sel.vehiclePrice|number}}</b></div>
+          <div><small>Dealer / seller</small><b>{{sel.vehicleDealer}}</b></div>
+          <div><small>Registration</small><b>{{sel.vehicleRegistrationNumber||'Not provided'}}</b></div>
+        </div>
+        <div class="kpis" *ngIf="sel.loanType==='FARMER' || sel.loanType==='CROP'">
+          <div><small>Farm location</small><b>{{sel.farmLocation}}</b></div>
+          <div><small>Crop / season</small><b>{{sel.cropName}} · {{sel.cropSeason}}</b></div>
+          <div><small>Land area</small><b>{{sel.landArea}} {{sel.landAreaUnit}}</b></div>
+          <div><small>Estimated cultivation cost</small><b>₹{{sel.cultivationCostEstimate|number}}</b></div>
         </div>
         <div class="acts" *ngIf="editable(sel)"><button class="b p" (click)="saveEdit()" [disabled]="saving">{{saving?'Saving...':'💾 Save changes'}}</button></div>
         <p class="muted" *ngIf="!editable(sel)">This loan is {{sel.status}} and can no longer be edited.</p>
@@ -118,18 +172,18 @@ import { environment } from '../../../../environment/environment';
     <div *ngIf="tab==='docs'">
       <section class="sec">
         <h4>📄 Documents</h4>
-        <div class="doc" *ngFor="let d of docTypes">
+        <div class="doc" *ngFor="let d of documentsFor(sel)">
           <div class="dinfo"><b>{{d.label}}</b>
             <span class="dstat" [attr.data-s]="sel[d.path] ? (sel[d.status]||'Pending') : 'None'">{{sel[d.path] ? (sel[d.status]||'Pending') : 'Not uploaded'}}</span>
             <i *ngIf="sel[d.remark]">{{sel[d.remark]}}</i></div>
           <div class="dact">
             <ng-container *ngIf="sel[d.path]">
-              <a class="b" [href]="fileUrl(d.key)" target="_blank" rel="noopener">👁 View</a>
+              <a class="b" *ngFor="let file of documentItems(d.key); let i=index" [href]="fileUrl(d.key,i)" target="_blank" rel="noopener">👁 View {{documentItems(d.key).length > 1 ? i + 1 : ''}}</a>
               <button class="b p" (click)="verify(d.key,'Verified')" [disabled]="sel[d.status]==='Verified'">✔ Verify</button>
               <button class="b d" (click)="reupload(d.key)">↻ Re-upload</button>
             </ng-container>
             <label class="b up">{{uploading===d.key ? 'Uploading...' : (sel[d.path] ? '⬆ Replace' : '⬆ Upload')}}
-              <input type="file" hidden accept=".pdf,.png,.jpg,.jpeg" [disabled]="!!uploading" (change)="upload(d.key,$event)"></label>
+              <input type="file" hidden [attr.accept]="d.accept" [attr.multiple]="d.multiple ? '' : null" [disabled]="!!uploading" (change)="upload(d.key,$event)"></label>
           </div>
         </div>
         <p class="muted">Files uploaded by admin are marked as verified automatically. Allowed: PDF, PNG, JPG (max 10 MB).</p>
@@ -226,11 +280,13 @@ import { environment } from '../../../../environment/environment';
 .stat{background:#fff;border:2px solid transparent;border-radius:12px;padding:12px;display:flex;flex-direction:column;align-items:center;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.08)}
 .stat.on{border-color:#2563eb;background:#eff6ff}.sv{font-size:24px;font-weight:800;color:#1e3a8a}.sl{font-size:12px;color:#64748b}
 .card{background:#fff;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,.08);padding:6px}
+.direct{padding:16px}.direct-head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}.direct-head h3{margin:0}.direct-head p{margin:4px 0}
 .tw{overflow-x:auto}
 .lt{width:100%;border-collapse:collapse;font-size:13px}
 .lt th{background:#f8fafc;color:#475569;font-weight:600;text-align:left;padding:10px;border-bottom:2px solid #e2e8f0;white-space:nowrap}
 .lt td{padding:10px;border-bottom:1px solid #eef2f7;vertical-align:middle}
 .lt td small{display:block;color:#94a3b8;font-size:11px}.lt tr:hover td{background:#f8fafc}
+.product{display:block;color:#475569;font-size:11px;margin-top:3px}
 .ra{white-space:nowrap}.c{text-align:center}
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin:8px 0}
 .kpis div{background:#f1f5f9;padding:8px 10px;border-radius:8px;display:flex;flex-direction:column}
@@ -271,14 +327,36 @@ import { environment } from '../../../../environment/environment';
 export class AdminHomeLoans implements OnInit, OnDestroy {
   private api = `${environment.apiBaseUrl}/api/home-loans`;
   loans: any[] = []; q = ''; filter = 'all'; sel: any = null; edit: any = {}; ai: any = null; charges: any = null; events: any[] | null = null;
+  showDirectApply = false;
+  directForm: any = {
+    accountNumber: '', loanType: 'HOME', amount: 1000000, tenure: 120, interestRate: 8.5,
+    propertyValue: null, purpose: '', propertyAddress: '', vehicleCondition: 'NEW', landAreaUnit: 'ACRE'
+  };
   tab = 'details'; rates: any[] = []; closure: any = null; closeRef = '';
   tu: any = { amount: null, rate: null, extraMonths: 0, note: '' };
   msg = ''; err = ''; saving = false; busy = false; uploading = '';
-  docTypes = [
-    { key: 'fdReceipt', label: 'FD Receipt', status: 'fdReceiptStatus', remark: 'fdReceiptRemark', path: 'fdReceiptPath' },
-    { key: 'model', label: 'Home Loan Model', status: 'modelDocStatus', remark: 'modelDocRemark', path: 'modelDocPath' },
-    { key: 'signature', label: 'Signature', status: 'signatureStatus', remark: 'signatureRemark', path: 'signaturePath' }
-  ];
+  private documentSets: Record<string, any[]> = {
+    HOME: [
+      { key: 'fdReceipt', label: 'Property / FD Receipt', status: 'fdReceiptStatus', remark: 'fdReceiptRemark', path: 'fdReceiptPath', accept: '.pdf,.png,.jpg,.jpeg' },
+      { key: 'model', label: 'Property / Home Loan Model', status: 'modelDocStatus', remark: 'modelDocRemark', path: 'modelDocPath', accept: '.pdf,.png,.jpg,.jpeg' },
+      { key: 'signature', label: 'Signature', status: 'signatureStatus', remark: 'signatureRemark', path: 'signaturePath', accept: '.pdf,.png,.jpg,.jpeg' }
+    ],
+    CAR: [
+      { key: 'vehicleInvoice', label: 'Vehicle Invoice', status: 'vehicleInvoiceStatus', remark: 'vehicleInvoiceRemark', path: 'vehicleInvoicePath', accept: '.pdf,.png,.jpg,.jpeg' },
+      { key: 'vehicleImages', label: 'Car Images', status: 'vehicleImagesStatus', remark: 'vehicleImagesRemark', path: 'vehicleImagePaths', accept: '.png,.jpg,.jpeg', multiple: true },
+      { key: 'signature', label: 'Signature', status: 'signatureStatus', remark: 'signatureRemark', path: 'signaturePath', accept: '.pdf,.png,.jpg,.jpeg' }
+    ],
+    FARMER: [
+      { key: 'landRecord', label: 'Land Record', status: 'landRecordStatus', remark: 'landRecordRemark', path: 'landRecordPath', accept: '.pdf,.png,.jpg,.jpeg' },
+      { key: 'agricultureEstimate', label: 'Agriculture Estimate', status: 'agricultureEstimateStatus', remark: 'agricultureEstimateRemark', path: 'agricultureEstimatePath', accept: '.pdf,.png,.jpg,.jpeg' },
+      { key: 'signature', label: 'Signature', status: 'signatureStatus', remark: 'signatureRemark', path: 'signaturePath', accept: '.pdf,.png,.jpg,.jpeg' }
+    ],
+    CROP: [
+      { key: 'landRecord', label: 'Land Record', status: 'landRecordStatus', remark: 'landRecordRemark', path: 'landRecordPath', accept: '.pdf,.png,.jpg,.jpeg' },
+      { key: 'cropEstimate', label: 'Crop Estimate', status: 'cropEstimateStatus', remark: 'cropEstimateRemark', path: 'cropEstimatePath', accept: '.pdf,.png,.jpg,.jpeg' },
+      { key: 'signature', label: 'Signature', status: 'signatureStatus', remark: 'signatureRemark', path: 'signaturePath', accept: '.pdf,.png,.jpg,.jpeg' }
+    ]
+  };
   private pending = ['Submitted', 'Under Review', 'Documents Required', 'Documents Submitted', 'Documents Verified'];
   constructor(private http: HttpClient) {}
   private poll: any;
@@ -291,6 +369,51 @@ export class AdminHomeLoans implements OnInit, OnDestroy {
   private adm() { return encodeURIComponent(this.admin); }
   private flash(ok: string, bad = '') { this.msg = ok; this.err = bad; setTimeout(() => { this.msg = ''; this.err = ''; }, 5000); }
   private fail(e: any) { this.busy = false; this.flash('', e?.error?.message || 'Request failed'); }
+  loanTypeLabel(type: string): string {
+    return ({ HOME: 'Home Loan', CAR: 'Car Loan', FARMER: 'Farmer Loan', CROP: 'Crop Loan' } as Record<string, string>)[type] || 'Home Loan';
+  }
+  documentsFor(loan: any) { return this.documentSets[loan?.loanType || 'HOME']; }
+  documentItems(type: string): string[] {
+    const doc = this.documentsFor(this.sel).find((item: any) => item.key === type);
+    const value = doc ? this.sel?.[doc.path] : '';
+    return value ? String(value).split(',').filter(Boolean) : [];
+  }
+  private validateDirectApplication(): string {
+    const f = this.directForm;
+    if (!f.accountNumber?.trim()) return 'Enter the customer account number';
+    if (!(Number(f.amount) >= 100000)) return 'Loan amount must be at least ₹1,00,000';
+    if (!(Number(f.tenure) >= 12 && Number(f.tenure) <= 360)) return 'Tenure must be between 12 and 360 months';
+    if (!(Number(f.interestRate) > 0 && Number(f.interestRate) <= 30)) return 'Enter a valid interest rate';
+    if (f.loanType === 'CAR' && (!f.vehicleMakeModel?.trim() || !f.vehicleDealer?.trim() ||
+        !(Number(f.vehicleYear) >= 1900) || !(Number(f.vehiclePrice) >= Number(f.amount))))
+      return 'Enter valid vehicle details and a car price at least equal to the loan amount';
+    if ((f.loanType === 'FARMER' || f.loanType === 'CROP') &&
+        (!f.farmLocation?.trim() || !f.cropName?.trim() || !f.cropSeason?.trim() ||
+        !(Number(f.landArea) > 0) || !(Number(f.cultivationCostEstimate) >= Number(f.amount))))
+      return 'Enter valid farm, crop and cultivation-cost details';
+    if (f.loanType === 'CROP' && !f.purpose?.trim()) return 'Enter the crop loan purpose';
+    return '';
+  }
+  submitDirectApplication() {
+    const validationError = this.validateDirectApplication();
+    if (validationError) { this.flash('', validationError); return; }
+    this.busy = true;
+    const token = sessionStorage.getItem('adminSessionToken');
+    const headers = new HttpHeaders(token ? { Authorization: `Bearer ${token}` } : {});
+    this.http.post<any>(`${this.api}/admin`, this.directForm, { headers }).subscribe({
+      next: result => {
+        this.busy = false;
+        this.showDirectApply = false;
+        this.directForm = {
+          accountNumber: '', loanType: 'HOME', amount: 1000000, tenure: 120, interestRate: 8.5,
+          propertyValue: null, purpose: '', propertyAddress: '', vehicleCondition: 'NEW', landAreaUnit: 'ACRE'
+        };
+        this.flash(`Application ${result.applicationId} submitted`);
+        this.load();
+      },
+      error: error => this.fail(error)
+    });
+  }
   live(l: any) { return l.status === 'Approved' || l.status === 'Closed'; }
   editable(l: any) { return !['Closed', 'Rejected', 'Cancelled'].includes(l.status); }
   count(s: string) { return this.loans.filter(l => l.status === s).length; }
@@ -342,7 +465,10 @@ export class AdminHomeLoans implements OnInit, OnDestroy {
     this.refreshEvents();
     this.http.get(`${this.api}/${l.id}/analysis`).subscribe({ next: a => this.ai = a, error: () => {} });
   }
-  fileUrl(type: string) { return `${this.api}/${this.sel.id}/documents/${type}/file`; }
+  fileUrl(type: string, index = 0) {
+    const suffix = type === 'vehicleImages' ? `?index=${index}` : '';
+    return `${this.api}/${this.sel.id}/documents/${type}/file${suffix}`;
+  }
   docs(l: any) { this.http.get<any[]>(`${this.api}/${l.id}/schedule`).subscribe({ next: s => printHomeLoanDocuments(l, s), error: () => printHomeLoanDocuments(l, []) }); }
   advance(l: any) { this.http.put(`${this.api}/${l.id}/advance?admin=${this.adm()}`, {}).subscribe({ next: () => { this.flash('Moved to next process'); this.load(); }, error: e => this.fail(e) }); }
   saveEdit() {
@@ -359,12 +485,19 @@ export class AdminHomeLoans implements OnInit, OnDestroy {
   }
   reupload(type: string) { const r = prompt('Reason for re-upload?'); if (r !== null) this.verify(type, 'Reupload Required', r); }
   upload(type: string, ev: Event) {
-    const input = ev.target as HTMLInputElement; const f = input.files?.[0]; if (!f) return;
-    if (f.size > 10 * 1024 * 1024) { this.flash('', 'File must be under 10 MB'); input.value = ''; return; }
-    const fd = new FormData(); fd.append('file', f);
+    const input = ev.target as HTMLInputElement;
+    const files = Array.from(input.files || []);
+    if (!files.length) return;
+    if (files.some(file => file.size > 10 * 1024 * 1024)) { this.flash('', 'Each file must be under 10 MB'); input.value = ''; return; }
     this.uploading = type;
-    this.http.post<any>(`${this.api}/${this.sel.id}/admin-documents/${type}?admin=${this.adm()}`, fd).subscribe({
-      next: r => { this.uploading = ''; input.value = ''; this.applyUpdate(r, 'Document uploaded and verified'); },
+    from(files).pipe(
+      concatMap(file => {
+        const fd = new FormData(); fd.append('file', file);
+        return this.http.post<any>(`${this.api}/${this.sel.id}/admin-documents/${type}?admin=${this.adm()}`, fd);
+      }),
+      toArray()
+    ).subscribe({
+      next: responses => { this.uploading = ''; input.value = ''; this.applyUpdate(responses[responses.length - 1], 'Document uploaded and verified'); },
       error: e => { this.uploading = ''; input.value = ''; this.fail(e); }
     });
   }

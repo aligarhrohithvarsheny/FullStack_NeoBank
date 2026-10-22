@@ -23,6 +23,7 @@ public class HomeLoan {
     private String userName;
     private String userEmail;
     private String pan;
+    private String loanType = "HOME"; // HOME, CAR, FARMER, CROP
 
     // Requested / approved terms
     private Double amount;
@@ -31,6 +32,43 @@ public class HomeLoan {
     private String purpose;
     private String propertyAddress;
     private Double propertyValue;
+
+    // Vehicle loan details
+    private String vehicleMakeModel;
+    private String vehicleCondition;
+    private Integer vehicleYear;
+    private String vehicleRegistrationNumber;
+    private String vehicleDealer;
+    private Double vehiclePrice;
+    @Column(length = 4000)
+    private String vehicleImagePaths;
+    private String vehicleInvoicePath;
+    private String vehicleInvoiceStatus;
+    @Column(length = 1000)
+    private String vehicleInvoiceRemark;
+    private String vehicleImagesStatus;
+    @Column(length = 1000)
+    private String vehicleImagesRemark;
+
+    // Agricultural and crop loan details
+    private String farmLocation;
+    private String cropName;
+    private String cropSeason;
+    private Double landArea;
+    private String landAreaUnit;
+    private Double cultivationCostEstimate;
+    private String landRecordPath;
+    private String landRecordStatus;
+    @Column(length = 1000)
+    private String landRecordRemark;
+    private String agricultureEstimatePath;
+    private String agricultureEstimateStatus;
+    @Column(length = 1000)
+    private String agricultureEstimateRemark;
+    private String cropEstimatePath;
+    private String cropEstimateStatus;
+    @Column(length = 1000)
+    private String cropEstimateRemark;
 
     // Workflow: Submitted, Under Review, Documents Required, Documents Submitted,
     // Documents Verified, Approved, Rejected, Closed

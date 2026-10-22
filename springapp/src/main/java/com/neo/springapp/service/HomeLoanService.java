@@ -31,7 +31,9 @@ public class HomeLoanService {
     private static final double PREPAYMENT_CHARGE_PCT = 1.0;
     private static final double CLOSURE_CHARGE_PCT = 2.0;
     private static final double RENEWAL_FEE_PCT = 0.5;
-    private static final Set<String> DOC_TYPES = Set.of("fdReceipt", "model", "signature");
+    private static final Set<String> DOC_TYPES = Set.of(
+            "fdReceipt", "model", "signature", "vehicleInvoice", "vehicleImages",
+            "landRecord", "agricultureEstimate", "cropEstimate");
 
     @Value("${app.upload-dir:uploads}")
     private String uploadRoot;
@@ -53,14 +55,32 @@ public class HomeLoanService {
 
     @Transactional
     public HomeLoan submit(HomeLoan in) {
+        return createApplication(in, null);
+    }
+
+    @Transactional
+    public HomeLoan submitAdmin(HomeLoan in, String admin) {
+        if (admin == null || admin.isBlank()) throw new IllegalArgumentException("Admin identity is required");
+        return createApplication(in, admin);
+    }
+
+    @Transactional
+    public HomeLoan createApplication(HomeLoan in, String submittedBy) {
         if (in.getAccountNumber() == null || in.getAccountNumber().isBlank()) throw new RuntimeException("Account number is required");
         Account account = accountRepository.findByAccountNumber(in.getAccountNumber());
         if (account == null) throw new RuntimeException("Account not found");
-        if (n(in.getAmount()) < 100000) throw new RuntimeException("Minimum home loan amount is 1,00,000");
+        String loanType = in.getLoanType() == null || in.getLoanType().isBlank()
+                ? "HOME" : in.getLoanType().trim().toUpperCase(Locale.ROOT);
+        if (!Set.of("HOME", "CAR", "FARMER", "CROP").contains(loanType)) {
+            throw new RuntimeException("Choose a valid loan type");
+        }
+        if (n(in.getAmount()) < 100000) throw new RuntimeException("Minimum loan amount is 1,00,000");
         if (in.getTenure() == null || in.getTenure() < 12 || in.getTenure() > 360) throw new RuntimeException("Tenure must be between 12 and 360 months");
         if (n(in.getInterestRate()) <= 0 || in.getInterestRate() > 30) throw new RuntimeException("Enter a valid interest rate");
+        validateProductDetails(in, loanType);
 
         HomeLoan h = new HomeLoan();
+        h.setLoanType(loanType);
         h.setAccountNumber(in.getAccountNumber());
         h.setUserName(account.getName());
         h.setUserEmail(userService.getUserByAccountNumber(in.getAccountNumber())
@@ -69,22 +89,38 @@ public class HomeLoanService {
         h.setAmount(in.getAmount());
         h.setTenure(in.getTenure());
         h.setInterestRate(in.getInterestRate());
-        h.setPurpose(in.getPurpose());
-        h.setPropertyAddress(in.getPropertyAddress());
-        h.setPropertyValue(in.getPropertyValue());
-        h.setApplicationId("HL" + java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd").format(LocalDate.now())
+        h.setPurpose(Set.of("HOME", "CROP").contains(loanType) ? trimToNull(in.getPurpose()) : null);
+        h.setPropertyAddress("HOME".equals(loanType) ? trimToNull(in.getPropertyAddress()) : null);
+        h.setPropertyValue("HOME".equals(loanType) ? in.getPropertyValue() : null);
+        if ("CAR".equals(loanType)) {
+            h.setVehicleMakeModel(trimToNull(in.getVehicleMakeModel()));
+            h.setVehicleCondition(trimToNull(in.getVehicleCondition()));
+            h.setVehicleYear(in.getVehicleYear());
+            h.setVehicleRegistrationNumber(trimToNull(in.getVehicleRegistrationNumber()));
+            h.setVehicleDealer(trimToNull(in.getVehicleDealer()));
+            h.setVehiclePrice(in.getVehiclePrice());
+        }
+        if ("FARMER".equals(loanType) || "CROP".equals(loanType)) {
+            h.setFarmLocation(trimToNull(in.getFarmLocation()));
+            h.setCropName(trimToNull(in.getCropName()));
+            h.setCropSeason(trimToNull(in.getCropSeason()));
+            h.setLandArea(in.getLandArea());
+            h.setLandAreaUnit(trimToNull(in.getLandAreaUnit()));
+            h.setCultivationCostEstimate(in.getCultivationCostEstimate());
+        }
+        h.setApplicationId(applicationPrefix(loanType) + java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd").format(LocalDate.now())
                 + String.format("%05d", new Random().nextInt(100000)));
         h.setStatus("Submitted");
-        h.setFdReceiptStatus("Pending");
-        h.setModelDocStatus("Pending");
-        h.setSignatureStatus("Pending");
-        Map<String, Object> a = analysisService.analyze(h.getAccountNumber(), h.getAmount(), h.getTenure(), h.getInterestRate(), h.getPropertyValue());
+        for (String type : requiredDocTypes(h)) setDocumentStatus(h, type, "Pending", null);
+        Map<String, Object> a = analysisService.analyze(h.getAccountNumber(), h.getAmount(), h.getTenure(),
+                h.getInterestRate(), "HOME".equals(loanType) ? h.getPropertyValue() : null);
         h.setApprovalProbability((Double) a.get("approvalProbability"));
         h.setRiskBand((String) a.get("riskBand"));
         h = repo.save(h);
-        event(h, "SUBMITTED", h.getUserName(), "Home loan application " + h.getApplicationId() + " submitted for "
+        String actor = submittedBy == null ? h.getUserName() : submittedBy;
+        event(h, "SUBMITTED", actor, loanLabel(h) + " application " + h.getApplicationId() + " submitted for "
                 + r2(h.getAmount()) + " over " + h.getTenure() + " months @ " + h.getInterestRate() + "%", null, null, null, null);
-        notificationService.notifyForAccount(h.getAccountNumber(), "Home loan application", "Submitted",
+        notificationService.notifyForAccount(h.getAccountNumber(), loanLabel(h) + " application", "Submitted",
                 h.getApplicationId(), Map.of(
                         "Requested amount", String.valueOf(h.getAmount()),
                         "Tenure (months)", String.valueOf(h.getTenure()),
@@ -92,9 +128,80 @@ public class HomeLoanService {
         return h;
     }
 
+    private void validateProductDetails(HomeLoan in, String loanType) {
+        switch (loanType) {
+            case "CAR" -> {
+                if (in.getVehicleMakeModel() == null || in.getVehicleMakeModel().isBlank())
+                    throw new RuntimeException("Car make and model are required");
+                if (!List.of("NEW", "USED").contains(
+                        in.getVehicleCondition() == null ? "" : in.getVehicleCondition().trim().toUpperCase(Locale.ROOT)))
+                    throw new RuntimeException("Select whether the car is new or used");
+                if (in.getVehicleYear() == null || in.getVehicleYear() < 1900 || in.getVehicleYear() > LocalDate.now().getYear() + 1)
+                    throw new RuntimeException("Enter a valid car manufacturing year");
+                if (n(in.getVehiclePrice()) <= 0 || n(in.getAmount()) > n(in.getVehiclePrice()))
+                    throw new RuntimeException("Car price must be positive and at least the requested loan amount");
+                if (in.getVehicleDealer() == null || in.getVehicleDealer().isBlank())
+                    throw new RuntimeException("Car dealer name is required");
+            }
+            case "FARMER" -> validateAgricultureDetails(in, true);
+            case "CROP" -> validateAgricultureDetails(in, false);
+            default -> { }
+        }
+    }
+
+    private void validateAgricultureDetails(HomeLoan in, boolean farmerLoan) {
+        if (in.getFarmLocation() == null || in.getFarmLocation().isBlank())
+            throw new RuntimeException("Farm location is required");
+        if (in.getCropName() == null || in.getCropName().isBlank())
+            throw new RuntimeException("Crop name is required");
+        if (in.getCropSeason() == null || in.getCropSeason().isBlank())
+            throw new RuntimeException("Crop season is required");
+        if (n(in.getLandArea()) <= 0)
+            throw new RuntimeException("Cultivated land area must be greater than zero");
+        if (in.getLandAreaUnit() == null || in.getLandAreaUnit().isBlank())
+            throw new RuntimeException("Land area unit is required");
+        if (n(in.getCultivationCostEstimate()) <= 0)
+            throw new RuntimeException("Estimated cultivation cost must be greater than zero");
+        if (n(in.getAmount()) > n(in.getCultivationCostEstimate()))
+            throw new RuntimeException("Requested loan cannot exceed the estimated cultivation cost");
+        if (!farmerLoan && (in.getPurpose() == null || in.getPurpose().isBlank()))
+            throw new RuntimeException("Crop loan purpose is required");
+    }
+
+    private String trimToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    private String applicationPrefix(String loanType) {
+        return switch (loanType == null ? "HOME" : loanType.toUpperCase(Locale.ROOT)) {
+            case "CAR" -> "CL";
+            case "FARMER" -> "FL";
+            case "CROP" -> "CR";
+            default -> "HL";
+        };
+    }
+
+    public String loanLabel(HomeLoan loan) {
+        return switch (loan.getLoanType() == null ? "HOME" : loan.getLoanType().toUpperCase(Locale.ROOT)) {
+            case "CAR" -> "Car Loan";
+            case "FARMER" -> "Farmer Loan";
+            case "CROP" -> "Crop Loan";
+            default -> "Home Loan";
+        };
+    }
+
     public List<HomeLoan> all() { return repo.findAllByOrderByApplicationDateDesc(); }
     public List<HomeLoan> byAccount(String acc) { return repo.findByAccountNumberOrderByApplicationDateDesc(acc); }
     public HomeLoan get(Long id) { return repo.findById(id).orElseThrow(() -> new RuntimeException("Home loan not found")); }
+
+    private List<String> requiredDocTypes(HomeLoan loan) {
+        return switch (loan.getLoanType() == null ? "HOME" : loan.getLoanType().toUpperCase(Locale.ROOT)) {
+            case "CAR" -> List.of("vehicleInvoice", "vehicleImages", "signature");
+            case "FARMER" -> List.of("landRecord", "agricultureEstimate", "signature");
+            case "CROP" -> List.of("landRecord", "cropEstimate", "signature");
+            default -> List.of("fdReceipt", "model", "signature");
+        };
+    }
 
     // ---------- Workflow ----------
 
@@ -106,7 +213,7 @@ public class HomeLoanService {
             case "Submitted": h.setStatus("Under Review"); break;
             case "Under Review": h.setStatus("Documents Required"); break;
             case "Documents Submitted":
-                if (!allDocsVerified(h)) throw new RuntimeException("Verify all three documents (or request re-upload) first");
+                if (!allDocsVerified(h)) throw new RuntimeException("Verify all required documents (or request re-upload) first");
                 h.setStatus("Documents Verified");
                 break;
             case "Documents Required": throw new RuntimeException("Waiting for the customer to upload documents");
@@ -151,24 +258,23 @@ public class HomeLoanService {
     public HomeLoan uploadDocument(Long id, String type, MultipartFile file) throws IOException {
         if (!DOC_TYPES.contains(type)) throw new RuntimeException("Unknown document type");
         if (file == null || file.isEmpty()) throw new RuntimeException("File is empty");
+        if (file.getSize() > 10 * 1024 * 1024) throw new RuntimeException("File must be 10 MB or smaller");
         HomeLoan h = get(id);
         if (!List.of("Documents Required", "Documents Submitted").contains(h.getStatus()))
             throw new RuntimeException("Documents can be uploaded only when requested by the bank");
         String orig = file.getOriginalFilename() == null ? "file" : file.getOriginalFilename();
         String ext = orig.contains(".") ? orig.substring(orig.lastIndexOf('.')).toLowerCase() : "";
         if (!List.of(".pdf", ".png", ".jpg", ".jpeg").contains(ext)) throw new RuntimeException("Only PDF, PNG or JPG files are allowed");
+        if ("vehicleImages".equals(type) && !List.of(".png", ".jpg", ".jpeg").contains(ext))
+            throw new RuntimeException("Car images must be PNG or JPG files");
         Path uploadDir = homeLoanUploadDir();
         Files.createDirectories(uploadDir);
-        String name = h.getApplicationId() + "-" + type + "-" + System.currentTimeMillis() + ext;
+        String name = h.getApplicationId() + "-" + type + "-" + UUID.randomUUID() + ext;
         Files.copy(file.getInputStream(), uploadDir.resolve(name), StandardCopyOption.REPLACE_EXISTING);
-        switch (type) {
-            case "fdReceipt": h.setFdReceiptPath(name); h.setFdReceiptStatus("Pending"); h.setFdReceiptRemark(null); break;
-            case "model": h.setModelDocPath(name); h.setModelDocStatus("Pending"); h.setModelDocRemark(null); break;
-            default: h.setSignaturePath(name); h.setSignatureStatus("Pending"); h.setSignatureRemark(null);
-        }
-        boolean complete = h.getFdReceiptPath() != null && h.getModelDocPath() != null && h.getSignaturePath() != null
-                && !"Reupload Required".equals(h.getFdReceiptStatus()) && !"Reupload Required".equals(h.getModelDocStatus())
-                && !"Reupload Required".equals(h.getSignatureStatus());
+        setDocumentPath(h, type, name, "vehicleImages".equals(type));
+        setDocumentStatus(h, type, "Pending", null);
+        boolean complete = requiredDocTypes(h).stream().allMatch(doc ->
+                documentPath(h, doc) != null && !"Reupload Required".equals(documentStatus(h, doc)));
         if (complete) h.setStatus("Documents Submitted");
         touch(h);
         repo.save(h);
@@ -181,11 +287,8 @@ public class HomeLoanService {
         if (!DOC_TYPES.contains(type)) throw new RuntimeException("Unknown document type");
         if (!List.of("Verified", "Reupload Required").contains(decision)) throw new RuntimeException("Decision must be Verified or Reupload Required");
         HomeLoan h = get(id);
-        switch (type) {
-            case "fdReceipt": requireFile(h.getFdReceiptPath()); h.setFdReceiptStatus(decision); h.setFdReceiptRemark(remark); break;
-            case "model": requireFile(h.getModelDocPath()); h.setModelDocStatus(decision); h.setModelDocRemark(remark); break;
-            default: requireFile(h.getSignaturePath()); h.setSignatureStatus(decision); h.setSignatureRemark(remark);
-        }
+        requireFile(documentPath(h, type));
+        setDocumentStatus(h, type, decision, remark);
         if ("Reupload Required".equals(decision)) h.setStatus("Documents Required");
         else if (allDocsVerified(h)) h.setStatus("Documents Verified");
         h.setReviewedBy(admin);
@@ -195,14 +298,13 @@ public class HomeLoanService {
         return h;
     }
 
-    public Map<String, Object> documentFile(Long id, String type) throws IOException {
+    public Map<String, Object> documentFile(Long id, String type, Integer index) throws IOException {
         HomeLoan h = get(id);
-        String name = switch (type) {
-            case "fdReceipt" -> h.getFdReceiptPath();
-            case "model" -> h.getModelDocPath();
-            case "signature" -> h.getSignaturePath();
-            default -> null;
-        };
+        if (!DOC_TYPES.contains(type)) throw new RuntimeException("Unknown document type");
+        List<String> paths = documentPaths(h, type);
+        int selectedIndex = index == null ? 0 : index;
+        if (selectedIndex < 0 || selectedIndex >= paths.size()) throw new RuntimeException("Document not uploaded");
+        String name = paths.get(selectedIndex);
         if (name == null) throw new RuntimeException("Document not uploaded");
         Path uploadDir = homeLoanUploadDir();
         Path p = uploadDir.resolve(name).normalize();
@@ -214,11 +316,87 @@ public class HomeLoanService {
     }
 
     private boolean allDocsVerified(HomeLoan h) {
-        return "Verified".equals(h.getFdReceiptStatus()) && "Verified".equals(h.getModelDocStatus()) && "Verified".equals(h.getSignatureStatus())
-                && h.getFdReceiptPath() != null && h.getModelDocPath() != null && h.getSignaturePath() != null;
+        return requiredDocTypes(h).stream().allMatch(type ->
+                "Verified".equals(documentStatus(h, type)) && documentPath(h, type) != null);
     }
     private void requireFile(String p) { if (p == null) throw new RuntimeException("Document not uploaded yet"); }
-    private String docLabel(String t) { return "fdReceipt".equals(t) ? "FD receipt" : "model".equals(t) ? "Home loan model" : "Signature"; }
+
+    private List<String> documentPaths(HomeLoan h, String type) {
+        String path = documentPath(h, type);
+        if (path == null || path.isBlank()) return List.of();
+        if ("vehicleImages".equals(type)) return Arrays.stream(path.split(",")).filter(p -> !p.isBlank()).toList();
+        return List.of(path);
+    }
+
+    private String documentPath(HomeLoan h, String type) {
+        return switch (type) {
+            case "fdReceipt" -> h.getFdReceiptPath();
+            case "model" -> h.getModelDocPath();
+            case "signature" -> h.getSignaturePath();
+            case "vehicleInvoice" -> h.getVehicleInvoicePath();
+            case "vehicleImages" -> h.getVehicleImagePaths();
+            case "landRecord" -> h.getLandRecordPath();
+            case "agricultureEstimate" -> h.getAgricultureEstimatePath();
+            case "cropEstimate" -> h.getCropEstimatePath();
+            default -> null;
+        };
+    }
+
+    private String documentStatus(HomeLoan h, String type) {
+        return switch (type) {
+            case "fdReceipt" -> h.getFdReceiptStatus();
+            case "model" -> h.getModelDocStatus();
+            case "signature" -> h.getSignatureStatus();
+            case "vehicleInvoice" -> h.getVehicleInvoiceStatus();
+            case "vehicleImages" -> h.getVehicleImagesStatus();
+            case "landRecord" -> h.getLandRecordStatus();
+            case "agricultureEstimate" -> h.getAgricultureEstimateStatus();
+            case "cropEstimate" -> h.getCropEstimateStatus();
+            default -> null;
+        };
+    }
+
+    private void setDocumentPath(HomeLoan h, String type, String path, boolean append) {
+        switch (type) {
+            case "fdReceipt" -> h.setFdReceiptPath(path);
+            case "model" -> h.setModelDocPath(path);
+            case "signature" -> h.setSignaturePath(path);
+            case "vehicleInvoice" -> h.setVehicleInvoicePath(path);
+            case "vehicleImages" -> h.setVehicleImagePaths(append && h.getVehicleImagePaths() != null
+                    ? h.getVehicleImagePaths() + "," + path : path);
+            case "landRecord" -> h.setLandRecordPath(path);
+            case "agricultureEstimate" -> h.setAgricultureEstimatePath(path);
+            case "cropEstimate" -> h.setCropEstimatePath(path);
+            default -> throw new IllegalArgumentException("Unknown document type");
+        }
+    }
+
+    private void setDocumentStatus(HomeLoan h, String type, String status, String remark) {
+        switch (type) {
+            case "fdReceipt" -> { h.setFdReceiptStatus(status); h.setFdReceiptRemark(remark); }
+            case "model" -> { h.setModelDocStatus(status); h.setModelDocRemark(remark); }
+            case "signature" -> { h.setSignatureStatus(status); h.setSignatureRemark(remark); }
+            case "vehicleInvoice" -> { h.setVehicleInvoiceStatus(status); h.setVehicleInvoiceRemark(remark); }
+            case "vehicleImages" -> { h.setVehicleImagesStatus(status); h.setVehicleImagesRemark(remark); }
+            case "landRecord" -> { h.setLandRecordStatus(status); h.setLandRecordRemark(remark); }
+            case "agricultureEstimate" -> { h.setAgricultureEstimateStatus(status); h.setAgricultureEstimateRemark(remark); }
+            case "cropEstimate" -> { h.setCropEstimateStatus(status); h.setCropEstimateRemark(remark); }
+            default -> throw new IllegalArgumentException("Unknown document type");
+        }
+    }
+
+    private String docLabel(String t) {
+        return switch (t) {
+            case "fdReceipt" -> "FD receipt";
+            case "model" -> "Home loan model";
+            case "vehicleInvoice" -> "Vehicle invoice";
+            case "vehicleImages" -> "Vehicle image";
+            case "landRecord" -> "Land record";
+            case "agricultureEstimate" -> "Agriculture cost estimate";
+            case "cropEstimate" -> "Crop cost estimate";
+            default -> "Signature";
+        };
+    }
 
     // ---------- Edit / approve ----------
 
@@ -293,30 +471,31 @@ public class HomeLoanService {
         h.setPrincipalPaid(0.0);
         h.setInterestPaid(0.0);
         h.setPrepaidAmount(0.0);
-        h.setLoanAccountNumber("HLN" + System.currentTimeMillis());
+        h.setLoanAccountNumber(applicationPrefix(h.getLoanType()) + "N" + System.currentTimeMillis());
         h.setApprovalDate(LocalDateTime.now());
         h.setApprovedBy(admin);
         h.setNextEmiDate(LocalDate.now().plusMonths(1));
         h.setStatus("Approved");
         touch(h);
-        branchAccountService.recordTreasuryMovement(amount, false, "Home Loan Sanction",
-                "Home loan sanctioned and disbursed: " + h.getLoanAccountNumber(), h.getAccountNumber());
-        if (fee > 0) branchAccountService.recordTreasuryMovement(fee, true, "Home Loan Processing Fee",
+        String product = loanLabel(h);
+        branchAccountService.recordTreasuryMovement(amount, false, product + " Sanction",
+                product + " sanctioned and disbursed: " + h.getLoanAccountNumber(), h.getAccountNumber());
+        if (fee > 0) branchAccountService.recordTreasuryMovement(fee, true, product + " Processing Fee",
                 "Processing fee collected for " + h.getLoanAccountNumber(), h.getAccountNumber());
-        if (gst > 0) branchAccountService.recordTreasuryMovement(gst, true, "Home Loan Processing GST",
+        if (gst > 0) branchAccountService.recordTreasuryMovement(gst, true, product + " Processing GST",
                 "GST collected on processing fee for " + h.getLoanAccountNumber(), h.getAccountNumber());
-        if (LEGAL_CHARGES > 0) branchAccountService.recordTreasuryMovement(LEGAL_CHARGES, true, "Home Loan Legal Charges",
+        if (LEGAL_CHARGES > 0) branchAccountService.recordTreasuryMovement(LEGAL_CHARGES, true, product + " Legal Charges",
                 "Legal charges collected for " + h.getLoanAccountNumber(), h.getAccountNumber());
         double newBal = r2(n(acc.getBalance()) + h.getNetDisbursed());
         acc.setBalance(newBal);
         accountRepository.save(acc);
-        saveTxn(h, "Home Loan Disbursement", h.getNetDisbursed(), "Loan Credit", newBal,
-                "Home Loan " + h.getLoanAccountNumber() + " disbursed (" + r2(amount) + " less charges " + total + ")");
+        saveTxn(h, product + " Disbursement", h.getNetDisbursed(), "Loan Credit", newBal,
+                product + " " + h.getLoanAccountNumber() + " disbursed (" + r2(amount) + " less charges " + total + ")");
         repo.save(h);
         event(h, "DISBURSED", admin, "Approved. Sanctioned " + r2(amount) + ", charges deducted " + total
                 + " (fee " + fee + " + GST " + gst + " + legal " + LEGAL_CHARGES + "), net credited " + h.getNetDisbursed(),
                 null, h.getNetDisbursed(), null, null, amount);
-        notificationService.notifyForAccount(h.getAccountNumber(), "Home loan application", "Approved",
+        notificationService.notifyForAccount(h.getAccountNumber(), loanLabel(h) + " application", "Approved",
                 h.getApplicationId(), Map.of(
                         "Approved amount", String.valueOf(h.getAmount()),
                         "Net disbursed", String.valueOf(h.getNetDisbursed()),
@@ -363,11 +542,11 @@ public class HomeLoanService {
         if (last) principal = rp;
         double debit = r2(principal + interest);
         Transaction transaction = null;
-        String emiDescription = "Home Loan EMI " + (h.getPaidEmis() + 1) + " - " + h.getLoanAccountNumber()
+        String emiDescription = loanLabel(h) + " EMI " + (h.getPaidEmis() + 1) + " - " + h.getLoanAccountNumber()
                 + " (principal " + principal + ", interest " + interest + ")";
-        if (debitAccountNumber != null) transaction = debitAccount(h, debitAccountNumber, debit, "Home Loan EMI", emiDescription);
-        else if (ref == null) transaction = debitAccount(h, debit, "Home Loan EMI", emiDescription);
-        else creditTreasury(h, debit, "Home Loan EMI", emiDescription + refNote(ref));
+        if (debitAccountNumber != null) transaction = debitAccount(h, debitAccountNumber, debit, loanLabel(h) + " EMI", emiDescription);
+        else if (ref == null) transaction = debitAccount(h, debit, loanLabel(h) + " EMI", emiDescription);
+        else creditTreasury(h, debit, loanLabel(h) + " EMI", emiDescription + refNote(ref));
         h.setPrincipalPaid(r2(n(h.getPrincipalPaid()) + principal));
         h.setInterestPaid(r2(n(h.getInterestPaid()) + interest));
         h.setRemainingPrincipal(r2(rp - principal));
@@ -385,7 +564,7 @@ public class HomeLoanService {
     public HomeLoan payInterest(Long id, String actor) {
         HomeLoan h = activeLoan(id);
         double interest = monthlyInterest(h);
-        debitAccount(h, interest, "Home Loan Interest", "Interest-only payment - " + h.getLoanAccountNumber());
+        debitAccount(h, interest, loanLabel(h) + " Interest", "Interest-only payment - " + h.getLoanAccountNumber());
         h.setInterestPaid(r2(n(h.getInterestPaid()) + interest));
         h.setNextEmiDate(h.getNextEmiDate().plusMonths(1));
         touch(h);
@@ -465,13 +644,13 @@ public class HomeLoanService {
         Map<String, Object> p = prepayPreview(id, amount, adjustment);
         HomeLoan h = activeLoan(id);
         double total = (Double) p.get("totalDebit");
-        String prepaymentDescription = "Home Loan Prepayment (principal " + amount + ", charges "
+        String prepaymentDescription = loanLabel(h) + " Prepayment (principal " + amount + ", charges "
                 + p.get("charge") + " + GST " + p.get("gst") + ") - " + h.getLoanAccountNumber();
         Transaction transaction = null;
         if (debitAccountNumber != null) {
-            transaction = debitAccount(h, debitAccountNumber, total, "Home Loan Prepayment", prepaymentDescription);
-        } else if (ref == null) transaction = debitAccount(h, total, "Home Loan Prepayment", prepaymentDescription);
-        else creditTreasury(h, total, "Home Loan Prepayment", prepaymentDescription + refNote(ref));
+            transaction = debitAccount(h, debitAccountNumber, total, loanLabel(h) + " Prepayment", prepaymentDescription);
+        } else if (ref == null) transaction = debitAccount(h, total, loanLabel(h) + " Prepayment", prepaymentDescription);
+        else creditTreasury(h, total, loanLabel(h) + " Prepayment", prepaymentDescription + refNote(ref));
         h.setRemainingPrincipal((Double) p.get("newOutstanding"));
         h.setRemainingTenure((Integer) p.get("newRemainingTenure"));
         if (reduceEmi) h.setEmi((Double) p.get("newEmi"));
@@ -507,11 +686,11 @@ public class HomeLoanService {
         Map<String, Object> p = closurePreview(id);
         HomeLoan h = activeLoan(id);
         double total = (Double) p.get("totalPayable");
-        String closureDescription = "Home loan foreclosure - " + h.getLoanAccountNumber()
+        String closureDescription = loanLabel(h) + " foreclosure - " + h.getLoanAccountNumber()
                 + " (principal " + n(h.getRemainingPrincipal()) + ", interest " + p.get("accruedInterest")
                 + ", charges " + p.get("closureCharge") + " + GST " + p.get("gst") + ")";
-        if (ref == null) debitAccount(h, total, "Home Loan Closure", closureDescription);
-        else creditTreasury(h, total, "Home Loan Closure", closureDescription + refNote(ref));
+        if (ref == null) debitAccount(h, total, loanLabel(h) + " Closure", closureDescription);
+        else creditTreasury(h, total, loanLabel(h) + " Closure", closureDescription + refNote(ref));
         double principal = n(h.getRemainingPrincipal());
         h.setPrincipalPaid(r2(n(h.getPrincipalPaid()) + principal));
         h.setInterestPaid(r2(n(h.getInterestPaid()) + (Double) p.get("accruedInterest")));
@@ -535,7 +714,7 @@ public class HomeLoanService {
         if (h.getRemainingTenure() + months > 360) throw new RuntimeException("Total remaining tenure cannot exceed 360 months");
         double fee = r2(n(h.getRemainingPrincipal()) * RENEWAL_FEE_PCT / 100);
         double gst = r2(fee * GST_PCT / 100);
-        debitAccount(h, r2(fee + gst), "Home Loan Renewal Fee", "Renewal fee - " + h.getLoanAccountNumber());
+        debitAccount(h, r2(fee + gst), loanLabel(h) + " Renewal Fee", "Renewal fee - " + h.getLoanAccountNumber());
         h.setRemainingTenure(h.getRemainingTenure() + months);
         h.setTenure(h.getTenure() + months);
         h.setEmi(r2(HomeLoanAnalysisService.emi(n(h.getRemainingPrincipal()), h.getInterestRate(), h.getRemainingTenure())));
@@ -632,11 +811,11 @@ public class HomeLoanService {
         Account acc = accountRepository.findByAccountNumber(h.getAccountNumber());
         if (acc == null) throw new RuntimeException("Account not found");
         double nb = r2(n(acc.getBalance()) + amount);
-        branchAccountService.recordTreasuryMovement(amount, false, "Home Loan Top-up",
-                "Home loan top-up released - " + h.getLoanAccountNumber(), h.getAccountNumber());
+        branchAccountService.recordTreasuryMovement(amount, false, loanLabel(h) + " Top-up",
+                loanLabel(h) + " top-up released - " + h.getLoanAccountNumber(), h.getAccountNumber());
         acc.setBalance(nb);
         accountRepository.save(acc);
-        saveTxn(h, "Home Loan Top-up", amount, "Credit", nb, "Home loan top-up released - " + h.getLoanAccountNumber());
+        saveTxn(h, loanLabel(h) + " Top-up", amount, "Credit", nb, loanLabel(h) + " top-up released - " + h.getLoanAccountNumber());
 
         h.setRemainingPrincipal(newPrincipal);
         h.setRemainingTenure(newTenure);
@@ -658,20 +837,20 @@ public class HomeLoanService {
     public HomeLoan adminUploadDocument(Long id, String type, MultipartFile file, String admin) throws IOException {
         if (!DOC_TYPES.contains(type)) throw new RuntimeException("Unknown document type");
         if (file == null || file.isEmpty()) throw new RuntimeException("File is empty");
+        if (file.getSize() > 10 * 1024 * 1024) throw new RuntimeException("File must be 10 MB or smaller");
         HomeLoan h = get(id);
         String orig = file.getOriginalFilename() == null ? "file" : file.getOriginalFilename();
         String ext = orig.contains(".") ? orig.substring(orig.lastIndexOf('.')).toLowerCase() : "";
         if (!List.of(".pdf", ".png", ".jpg", ".jpeg").contains(ext)) throw new RuntimeException("Only PDF, PNG or JPG files are allowed");
+        if ("vehicleImages".equals(type) && !List.of(".png", ".jpg", ".jpeg").contains(ext))
+            throw new RuntimeException("Car images must be PNG or JPG files");
         Path uploadDir = homeLoanUploadDir();
         Files.createDirectories(uploadDir);
-        String name = h.getApplicationId() + "-" + type + "-" + System.currentTimeMillis() + ext;
+        String name = h.getApplicationId() + "-" + type + "-" + UUID.randomUUID() + ext;
         Files.copy(file.getInputStream(), uploadDir.resolve(name), StandardCopyOption.REPLACE_EXISTING);
         String remark = "Uploaded by admin " + admin;
-        switch (type) {
-            case "fdReceipt": h.setFdReceiptPath(name); h.setFdReceiptStatus("Verified"); h.setFdReceiptRemark(remark); break;
-            case "model": h.setModelDocPath(name); h.setModelDocStatus("Verified"); h.setModelDocRemark(remark); break;
-            default: h.setSignaturePath(name); h.setSignatureStatus("Verified"); h.setSignatureRemark(remark);
-        }
+        setDocumentPath(h, type, name, "vehicleImages".equals(type));
+        setDocumentStatus(h, type, "Verified", remark);
         if (List.of("Submitted", "Under Review", "Documents Required", "Documents Submitted").contains(h.getStatus()) && allDocsVerified(h)) h.setStatus("Documents Verified");
         touch(h);
         repo.save(h);

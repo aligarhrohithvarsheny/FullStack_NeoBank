@@ -2,6 +2,7 @@ import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
+import { concatMap, from, toArray } from 'rxjs';
 import { environment } from '../../../../environment/environment';
 import { printHomeLoanNoc, printHomeLoanDocuments } from '../../../service/home-loan-documents';
 import { printFundTransferReceipt } from '../../../service/fund-transfer-receipt';
@@ -13,8 +14,8 @@ import { printFundTransferReceipt } from '../../../service/fund-transfer-receipt
   template: `
 <div class="hl">
   <div class="hero">
-    <div><h2>🏠 Home Loan</h2><p>Apply online in 3 simple steps. Track your application and manage your loan in one place.</p></div>
-    <div class="hero-badge">Rates from 8.5% p.a.</div>
+    <div>    <h2>🏦 Loans</h2><p>Apply for a home, car, farmer or crop loan in 3 simple steps. Track your application and manage repayments.</p></div>
+    <div class="hero-badge">Indicative rates · subject to approval</div>
   </div>
   <div class="msg ok" *ngIf="msg">✔ {{msg}}</div>
   <div class="msg err" *ngIf="err">⚠ {{err}}</div>
@@ -27,20 +28,45 @@ import { printFundTransferReceipt } from '../../../service/fund-transfer-receipt
 
   <div *ngIf="tab==='apply'">
     <div class="steps">
-      <div class="step" [class.active]="step===1" [class.done]="step>1"><span>1</span><div><b>Loan details</b><small>Amount, tenure, rate</small></div></div>
+      <div class="step" [class.active]="step===1" [class.done]="step>1"><span>1</span><div><b>{{loanTypeLabel()}} details</b><small>Amount, tenure, rate and product details</small></div></div>
       <div class="step" [class.active]="step===2" [class.done]="step>2"><span>2</span><div><b>Review &amp; terms</b><small>Accept conditions</small></div></div>
       <div class="step" [class.active]="step===3"><span>3</span><div><b>Submit</b><small>Get Application ID</small></div></div>
     </div>
 
     <div class="card" *ngIf="step===1">
-      <h3>Step 1 · Enter your loan details</h3>
+      <h3>Step 1 · {{loanTypeLabel()}} details</h3>
       <div class="grid">
+        <label>Loan Type<select [(ngModel)]="form.loanType" (ngModelChange)="onLoanTypeChange()">
+          <option value="HOME">Home Loan</option>
+          <option value="CAR">Car Loan</option>
+          <option value="FARMER">Farmer Loan</option>
+          <option value="CROP">Crop Loan</option>
+        </select></label>
         <label>Loan Amount (₹)<input type="number" [(ngModel)]="form.amount" (ngModelChange)="calc()" min="100000"><small class="hint">Minimum ₹1,00,000</small></label>
         <label>Tenure (months)<input type="number" [(ngModel)]="form.tenure" (ngModelChange)="calc()" min="12" max="360"><small class="hint">12 to 360 months</small></label>
         <label>Interest Rate (% p.a.)<input type="number" step="0.05" [(ngModel)]="form.interestRate" (ngModelChange)="calc()"><small class="hint">Indicative rate; final rate set at approval</small></label>
-        <label>Property Value (₹)<input type="number" [(ngModel)]="form.propertyValue" (ngModelChange)="calc()"><small class="hint">Loan up to 90% of property value</small></label>
-        <label>Purpose<input [(ngModel)]="form.purpose" placeholder="e.g. Purchase of apartment"></label>
-        <label>Property Address<input [(ngModel)]="form.propertyAddress" placeholder="Full address of the property"></label>
+        <ng-container *ngIf="form.loanType==='HOME'">
+          <label>Property Value (₹)<input type="number" [(ngModel)]="form.propertyValue"></label>
+          <label>Purpose<input [(ngModel)]="form.purpose" placeholder="e.g. Purchase of apartment"></label>
+          <label>Property Address<input [(ngModel)]="form.propertyAddress" placeholder="Full address of the property"></label>
+        </ng-container>
+        <ng-container *ngIf="form.loanType==='CAR'">
+          <label>Car Make &amp; Model<input [(ngModel)]="form.vehicleMakeModel" placeholder="e.g. Make, model, variant"></label>
+          <label>Vehicle Condition<select [(ngModel)]="form.vehicleCondition"><option value="NEW">New</option><option value="USED">Used</option></select></label>
+          <label>Manufacturing Year<input type="number" [(ngModel)]="form.vehicleYear" min="1900"></label>
+          <label>Car Price (₹)<input type="number" [(ngModel)]="form.vehiclePrice" min="1"></label>
+          <label>Dealer / Seller<input [(ngModel)]="form.vehicleDealer"></label>
+          <label>Registration Number (if available)<input [(ngModel)]="form.vehicleRegistrationNumber"></label>
+        </ng-container>
+        <ng-container *ngIf="form.loanType==='FARMER' || form.loanType==='CROP'">
+          <label>Farm Location<input [(ngModel)]="form.farmLocation" placeholder="Village, taluk and district"></label>
+          <label>Crop Name<input [(ngModel)]="form.cropName" placeholder="Crop planned for the season"></label>
+          <label>Crop Season<input [(ngModel)]="form.cropSeason" placeholder="e.g. Kharif, Rabi"></label>
+          <label>Land Area<input type="number" [(ngModel)]="form.landArea" min="0.01"></label>
+          <label>Land Area Unit<select [(ngModel)]="form.landAreaUnit"><option value="ACRE">Acres</option><option value="HECTARE">Hectares</option></select></label>
+          <label>Estimated Cultivation Cost (₹)<input type="number" [(ngModel)]="form.cultivationCostEstimate" min="1"></label>
+          <label *ngIf="form.loanType==='CROP'">Loan Purpose<input [(ngModel)]="form.purpose" placeholder="Seeds, fertilizer, irrigation, etc."></label>
+        </ng-container>
       </div>
       <div class="emi-box" *ngIf="emiPreview">
         <div><small>Estimated EMI</small><b>₹{{emiPreview | number:'1.0-0'}}</b></div>
@@ -61,20 +87,37 @@ import { printFundTransferReceipt } from '../../../service/fund-transfer-receipt
         <div><small>Tenure</small><b>{{form.tenure}} months</b></div>
         <div><small>Interest rate</small><b>{{form.interestRate}}% p.a.</b></div>
         <div><small>Estimated EMI</small><b>₹{{emiPreview | number:'1.0-0'}}</b></div>
-        <div><small>Property value</small><b>₹{{form.propertyValue | number}}</b></div>
-        <div><small>Purpose</small><b>{{form.purpose || '-'}}</b></div>
-        <div class="wide"><small>Property address</small><b>{{form.propertyAddress || '-'}}</b></div>
+        <ng-container [ngSwitch]="form.loanType">
+          <ng-container *ngSwitchCase="'HOME'">
+            <div><small>Property value</small><b>₹{{form.propertyValue | number}}</b></div>
+            <div><small>Purpose</small><b>{{form.purpose || '-'}}</b></div>
+            <div class="wide"><small>Property address</small><b>{{form.propertyAddress || '-'}}</b></div>
+          </ng-container>
+          <ng-container *ngSwitchCase="'CAR'">
+            <div><small>Vehicle</small><b>{{form.vehicleMakeModel}} · {{form.vehicleCondition}}</b></div>
+            <div><small>Year / Price</small><b>{{form.vehicleYear}} · ₹{{form.vehiclePrice | number}}</b></div>
+            <div><small>Dealer</small><b>{{form.vehicleDealer}}</b></div>
+            <div><small>Registration (if available)</small><b>{{form.vehicleRegistrationNumber || '-'}}</b></div>
+          </ng-container>
+          <ng-container *ngSwitchDefault>
+            <div><small>Crop and season</small><b>{{form.cropName}} · {{form.cropSeason}}</b></div>
+            <div><small>Farm location</small><b>{{form.farmLocation}}</b></div>
+            <div><small>Land area</small><b>{{form.landArea}} {{form.landAreaUnit}}</b></div>
+            <div><small>Estimated cultivation cost</small><b>₹{{form.cultivationCostEstimate | number}}</b></div>
+            <div *ngIf="form.loanType==='CROP'"><small>Purpose</small><b>{{form.purpose}}</b></div>
+          </ng-container>
+        </ng-container>
       </div>
       <div class="terms">
         <h4>Terms &amp; Conditions</h4>
         <ol>
           <li>Submitting this form is only an application. Approval is at the sole discretion of NeoBank after document verification.</li>
-          <li>You must upload three documents when requested: FD receipt, Home Loan model and signature. Documents can be re-uploaded if the bank asks.</li>
+          <li>When requested, upload the documents for your selected loan: property documents for a home loan, vehicle invoice and car images for a car loan, or land and crop-cost records for an agricultural loan, plus your signature.</li>
           <li>The interest rate shown is indicative and may change at approval based on credit assessment.</li>
           <li>A processing fee and applicable GST are deducted from the sanctioned amount at disbursal.</li>
           <li>Prepayment attracts 1% charge plus 18% GST. Foreclosure attracts 2% of the outstanding principal plus GST and one month's interest.</li>
           <li>EMIs are due monthly. Delayed EMIs may attract penal interest and affect your credit profile.</li>
-          <li>The property remains security for the loan until it is fully repaid and closed.</li>
+          <li>Any collateral or security provided for the loan remains subject to the facility terms until the loan is fully repaid and closed.</li>
           <li>You may cancel the application any time before approval, free of charge.</li>
           <li>You confirm that all information provided is true and complete.</li>
         </ol>
@@ -91,7 +134,7 @@ import { printFundTransferReceipt } from '../../../service/fund-transfer-receipt
       <div class="timeline">
         <div><span>1</span>You receive an <b>Application ID</b> instantly</div>
         <div><span>2</span>The bank reviews your request</div>
-        <div><span>3</span>Upload FD receipt, Home Loan model and signature</div>
+        <div><span>3</span>Upload the relevant {{loanTypeLabel()}} documents when requested</div>
         <div><span>4</span>Documents are verified (re-upload if asked)</div>
         <div><span>5</span>Loan approved and credited to your savings account</div>
       </div>
@@ -101,11 +144,11 @@ import { printFundTransferReceipt } from '../../../service/fund-transfer-receipt
   </div>
 
 <div *ngIf="tab==='mine'">
-    <div *ngIf="!loans.length" class="card">No home loan applications yet.</div>
+    <div *ngIf="!loans.length" class="card">No loan applications yet.</div>
     <div class="card" *ngFor="let l of loans">
       <div class="row">
         <div><b>{{l.applicationId}}</b> <span class="badge" [attr.data-s]="l.status">{{l.status}}</span><br>
-          ₹{{l.amount | number}} · {{l.tenure}} months · {{l.interestRate}}%</div>
+          <span class="badge">{{loanTypeLabel(l.loanType)}}</span> · ₹{{l.amount | number}} · {{l.tenure}} months · {{l.interestRate}}%</div>
         <div>
           <button class="btn danger sm" *ngIf="canCancel(l)" (click)="cancel(l)">Cancel Application</button>
           <button class="btn sm" (click)="toggle(l)">{{sel?.id===l.id?'Hide':'Details'}}</button>
@@ -117,14 +160,29 @@ import { printFundTransferReceipt } from '../../../service/fund-transfer-receipt
       <div class="msg err" *ngIf="l.status==='Cancelled'">This application was cancelled.</div>
 
       <div *ngIf="sel?.id===l.id">
+        <div class="review" *ngIf="l.loanType==='CAR'">
+          <div><small>Vehicle</small><b>{{l.vehicleMakeModel}} · {{l.vehicleCondition}}</b></div>
+          <div><small>Year / price</small><b>{{l.vehicleYear}} · ₹{{l.vehiclePrice|number}}</b></div>
+          <div><small>Dealer / seller</small><b>{{l.vehicleDealer}}</b></div>
+          <div><small>Registration</small><b>{{l.vehicleRegistrationNumber||'Not provided'}}</b></div>
+        </div>
+        <div class="review" *ngIf="l.loanType==='FARMER' || l.loanType==='CROP'">
+          <div><small>Farm location</small><b>{{l.farmLocation}}</b></div>
+          <div><small>Crop / season</small><b>{{l.cropName}} · {{l.cropSeason}}</b></div>
+          <div><small>Land area</small><b>{{l.landArea}} {{l.landAreaUnit}}</b></div>
+          <div><small>Estimated cultivation cost</small><b>₹{{l.cultivationCostEstimate|number}}</b></div>
+        </div>
         <div class="docs" *ngIf="!isLive(l) && l.status!=='Rejected'">
-          <h4>Documents (upload PDF/image)</h4>
-          <div class="doc" *ngFor="let d of docTypes">
+          <h4>Documents (PDF/image)</h4>
+          <div class="doc" *ngFor="let d of documentsFor(l)">
             <span>{{d.label}}:
               <b class="dstat" [attr.data-s]="l[d.path] ? (l[d.status]||'Pending') : 'None'">{{l[d.path] ? '✔ Uploaded · ' + (l[d.status]||'Pending') : 'Not uploaded'}}</b>
+              <small *ngIf="l[d.path]"> · {{documentNames(l,d.key).join(', ')}}</small>
               <i *ngIf="l[d.remark]">— {{l[d.remark]}}</i></span>
+            <a *ngFor="let name of documentNames(l,d.key); let i=index" class="btn sm ghost"
+              [href]="documentUrl(l,d.key,i)" target="_blank" rel="noopener">View {{i + 1}}</a>
             <span *ngIf="canUpload(l) && l[d.status]!=='Verified'">
-              <input type="file" accept=".pdf,.png,.jpg,.jpeg" (change)="upload(l,d.key,$event)" [disabled]="uploading===d.key">
+              <input type="file" [attr.accept]="d.accept" [attr.multiple]="d.multiple ? '' : null" (change)="upload(l,d.key,$event)" [disabled]="uploading===d.key">
               <small *ngIf="uploading===d.key"> Uploading...</small>
             </span>
           </div>
@@ -187,7 +245,7 @@ import { printFundTransferReceipt } from '../../../service/fund-transfer-receipt
   </div>
 
   <div *ngIf="tab==='consolidated' && cons" class="card" id="hl-print">
-    <h3>Consolidated Home Loan Statement <button class="btn sm" (click)="print()">Print</button></h3>
+    <h3>Consolidated Loan Statement <button class="btn sm" (click)="print()">Print</button></h3>
     <div class="stats">
       <div><small>Sanctioned</small><b>₹{{cons.totalSanctioned|number}}</b></div>
       <div><small>Outstanding</small><b>₹{{cons.totalOutstanding|number}}</b></div>
@@ -263,20 +321,54 @@ export class Homeloan implements OnInit, OnDestroy {
   private api = `${environment.apiBaseUrl}/api/home-loans`;
   tab = 'apply';
   user: any = {};
-  form: any = { amount: 1000000, tenure: 120, interestRate: 8.5, propertyValue: 1500000, purpose: '', propertyAddress: '' };
+  form: any = {
+    loanType: 'HOME', amount: 1000000, tenure: 120, interestRate: 8.5,
+    propertyValue: 1500000, purpose: '', propertyAddress: '', vehicleCondition: 'NEW', landAreaUnit: 'ACRE'
+  };
   emiPreview = 0; analysis: any = null; loans: any[] = []; sel: any = null;
   schedule: any[] = []; statement: any = null; cons: any = null;
   prepayAmt: number | null = null; renewMonths: number | null = null; prepayPrev: any = null; closePrev: any = null;
   msg = ''; err = ''; busy = false;
-  docTypes = [
-    { key: 'fdReceipt', path: 'fdReceiptPath', label: 'FD Receipt', status: 'fdReceiptStatus', remark: 'fdReceiptRemark' },
-    { key: 'model', path: 'modelDocPath', label: 'Home Loan Model', status: 'modelDocStatus', remark: 'modelDocRemark' },
-    { key: 'signature', path: 'signaturePath', label: 'Signature', status: 'signatureStatus', remark: 'signatureRemark' }
-  ];
+  private documentSets: Record<string, any[]> = {
+    HOME: [
+      { key: 'fdReceipt', path: 'fdReceiptPath', label: 'Property / FD Receipt', status: 'fdReceiptStatus', remark: 'fdReceiptRemark', accept: '.pdf,.png,.jpg,.jpeg' },
+      { key: 'model', path: 'modelDocPath', label: 'Property / Home Loan Model', status: 'modelDocStatus', remark: 'modelDocRemark', accept: '.pdf,.png,.jpg,.jpeg' },
+      { key: 'signature', path: 'signaturePath', label: 'Signature', status: 'signatureStatus', remark: 'signatureRemark', accept: '.pdf,.png,.jpg,.jpeg' }
+    ],
+    CAR: [
+      { key: 'vehicleInvoice', path: 'vehicleInvoicePath', label: 'Vehicle Invoice', status: 'vehicleInvoiceStatus', remark: 'vehicleInvoiceRemark', accept: '.pdf,.png,.jpg,.jpeg' },
+      { key: 'vehicleImages', path: 'vehicleImagePaths', label: 'Car Images', status: 'vehicleImagesStatus', remark: 'vehicleImagesRemark', accept: '.png,.jpg,.jpeg', multiple: true },
+      { key: 'signature', path: 'signaturePath', label: 'Signature', status: 'signatureStatus', remark: 'signatureRemark', accept: '.pdf,.png,.jpg,.jpeg' }
+    ],
+    FARMER: [
+      { key: 'landRecord', path: 'landRecordPath', label: 'Land Record', status: 'landRecordStatus', remark: 'landRecordRemark', accept: '.pdf,.png,.jpg,.jpeg' },
+      { key: 'agricultureEstimate', path: 'agricultureEstimatePath', label: 'Agriculture Estimate', status: 'agricultureEstimateStatus', remark: 'agricultureEstimateRemark', accept: '.pdf,.png,.jpg,.jpeg' },
+      { key: 'signature', path: 'signaturePath', label: 'Signature', status: 'signatureStatus', remark: 'signatureRemark', accept: '.pdf,.png,.jpg,.jpeg' }
+    ],
+    CROP: [
+      { key: 'landRecord', path: 'landRecordPath', label: 'Land Record', status: 'landRecordStatus', remark: 'landRecordRemark', accept: '.pdf,.png,.jpg,.jpeg' },
+      { key: 'cropEstimate', path: 'cropEstimatePath', label: 'Crop Estimate', status: 'cropEstimateStatus', remark: 'cropEstimateRemark', accept: '.pdf,.png,.jpg,.jpeg' },
+      { key: 'signature', path: 'signaturePath', label: 'Signature', status: 'signatureStatus', remark: 'signatureRemark', accept: '.pdf,.png,.jpg,.jpeg' }
+    ]
+  };
   private t: any;
   private poll: any;
   adjustment = 'REDUCE_TENURE';
   step = 1; agreed = false; uploading = '';
+  loanTypeLabel(type?: string): string {
+    const loanType = type || this.form.loanType;
+    return ({ HOME: 'Home Loan', CAR: 'Car Loan', FARMER: 'Farmer Loan', CROP: 'Crop Loan' } as Record<string, string>)[loanType] || 'Home Loan';
+  }
+  documentsFor(loan: any) { return this.documentSets[loan.loanType || 'HOME']; }
+  documentNames(loan: any, type: string): string[] {
+    const path = this.documentSets[loan.loanType || 'HOME'].find((d: any) => d.key === type)?.path;
+    const value = path ? loan[path] : '';
+    return value ? String(value).split(',').filter(Boolean) : [];
+  }
+  documentUrl(loan: any, type: string, index: number) {
+    return `${this.api}/${loan.id}/documents/${type}/file${type === 'vehicleImages' ? `?index=${index}` : ''}`;
+  }
+  onLoanTypeChange() { this.form.purpose = ''; this.calc(); }
   canUpload(l: any) { return ['Documents Required', 'Documents Submitted'].includes(l.status); }
   stages = ['Submitted', 'Under Review', 'Documents', 'Verified', 'Approved'];
   stageIdx(l: any) {
@@ -291,8 +383,22 @@ export class Homeloan implements OnInit, OnDestroy {
     const f = this.form;
     if (!(f.amount >= 100000)) return 'Loan amount must be at least ₹1,00,000';
     if (!(f.tenure >= 12 && f.tenure <= 360)) return 'Tenure must be between 12 and 360 months';
-    if (!(f.interestRate > 0)) return 'Enter a valid interest rate';
-    if (f.propertyValue > 0 && f.amount > f.propertyValue * 0.9) return 'Loan amount cannot exceed 90% of the property value';
+    if (!(f.interestRate > 0 && f.interestRate <= 30)) return 'Enter a valid interest rate';
+    if (f.loanType === 'HOME') {
+      if (f.propertyValue > 0 && f.amount > f.propertyValue * 0.9) return 'Loan amount cannot exceed 90% of the property value';
+    }
+    if (f.loanType === 'CAR') {
+      if (!f.vehicleMakeModel?.trim() || !f.vehicleDealer?.trim()) return 'Enter the car make, model and dealer or seller';
+      if (!['NEW', 'USED'].includes(f.vehicleCondition)) return 'Select whether the car is new or used';
+      if (!(f.vehicleYear >= 1900 && f.vehicleYear <= new Date().getFullYear() + 1)) return 'Enter a valid car manufacturing year';
+      if (!(f.vehiclePrice > 0) || f.amount > f.vehiclePrice) return 'Car price must be at least the requested loan amount';
+    }
+    if (f.loanType === 'FARMER' || f.loanType === 'CROP') {
+      if (!f.farmLocation?.trim() || !f.cropName?.trim() || !f.cropSeason?.trim()) return 'Enter the farm location, crop name and season';
+      if (!(f.landArea > 0) || !f.landAreaUnit) return 'Enter a valid land area and unit';
+      if (!(f.cultivationCostEstimate > 0) || f.amount > f.cultivationCostEstimate) return 'Estimated cultivation cost must be at least the requested loan amount';
+      if (f.loanType === 'CROP' && !f.purpose?.trim()) return 'Enter the crop loan purpose';
+    }
     return '';
   }
   next() { if (!this.formError()) this.step = 2; }
@@ -327,7 +433,11 @@ export class Homeloan implements OnInit, OnDestroy {
     clearTimeout(this.t);
     this.t = setTimeout(() => {
       if (!this.user.accountNumber) return;
-      this.http.post(`${this.api}/analyze`, { accountNumber: this.user.accountNumber, ...this.form }).subscribe({ next: (a) => this.analysis = a, error: () => {} });
+      this.http.post(`${this.api}/analyze`, {
+        accountNumber: this.user.accountNumber,
+        ...this.form,
+        propertyValue: this.form.loanType === 'HOME' ? this.form.propertyValue : null
+      }).subscribe({ next: (a) => this.analysis = a, error: () => {} });
     }, 400);
   }
   load() {
@@ -344,13 +454,27 @@ export class Homeloan implements OnInit, OnDestroy {
   }
   toggle(l: any) { this.sel = this.sel?.id === l.id ? null : l; this.payments = []; if (this.sel) this.loadPayments(l); this.schedule = []; this.statement = null; this.prepayPrev = null; this.closePrev = null; }
   upload(l: any, type: string, ev: any) {
-    const f = ev.target.files?.[0]; if (!f) return;
-    const input = ev.target;
-    if (f.size > 10 * 1024 * 1024) { this.flash('', 'File must be under 10 MB'); input.value = ''; return; }
-    const fd = new FormData(); fd.append('file', f);
+    const input = ev.target as HTMLInputElement;
+    const files = Array.from(input.files || []);
+    if (!files.length) return;
+    if (files.some(file => file.size > 10 * 1024 * 1024)) {
+      this.flash('', 'Each file must be under 10 MB'); input.value = ''; return;
+    }
     this.uploading = type;
-    this.http.post<any>(`${this.api}/${l.id}/documents/${type}`, fd).subscribe({
-      next: r => { this.uploading = ''; input.value = ''; this.flash('Document uploaded successfully'); if (this.sel?.id === r.id) this.sel = r; this.load(); },
+    from(files).pipe(
+      concatMap(file => {
+        const fd = new FormData(); fd.append('file', file);
+        return this.http.post<any>(`${this.api}/${l.id}/documents/${type}`, fd);
+      }),
+      toArray()
+    ).subscribe({
+      next: responses => {
+        this.uploading = ''; input.value = '';
+        const updated = responses[responses.length - 1];
+        this.flash('Document uploaded successfully');
+        if (this.sel?.id === updated.id) this.sel = updated;
+        this.load();
+      },
       error: e => { this.uploading = ''; input.value = ''; this.fail(e); }
     });
   }

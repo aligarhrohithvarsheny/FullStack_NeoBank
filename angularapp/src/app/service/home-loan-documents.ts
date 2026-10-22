@@ -5,15 +5,28 @@ const date = (v: any) => (v ? new Date(v).toLocaleDateString('en-IN', { day: '2-
 const row = (k: string, v: any) => `<tr><th>${k}</th><td>${esc(v)}</td></tr>`;
 
 export function printHomeLoanDocuments(l: any, schedule: any[] = []) {
+  const product = ({ HOME: 'Home Loan', CAR: 'Car Loan', FARMER: 'Farmer Loan', CROP: 'Crop Loan' } as Record<string, string>)[l.loanType] || 'Home Loan';
+  const productRows = l.loanType === 'CAR'
+    ? `${row('Vehicle', l.vehicleMakeModel)}${row('Condition / year', `${l.vehicleCondition || '-'} / ${l.vehicleYear || '-'}`)}${row('Dealer / seller', l.vehicleDealer)}${row('Vehicle price', money(l.vehiclePrice))}${row('Registration', l.vehicleRegistrationNumber)}`
+    : (l.loanType === 'FARMER' || l.loanType === 'CROP')
+      ? `${row('Farm location', l.farmLocation)}${row('Crop / season', `${l.cropName || '-'} / ${l.cropSeason || '-'}`)}${row('Land area', `${l.landArea ?? '-'} ${l.landAreaUnit || ''}`)}${row('Cultivation cost estimate', money(l.cultivationCostEstimate))}`
+      : `${row('Property address', l.propertyAddress)}${row('Property value', money(l.propertyValue))}`;
+  const docRows = l.loanType === 'CAR'
+    ? `${row('Vehicle invoice', l.vehicleInvoiceStatus)}${row('Car images', l.vehicleImagesStatus)}${row('Signature', l.signatureStatus)}`
+    : l.loanType === 'FARMER'
+      ? `${row('Land record', l.landRecordStatus)}${row('Agriculture estimate', l.agricultureEstimateStatus)}${row('Signature', l.signatureStatus)}`
+      : l.loanType === 'CROP'
+        ? `${row('Land record', l.landRecordStatus)}${row('Crop estimate', l.cropEstimateStatus)}${row('Signature', l.signatureStatus)}`
+        : `${row('FD receipt', l.fdReceiptStatus)}${row('Home loan model', l.modelDocStatus)}${row('Signature', l.signatureStatus)}`;
   const rows = (schedule || []).slice(0, 24).map((s: any, i: number) =>
     `<tr><td>${esc(s.installment ?? s.no ?? i + 1)}</td><td>${date(s.dueDate ?? s.date)}</td><td>${money(s.emi)}</td><td>${money(s.principal)}</td><td>${money(s.interest)}</td><td>${money(s.balance)}</td></tr>`).join('');
 
   const head = (title: string, page: number) => `
-    <div class="hd"><div><div class="bank">NeoBank</div><div class="sub">Home Loan Division</div></div>
+    <div class="hd"><div><div class="bank">NeoBank</div><div class="sub">${esc(product)} Division</div></div>
     <div class="ref">Application ID: <b>${esc(l.applicationId)}</b><br>Loan A/c: <b>${esc(l.loanAccountNumber)}</b></div></div>
     <h2>${title}</h2><div class="pg">Page ${page} of 3</div>`;
 
-  const html = `<!doctype html><html><head><meta charset="utf-8"><title>Home Loan ${esc(l.applicationId)}</title>
+  const html = `<!doctype html><html><head><meta charset="utf-8"><title>${esc(product)} ${esc(l.applicationId)}</title>
 <style>
 *{box-sizing:border-box}body{font-family:'Segoe UI',Arial,sans-serif;color:#0f172a;margin:0}
 .page{width:210mm;min-height:285mm;padding:16mm;margin:auto;page-break-after:always;border:1px solid #cbd5e1;position:relative}
@@ -33,19 +46,19 @@ th,td{border:1px solid #e2e8f0;padding:7px 9px;text-align:left}th{background:#f1
 @media print{.page{border:0}}
 </style></head><body>
 
-<div class="page">${head('Home Loan Sanction &amp; Customer Details', 1)}
+<div class="page">${head(`${esc(product)} Sanction &amp; Customer Details`, 1)}
   <h3>Customer details</h3>
   <table>${row('Customer name', l.userName)}${row('Savings account', l.accountNumber)}${row('Email', l.userEmail)}${row('PAN', l.pan)}</table>
   <h3>Loan details</h3>
   <table>${row('Sanctioned amount', money(l.amount))}${row('Tenure', (l.tenure ?? '-') + ' months')}${row('Interest rate', (l.interestRate ?? '-') + '% p.a.')}
-  ${row('Monthly EMI', money(l.emi))}${row('Purpose', l.purpose)}${row('Property address', l.propertyAddress)}${row('Property value', money(l.propertyValue))}
+  ${row('Monthly EMI', money(l.emi))}${row('Purpose', l.purpose)}${productRows}
   ${row('Application date', date(l.applicationDate))}${row('Approval date', date(l.approvalDate))}${row('Approved by', l.approvedBy)}${row('First EMI due', date(l.nextEmiDate))}</table>
   <h3>Documents verified</h3>
-  <table>${row('FD receipt', l.fdReceiptStatus)}${row('Home loan model', l.modelDocStatus)}${row('Signature', l.signatureStatus)}</table>
+  <table>${docRows}</table>
   <div class="stamp">APPROVED</div>
 </div>
 
-<div class="page">${head('Home Loan Receipt (FD-style Disbursement Certificate)', 2)}
+<div class="page">${head(`${esc(product)} Disbursement Certificate`, 2)}
   <div class="fd">
     <div style="font-size:12px;color:#64748b">Net amount credited to savings account ${esc(l.accountNumber)}</div>
     <div class="big">${money(l.netDisbursed)}</div>
@@ -60,10 +73,10 @@ th,td{border:1px solid #e2e8f0;padding:7px 9px;text-align:left}th{background:#f1
   <p class="note">This is a computer generated certificate and is valid without a physical signature.</p>
 </div>
 
-<div class="page">${head('Home Loan Model &amp; Signature', 3)}
+<div class="page">${head(`${esc(product)} Repayment Model`, 3)}
   <h3>Repayment model (first ${Math.min(24, (schedule || []).length)} instalments)</h3>
   <table class="grid"><tr><th>#</th><th>Due date</th><th>EMI</th><th>Principal</th><th>Interest</th><th>Balance</th></tr>${rows || '<tr><td colspan="6">Schedule not available</td></tr>'}</table>
-  <div class="sig"><div>Customer signature<br><small>${esc(l.userName)}</small></div><div>Authorised signatory<br><small>NeoBank Home Loan Division</small></div></div>
+  <div class="sig"><div>Customer signature<br><small>${esc(l.userName)}</small></div><div>Authorised signatory<br><small>NeoBank ${esc(product)} Division</small></div></div>
   <p class="note">By signing, the customer confirms acceptance of the sanction terms, charges and repayment schedule.</p>
 </div>
 <script>window.onload=function(){setTimeout(function(){window.print()},300)}</script>
@@ -76,6 +89,10 @@ th,td{border:1px solid #e2e8f0;padding:7px 9px;text-align:left}th{background:#f1
 
 export function printHomeLoanNoc(n: any) {
   const l = n.loan || {};
+  const product = ({ HOME: 'Home Loan', CAR: 'Car Loan', FARMER: 'Farmer Loan', CROP: 'Crop Loan' } as Record<string, string>)[l.loanType] || 'Home Loan';
+  const collateral = l.loanType === 'CAR' ? l.vehicleMakeModel
+    : l.loanType === 'FARMER' || l.loanType === 'CROP' ? `${l.farmLocation || '-'} · ${l.cropName || '-'}`
+      : l.propertyAddress;
   const html = `<!doctype html><html><head><meta charset="utf-8"><title>NOC ${esc(n.nocNumber)}</title>
 <style>
 body{font-family:'Segoe UI',Arial,sans-serif;color:#0f172a;margin:0;padding:24px}
@@ -89,17 +106,16 @@ table{width:100%;border-collapse:collapse;margin:14px 0;font-size:14px}th,td{bor
 .sig{margin-top:70px;display:flex;justify-content:space-between}.sig div{border-top:1px solid #0f172a;padding-top:6px;width:42%;text-align:center;font-size:13px}
 .seal{position:absolute;right:50px;top:150px;border:3px solid #16a34a;color:#16a34a;font-weight:800;padding:6px 14px;border-radius:8px;transform:rotate(-10deg);opacity:.75}
 </style></head><body><div class="c">
-<div class="hd"><div class="bank">NeoBank</div><div style="font-size:12px;color:#64748b">Home Loan Division</div></div>
+<div class="hd"><div class="bank">NeoBank</div><div style="font-size:12px;color:#64748b">${esc(product)} Division</div></div>
 <div class="seal">LOAN CLOSED</div>
 <h1>NO OBJECTION CERTIFICATE</h1>
 <div class="meta"><span>NOC No: <b>${esc(n.nocNumber)}</b></span><span>Date: <b>${date(n.issuedOn)}</b></span></div>
-<p>This is to certify that the Home Loan account <b>${esc(l.loanAccountNumber)}</b> (Application ID <b>${esc(l.applicationId)}</b>) sanctioned to
+<p>This is to certify that the ${esc(product)} account <b>${esc(l.loanAccountNumber)}</b> (Application ID <b>${esc(l.applicationId)}</b>) sanctioned to
 <b>${esc(l.userName)}</b>, holder of savings account <b>${esc(l.accountNumber)}</b>, has been fully repaid and closed on <b>${date(l.closureDate)}</b>.
-NeoBank has <b>no objection</b> and no further claim against the borrower in respect of this loan, and any lien or charge created on the property or deposits
-as security for this loan stands released.</p>
+NeoBank has <b>no objection</b> and no further claim against the borrower in respect of this loan, and any security interest created in connection with this facility stands released.</p>
 <table>${row('Borrower', l.userName)}${row('Loan account', l.loanAccountNumber)}${row('Total sanctioned (incl. top-ups)', money(l.amount))}
 ${row('Principal repaid', money(l.principalPaid))}${row('Interest paid', money(l.interestPaid))}${row('Closure amount', money(l.closureAmount))}
-${row('Property', l.propertyAddress)}${row('Closure date', date(l.closureDate))}</table>
+${row('Facility / collateral', collateral)}${row('Closure date', date(l.closureDate))}</table>
 <p style="font-size:12px;color:#64748b">This is a computer generated certificate issued by NeoBank. Please retain it for your records.</p>
 <div class="sig"><div>Borrower<br><small>${esc(l.userName)}</small></div><div>Authorised signatory<br><small>NeoBank Home Loan Division</small></div></div>
 </div><script>window.onload=function(){setTimeout(function(){window.print()},300)}</script></body></html>`;
