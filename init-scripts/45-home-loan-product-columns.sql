@@ -8,7 +8,8 @@ SELECT GROUP_CONCAT(
 )
 INTO @home_loan_missing_columns
 FROM (
-    SELECT 'vehicle_make_model' AS column_name, 'VARCHAR(255)' AS column_definition
+    SELECT 'loan_type' AS column_name, 'VARCHAR(255)' AS column_definition
+    UNION ALL SELECT 'vehicle_make_model', 'VARCHAR(255)'
     UNION ALL SELECT 'vehicle_condition', 'VARCHAR(255)'
     UNION ALL SELECT 'vehicle_year', 'INT'
     UNION ALL SELECT 'vehicle_registration_number', 'VARCHAR(255)'
@@ -53,3 +54,13 @@ SET @home_loan_ddl = IF(
 PREPARE home_loan_schema_update FROM @home_loan_ddl;
 EXECUTE home_loan_schema_update;
 DEALLOCATE PREPARE home_loan_schema_update;
+
+UPDATE home_loans
+SET loan_type = CASE
+    WHEN UPPER(LEFT(application_id, 2)) = 'CL' THEN 'CAR'
+    WHEN UPPER(LEFT(application_id, 2)) = 'FL' THEN 'FARMER'
+    WHEN UPPER(LEFT(application_id, 2)) = 'CR' THEN 'CROP'
+    ELSE 'HOME'
+END
+WHERE loan_type IS NULL OR loan_type = '' OR
+    (UPPER(loan_type) = 'HOME' AND UPPER(LEFT(application_id, 2)) IN ('CL', 'FL', 'CR'));
