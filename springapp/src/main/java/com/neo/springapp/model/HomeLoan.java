@@ -30,7 +30,9 @@ public class HomeLoan {
     private Double amount;
     private Integer tenure; // months
     private Double interestRate; // % p.a.
+    @Column(columnDefinition = "TEXT")
     private String purpose;
+    @Column(columnDefinition = "TEXT")
     private String propertyAddress;
     private Double propertyValue;
 
@@ -94,22 +96,26 @@ public class HomeLoan {
     private LocalDateTime applicationDate;
     private LocalDateTime lastUpdated;
     private String reviewedBy;
-    @Column(length = 1000)
+    @Column(columnDefinition = "TEXT")
     private String adminNotes;
+    @Column(columnDefinition = "TEXT")
     private String rejectionReason;
 
     // Documents (FD receipt, property/home loan model, signature)
+    @Column(columnDefinition = "TEXT")
     private String fdReceiptPath;
+    @Column(columnDefinition = "TEXT")
     private String modelDocPath;
+    @Column(columnDefinition = "TEXT")
     private String signaturePath;
     private String fdReceiptStatus;   // Pending, Verified, Reupload Required
     private String modelDocStatus;
     private String signatureStatus;
-    @Column(length = 1000)
+    @Column(columnDefinition = "TEXT")
     private String fdReceiptRemark;
-    @Column(length = 1000)
+    @Column(columnDefinition = "TEXT")
     private String modelDocRemark;
-    @Column(length = 1000)
+    @Column(columnDefinition = "TEXT")
     private String signatureRemark;
 
     // Approval / charges

@@ -17,6 +17,12 @@ public class HomeLoanProductSchemaMigrationRunner implements ApplicationRunner {
     private static final Logger log = LoggerFactory.getLogger(HomeLoanProductSchemaMigrationRunner.class);
     private static final Map<String, String> COLUMNS = new LinkedHashMap<>();
 
+    private static final String[] LEGACY_TEXT_COLUMNS = {
+            "purpose", "property_address", "rejection_reason", "fd_receipt_path",
+            "model_doc_path", "signature_path", "fd_receipt_remark", "model_doc_remark",
+            "signature_remark", "admin_notes"
+    };
+
     static {
         COLUMNS.put("loan_type", "VARCHAR(32)");
         COLUMNS.put("vehicle_make_model", "TEXT");
@@ -71,6 +77,10 @@ public class HomeLoanProductSchemaMigrationRunner implements ApplicationRunner {
             return;
         }
 
+        // Free inline row space before adding product columns to legacy tables.
+        for (String column : LEGACY_TEXT_COLUMNS) {
+            ensureTextColumn(column);
+        }
         for (Map.Entry<String, String> column : COLUMNS.entrySet()) {
             ensureColumn(column.getKey(), column.getValue());
         }
