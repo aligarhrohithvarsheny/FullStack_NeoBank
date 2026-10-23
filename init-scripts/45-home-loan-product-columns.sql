@@ -2,6 +2,41 @@
 -- Safe to re-run: existing columns are omitted from the ALTER statement.
 SET SESSION group_concat_max_len = 8192;
 
+-- Legacy free-text and file-path fields can otherwise leave too little inline
+-- row space for the new columns on older MySQL tables.
+SELECT GROUP_CONCAT(
+    CONCAT('MODIFY COLUMN `', text_columns.column_name, '` TEXT')
+    SEPARATOR ', '
+)
+INTO @home_loan_legacy_text_columns
+FROM (
+    SELECT 'purpose' AS column_name
+    UNION ALL SELECT 'property_address'
+    UNION ALL SELECT 'rejection_reason'
+    UNION ALL SELECT 'fd_receipt_path'
+    UNION ALL SELECT 'model_doc_path'
+    UNION ALL SELECT 'signature_path'
+    UNION ALL SELECT 'fd_receipt_remark'
+    UNION ALL SELECT 'model_doc_remark'
+    UNION ALL SELECT 'signature_remark'
+    UNION ALL SELECT 'admin_notes'
+) AS text_columns
+JOIN information_schema.COLUMNS existing_column
+    ON existing_column.TABLE_SCHEMA = DATABASE()
+    AND existing_column.TABLE_NAME = 'home_loans'
+    AND existing_column.COLUMN_NAME = text_columns.column_name
+WHERE existing_column.DATA_TYPE NOT IN ('text', 'mediumtext', 'longtext');
+
+SET @home_loan_legacy_text_ddl = IF(
+    @home_loan_legacy_text_columns IS NULL,
+    'SELECT 1',
+    CONCAT('ALTER TABLE `home_loans` ', @home_loan_legacy_text_columns)
+);
+
+PREPARE home_loan_legacy_text_update FROM @home_loan_legacy_text_ddl;
+EXECUTE home_loan_legacy_text_update;
+DEALLOCATE PREPARE home_loan_legacy_text_update;
+
 SELECT GROUP_CONCAT(
     CONCAT('ADD COLUMN `', columns_to_add.column_name, '` ', columns_to_add.column_definition)
     SEPARATOR ', '
