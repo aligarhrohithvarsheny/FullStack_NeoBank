@@ -16,6 +16,7 @@ import java.util.*;
 
 @Service
 public class PositivePayService {
+    private final DemandDraftRepository demandDraftRepository;
     private final PositivePayRequestRepository requestRepository;
     private final PositivePayAuditLogRepository auditRepository;
     private final ChequeRepository chequeRepository;
@@ -27,10 +28,12 @@ public class PositivePayService {
     private final AccountRepository accountRepository;
     private final UserRepository userRepository;
     private final AccountService accountService;
+    private final AiSecurityService aiSecurityService;
 
     private static final BigDecimal MINIMUM_AMOUNT = BigDecimal.ZERO;
 
-    public PositivePayService(PositivePayRequestRepository requestRepository,
+    public PositivePayService(DemandDraftRepository demandDraftRepository,
+                              PositivePayRequestRepository requestRepository,
                               PositivePayAuditLogRepository auditRepository,
                               ChequeRepository chequeRepository,
                               ChequeRequestRepository salaryChequeRepository,
@@ -40,12 +43,13 @@ public class PositivePayService {
                               CurrentAccountRepository currentAccountRepository,
                               AccountRepository accountRepository,
                               UserRepository userRepository,
-                              AccountService accountService) {
-        this.requestRepository = requestRepository; this.auditRepository = auditRepository;
+                              AccountService accountService,
+                              AiSecurityService aiSecurityService) {
+        this.demandDraftRepository = demandDraftRepository; this.requestRepository = requestRepository; this.auditRepository = auditRepository;
         this.chequeRepository = chequeRepository; this.salaryChequeRepository = salaryChequeRepository; this.savingsChequeRepository = savingsChequeRepository;
         this.businessChequeRepository = businessChequeRepository; this.salaryAccountRepository = salaryAccountRepository;
         this.currentAccountRepository = currentAccountRepository; this.accountRepository = accountRepository;
-        this.userRepository = userRepository; this.accountService = accountService;
+        this.userRepository = userRepository; this.accountService = accountService; this.aiSecurityService = aiSecurityService;
     }
 
     public BigDecimal getMinimumAmount() { return MINIMUM_AMOUNT; }
@@ -97,8 +101,57 @@ public class PositivePayService {
         PositivePayRequest request = new PositivePayRequest();
         String ref; do { ref = "PP" + LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE) + String.format("%06d", java.util.concurrent.ThreadLocalRandom.current().nextInt(1_000_000)); } while (requestRepository.findByReferenceNumber(ref).isPresent()); request.setReferenceNumber(ref);
         request.setUserId(owner.userId); request.setAccountId(owner.accountId); request.setAccountNumber(input.accountNumber()); request.setAccountType(owner.type); request.setAccountHolderName(owner.name); request.setCustomerEmail(owner.email); request.setCustomerPhone(owner.phone);
-        request.setChequeSource(cheque.source); request.setChequeId(cheque.id); request.setChequeNumber(cheque.number); request.setChequeStatus(cheque.status); request.setChequeBookNumber(cheque.bookNumber); request.setChequeDate(input.chequeDate()); request.setAmount(input.amount()); request.setPayeeName(input.payeeName()); request.setPayeeAccountNumber(input.payeeAccountNumber()); request.setPayeeBankName(input.payeeBankName()); request.setPayeeIfsc(input.payeeIfsc()); request.setRemarks(input.remarks()); request.setStatus(PositivePayStatus.PENDING_ADMIN_APPROVAL);
-        PositivePayRequest saved = requestRepository.save(request); audit(saved, "CUSTOMER_SUBMITTED", owner.name, "CUSTOMER", ip, input.remarks()); return PositivePayResponse.from(saved);
+        request.setChequeSource(cheque.source); request.setChequeId(cheque.id); request.setChequeNumber(cheque.number); request.setChequeStatus(cheque.status); request.setChequeBookNumber(cheque.bookNumber); request.setChequeDate(input.chequeDate()); request.setAmount(input.amount()); request.setPayeeName(input.payeeName().trim()); request.setPayeeAccountNumber(input.payeeAccountNumber()); request.setPayeeBankName(input.payeeBankName()); request.setPayeeIfsc(input.payeeIfsc()); request.setRemarks(input.remarks());
+        applyAiDecision(request, owner, input.amount(), input.payeeAccountNumber(), ip);
+        PositivePayRequest saved = requestRepository.save(request);
+        audit(saved, "CUSTOMER_SUBMITTED", owner.name, "CUSTOMER", ip, input.remarks());
+        audit(saved, saved.getStatus() == PositivePayStatus.APPROVED ? "AI_APPROVED" : "AI_REJECTED",
+                "AI_SECURITY_ENGINE", "SYSTEM", ip, aiDecisionRemarks(saved));
+        if (saved.getStatus() == PositivePayStatus.APPROVED) linkReceiverToDrawRequest(saved);
+        return PositivePayResponse.from(saved);
+    }
+
+    @Transactional
+    public PositivePayResponse update(String reference, PositivePayUpdateRequest input, Long claimedUserId, String ip) {
+        PositivePayRequest request = requestRepository.findByReferenceNumber(reference)
+                .orElseThrow(() -> new NoSuchElementException("Positive Pay request not found"));
+        if (claimedUserId == null || request.getUserId() == null || !claimedUserId.equals(request.getUserId())) {
+            throw new SecurityException("Request access denied");
+        }
+        if (request.getStatus() != PositivePayStatus.APPROVED
+                && request.getStatus() != PositivePayStatus.PENDING_ADMIN_APPROVAL) {
+            throw new IllegalArgumentException("Only unpresented Positive Pay requests can be edited");
+        }
+        if (demandDraftRepository.findByChequeNumberAndAccountNumber(request.getChequeNumber(), request.getAccountNumber()).isPresent()) {
+            throw new IllegalArgumentException("Positive Pay cannot be edited after a demand draft has been created");
+        }
+        Owner owner = resolveOwner(request.getAccountNumber());
+        ResolvedCheque cheque = resolveCheque(owner, request.getChequeNumber());
+        if (owner == null || cheque == null || !cheque.available) {
+            throw new IllegalArgumentException("Cheque is no longer available for editing");
+        }
+        if (input.chequeDate() == null || input.chequeDate().isAfter(LocalDate.now())) {
+            throw new IllegalArgumentException("Cheque date cannot be in the future");
+        }
+        if (input.amount() == null || input.amount().signum() <= 0) {
+            throw new IllegalArgumentException("Cheque amount must be greater than zero");
+        }
+        if (input.payeeName() == null || input.payeeName().isBlank()) {
+            throw new IllegalArgumentException("Payee name is required");
+        }
+        request.setChequeDate(input.chequeDate());
+        request.setAmount(input.amount());
+        request.setPayeeName(input.payeeName().trim());
+        request.setPayeeAccountNumber(input.payeeAccountNumber());
+        request.setPayeeBankName(input.payeeBankName());
+        request.setPayeeIfsc(input.payeeIfsc());
+        request.setRemarks(input.remarks());
+        applyAiDecision(request, owner, input.amount(), input.payeeAccountNumber(), ip);
+        PositivePayRequest saved = requestRepository.save(request);
+        audit(saved, saved.getStatus() == PositivePayStatus.APPROVED ? "AI_APPROVED_AFTER_CUSTOMER_EDIT" : "AI_REJECTED_AFTER_CUSTOMER_EDIT",
+                "AI_SECURITY_ENGINE", "SYSTEM", ip, aiDecisionRemarks(saved));
+        if (saved.getStatus() == PositivePayStatus.APPROVED) linkReceiverToDrawRequest(saved);
+        return PositivePayResponse.from(saved);
     }
 
     public List<PositivePayResponse> byAccount(String accountNumber, Long claimedUserId) { Owner owner = resolveOwner(accountNumber); if (owner == null || (claimedUserId != null && owner.userId != null && !claimedUserId.equals(owner.userId))) throw new SecurityException("Account access denied"); return requestRepository.findByAccountNumberOrderBySubmittedAtDesc(accountNumber).stream().map(PositivePayResponse::from).toList(); }
@@ -145,6 +198,27 @@ public class PositivePayService {
         }
     }
     @Transactional public PositivePayAdminResponse reject(String reference, String by, String reason, String ip) { PositivePayRequest r = pending(reference); r.setStatus(PositivePayStatus.REJECTED); r.setRejectedAt(LocalDateTime.now()); r.setRejectedBy(by); r.setRejectionReason(reason); PositivePayRequest saved=requestRepository.save(r); audit(saved,"ADMIN_REJECTED",by,"ADMIN",ip,reason); return adminGet(saved.getReferenceNumber()); }
+
+    private void applyAiDecision(PositivePayRequest request, Owner owner, BigDecimal amount, String recipientAccount, String ip) {
+        Double balance = accountService.getBalanceByAccountNumber(owner.number);
+        Map<String, Object> assessment = aiSecurityService.analyzeTransaction(
+                owner.number, owner.name, amount.doubleValue(), recipientAccount, "POSITIVE_PAY",
+                balance, ip, null, null);
+        boolean blocked = Boolean.TRUE.equals(assessment.get("shouldBlock"))
+                || Boolean.TRUE.equals(assessment.get("requiresMFA"));
+        request.setApprovedAt(blocked ? null : LocalDateTime.now());
+        request.setApprovedBy(blocked ? null : "AI_SECURITY_ENGINE");
+        request.setRejectedAt(blocked ? LocalDateTime.now() : null);
+        request.setRejectedBy(blocked ? "AI_SECURITY_ENGINE" : null);
+        request.setRejectionReason(blocked ? "AI risk screening identified elevated risk and did not approve this registration." : null);
+        request.setStatus(blocked ? PositivePayStatus.REJECTED : PositivePayStatus.APPROVED);
+    }
+
+    private String aiDecisionRemarks(PositivePayRequest request) {
+        return request.getStatus() == PositivePayStatus.APPROVED
+                ? "AI risk screening passed the cheque registration."
+                : request.getRejectionReason();
+    }
 
     @Transactional public Map<String,Object> matchPresented(String accountNumber, String chequeNumber, LocalDate date, BigDecimal amount, String payeeName, String ip) { PositivePayRequest r=requestRepository.findFirstByAccountNumberAndChequeNumberAndStatusIn(accountNumber,chequeNumber, activeRegistrationStatuses()).filter(req -> PositivePayStatus.isRegistrationStatus(req.getStatus()) && req.getStatus() != PositivePayStatus.PENDING_ADMIN_APPROVAL).orElseThrow(() -> new IllegalArgumentException("No approved Positive Pay registration found")); boolean matched=r.getChequeDate().equals(date) && r.getAmount().compareTo(amount)==0 && r.getPayeeName().equalsIgnoreCase(payeeName); r.setStatus(matched?PositivePayStatus.MATCHED:PositivePayStatus.MISMATCH); requestRepository.save(r); audit(r,matched?"CHEQUE_DETAILS_MATCHED":"CHEQUE_DETAILS_MISMATCHED","SYSTEM","SYSTEM",ip,matched?null:"Presented details did not match registration"); return Map.of("matched",matched,"status",r.getStatus().name(),"referenceNumber",r.getReferenceNumber()); }
 

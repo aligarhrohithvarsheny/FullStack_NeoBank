@@ -10,6 +10,7 @@ import com.neo.springapp.repository.AccountRepository;
 import com.neo.springapp.repository.DemandDraftRepository;
 import com.neo.springapp.repository.ChequeRepository;
 import com.neo.springapp.repository.PositivePayRequestRepository;
+import com.neo.springapp.repository.SavingsChequeRequestRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.io.ByteArrayOutputStream;
@@ -24,20 +25,26 @@ public class DemandDraftService {
     private final AccountRepository accountRepository;
     private final TransactionService transactionService;
     private final ChequeRepository chequeRepository;
+    private final SavingsChequeRequestRepository savingsChequeRepository;
     private final PositivePayRequestRepository positivePayRequestRepository;
     private final AccountService accountService;
 
-    public DemandDraftService(DemandDraftRepository draftRepository, AccountRepository accountRepository, TransactionService transactionService, ChequeRepository chequeRepository, PositivePayRequestRepository positivePayRequestRepository, AccountService accountService) {
+    public DemandDraftService(DemandDraftRepository draftRepository, AccountRepository accountRepository, TransactionService transactionService, ChequeRepository chequeRepository, SavingsChequeRequestRepository savingsChequeRepository, PositivePayRequestRepository positivePayRequestRepository, AccountService accountService) {
         this.draftRepository = draftRepository; this.accountRepository = accountRepository; this.transactionService = transactionService; this.chequeRepository = chequeRepository;
-        this.positivePayRequestRepository = positivePayRequestRepository; this.accountService = accountService;
+        this.savingsChequeRepository = savingsChequeRepository; this.positivePayRequestRepository = positivePayRequestRepository; this.accountService = accountService;
     }
 
     public Account verifyCheque(String accountNumber, String chequeNumber) {
         Account account = accountRepository.findByAccountNumber(accountNumber);
         if (account == null || chequeNumber == null || chequeNumber.isBlank()) return null;
-        if (chequeRepository.findByChequeNumber(chequeNumber.trim())
+        String normalizedChequeNumber = chequeNumber.trim();
+        boolean legacyChequeAvailable = chequeRepository.findByChequeNumber(normalizedChequeNumber)
                 .filter(cheque -> accountNumber.equals(cheque.getAccountNumber()) && cheque.isAvailable())
-                .isEmpty()) return null;
+                .isPresent();
+        boolean savingsDrawAvailable = savingsChequeRepository.findAllByChequeNumber(normalizedChequeNumber).stream()
+                .anyMatch(cheque -> Objects.equals(cheque.getAccountId(), account.getId())
+                        && isAvailableSavingsChequeStatus(cheque.getStatus()));
+        if (!legacyChequeAvailable && !savingsDrawAvailable) return null;
         return account;
     }
 
@@ -60,10 +67,17 @@ public class DemandDraftService {
         request.setChequeNumber(chequeNumber);
         request.setPayeeName(request.getPayeeName().trim());
         request.setPayeeAccountNumber(request.getPayeeAccountNumber().trim());
-        com.neo.springapp.model.Cheque cheque = chequeRepository.findByChequeNumber(chequeNumber)
+        Optional<com.neo.springapp.model.Cheque> legacyCheque = chequeRepository.findByChequeNumber(chequeNumber)
                 .filter(c -> accountNumber.equals(c.getAccountNumber()))
-                .orElseThrow(() -> new IllegalArgumentException("Cheque number is not allocated to this savings account"));
-        if (!cheque.isAvailable()) throw new IllegalArgumentException("Cheque number has already been used and cannot be reused");
+                .filter(com.neo.springapp.model.Cheque::isAvailable);
+        Optional<com.neo.springapp.model.SavingsChequeRequest> savingsCheque = savingsChequeRepository.findAllByChequeNumber(chequeNumber)
+                .stream()
+                .filter(c -> Objects.equals(c.getAccountId(), account.getId()))
+                .filter(c -> isAvailableSavingsChequeStatus(c.getStatus()))
+                .findFirst();
+        if (legacyCheque.isEmpty() && savingsCheque.isEmpty()) {
+            throw new IllegalArgumentException("Cheque number is not an available cheque allocated to this savings account");
+        }
         if (draftRepository.findByChequeNumberAndAccountNumber(chequeNumber, accountNumber).isPresent()) throw new IllegalArgumentException("Cheque number already used");
         if (request.getAmount() == null || request.getAmount().signum() <= 0) throw new IllegalArgumentException("Amount must be greater than zero");
         requireApprovedPositivePay(accountNumber, request.getChequeNumber(), request.getAmount(), request.getPayeeName());
@@ -72,9 +86,18 @@ public class DemandDraftService {
         request.setAccountNumber(accountNumber); request.setUserName(account.getName()); request.setAvailableBalance(balance); request.setLockedAmount(request.getAmount()); request.setStatus("PENDING"); request.setDraftDate(request.getDraftDate() == null ? LocalDate.now() : request.getDraftDate());
         DemandDraft saved = draftRepository.save(request);
         // Mark the cheque as USED so it moves to the "Used" section and can never be reused for another DD/draw
-        cheque.markUsed("DEMAND_DRAFT", saved.getId() == null ? saved.getChequeNumber() : ("DD-ID-" + saved.getId()));
-        chequeRepository.save(cheque);
+        if (legacyCheque.isPresent()) {
+            com.neo.springapp.model.Cheque cheque = legacyCheque.get();
+            cheque.markUsed("DEMAND_DRAFT", saved.getId() == null ? saved.getChequeNumber() : ("DD-ID-" + saved.getId()));
+            chequeRepository.save(cheque);
+        }
         return saved;
+    }
+
+    private boolean isAvailableSavingsChequeStatus(String status) {
+        return "APPROVED".equalsIgnoreCase(status)
+                || "PENDING".equalsIgnoreCase(status)
+                || "AWAITING_POSITIVE_PAY".equalsIgnoreCase(status);
     }
 
     @Transactional
