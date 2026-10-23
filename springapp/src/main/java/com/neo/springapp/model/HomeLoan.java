@@ -23,6 +23,7 @@ public class HomeLoan {
     private String userName;
     private String userEmail;
     private String pan;
+    @Column(length = 32)
     private String loanType = "HOME"; // HOME, CAR, FARMER, CROP
 
     // Requested / approved terms
@@ -34,40 +35,57 @@ public class HomeLoan {
     private Double propertyValue;
 
     // Vehicle loan details
+    @Column(columnDefinition = "TEXT")
     private String vehicleMakeModel;
+    @Column(length = 32)
     private String vehicleCondition;
     private Integer vehicleYear;
+    @Column(length = 64)
     private String vehicleRegistrationNumber;
+    @Column(columnDefinition = "TEXT")
     private String vehicleDealer;
     private Double vehiclePrice;
-    @Column(length = 4000)
+    @Column(columnDefinition = "TEXT")
     private String vehicleImagePaths;
+    @Column(columnDefinition = "TEXT")
     private String vehicleInvoicePath;
+    @Column(length = 32)
     private String vehicleInvoiceStatus;
-    @Column(length = 1000)
+    @Column(columnDefinition = "TEXT")
     private String vehicleInvoiceRemark;
+    @Column(length = 32)
     private String vehicleImagesStatus;
-    @Column(length = 1000)
+    @Column(columnDefinition = "TEXT")
     private String vehicleImagesRemark;
 
     // Agricultural and crop loan details
+    @Column(columnDefinition = "TEXT")
     private String farmLocation;
+    @Column(columnDefinition = "TEXT")
     private String cropName;
+    @Column(length = 64)
     private String cropSeason;
     private Double landArea;
+    @Column(length = 32)
     private String landAreaUnit;
     private Double cultivationCostEstimate;
+    @Column(columnDefinition = "TEXT")
     private String landRecordPath;
+    @Column(length = 32)
     private String landRecordStatus;
-    @Column(length = 1000)
+    @Column(columnDefinition = "TEXT")
     private String landRecordRemark;
+    @Column(columnDefinition = "TEXT")
     private String agricultureEstimatePath;
+    @Column(length = 32)
     private String agricultureEstimateStatus;
-    @Column(length = 1000)
+    @Column(columnDefinition = "TEXT")
     private String agricultureEstimateRemark;
+    @Column(columnDefinition = "TEXT")
     private String cropEstimatePath;
+    @Column(length = 32)
     private String cropEstimateStatus;
-    @Column(length = 1000)
+    @Column(columnDefinition = "TEXT")
     private String cropEstimateRemark;
 
     // Workflow: Submitted, Under Review, Documents Required, Documents Submitted,
