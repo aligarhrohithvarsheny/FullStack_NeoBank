@@ -8,34 +8,34 @@ SELECT GROUP_CONCAT(
 )
 INTO @home_loan_missing_columns
 FROM (
-    SELECT 'loan_type' AS column_name, 'VARCHAR(255)' AS column_definition
-    UNION ALL SELECT 'vehicle_make_model', 'VARCHAR(255)'
-    UNION ALL SELECT 'vehicle_condition', 'VARCHAR(255)'
+    SELECT 'loan_type' AS column_name, 'VARCHAR(32)' AS column_definition
+    UNION ALL SELECT 'vehicle_make_model', 'TEXT'
+    UNION ALL SELECT 'vehicle_condition', 'VARCHAR(32)'
     UNION ALL SELECT 'vehicle_year', 'INT'
-    UNION ALL SELECT 'vehicle_registration_number', 'VARCHAR(255)'
-    UNION ALL SELECT 'vehicle_dealer', 'VARCHAR(255)'
+    UNION ALL SELECT 'vehicle_registration_number', 'VARCHAR(64)'
+    UNION ALL SELECT 'vehicle_dealer', 'TEXT'
     UNION ALL SELECT 'vehicle_price', 'DOUBLE'
-    UNION ALL SELECT 'vehicle_image_paths', 'VARCHAR(4000)'
-    UNION ALL SELECT 'vehicle_invoice_path', 'VARCHAR(255)'
-    UNION ALL SELECT 'vehicle_invoice_status', 'VARCHAR(255)'
-    UNION ALL SELECT 'vehicle_invoice_remark', 'VARCHAR(1000)'
-    UNION ALL SELECT 'vehicle_images_status', 'VARCHAR(255)'
-    UNION ALL SELECT 'vehicle_images_remark', 'VARCHAR(1000)'
-    UNION ALL SELECT 'farm_location', 'VARCHAR(255)'
-    UNION ALL SELECT 'crop_name', 'VARCHAR(255)'
-    UNION ALL SELECT 'crop_season', 'VARCHAR(255)'
+    UNION ALL SELECT 'vehicle_image_paths', 'TEXT'
+    UNION ALL SELECT 'vehicle_invoice_path', 'TEXT'
+    UNION ALL SELECT 'vehicle_invoice_status', 'VARCHAR(32)'
+    UNION ALL SELECT 'vehicle_invoice_remark', 'TEXT'
+    UNION ALL SELECT 'vehicle_images_status', 'VARCHAR(32)'
+    UNION ALL SELECT 'vehicle_images_remark', 'TEXT'
+    UNION ALL SELECT 'farm_location', 'TEXT'
+    UNION ALL SELECT 'crop_name', 'TEXT'
+    UNION ALL SELECT 'crop_season', 'VARCHAR(64)'
     UNION ALL SELECT 'land_area', 'DOUBLE'
-    UNION ALL SELECT 'land_area_unit', 'VARCHAR(255)'
+    UNION ALL SELECT 'land_area_unit', 'VARCHAR(32)'
     UNION ALL SELECT 'cultivation_cost_estimate', 'DOUBLE'
-    UNION ALL SELECT 'land_record_path', 'VARCHAR(255)'
-    UNION ALL SELECT 'land_record_status', 'VARCHAR(255)'
-    UNION ALL SELECT 'land_record_remark', 'VARCHAR(1000)'
-    UNION ALL SELECT 'agriculture_estimate_path', 'VARCHAR(255)'
-    UNION ALL SELECT 'agriculture_estimate_status', 'VARCHAR(255)'
-    UNION ALL SELECT 'agriculture_estimate_remark', 'VARCHAR(1000)'
-    UNION ALL SELECT 'crop_estimate_path', 'VARCHAR(255)'
-    UNION ALL SELECT 'crop_estimate_status', 'VARCHAR(255)'
-    UNION ALL SELECT 'crop_estimate_remark', 'VARCHAR(1000)'
+    UNION ALL SELECT 'land_record_path', 'TEXT'
+    UNION ALL SELECT 'land_record_status', 'VARCHAR(32)'
+    UNION ALL SELECT 'land_record_remark', 'TEXT'
+    UNION ALL SELECT 'agriculture_estimate_path', 'TEXT'
+    UNION ALL SELECT 'agriculture_estimate_status', 'VARCHAR(32)'
+    UNION ALL SELECT 'agriculture_estimate_remark', 'TEXT'
+    UNION ALL SELECT 'crop_estimate_path', 'TEXT'
+    UNION ALL SELECT 'crop_estimate_status', 'VARCHAR(32)'
+    UNION ALL SELECT 'crop_estimate_remark', 'TEXT'
 ) AS columns_to_add
 WHERE NOT EXISTS (
     SELECT 1
@@ -54,6 +54,43 @@ SET @home_loan_ddl = IF(
 PREPARE home_loan_schema_update FROM @home_loan_ddl;
 EXECUTE home_loan_schema_update;
 DEALLOCATE PREPARE home_loan_schema_update;
+
+SELECT GROUP_CONCAT(
+    CONCAT('MODIFY COLUMN `', text_columns.column_name, '` TEXT')
+    SEPARATOR ', '
+)
+INTO @home_loan_text_columns
+FROM (
+    SELECT 'vehicle_make_model' AS column_name
+    UNION ALL SELECT 'vehicle_dealer'
+    UNION ALL SELECT 'vehicle_image_paths'
+    UNION ALL SELECT 'vehicle_invoice_path'
+    UNION ALL SELECT 'vehicle_invoice_remark'
+    UNION ALL SELECT 'vehicle_images_remark'
+    UNION ALL SELECT 'farm_location'
+    UNION ALL SELECT 'crop_name'
+    UNION ALL SELECT 'land_record_path'
+    UNION ALL SELECT 'land_record_remark'
+    UNION ALL SELECT 'agriculture_estimate_path'
+    UNION ALL SELECT 'agriculture_estimate_remark'
+    UNION ALL SELECT 'crop_estimate_path'
+    UNION ALL SELECT 'crop_estimate_remark'
+) AS text_columns
+JOIN information_schema.COLUMNS existing_column
+    ON existing_column.TABLE_SCHEMA = DATABASE()
+    AND existing_column.TABLE_NAME = 'home_loans'
+    AND existing_column.COLUMN_NAME = text_columns.column_name
+WHERE existing_column.DATA_TYPE NOT IN ('text', 'mediumtext', 'longtext');
+
+SET @home_loan_text_ddl = IF(
+    @home_loan_text_columns IS NULL,
+    'SELECT 1',
+    CONCAT('ALTER TABLE `home_loans` ', @home_loan_text_columns)
+);
+
+PREPARE home_loan_text_update FROM @home_loan_text_ddl;
+EXECUTE home_loan_text_update;
+DEALLOCATE PREPARE home_loan_text_update;
 
 UPDATE home_loans
 SET loan_type = CASE
