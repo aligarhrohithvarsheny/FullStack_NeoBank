@@ -12,6 +12,7 @@ export class PositivePayComponent implements OnInit {
   requests: any[] = [];
   requestSearchQuery = '';
   selected: any = null;
+  editing: any = null;
   activeTab: 'available'|'history' = 'available';
   loading = false;
   saving = false;
@@ -56,6 +57,29 @@ export class PositivePayComponent implements OnInit {
     });
   }
   open(c: any) { this.error = ''; this.message = ''; this.selected = c; this.form = { chequeDate: '', amount: c.amount || null, payeeName: '', payeeAccountNumber: '', payeeBankName: '', payeeIfsc: '', remarks: '', confirmation: false }; }
-  submit() { this.error = ''; if (!this.selected?.eligible) { this.error = 'Positive Pay registration is not required for this cheque amount.'; return; } if (!this.form.confirmation) { this.error = 'Please confirm the cheque details.'; return; } this.saving = true; this.service.create({ accountNumber: this.accountNumber, chequeNumber: this.selected.chequeNumber, ...this.form }).subscribe({ next: r => { this.message = `Positive Pay Registered Successfully. Reference: ${r.referenceNumber}`; this.saving = false; this.selected = null; this.refresh(); this.activeTab = 'history'; }, error: e => { this.error = e.error?.message || 'Unable to submit Positive Pay'; this.saving = false; } }); }
+  openEdit(request: any) { this.error = ''; this.message = ''; this.editing = request; this.selected = null; this.form = { chequeDate: request.chequeDate, amount: request.amount, payeeName: request.payeeName, payeeAccountNumber: request.payeeAccountNumber || '', payeeBankName: request.payeeBankName || '', payeeIfsc: request.payeeIfsc || '', remarks: request.remarks || '', confirmation: false }; }
+  closeForm() { this.selected = null; this.editing = null; }
+  statusLabel(status: string): string { return status === 'APPROVED' ? 'CHEQUE PASSED' : status.replace(/_/g, ' '); }
+  submit() {
+    this.error = '';
+    if (!this.editing && !this.selected?.eligible) { this.error = 'This cheque is not available for Positive Pay registration.'; return; }
+    if (!this.form.confirmation) { this.error = 'Please confirm the cheque details.'; return; }
+    this.saving = true;
+    const request = this.editing
+      ? this.service.update(this.editing.referenceNumber, this.form)
+      : this.service.create({ accountNumber: this.accountNumber, chequeNumber: this.selected.chequeNumber, ...this.form });
+    request.subscribe({
+      next: r => {
+        this.message = this.editing
+          ? `Positive Pay updated. Status: ${this.statusLabel(r.status)}.`
+          : `Positive Pay Registered. Status: ${this.statusLabel(r.status)}. Reference: ${r.referenceNumber}`;
+        this.saving = false;
+        this.closeForm();
+        this.refresh();
+        this.activeTab = 'history';
+      },
+      error: e => { this.error = e.error?.message || 'Unable to save Positive Pay'; this.saving = false; }
+    });
+  }
   cancel(r: any) { if (!confirm(`Cancel ${r.referenceNumber}?`)) return; this.service.cancel(r.referenceNumber).subscribe({ next: () => this.refresh(), error: e => this.error = e.error?.message || 'Unable to cancel request' }); }
 }

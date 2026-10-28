@@ -25,6 +25,7 @@ export class PositivePayService {
   }
   eligible(account: string): Observable<any[]> { return this.http.get<any[]>(`${this.base}/accounts/${encodeURIComponent(account)}/eligible-cheques`, this.userHeaders(account)); }
   create(payload: any): Observable<any> { return this.http.post(this.base, payload, this.userHeaders(payload.accountNumber)); }
+  update(reference: string, payload: any): Observable<any> { return this.http.put(`${this.base}/${encodeURIComponent(reference)}`, payload, this.userHeaders()); }
   history(account: string): Observable<any[]> { return this.http.get<any[]>(`${this.base}/account/${encodeURIComponent(account)}`, this.userHeaders(account)); }
   details(reference: string): Observable<any> { return this.http.get(`${this.base}/${encodeURIComponent(reference)}`, this.userHeaders()); }
   cancel(reference: string): Observable<any> { return this.http.patch(`${this.base}/${encodeURIComponent(reference)}/cancel`, {}, this.userHeaders()); }

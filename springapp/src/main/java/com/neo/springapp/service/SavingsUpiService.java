@@ -178,9 +178,11 @@ public class SavingsUpiService {
 
         // Validate inputs
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            recordFailedAttempt(senderAccountNumber, receiverUpiId, amount, "Invalid amount", null);
             res.put("success", false); res.put("error", "Invalid amount"); return res;
         }
         if (amount.compareTo(new BigDecimal("100000")) > 0) {
+            recordFailedAttempt(senderAccountNumber, receiverUpiId, amount, "Amount exceeds UPI limit of ₹1,00,000", null);
             res.put("success", false); res.put("error", "Amount exceeds UPI limit of ₹1,00,000"); return res;
         }
 
@@ -188,19 +190,26 @@ public class SavingsUpiService {
         User sender = userRepository.findByAccountNumber(senderAccountNumber).orElse(null);
         if (sender == null) { res.put("success", false); res.put("error", "Sender not found"); return res; }
         if (!Boolean.TRUE.equals(sender.getUpiEnabled())) {
+            recordFailedAttempt(senderAccountNumber, receiverUpiId, amount, "UPI is not enabled for this account", sender);
             res.put("success", false); res.put("error", "UPI is not enabled for your account"); return res;
         }
         if (!Boolean.TRUE.equals(sender.getTransactionPinSet()) || sender.getTransactionPin() == null) {
+            recordFailedAttempt(senderAccountNumber, receiverUpiId, amount, "UPI PIN is not set", sender);
             res.put("success", false); res.put("error", "Please set your UPI PIN first"); return res;
         }
         if (!encoder.matches(pin, sender.getTransactionPin())) {
+            recordFailedAttempt(senderAccountNumber, receiverUpiId, amount, "Incorrect UPI PIN", sender);
             res.put("success", false); res.put("error", "Incorrect UPI PIN"); return res;
         }
 
         Account senderAcc = sender.getAccount();
-        if (senderAcc == null) { res.put("success", false); res.put("error", "Account not found"); return res; }
+        if (senderAcc == null) {
+            recordFailedAttempt(senderAccountNumber, receiverUpiId, amount, "Account not found", sender);
+            res.put("success", false); res.put("error", "Account not found"); return res;
+        }
         emergencyControlService.assertAccountNotIsolated(senderAccountNumber);
         if (senderAcc.getBalance() == null || senderAcc.getBalance() < amount.doubleValue()) {
+            recordFailedAttempt(senderAccountNumber, receiverUpiId, amount, "Insufficient balance", sender);
             res.put("success", false); res.put("error", "Insufficient balance"); return res;
         }
 
@@ -215,13 +224,20 @@ public class SavingsUpiService {
         if (recentCount >= 3) riskScore += 30;
 
         // Verify receiver UPI ID
+        if (receiverUpiId == null || receiverUpiId.isBlank()) {
+            recordFailedAttempt(senderAccountNumber, receiverUpiId, amount, "Receiver UPI ID is required", sender);
+            res.put("success", false); res.put("error", "Receiver UPI ID is required"); return res;
+        }
         String rUpi = receiverUpiId.trim().toLowerCase();
         if (rUpi.equals(sender.getUpiId())) {
+            recordFailedAttempt(senderAccountNumber, receiverUpiId, amount, "Cannot send money to your own UPI ID", sender);
             res.put("success", false); res.put("error", "Cannot send money to yourself"); return res;
         }
         Map<String, Object> verify = verifyUpiId(rUpi);
         if (!Boolean.TRUE.equals(verify.get("verified"))) {
-            res.put("success", false); res.put("error", verify.getOrDefault("error", "Invalid receiver UPI ID").toString()); return res;
+            String error = verify.getOrDefault("error", "Invalid receiver UPI ID").toString();
+            recordFailedAttempt(senderAccountNumber, receiverUpiId, amount, error, sender);
+            res.put("success", false); res.put("error", error); return res;
         }
         String receiverName = (String) verify.get("name");
         String receiverAccount = (String) verify.get("accountNumber");
@@ -270,6 +286,32 @@ public class SavingsUpiService {
         res.put("message", "₹" + amount + " sent successfully to " + receiverName);
         res.put("transaction", txn);
         return res;
+    }
+
+    private void recordFailedAttempt(String senderAccountNumber, String receiverUpiId, BigDecimal amount,
+                                     String failureReason, User knownSender) {
+        User sender = knownSender != null
+                ? knownSender
+                : userRepository.findByAccountNumber(senderAccountNumber).orElse(null);
+        if (sender == null) return;
+        if (amount != null && amount.precision() > 16) return;
+
+        SavingsUpiTransaction attempt = new SavingsUpiTransaction();
+        attempt.setTransactionRef("SUPI" + System.currentTimeMillis() + String.format("%04d", new Random().nextInt(9999)));
+        attempt.setSenderAccount(senderAccountNumber);
+        attempt.setSenderUpiId(sender.getUpiId());
+        attempt.setSenderName(sender.getAccount() != null ? sender.getAccount().getName() : sender.getUsername());
+        String recipient = receiverUpiId == null || receiverUpiId.isBlank()
+                ? "Not provided" : receiverUpiId.trim().toLowerCase();
+        attempt.setReceiverUpiId(recipient.length() > 255 ? recipient.substring(0, 255) : recipient);
+        attempt.setAmount(amount == null ? BigDecimal.ZERO : amount);
+        String reason = "Failed: " + failureReason;
+        attempt.setRemark(reason.length() > 255 ? reason.substring(0, 255) : reason);
+        attempt.setPaymentMethod("UPI");
+        attempt.setStatus("FAILED");
+        attempt.setFraudFlagged(false);
+        attempt.setCreatedAt(LocalDateTime.now());
+        savingsUpiTxnRepo.save(attempt);
     }
 
     private void creditReceiver(String accountType, String accountNumber, String upiId, BigDecimal amount) {

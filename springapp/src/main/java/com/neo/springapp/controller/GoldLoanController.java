@@ -229,7 +229,7 @@ public class GoldLoanController {
     }
 
     // Approve or reject gold loan
-    @PutMapping("/{id}/approve")
+    @RequestMapping(value = "/{id}/approve", method = {RequestMethod.PUT, RequestMethod.POST})
     public ResponseEntity<Map<String, Object>> approveGoldLoan(
             @PathVariable Long id,
             @RequestParam String status,
