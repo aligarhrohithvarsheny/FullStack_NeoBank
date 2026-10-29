@@ -3,6 +3,7 @@ package com.neo.springapp.service;
 import com.neo.springapp.dto.PositivePayCreateRequest;
 import com.neo.springapp.dto.PositivePayUpdateRequest;
 import com.neo.springapp.model.Account;
+import com.neo.springapp.model.PositivePayAuditLog;
 import com.neo.springapp.model.PositivePayRequest;
 import com.neo.springapp.model.PositivePayStatus;
 import com.neo.springapp.model.SavingsChequeRequest;
@@ -11,6 +12,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
+import org.mockito.ArgumentCaptor;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
@@ -20,10 +22,15 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -61,11 +68,11 @@ class PositivePayServiceTest {
         savingsCheque.setAccountId(account.getId());
         savingsCheque.setChequeNumber("SCHQ-81-0001");
         savingsCheque.setStatus("AWAITING_POSITIVE_PAY");
-        when(userRepository.findByAccountNumber("SAV-1001")).thenReturn(Optional.empty());
-        when(accountRepository.findByAccountNumber("SAV-1001")).thenReturn(account);
-        when(savingsChequeRepository.findAllByChequeNumber("SCHQ-81-0001")).thenReturn(List.of(savingsCheque));
-        when(accountService.getBalanceByAccountNumber("SAV-1001")).thenReturn(10000.0);
-        when(requestRepository.save(any(PositivePayRequest.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        lenient().when(userRepository.findByAccountNumber("SAV-1001")).thenReturn(Optional.empty());
+        lenient().when(accountRepository.findByAccountNumber("SAV-1001")).thenReturn(account);
+        lenient().when(savingsChequeRepository.findAllByChequeNumber("SCHQ-81-0001")).thenReturn(List.of(savingsCheque));
+        lenient().when(accountService.getBalanceByAccountNumber("SAV-1001")).thenReturn(10000.0);
+        lenient().when(requestRepository.save(any(PositivePayRequest.class))).thenAnswer(invocation -> invocation.getArgument(0));
     }
 
     @Test
@@ -118,6 +125,46 @@ class PositivePayServiceTest {
 
         assertEquals(PositivePayStatus.APPROVED.name(), response.status());
         assertEquals("Updated Payee", response.payeeName());
+    }
+
+    @Test
+    void allowsAdminToOverrideAiRejectionWithAnAuditRemark() {
+        PositivePayRequest existing = new PositivePayRequest();
+        existing.setReferenceNumber("PP-TEST-2");
+        existing.setAccountNumber(account.getAccountNumber());
+        existing.setChequeNumber(savingsCheque.getChequeNumber());
+        existing.setChequeSource("SAVINGS_CHEQUE_REQUESTS");
+        existing.setChequeId(savingsCheque.getId());
+        existing.setStatus(PositivePayStatus.REJECTED);
+        existing.setRejectedBy("AI_SECURITY_ENGINE");
+        existing.setRejectionReason("AI risk screening identified elevated risk.");
+        when(requestRepository.findByReferenceNumber("PP-TEST-2")).thenReturn(Optional.of(existing));
+        when(savingsChequeRepository.findById(savingsCheque.getId())).thenReturn(Optional.empty());
+
+        var response = service.approve("PP-TEST-2", "Admin User", "Verified customer details", "127.0.0.1");
+
+        assertEquals(PositivePayStatus.APPROVED.name(), response.request().status());
+        assertEquals("Admin User", response.request().approvedBy());
+        assertNull(response.request().rejectionReason());
+        assertNull(response.request().rejectedBy());
+        ArgumentCaptor<PositivePayAuditLog> audit = ArgumentCaptor.forClass(PositivePayAuditLog.class);
+        verify(auditRepository).save(audit.capture());
+        assertEquals("ADMIN_OVERRIDDEN_AI_REJECTION", audit.getValue().getAction());
+        assertEquals("Verified customer details", audit.getValue().getRemarks());
+    }
+
+    @Test
+    void doesNotAllowAdminToOverrideANonAiRejection() {
+        PositivePayRequest existing = new PositivePayRequest();
+        existing.setReferenceNumber("PP-TEST-3");
+        existing.setStatus(PositivePayStatus.REJECTED);
+        existing.setRejectedBy("Admin User");
+        when(requestRepository.findByReferenceNumber("PP-TEST-3")).thenReturn(Optional.of(existing));
+
+        assertThrows(IllegalArgumentException.class,
+                () -> service.approve("PP-TEST-3", "Another Admin", "Reviewed", "127.0.0.1"));
+
+        verify(requestRepository, never()).save(any(PositivePayRequest.class));
     }
 
     private PositivePayCreateRequest request() {

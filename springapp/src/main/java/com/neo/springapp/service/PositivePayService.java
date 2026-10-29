@@ -161,7 +161,31 @@ public class PositivePayService {
     public Page<PositivePayRequest> adminList(PositivePayStatus status, Pageable pageable) { return status == null ? requestRepository.findAll(pageable) : requestRepository.findByStatus(status, pageable); }
     public Map<String, Object> adminStats() { LocalDateTime start = LocalDate.now().atStartOfDay(); LocalDateTime end = start.plusDays(1); Map<String,Object> m = new LinkedHashMap<>(); m.put("pending", requestRepository.countByStatus(PositivePayStatus.PENDING_ADMIN_APPROVAL)); m.put("approved", requestRepository.countByStatus(PositivePayStatus.APPROVED)); m.put("rejected", requestRepository.countByStatus(PositivePayStatus.REJECTED)); m.put("cancelled", requestRepository.countByStatus(PositivePayStatus.CANCELLED)); m.put("today", requestRepository.countBySubmittedAtBetween(start,end)); m.put("minimumAmount", MINIMUM_AMOUNT); m.put("totalPositivePayAmount", requestRepository.findAll().stream().filter(r -> r.getAmount()!=null).map(PositivePayRequest::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add)); return m; }
     public PositivePayAdminResponse adminGet(String reference) { PositivePayRequest r = requestRepository.findByReferenceNumber(reference).orElseThrow(); Owner o = resolveOwner(r.getAccountNumber()); return PositivePayAdminResponse.from(r, o == null ? "UNKNOWN" : o.status); }
-    @Transactional public PositivePayAdminResponse approve(String reference, String by, String remark, String ip) { PositivePayRequest r = pending(reference); ResolvedCheque c = resolveCheque(resolveOwner(r.getAccountNumber()), r.getChequeNumber()); if (c == null || !c.available) throw new IllegalArgumentException("Cheque is no longer available"); r.setStatus(PositivePayStatus.APPROVED); r.setApprovedAt(LocalDateTime.now()); r.setApprovedBy(by); r.setRemarks(remark); PositivePayRequest saved=requestRepository.save(r); linkReceiverToDrawRequest(saved); audit(saved,"ADMIN_APPROVED",by,"ADMIN",ip,remark); return adminGet(saved.getReferenceNumber()); }
+    @Transactional public PositivePayAdminResponse approve(String reference, String by, String remark, String ip) {
+        PositivePayRequest r = requestRepository.findByReferenceNumber(reference).orElseThrow();
+        boolean overridingAiRejection = r.getStatus() == PositivePayStatus.REJECTED
+                && "AI_SECURITY_ENGINE".equalsIgnoreCase(r.getRejectedBy());
+        if (r.getStatus() != PositivePayStatus.PENDING_ADMIN_APPROVAL && !overridingAiRejection) {
+            throw new IllegalArgumentException("Only pending requests or AI-rejected requests can be manually approved");
+        }
+        if (overridingAiRejection && (remark == null || remark.isBlank())) {
+            throw new IllegalArgumentException("An approval remark is required to override an AI rejection");
+        }
+        ResolvedCheque c = resolveCheque(resolveOwner(r.getAccountNumber()), r.getChequeNumber());
+        if (c == null || !c.available) throw new IllegalArgumentException("Cheque is no longer available");
+        r.setStatus(PositivePayStatus.APPROVED);
+        r.setApprovedAt(LocalDateTime.now());
+        r.setApprovedBy(by);
+        r.setRejectedAt(null);
+        r.setRejectedBy(null);
+        r.setRejectionReason(null);
+        if (remark != null && !remark.isBlank()) r.setRemarks(remark);
+        PositivePayRequest saved = requestRepository.save(r);
+        linkReceiverToDrawRequest(saved);
+        audit(saved, overridingAiRejection ? "ADMIN_OVERRIDDEN_AI_REJECTION" : "ADMIN_APPROVED",
+                by, "ADMIN", ip, remark);
+        return adminGet(saved.getReferenceNumber());
+    }
 
     private void linkReceiverToDrawRequest(PositivePayRequest request) {
         if (request.getChequeId() == null) return;
