@@ -3,7 +3,6 @@ package com.neo.springapp.service;
 import com.neo.springapp.model.*;
 import com.neo.springapp.repository.*;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -52,9 +51,6 @@ public class SavingsChequeDrawService {
     private ChequeRepository legacyChequeRepository;
 
     @Autowired
-    private PositivePayRequestRepository positivePayRequestRepository;
-
-    @Autowired
     private BusinessTransactionRepository businessTransactionRepository;
 
     @Autowired
@@ -97,9 +93,6 @@ public class SavingsChequeDrawService {
     private SalaryNormalTransactionRepository salaryNormalTransactionRepository;
 
     private static final int MAX_CHEQUE_LEAVES = 30;
-
-    @Value("${positivepay.minimum.amount:10000}")
-    private BigDecimal positivePayMinimumAmount;
 
     // ==================== USER OPERATIONS ====================
 
@@ -213,8 +206,7 @@ public class SavingsChequeDrawService {
         request.setRemarks(remarks);
         boolean selfPayee = payeeName != null && payeeName.trim().equalsIgnoreCase("SELF");
         boolean fundTransfer = "FUND_TRANSFER".equals(purpose) || (payeeAccountNumber != null && !payeeAccountNumber.isBlank() && "GENERAL".equals(purpose));
-        boolean positivePayRequired = !selfPayee && !fundTransfer && BigDecimal.valueOf(amount).compareTo(positivePayMinimumAmount) >= 0;
-        request.setStatus(selfPayee ? "SELF_CASH" : (positivePayRequired ? "AWAITING_POSITIVE_PAY" : "PENDING"));
+        request.setStatus(selfPayee ? "SELF_CASH" : "PENDING");
         if (selfPayee) request.setPayeeName("SELF");
         request.setCreatedAt(LocalDateTime.now());
         request.setUpdatedAt(LocalDateTime.now());
@@ -266,30 +258,14 @@ public class SavingsChequeDrawService {
             chequeRequestRepository.save(saved);
             logAuditAction(saved.getId(), "AI_ENGINE", "AI_VERIFY", String.valueOf(ai.get("report")));
             response.put("aiVerification", ai);
-
-            if (aiPass) {
-                Map<String, Object> settled = approveChequeDrawRequest(
-                        saved.getId(), "AI_VERIFIED", "AI auto-approved verified NeoBank cheque transfer",
-                        String.valueOf(payeeLookup.get("settlementAccountNumber") != null
-                                ? payeeLookup.get("settlementAccountNumber")
-                                : payeeLookup.get("accountNumber")));
-                response.putAll(settled);
-                response.put("aiApproved", true);
-                response.put("success", true);
-                response.put("message", "Cheque transferred and AI-approved instantly. Funds are posted to all transaction records.");
-                return response;
-            }
-            response.put("aiApproved", false);
-            response.put("message", "Payee found but AI held this cheque for admin review: " + ai.get("reason"));
+            response.put("aiApproved", aiPass);
+            response.put("message", aiPass
+                    ? "AI screening passed. The cheque remains pending for admin verification of the signed authorization."
+                    : "AI flagged this cheque for admin review: " + ai.get("reason"));
             response.put("status", saved.getStatus());
             return response;
         }
 
-        if (positivePayRequired) {
-            response.put("positivePayRequired", true);
-            response.put("positivePayMessage", "This cheque is ₹10,000 or above. Register it in Positive Pay before admin draw verification.");
-            response.put("positivePayAccountNumber", account.getAccountNumber());
-        }
         return response;
     }
 
@@ -601,19 +577,6 @@ public class SavingsChequeDrawService {
         return result;
     }
 
-    private void requirePositivePayApproval(SavingsChequeRequest cheque, String accountNumber, BigDecimal amount) {
-        if ("FUND_TRANSFER".equalsIgnoreCase(cheque.getChequePurpose())) return;
-        if (Boolean.TRUE.equals(cheque.getAiApproved())) return;
-        if (amount.compareTo(positivePayMinimumAmount) < 0) return;
-        boolean approved = positivePayRequestRepository
-            .findFirstByAccountNumberAndChequeNumberAndStatusIn(accountNumber, cheque.getChequeNumber(),
-                List.of(PositivePayStatus.PENDING_ADMIN_APPROVAL, PositivePayStatus.APPROVED,
-                    PositivePayStatus.MATCHED, PositivePayStatus.MISMATCH))
-            .map(req -> req.getStatus() == PositivePayStatus.APPROVED)
-            .orElse(false);
-        if (!approved) throw new RuntimeException("Positive Pay must be approved before cheque approval");
-    }
-
         @Transactional
         public Map<String, Object> approveChequeDrawRequest(Long id, String adminEmail, String remarks,
                                                          String payeeAccountNumber) {
@@ -624,8 +587,8 @@ public class SavingsChequeDrawService {
             throw new IllegalArgumentException("Gold Loan prepayment cheques must be used from Admin Funds Transfer, not approved as ordinary cheques");
         }
 
-        if (!request.getStatus().equals("PENDING")) {
-            throw new RuntimeException("Only PENDING cheques can be approved");
+        if (!request.getStatus().equals("PENDING") && !request.getStatus().equals("AWAITING_POSITIVE_PAY")) {
+            throw new RuntimeException("Only pending cheques can be approved");
         }
 
         if (payeeAccountNumber == null || payeeAccountNumber.trim().isEmpty()) {
@@ -649,7 +612,6 @@ public class SavingsChequeDrawService {
                 .orElseThrow(() -> new RuntimeException("Savings account not found"));
 
         BigDecimal amount = request.getAmount();
-        requirePositivePayApproval(request, senderAccount.getAccountNumber(), amount);
         BigDecimal senderBalance = BigDecimal.valueOf(senderAccount.getBalance() != null ? senderAccount.getBalance() : 0.0);
 
         if (senderBalance.compareTo(amount) < 0) {

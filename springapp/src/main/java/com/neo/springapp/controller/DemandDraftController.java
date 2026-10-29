@@ -26,8 +26,7 @@ public class DemandDraftController {
     public ResponseEntity<?> verifyPositivePay(@RequestParam String accountNumber, @RequestParam String chequeNumber,
                                                 @RequestParam BigDecimal amount, @RequestParam String payeeName) {
         try {
-            var registration = service.verifyPositivePay(accountNumber, chequeNumber, amount, payeeName);
-            return ResponseEntity.ok(Map.of("verified", true, "referenceNumber", registration.getReferenceNumber()));
+            return ResponseEntity.ok(service.verifyPositivePay(accountNumber, chequeNumber, amount, payeeName));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("verified", false, "message", e.getMessage()));
         }

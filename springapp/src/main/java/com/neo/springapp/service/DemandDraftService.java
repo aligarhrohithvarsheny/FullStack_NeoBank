@@ -48,8 +48,20 @@ public class DemandDraftService {
         return account;
     }
 
-    public PositivePayRequest verifyPositivePay(String accountNumber, String chequeNumber, BigDecimal amount, String payeeName) {
-        return requireApprovedPositivePay(accountNumber, chequeNumber, amount, payeeName);
+    public Map<String, Object> verifyPositivePay(String accountNumber, String chequeNumber, BigDecimal amount, String payeeName) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        Optional<PositivePayRequest> registration = positivePayRequestRepository
+                .findFirstByAccountNumberAndChequeNumberAndStatusIn(
+                        accountNumber, chequeNumber.trim(), Arrays.asList(PositivePayStatus.values()));
+        result.put("registered", registration.isPresent());
+        result.put("status", registration.map(request -> request.getStatus().name()).orElse("NOT_REGISTERED"));
+        result.put("referenceNumber", registration.map(PositivePayRequest::getReferenceNumber).orElse(null));
+        result.put("matchesDetails", registration.map(request ->
+                amount != null && amount.compareTo(request.getAmount()) == 0 &&
+                payeeName != null && request.getPayeeName() != null &&
+                payeeName.trim().equalsIgnoreCase(request.getPayeeName().trim())).orElse(false));
+        result.put("required", false);
+        return result;
     }
 
     public List<DemandDraft> findByAccount(String accountNumber) { return draftRepository.findByAccountNumberOrderByCreatedAtDesc(accountNumber); }
@@ -80,7 +92,6 @@ public class DemandDraftService {
         }
         if (draftRepository.findByChequeNumberAndAccountNumber(chequeNumber, accountNumber).isPresent()) throw new IllegalArgumentException("Cheque number already used");
         if (request.getAmount() == null || request.getAmount().signum() <= 0) throw new IllegalArgumentException("Amount must be greater than zero");
-        requireApprovedPositivePay(accountNumber, request.getChequeNumber(), request.getAmount(), request.getPayeeName());
         BigDecimal balance = BigDecimal.valueOf(account.getBalance() == null ? 0 : account.getBalance());
         if (balance.compareTo(request.getAmount()) < 0) throw new IllegalArgumentException("Insufficient balance");
         request.setAccountNumber(accountNumber); request.setUserName(account.getName()); request.setAvailableBalance(balance); request.setLockedAmount(request.getAmount()); request.setStatus("PENDING"); request.setDraftDate(request.getDraftDate() == null ? LocalDate.now() : request.getDraftDate());
@@ -138,7 +149,6 @@ public class DemandDraftService {
         requireAccountHolderName(debitAccount, draft.getUserName(), "Customer debit account");
         Map<String, Object> payeeAccount = requireActiveAccount(draft.getPayeeAccountNumber(), "Payee account");
         requireAccountHolderName(payeeAccount, draft.getPayeeName(), "Payee account");
-        requireApprovedPositivePay(draft.getAccountNumber(), draft.getChequeNumber(), draft.getAmount(), draft.getPayeeName());
         draft.setAccountDetailsVerified(true);
         draft.setAccountDetailsVerifiedBy(admin);
         draft.setAccountDetailsVerifiedAt(LocalDateTime.now());
@@ -154,7 +164,6 @@ public class DemandDraftService {
         requireAccountHolderName(debitAccount, draft.getUserName(), "Customer debit account");
         Map<String, Object> payeeAccount = requireActiveAccount(draft.getPayeeAccountNumber(), "Payee account");
         requireAccountHolderName(payeeAccount, draft.getPayeeName(), "Payee account");
-        requireApprovedPositivePay(draft.getAccountNumber(), draft.getChequeNumber(), draft.getAmount(), draft.getPayeeName());
         draft.setDdNumber("DD" + System.currentTimeMillis());
         Account account = accountRepository.findByAccountNumber(draft.getAccountNumber());
         if (account == null || account.getBalance() == null || BigDecimal.valueOf(account.getBalance()).compareTo(draft.getAmount()) < 0) {
@@ -182,23 +191,6 @@ public class DemandDraftService {
         if (!"APPROVED".equals(d.getStatus())) throw new IllegalArgumentException("DD is not approved");
         String html = generateDemandDraftHtml(d);
         ByteArrayOutputStream output = new ByteArrayOutputStream(); HtmlConverter.convertToPdf(html, output); return output.toByteArray();
-    }
-
-    private PositivePayRequest requireApprovedPositivePay(String accountNumber, String chequeNumber, BigDecimal amount, String payeeName) {
-        if (amount == null || amount.signum() <= 0 || payeeName == null || payeeName.isBlank()) {
-            throw new IllegalArgumentException("Enter the DD amount and payee name before verifying Positive Pay");
-        }
-        PositivePayRequest registration = positivePayRequestRepository
-                .findFirstByAccountNumberAndChequeNumberAndStatusIn(
-                        accountNumber, chequeNumber.trim(), List.of(PositivePayStatus.APPROVED))
-                .orElseThrow(() -> new IllegalArgumentException("An approved Positive Pay registration is required for this cheque"));
-        if (registration.getAmount().compareTo(amount) != 0) {
-            throw new IllegalArgumentException("DD amount does not match the approved Positive Pay amount");
-        }
-        if (!registration.getPayeeName().trim().equalsIgnoreCase(payeeName.trim())) {
-            throw new IllegalArgumentException("DD payee does not match the approved Positive Pay payee");
-        }
-        return registration;
     }
 
     private Map<String, Object> requireActiveAccount(String accountNumber, String description) {

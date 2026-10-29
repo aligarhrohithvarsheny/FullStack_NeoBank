@@ -33,9 +33,6 @@ import com.neo.springapp.repository.SalaryAccountRepository;
 import com.neo.springapp.repository.SalaryNormalTransactionRepository;
 import com.neo.springapp.repository.SavingsChequeRequestRepository;
 import com.neo.springapp.repository.SavingsChequeAuditLogRepository;
-import com.neo.springapp.repository.PositivePayRequestRepository;
-import com.neo.springapp.model.PositivePayStatus;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -122,12 +119,6 @@ public class AdminFundTransferService {
     @Autowired
     private SavingsChequeAuditLogRepository savingsChequeAuditLogRepository;
 
-    @Autowired
-    private PositivePayRequestRepository positivePayRequestRepository;
-
-    @Value("${positivepay.minimum.amount:10000}")
-    private BigDecimal positivePayMinimumAmount;
-
     public List<AdminFundTransfer> getAll(String search) {
         if (search != null && !search.isBlank()) {
             return repository.search(search.trim());
@@ -145,19 +136,6 @@ public class AdminFundTransferService {
 
     private boolean isLoanReservedCheque(SavingsChequeRequest cheque) {
         return isGoldLoanPrepaymentCheque(cheque) || isHomeLoanCheque(cheque);
-    }
-
-    private void requirePositivePayApproval(String accountNumber, SavingsChequeRequest cheque) {
-        if (cheque.getAmount() == null || cheque.getAmount().compareTo(positivePayMinimumAmount) < 0) return;
-        boolean approved = positivePayRequestRepository
-                .findFirstByAccountNumberAndChequeNumberAndStatusIn(accountNumber, cheque.getChequeNumber(),
-                        List.of(PositivePayStatus.PENDING_ADMIN_APPROVAL, PositivePayStatus.APPROVED,
-                                PositivePayStatus.MATCHED, PositivePayStatus.MISMATCH))
-                .map(request -> request.getStatus() == PositivePayStatus.APPROVED)
-                .orElse(false);
-        if (!approved) {
-            throw new IllegalArgumentException("Positive Pay must be approved before this cheque can fund a Gold Loan prepayment");
-        }
     }
 
     // Verify sender's cheque number belongs to the given account and names match; also returns the balance
@@ -525,7 +503,6 @@ public class AdminFundTransferService {
                     || round2(requestedAmount) != round2(savingsCheque.getAmount().doubleValue())) {
                 throw new IllegalArgumentException("Payment amount must match the amount written on the Gold Loan prepayment cheque");
             }
-            requirePositivePayApproval(normalizedSender, savingsCheque);
         }
 
         double amount;
@@ -825,7 +802,6 @@ public class AdminFundTransferService {
         if (reserved.getAmount() == null || round2(reserved.getAmount().doubleValue()) != round2(basis)) {
             throw new IllegalArgumentException("Payment amount must match the amount written on the Home Loan cheque");
         }
-        requirePositivePayApproval(sender, reserved);
     }
 
     private Map<String, Object> applyPrepayment(String type, String loanAccountNumber, double amount, String adjustment) {

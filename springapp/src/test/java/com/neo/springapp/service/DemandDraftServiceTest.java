@@ -2,8 +2,6 @@ package com.neo.springapp.service;
 
 import com.neo.springapp.model.Account;
 import com.neo.springapp.model.DemandDraft;
-import com.neo.springapp.model.PositivePayRequest;
-import com.neo.springapp.model.PositivePayStatus;
 import com.neo.springapp.model.SavingsChequeRequest;
 import com.neo.springapp.repository.AccountRepository;
 import com.neo.springapp.repository.ChequeRepository;
@@ -85,7 +83,7 @@ class DemandDraftServiceTest {
     }
 
     @Test
-    void createsDemandDraftFromAnAiPassedSavingsChequeNumber() {
+    void createsDemandDraftWithoutPositivePayRegistration() {
         SavingsChequeRequest draw = new SavingsChequeRequest();
         draw.setAccountId(account.getId());
         draw.setChequeNumber("SCHQ-81-0003");
@@ -93,14 +91,6 @@ class DemandDraftServiceTest {
         when(savingsChequeRepository.findAllByChequeNumber("SCHQ-81-0003")).thenReturn(List.of(draw));
         when(draftRepository.findByChequeNumberAndAccountNumber("SCHQ-81-0003", "SAV-1001"))
                 .thenReturn(Optional.empty());
-        PositivePayRequest registration = new PositivePayRequest();
-        registration.setStatus(PositivePayStatus.APPROVED);
-        registration.setAmount(new BigDecimal("500.00"));
-        registration.setPayeeName("Payee");
-        when(positivePayRequestRepository.findFirstByAccountNumberAndChequeNumberAndStatusIn(
-                org.mockito.ArgumentMatchers.eq("SAV-1001"),
-                org.mockito.ArgumentMatchers.eq("SCHQ-81-0003"),
-                org.mockito.ArgumentMatchers.anyList())).thenReturn(Optional.of(registration));
         when(draftRepository.save(any(DemandDraft.class))).thenAnswer(invocation -> invocation.getArgument(0));
         DemandDraft request = new DemandDraft();
         request.setChequeNumber("SCHQ-81-0003");

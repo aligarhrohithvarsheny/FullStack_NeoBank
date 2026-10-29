@@ -3,7 +3,6 @@ package com.neo.springapp.service;
 import com.neo.springapp.model.*;
 import com.neo.springapp.repository.*;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -43,9 +42,6 @@ public class BusinessChequeDrawService {
     private CurrentAccountRepository currentAccountRepository;
 
     @Autowired
-    private PositivePayRequestRepository positivePayRequestRepository;
-
-    @Autowired
     private BusinessTransactionRepository businessTransactionRepository;
 
     @Autowired
@@ -61,9 +57,6 @@ public class BusinessChequeDrawService {
     private GlobalTransactionIdGenerator globalTransactionIdGenerator;
 
     private static final int MAX_CHEQUE_LEAVES = 30;
-
-    @Value("${positivepay.minimum.amount:10000}")
-    private BigDecimal positivePayMinimumAmount;
 
     // ==================== USER OPERATIONS ====================
 
@@ -106,8 +99,7 @@ public class BusinessChequeDrawService {
         request.setPayeeName(payeeName);
         request.setRemarks(remarks);
         boolean selfPayee = payeeName != null && payeeName.trim().equalsIgnoreCase("SELF");
-        boolean positivePayRequired = !selfPayee && BigDecimal.valueOf(amount).compareTo(positivePayMinimumAmount) >= 0;
-        request.setStatus(selfPayee ? "SELF_CASH" : (positivePayRequired ? "AWAITING_POSITIVE_PAY" : "PENDING"));
+        request.setStatus(selfPayee ? "SELF_CASH" : "PENDING");
         if (selfPayee) request.setPayeeName("SELF");
         request.setCreatedAt(LocalDateTime.now());
         request.setUpdatedAt(LocalDateTime.now());
@@ -125,11 +117,6 @@ public class BusinessChequeDrawService {
         response.put("chequeNumber", chequeNumber);
         response.put("requestId", saved.getId());
         response.put("status", request.getStatus());
-        if (positivePayRequired) {
-            response.put("positivePayRequired", true);
-            response.put("positivePayMessage", "This cheque is ₹10,000 or above. Register it in Positive Pay before admin draw verification.");
-            response.put("positivePayAccountNumber", account.getAccountNumber());
-        }
         return response;
     }
 
@@ -394,25 +381,14 @@ public class BusinessChequeDrawService {
         return result;
     }
 
-        private void requirePositivePayApproval(String accountNumber, String chequeNumber, BigDecimal amount) {
-        if (amount.compareTo(positivePayMinimumAmount) < 0) return;
-        boolean approved = positivePayRequestRepository
-            .findFirstByAccountNumberAndChequeNumberAndStatusIn(accountNumber, chequeNumber,
-                List.of(PositivePayStatus.PENDING_ADMIN_APPROVAL, PositivePayStatus.APPROVED,
-                    PositivePayStatus.MATCHED, PositivePayStatus.MISMATCH))
-            .map(request -> request.getStatus() == PositivePayStatus.APPROVED)
-            .orElse(false);
-        if (!approved) throw new RuntimeException("Positive Pay must be approved before cheque approval");
-        }
-
         @Transactional
         public Map<String, Object> approveChequeDrawRequest(Long id, String adminEmail, String remarks,
                                                          String payeeAccountNumber) {
         BusinessChequeRequest request = chequeRequestRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Business cheque request not found"));
 
-        if (!request.getStatus().equals("PENDING")) {
-            throw new RuntimeException("Only PENDING cheques can be approved");
+        if (!request.getStatus().equals("PENDING") && !request.getStatus().equals("AWAITING_POSITIVE_PAY")) {
+            throw new RuntimeException("Only pending cheques can be approved");
         }
 
         if (payeeAccountNumber == null || payeeAccountNumber.trim().isEmpty()) {
@@ -430,7 +406,6 @@ public class BusinessChequeDrawService {
                 .orElseThrow(() -> new RuntimeException("Business account not found"));
 
         BigDecimal amount = request.getAmount();
-        requirePositivePayApproval(senderAccount.getAccountNumber(), request.getChequeNumber(), amount);
         BigDecimal senderBalance = BigDecimal.valueOf(senderAccount.getBalance() != null ? senderAccount.getBalance() : 0.0);
 
         if (senderBalance.compareTo(amount) < 0) {

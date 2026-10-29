@@ -18,11 +18,9 @@ import com.neo.springapp.repository.ChequeRequestRepository;
 import com.neo.springapp.repository.EmiPaymentRepository;
 import com.neo.springapp.repository.GoldLoanHistoryRepository;
 import com.neo.springapp.repository.GoldLoanRepository;
-import com.neo.springapp.repository.PositivePayRequestRepository;
 import com.neo.springapp.repository.SavingsChequeAuditLogRepository;
 import com.neo.springapp.repository.SavingsChequeRequestRepository;
 import com.neo.springapp.repository.SalaryNormalTransactionRepository;
-import org.springframework.test.util.ReflectionTestUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -57,7 +55,6 @@ class AdminFundTransferServiceGoldLoanForeclosureTest {
     @Mock private BusinessChequeRequestRepository businessChequeRequestRepository;
     @Mock private SavingsChequeRequestRepository savingsChequeRequestRepository;
     @Mock private SavingsChequeAuditLogRepository savingsChequeAuditLogRepository;
-    @Mock private PositivePayRequestRepository positivePayRequestRepository;
 
     @InjectMocks private AdminFundTransferService service;
 
@@ -118,7 +115,6 @@ class AdminFundTransferServiceGoldLoanForeclosureTest {
 
     @Test
     void chequePrepaymentUpdatesAccountStatementAndConsumesReservedCheque() {
-        ReflectionTestUtils.setField(service, "positivePayMinimumAmount", new java.math.BigDecimal("10000"));
         GoldLoan loan = new GoldLoan();
         loan.setId(8L);
         loan.setLoanAccountNumber("GL-1008");
