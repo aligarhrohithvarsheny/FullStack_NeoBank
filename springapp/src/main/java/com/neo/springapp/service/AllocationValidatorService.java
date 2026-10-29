@@ -176,9 +176,14 @@ public class AllocationValidatorService {
             return result;
         }
 
-        // Check allocation is active
-        if (!"ACTIVE".equals(allocation.getStatus())) {
-            validationErrors.add("Can only update ACTIVE allocations. Current status: " + allocation.getStatus());
+        // Expired allocations marked COMPLETED by the scheduled expiry check may be reapproved.
+        boolean expiredCompletedAllocation = "COMPLETED".equals(allocation.getStatus()) &&
+            allocation.getValidTill() != null && allocation.getValidTill().isBefore(LocalDate.now());
+        if (!"ACTIVE".equals(allocation.getStatus()) && !expiredCompletedAllocation) {
+            validationErrors.add("Only active allocations or allocations completed by expiry can be updated. Current status: " + allocation.getStatus());
+        }
+        if (expiredCompletedAllocation && (newValidTill == null || !newValidTill.isAfter(LocalDate.now()))) {
+            validationErrors.add("A reapproved allocation must have a new valid till date in the future.");
         }
 
         // Validate new amount

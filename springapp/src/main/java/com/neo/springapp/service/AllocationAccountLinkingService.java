@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.List;
@@ -267,6 +268,124 @@ public class AllocationAccountLinkingService {
         allocationRepository.save(allocation);
         
         return account;
+    }
+
+    /**
+     * Update a linked account and resubmit it for the existing admin verification step.
+     */
+    public AllocationAccount updateLinkedAccountDetails(
+            Long allocationId,
+            String accountNumber,
+            String ifscCode,
+            String accountHolderName,
+            String bankName,
+            String accountType,
+            String branchName,
+            String city,
+            String location,
+            String state,
+            String chequeNumber,
+            String chequeHolderName,
+            LocalDate chequeDate,
+            String chequeBank,
+            String chequeImageUrl,
+            Long hodAdminId) {
+        Admin hod = adminRepository.findById(hodAdminId)
+            .orElseThrow(() -> new IllegalArgumentException("HOD account was not found."));
+        if (!"HOD".equalsIgnoreCase(hod.getRole())) {
+            throw new IllegalArgumentException("Only a HOD can edit a linked allocation account.");
+        }
+
+        FundsAllocation allocation = allocationRepository.findById(allocationId)
+            .orElseThrow(() -> new IllegalArgumentException("Allocation not found."));
+        if (!"ACTIVE".equalsIgnoreCase(allocation.getStatus())) {
+            throw new IllegalArgumentException("Only active allocations can be edited.");
+        }
+        AllocationAccount account = accountRepository.findByAllocationId(allocationId)
+            .orElseThrow(() -> new IllegalArgumentException("No account linked to this allocation."));
+
+        if (allocation.getBranchName() == null ||
+                !allocation.getBranchName().trim().equalsIgnoreCase(valueOrEmpty(branchName))) {
+            throw new IllegalArgumentException("Branch must match the selected allocation.");
+        }
+        if (city == null || city.isBlank()) {
+            throw new IllegalArgumentException("City is required.");
+        }
+        Admin manager = allocation.getManagerId() == null
+            ? null : adminRepository.findById(allocation.getManagerId()).orElse(null);
+        String allocationCity = manager == null ? null : manager.getAssignedCity();
+        if (allocationCity != null && !allocationCity.isBlank() &&
+                !allocationCity.trim().equalsIgnoreCase(valueOrEmpty(city))) {
+            throw new IllegalArgumentException("City must match the selected allocation's branch.");
+        }
+
+        Map<String, Object> verified = verifyInternalAccount(accountNumber, ifscCode);
+        if (!String.valueOf(verified.get("bankName")).equalsIgnoreCase(valueOrEmpty(bankName)) ||
+                !String.valueOf(verified.get("accountHolderName")).equalsIgnoreCase(valueOrEmpty(accountHolderName)) ||
+                !String.valueOf(verified.get("accountType")).equalsIgnoreCase(valueOrEmpty(accountType))) {
+            throw new IllegalArgumentException("Bank and account holder must match the verified account.");
+        }
+        String verifiedAccountNumber = String.valueOf(verified.get("accountNumber"));
+        Optional<AllocationAccount> existingAccount = accountRepository.findByAccountNumber(verifiedAccountNumber);
+        if (existingAccount.isPresent() && !existingAccount.get().getId().equals(account.getId())) {
+            throw new IllegalArgumentException("Account number is already linked to another allocation.");
+        }
+        if (chequeNumber == null || !chequeNumber.matches("\\d{6,10}")) {
+            throw new IllegalArgumentException("Cheque number must contain 6 to 10 digits.");
+        }
+        if (chequeDate == null || chequeDate.isAfter(LocalDate.now())) {
+            throw new IllegalArgumentException("Enter a valid cheque date that is not in the future.");
+        }
+        if (chequeHolderName == null || chequeHolderName.isBlank() ||
+                chequeBank == null || chequeBank.isBlank()) {
+            throw new IllegalArgumentException("Cheque holder and cheque bank are required.");
+        }
+
+        account.setAccountNumber(verifiedAccountNumber);
+        account.setIfscCode(String.valueOf(verified.get("ifscCode")));
+        account.setAccountHolderName(String.valueOf(verified.get("accountHolderName")));
+        account.setBankName(String.valueOf(verified.get("bankName")));
+        account.setAccountType(String.valueOf(verified.get("accountType")));
+        account.setBranchName(allocation.getBranchName());
+        account.setCity(city.trim());
+        account.setLocation(location == null ? "" : location.trim());
+        account.setState(state == null ? "" : state.trim());
+        account.setChequeNumber(chequeNumber.trim());
+        account.setChequeHolderName(chequeHolderName.trim());
+        account.setChequeStatus("PENDING");
+        account.setVerificationStatus("PENDING");
+        account.setVerificationNotes(null);
+        account.setVerifiedAt(null);
+        account.setVerifiedByAdminId(null);
+        account.setUpdatedAt(LocalDateTime.now());
+
+        allocation.setLinkedAccountNumber(verifiedAccountNumber);
+        allocation.setLinkedIfscCode(String.valueOf(verified.get("ifscCode")));
+        allocation.setLinkedAccountHolderName(String.valueOf(verified.get("accountHolderName")));
+        allocation.setLinkedBankName(String.valueOf(verified.get("bankName")));
+        allocation.setLinkedAccountType(String.valueOf(verified.get("accountType")));
+        allocation.setLinkedChequeNumber(chequeNumber.trim());
+        allocation.setChequeHolderName(chequeHolderName.trim());
+        allocation.setChequeDate(chequeDate);
+        allocation.setChequeBank(chequeBank.trim());
+        allocation.setChequeImageUrl(chequeImageUrl);
+        allocation.setAccountVerificationStatus("PENDING");
+        allocation.setChequeVerificationStatus("PENDING");
+        allocation.setAccountStatus("LINKING_PENDING");
+        allocation.setAccountVerifiedAt(null);
+        allocation.setVerifiedByAdminId(null);
+        allocation.setVerifiedByAdminName(null);
+        allocation.setVerifiedAt(null);
+        allocation.setChequeVerificationNotes(null);
+        allocation.setChargeManagementEnabled(false);
+
+        accountRepository.save(account);
+        allocationRepository.save(allocation);
+        return account;
+    }
+
+    private String valueOrEmpty(String value) {
+        return value == null ? "" : value.trim();
     }
     
     /**

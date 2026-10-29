@@ -1,8 +1,11 @@
 package com.neo.springapp.service;
 
 import com.neo.springapp.model.Account;
+import com.neo.springapp.model.Admin;
 import com.neo.springapp.model.BranchAccount;
 import com.neo.springapp.model.CurrentAccount;
+import com.neo.springapp.model.FundsAllocation;
+import com.neo.springapp.entity.AllocationAccount;
 import com.neo.springapp.repository.AccountRepository;
 import com.neo.springapp.repository.AdminRepository;
 import com.neo.springapp.repository.BranchAccountRepository;
@@ -18,6 +21,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Map;
 import java.util.Optional;
+import java.time.LocalDate;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -111,5 +115,45 @@ class AllocationAccountLinkingServiceTest {
         assertThat(result).containsEntry("success", true);
         assertThat(result).containsEntry("bankName", "ExyVault");
         assertThat(result).containsEntry("accountHolderName", "ExyVault Treasury");
+    }
+
+    @Test
+    void editingLinkedAccountResetsVerificationAndResubmitsForAdminApproval() {
+        Admin hod = new Admin();
+        hod.setRole("HOD");
+        FundsAllocation allocation = new FundsAllocation();
+        allocation.setStatus("ACTIVE");
+        allocation.setBranchName("Central Branch");
+        allocation.setManagerId(2L);
+        AllocationAccount linkedAccount = new AllocationAccount();
+        linkedAccount.setId(44L);
+        linkedAccount.setAllocationId(7L);
+        linkedAccount.setAccountNumber("NEOBANK000001");
+        linkedAccount.setVerificationStatus("VERIFIED");
+        linkedAccount.setChequeStatus("CLEARED");
+        linkedAccount.setAccountStatus("ACTIVE");
+        Account internalAccount = new Account();
+        internalAccount.setAccountNumber("NEOBANK000001");
+        internalAccount.setName("NeoBank Official");
+        internalAccount.setStatus("ACTIVE");
+
+        when(adminRepository.findById(1L)).thenReturn(Optional.of(hod));
+        when(fundsAllocationRepository.findById(7L)).thenReturn(Optional.of(allocation));
+        when(allocationAccountRepository.findByAllocationId(7L)).thenReturn(Optional.of(linkedAccount));
+        when(allocationAccountRepository.findByAccountNumber("NEOBANK000001")).thenReturn(Optional.of(linkedAccount));
+        when(savingsAccountRepository.findByAccountNumber("NEOBANK000001")).thenReturn(internalAccount);
+
+        AllocationAccount result = service.updateLinkedAccountDetails(
+            7L, "NEOBANK000001", "NEOB0000001", "NeoBank Official", "NeoBank", "CURRENT",
+            "Central Branch", "Mumbai", "Central", "Maharashtra", "123456", "NeoBank Official",
+            LocalDate.now(), "NeoBank", "", 1L
+        );
+
+        assertThat(result.getVerificationStatus()).isEqualTo("PENDING");
+        assertThat(result.getChequeStatus()).isEqualTo("PENDING");
+        assertThat(result.getVerifiedAt()).isNull();
+        assertThat(allocation.getAccountStatus()).isEqualTo("LINKING_PENDING");
+        assertThat(allocation.getAccountVerificationStatus()).isEqualTo("PENDING");
+        assertThat(allocation.getChargeManagementEnabled()).isFalse();
     }
 }

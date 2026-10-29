@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.math.BigDecimal;
 import java.util.*;
 
 /**
@@ -23,6 +24,9 @@ public class FundsAllocationService {
 
     @Autowired
     private FundsAllocationRepository allocationRepository;
+
+    @Autowired
+    private AllocationAccountRepository allocationAccountRepository;
 
     @Autowired
     private AllocationUtilizationRepository utilizationRepository;
@@ -193,6 +197,13 @@ public class FundsAllocationService {
     public Map<String, Object> updateAllocation(Long allocationId, Double newAmount, LocalDate newValidTill, String description, Long hodAdminId) {
         Map<String, Object> result = new HashMap<>();
 
+        Admin hod = adminRepository.findById(hodAdminId).orElse(null);
+        if (hod == null || !"HOD".equalsIgnoreCase(hod.getRole())) {
+            result.put("success", false);
+            result.put("message", "Only a HOD can update an allocation.");
+            return result;
+        }
+
         FundsAllocation allocation = allocationRepository.findById(allocationId).orElse(null);
         if (allocation == null) {
             result.put("success", false);
@@ -200,9 +211,11 @@ public class FundsAllocationService {
             return result;
         }
 
-        if (!"ACTIVE".equals(allocation.getStatus())) {
+        boolean expiredCompletedAllocation = "COMPLETED".equals(allocation.getStatus()) &&
+            allocation.getValidTill() != null && allocation.getValidTill().isBefore(LocalDate.now());
+        if (!"ACTIVE".equals(allocation.getStatus()) && !expiredCompletedAllocation) {
             result.put("success", false);
-            result.put("message", "Can only update ACTIVE allocations");
+            result.put("message", "Only active allocations or allocations completed by expiry can be updated.");
             return result;
         }
 
@@ -210,14 +223,29 @@ public class FundsAllocationService {
             allocation.setAllocatedAmount(newAmount);
             allocation.setCurrentBalance(newAmount - (allocation.getTotalDebited() != null ? allocation.getTotalDebited() : 0.0)
                     + (allocation.getTotalCredited() != null ? allocation.getTotalCredited() : 0.0));
+
+            allocationAccountRepository.findByAllocationId(allocationId).ifPresent(linkedAccount -> {
+                BigDecimal allocated = BigDecimal.valueOf(newAmount);
+                BigDecimal debited = linkedAccount.getTotalDebited() == null ? BigDecimal.ZERO : linkedAccount.getTotalDebited();
+                BigDecimal credited = linkedAccount.getTotalCredited() == null ? BigDecimal.ZERO : linkedAccount.getTotalCredited();
+                BigDecimal updatedBalance = allocated.subtract(debited).add(credited);
+                linkedAccount.setTotalAllocated(allocated);
+                linkedAccount.setCurrentBalance(updatedBalance);
+                linkedAccount.setAccountBalance(updatedBalance);
+                linkedAccount.setUpdatedAt(LocalDateTime.now());
+                allocationAccountRepository.save(linkedAccount);
+            });
         }
 
         if (newValidTill != null) {
             allocation.setValidTill(newValidTill);
+            if (expiredCompletedAllocation && newValidTill.isAfter(LocalDate.now())) {
+                allocation.setStatus("ACTIVE");
+            }
         }
 
-        if (description != null && !description.trim().isEmpty()) {
-            allocation.setDescription(description);
+        if (description != null) {
+            allocation.setDescription(description.trim());
         }
 
         allocation.setUpdatedAt(LocalDateTime.now());
@@ -398,6 +426,12 @@ public class FundsAllocationService {
         dto.put("ifscCode", allocation.getLinkedIfscCode());
         dto.put("accountHolderName", allocation.getLinkedAccountHolderName());
         dto.put("bankName", allocation.getLinkedBankName());
+        dto.put("accountType", allocation.getLinkedAccountType());
+        dto.put("linkedChequeNumber", allocation.getLinkedChequeNumber());
+        dto.put("chequeHolderName", allocation.getChequeHolderName());
+        dto.put("chequeDate", allocation.getChequeDate());
+        dto.put("chequeBank", allocation.getChequeBank());
+        dto.put("chequeImageUrl", allocation.getChequeImageUrl());
         dto.put("accountStatus", allocation.getAccountStatus());
         dto.put("accountVerificationStatus", allocation.getAccountVerificationStatus());
         dto.put("chequeVerificationStatus", allocation.getChequeVerificationStatus());

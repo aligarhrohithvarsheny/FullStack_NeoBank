@@ -153,6 +153,55 @@ public class AllocationAccountLinkingController {
             return ResponseEntity.badRequest().body(Map.of("success", false, "message", exception.getMessage()));
         }
     }
+
+    @PutMapping("/hod/account/{allocationId}")
+    public ResponseEntity<?> updateHodAccountDetails(
+            @PathVariable Long allocationId,
+            @RequestBody Map<String, Object> request) {
+        try {
+            AllocationAccount account = accountLinkingService.updateLinkedAccountDetails(
+                allocationId,
+                requiredText(request, "accountNumber"),
+                requiredText(request, "ifscCode"),
+                requiredText(request, "accountHolderName"),
+                requiredText(request, "bankName"),
+                requiredText(request, "accountType"),
+                requiredText(request, "branchName"),
+                requiredText(request, "city"),
+                optionalText(request, "location"),
+                optionalText(request, "state"),
+                requiredText(request, "chequeNumber"),
+                requiredText(request, "chequeHolderName"),
+                LocalDate.parse(requiredText(request, "chequeDate")),
+                requiredText(request, "chequeBank"),
+                optionalText(request, "chequeImageUrl"),
+                Long.parseLong(requiredText(request, "hodAdminId"))
+            );
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "Account details updated and resubmitted for admin verification.",
+                "account", account
+            ));
+        } catch (Exception exception) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "success", false,
+                "message", exception.getMessage() == null ? "Unable to update account details." : exception.getMessage()
+            ));
+        }
+    }
+
+    private String requiredText(Map<String, Object> request, String key) {
+        Object value = request.get(key);
+        if (value == null || value.toString().isBlank()) {
+            throw new IllegalArgumentException(key + " is required.");
+        }
+        return value.toString().trim();
+    }
+
+    private String optionalText(Map<String, Object> request, String key) {
+        Object value = request.get(key);
+        return value == null ? "" : value.toString().trim();
+    }
     
     /**
      * HOD: Get pending verification accounts (for review)
