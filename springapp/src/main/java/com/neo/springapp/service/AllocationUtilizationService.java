@@ -174,6 +174,23 @@ public class AllocationUtilizationService {
             result.put("message", "Allocation not found");
             return result;
         }
+        if (amount == null || !Double.isFinite(amount) || amount <= 0) {
+            result.put("success", false);
+            result.put("message", "Credit amount must be greater than zero");
+            return result;
+        }
+        if (allocation.getAllocationAccountId() == null) {
+            result.put("success", false);
+            result.put("message", "Allocation does not have a linked allocation account");
+            return result;
+        }
+        var linkedAccount = allocationAccountRepository.findById(allocation.getAllocationAccountId()).orElse(null);
+        if (linkedAccount == null || !"VERIFIED".equals(linkedAccount.getVerificationStatus())
+                || !"ACTIVE".equals(linkedAccount.getAccountStatus())) {
+            result.put("success", false);
+            result.put("message", "The linked allocation account is not active and verified");
+            return result;
+        }
 
         // Create utilization record
         AllocationUtilization utilization = new AllocationUtilization();
@@ -199,6 +216,18 @@ public class AllocationUtilizationService {
         allocation.setUpdatedAt(LocalDateTime.now());
         allocationRepository.save(allocation);
 
+        java.math.BigDecimal creditAmount = java.math.BigDecimal.valueOf(amount);
+        java.math.BigDecimal linkedBalance = linkedAccount.getCurrentBalance() != null
+                ? linkedAccount.getCurrentBalance()
+                : (linkedAccount.getAccountBalance() != null ? linkedAccount.getAccountBalance() : java.math.BigDecimal.ZERO);
+        java.math.BigDecimal updatedLinkedBalance = linkedBalance.add(creditAmount);
+        linkedAccount.setCurrentBalance(updatedLinkedBalance);
+        linkedAccount.setAccountBalance(updatedLinkedBalance);
+        linkedAccount.setTotalCredited((linkedAccount.getTotalCredited() != null
+                ? linkedAccount.getTotalCredited() : java.math.BigDecimal.ZERO).add(creditAmount));
+        linkedAccount.setUpdatedAt(LocalDateTime.now());
+        allocationAccountRepository.save(linkedAccount);
+
         // Update metrics
         updateMetrics(allocationId, productType, "CREDIT", amount);
 
@@ -206,6 +235,7 @@ public class AllocationUtilizationService {
         result.put("message", "Funds credited to allocation successfully");
         result.put("utilizationId", saved.getUtilizationId());
         result.put("remainingBalance", saved.getRemainingBalance());
+        result.put("allocationAccountBalance", updatedLinkedBalance);
         result.put("utilization", buildUtilizationDTO(saved));
         return result;
     }

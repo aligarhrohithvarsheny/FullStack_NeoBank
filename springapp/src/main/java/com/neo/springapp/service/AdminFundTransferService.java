@@ -2,6 +2,7 @@ package com.neo.springapp.service;
 
 import com.neo.springapp.model.Account;
 import com.neo.springapp.model.AdminFundTransfer;
+import com.neo.springapp.model.AllocationUtilization;
 import com.neo.springapp.model.BusinessChequeRequest;
 import com.neo.springapp.model.Cheque;
 import com.neo.springapp.model.ChequeRequest;
@@ -13,11 +14,13 @@ import com.neo.springapp.model.HomeLoan;
 import com.neo.springapp.repository.HomeLoanRepository;
 import com.neo.springapp.model.Loan;
 import com.neo.springapp.model.SalaryAccount;
+import com.neo.springapp.model.SalaryNormalTransaction;
 import com.neo.springapp.model.SavingsChequeRequest;
 import com.neo.springapp.model.SavingsChequeAuditLog;
 import com.neo.springapp.model.Transaction;
 import com.neo.springapp.repository.AccountRepository;
 import com.neo.springapp.repository.AdminFundTransferRepository;
+import com.neo.springapp.repository.AllocationUtilizationRepository;
 import com.neo.springapp.repository.BusinessChequeRequestRepository;
 import com.neo.springapp.repository.ChequeRepository;
 import com.neo.springapp.repository.ChequeRequestRepository;
@@ -27,6 +30,7 @@ import com.neo.springapp.repository.GoldLoanHistoryRepository;
 import com.neo.springapp.repository.GoldLoanRepository;
 import com.neo.springapp.repository.LoanRepository;
 import com.neo.springapp.repository.SalaryAccountRepository;
+import com.neo.springapp.repository.SalaryNormalTransactionRepository;
 import com.neo.springapp.repository.SavingsChequeRequestRepository;
 import com.neo.springapp.repository.SavingsChequeAuditLogRepository;
 import com.neo.springapp.repository.PositivePayRequestRepository;
@@ -53,6 +57,12 @@ public class AdminFundTransferService {
     private AdminFundTransferRepository repository;
 
     @Autowired
+    private AllocationUtilizationRepository allocationUtilizationRepository;
+
+    @Autowired
+    private AllocationUtilizationService allocationUtilizationService;
+
+    @Autowired
     private AccountService accountService;
 
     @Autowired
@@ -63,6 +73,9 @@ public class AdminFundTransferService {
 
     @Autowired
     private SalaryAccountRepository salaryAccountRepository;
+
+    @Autowired
+    private SalaryNormalTransactionRepository salaryNormalTransactionRepository;
 
     @Autowired
     private GoldLoanRepository goldLoanRepository;
@@ -279,6 +292,106 @@ public class AdminFundTransferService {
                 category, loanPaymentType, loanAccountNumber, emiPaymentId, prepaymentAdjustment);
     }
 
+    @Transactional
+    public Map<String, Object> processGoldLoanForeclosure(String loanAccountNumber, Double requestedAmount,
+            Double interestRate, String performedBy) {
+        GoldLoan loan = goldLoanRepository.findByLoanAccountNumber(loanAccountNumber)
+                .orElseThrow(() -> new IllegalArgumentException("Gold loan account not found"));
+        if (!"Approved".equalsIgnoreCase(loan.getStatus())) {
+            throw new IllegalArgumentException("Only approved gold loans can be foreclosed");
+        }
+        String linkedAccountNumber = loan.getAccountNumber();
+        if (linkedAccountNumber == null || linkedAccountNumber.isBlank()) {
+            throw new IllegalArgumentException("Gold loan does not have a linked customer account");
+        }
+        Map<String, Object> accountInfo = accountService.verifyAccountByNumber(linkedAccountNumber);
+        if (!Boolean.TRUE.equals(accountInfo.get("found"))) {
+            throw new IllegalArgumentException("The linked customer account could not be found");
+        }
+        String accountStatus = String.valueOf(accountInfo.get("status"));
+        if (!"ACTIVE".equalsIgnoreCase(accountStatus)) {
+            throw new IllegalArgumentException("The linked customer account is not active");
+        }
+        String accountType = String.valueOf(accountInfo.get("accountType"));
+        if (interestRate != null) {
+            if (interestRate <= 0) {
+                throw new IllegalArgumentException("Interest rate must be greater than zero");
+            }
+            goldLoanService.updateInterestRate(loan.getId(), interestRate);
+        }
+
+        Map<String, Object> calculation = goldLoanService.calculateForeclosure(loanAccountNumber);
+        if (!Boolean.TRUE.equals(calculation.get("success"))) {
+            throw new IllegalArgumentException(String.valueOf(
+                    calculation.getOrDefault("message", "Unable to calculate gold-loan foreclosure")));
+        }
+        double amount = round2(requestedAmount == null
+                ? numberValue(calculation.get("totalForeclosureAmount"))
+                : requestedAmount);
+        if (amount <= 0) {
+            throw new IllegalArgumentException("Foreclosure amount must be greater than zero");
+        }
+
+        double balanceBefore = getBalance(linkedAccountNumber, accountType);
+        requireSufficientBalance(linkedAccountNumber, accountType, amount);
+        Map<String, Object> before = snapshotLoan(loanAccountNumber);
+        GoldLoan foreclosed = goldLoanService.processForeclosureWithAmount(
+                loanAccountNumber, performedBy == null || performedBy.isBlank() ? "Admin" : performedBy, amount);
+        if (foreclosed == null) {
+            throw new IllegalArgumentException("Gold-loan foreclosure could not be completed");
+        }
+        creditGoldLoanAllocation(loanAccountNumber, foreclosed, amount, performedBy);
+
+        adjustBalance(accountType, linkedAccountNumber, -amount);
+        double balanceAfter = getBalance(linkedAccountNumber, accountType);
+        String transferId = "AFT" + System.currentTimeMillis();
+        String description = "Gold loan foreclosure " + loanAccountNumber + " | " + transferId;
+        String customerName = String.valueOf(accountInfo.get("name"));
+        saveLedgerTransaction(linkedAccountNumber, customerName, amount, "Debit", balanceAfter, description);
+        saveSalaryLoanStatement(accountInfo, linkedAccountNumber, amount, balanceBefore, balanceAfter, description);
+
+        Map<String, Object> paymentDetails = new HashMap<>();
+        appendSnapshotBefore(paymentDetails, before);
+        appendSnapshot(paymentDetails, Map.of(
+                "outstandingPrincipal", 0.0,
+                "remainingInterest", 0.0,
+                "emiAmount", 0.0,
+                "remainingTenure", 0));
+        paymentDetails.put("principalPaid", numberValue(calculation.get("remainingPrincipal")));
+        paymentDetails.put("interestPaid", numberValue(calculation.get("remainingInterest")));
+        paymentDetails.put("charges", round2(numberValue(calculation.get("foreclosureCharges"))
+                + numberValue(calculation.get("gst"))));
+        paymentDetails.put("interestSaved", 0.0);
+
+        AdminFundTransfer transfer = new AdminFundTransfer();
+        transfer.setTransferId(transferId);
+        transfer.setSenderAccountNumber(linkedAccountNumber);
+        transfer.setSenderName(customerName);
+        transfer.setSenderAccountType(accountType);
+        transfer.setReceiverAccountNumber(loanAccountNumber);
+        transfer.setReceiverName(loan.getUserName());
+        transfer.setReceiverAccountType("GOLD_LOAN");
+        transfer.setTransferCategory("GOLD_LOAN");
+        transfer.setLoanAccountNumber(loanAccountNumber);
+        transfer.setLoanPaymentType("FORECLOSURE");
+        transfer.setAmount(amount);
+        transfer.setTransferCharge(0.0);
+        transfer.setDescription(description);
+        transfer.setStatus("COMPLETED");
+        transfer.setPerformedBy(performedBy == null || performedBy.isBlank() ? "Admin" : performedBy);
+        transfer.setPerformedAt(LocalDateTime.now());
+        setTransferPaymentDetails(transfer, paymentDetails);
+        AdminFundTransfer saved = repository.save(transfer);
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("success", true);
+        result.put("message", "Gold-loan foreclosure completed from the linked customer account.");
+        result.put("goldLoan", foreclosed);
+        result.put("transfer", saved);
+        result.put("newBalance", balanceAfter);
+        return result;
+    }
+
     private Map<String, Object> processAccountTransfer(String senderAccountNumber, String senderChequeNumber,
             String receiverAccountNumber, Double amount, String description, String performedBy, String category) {
         Map<String, Object> result = new HashMap<>();
@@ -456,6 +569,7 @@ public class AdminFundTransferService {
                     + numberValue(calculation.get("gst")));
             amount = numberValue(calculation.get("totalForeclosureAmount"));
             requireSufficientBalance(normalizedSender, (String) senderInfo.get("accountType"), amount);
+            double balanceBefore = getBalance(normalizedSender, (String) senderInfo.get("accountType"));
             adjustBalance((String) senderInfo.get("accountType"), normalizedSender, -amount);
             Object loan;
             if ("GOLD_LOAN".equals(type)) {
@@ -468,14 +582,21 @@ public class AdminFundTransferService {
             if (loan == null) {
                 throw new IllegalArgumentException("Loan foreclosure could not be completed");
             }
+            if ("GOLD_LOAN".equals(type)) {
+                creditGoldLoanAllocation(normalizedLoanNumber, (GoldLoan) loan, amount, performedBy);
+            }
             paymentDetails.put("outstandingPrincipalAfter", 0.0);
             paymentDetails.put("remainingInterestAfter", 0.0);
             paymentDetails.put("emiAmountAfter", 0.0);
             paymentDetails.put("remainingTenureAfter", 0);
             paymentResult = Map.of("success", true, "foreclosure", calculation);
+            double balanceAfter = getBalance(normalizedSender, (String) senderInfo.get("accountType"));
+            String ledgerDescription = type.replace('_', ' ') + " foreclosure " + normalizedLoanNumber;
             saveLedgerTransaction(normalizedSender, (String) senderInfo.get("name"), amount, "Debit",
-                    getBalance(normalizedSender, (String) senderInfo.get("accountType")),
-                    type.replace('_', ' ') + " foreclosure " + normalizedLoanNumber);
+                    balanceAfter, ledgerDescription);
+            if ("GOLD_LOAN".equals(type)) {
+                saveSalaryLoanStatement(senderInfo, normalizedSender, amount, balanceBefore, balanceAfter, ledgerDescription);
+            }
         } else if ("PREPAYMENT".equals(action)) {
             if (requestedAmount == null || requestedAmount <= 0) {
                 throw new IllegalArgumentException("Prepayment amount must be greater than 0");
@@ -486,11 +607,16 @@ public class AdminFundTransferService {
             }
             amount = round2(requestedAmount);
             requireSufficientBalance(normalizedSender, (String) senderInfo.get("accountType"), amount);
+            double balanceBefore = getBalance(normalizedSender, (String) senderInfo.get("accountType"));
             paymentDetails.putAll(applyPrepayment(type, normalizedLoanNumber, amount, adjustment));
             adjustBalance((String) senderInfo.get("accountType"), normalizedSender, -amount);
+            double balanceAfter = getBalance(normalizedSender, (String) senderInfo.get("accountType"));
+            String ledgerDescription = type.replace('_', ' ') + " prepayment " + normalizedLoanNumber + " (" + adjustment + ")";
             saveLedgerTransaction(normalizedSender, (String) senderInfo.get("name"), amount, "Debit",
-                    getBalance(normalizedSender, (String) senderInfo.get("accountType")),
-                    type.replace('_', ' ') + " prepayment " + normalizedLoanNumber + " (" + adjustment + ")");
+                    balanceAfter, ledgerDescription);
+            if ("GOLD_LOAN".equals(type)) {
+                saveSalaryLoanStatement(senderInfo, normalizedSender, amount, balanceBefore, balanceAfter, ledgerDescription);
+            }
             paymentResult = Map.of("success", true, "adjustment", adjustment);
         } else {
             throw new IllegalArgumentException("Choose EMI, prepayment, or foreclosure");
@@ -929,6 +1055,45 @@ public class AdminFundTransferService {
         transaction.setStatus("Completed");
         transaction.setBalance(balance);
         transactionService.saveTransaction(transaction);
+    }
+
+    private void saveSalaryLoanStatement(Map<String, Object> accountInfo, String accountNumber, double amount,
+            double balanceBefore, double balanceAfter, String description) {
+        if (!String.valueOf(accountInfo.get("accountType")).startsWith("Salary")) return;
+        SalaryAccount salary = salaryAccountRepository.findByAccountNumber(accountNumber);
+        if (salary == null) {
+            throw new IllegalArgumentException("Linked salary account not found for statement update");
+        }
+        SalaryNormalTransaction statement = new SalaryNormalTransaction();
+        statement.setSalaryAccountId(salary.getId());
+        statement.setAccountNumber(accountNumber);
+        statement.setType("Debit");
+        statement.setAmount(amount);
+        statement.setRemark(description);
+        statement.setPreviousBalance(balanceBefore);
+        statement.setNewBalance(balanceAfter);
+        statement.setStatus("Success");
+        salaryNormalTransactionRepository.save(statement);
+    }
+
+    private void creditGoldLoanAllocation(String loanAccountNumber, GoldLoan loan, double amount, String performedBy) {
+        String linkedTransactionId = "GOLD-LOAN-" + loanAccountNumber;
+        AllocationUtilization debit = allocationUtilizationRepository.findByLinkedTransactionId(linkedTransactionId)
+                .stream()
+                .filter(item -> "GOLD_LOAN".equalsIgnoreCase(item.getProductType())
+                        && "DEBIT".equalsIgnoreCase(item.getTransactionType()))
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException(
+                        "Original gold-loan allocation debit was not found; foreclosure cannot credit an unrelated allocation."));
+        Map<String, Object> credit = allocationUtilizationService.creditAllocationFunds(
+                debit.getAllocationId(), amount, "GOLD_LOAN", loan.getAccountNumber(), loan.getUserName(),
+                "GOLD-CLOSURE-" + loanAccountNumber,
+                "Gold loan foreclosure repayment " + loanAccountNumber,
+                debit.getPerformedByAdminId());
+        if (!Boolean.TRUE.equals(credit.get("success"))) {
+            throw new IllegalStateException("Could not credit the original gold-loan allocation: "
+                    + credit.getOrDefault("message", "Unknown allocation error"));
+        }
     }
 
     private void requireSufficientBalance(String accountNumber, String accountType, double amount) {

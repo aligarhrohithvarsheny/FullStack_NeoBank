@@ -105,4 +105,32 @@ class AllocationUtilizationServiceTest {
         assertThat(linkedAccount.getCurrentBalance()).isEqualByComparingTo("20.00");
         verify(utilizationRepository, never()).save(any());
     }
+
+    @Test
+    void creditSynchronizesAllocationAndLinkedAccountBalances() {
+        linkedAccount.setTotalCredited(BigDecimal.ZERO);
+
+        var result = service.creditAllocationFunds(7L, 40.0, "GOLD_LOAN", "CUSTOMER-1", "Customer",
+                "GOLD-CLOSURE-1", "Gold loan foreclosure", 3L);
+
+        assertThat(result.get("success")).isEqualTo(true);
+        assertThat(allocation.getCurrentBalance()).isEqualTo(140.0);
+        assertThat(allocation.getTotalCredited()).isEqualTo(40.0);
+        assertThat(linkedAccount.getCurrentBalance()).isEqualByComparingTo("140.00");
+        assertThat(linkedAccount.getAccountBalance()).isEqualByComparingTo("140.00");
+        assertThat(linkedAccount.getTotalCredited()).isEqualByComparingTo("40.00");
+    }
+
+    @Test
+    void rejectsCreditWhenLinkedAllocationAccountIsInactive() {
+        linkedAccount.setAccountStatus("BLOCKED");
+
+        var result = service.creditAllocationFunds(7L, 40.0, "GOLD_LOAN", "CUSTOMER-1", "Customer",
+                "GOLD-CLOSURE-1", "Gold loan foreclosure", 3L);
+
+        assertThat(result.get("success")).isEqualTo(false);
+        assertThat(allocation.getCurrentBalance()).isEqualTo(100.0);
+        assertThat(linkedAccount.getCurrentBalance()).isEqualByComparingTo("100.00");
+        verify(utilizationRepository, never()).save(any());
+    }
 }

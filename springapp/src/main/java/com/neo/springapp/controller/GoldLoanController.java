@@ -2,20 +2,14 @@ package com.neo.springapp.controller;
 
 import com.neo.springapp.model.GoldLoan;
 import com.neo.springapp.model.GoldRate;
-import com.neo.springapp.model.Transaction;
-import com.neo.springapp.model.Account;
 import com.neo.springapp.model.AdminCashTransaction;
 import com.neo.springapp.model.AdminFundTransfer;
-import com.neo.springapp.model.SalaryAccount;
-import com.neo.springapp.model.SalaryNormalTransaction;
-import com.neo.springapp.repository.SalaryAccountRepository;
-import com.neo.springapp.repository.SalaryNormalTransactionRepository;
 import com.neo.springapp.repository.AdminFundTransferRepository;
 import com.neo.springapp.repository.AdminCashTransactionRepository;
 import com.neo.springapp.service.GoldLoanService;
 import com.neo.springapp.service.GoldRateService;
 import com.neo.springapp.service.AccountService;
-import com.neo.springapp.service.TransactionService;
+import com.neo.springapp.service.AdminFundTransferService;
 import com.neo.springapp.service.PdfService;
 import com.neo.springapp.service.EmailService;
 import com.neo.springapp.service.UserSessionTokenService;
@@ -58,7 +52,7 @@ public class GoldLoanController {
     private AccountService accountService;
     
     @Autowired
-    private TransactionService transactionService;
+    private AdminFundTransferService adminFundTransferService;
     
     @Autowired
     private PdfService pdfService;
@@ -69,17 +63,8 @@ public class GoldLoanController {
     @Value("${app.upload-dir:uploads}")
     private String uploadDirectory;
 
-    @Autowired
-    private com.neo.springapp.service.BranchAccountService branchAccountService;
-
     @Autowired(required = false)
     private com.neo.springapp.service.BankChargesService bankChargesService;
-
-    @Autowired
-    private SalaryAccountRepository salaryAccountRepository;
-
-    @Autowired
-    private SalaryNormalTransactionRepository salaryNormalTransactionRepository;
 
     @Autowired
     private AdminFundTransferRepository adminFundTransferRepository;
@@ -354,147 +339,20 @@ public class GoldLoanController {
             @PathVariable String loanAccountNumber,
             @RequestParam(required = false, defaultValue = "Admin") String foreclosedBy,
             @RequestBody(required = false) Map<String, Object> foreclosureData) {
-        
-        Map<String, Object> response = new HashMap<>();
-        
         try {
-            GoldLoan goldLoan = goldLoanService.getGoldLoanByLoanAccountNumber(loanAccountNumber);
-            
-            if (goldLoan == null) {
-                response.put("success", false);
-                response.put("message", "Gold loan not found");
-                return ResponseEntity.notFound().build();
-            }
-
-            // Get foreclosure amount - use edited amount if provided, otherwise calculate
-            Double foreclosureAmount;
-            
-            if (foreclosureData != null && foreclosureData.containsKey("foreclosureAmount")) {
-                foreclosureAmount = Double.valueOf(foreclosureData.get("foreclosureAmount").toString());
-            } else {
-                // Calculate foreclosure to get amount
-                Map<String, Object> calculation = goldLoanService.calculateForeclosure(loanAccountNumber);
-                if (!(Boolean) calculation.get("success")) {
-                    response.put("success", false);
-                    response.put("message", calculation.get("message"));
-                    return ResponseEntity.badRequest().body(response);
-                }
-                foreclosureAmount = (Double) calculation.get("totalForeclosureAmount");
-            }
-
-            // Check account balance - try regular accounts first, then salary accounts
-            Account account = accountService.getAccountByNumber(goldLoan.getAccountNumber());
-            boolean isSalaryAccount = false;
-            SalaryAccount salaryAccount = null;
-            Double currentBalance = null;
-
-            if (account != null) {
-                currentBalance = account.getBalance();
-            } else {
-                // Fallback: check salary_accounts table
-                salaryAccount = salaryAccountRepository.findByAccountNumber(goldLoan.getAccountNumber());
-                if (salaryAccount != null && salaryAccount.getBalance() != null) {
-                    currentBalance = salaryAccount.getBalance();
-                    isSalaryAccount = true;
-                }
-            }
-
-            if (currentBalance == null) {
-                response.put("success", false);
-                response.put("message", "Account not found");
-                return ResponseEntity.badRequest().body(response);
-            }
-
-            if (currentBalance < foreclosureAmount) {
-                response.put("success", false);
-                response.put("message", "Insufficient balance. Required: ₹" + foreclosureAmount + ", Available: ₹" + currentBalance);
-                return ResponseEntity.badRequest().body(response);
-            }
-
-            // Debit foreclosure amount
-            Double balanceBefore = currentBalance;
-            Double newBalance;
-            if (isSalaryAccount && salaryAccount != null) {
-                Double updatedBal = salaryAccount.getBalance() - foreclosureAmount;
-                salaryAccount.setBalance(updatedBal);
-                salaryAccount.setUpdatedAt(LocalDateTime.now());
-                salaryAccountRepository.save(salaryAccount);
-                newBalance = updatedBal;
-            } else {
-                newBalance = accountService.debitBalance(goldLoan.getAccountNumber(), foreclosureAmount);
-            }
-
-            if (newBalance == null) {
-                response.put("success", false);
-                response.put("message", "Failed to debit foreclosure amount from account");
-                return ResponseEntity.badRequest().body(response);
-            }
-
-            // Process foreclosure - use custom amount if provided
-            GoldLoan foreclosedLoan;
-            Double editedInterestRate = null;
-            
-            if (foreclosureData != null && foreclosureData.containsKey("foreclosureAmount")) {
-                if (foreclosureData.containsKey("interestRate")) {
-                    editedInterestRate = Double.valueOf(foreclosureData.get("interestRate").toString());
-                    // Update loan interest rate if changed
-                    goldLoanService.updateInterestRate(goldLoan.getId(), editedInterestRate);
-                    goldLoan = goldLoanService.getGoldLoanById(goldLoan.getId()); // Refresh
-                }
-                foreclosedLoan = goldLoanService.processForeclosureWithAmount(loanAccountNumber, foreclosedBy, foreclosureAmount);
-            } else {
-                foreclosedLoan = goldLoanService.processForeclosure(loanAccountNumber, foreclosedBy);
-            }
-            
-            if (foreclosedLoan != null) {
-                // Create transaction record with updated balance
-                Transaction foreclosureTransaction = new Transaction();
-                foreclosureTransaction.setMerchant("Gold Loan Foreclosure");
-                foreclosureTransaction.setAmount(foreclosureAmount);
-                foreclosureTransaction.setType("Debit");
-                foreclosureTransaction.setAccountNumber(goldLoan.getAccountNumber());
-                foreclosureTransaction.setDescription("Gold Loan Foreclosure - " + loanAccountNumber + 
-                    (editedInterestRate != null ? " | Interest Rate: " + editedInterestRate + "%" : ""));
-                foreclosureTransaction.setDate(LocalDateTime.now());
-                foreclosureTransaction.setStatus("Completed");
-                foreclosureTransaction.setBalance(newBalance);
-                
-                transactionService.saveTransaction(foreclosureTransaction);
-                branchAccountService.recordTreasuryMovement(
-                    foreclosureAmount,
-                    true,
-                    "Gold Loan Foreclosure Collection",
-                    foreclosureTransaction.getDescription(),
-                    goldLoan.getAccountNumber()
-                );
-
-                // Also create salary normal transaction if it's a salary account
-                if (isSalaryAccount && salaryAccount != null) {
-                    SalaryNormalTransaction salTxn = new SalaryNormalTransaction();
-                    salTxn.setSalaryAccountId(salaryAccount.getId());
-                    salTxn.setAccountNumber(goldLoan.getAccountNumber());
-                    salTxn.setType("Debit");
-                    salTxn.setAmount(foreclosureAmount);
-                    salTxn.setRemark("Gold Loan Foreclosure - " + loanAccountNumber);
-                    salTxn.setPreviousBalance(balanceBefore);
-                    salTxn.setNewBalance(newBalance);
-                    salTxn.setStatus("Success");
-                    salaryNormalTransactionRepository.save(salTxn);
-                }
-
-                response.put("success", true);
-                response.put("message", "Foreclosure processed successfully");
-                response.put("goldLoan", foreclosedLoan);
-                return ResponseEntity.ok(response);
-            } else {
-                response.put("success", false);
-                response.put("message", "Failed to process foreclosure");
-                return ResponseEntity.internalServerError().body(response);
-            }
+            Double amount = foreclosureData != null && foreclosureData.get("foreclosureAmount") != null
+                    ? Double.valueOf(foreclosureData.get("foreclosureAmount").toString()) : null;
+            Double interestRate = foreclosureData != null && foreclosureData.get("interestRate") != null
+                    ? Double.valueOf(foreclosureData.get("interestRate").toString()) : null;
+            return ResponseEntity.ok(adminFundTransferService.processGoldLoanForeclosure(
+                    loanAccountNumber, amount, interestRate, foreclosedBy));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("success", false,
+                    "message", e.getMessage() == null ? "Unable to process gold-loan foreclosure" : e.getMessage()));
         } catch (Exception e) {
-            response.put("success", false);
-            response.put("message", "Failed to process foreclosure: " + e.getMessage());
-            return ResponseEntity.internalServerError().body(response);
+            return ResponseEntity.internalServerError().body(Map.of("success", false,
+                    "message", "Failed to process gold-loan foreclosure: "
+                            + (e.getMessage() == null ? "Unexpected error" : e.getMessage())));
         }
     }
 

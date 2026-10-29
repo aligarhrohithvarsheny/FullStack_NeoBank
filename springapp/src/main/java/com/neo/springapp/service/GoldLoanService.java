@@ -44,8 +44,6 @@ public class GoldLoanService {
     private final ChargeManagementService chargeManagementService;
     private final TransactionService transactionService;
     @Autowired
-    private BranchAccountService branchAccountService;
-    @Autowired
     private CustomerEventNotificationService notificationService;
 
     public GoldLoanService(GoldLoanRepository goldLoanRepository, 
@@ -296,8 +294,6 @@ public class GoldLoanService {
                 if (!Boolean.TRUE.equals(allocationDebit.get("success"))) {
                     throw new IllegalStateException("Allocation disbursement failed: " + allocationDebit.get("message"));
                 }
-                branchAccountService.recordTreasuryMovement(recalculatedLoanAmount, false, "Gold Loan Disbursement",
-                        "Gold loan sanctioned: " + goldLoan.getLoanAccountNumber(), goldLoan.getAccountNumber());
                 System.out.println("✅ Recalculated loan amount: ₹" + recalculatedLoanAmount + 
                                  " (75% of verified gold value: ₹" + verifiedValue + ")");
                 
