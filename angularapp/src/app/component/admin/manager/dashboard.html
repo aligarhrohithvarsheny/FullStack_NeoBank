@@ -60,9 +60,9 @@
         <h2>Manager Dashboard</h2>
       </div>
       <div class="header-right">
-          <button type="button" class="manager-account-action" (click)="setActiveSection('branch-account')" title="View NeoBank treasury funds and transactions">
+          <button type="button" class="manager-account-action" (click)="setActiveSection('branch-account')" title="View the central NeoBank account within your assigned city scope">
             <i class="fa fa-wallet"></i>
-            NeoBank Funds:
+            Central funds:
             <span *ngIf="branchAccountSummary">₹ {{ (branchAccountSummary.balance ?? 0) | number:'1.2-2' }}</span>
             <span *ngIf="!branchAccountSummary">Loading</span>
           </button>
@@ -1707,9 +1707,9 @@
       <div class="section-header">
         <div class="header-content">
           <div>
-            <h2><i class="fa fa-university"></i> NeoBank Treasury Account</h2>
+            <h2><i class="fa fa-university"></i> Shared NeoBank Central Account</h2>
             <p class="section-subtitle">
-              View available NeoBank treasury funds and the ledger for loan sanctions, repayments, interest, processing fees, CIBIL charges, and other collections.
+              View central-account transactions associated with your assigned city: {{ managerAssignedCity || 'No city assigned' }}.
             </p>
           </div>
           <button class="refresh-btn" (click)="loadBranchAccountSummary()" [disabled]="isLoadingBranchAccount">
@@ -1725,7 +1725,7 @@
       </div>
 
       <div class="info-card idcard-panel" *ngIf="branchAccountSummary && !isLoadingBranchAccount">
-        <h4><i class="fa fa-wallet"></i> Current Treasury Account</h4>
+        <h4><i class="fa fa-wallet"></i> Central Account Details <span class="section-description">(shared ledger; city is an access/reporting scope)</span></h4>
         <div class="details-grid" style="margin-top: 12px;">
           <div class="detail-item">
             <label>Account Number</label>
@@ -1733,7 +1733,19 @@
           </div>
           <div class="detail-item">
             <label>Account Name</label>
-            <span class="value">{{ branchAccountSummary?.accountName || 'NeoBank Branch' }}</span>
+            <span class="value">{{ branchAccountSummary?.accountName || 'NeoBank Official' }}</span>
+          </div>
+          <div class="detail-item">
+            <label>Bank Name</label>
+            <span class="value">{{ branchAccountSummary?.bankName || 'NeoBank' }}</span>
+          </div>
+          <div class="detail-item">
+            <label>Customer ID</label>
+            <span class="value">{{ branchAccountSummary?.customerId || '—' }}</span>
+          </div>
+          <div class="detail-item">
+            <label>Branch City</label>
+            <span class="value">{{ branchAccountSummary?.branchCity || '—' }}</span>
           </div>
           <div class="detail-item">
             <label>IFSC</label>
@@ -1745,14 +1757,25 @@
           </div>
           <div class="detail-item">
             <label>Status</label>
-            <span class="value">{{ branchAccountSummary?.isConfigured ? 'Configured' : 'Using default (NEOBANK000001)' }}</span>
+            <span class="value">{{ branchAccountSummary?.isConfigured ? 'Active' : 'Not assigned — contact HOD' }}</span>
           </div>
+          <div class="detail-item"><label>Total Credits</label><span class="value">₹ {{ (branchAccountSummary?.totalCredits ?? 0) | number:'1.2-2' }}</span></div>
+          <div class="detail-item"><label>Total Debits</label><span class="value">₹ {{ (branchAccountSummary?.totalDebits ?? 0) | number:'1.2-2' }}</span></div>
+          <div class="detail-item"><label>Total Charges</label><span class="value">₹ {{ (branchAccountSummary?.totalCharges ?? 0) | number:'1.2-2' }}</span></div>
+          <div class="detail-item"><label>CIBIL / processing</label><span class="value">₹ {{ (branchAccountSummary?.cibilCharges ?? 0) + (branchAccountSummary?.loanProcessingCharges ?? 0) | number:'1.2-2' }}</span></div>
+          <div class="detail-item"><label>Gold / loan interest</label><span class="value">₹ {{ (branchAccountSummary?.goldLoanInterest ?? 0) + (branchAccountSummary?.loanInterest ?? 0) | number:'1.2-2' }}</span></div>
+          <div class="detail-item"><label>FASTag activity</label><span class="value">₹ {{ branchAccountSummary?.fasttagTransactions ?? 0 | number:'1.2-2' }}</span></div>
+          <div class="detail-item"><label>Insurance activity</label><span class="value">₹ {{ branchAccountSummary?.insuranceTransactions ?? 0 | number:'1.2-2' }}</span></div>
+          <div class="detail-item"><label>Last Transaction</label><span class="value">{{ branchAccountSummary?.lastTransactionDate ? (branchAccountSummary.lastTransactionDate | date:'medium') : '—' }}</span></div>
         </div>
+      </div>
+      <div class="info-card" *ngIf="branchAccountSummary && !branchAccountSummary.isConfigured && !isLoadingBranchAccount">
+        <p class="section-description">Ask the HOD to assign your manager profile to a city to enable city-scoped access to the shared account.</p>
       </div>
 
       <div class="info-card branch-operations-card" style="margin-top: 24px;">
-        <h4><i class="fa fa-chart-line"></i> Daily Branch Operations</h4>
-        <p class="section-description">Admin-allotted operating amount and live activity across savings, current, salary and branch accounts.</p>
+        <h4><i class="fa fa-chart-line"></i> City Operations Summary</h4>
+        <p class="section-description">City-filtered activity and customer account balances. These are reporting figures, not separate branch funds.</p>
         <div class="details-grid">
           <div class="detail-item">
             <label>Allocation Date</label>
@@ -1794,7 +1817,7 @@
           <div class="branch-kpi"><span>Utilized</span><strong>₹ {{ branchOperations.utilizedAmount | number:'1.2-2' }}</strong></div>
           <div class="branch-kpi"><span>Remaining</span><strong>₹ {{ branchOperations.remainingAllocation | number:'1.2-2' }}</strong></div>
           <div class="branch-kpi"><span>Profit / Loss</span><strong [class.negative-value]="branchOperations.profitLoss < 0">₹ {{ branchOperations.profitLoss | number:'1.2-2' }}</strong></div>
-          <div class="branch-kpi"><span>Branch Balance</span><strong>₹ {{ branchOperations.branchBalance | number:'1.2-2' }}</strong></div>
+          <div class="branch-kpi"><span>Shared Central Balance</span><strong>₹ {{ branchOperations.branchBalance | number:'1.2-2' }}</strong></div>
         </div>
 
         <div *ngIf="branchOperations?.totals" class="branch-metric-list">
@@ -1839,44 +1862,10 @@
         </div>
       </div>
 
-      <div class="info-card branch-account-form-card" style="margin-top: 24px;">
-        <h4><i class="fa fa-plus-circle"></i> Link NeoBank Treasury Account</h4>
-        <p class="section-description">
-          Fetch the existing verified NeoBank-owned account. Customer and external accounts cannot be linked as the treasury account.
-        </p>
-        <div class="details-grid">
-          <div class="detail-item">
-            <label>Account Number</label>
-            <input type="text" [(ngModel)]="branchAccountNumber" readonly class="form-input" placeholder="Fetch the verified NeoBank account">
-          </div>
-          <div class="detail-item">
-            <label>Account Name</label>
-            <input type="text" [(ngModel)]="branchAccountName" readonly class="form-input" placeholder="NeoBank Official">
-          </div>
-          <div class="detail-item">
-            <label>IFSC (optional)</label>
-            <input type="text" [(ngModel)]="branchAccountIfsc" class="form-input" placeholder="e.g. NEOB0001234">
-          </div>
-        </div>
-        <div class="branch-account-actions" style="margin-top: 16px;">
-          <button type="button" class="refresh-btn" (click)="fetchNeoBankTreasuryAccount()" [disabled]="isFetchingBranchAccount">
-            <i class="fa" [class.fa-spinner]="isFetchingBranchAccount" [class.fa-spin]="isFetchingBranchAccount" [class.fa-download]="!isFetchingBranchAccount"></i>
-            {{ isFetchingBranchAccount ? 'Fetching...' : 'Fetch NeoBank Account' }}
-          </button>
-          <button type="button" class="btn-open-bank-account" (click)="setBranchAccount()" [disabled]="isSavingBranchAccount || !(branchAccountNumber || '').trim()">
-            <i class="fa" [class.fa-spinner]="isSavingBranchAccount" [class.fa-university]="!isSavingBranchAccount" [class.fa-spin]="isSavingBranchAccount"></i>
-            {{ isSavingBranchAccount ? 'Linking...' : 'Link Treasury Account' }}
-          </button>
-        </div>
-        <p class="section-description" style="margin-top: 12px; font-size: 12px;">
-          Only the verified NeoBank treasury account is eligible. Loan sanctions are debited from available funds; loan repayments, fees, and interest are credited to this ledger.
-        </p>
-      </div>
-
-      <!-- Branch Account Transactions (opened bank account) -->
+      <!-- Shared central ledger, filtered by manager city -->
       <div class="info-card" style="margin-top: 24px;">
-        <h4><i class="fa fa-list-alt"></i> NeoBank Treasury Transactions</h4>
-        <p class="section-description">All treasury debits and credits, including sanctions, EMIs, prepayments, interest, processing fees, and CIBIL charges.</p>
+        <h4><i class="fa fa-list-alt"></i> Central Account Transactions</h4>
+        <p class="section-description">Transactions recorded against the single NeoBank account and filtered to your assigned city.</p>
         <div class="branch-txns-filters details-grid" style="margin-bottom: 16px;">
           <div class="detail-item">
             <label>From Date</label>
@@ -1887,8 +1876,32 @@
             <input type="date" [(ngModel)]="branchTxnsToDate" class="form-input">
           </div>
           <div class="detail-item">
-            <label>Filter (ID / name / description)</label>
-            <input type="text" [(ngModel)]="branchTxnsSearch" class="form-input" placeholder="Search...">
+            <label>Search ID / reference / account / details</label>
+            <input type="text" [(ngModel)]="branchTxnsSearch" class="form-input" placeholder="Transaction, account or reference">
+          </div>
+          <div class="detail-item">
+            <label>Category</label>
+            <input type="text" [(ngModel)]="branchTxnsCategory" class="form-input" placeholder="e.g. INSURANCE">
+          </div>
+          <div class="detail-item">
+            <label>Type</label>
+            <select [(ngModel)]="branchTxnsType" class="form-input">
+              <option value="">All types</option><option value="Credit">Credit</option><option value="Debit">Debit</option>
+            </select>
+          </div>
+          <div class="detail-item">
+            <label>Status</label>
+            <select [(ngModel)]="branchTxnsStatus" class="form-input">
+              <option value="">All statuses</option><option value="Completed">Success</option><option value="Pending">Pending</option><option value="Failed">Failed</option>
+            </select>
+          </div>
+          <div class="detail-item">
+            <label>Minimum amount</label>
+            <input type="number" min="0" [(ngModel)]="branchTxnsMinAmount" class="form-input">
+          </div>
+          <div class="detail-item">
+            <label>Maximum amount</label>
+            <input type="number" min="0" [(ngModel)]="branchTxnsMaxAmount" class="form-input">
           </div>
           <div class="detail-item" style="display: flex; align-items: flex-end;">
             <button type="button" class="refresh-btn" (click)="applyBranchTxnsFilter()" [disabled]="isLoadingBranchTxns">
@@ -1896,30 +1909,30 @@
             </button>
           </div>
         </div>
+        <div *ngIf="branchTxnsError" class="section-description negative-value">{{ branchTxnsError }}</div>
         <div *ngIf="isLoadingBranchTxns" class="section-description"><i class="fa fa-spinner fa-spin"></i> Loading transactions...</div>
         <div *ngIf="!isLoadingBranchTxns && branchAccountTransactions.length === 0" class="section-description">No transactions found.</div>
         <div *ngIf="!isLoadingBranchTxns && branchAccountTransactions.length > 0" class="table-container" style="overflow-x: auto;">
           <table class="data-table branch-txns-table">
             <thead>
               <tr>
-                <th>ID</th>
-                <th>Date</th>
-                <th>Related Account Name</th>
-                <th>Related Account No.</th>
-                <th>Amount</th>
-                <th>Type</th>
-                <th>Description</th>
+                <th>Transaction / Reference</th><th>Date and time</th><th>Category / Description</th>
+                <th>Debit</th><th>Credit</th><th>Source / Counterparty</th><th>Destination</th>
+                <th>Status</th><th>Balance after</th><th>Receipt</th>
               </tr>
             </thead>
             <tbody>
               <tr *ngFor="let t of branchAccountTransactions">
-                <td>{{ t.id }}</td>
-                <td>{{ t.date | date:'short' }}</td>
-                <td>{{ t.debitedUserAccountName || '—' }}</td>
-                <td>{{ t.debitedUserAccountNumber || '—' }}</td>
-                <td>₹ {{ t.amount | number:'1.2-2' }}</td>
-                <td>{{ t.type }}</td>
-                <td>{{ t.description || t.merchant || '—' }}</td>
+                <td>{{ t.transactionId }}<small>{{ t.referenceNumber || '—' }}</small></td>
+                <td>{{ t.date | date:'medium' }}</td>
+                <td>{{ t.category || t.type }}<small>{{ t.chargeType || t.description || t.merchant || '—' }}</small></td>
+                <td>₹ {{ t.debitAmount | number:'1.2-2' }}</td><td>₹ {{ t.creditAmount | number:'1.2-2' }}</td>
+                <td>{{ t.sourceAccountNumber || '—' }}</td><td>{{ t.destinationAccountNumber || t.accountNumber || '—' }}</td>
+                <td>{{ t.status || 'Completed' }}</td><td>₹ {{ t.balance | number:'1.2-2' }}</td>
+                <td>
+                  <button type="button" class="refresh-btn" (click)="openBranchTransactionReceipt(t.transactionId)" aria-label="View transaction receipt">View PDF</button>
+                  <button type="button" class="refresh-btn" (click)="openBranchTransactionReceipt(t.transactionId, true)" aria-label="Download transaction receipt">Download</button>
+                </td>
               </tr>
             </tbody>
           </table>

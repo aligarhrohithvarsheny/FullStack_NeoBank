@@ -393,7 +393,7 @@ export class BusinessChequeManagementComponent implements OnInit, OnDestroy {
 
   getStatusText(status: BusinessChequeStatus): string {
     const statusMap: { [key in BusinessChequeStatus]: string } = {
-      'AWAITING_POSITIVE_PAY': 'Awaiting Positive Pay',
+      'AWAITING_POSITIVE_PAY': 'Pending admin verification',
       'PENDING': 'Pending',
       'APPROVED': 'Approved',
       'COMPLETED': 'Completed',

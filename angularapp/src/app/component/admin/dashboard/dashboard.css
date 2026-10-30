@@ -9950,6 +9950,83 @@ app-admin-dashboard .dashboard-container {
   background: #fef3c7;
   color: #92400e;
 }
+.admin-upi-transaction-filters {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 16px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+}
+.admin-upi-transaction-filters label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 150px;
+  color: #475569;
+  font-size: 11px;
+  font-weight: 700;
+}
+.admin-upi-transaction-filters .admin-upi-search {
+  flex: 1 1 340px;
+}
+.admin-upi-transaction-filters input {
+  min-height: 40px;
+  padding: 8px 11px;
+  color: #1e293b;
+  background: #fff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font: inherit;
+}
+.admin-upi-transaction-filters input:focus {
+  outline: 2px solid rgba(13, 148, 136, .2);
+  border-color: #0d9488;
+}
+.admin-upi-clear-filters {
+  min-height: 40px;
+  padding: 8px 14px;
+  color: #0f766e;
+  background: #f0fdfa;
+  border: 1px solid #99f6e4;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.admin-upi-result-count {
+  padding: 0 0 11px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 600;
+}
+.admin-upi-outcome {
+  display: inline-flex;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.admin-upi-outcome.success {
+  color: #047857;
+  background: #d1fae5;
+}
+.admin-upi-outcome.failed {
+  color: #b91c1c;
+  background: #fee2e2;
+}
+.admin-upi-outcome.attention {
+  color: #92400e;
+  background: #fef3c7;
+}
+.admin-upi-outcome.unknown {
+  color: #475569;
+  background: #e2e8f0;
+}
 .admin-upi-btn-block {
   background: #fee2e2;
   color: #dc2626;

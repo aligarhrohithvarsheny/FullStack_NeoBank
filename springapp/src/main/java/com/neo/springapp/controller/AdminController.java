@@ -1166,7 +1166,7 @@ public class AdminController {
                 features.add(normalizedFeature);
             }
 
-            Admin admin = adminService.getAdminByEmail(email);
+            Admin admin = adminService.getAdminForFeatureAccess(email);
             if (admin == null || !"ADMIN".equalsIgnoreCase(admin.getRole())) {
                 return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of(
                         "success", false,
@@ -1225,7 +1225,7 @@ public class AdminController {
                 return ResponseEntity.badRequest().body(resp);
             }
 
-            Admin admin = adminService.getAdminByEmail(email);
+            Admin admin = adminService.getAdminForFeatureAccess(email);
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);
             List<Map<String, Object>> features = admin == null || admin.getFeatureAccessJson() == null

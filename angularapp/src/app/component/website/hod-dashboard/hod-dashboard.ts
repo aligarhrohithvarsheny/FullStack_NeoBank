@@ -33,8 +33,25 @@ export class HodDashboard implements OnInit {
   lastRefreshed = '';
   staffSearch = '';
   selectedStaff: any = null;
+  branchAccounts: any[] = [];
+  centralAccount: any = null;
+  centralTransactions: any[] = [];
+  centralTransactionFilters = {
+    fromDate: '', toDate: '', search: '', category: '', type: '', status: '', minAmount: '', maxAmount: ''
+  };
+  centralTransactionsPage = 0;
+  centralTransactionsTotalPages = 0;
+  centralTransactionsTotalElements = 0;
+  isLoadingCentralLedger = false;
+  customerSearch = '';
+  customerMatches: any[] = [];
+  isSearchingCustomers = false;
+  isSavingBranchAssignment = false;
+  centralLedgerError = '';
+  private customerSearchTimer?: ReturnType<typeof setTimeout>;
   cityMetrics: Record<string, any> = {};
   private refreshTimer?: ReturnType<typeof setInterval>;
+  private ledgerRefreshTimer?: ReturnType<typeof setInterval>;
 
   constructor(private http: HttpClient, private router: Router) {}
 
@@ -42,11 +59,21 @@ export class HodDashboard implements OnInit {
     this.loadCities();
     this.loadCityMetrics();
     this.refreshOverview();
+    this.loadBranchAccounts();
+    this.loadCentralLedger();
     this.refreshTimer = setInterval(() => this.refreshOverview(), 30000);
+    this.ledgerRefreshTimer = setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible'
+          && !this.isLoadingCentralLedger) {
+        this.loadCentralLedger();
+      }
+    }, 5000);
   }
 
   ngOnDestroy(): void {
     if (this.refreshTimer) clearInterval(this.refreshTimer);
+    if (this.ledgerRefreshTimer) clearInterval(this.ledgerRefreshTimer);
+    if (this.customerSearchTimer) clearTimeout(this.customerSearchTimer);
   }
 
   refreshOverview(): void {
@@ -142,6 +169,135 @@ export class HodDashboard implements OnInit {
 
   openAccountLinking(): void { this.router.navigate(['/hod/account-linking']); }
 
+  get branchCities(): string[] {
+    return [...new Set(this.branchAccounts.map(account => String(account.branchCity || '').trim()).filter(Boolean))];
+  }
+
+  loadCentralLedger(): void {
+    this.isLoadingCentralLedger = true;
+    this.centralLedgerError = '';
+    this.http.get<any>(`${environment.apiBaseUrl}/api/admins/hod/central-account`, this.hodAuthOptions()).subscribe({
+      next: account => this.centralAccount = account,
+      error: err => {
+        this.centralAccount = null;
+        this.centralLedgerError = err.error?.message || 'Central account summary is unavailable.';
+      }
+    });
+    const params = new URLSearchParams({ page: String(this.centralTransactionsPage), size: '20' });
+    Object.entries(this.centralTransactionFilters).forEach(([key, value]) => {
+      if (value) params.set(key, value);
+    });
+    this.http.get<any>(`${environment.apiBaseUrl}/api/admins/hod/central-account/transactions?${params}`, this.hodAuthOptions()).subscribe({
+      next: result => {
+        this.centralTransactions = result.content || [];
+        this.centralTransactionsTotalPages = result.totalPages || 0;
+        this.centralTransactionsTotalElements = result.totalElements || 0;
+        this.isLoadingCentralLedger = false;
+      },
+      error: err => {
+        this.centralTransactions = [];
+        this.centralLedgerError = err.error?.message || 'Central account transactions are unavailable.';
+        this.isLoadingCentralLedger = false;
+      }
+    });
+  }
+
+  applyCentralLedgerFilters(): void {
+    this.centralTransactionsPage = 0;
+    this.loadCentralLedger();
+  }
+
+  changeCentralLedgerPage(direction: number): void {
+    const nextPage = this.centralTransactionsPage + direction;
+    if (nextPage < 0 || nextPage >= this.centralTransactionsTotalPages) return;
+    this.centralTransactionsPage = nextPage;
+    this.loadCentralLedger();
+  }
+
+  openCentralTransactionReceipt(transactionId: string, download = false): void {
+    const previewWindow = download ? null : window.open('', '_blank');
+    if (!download && !previewWindow) {
+      this.errorMessage = 'Allow pop-ups to view the transaction receipt.';
+      return;
+    }
+    const url = `${environment.apiBaseUrl}/api/admins/hod/central-account/transactions/${encodeURIComponent(transactionId)}/receipt?download=${download}`;
+    this.http.get(url, { ...this.hodAuthOptions(), responseType: 'blob' }).subscribe({
+      next: blob => {
+        const objectUrl = URL.createObjectURL(blob);
+        if (download) {
+          const link = document.createElement('a');
+          link.href = objectUrl;
+          link.download = `${transactionId}.pdf`;
+          link.click();
+          setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+          return;
+        }
+        previewWindow!.location.href = objectUrl;
+        setTimeout(() => URL.revokeObjectURL(objectUrl), 60000);
+      },
+      error: () => {
+        previewWindow?.close();
+        this.errorMessage = 'Unable to load the transaction receipt.';
+      }
+    });
+  }
+
+  loadBranchAccounts(): void {
+    this.http.get<any[]>(`${environment.apiBaseUrl}/api/admins/hod/branch-accounts`, this.hodAuthOptions()).subscribe({
+      next: accounts => this.branchAccounts = accounts || [],
+      error: err => this.errorMessage = err.error?.message || 'Branch account data is unavailable.'
+    });
+  }
+
+  searchBranchCustomers(): void {
+    if (this.customerSearchTimer) clearTimeout(this.customerSearchTimer);
+    const query = this.customerSearch.trim();
+    if (query.length < 2) {
+      this.customerMatches = [];
+      return;
+    }
+    this.customerSearchTimer = setTimeout(() => {
+      this.isSearchingCustomers = true;
+      this.http.get<any[]>(`${environment.apiBaseUrl}/api/admins/hod/branch-accounts/customers?search=${encodeURIComponent(query)}`,
+        this.hodAuthOptions()).subscribe({
+        next: customers => {
+          this.customerMatches = customers || [];
+          this.isSearchingCustomers = false;
+        },
+        error: err => {
+          this.errorMessage = err.error?.message || 'Unable to search customer accounts.';
+          this.isSearchingCustomers = false;
+        }
+      });
+    }, 250);
+  }
+
+  assignCustomerBranch(customer: any, branchCity: string): void {
+    if (!customer?.accountNumber || !branchCity) return;
+    this.isSavingBranchAssignment = true;
+    this.http.put<any>(`${environment.apiBaseUrl}/api/admins/hod/branch-accounts/customer-assignment`,
+      { accountNumber: customer.accountNumber, branchCity }, this.hodAuthOptions()).subscribe({
+      next: response => {
+        this.isSavingBranchAssignment = false;
+        if (!response?.success) {
+          this.errorMessage = response?.message || 'Unable to assign customer account.';
+          return;
+        }
+        customer.branchCity = branchCity;
+        this.errorMessage = '';
+      },
+      error: err => {
+        this.isSavingBranchAssignment = false;
+        this.errorMessage = err.error?.message || 'Unable to assign customer account.';
+      }
+    });
+  }
+
+  private hodAuthOptions(): { headers: Record<string, string> } {
+    const token = sessionStorage.getItem('adminSessionToken') || '';
+    return { headers: token ? { Authorization: `Bearer ${token}` } : {} };
+  }
+
   removeCity(city: CityOperation): void {
     if (!city.id) return;
     this.http.delete(`${environment.apiBaseUrl}/api/admins/hod/cities/${city.id}`).subscribe({
@@ -156,6 +312,7 @@ export class HodDashboard implements OnInit {
 
   logout(): void {
     sessionStorage.removeItem('admin');
+    sessionStorage.removeItem('adminSessionToken');
     sessionStorage.removeItem('userRole');
     sessionStorage.removeItem('adminLoginTime');
     this.router.navigate(['/hod/login']);

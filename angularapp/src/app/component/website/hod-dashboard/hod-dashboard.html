@@ -28,6 +28,115 @@
 
     <p class="hod-error" *ngIf="errorMessage">{{ errorMessage }}</p>
 
+    <section class="panel branch-accounts-panel">
+      <div class="panel-heading">
+        <div><span class="panel-kicker">Central ledger</span><h2>NeoBank Central Account</h2></div>
+        <button type="button" class="close-button" (click)="loadCentralLedger(); loadBranchAccounts()">Refresh</button>
+      </div>
+      <p class="branch-account-help">All bank-owned credits and debits use this one account. City is used only to scope manager access and reporting; it does not create branch balances.</p>
+      <div class="branch-account-list" *ngIf="centralAccount">
+        <article class="branch-account-card">
+          <div class="branch-account-title"><strong>{{ centralAccount.accountName || 'NeoBank Official' }}</strong><span>Shared central account</span></div>
+          <div class="branch-account-details">
+            <div><small>Account number</small><strong>{{ centralAccount.accountNumber }}</strong></div>
+            <div><small>Customer ID</small><strong>{{ centralAccount.customerId || '—' }}</strong></div>
+            <div><small>Opening balance (estimated)</small><strong>{{ centralAccount.openingBalance || 0 | currency:'INR':'symbol':'1.2-2' }}</strong></div>
+            <div><small>Total credits</small><strong>{{ centralAccount.totalCredits || 0 | currency:'INR':'symbol':'1.2-2' }}</strong></div>
+            <div><small>Total debits</small><strong>{{ centralAccount.totalDebits || 0 | currency:'INR':'symbol':'1.2-2' }}</strong></div>
+            <div><small>Total charges</small><strong>{{ centralAccount.totalCharges || 0 | currency:'INR':'symbol':'1.2-2' }}</strong></div>
+            <div><small>CIBIL / processing charges</small><strong>{{ (centralAccount.cibilCharges || 0) + (centralAccount.loanProcessingCharges || 0) | currency:'INR':'symbol':'1.2-2' }}</strong></div>
+            <div><small>Gold / loan interest</small><strong>{{ (centralAccount.goldLoanInterest || 0) + (centralAccount.loanInterest || 0) | currency:'INR':'symbol':'1.2-2' }}</strong></div>
+            <div><small>FASTag activity</small><strong>{{ centralAccount.fasttagTransactions || 0 | currency:'INR':'symbol':'1.2-2' }}</strong></div>
+            <div><small>Insurance activity</small><strong>{{ centralAccount.insuranceTransactions || 0 | currency:'INR':'symbol':'1.2-2' }}</strong></div>
+            <div><small>Foreclosure charges</small><strong>{{ centralAccount.foreclosureCharges || 0 | currency:'INR':'symbol':'1.2-2' }}</strong></div>
+            <div><small>Available balance</small><strong>{{ centralAccount.balance || 0 | currency:'INR':'symbol':'1.2-2' }}</strong></div>
+            <div><small>Last transaction</small><strong>{{ centralAccount.lastTransactionDate ? (centralAccount.lastTransactionDate | date:'medium') : '—' }}</strong></div>
+          </div>
+        </article>
+      </div>
+      <div class="empty-state" *ngIf="!centralAccount && !centralLedgerError">Loading the central account…</div>
+
+      <h3 class="branch-account-help">Manager access by assigned city</h3>
+      <div class="branch-account-list" *ngIf="branchAccounts.length; else noBranchAccounts">
+        <article class="branch-account-card" *ngFor="let account of branchAccounts">
+          <div class="branch-account-title"><strong>{{ account.managerName || account.managerEmail || 'Manager' }}</strong><span>{{ account.branchCity }} city scope</span></div>
+          <div class="branch-account-details">
+            <div><small>Central account</small><strong>{{ account.accountNumber }}</strong></div>
+            <div><small>Manager email</small><strong>{{ account.managerEmail || '—' }}</strong></div>
+            <div><small>Access</small><strong>{{ account.sharedCentralAccount ? 'City-scoped' : 'Unavailable' }}</strong></div>
+          </div>
+        </article>
+      </div>
+      <ng-template #noBranchAccounts><div class="empty-state">Assign a city to a manager to enable city-scoped access.</div></ng-template>
+
+      <div class="customer-branch-assignment">
+        <label for="customer-account-search">Assign an existing customer account to a branch</label>
+        <input id="customer-account-search" [(ngModel)]="customerSearch" (ngModelChange)="searchBranchCustomers()"
+          placeholder="Search customer name or account number" autocomplete="off">
+        <small *ngIf="isSearchingCustomers">Searching accounts…</small>
+        <div class="customer-branch-results" *ngIf="customerMatches.length">
+          <div class="customer-branch-row" *ngFor="let customer of customerMatches">
+            <span><strong>{{ customer.name || 'Customer' }}</strong><small>{{ customer.accountNumber }} · {{ customer.accountType || 'Account' }}</small></span>
+            <select [ngModel]="customer.branchCity || ''" (ngModelChange)="assignCustomerBranch(customer, $event)"
+              [disabled]="isSavingBranchAssignment || !branchCities.length">
+              <option value="">Select branch</option>
+              <option *ngFor="let city of branchCities" [value]="city">{{ city }}</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel branch-accounts-panel">
+      <div class="panel-heading">
+        <div><span class="panel-kicker">Financial control</span><h2>Central Account Transactions</h2></div>
+      </div>
+      <p class="branch-account-help">Search the persisted central-ledger entries and generate receipts from each transaction record.</p>
+      <div class="customer-branch-assignment">
+        <label>From / to date</label>
+        <div class="branch-account-details">
+          <input type="date" [(ngModel)]="centralTransactionFilters.fromDate" aria-label="From date">
+          <input type="date" [(ngModel)]="centralTransactionFilters.toDate" aria-label="To date">
+          <input [(ngModel)]="centralTransactionFilters.search" placeholder="Transaction, reference, account">
+          <input [(ngModel)]="centralTransactionFilters.category" placeholder="Category">
+          <select [(ngModel)]="centralTransactionFilters.type"><option value="">All types</option><option value="Credit">Credit</option><option value="Debit">Debit</option></select>
+          <select [(ngModel)]="centralTransactionFilters.status"><option value="">All statuses</option><option value="Completed">Success</option><option value="Pending">Pending</option><option value="Failed">Failed</option></select>
+          <input type="number" min="0" [(ngModel)]="centralTransactionFilters.minAmount" placeholder="Minimum amount">
+          <input type="number" min="0" [(ngModel)]="centralTransactionFilters.maxAmount" placeholder="Maximum amount">
+          <button type="button" class="close-button" (click)="applyCentralLedgerFilters()">Apply filters</button>
+        </div>
+      </div>
+      <p class="hod-error" *ngIf="centralLedgerError">{{ centralLedgerError }}</p>
+      <div class="empty-state" *ngIf="isLoadingCentralLedger">Loading transactions…</div>
+      <div class="empty-state" *ngIf="!isLoadingCentralLedger && !centralTransactions.length">No central account transactions found.</div>
+      <div class="branch-account-list" *ngIf="centralTransactions.length">
+        <article class="branch-account-card" *ngFor="let transaction of centralTransactions">
+          <div class="branch-account-title">
+            <strong>{{ transaction.transactionId }}</strong>
+            <span>{{ transaction.date | date:'medium' }} · {{ transaction.status || 'Completed' }}</span>
+          </div>
+          <div class="branch-account-details">
+            <div><small>Category / type</small><strong>{{ transaction.category || transaction.type }} · {{ transaction.chargeType || '—' }}</strong></div>
+            <div><small>Debit / credit</small><strong>{{ transaction.debitAmount || 0 | currency:'INR':'symbol':'1.2-2' }} / {{ transaction.creditAmount || 0 | currency:'INR':'symbol':'1.2-2' }}</strong></div>
+            <div><small>Source</small><strong>{{ transaction.sourceAccountNumber || '—' }}</strong></div>
+            <div><small>Destination</small><strong>{{ transaction.destinationAccountNumber || transaction.accountNumber || '—' }}</strong></div>
+            <div><small>Reference</small><strong>{{ transaction.referenceNumber || '—' }}</strong></div>
+            <div><small>Balance after</small><strong>{{ transaction.balance || 0 | currency:'INR':'symbol':'1.2-2' }}</strong></div>
+            <div><small>Description</small><strong>{{ transaction.description || transaction.merchant || '—' }}</strong></div>
+          </div>
+          <div class="hod-topbar-actions">
+            <button type="button" class="account-linking-button" (click)="openCentralTransactionReceipt(transaction.transactionId)">View PDF</button>
+            <button type="button" class="account-linking-button" (click)="openCentralTransactionReceipt(transaction.transactionId, true)">Download PDF</button>
+          </div>
+        </article>
+      </div>
+      <div class="hod-topbar-actions" *ngIf="centralTransactionsTotalPages > 1">
+        <button type="button" class="account-linking-button" (click)="changeCentralLedgerPage(-1)" [disabled]="centralTransactionsPage === 0">Previous</button>
+        <span>Page {{ centralTransactionsPage + 1 }} of {{ centralTransactionsTotalPages }} · {{ centralTransactionsTotalElements }} records</span>
+        <button type="button" class="account-linking-button" (click)="changeCentralLedgerPage(1)" [disabled]="centralTransactionsPage >= centralTransactionsTotalPages - 1">Next</button>
+      </div>
+    </section>
+
     <section class="dashboard-grid">
       <div class="panel city-panel">
         <div class="panel-heading"><div><span class="panel-kicker">Regional control</span><h2>City Bank Operations</h2></div><span class="count-badge">{{ cities.length }} cities</span></div>

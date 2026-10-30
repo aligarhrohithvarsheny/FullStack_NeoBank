@@ -27,6 +27,20 @@ export class AllocationAccountService {
     });
   }
 
+  getAllAllocations(): Observable<any> {
+    return this.http.get(`${this.apiUrl}/hod/allocations`, {
+      params: { page: '0', size: '100' }
+    });
+  }
+
+  updateAllocation(allocationId: number, payload: any): Observable<any> {
+    return this.http.put(`${this.apiUrl}/hod/allocations/${allocationId}`, payload);
+  }
+
+  updateLinkedAccountDetails(allocationId: number, payload: any): Observable<any> {
+    return this.http.put(`${this.apiUrl}/hod/account/${allocationId}`, payload);
+  }
+
   getHodStaff(): Observable<any[]> {
     return this.http.get<any[]>(`${environment.apiBaseUrl}/api/admins/staff`);
   }

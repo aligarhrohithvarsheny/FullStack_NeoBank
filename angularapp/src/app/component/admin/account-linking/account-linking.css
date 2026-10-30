@@ -36,6 +36,53 @@
 
 .create-allocation-panel h6 { margin: 0 0 14px; color: #174b46; font-weight: 700; }
 
+.allocation-list-heading,
+.edit-panel-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.account-count {
+  flex: 0 0 auto;
+  padding: 6px 11px;
+  border-radius: 99px;
+  color: #155e57;
+  background: #e3f4ef;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.allocation-table { min-width: 1180px; }
+.allocation-table thead th { white-space: nowrap; font-size: 12px; }
+.allocation-table tbody td { font-size: 13px; }
+.linked-account-cell { min-width: 220px; }
+.money-cell { min-width: 140px; white-space: nowrap; font-weight: 700; font-variant-numeric: tabular-nums; }
+.balance-cell { color: #155e57; }
+.debit-value { color: #a63e3e; }
+.credit-value { color: #16805d; }
+.expiry-overdue { color: #b42318; font-weight: 700; }
+.account-action-buttons { display: flex; flex-direction: column; align-items: flex-start; gap: 7px; min-width: 150px; }
+.account-action-buttons .btn { white-space: nowrap; }
+
+.account-edit-panel,
+.allocation-edit-panel {
+  padding: 22px;
+  margin-bottom: 24px;
+  border: 1px solid #d6e5e1;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 8px 26px rgba(18, 61, 67, 0.08);
+}
+
+.allocation-edit-panel { border-left: 4px solid #d89d25; }
+.account-edit-panel { border-left: 4px solid #0f766e; }
+.edit-panel-heading { margin-bottom: 18px; }
+.edit-panel-heading h5 { margin: 4px 0; color: #173c40; font-weight: 700; }
+.edit-panel-heading p { margin: 0; color: #647579; font-size: 13px; }
+.edit-panel-heading .account-linking-eyebrow { color: #0f766e; }
+
 .card {
   border: none;
   box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
@@ -270,6 +317,10 @@ small {
 @media (max-width: 768px) {
   .account-linking-hero { align-items: flex-start; flex-direction: column; padding: 22px; }
   .account-linking-hero h1 { font-size: 23px; }
+  .allocation-list-heading,
+  .edit-panel-heading { align-items: flex-start; flex-direction: column; }
+  .account-edit-panel,
+  .allocation-edit-panel { padding: 16px; }
   .col-lg-4,
   .col-lg-8 {
     margin-bottom: 2rem;

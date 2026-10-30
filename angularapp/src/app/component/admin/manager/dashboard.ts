@@ -266,19 +266,19 @@ export class ManagerDashboard implements OnInit, OnDestroy {
   managerFeatureFilter: string = 'ALL';
   managerFeatureSearchQuery: string = '';
 
-  // Branch Account (deposit account for all charges and interest)
+  // Shared central account, scoped to the manager's assigned city
   branchAccountSummary: any = null;
-  branchAccountNumber: string = '';
-  branchAccountName: string = '';
-  branchAccountIfsc: string = '';
-  isFetchingBranchAccount = false;
   isLoadingBranchAccount: boolean = false;
-  isSavingBranchAccount: boolean = false;
-  // Branch account transactions (opened bank account)
   branchAccountTransactions: any[] = [];
   branchTxnsFromDate: string = '';
   branchTxnsToDate: string = '';
   branchTxnsSearch: string = '';
+  branchTxnsCategory: string = '';
+  branchTxnsType: string = '';
+  branchTxnsStatus: string = '';
+  branchTxnsMinAmount: number | null = null;
+  branchTxnsMaxAmount: number | null = null;
+  branchTxnsError: string = '';
   branchTxnsPage: number = 0;
   branchTxnsSize: number = 20;
   branchTxnsTotalElements: number = 0;
@@ -440,6 +440,7 @@ export class ManagerDashboard implements OnInit, OnDestroy {
 
   private sessionTimerHandle: any = null;
   private staffLocationTimer: any = null;
+  private ledgerRefreshTimer: ReturnType<typeof setInterval> | null = null;
 
   ngOnInit() {
     if (isPlatformBrowser(this.platformId)) {
@@ -474,6 +475,13 @@ export class ManagerDashboard implements OnInit, OnDestroy {
         this.refreshUsedTimes();
       }, 1000);
       this.staffLocationTimer = setInterval(() => this.loadAllAdmins(), 30000);
+      this.ledgerRefreshTimer = setInterval(() => {
+        if (this.activeSection === 'branch-account' && document.visibilityState === 'visible'
+            && !this.isLoadingBranchTxns) {
+          this.loadBranchAccountSummary();
+          this.loadBranchAccountTransactions();
+        }
+      }, 5000);
     }
   }
 
@@ -493,6 +501,10 @@ export class ManagerDashboard implements OnInit, OnDestroy {
     if (this.staffLocationTimer) {
       clearInterval(this.staffLocationTimer);
       this.staffLocationTimer = null;
+    }
+    if (this.ledgerRefreshTimer) {
+      clearInterval(this.ledgerRefreshTimer);
+      this.ledgerRefreshTimer = null;
     }
   }
   
@@ -2416,15 +2428,10 @@ export class ManagerDashboard implements OnInit, OnDestroy {
   loadBranchAccountSummary() {
     this.isLoadingBranchAccount = true;
     this.branchAccountSummary = null;
-    this.http.get<any>(`${environment.apiBaseUrl}/api/admins/branch-account`).subscribe({
+    this.http.get<any>(`${environment.apiBaseUrl}/api/admins/branch-account`, this.managerAuthOptions()).subscribe({
       next: (data) => {
         this.branchAccountSummary = data;
         this.isLoadingBranchAccount = false;
-        if (data && (data.accountNumber || data.accountName || data.ifscCode)) {
-          if (data.accountNumber) this.branchAccountNumber = String(data.accountNumber);
-          if (data.accountName) this.branchAccountName = String(data.accountName);
-          if (data.ifscCode) this.branchAccountIfsc = String(data.ifscCode);
-        }
       },
       error: (err) => {
         console.error('Error loading branch account', err);
@@ -2434,82 +2441,64 @@ export class ManagerDashboard implements OnInit, OnDestroy {
     });
   }
 
-  fetchNeoBankTreasuryAccount() {
-    this.isFetchingBranchAccount = true;
-    this.http.get<any>(`${environment.apiBaseUrl}/api/admins/branch-account/available`).subscribe({
-      next: (response) => {
-        this.isFetchingBranchAccount = false;
-        const account = response?.accounts?.[0];
-        if (!response?.success || !account) {
-          this.alertService.error('Branch Account', response?.message || 'No verified NeoBank account is available to link.');
-          return;
-        }
-        this.branchAccountNumber = String(account.accountNumber);
-        this.branchAccountName = String(account.accountName);
-        this.alertService.success('Branch Account', 'Verified NeoBank account fetched. Save to link it.');
-      },
-      error: (err) => {
-        this.isFetchingBranchAccount = false;
-        this.alertService.error('Branch Account', err.error?.message || 'Could not fetch a verified NeoBank account.');
-      }
-    });
-  }
-
-  setBranchAccount() {
-    if (!this.branchAccountNumber || !this.branchAccountNumber.trim()) {
-      this.alertService.error('Error', 'Account number is required');
-      return;
-    }
-    this.isSavingBranchAccount = true;
-    const body: any = {
-      accountNumber: this.branchAccountNumber.trim(),
-      accountName: this.branchAccountName.trim() || undefined,
-      ifscCode: this.branchAccountIfsc.trim() || undefined
-    };
-    const adminData = sessionStorage.getItem('admin');
-    if (adminData) {
-      try {
-        const admin = JSON.parse(adminData);
-        if (admin.id != null) body.adminId = String(admin.id);
-      } catch (_) {}
-    }
-    this.http.put<any>(`${environment.apiBaseUrl}/api/admins/branch-account`, body).subscribe({
-      next: (resp) => {
-        this.isSavingBranchAccount = false;
-        if (resp && resp.success) {
-          this.alertService.success('Branch Account', resp.message || 'Branch account set successfully.');
-          this.loadBranchAccountSummary();
-          this.loadBranchAccountTransactions();
-        } else {
-          this.alertService.error('Error', resp?.message || 'Failed to set branch account');
-        }
-      },
-      error: (err) => {
-        console.error('Error setting branch account', err);
-        this.isSavingBranchAccount = false;
-        this.alertService.error('Error', err.error?.message || 'Failed to set branch account');
-      }
-    });
-  }
-
   loadBranchAccountTransactions() {
     this.isLoadingBranchTxns = true;
+    this.branchTxnsError = '';
     let url = `${environment.apiBaseUrl}/api/admins/branch-account/transactions?page=${this.branchTxnsPage}&size=${this.branchTxnsSize}`;
     if (this.branchTxnsFromDate) url += `&fromDate=${encodeURIComponent(this.branchTxnsFromDate)}`;
     if (this.branchTxnsToDate) url += `&toDate=${encodeURIComponent(this.branchTxnsToDate)}`;
     if (this.branchTxnsSearch?.trim()) url += `&search=${encodeURIComponent(this.branchTxnsSearch.trim())}`;
-    this.http.get<any>(url).subscribe({
+    if (this.branchTxnsCategory) url += `&category=${encodeURIComponent(this.branchTxnsCategory)}`;
+    if (this.branchTxnsType) url += `&type=${encodeURIComponent(this.branchTxnsType)}`;
+    if (this.branchTxnsStatus) url += `&status=${encodeURIComponent(this.branchTxnsStatus)}`;
+    if (this.branchTxnsMinAmount != null) url += `&minAmount=${this.branchTxnsMinAmount}`;
+    if (this.branchTxnsMaxAmount != null) url += `&maxAmount=${this.branchTxnsMaxAmount}`;
+    this.http.get<any>(url, this.managerAuthOptions()).subscribe({
       next: (data) => {
         this.branchAccountTransactions = data.content || [];
         this.branchTxnsTotalElements = data.totalElements ?? 0;
         this.branchTxnsTotalPages = data.totalPages ?? 0;
         this.isLoadingBranchTxns = false;
       },
-      error: () => {
+      error: (err) => {
         this.branchAccountTransactions = [];
+        this.branchTxnsError = err.error?.message || 'Unable to load central account transactions.';
         this.isLoadingBranchTxns = false;
       }
     });
+  }
+
+  openBranchTransactionReceipt(transactionId: string, download = false): void {
+    const previewWindow = download ? null : window.open('', '_blank');
+    if (!download && !previewWindow) {
+      this.alertService.error('Transaction receipt', 'Allow pop-ups to view the receipt.');
+      return;
+    }
+    const url = `${environment.apiBaseUrl}/api/admins/branch-account/transactions/${encodeURIComponent(transactionId)}/receipt?download=${download}`;
+    this.http.get(url, { ...this.managerAuthOptions(), responseType: 'blob' }).subscribe({
+      next: blob => {
+        const objectUrl = URL.createObjectURL(blob);
+        if (download) {
+          const link = document.createElement('a');
+          link.href = objectUrl;
+          link.download = `${transactionId}.pdf`;
+          link.click();
+          setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+          return;
+        }
+        previewWindow!.location.href = objectUrl;
+        setTimeout(() => URL.revokeObjectURL(objectUrl), 60000);
+      },
+      error: () => {
+        previewWindow?.close();
+        this.alertService.error('Transaction receipt', 'Unable to load the transaction receipt.');
+      }
+    });
+  }
+
+  private managerAuthOptions(): { headers: Record<string, string> } {
+    const token = sessionStorage.getItem('adminSessionToken') || '';
+    return { headers: token ? { Authorization: `Bearer ${token}` } : {} };
   }
 
   applyBranchTxnsFilter() {
@@ -2542,7 +2531,7 @@ export class ManagerDashboard implements OnInit, OnDestroy {
       allocatedAmount: this.dailyAllocationAmount,
       note: this.dailyAllocationNote,
       allocatedBy: this.managerName
-    }).subscribe({
+    }, this.managerAuthOptions()).subscribe({
       next: (response) => {
         this.isSavingDailyAllocation = false;
         if (response?.success) {
@@ -2563,14 +2552,14 @@ export class ManagerDashboard implements OnInit, OnDestroy {
   loadBranchOperations() {
     this.isLoadingBranchOperations = true;
     const url = `${environment.apiBaseUrl}/api/admins/branch-account/operations?fromDate=${encodeURIComponent(this.branchOperationsDate)}&toDate=${encodeURIComponent(this.branchOperationsToDate)}`;
-    this.http.get<any>(url).subscribe({
+    this.http.get<any>(url, this.managerAuthOptions()).subscribe({
       next: (data) => { this.branchOperations = data; this.isLoadingBranchOperations = false; },
       error: () => { this.branchOperations = null; this.isLoadingBranchOperations = false; }
     });
   }
 
   loadDailyAllocations() {
-    this.http.get<any[]>(`${environment.apiBaseUrl}/api/admins/branch-account/daily-allocations`).subscribe({
+    this.http.get<any[]>(`${environment.apiBaseUrl}/api/admins/branch-account/daily-allocations`, this.managerAuthOptions()).subscribe({
       next: (data) => this.dailyAllocations = data || [],
       error: () => this.dailyAllocations = []
     });

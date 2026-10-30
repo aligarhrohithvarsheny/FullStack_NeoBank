@@ -25,11 +25,11 @@ public class SessionHistoryController {
      * Get all session history (for manager dashboard)
      */
     @GetMapping("/all")
-    public ResponseEntity<Map<String, Object>> getAllSessionHistory() {
+    public ResponseEntity<Map<String, Object>> getAllSessionHistory(
+            @RequestParam(defaultValue = "200") int limit) {
         try {
-            System.out.println("🔍 Fetching all session history...");
-            List<SessionHistory> sessions = sessionHistoryService.getAllSessionHistory();
-            System.out.println("📊 Found " + sessions.size() + " session history records");
+            int boundedLimit = Math.max(1, Math.min(limit, 500));
+            List<SessionHistory> sessions = sessionHistoryService.getRecentSessionHistory(boundedLimit);
             
             List<Map<String, Object>> sessionList = sessions.stream().map(s -> {
                 Map<String, Object> item = new HashMap<>();
@@ -56,8 +56,8 @@ public class SessionHistoryController {
             response.put("success", true);
             response.put("sessions", sessionList);
             response.put("total", sessionList.size());
-            
-            System.out.println("✅ Returning " + sessionList.size() + " session history records");
+            response.put("limit", boundedLimit);
+            response.put("truncated", sessionList.size() == boundedLimit);
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             System.err.println("❌ Error fetching session history: " + e.getMessage());
@@ -212,4 +212,3 @@ public class SessionHistoryController {
         }
     }
 }
-

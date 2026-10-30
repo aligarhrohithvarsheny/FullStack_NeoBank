@@ -5178,14 +5178,22 @@
     </div>
 
     <!-- Stats bar -->
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px;">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:16px;margin-bottom:24px;">
       <div style="background:#fff;border-radius:12px;padding:16px;box-shadow:0 1px 4px rgba(0,0,0,.08);text-align:center;">
         <div style="font-size:28px;font-weight:700;color:#0d9488;">{{adminUpiAccounts.length}}</div>
         <div style="font-size:12px;color:#64748b;margin-top:4px;">Total UPI Accounts</div>
       </div>
       <div style="background:#fff;border-radius:12px;padding:16px;box-shadow:0 1px 4px rgba(0,0,0,.08);text-align:center;">
         <div style="font-size:28px;font-weight:700;color:#2563eb;">{{adminUpiTransactions.length}}</div>
-        <div style="font-size:12px;color:#64748b;margin-top:4px;">Total Transactions</div>
+        <div style="font-size:12px;color:#64748b;margin-top:4px;">Payment Attempts</div>
+      </div>
+      <div style="background:#fff;border-radius:12px;padding:16px;box-shadow:0 1px 4px rgba(0,0,0,.08);text-align:center;">
+        <div style="font-size:28px;font-weight:700;color:#059669;">{{adminUpiSuccessfulCount}}</div>
+        <div style="font-size:12px;color:#64748b;margin-top:4px;">Successful</div>
+      </div>
+      <div style="background:#fff;border-radius:12px;padding:16px;box-shadow:0 1px 4px rgba(0,0,0,.08);text-align:center;">
+        <div style="font-size:28px;font-weight:700;color:#dc2626;">{{adminUpiFailedAttemptCount}}</div>
+        <div style="font-size:12px;color:#64748b;margin-top:4px;">Failed Attempts</div>
       </div>
       <div style="background:#fff;border-radius:12px;padding:16px;box-shadow:0 1px 4px rgba(0,0,0,.08);text-align:center;">
         <div style="font-size:28px;font-weight:700;color:#dc2626;">{{adminUpiFlagged.length}}</div>
@@ -5204,6 +5212,33 @@
       <button (click)="adminUpiTab='flagged'" [style.color]="adminUpiTab==='flagged' ? '#dc2626' : '#64748b'" [style.border-bottom]="adminUpiTab==='flagged' ? '3px solid #dc2626' : '3px solid transparent'" style="padding:10px 18px;background:none;border:none;cursor:pointer;font-size:13px;font-weight:600;">
         ⚠️ Flagged
       </button>
+    </div>
+
+    <div class="admin-upi-transaction-filters" *ngIf="adminUpiTab === 'transactions' || adminUpiTab === 'flagged'">
+      <label class="admin-upi-search">
+        <span>Search UPI transactions</span>
+        <input
+          type="search"
+          [(ngModel)]="adminUpiSearchTerm"
+          placeholder="UPI ID, transaction ID, account number, date, amount..."
+          aria-label="Search UPI ID, transaction ID, account number, date, or amount"
+        />
+      </label>
+      <label>
+        <span>From date</span>
+        <input type="date" [(ngModel)]="adminUpiFromDate" />
+      </label>
+      <label>
+        <span>To date</span>
+        <input type="date" [(ngModel)]="adminUpiToDate" />
+      </label>
+      <button type="button" class="admin-upi-clear-filters" (click)="clearAdminUpiTransactionFilters()">Clear filters</button>
+      <span class="admin-upi-result-count" *ngIf="adminUpiTab === 'transactions'">
+        {{filteredAdminUpiTransactions.length}} of {{adminUpiTransactions.length}} attempts
+      </span>
+      <span class="admin-upi-result-count" *ngIf="adminUpiTab === 'flagged'">
+        {{filteredAdminUpiFlagged.length}} of {{adminUpiFlagged.length}} flagged attempts
+      </span>
     </div>
 
     <!-- Accounts tab -->
@@ -5251,29 +5286,49 @@
     <!-- Transactions tab -->
     <div *ngIf="adminUpiTab === 'transactions'">
       <div *ngIf="isLoadingAdminUpiTxns" style="text-align:center;padding:40px;color:#64748b;">Loading transactions...</div>
-      <div *ngIf="!isLoadingAdminUpiTxns && adminUpiTransactions.length === 0" style="text-align:center;padding:40px;color:#94a3b8;">No UPI transactions found.</div>
-      <div *ngIf="!isLoadingAdminUpiTxns && adminUpiTransactions.length > 0" style="overflow-x:auto;">
+      <div *ngIf="!isLoadingAdminUpiTxns && adminUpiTransactions.length === 0" style="text-align:center;padding:40px;color:#94a3b8;">No UPI payment attempts have been recorded.</div>
+      <div *ngIf="!isLoadingAdminUpiTxns && adminUpiTransactions.length > 0 && filteredAdminUpiTransactions.length === 0" style="text-align:center;padding:40px;color:#94a3b8;">No UPI attempts match these filters.</div>
+      <div *ngIf="!isLoadingAdminUpiTxns && filteredAdminUpiTransactions.length > 0" style="overflow-x:auto;">
         <table style="width:100%;border-collapse:collapse;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.08);">
           <thead style="background:#f8fafc;">
             <tr>
-              <th style="padding:12px 16px;text-align:left;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;">Date</th>
-              <th style="padding:12px 16px;text-align:left;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;">Ref</th>
-              <th style="padding:12px 16px;text-align:left;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;">From</th>
-              <th style="padding:12px 16px;text-align:left;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;">To</th>
-              <th style="padding:12px 16px;text-align:left;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;">Amount</th>
-              <th style="padding:12px 16px;text-align:left;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;">Status</th>
+              <th style="padding:12px 16px;text-align:left;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;">Attempt time</th>
+              <th style="padding:12px 16px;text-align:left;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;">Outcome</th>
+              <th style="padding:12px 16px;text-align:left;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;">Transaction ID</th>
+              <th style="padding:12px 16px;text-align:left;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;">From account / UPI</th>
+              <th style="padding:12px 16px;text-align:left;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;">To account / UPI</th>
+              <th style="padding:12px 16px;text-align:right;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;">Amount</th>
+              <th style="padding:12px 16px;text-align:left;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;">Attempt details</th>
             </tr>
           </thead>
           <tbody>
-            <tr *ngFor="let tx of adminUpiTransactions" style="border-top:1px solid #f1f5f9;" [style.background]="tx.fraudFlagged ? '#fff5f5' : 'transparent'">
-              <td style="padding:12px 16px;font-size:12px;color:#64748b;">{{tx.createdAt | date:'dd/MM/yy, h:mm a'}}</td>
-              <td style="padding:12px 16px;font-size:11px;font-family:monospace;color:#64748b;">{{tx.transactionRef}}</td>
-              <td style="padding:12px 16px;font-size:12px;color:#1e293b;">{{tx.senderUpiId}}<br><span style="font-size:11px;color:#64748b;">{{tx.senderName}}</span></td>
-              <td style="padding:12px 16px;font-size:12px;color:#1e293b;">{{tx.receiverUpiId}}<br><span style="font-size:11px;color:#64748b;">{{tx.receiverName}}</span></td>
-              <td style="padding:12px 16px;font-size:13px;font-weight:700;color:#1e293b;">₹{{tx.amount | number:'1.2-2'}}</td>
+            <tr *ngFor="let tx of filteredAdminUpiTransactions" style="border-top:1px solid #f1f5f9;" [style.background]="tx.fraudFlagged || getAdminUpiStatusClass(tx.status) === 'failed' ? '#fff5f5' : 'transparent'">
+              <td style="padding:12px 16px;font-size:12px;color:#64748b;white-space:nowrap;">
+                <strong style="display:block;color:#1e293b;">{{tx.createdAt | date:'dd/MM/yyyy'}}</strong>
+                <span>{{tx.createdAt | date:'h:mm:ss a'}}</span>
+              </td>
               <td style="padding:12px 16px;">
-                <span [style.background]="tx.status === 'SUCCESS' ? '#d1fae5' : '#fee2e2'" [style.color]="tx.status === 'SUCCESS' ? '#065f46' : '#dc2626'" style="padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;">{{tx.status}}</span>
-                <span *ngIf="tx.fraudFlagged" style="margin-left:4px;font-size:11px;">⚠️</span>
+                <span class="admin-upi-outcome" [ngClass]="getAdminUpiStatusClass(tx.status)">{{tx.status || 'ATTEMPTED'}}</span>
+                <span *ngIf="tx.fraudFlagged" style="display:block;margin-top:5px;font-size:11px;color:#92400e;">⚠️ Flagged for review</span>
+              </td>
+              <td style="padding:12px 16px;font-size:11px;font-family:monospace;color:#334155;white-space:nowrap;">{{tx.transactionRef || tx.txnId || '—'}}</td>
+              <td style="padding:12px 16px;font-size:12px;color:#1e293b;">
+                <strong style="display:block;">{{tx.senderName || 'Sender'}}</strong>
+                <span style="font-size:11px;color:#64748b;">Account: {{tx.senderAccount || '—'}}</span>
+                <span style="display:block;font-size:11px;color:#0d9488;">{{tx.senderUpiId || '—'}}</span>
+              </td>
+              <td style="padding:12px 16px;font-size:12px;color:#1e293b;">
+                <strong style="display:block;">{{tx.receiverName || 'Recipient'}}</strong>
+                <span style="font-size:11px;color:#64748b;">Account: {{tx.receiverAccount || '—'}}</span>
+                <span style="display:block;font-size:11px;color:#0d9488;">{{tx.receiverUpiId || '—'}}</span>
+              </td>
+              <td style="padding:12px 16px;text-align:right;font-size:14px;font-weight:700;color:#1e293b;white-space:nowrap;">₹{{tx.amount | number:'1.2-2'}}</td>
+              <td style="padding:12px 16px;max-width:260px;font-size:12px;color:#64748b;">
+                <span *ngIf="isAdminUpiFailed(tx)" style="font-weight:600;color:#b91c1c;">Failed attempt</span>
+                <span *ngIf="isAdminUpiSuccessful(tx)" style="font-weight:600;color:#047857;">Transferred</span>
+                <span *ngIf="!isAdminUpiFailed(tx) && !isAdminUpiSuccessful(tx)" style="font-weight:600;color:#92400e;">{{tx.fraudFlagged ? 'Held for review' : 'Attempt recorded'}}</span>
+                <span *ngIf="tx.remark" style="display:block;margin-top:4px;overflow-wrap:anywhere;">{{tx.remark}}</span>
+                <span *ngIf="tx.riskScore" style="display:block;margin-top:4px;font-size:11px;">Risk score: {{tx.riskScore}}/100</span>
               </td>
             </tr>
           </tbody>
@@ -5284,10 +5339,10 @@
     <!-- Flagged tab -->
     <div *ngIf="adminUpiTab === 'flagged'">
       <div *ngIf="isLoadingAdminUpiFlagged" style="text-align:center;padding:40px;color:#64748b;">Loading flagged transactions...</div>
-      <div *ngIf="!isLoadingAdminUpiFlagged && adminUpiFlagged.length === 0" style="text-align:center;padding:40px;color:#22c55e;">✅ No flagged transactions found.</div>
-      <div *ngIf="!isLoadingAdminUpiFlagged && adminUpiFlagged.length > 0" style="overflow-x:auto;">
+      <div *ngIf="!isLoadingAdminUpiFlagged && filteredAdminUpiFlagged.length === 0" style="text-align:center;padding:40px;color:#22c55e;">✅ No flagged transactions match these filters.</div>
+      <div *ngIf="!isLoadingAdminUpiFlagged && filteredAdminUpiFlagged.length > 0" style="overflow-x:auto;">
         <div style="background:#fff5f5;border:1px solid #fecaca;border-radius:12px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:#dc2626;">
-          ⚠️ {{adminUpiFlagged.length}} transaction(s) flagged as potentially fraudulent. Review and take action if necessary.
+          ⚠️ {{filteredAdminUpiFlagged.length}} transaction(s) flagged as potentially fraudulent. Review and take action if necessary.
         </div>
         <table style="width:100%;border-collapse:collapse;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.08);">
           <thead style="background:#fef2f2;">
@@ -5301,7 +5356,7 @@
             </tr>
           </thead>
           <tbody>
-            <tr *ngFor="let tx of adminUpiFlagged" style="border-top:1px solid #fecaca;background:#fff5f5;">
+            <tr *ngFor="let tx of filteredAdminUpiFlagged" style="border-top:1px solid #fecaca;background:#fff5f5;">
               <td style="padding:12px 16px;font-size:12px;color:#64748b;">{{tx.createdAt | date:'dd/MM/yy, h:mm a'}}</td>
               <td style="padding:12px 16px;font-size:11px;font-family:monospace;color:#64748b;">{{tx.transactionRef}}</td>
               <td style="padding:12px 16px;font-size:12px;color:#1e293b;">{{tx.senderUpiId}}<br><span style="font-size:11px;color:#64748b;">{{tx.senderName}}</span></td>

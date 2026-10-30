@@ -66,6 +66,7 @@ export class HodLogin {
           return;
         }
         sessionStorage.setItem('admin', JSON.stringify(response.admin));
+        if (response.sessionToken) sessionStorage.setItem('adminSessionToken', response.sessionToken);
         sessionStorage.setItem('userRole', 'HOD');
         sessionStorage.setItem('adminLoginTime', new Date().toISOString());
         this.alertService.loginSuccess('HOD');

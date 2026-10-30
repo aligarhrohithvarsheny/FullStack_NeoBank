@@ -59,7 +59,13 @@ export class PositivePayComponent implements OnInit {
   open(c: any) { this.error = ''; this.message = ''; this.selected = c; this.form = { chequeDate: '', amount: c.amount || null, payeeName: '', payeeAccountNumber: '', payeeBankName: '', payeeIfsc: '', remarks: '', confirmation: false }; }
   openEdit(request: any) { this.error = ''; this.message = ''; this.editing = request; this.selected = null; this.form = { chequeDate: request.chequeDate, amount: request.amount, payeeName: request.payeeName, payeeAccountNumber: request.payeeAccountNumber || '', payeeBankName: request.payeeBankName || '', payeeIfsc: request.payeeIfsc || '', remarks: request.remarks || '', confirmation: false }; }
   closeForm() { this.selected = null; this.editing = null; }
-  statusLabel(status: string): string { return status === 'APPROVED' ? 'CHEQUE PASSED' : status.replace(/_/g, ' '); }
+  statusLabel(status: string): string {
+    if (status === 'APPROVED') return 'AI PASS · OPTIONAL';
+    if (status === 'REJECTED') return 'AI FLAG · OPTIONAL';
+    if (status === 'PENDING_ADMIN_APPROVAL') return 'PENDING · INFORMATIONAL';
+    if (status === 'NOT_REGISTERED') return 'NOT REGISTERED · OPTIONAL';
+    return status.replace(/_/g, ' ');
+  }
   submit() {
     this.error = '';
     if (!this.editing && !this.selected?.eligible) { this.error = 'This cheque is not available for Positive Pay registration.'; return; }

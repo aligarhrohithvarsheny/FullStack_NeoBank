@@ -19,6 +19,9 @@ public interface AdminRepository extends JpaRepository<Admin, Long> {
     // Case-insensitive lookup for normalized login/create flows
     Admin findByEmailIgnoreCase(String email);
 
+    // Legacy databases can contain duplicate email rows; use a collection for administrative lookups.
+    java.util.List<Admin> findAllByEmailIgnoreCaseOrderByIdDesc(String email);
+
     // Duplicate check to prevent multiple accounts with same email
     boolean existsByEmailIgnoreCase(String email);
     

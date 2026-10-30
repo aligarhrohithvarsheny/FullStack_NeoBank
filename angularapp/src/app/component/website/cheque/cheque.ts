@@ -266,11 +266,6 @@ export class ChequeComponent implements OnInit {
       next: (response) => {
         this.isSubmitting = false;
         if (response.success) {
-          if (response.positivePayRequired) {
-            sessionStorage.setItem('positivePayDraft', JSON.stringify({ accountNumber: this.account?.accountNumber, accountType: 'Savings', chequeNumber: response.chequeNumber, amount: this.amount, payeeName: this.payeeName.trim() }));
-            this.router.navigate(['/website/accounts', this.account?.accountNumber, 'positive-pay']);
-            return;
-          }
           this.successMessage = `Cheque request submitted successfully! Cheque Number: ${response.chequeNumber}. Waiting for admin approval.`;
           setTimeout(() => {
             this.resetForm();
@@ -673,7 +668,7 @@ export class ChequeComponent implements OnInit {
 
   getStatusText(status: SavingsChequeStatus): string {
     const statusMap: { [key in SavingsChequeStatus]: string } = {
-      'AWAITING_POSITIVE_PAY': 'Awaiting Positive Pay',
+      'AWAITING_POSITIVE_PAY': 'Pending admin verification',
       'PENDING': 'Awaiting Approval',
       'APPROVED': 'Approved',
       'COMPLETED': 'Processed',

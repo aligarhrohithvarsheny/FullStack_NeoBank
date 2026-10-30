@@ -134,6 +134,21 @@ public class AdminService {
         return adminRepository.findByEmailIgnoreCase(normalizedEmail);
     }
 
+    @Transactional(readOnly = true)
+    public Admin getAdminForFeatureAccess(String email) {
+        String normalizedEmail = normalizeEmail(email);
+        if (normalizedEmail == null || normalizedEmail.isEmpty()) return null;
+        return adminRepository.findAllByEmailIgnoreCaseOrderByIdDesc(normalizedEmail).stream()
+                .filter(admin -> "ADMIN".equalsIgnoreCase(admin.getRole()))
+                .sorted(java.util.Comparator
+                        .comparing((Admin admin) -> admin.getFeatureAccessJson() != null
+                                && !admin.getFeatureAccessJson().isBlank())
+                        .reversed()
+                        .thenComparing(Admin::getId, java.util.Comparator.nullsLast(java.util.Comparator.reverseOrder())))
+                .findFirst()
+                .orElse(null);
+    }
+
     @Transactional
     public boolean verifyInsuranceReviewer(String email, String password) {
         if (email == null || email.isBlank() || password == null || password.isBlank()) return false;

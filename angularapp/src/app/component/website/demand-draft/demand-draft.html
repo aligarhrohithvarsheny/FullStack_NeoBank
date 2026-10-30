@@ -1,7 +1,7 @@
 <div class="dd-page">
   <button (click)="goBack()">Back to Dashboard</button>
   <h1>Savings Account Demand Draft</h1>
-  <p>Verify a newly entered cheque number and its approved Positive Pay details before requesting a DD.</p>
+  <p>Verify the cheque details and submit the demand draft. Positive Pay is optional and its status does not block processing.</p>
   <div class="alert error" *ngIf="error">{{ error }}</div>
   <div class="alert success" *ngIf="message">{{ message }}</div>
   <section class="dd-card">
@@ -17,21 +17,14 @@
       <span>Available balance: ₹{{accountDetails.balance | number:'1.2-2'}}</span>
     </div>
     <div class="form-grid" *ngIf="verified">
-      <label>Payee Name<input [(ngModel)]="form.payeeName" (ngModelChange)="resetPositivePayVerification()"></label>
+      <label>Payee Name<input [(ngModel)]="form.payeeName"></label>
       <label>Payee NeoBank Account Number<input [(ngModel)]="form.payeeAccountNumber"></label>
-      <label>Amount<input type="number" [(ngModel)]="form.amount" (ngModelChange)="resetPositivePayVerification()" min="1"></label>
+      <label>Amount<input type="number" [(ngModel)]="form.amount" min="1"></label>
       <label>DD Date<input type="date" [(ngModel)]="form.draftDate"></label>
       <label class="wide">Reason<textarea [(ngModel)]="form.reason"></textarea></label>
     </div>
-    <div class="positive-pay-check" *ngIf="verified">
-      <p>Positive Pay approval must match this cheque number, DD amount, and payee. All cheque amounts are eligible.</p>
-      <button (click)="verifyPositivePay()" [disabled]="verifyingPositivePay || !form.amount || !form.payeeName">
-        {{verifyingPositivePay ? 'Checking...' : 'Verify Positive Pay'}}
-      </button>
-      <span class="pp-verified" *ngIf="positivePayVerified">Approved Positive Pay {{positivePayReference}} verified</span>
-      <button type="button" class="secondary" (click)="openPositivePay()">Open Positive Pay</button>
-    </div>
-    <button *ngIf="verified" (click)="submit()" [disabled]="submitting || !positivePayVerified">{{submitting ? 'Sending...' : 'Send DD Request'}}</button>
+    <p class="optional-positive-pay" *ngIf="verified">Positive Pay status is optional and does not affect demand draft eligibility. Admins verify the customer-signed cheque authorization during processing.</p>
+    <button *ngIf="verified" (click)="submit()" [disabled]="submitting">{{submitting ? 'Sending...' : 'Send DD Request'}}</button>
   </section>
   <section class="dd-card">
     <h2>My Demand Drafts</h2>

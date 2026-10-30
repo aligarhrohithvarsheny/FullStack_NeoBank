@@ -59,6 +59,27 @@
 .assignment-list .assignment-disabled { opacity: .55; cursor: not-allowed; }
 .assignment-list label small { color: #0f766e; font-size: 10px; font-weight: 800; }
 .hod-error { color: #b42318; margin: 16px 0; }
+.branch-accounts-panel { margin-top: 20px; }
+.branch-account-help { margin: -8px 0 18px; color: #668087; font-size: 13px; }
+.branch-account-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 12px; }
+.branch-account-card { padding: 16px; border: 1px solid #cfe5e2; border-radius: 10px; background: #f7fcfb; }
+.branch-account-title { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 14px; color: #0d3b43; }
+.branch-account-title span { color: #0f766e; font-size: 11px; font-weight: 800; text-transform: uppercase; }
+.branch-account-details { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.branch-account-details div { display: grid; gap: 4px; min-width: 0; }
+.branch-account-details small, .customer-branch-row small { color: #668087; font-size: 11px; }
+.branch-account-details strong { overflow-wrap: anywhere; color: #12313a; font-size: 13px; }
+.branch-account-create, .customer-branch-assignment { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(220px, 2fr) auto; align-items: center; gap: 10px; margin-top: 18px; padding-top: 18px; border-top: 1px solid #edf2f2; }
+.branch-account-create label, .customer-branch-assignment label { color: #12313a; font-size: 13px; font-weight: 700; }
+.branch-account-create select, .branch-account-create button, .customer-branch-assignment input, .customer-branch-row select { min-width: 0; padding: 10px 12px; border: 1px solid #c9d9db; border-radius: 7px; background: #fff; }
+.branch-account-create button { border: 0; background: #0f766e; color: #fff; font-weight: 700; cursor: pointer; }
+.branch-account-create button:disabled { opacity: .5; cursor: not-allowed; }
+.branch-account-create span, .customer-branch-assignment > small { grid-column: 2 / -1; color: #668087; font-size: 11px; }
+.customer-branch-assignment { grid-template-columns: 1fr 2fr; }
+.customer-branch-results { grid-column: 1 / -1; display: grid; }
+.customer-branch-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid #edf2f2; }
+.customer-branch-row span { display: grid; gap: 4px; }
+.customer-branch-row select { width: min(230px, 45%); }
 @media (max-width: 1100px) { .live-data-grid { grid-template-columns: repeat(3, 1fr); } }
-@media (max-width: 900px) { .metric-grid { grid-template-columns: repeat(2, 1fr); } .dashboard-grid { grid-template-columns: 1fr; } .add-city-form { grid-template-columns: 1fr 1fr; } .add-city-form input:first-child { grid-column: span 2; } .add-city-form button { min-height: 40px; } .edit-fields, .city-metrics { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 520px) { .hod-topbar { align-items: flex-start; flex-direction: column; } .hod-topbar-actions { width: 100%; flex-wrap: wrap; } .metric-grid, .live-data-grid { grid-template-columns: 1fr; } .add-city-form, .edit-fields, .profile-grid, .city-metrics { grid-template-columns: 1fr; } .profile-wide { grid-column: auto; } .add-city-form input:first-child { grid-column: auto; } }
+@media (max-width: 900px) { .metric-grid { grid-template-columns: repeat(2, 1fr); } .dashboard-grid { grid-template-columns: 1fr; } .add-city-form { grid-template-columns: 1fr 1fr; } .add-city-form input:first-child { grid-column: span 2; } .add-city-form button { min-height: 40px; } .edit-fields, .city-metrics { grid-template-columns: repeat(2, 1fr); } .branch-account-create, .customer-branch-assignment { grid-template-columns: 1fr 1fr; } .branch-account-create label, .customer-branch-assignment label { grid-column: 1 / -1; } }
+@media (max-width: 520px) { .hod-topbar { align-items: flex-start; flex-direction: column; } .hod-topbar-actions { width: 100%; flex-wrap: wrap; } .metric-grid, .live-data-grid { grid-template-columns: 1fr; } .add-city-form, .edit-fields, .profile-grid, .city-metrics, .branch-account-details, .branch-account-create, .customer-branch-assignment { grid-template-columns: 1fr; } .profile-wide { grid-column: auto; } .add-city-form input:first-child { grid-column: auto; } .branch-account-create label, .customer-branch-assignment label, .branch-account-create span, .customer-branch-assignment > small { grid-column: auto; } .customer-branch-row { align-items: flex-start; flex-direction: column; } .customer-branch-row select { width: 100%; } }

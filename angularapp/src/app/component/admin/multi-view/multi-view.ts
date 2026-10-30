@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, HostListener, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -12,13 +12,17 @@ interface MultiViewPane { path: string; url: SafeResourceUrl | null; }
   standalone: true,
   imports: [CommonModule, FormsModule],
   template: `
-    <div class="mv-root">
+    <div class="mv-root" (mousemove)="revealFullscreenExit()">
       <div class="mv-bar">
         <button class="mv-btn" (click)="goHome()">&larr; Dashboard Home</button>
         <strong>4-in-1 Multitasking Screen</strong>
         <span class="mv-hint">Pick a feature in each pane and work on four things at once.</span>
+        <button class="mv-btn" *ngIf="!isFullscreen" (click)="enterFullscreen()">Full Screen</button>
         <button class="mv-btn" (click)="reloadAll()">Reload all</button>
       </div>
+      <button class="mv-fullscreen-exit" *ngIf="isFullscreen && fullscreenExitVisible"
+              (click)="exitFullscreen()">Exit Full Screen</button>
+      <p class="mv-error" *ngIf="fullscreenError" role="alert">{{ fullscreenError }}</p>
       <div class="mv-grid" [class.has-max]="maximizedIndex !== -1">
         <div class="mv-pane" *ngFor="let pane of panes; let i = index"
              [class.hidden]="maximizedIndex !== -1 && maximizedIndex !== i">
@@ -32,7 +36,7 @@ interface MultiViewPane { path: string; url: SafeResourceUrl | null; }
               {{ maximizedIndex === i ? 'Restore' : 'Maximize' }}
             </button>
           </div>
-          <iframe *ngIf="pane.url" [src]="pane.url" title="Admin feature pane"></iframe>
+          <iframe *ngIf="pane.url" [src]="pane.url" title="Admin feature pane" (load)="onFrameLoad($event)"></iframe>
           <div class="mv-empty" *ngIf="!pane.url">Select a feature to load it here</div>
         </div>
       </div>
@@ -43,6 +47,8 @@ interface MultiViewPane { path: string; url: SafeResourceUrl | null; }
     .mv-bar { display: flex; align-items: center; gap: 14px; padding: 8px 14px; background: #1a237e; color: #fff; }
     .mv-hint { flex: 1; font-size: 12px; opacity: .8; }
     .mv-btn { border: 0; border-radius: 4px; padding: 4px 10px; cursor: pointer; background: #e8eaf6; color: #1a237e; }
+    .mv-fullscreen-exit { position: fixed; top: 12px; right: 12px; z-index: 2147483647; border: 0; border-radius: 6px; padding: 10px 16px; cursor: pointer; color: #fff; background: #b91c1c; box-shadow: 0 2px 12px #0005; }
+    .mv-error { position: fixed; top: 55px; right: 12px; z-index: 2147483647; margin: 0; padding: 8px 12px; border-radius: 6px; color: #991b1b; background: #fee2e2; }
     .mv-grid { flex: 1; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 6px; padding: 6px; min-height: 0; }
     .mv-grid.has-max { grid-template-columns: 1fr; grid-template-rows: 1fr; }
     .mv-pane { display: flex; flex-direction: column; background: #fff; border: 1px solid #c5cae9; border-radius: 6px; overflow: hidden; min-height: 0; }
@@ -54,7 +60,7 @@ interface MultiViewPane { path: string; url: SafeResourceUrl | null; }
     @media (max-width: 900px) { .mv-grid { grid-template-columns: 1fr; grid-template-rows: repeat(4, 70vh); overflow: auto; } }
   `]
 })
-export class AdminMultiView implements OnInit {
+export class AdminMultiView implements OnInit, OnDestroy {
   options: MultiViewOption[] = [
     { path: 'users', label: 'Users' },
     { path: 'transactions', label: 'Transactions' },
@@ -89,7 +95,11 @@ export class AdminMultiView implements OnInit {
   ];
   panes: MultiViewPane[] = [0, 1, 2, 3].map(() => ({ path: '', url: null }));
   maximizedIndex = -1;
+  isFullscreen = false;
+  fullscreenExitVisible = false;
+  fullscreenError = '';
   private readonly storageKey = 'adminMultiViewPanes';
+  private readonly frameDocuments = new Map<HTMLIFrameElement, { document: Document; listener: EventListener }>();
 
   constructor(private router: Router, private sanitizer: DomSanitizer) {}
 
@@ -98,6 +108,63 @@ export class AdminMultiView implements OnInit {
     let saved: string[] = [];
     try { saved = JSON.parse(localStorage.getItem(this.storageKey) || '[]'); } catch { saved = []; }
     defaults.forEach((d, i) => this.load(i, saved[i] ?? d));
+  }
+
+  ngOnDestroy(): void {
+    this.frameDocuments.forEach(({ document, listener }) => document.removeEventListener('mousemove', listener));
+    this.frameDocuments.clear();
+    if (typeof document !== 'undefined' && document.fullscreenElement === document.documentElement) {
+      void document.exitFullscreen();
+    }
+  }
+
+  @HostListener('document:fullscreenchange')
+  syncFullscreenState(): void {
+    if (typeof document === 'undefined') return;
+    this.isFullscreen = document.fullscreenElement === document.documentElement;
+    if (!this.isFullscreen) this.fullscreenExitVisible = false;
+  }
+
+  async enterFullscreen(): Promise<void> {
+    this.fullscreenError = '';
+    try {
+      await document.documentElement.requestFullscreen();
+      this.isFullscreen = document.fullscreenElement === document.documentElement;
+      this.fullscreenExitVisible = false;
+    } catch (error) {
+      this.fullscreenError = error instanceof Error
+        ? `Could not enter fullscreen: ${error.message}`
+        : 'Could not enter fullscreen. Use the browser’s fullscreen permission and try again.';
+    }
+  }
+
+  async exitFullscreen(): Promise<void> {
+    this.fullscreenError = '';
+    if (!document.fullscreenElement) return;
+    try {
+      await document.exitFullscreen();
+      this.fullscreenExitVisible = false;
+    } catch (error) {
+      this.fullscreenError = error instanceof Error
+        ? `Could not exit fullscreen: ${error.message}`
+        : 'Could not exit fullscreen. Press Escape to leave fullscreen mode.';
+    }
+  }
+
+  revealFullscreenExit(): void {
+    if (this.isFullscreen) this.fullscreenExitVisible = true;
+  }
+
+  onFrameLoad(event: Event): void {
+    const frame = event.target;
+    if (!(frame instanceof HTMLIFrameElement)) return;
+    const oldBinding = this.frameDocuments.get(frame);
+    if (oldBinding) oldBinding.document.removeEventListener('mousemove', oldBinding.listener);
+    const frameDocument = frame.contentDocument;
+    if (!frameDocument) return;
+    const listener: EventListener = () => this.revealFullscreenExit();
+    frameDocument.addEventListener('mousemove', listener);
+    this.frameDocuments.set(frame, { document: frameDocument, listener });
   }
 
   setPane(i: number, path: string): void {

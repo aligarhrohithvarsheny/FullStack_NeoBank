@@ -8,8 +8,12 @@ export class AdminPositivePayComponent implements OnInit {
   rows: any[] = []; stats: any = {}; status = ''; page = 0; totalPages = 0; selected: any = null; loading = false; error = '';
   constructor(private service: PositivePayService) {}
   ngOnInit() { this.refresh(); }
-  refresh() { this.loading=true; this.service.adminStats().subscribe(r=>this.stats=r); this.service.adminList(this.status || undefined,this.page,20).subscribe({next:r=>{this.rows=r.content||[];this.totalPages=r.totalPages||0;this.loading=false},error:e=>{this.error=e.error?.message||'Unable to load Positive Pay requests';this.loading=false}}); }
+  refresh() { this.loading=true; this.error=''; this.service.adminStats().subscribe({next:r=>this.stats=r,error:e=>this.error=e.error?.message||'Unable to load Positive Pay statistics'}); this.service.adminList(this.status || undefined,this.page,20).subscribe({next:r=>{this.rows=r.content||[];this.totalPages=r.totalPages||0;this.loading=false},error:e=>{this.error=e.error?.message||'Unable to load Positive Pay requests';this.loading=false}}); }
   filter() { this.page=0; this.refresh(); }
-  view(r:any) { this.service.adminDetails(r.referenceNumber).subscribe({next:x=>this.selected=x,error:e=>this.error=e.error?.message||'Unable to load details'}); }
-  statusLabel(value: string): string { return value === 'APPROVED' ? 'AI APPROVED · CHEQUE PASSED' : value.replace(/_/g, ' '); }
+  view(r:any) { this.error=''; this.service.adminDetails(r.referenceNumber).subscribe({next:x=>this.selected=x,error:e=>this.error=e.error?.message||'Unable to load details'}); }
+  statusLabel(value: string, decidedBy?: string): string {
+    if (value === 'APPROVED') return decidedBy === 'AI_SECURITY_ENGINE' ? 'AI PASS · INFORMATIONAL' : 'PASSED · INFORMATIONAL';
+    if (value === 'REJECTED') return 'AI FLAG · INFORMATIONAL';
+    return `${value.replace(/_/g, ' ')} · INFORMATIONAL`;
+  }
 }

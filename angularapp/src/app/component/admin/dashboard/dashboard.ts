@@ -268,6 +268,76 @@ export class Dashboard implements OnInit, OnDestroy {
   isLoadingAdminUpiTxns: boolean = false;
   isLoadingAdminUpiFlagged: boolean = false;
   adminUpiTab: string = 'accounts';
+  adminUpiSearchTerm = '';
+  adminUpiFromDate = '';
+  adminUpiToDate = '';
+
+  get filteredAdminUpiTransactions(): any[] {
+    return this.filterAdminUpiTransactions(this.adminUpiTransactions);
+  }
+
+  get filteredAdminUpiFlagged(): any[] {
+    return this.filterAdminUpiTransactions(this.adminUpiFlagged);
+  }
+
+  get adminUpiFailedAttemptCount(): number {
+    return this.adminUpiTransactions.filter(tx => this.isAdminUpiFailed(tx)).length;
+  }
+
+  get adminUpiSuccessfulCount(): number {
+    return this.adminUpiTransactions.filter(tx => this.isAdminUpiSuccessful(tx)).length;
+  }
+
+  private filterAdminUpiTransactions(transactions: any[]): any[] {
+    const term = this.adminUpiSearchTerm.trim().toLowerCase();
+    const numericTerm = term.replace(/[,\s₹]/g, '');
+    return transactions.filter(tx => {
+      const searchableFields = [
+        tx.transactionRef,
+        tx.txnId,
+        tx.senderUpiId,
+        tx.receiverUpiId,
+        tx.senderAccount,
+        tx.receiverAccount,
+        tx.accountNumber,
+        tx.amount,
+        tx.status,
+        tx.remark,
+        tx.createdAt
+      ];
+      const matchesTerm = !term || searchableFields.some(value =>
+        String(value ?? '').toLowerCase().includes(term)
+      ) || (numericTerm !== '' && String(tx.amount ?? '').includes(numericTerm));
+      if (!matchesTerm) return false;
+
+      const date = tx.createdAt ? String(tx.createdAt).slice(0, 10) : '';
+      if (this.adminUpiFromDate && (!date || date < this.adminUpiFromDate)) return false;
+      if (this.adminUpiToDate && (!date || date > this.adminUpiToDate)) return false;
+      return true;
+    });
+  }
+
+  clearAdminUpiTransactionFilters() {
+    this.adminUpiSearchTerm = '';
+    this.adminUpiFromDate = '';
+    this.adminUpiToDate = '';
+  }
+
+  isAdminUpiFailed(tx: any): boolean {
+    return ['FAILED', 'FAILURE', 'DECLINED', 'REJECTED'].includes(String(tx?.status || '').toUpperCase());
+  }
+
+  isAdminUpiSuccessful(tx: any): boolean {
+    return ['SUCCESS', 'COMPLETED'].includes(String(tx?.status || '').toUpperCase());
+  }
+
+  getAdminUpiStatusClass(status: string | undefined): string {
+    const normalized = String(status || '').toUpperCase();
+    if (['SUCCESS', 'COMPLETED'].includes(normalized)) return 'success';
+    if (['FAILED', 'FAILURE', 'DECLINED', 'REJECTED'].includes(normalized)) return 'failed';
+    if (['FLAGGED', 'PENDING', 'PROCESSING', 'ATTEMPTED'].includes(normalized)) return 'attention';
+    return 'unknown';
+  }
 
   // ── ATM Management ──────────────────────────────────────
   atmMachines: any[] = [];
@@ -677,7 +747,11 @@ export class Dashboard implements OnInit, OnDestroy {
     this.isLoadingAdminUpiTxns = true;
     this.http.get<any>(`${environment.apiBaseUrl}/api/admins/upi/savings/transactions`).subscribe({
       next: (res: any) => { this.adminUpiTransactions = res?.transactions || []; this.isLoadingAdminUpiTxns = false; },
-      error: () => { this.adminUpiTransactions = []; this.isLoadingAdminUpiTxns = false; }
+      error: (err: any) => {
+        this.adminUpiTransactions = [];
+        this.isLoadingAdminUpiTxns = false;
+        this.alertService.error('UPI Transactions Unavailable', err?.error?.message || 'Failed to load UPI transactions.');
+      }
     });
   }
 
@@ -685,7 +759,11 @@ export class Dashboard implements OnInit, OnDestroy {
     this.isLoadingAdminUpiFlagged = true;
     this.http.get<any>(`${environment.apiBaseUrl}/api/admins/upi/savings/flagged`).subscribe({
       next: (res: any) => { this.adminUpiFlagged = res?.transactions || []; this.isLoadingAdminUpiFlagged = false; },
-      error: () => { this.adminUpiFlagged = []; this.isLoadingAdminUpiFlagged = false; }
+      error: (err: any) => {
+        this.adminUpiFlagged = [];
+        this.isLoadingAdminUpiFlagged = false;
+        this.alertService.error('Flagged UPI Transactions Unavailable', err?.error?.message || 'Failed to load flagged UPI transactions.');
+      }
     });
   }
 

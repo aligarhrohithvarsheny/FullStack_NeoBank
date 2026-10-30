@@ -398,7 +398,7 @@ export class SavingsChequeManagementComponent implements OnInit, OnDestroy {
 
   getStatusText(status: SavingsChequeStatus): string {
     const statusMap: { [key in SavingsChequeStatus]: string } = {
-      'AWAITING_POSITIVE_PAY': 'Awaiting Positive Pay',
+      'AWAITING_POSITIVE_PAY': 'Pending admin verification',
       'PENDING': 'Pending',
       'APPROVED': 'Approved',
       'COMPLETED': 'Completed',

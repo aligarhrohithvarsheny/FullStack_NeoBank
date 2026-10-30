@@ -15,6 +15,8 @@ export class AccountLinkingComponent implements OnInit {
   accountForm!: FormGroup;
   chequeForm!: FormGroup;
   allocationForm!: FormGroup;
+  editAccountForm!: FormGroup;
+  editAllocationForm!: FormGroup;
   
   // UI State
   step = 1;  // Step 1: Account Details, Step 2: Cheque Details
@@ -24,6 +26,9 @@ export class AccountLinkingComponent implements OnInit {
   
   // Data
   linkedAccounts: any[] = [];
+  allAllocations: any[] = [];
+  editingAccount: any | null = null;
+  editingAllocation: any | null = null;
   selectedCity = '';
   selectedBranch = '';
   allocations: any[] = [];
@@ -72,17 +77,45 @@ export class AccountLinkingComponent implements OnInit {
       validTill: ['', Validators.required],
       description: ['']
     });
+
+    this.editAccountForm = this.fb.group({
+      accountNumber: ['', [Validators.required, Validators.pattern(/^[A-Z0-9]{6,20}$/i)]],
+      ifscCode: ['', [Validators.required, Validators.pattern(/^(NEOB0000001|EZYV000123)$/i)]],
+      accountHolderName: ['', [Validators.required, Validators.minLength(3)]],
+      bankName: ['', Validators.required],
+      accountType: ['CURRENT', Validators.required],
+      branchName: ['', Validators.required],
+      city: ['', Validators.required],
+      location: [''],
+      state: [''],
+      chequeNumber: ['', [Validators.required, Validators.pattern(/^\d{6,10}$/)]],
+      chequeHolderName: ['', Validators.required],
+      chequeDate: ['', Validators.required],
+      chequeBank: ['', Validators.required],
+      chequeImageUrl: ['']
+    });
+
+    this.editAllocationForm = this.fb.group({
+      amount: ['', [Validators.required, Validators.min(1)]],
+      validTill: ['', Validators.required],
+      description: ['']
+    });
   }
 
   ngOnInit(): void {
     this.loadAvailableCities();
     this.loadAllocations();
     this.loadManagers();
+    const hodCity = String(this.getHodSession()?.assignedCity || '').trim();
+    if (hodCity) {
+      this.selectedCity = hodCity;
+      this.loadAccountsByLocation();
+    }
   }
 
   get branchOptions(): string[] {
     const city = this.selectedCity.trim().toLowerCase();
-    return [...new Set(this.activeAllocations
+    return [...new Set(this.allAllocations
       .filter(allocation => !city || String(allocation.city || '').toLowerCase() === city)
       .map(allocation => String(allocation.branchName || '').trim())
       .filter(Boolean))].sort((a, b) => a.localeCompare(b));
@@ -108,15 +141,17 @@ export class AccountLinkingComponent implements OnInit {
   }
 
   loadAllocations(selectAllocationId?: number): void {
-    this.accountService.getAllocations().subscribe({
+    this.accountService.getAllAllocations().subscribe({
       next: (response: any) => {
         const allocations = response.content || response.allocations || [];
+        this.allAllocations = allocations;
         this.activeAllocations = allocations.filter((allocation: any) => allocation.status === 'ACTIVE');
         this.allocations = this.activeAllocations.filter((allocation: any) =>
-          allocation.status === 'ACTIVE' && (!allocation.accountStatus || allocation.accountStatus === 'NOT_LINKED')
+          (!allocation.accountStatus || allocation.accountStatus === 'NOT_LINKED') &&
+          !this.isAllocationExpired(allocation)
         );
         if (this.allocations.length === 0) this.showCreateAllocation = true;
-        const allocationCities = this.activeAllocations.map((allocation: any) => String(allocation.city || '').trim()).filter(Boolean);
+        const allocationCities = allocations.map((allocation: any) => String(allocation.city || '').trim()).filter(Boolean);
         this.cityOptions = [...new Set([...this.cityOptions, ...allocationCities])].sort((a, b) => a.localeCompare(b));
         if (selectAllocationId && this.allocations.some(item => Number(item.id) === selectAllocationId)) {
           this.accountForm.patchValue({ allocationId: String(selectAllocationId) });
@@ -125,6 +160,130 @@ export class AccountLinkingComponent implements OnInit {
       },
       error: (error: any) => {
         this.errorMessage = error.error?.message || 'Failed to load active allocations.';
+      }
+    });
+  }
+
+  getAllocationForAccount(account: any): any | null {
+    return this.allAllocations.find(item => Number(item.id) === Number(account.allocationId)) || null;
+  }
+
+  isAllocationExpired(allocation: any): boolean {
+    if (!allocation?.validTill) return false;
+    const today = new Date();
+    const localDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    return String(allocation.validTill).slice(0, 10) < localDate;
+  }
+
+  editLinkedAccount(account: any): void {
+    this.editingAccount = account;
+    const allocation = this.getAllocationForAccount(account);
+    this.editAccountForm.reset({
+      accountNumber: account.accountNumber || '',
+      ifscCode: account.ifscCode || '',
+      accountHolderName: account.accountHolderName || '',
+      bankName: account.bankName || '',
+      accountType: account.accountType || 'CURRENT',
+      branchName: account.branchName || '',
+      city: account.city || '',
+      location: account.location || '',
+      state: account.state || '',
+      chequeNumber: account.chequeNumber || '',
+      chequeHolderName: account.chequeHolderName || '',
+      chequeDate: allocation?.chequeDate || '',
+      chequeBank: allocation?.chequeBank || account.bankName || '',
+      chequeImageUrl: allocation?.chequeImageUrl || account.verificationDocuments || ''
+    });
+    this.errorMessage = '';
+  }
+
+  saveLinkedAccount(): void {
+    if (!this.editingAccount || this.editAccountForm.invalid) {
+      this.editAccountForm.markAllAsTouched();
+      return;
+    }
+    const hod = this.getHodSession();
+    if (!hod?.id || sessionStorage.getItem('userRole') !== 'HOD') {
+      this.errorMessage = 'Sign in with a HOD account to edit linked accounts.';
+      return;
+    }
+    const allocationId = Number(this.editingAccount.allocationId);
+    this.loading = true;
+    this.errorMessage = '';
+    this.accountService.updateLinkedAccountDetails(allocationId, {
+      ...this.editAccountForm.getRawValue(),
+      hodAdminId: hod.id
+    }).subscribe({
+      next: (response: any) => {
+        this.loading = false;
+        if (!response?.success) {
+          this.errorMessage = response?.message || 'Account details were not updated.';
+          return;
+        }
+        this.successMessage = 'Account updated and sent to an admin for verification.';
+        this.editingAccount = null;
+        this.loadAllocations();
+        if (this.selectedCity) this.loadAccountsByLocation();
+      },
+      error: error => {
+        this.loading = false;
+        this.errorMessage = error.error?.message || 'Failed to update linked account.';
+      }
+    });
+  }
+
+  editAllocationDetails(account: any): void {
+    const allocation = this.getAllocationForAccount(account);
+    if (!allocation) {
+      this.errorMessage = 'Allocation details could not be found. Reload the page and try again.';
+      return;
+    }
+    this.editingAllocation = allocation;
+    this.editAllocationForm.reset({
+      amount: allocation.allocatedAmount ?? 0,
+      validTill: allocation.validTill || '',
+      description: allocation.description || ''
+    });
+    this.errorMessage = '';
+  }
+
+  saveAllocationDetails(): void {
+    if (!this.editingAllocation || this.editAllocationForm.invalid) {
+      this.editAllocationForm.markAllAsTouched();
+      return;
+    }
+    const hod = this.getHodSession();
+    if (!hod?.id || sessionStorage.getItem('userRole') !== 'HOD') {
+      this.errorMessage = 'Sign in with a HOD account to extend an allocation.';
+      return;
+    }
+    const allocation = this.editingAllocation;
+    const wasExpired = this.isAllocationExpired(allocation);
+    const value = this.editAllocationForm.getRawValue();
+    this.loading = true;
+    this.errorMessage = '';
+    this.accountService.updateAllocation(Number(allocation.id), {
+      hodAdminId: hod.id,
+      amount: Number(value.amount),
+      validTill: value.validTill,
+      description: value.description
+    }).subscribe({
+      next: (response: any) => {
+        this.loading = false;
+        if (!response?.success) {
+          this.errorMessage = response?.message || 'Allocation was not updated.';
+          return;
+        }
+        this.successMessage = wasExpired
+          ? 'Allocation validity extended and reapproved. Its updated balances are now active.'
+          : 'Allocation details and balances updated.';
+        this.editingAllocation = null;
+        this.loadAllocations();
+        if (this.selectedCity) this.loadAccountsByLocation();
+      },
+      error: error => {
+        this.loading = false;
+        this.errorMessage = error.error?.message || 'Failed to update allocation.';
       }
     });
   }
@@ -431,8 +590,9 @@ export class AccountLinkingComponent implements OnInit {
    * Download cheque image
    */
   downloadChequeImage(account: any): void {
-    if (account.chequeImageUrl) {
-      window.open(account.chequeImageUrl, '_blank');
+    const chequeImageUrl = account.chequeImageUrl || this.getAllocationForAccount(account)?.chequeImageUrl;
+    if (chequeImageUrl) {
+      window.open(chequeImageUrl, '_blank', 'noopener');
     }
   }
 

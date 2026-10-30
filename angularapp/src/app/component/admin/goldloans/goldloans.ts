@@ -21,6 +21,7 @@ interface GoldLoan {
   accountNumber: string;
   customerId?: string; // Mapped from account for admin display
   currentBalance: number;
+  remainingPrincipal?: number;
   loanAccountNumber?: string;
   mobile?: string;
   applicationDate?: string;
@@ -74,6 +75,7 @@ export class AdminGoldLoans implements OnInit {
   adminName: string = 'Admin';
   adminId: number | null = null;
   verifiedAllocations: any[] = [];
+  expiredVerifiedAllocationsFound = false;
   
   // Gold details form (for acceptance)
   showGoldDetailsModal: boolean = false;
@@ -147,6 +149,31 @@ export class AdminGoldLoans implements OnInit {
   showHistoryModal: boolean = false;
   historyList: any[] = [];
   loadingHistory: boolean = false;
+
+  // Admin-created application
+  showNewApplicationModal = false;
+  lookingUpApplicant = false;
+  creatingApplication = false;
+  applicantLookupComplete = false;
+  applicantAccountNumber = '';
+  applicant: { name: string; email: string; phone: string; balance: number } | null = null;
+  newApplicationForm = {
+    goldGrams: 0,
+    tenure: 12,
+    interestRate: 12,
+    goldPurity: '22K',
+    goldItems: '',
+    goldDescription: ''
+  };
+
+  // Cheque-funded gold-loan prepayment
+  showChequePaymentModal = false;
+  verifyingPaymentCheque = false;
+  processingChequePayment = false;
+  paymentChequeNumber = '';
+  paymentAmount: number | null = null;
+  paymentAdjustment: 'REDUCE_EMI' | 'REDUCE_TENURE' = 'REDUCE_EMI';
+  paymentChequeVerification: any = null;
 
   constructor(
     private router: Router,
@@ -237,7 +264,7 @@ export class AdminGoldLoans implements OnInit {
   }
 
   loadCurrentGoldRate() {
-    this.http.get(`${environment.apiBaseUrl}/gold-rates/current`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/api/gold-rates/current`).subscribe({
       next: (rate: any) => {
         this.currentGoldRate = rate;
         this.newGoldRate = rate.ratePerGram;
@@ -255,7 +282,7 @@ export class AdminGoldLoans implements OnInit {
     }
 
     this.updatingRate = true;
-    this.http.put(`${environment.apiBaseUrl}/gold-rates/update?ratePerGram=${this.newGoldRate}&updatedBy=${this.adminName}`, {}).subscribe({
+    this.http.put(`${environment.apiBaseUrl}/api/gold-rates/update?ratePerGram=${this.newGoldRate}&updatedBy=${encodeURIComponent(this.adminName)}`, {}).subscribe({
       next: (response: any) => {
         if (response.success) {
           this.alertService.success('Gold Rate Updated', `Gold rate updated to ₹${this.newGoldRate} per gram`);
@@ -274,6 +301,255 @@ export class AdminGoldLoans implements OnInit {
     });
   }
 
+  openNewApplicationModal() {
+    this.showNewApplicationModal = true;
+    this.applicantLookupComplete = false;
+    this.applicantAccountNumber = '';
+    this.applicant = null;
+    this.newApplicationForm = {
+      goldGrams: 0,
+      tenure: 12,
+      interestRate: 12,
+      goldPurity: '22K',
+      goldItems: '',
+      goldDescription: ''
+    };
+  }
+
+  closeNewApplicationModal() {
+    if (this.creatingApplication) return;
+    this.showNewApplicationModal = false;
+  }
+
+  lookupApplicant() {
+    const accountNumber = this.applicantAccountNumber.trim();
+    if (!accountNumber) {
+      this.alertService.error('Account Required', 'Enter the customer account number.');
+      return;
+    }
+
+    this.lookingUpApplicant = true;
+    this.applicantLookupComplete = false;
+    this.applicant = null;
+    this.http.get<any>(`${environment.apiBaseUrl}/api/users/account/${encodeURIComponent(accountNumber)}`).subscribe({
+      next: user => {
+        const account = user?.account;
+        const name = account?.name || '';
+        if (!user?.accountNumber || !name) {
+          this.lookingUpApplicant = false;
+          this.alertService.error('Account Details Unavailable', 'The account was found but customer details are incomplete.');
+          return;
+        }
+        this.applicantAccountNumber = user.accountNumber;
+        this.applicant = {
+          name,
+          email: user.email || '',
+          phone: account.phone || '',
+          balance: Number(account.balance) || 0
+        };
+        this.applicantLookupComplete = true;
+        this.lookingUpApplicant = false;
+      },
+      error: err => {
+        this.lookingUpApplicant = false;
+        this.alertService.error('Customer Not Found', err.error?.message || 'No customer was found for that account number.');
+      }
+    });
+  }
+
+  getNewApplicationGoldValue(): number {
+    return this.currentGoldRate
+      ? Math.round(this.newApplicationForm.goldGrams * this.currentGoldRate.ratePerGram * 100) / 100
+      : 0;
+  }
+
+  getNewApplicationLoanAmount(): number {
+    return Math.round(this.getNewApplicationGoldValue() * 0.75 * 100) / 100;
+  }
+
+  getNewApplicationEmi(): number {
+    const principal = this.getNewApplicationLoanAmount();
+    const months = Number(this.newApplicationForm.tenure);
+    const monthlyRate = Number(this.newApplicationForm.interestRate) / 1200;
+    if (principal <= 0 || months <= 0) return 0;
+    if (monthlyRate === 0) return Math.round((principal / months) * 100) / 100;
+    const factor = Math.pow(1 + monthlyRate, months);
+    return Math.round((principal * monthlyRate * factor / (factor - 1)) * 100) / 100;
+  }
+
+  createApplication() {
+    if (!this.applicantLookupComplete || !this.applicant) {
+      this.alertService.error('Customer Required', 'Look up and confirm the customer account first.');
+      return;
+    }
+    if (!this.currentGoldRate || this.newApplicationForm.goldGrams <= 0) {
+      this.alertService.error('Gold Details Required', "Enter a valid gold weight and ensure today's gold rate is loaded.");
+      return;
+    }
+    if (this.newApplicationForm.interestRate < 0 || this.newApplicationForm.tenure <= 0) {
+      this.alertService.error('Loan Details Invalid', 'Enter a valid interest rate and tenure.');
+      return;
+    }
+    if (!this.newApplicationForm.goldItems.trim()) {
+      this.alertService.error('Jewellery Details Required', 'Enter the jewellery items included with this application.');
+      return;
+    }
+
+    this.creatingApplication = true;
+    const payload = {
+      accountNumber: this.applicantAccountNumber.trim(),
+      userName: this.applicant.name,
+      userEmail: this.applicant.email,
+      currentBalance: this.applicant.balance,
+      goldGrams: this.newApplicationForm.goldGrams,
+      tenure: Number(this.newApplicationForm.tenure),
+      interestRate: Number(this.newApplicationForm.interestRate),
+      status: 'Pending',
+      goldPurity: this.newApplicationForm.goldPurity,
+      goldItems: this.newApplicationForm.goldItems.trim(),
+      goldDescription: this.newApplicationForm.goldDescription.trim()
+    };
+    this.http.post<any>(`${environment.apiBaseUrl}/api/gold-loans`, payload).subscribe({
+      next: response => {
+        this.creatingApplication = false;
+        if (!response?.success) {
+          this.alertService.error('Application Failed', response?.message || 'Could not create the gold-loan application.');
+          return;
+        }
+        this.alertService.success('Application Created', response.message || 'Gold-loan application added to the pending queue.');
+        this.showNewApplicationModal = false;
+        this.loadGoldLoans();
+      },
+      error: err => {
+        this.creatingApplication = false;
+        this.alertService.error('Application Failed', err.error?.message || 'Could not create the gold-loan application.');
+      }
+    });
+  }
+
+  openChequePayment(loan: GoldLoan) {
+    if (!loan.loanAccountNumber || !loan.accountNumber || loan.status !== 'Approved') {
+      this.alertService.error('Payment Unavailable', 'Only approved loans with valid account details can accept prepayment.');
+      return;
+    }
+    this.selectedLoan = loan;
+    this.paymentChequeNumber = '';
+    this.paymentAmount = null;
+    this.paymentAdjustment = 'REDUCE_EMI';
+    this.paymentChequeVerification = null;
+    this.showChequePaymentModal = true;
+  }
+
+  closeChequePayment() {
+    if (this.processingChequePayment) return;
+    this.showChequePaymentModal = false;
+    this.selectedLoan = null;
+    this.paymentChequeVerification = null;
+  }
+
+  verifyPaymentCheque() {
+    if (!this.selectedLoan?.accountNumber || !this.paymentChequeNumber.trim()) {
+      this.alertService.error('Cheque Required', 'Enter a cheque number to verify it against the customer account.');
+      return;
+    }
+    this.verifyingPaymentCheque = true;
+    this.paymentChequeVerification = null;
+    this.http.get<any>(`${environment.apiBaseUrl}/api/admin-fund-transfers/verify-sender-cheque`, {
+      params: {
+        accountNumber: this.selectedLoan.accountNumber,
+        chequeNumber: this.paymentChequeNumber.trim()
+      }
+    }).subscribe({
+      next: result => {
+        this.verifyingPaymentCheque = false;
+        this.paymentChequeVerification = result;
+        if (!result?.valid) {
+          this.alertService.error('Cheque Invalid', result?.message || 'This cheque is not available for the customer account.');
+          return;
+        }
+        if (result.nameMatches === false) {
+          this.alertService.error('Cheque Name Mismatch', 'The name on this cheque does not match the account holder.');
+          return;
+        }
+        if (result.chequePurpose === 'GOLD_LOAN_PREPAYMENT'
+          && String(result.goldLoanAccountNumber || '').toLowerCase()
+            !== String(this.selectedLoan?.loanAccountNumber || '').toLowerCase()) {
+          this.paymentChequeVerification = {
+            ...result,
+            valid: false,
+            message: 'This cheque is reserved for another gold loan.'
+          };
+          this.alertService.error('Cheque Restricted', 'This cheque is reserved for another gold loan.');
+          return;
+        }
+        if (result.chequeAmount != null) {
+          this.paymentAmount = Number(result.chequeAmount);
+        }
+      },
+      error: err => {
+        this.verifyingPaymentCheque = false;
+        this.paymentChequeVerification = { valid: false, message: err.error?.message || 'Cheque verification failed.' };
+        this.alertService.error('Cheque Verification Failed', err.error?.message || 'Could not verify this cheque.');
+      }
+    });
+  }
+
+  payGoldLoanByCheque() {
+    const loan = this.selectedLoan;
+    const cheque = this.paymentChequeVerification;
+    if (!loan?.loanAccountNumber || !loan.accountNumber || !cheque?.valid || cheque.nameMatches === false) {
+      this.alertService.error('Cheque Not Verified', 'Verify a valid cheque for this customer before processing payment.');
+      return;
+    }
+    if (!this.paymentAmount || this.paymentAmount <= 0) {
+      this.alertService.error('Invalid Amount', 'Enter a payment amount greater than zero.');
+      return;
+    }
+    const outstandingPrincipal = Number(loan.remainingPrincipal ?? loan.loanAmount);
+    if (outstandingPrincipal > 0 && this.paymentAmount >= outstandingPrincipal) {
+      this.alertService.error('Amount Exceeds Outstanding', 'Prepayment must be less than the outstanding principal. Use foreclosure to close the loan.');
+      return;
+    }
+    if (cheque.chequePurpose === 'GOLD_LOAN_PREPAYMENT'
+      && Math.round(Number(this.paymentAmount) * 100) !== Math.round(Number(cheque.chequeAmount) * 100)) {
+      this.alertService.error('Amount Mismatch', 'Payment amount must match the amount written on this reserved cheque.');
+      return;
+    }
+
+    this.processingChequePayment = true;
+    this.http.post<any>(`${environment.apiBaseUrl}/api/admin-fund-transfers/process`, {
+      senderAccountNumber: loan.accountNumber,
+      senderChequeNumber: this.paymentChequeNumber.trim(),
+      receiverAccountNumber: loan.loanAccountNumber,
+      amount: Number(this.paymentAmount),
+      description: `Gold loan prepayment by cheque ${this.paymentChequeNumber.trim()}`,
+      performedBy: this.adminName,
+      transferCategory: 'GOLD_LOAN',
+      loanPaymentType: 'PREPAYMENT',
+      loanAccountNumber: loan.loanAccountNumber,
+      prepaymentAdjustment: this.paymentAdjustment
+    }).subscribe({
+      next: response => {
+        this.processingChequePayment = false;
+        if (!response?.success) {
+          this.alertService.error('Payment Failed', response?.message || 'Could not process the cheque payment.');
+          return;
+        }
+        const balanceMessage = response.newBalance == null
+          ? ''
+          : ` Linked account balance: ₹${Number(response.newBalance).toFixed(2)}.`;
+        this.alertService.success('Payment Processed',
+          `${response.message || 'Gold-loan prepayment was processed successfully.'}${balanceMessage}`);
+        this.closeChequePayment();
+        this.loadGoldLoans();
+      },
+      error: err => {
+        this.processingChequePayment = false;
+        this.alertService.error('Payment Failed', err.error?.message || 'Could not process the cheque payment.');
+      }
+    });
+  }
+
   approveGoldLoan(loan: GoldLoan, status: string) {
     if (!loan.id) return;
 
@@ -281,9 +557,12 @@ export class AdminGoldLoans implements OnInit {
     if (status === 'Approved') {
       this.selectedLoan = loan;
       this.verifiedAllocations = [];
+      this.expiredVerifiedAllocationsFound = false;
       // Pre-fill form with loan data
       this.goldDetailsForm.verifiedGoldGrams = loan.goldGrams;
-      this.goldDetailsForm.goldPurity = '22K';
+      this.goldDetailsForm.goldItems = loan.goldItems || '';
+      this.goldDetailsForm.goldDescription = loan.goldDescription || '';
+      this.goldDetailsForm.goldPurity = loan.goldPurity || '22K';
       this.goldDetailsForm.allocationId = null;
       this.goldDetailsForm.performedByAdminId = this.adminId;
       this.showGoldDetailsModal = true;
@@ -300,17 +579,31 @@ export class AdminGoldLoans implements OnInit {
     this.http.get<any>(`${environment.apiBaseUrl}/api/hod/allocations?status=ACTIVE&page=0&size=100`).subscribe({
       next: response => {
         const allocations = response?.content || response?.allocations || [];
-        this.verifiedAllocations = allocations.filter((allocation: any) =>
+        const verified = allocations.filter((allocation: any) =>
           allocation.status === 'ACTIVE' &&
           allocation.accountVerificationStatus === 'VERIFIED' &&
           allocation.chargeManagementEnabled === true &&
           !!allocation.allocationAccountId
+        );
+        this.expiredVerifiedAllocationsFound = verified.some((allocation: any) =>
+          this.isAllocationExpired(allocation.validTill)
+        );
+        this.verifiedAllocations = verified.filter((allocation: any) =>
+          !this.isAllocationExpired(allocation.validTill)
         );
       },
       error: err => {
         this.alertService.error('Allocation Lookup', err.error?.message || 'Could not load verified allocation accounts.');
       }
     });
+  }
+
+  private isAllocationExpired(validTill: string | null | undefined): boolean {
+    if (!validTill) return false;
+    const expiryDate = validTill.slice(0, 10);
+    const today = new Date();
+    const todayDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    return expiryDate < todayDate;
   }
   
   calculateLoanDetails() {
@@ -354,8 +647,9 @@ export class AdminGoldLoans implements OnInit {
     const requestBody = status === 'Approved' && goldDetails ? goldDetails : {};
 
     this.http.put(
-      `${environment.apiBaseUrl}/api/gold-loans/${loan.id}/approve?status=${status}&approvedBy=${this.adminName}`,
-      requestBody
+      `${environment.apiBaseUrl}/api/gold-loans/${loan.id}/approve`,
+      requestBody,
+      { params: { status, approvedBy: this.adminName } }
     ).subscribe({
       next: (response: any) => {
         if (response.success) {
@@ -380,7 +674,10 @@ export class AdminGoldLoans implements OnInit {
       },
       error: (err: any) => {
         console.error('Error processing gold loan:', err);
-        this.alertService.error('Action Failed', err.error?.message || 'Failed to process gold loan');
+        const message = err.error?.message || 'Failed to process gold loan';
+        this.alertService.error('Action Failed', message.includes('Allocation has expired')
+          ? 'The selected funding allocation has expired. Select a current allocation or ask the HOD to extend/create one.'
+          : message);
         this.approving = false;
       }
     });
@@ -761,27 +1058,7 @@ export class AdminGoldLoans implements OnInit {
 
   saveForeclosureChanges() {
     if (!this.selectedLoan || !this.selectedLoan.loanAccountNumber) return;
-    
-    // Update loan interest rate if changed
-    if (this.editedInterestRate !== this.selectedLoan.interestRate) {
-      this.updateLoanInterestRate(this.selectedLoan.id!, this.editedInterestRate);
-    }
-    
-    // Process foreclosure with edited amount
     this.processForeclosure();
-  }
-
-  updateLoanInterestRate(loanId: number, newInterestRate: number) {
-    this.http.put<any>(`${environment.apiBaseUrl}/api/gold-loans/${loanId}/interest-rate`, null, {
-      params: { interestRate: newInterestRate.toString() }
-    }).subscribe({
-      next: (response) => {
-        console.log('Interest rate updated:', response);
-      },
-      error: (err) => {
-        console.error('Error updating interest rate:', err);
-      }
-    });
   }
 
   processForeclosure() {
@@ -796,10 +1073,15 @@ export class AdminGoldLoans implements OnInit {
       interestRate: this.editedInterestRate
     } : {};
 
-    this.http.post<any>(`${environment.apiBaseUrl}/api/gold-loans/foreclosure/${this.selectedLoan.loanAccountNumber}`, requestBody).subscribe({
+    this.http.post<any>(`${environment.apiBaseUrl}/api/gold-loans/foreclosure/${this.selectedLoan.loanAccountNumber}`, requestBody, {
+      params: { foreclosedBy: this.adminName || 'Admin' }
+    }).subscribe({
       next: (response) => {
         if (response.success) {
-          this.alertService.success('Success', 'Foreclosure processed successfully');
+          const balanceMessage = response.newBalance == null
+            ? ''
+            : ` Linked account balance: ₹${Number(response.newBalance).toFixed(2)}.`;
+          this.alertService.success('Success', `Foreclosure processed successfully.${balanceMessage}`);
           this.closeForeclosureModal();
           this.loadGoldLoans();
         } else {
@@ -901,4 +1183,3 @@ export class AdminGoldLoans implements OnInit {
     }
   }
 }
-

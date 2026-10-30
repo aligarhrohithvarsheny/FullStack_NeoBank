@@ -2,15 +2,15 @@
   <header>
     <div>
       <p class="eyebrow">CHEQUE MANAGEMENT</p>
-      <h1>Positive Pay Requests</h1>
-      <p>AI screens registered cheque details automatically. No manual approval is required.</p>
+      <h1>Positive Pay Status</h1>
+      <p>Informational AI screening results only. Admins verify the customer-signed cheque authorization during transaction processing; Positive Pay approval is not required.</p>
     </div>
     <button class="outline" (click)="refresh()">Refresh</button>
   </header>
   <div class="kpis">
     <div><span>Pending</span><strong>{{ stats.pending || 0 }}</strong></div>
-    <div><span>AI Passed</span><strong>{{ stats.approved || 0 }}</strong></div>
-    <div><span>AI Rejected</span><strong>{{ stats.rejected || 0 }}</strong></div>
+    <div><span>AI Pass · Informational</span><strong>{{ stats.approved || 0 }}</strong></div>
+    <div><span>AI Flags · Informational</span><strong>{{ stats.rejected || 0 }}</strong></div>
     <div><span>Today's Requests</span><strong>{{ stats.today || 0 }}</strong></div>
     <div><span>Total Amount</span><strong>₹{{ stats.totalPositivePayAmount || 0 | number:'1.0-0' }}</strong></div>
   </div>
@@ -18,7 +18,7 @@
     <select [(ngModel)]="status" (change)="filter()">
       <option value="">All statuses</option>
       <option value="PENDING_ADMIN_APPROVAL">Pending</option>
-      <option value="APPROVED">AI Passed</option>
+      <option value="APPROVED">Approved</option>
       <option value="REJECTED">AI Rejected</option>
       <option value="CANCELLED">Cancelled</option>
     </select>
@@ -34,7 +34,7 @@
           <tr *ngFor="let r of rows">
             <td>{{r.referenceNumber}}</td><td>{{r.accountHolderName||'—'}}</td><td>{{r.accountNumber}}</td><td>{{r.accountType}}</td>
             <td>{{r.chequeNumber}}</td><td>{{r.chequeDate|date:'mediumDate'}}</td><td>{{r.payeeName}}</td>
-            <td>₹{{r.amount|number:'1.2-2'}}</td><td><span class="status" [class]="r.status.toLowerCase()">{{statusLabel(r.status)}}</span></td>
+            <td>₹{{r.amount|number:'1.2-2'}}</td><td><span class="status" [class]="r.status.toLowerCase()">{{statusLabel(r.status, r.approvedBy)}}</span></td>
             <td><button class="link" (click)="view(r)">View</button></td>
           </tr>
         </tbody>
@@ -54,8 +54,10 @@
         <p><b>Customer</b>{{selected.request.accountHolderName}}<br>{{selected.customerEmail}}<br>{{selected.customerPhone}}</p>
         <p><b>Account</b>{{selected.fullAccountNumber}}<br>{{selected.request.accountType}} · {{selected.accountStatus}}</p>
         <p><b>Cheque</b>{{selected.request.chequeNumber}}<br>Status: {{selected.request.chequeStatus}}<br>Book: {{selected.request.chequeBookNumber||'—'}}</p>
-        <p><b>Positive Pay</b>{{selected.request.chequeDate|date:'mediumDate'}}<br>₹{{selected.request.amount|number:'1.2-2'}}<br>{{selected.request.payeeName}}<br>Status: {{statusLabel(selected.request.status)}}<br>Screened by: {{selected.request.approvedBy||selected.request.rejectedBy||'AI Security Engine'}}</p>
+        <p><b>Positive Pay</b>{{selected.request.chequeDate|date:'mediumDate'}}<br>₹{{selected.request.amount|number:'1.2-2'}}<br>{{selected.request.payeeName}}<br>Status: {{statusLabel(selected.request.status, selected.request.approvedBy)}}<br>Screened by: {{selected.request.approvedBy||selected.request.rejectedBy||'AI Security Engine'}}<br *ngIf="selected.request.rejectionReason">AI rejection reason: {{selected.request.rejectionReason}}</p>
       </div>
+      <p class="informational-note">This AI result is informational only; it does not approve or block cheque transactions. Admins verify the customer-signed cheque authorization as part of the actual transaction.</p>
+      <p class="error" *ngIf="error">{{error}}</p>
     </div>
   </div>
 </section>

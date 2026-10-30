@@ -1361,6 +1361,124 @@
 .modal-body .form-group .form-input.ng-valid.ng-touched,
 .modal-body .form-group .form-textarea.ng-valid.ng-touched {
   border-color: #10b981 !important;
+}
+
+.applications-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 15px;
+}
+
+.applications-heading h3 {
+  margin: 0;
+}
+
+.cheque-payment-btn {
+  background: #0369a1;
+  color: #fff;
+}
+
+.cheque-payment-btn:hover:not(:disabled) {
+  background: #075985;
+}
+
+.application-step {
+  padding: 18px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+}
+
+.application-step h4 {
+  margin: 0 0 16px;
+  color: #1e40af;
+}
+
+.application-step .form-hint {
+  margin: 0 0 14px;
+}
+
+.modal-body fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.modal-body fieldset:disabled {
+  opacity: 0.62;
+}
+
+.account-lookup-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.account-lookup-row .form-group {
+  flex: 1;
+}
+
+.lookup-btn {
+  min-height: 44px;
+  white-space: nowrap;
+}
+
+.customer-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin: 16px 0;
+  padding: 16px;
+  border-radius: 10px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+
+.customer-summary > div {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.customer-summary span {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.customer-summary strong {
+  color: #1e293b;
+  overflow-wrap: anywhere;
+}
+
+.cheque-verification {
+  margin: 8px 0 0;
+  color: #047857;
+  font-size: 13px;
+}
+
+.cheque-verification.invalid {
+  color: #b91c1c;
+}
+
+@media (max-width: 768px) {
+  .applications-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .account-lookup-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .lookup-btn {
+    width: 100%;
+  }
   background-color: #f0fdf4 !important;
 }
 
@@ -1384,4 +1502,3 @@
   color: #991b1b;
   border: 1px solid #ef4444;
 }
-

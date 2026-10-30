@@ -48,7 +48,10 @@
 
   <!-- Filter Section -->
   <div class="filter-section">
-    <h3>Gold Loan Applications</h3>
+    <div class="applications-heading">
+      <h3>Gold Loan Applications</h3>
+      <button type="button" class="action-btn approve-btn" (click)="openNewApplicationModal()">+ New Application</button>
+    </div>
     <div class="filter-buttons">
       <button
         type="button"
@@ -152,6 +155,13 @@
               (click)="viewForeclosure(loan)"
             >
               💰 Foreclosure
+            </button>
+            <button
+              type="button"
+              class="action-btn cheque-payment-btn"
+              (click)="openChequePayment(loan)"
+            >
+              🧾 Pay by Cheque
             </button>
             <button
               type="button"
@@ -269,8 +279,8 @@
       </div>
 
       <!-- Gold Details Section (if approved) -->
-      <div class="gold-details-section" *ngIf="loan.status === 'Approved' && loan.goldItems">
-        <h5>📦 Gold Details (Verified)</h5>
+      <div class="gold-details-section" *ngIf="(loan.status === 'Approved' || loan.status === 'Pending') && loan.goldItems">
+        <h5>📦 Jewellery Details{{ loan.status === 'Approved' ? ' (Verified)' : ' (Pending Verification)' }}</h5>
         <div class="details-grid">
           <div class="detail-item" *ngIf="loan.goldItems">
             <span class="detail-label">Gold Items:</span>
@@ -281,7 +291,7 @@
             <span class="detail-value">{{ loan.goldDescription }}</span>
           </div>
           <div class="detail-item" *ngIf="loan.goldPurity">
-            <span class="detail-label">Verified Purity:</span>
+            <span class="detail-label">{{ loan.status === 'Approved' ? 'Verified Purity:' : 'Declared Purity:' }}</span>
             <span class="detail-value">{{ loan.goldPurity }}</span>
           </div>
           <div class="detail-item" *ngIf="loan.verifiedGoldGrams">
@@ -312,6 +322,203 @@
           </div>
         </div>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- Admin-created Gold Loan Application -->
+<div class="modal-overlay" *ngIf="showNewApplicationModal" (click)="closeNewApplicationModal()">
+  <div class="modal-content large-modal" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3>➕ New Gold Loan Application</h3>
+      <button class="close-btn" type="button" (click)="closeNewApplicationModal()">×</button>
+    </div>
+    <form (ngSubmit)="createApplication()">
+      <div class="modal-body">
+        <section class="application-step">
+          <h4>1. Customer account</h4>
+          <div class="account-lookup-row">
+            <div class="form-group">
+              <label for="newLoanAccountNumber">Account Number <span class="required">*</span></label>
+              <input
+                id="newLoanAccountNumber"
+                name="newLoanAccountNumber"
+                class="form-input"
+                [(ngModel)]="applicantAccountNumber"
+                (ngModelChange)="applicantLookupComplete = false; applicant = null"
+                placeholder="Enter customer account number"
+                required
+              />
+            </div>
+            <button
+              type="button"
+              class="btn-submit lookup-btn"
+              (click)="lookupApplicant()"
+              [disabled]="lookingUpApplicant || !applicantAccountNumber.trim()"
+            >
+              {{ lookingUpApplicant ? 'Looking up...' : 'Find Customer' }}
+            </button>
+          </div>
+          <div class="customer-summary" *ngIf="applicantLookupComplete && applicant">
+            <div><span>Customer Name</span><strong>{{ applicant.name }}</strong></div>
+            <div><span>Email</span><strong>{{ applicant.email || 'Not on file' }}</strong></div>
+            <div><span>Mobile</span><strong>{{ applicant.phone || 'Not on file' }}</strong></div>
+            <div><span>Available Balance</span><strong>₹{{ applicant.balance | number:'1.2-2' }}</strong></div>
+          </div>
+        </section>
+
+        <fieldset [disabled]="!applicantLookupComplete || creatingApplication">
+          <section class="application-step">
+            <h4>2. Gold and loan details</h4>
+            <p class="form-hint" *ngIf="currentGoldRate">
+              Current 22K gold rate: ₹{{ currentGoldRate.ratePerGram | number:'1.2-2' }} per gram
+            </p>
+            <div class="form-grid">
+              <div class="form-group">
+                <label for="newLoanGoldGrams">Gold Weight (grams) <span class="required">*</span></label>
+                <input id="newLoanGoldGrams" name="newLoanGoldGrams" class="form-input" type="number"
+                  [(ngModel)]="newApplicationForm.goldGrams" min="0.01" step="0.01" required />
+              </div>
+              <div class="form-group">
+                <label for="newLoanPurity">Gold Purity</label>
+                <select id="newLoanPurity" name="newLoanPurity" class="form-input"
+                  [(ngModel)]="newApplicationForm.goldPurity">
+                  <option value="22K">22K</option>
+                  <option value="Other">Other / to be verified</option>
+                </select>
+                <small class="form-hint">The preview uses the current 22K rate. Verify other purity before approval.</small>
+              </div>
+              <div class="form-group">
+                <label>Loan-to-value</label>
+                <input class="form-input" value="75% of gold value" readonly />
+                <small class="form-hint">Matches the customer application calculation policy.</small>
+              </div>
+              <div class="form-group">
+                <label for="newLoanInterestRate">Interest Rate (% p.a.) <span class="required">*</span></label>
+                <input id="newLoanInterestRate" name="newLoanInterestRate" class="form-input" type="number"
+                  [(ngModel)]="newApplicationForm.interestRate" min="0" step="0.01" required />
+              </div>
+              <div class="form-group">
+                <label for="newLoanTenure">Tenure <span class="required">*</span></label>
+                <select id="newLoanTenure" name="newLoanTenure" class="form-input"
+                  [(ngModel)]="newApplicationForm.tenure" required>
+                  <option [ngValue]="6">6 months</option>
+                  <option [ngValue]="12">12 months</option>
+                  <option [ngValue]="18">18 months</option>
+                  <option [ngValue]="24">24 months</option>
+                  <option [ngValue]="36">36 months</option>
+                </select>
+              </div>
+            </div>
+            <div class="calculation-preview">
+              <h4>Loan Calculation</h4>
+              <div class="calc-grid">
+                <div class="calc-item">
+                  <span class="calc-label">Total Gold Value</span>
+                  <span class="calc-value">₹{{ getNewApplicationGoldValue() | number:'1.2-2' }}</span>
+                </div>
+                <div class="calc-item highlight">
+                  <span class="calc-label">Eligible Loan (75%)</span>
+                  <span class="calc-value">₹{{ getNewApplicationLoanAmount() | number:'1.2-2' }}</span>
+                </div>
+                <div class="calc-item">
+                  <span class="calc-label">Estimated Monthly EMI</span>
+                  <span class="calc-value">₹{{ getNewApplicationEmi() | number:'1.2-2' }}</span>
+                </div>
+                <div class="calc-item">
+                  <span class="calc-label">Estimated Total Repayment</span>
+                  <span class="calc-value">₹{{ getNewApplicationEmi() * newApplicationForm.tenure | number:'1.2-2' }}</span>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="application-step">
+            <h4>3. Jewellery details</h4>
+            <div class="form-group">
+              <label for="newLoanGoldItems">Jewellery Items <span class="required">*</span></label>
+              <input id="newLoanGoldItems" name="newLoanGoldItems" class="form-input"
+                [(ngModel)]="newApplicationForm.goldItems" placeholder="e.g. 2 bangles and 1 chain" required />
+            </div>
+            <div class="form-group">
+              <label for="newLoanGoldDescription">Jewellery Description</label>
+              <textarea id="newLoanGoldDescription" name="newLoanGoldDescription" class="form-input"
+                [(ngModel)]="newApplicationForm.goldDescription" rows="3"
+                placeholder="Add identifying details for verification and storage"></textarea>
+            </div>
+          </section>
+        </fieldset>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-cancel" (click)="closeNewApplicationModal()" [disabled]="creatingApplication">Cancel</button>
+        <button type="submit" class="btn-submit"
+          [disabled]="creatingApplication || !applicantLookupComplete || !applicant || !currentGoldRate">
+          {{ creatingApplication ? 'Creating Application...' : 'Create Pending Application' }}
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Gold Loan Cheque Payment -->
+<div class="modal-overlay" *ngIf="showChequePaymentModal" (click)="closeChequePayment()">
+  <div class="modal-content" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3>🧾 Gold Loan Payment by Cheque</h3>
+      <button class="close-btn" type="button" (click)="closeChequePayment()">×</button>
+    </div>
+    <div class="modal-body" *ngIf="selectedLoan">
+      <div class="customer-summary">
+        <div><span>Customer</span><strong>{{ selectedLoan.userName }}</strong></div>
+        <div><span>Account</span><strong>{{ selectedLoan.accountNumber }}</strong></div>
+        <div><span>Gold Loan</span><strong>{{ selectedLoan.loanAccountNumber }}</strong></div>
+        <div><span>Outstanding Principal</span><strong>₹{{ (selectedLoan.remainingPrincipal || selectedLoan.loanAmount) | number:'1.2-2' }}</strong></div>
+      </div>
+      <div class="form-group">
+        <label for="goldLoanPaymentCheque">Cheque Number <span class="required">*</span></label>
+        <div class="account-lookup-row">
+          <input id="goldLoanPaymentCheque" class="form-input" [(ngModel)]="paymentChequeNumber"
+            (ngModelChange)="paymentChequeVerification = null; paymentAmount = null"
+            placeholder="Enter customer cheque number" />
+          <button type="button" class="btn-submit lookup-btn" (click)="verifyPaymentCheque()"
+            [disabled]="verifyingPaymentCheque || !paymentChequeNumber.trim()">
+            {{ verifyingPaymentCheque ? 'Verifying...' : 'Verify Cheque' }}
+          </button>
+        </div>
+        <p class="cheque-verification" *ngIf="paymentChequeVerification?.valid && paymentChequeVerification?.nameMatches !== false">
+          {{ paymentChequeVerification.message }}
+          <span *ngIf="paymentChequeVerification.chequeAmount != null">
+            · Cheque amount ₹{{ paymentChequeVerification.chequeAmount | number:'1.2-2' }}
+          </span>
+        </p>
+        <p class="cheque-verification invalid" *ngIf="paymentChequeVerification && (!paymentChequeVerification.valid || paymentChequeVerification.nameMatches === false)">
+          {{ paymentChequeVerification.message || 'The cheque could not be verified for this account.' }}
+        </p>
+      </div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="goldLoanPaymentAmount">Prepayment Amount (₹) <span class="required">*</span></label>
+          <input id="goldLoanPaymentAmount" class="form-input" type="number" [(ngModel)]="paymentAmount"
+            min="0.01" step="0.01" [disabled]="!paymentChequeVerification?.valid" />
+        </div>
+        <div class="form-group">
+          <label for="goldLoanPaymentAdjustment">Apply remaining schedule as</label>
+          <select id="goldLoanPaymentAdjustment" class="form-input" [(ngModel)]="paymentAdjustment">
+            <option value="REDUCE_EMI">Reduce future EMI</option>
+            <option value="REDUCE_TENURE">Reduce loan tenure</option>
+          </select>
+        </div>
+      </div>
+      <p class="form-hint">
+        Processing the payment debits the customer's account, consumes the cheque, updates the loan balance and EMI schedule, and records the payment in customer history.
+      </p>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn-cancel" (click)="closeChequePayment()" [disabled]="processingChequePayment">Cancel</button>
+      <button type="button" class="btn-submit" (click)="payGoldLoanByCheque()"
+        [disabled]="processingChequePayment || verifyingPaymentCheque || !paymentChequeVerification?.valid || paymentChequeVerification?.nameMatches === false || !paymentAmount || paymentAmount <= 0">
+        {{ processingChequePayment ? 'Processing Payment...' : 'Process Cheque Payment' }}
+      </button>
     </div>
   </div>
 </div>
@@ -406,7 +613,12 @@
               {{ allocation.allocationId }} · {{ allocation.managerName }} · {{ allocation.branchName }} · {{ allocation.accountNumber }} · Balance ₹{{ allocation.currentBalance | number:'1.0-2' }}
             </option>
           </select>
-          <small class="form-hint" *ngIf="verifiedAllocations.length === 0">No active allocation has a verified linked account and enabled charge collection.</small>
+          <small class="form-hint" *ngIf="verifiedAllocations.length === 0 && expiredVerifiedAllocationsFound">
+            The verified allocation has expired. Ask the HOD to extend it or create a current allocation before approving.
+          </small>
+          <small class="form-hint" *ngIf="verifiedAllocations.length === 0 && !expiredVerifiedAllocationsFound">
+            No active allocation has a verified linked account and enabled charge collection.
+          </small>
         </div>
 
         <!-- Auto-calculated Loan Details -->
@@ -1004,4 +1216,3 @@
     </div>
   </div>
 </div>
-

@@ -226,6 +226,12 @@ public class SessionHistoryService {
         return sessionHistoryRepository.findAllByOrderByLoginTimeDesc();
     }
 
+    public List<SessionHistory> getRecentSessionHistory(int limit) {
+        int boundedLimit = Math.max(1, Math.min(limit, 500));
+        return sessionHistoryRepository.findRecentSessions(
+                org.springframework.data.domain.PageRequest.of(0, boundedLimit));
+    }
+
     /**
      * Get active sessions
      */
@@ -256,4 +262,3 @@ public class SessionHistoryService {
         return String.format("%02d:%02d:%02d", hours, minutes, seconds);
     }
 }
-

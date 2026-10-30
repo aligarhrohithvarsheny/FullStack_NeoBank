@@ -196,11 +196,6 @@ export class BusinessDrawChequeComponent implements OnInit {
       next: (response) => {
         this.isSubmitting = false;
         if (response.success) {
-          if (response.positivePayRequired) {
-            sessionStorage.setItem('positivePayDraft', JSON.stringify({ accountNumber: this.account?.accountNumber, accountType: 'Current', chequeNumber: response.chequeNumber, amount: this.amount, payeeName: this.payeeName.trim() }));
-            this.router.navigate(['/website/accounts', this.account?.accountNumber, 'positive-pay']);
-            return;
-          }
           this.successMessage = `Cheque request submitted successfully! Cheque Number: ${response.chequeNumber}. Waiting for admin approval.`;
           setTimeout(() => {
             this.resetForm();
@@ -587,7 +582,7 @@ export class BusinessDrawChequeComponent implements OnInit {
 
   getStatusText(status: BusinessChequeStatus): string {
     const statusMap: { [key in BusinessChequeStatus]: string } = {
-      'AWAITING_POSITIVE_PAY': 'Awaiting Positive Pay',
+      'AWAITING_POSITIVE_PAY': 'Pending admin verification',
       'PENDING': 'Awaiting Approval',
       'APPROVED': 'Approved',
       'COMPLETED': 'Processed',

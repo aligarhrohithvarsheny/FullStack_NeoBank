@@ -1,6 +1,7 @@
 package com.neo.springapp.repository;
 
 import com.neo.springapp.model.SessionHistory;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
@@ -26,5 +27,7 @@ public interface SessionHistoryRepository extends JpaRepository<SessionHistory, 
     // Find recent sessions (last N records)
     @Query("SELECT s FROM SessionHistory s ORDER BY s.loginTime DESC")
     List<SessionHistory> findRecentSessions();
-}
 
+    @Query("SELECT s FROM SessionHistory s ORDER BY s.loginTime DESC")
+    List<SessionHistory> findRecentSessions(Pageable pageable);
+}
