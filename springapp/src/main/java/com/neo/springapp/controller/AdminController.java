@@ -29,6 +29,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.security.SecureRandom;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.HashMap;
@@ -51,6 +52,11 @@ public class AdminController {
 
     @Autowired
     private com.neo.springapp.service.UserSessionTokenService userSessionTokenService;
+
+    @Autowired
+    private com.neo.springapp.service.PasswordService passwordService;
+
+    private final SecureRandom secureRandom = new SecureRandom();
     
     @Autowired
     private UserLoginHistoryService loginHistoryService;
@@ -455,6 +461,110 @@ public class AdminController {
         }
         admin.setAssignedCity(city.isBlank() ? null : city);
         return ResponseEntity.ok(createSafeAdminResponse(adminService.saveAdmin(admin)));
+    }
+
+    @PostMapping("/hod/staff/{adminId}/manager-login")
+    public ResponseEntity<Map<String, Object>> generateManagerLogin(
+            @PathVariable Long adminId,
+            @org.springframework.security.core.annotation.AuthenticationPrincipal
+            com.neo.springapp.service.UserSessionTokenService.SessionPrincipal principal) {
+        if (!isHod(principal)) return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of(
+                "success", false, "message", "A HOD session is required."));
+
+        Admin manager = adminService.getAdminById(adminId);
+        if (manager == null || !"MANAGER".equalsIgnoreCase(manager.getRole())) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "success", false, "message", "Select an existing manager profile."));
+        }
+        if (manager.getAssignedCity() == null || manager.getAssignedCity().isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "success", false, "message", "Assign the manager to a city before creating login credentials."));
+        }
+
+        String username = "mgr-" + manager.getId();
+        String temporaryPassword = generateManagerTemporaryPassword();
+        manager.setManagerLoginUsername(username);
+        manager.setManagerLoginPasswordHash(passwordService.encryptPassword(temporaryPassword));
+        manager.setManagerLoginFailedAttempts(0);
+        manager.setManagerLoginLocked(false);
+        adminService.saveAdmin(manager);
+
+        return ResponseEntity.ok(Map.of(
+                "success", true,
+                "username", username,
+                "password", temporaryPassword,
+                "managerName", manager.getName() == null ? manager.getEmail() : manager.getName(),
+                "assignedCity", manager.getAssignedCity(),
+                "centralAccountNumber", com.neo.springapp.service.BranchAccountService.DEFAULT_NEOBANK_ACCOUNT));
+    }
+
+    @PostMapping("/manager-user-login")
+    public ResponseEntity<Map<String, Object>> loginManagerFromUserPortal(
+            @RequestBody Map<String, String> credentials,
+            @RequestHeader(value = "X-Forwarded-For", required = false) String forwardedFor,
+            @RequestHeader(value = "User-Agent", required = false) String userAgent) {
+        String username = credentials == null ? null : credentials.get("username");
+        String password = credentials == null ? null : credentials.get("password");
+        if (username == null || username.isBlank() || password == null || password.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "success", false, "message", "Manager username and password are required."));
+        }
+
+        Admin manager = adminService.getAdminByManagerLoginUsername(username.trim());
+        if (manager == null || !"MANAGER".equalsIgnoreCase(manager.getRole())
+                || manager.getAssignedCity() == null || manager.getAssignedCity().isBlank()
+                || manager.getManagerLoginPasswordHash() == null
+                || manager.getManagerLoginPasswordHash().isBlank()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of(
+                    "success", false, "message", "Invalid manager username or password."));
+        }
+        if (Boolean.TRUE.equals(manager.getManagerLoginLocked())) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of(
+                    "success", false, "accountLocked", true,
+                    "message", "Manager login is locked. Contact the HOD to reset credentials."));
+        }
+        if (!passwordService.verifyPassword(password, manager.getManagerLoginPasswordHash())) {
+            int failedAttempts = manager.getManagerLoginFailedAttempts() == null
+                    ? 1 : manager.getManagerLoginFailedAttempts() + 1;
+            manager.setManagerLoginFailedAttempts(failedAttempts);
+            if (failedAttempts >= 3) manager.setManagerLoginLocked(true);
+            adminService.saveAdmin(manager);
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of(
+                    "success", false,
+                    "accountLocked", failedAttempts >= 3,
+                    "failedAttempts", failedAttempts,
+                    "message", failedAttempts >= 3
+                            ? "Manager login is locked. Contact the HOD to reset credentials."
+                            : "Invalid manager username or password."));
+        }
+
+        manager.setManagerLoginFailedAttempts(0);
+        manager.setManagerLoginLocked(false);
+        adminService.saveAdmin(manager);
+        String clientIp = forwardedFor == null ? "Unknown" : forwardedFor.split(",")[0].trim();
+        String deviceInfo = userAgent == null ? "Unknown" : userAgent;
+        try {
+            adminLoginHistoryService.recordLogin(manager, "IP: " + clientIp, clientIp, deviceInfo, "MANAGER_PORTAL");
+            sessionHistoryService.recordAdminLogin(manager, "IP: " + clientIp, clientIp, deviceInfo, "MANAGER_PORTAL");
+        } catch (Exception exception) {
+            System.err.println("Unable to record manager portal login: " + exception.getMessage());
+        }
+
+        return ResponseEntity.ok(Map.of(
+                "success", true,
+                "role", "MANAGER",
+                "admin", createSafeAdminResponse(manager),
+                "sessionToken", userSessionTokenService.issueAdmin(manager.getId(), manager.getEmail(), "MANAGER"),
+                "message", "Manager login successful"));
+    }
+
+    private String generateManagerTemporaryPassword() {
+        String alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%";
+        StringBuilder password = new StringBuilder(20);
+        for (int index = 0; index < 20; index++) {
+            password.append(alphabet.charAt(secureRandom.nextInt(alphabet.length())));
+        }
+        return password.toString();
     }
 
     @GetMapping("/hod-overview")
@@ -1579,6 +1689,12 @@ public class AdminController {
         adminResponse.put("branchAccountName", admin.getBranchAccountName());
         adminResponse.put("branchAccountIfsc", admin.getBranchAccountIfsc());
         adminResponse.put("assignedCity", admin.getAssignedCity());
+        adminResponse.put("managerLoginUsername", admin.getManagerLoginUsername());
+        adminResponse.put("managerLoginEnabled", admin.getManagerLoginUsername() != null
+                && admin.getManagerLoginPasswordHash() != null && !admin.getManagerLoginPasswordHash().isBlank());
+        adminResponse.put("managerLoginLocked", Boolean.TRUE.equals(admin.getManagerLoginLocked()));
+        adminResponse.put("managerLoginFailedAttempts", admin.getManagerLoginFailedAttempts() == null
+                ? 0 : admin.getManagerLoginFailedAttempts());
         adminResponse.put("salaryAccountNumber", admin.getSalaryAccountNumber());
         adminResponse.put("salaryAccountLinked", admin.getSalaryAccountLinked() != null ? admin.getSalaryAccountLinked() : false);
         return adminResponse;

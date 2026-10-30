@@ -69,6 +69,13 @@ public class Admin {
     // City assigned by HOD; an admin or manager can belong to only one city.
     private String assignedCity;
 
+    // Separate credentials for manager access through the customer login screen.
+    private String managerLoginUsername;
+    @JsonIgnore
+    private String managerLoginPasswordHash;
+    private Integer managerLoginFailedAttempts = 0;
+    private Boolean managerLoginLocked = false;
+
     // Salary payout account (admin employee NeoBank account number)
     private String salaryAccountNumber;
 

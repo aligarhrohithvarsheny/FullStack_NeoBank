@@ -81,8 +81,7 @@ public class BranchAccountService {
         Map<String, Object> result = new HashMap<>();
         result.put("success", true);
         result.put("message", "Branch access is enabled for the existing central NeoBank account.");
-        result.put("branchAccount", branchAccountDetails(centralAccount, city, manager.getId(),
-                manager.getName(), manager.getEmail()));
+        result.put("branchAccount", branchAccountDetails(centralAccount, manager));
         return result;
     }
 
@@ -93,8 +92,7 @@ public class BranchAccountService {
                 .filter(manager -> manager.getAssignedCity() != null && !manager.getAssignedCity().isBlank())
                 .filter(manager -> "MANAGER".equalsIgnoreCase(manager.getRole())
                         || "ADMIN".equalsIgnoreCase(manager.getRole()))
-                .map(manager -> branchAccountDetails(centralAccount, manager.getAssignedCity(), manager.getId(),
-                        manager.getName(), manager.getEmail()))
+                .map(manager -> branchAccountDetails(centralAccount, manager))
                 .toList();
     }
 
@@ -159,18 +157,23 @@ public class BranchAccountService {
         return Map.of("success", false, "message", message);
     }
 
-    private Map<String, Object> branchAccountDetails(Account centralAccount, String city, Long managerId,
-                                                     String managerName, String managerEmail) {
+    private Map<String, Object> branchAccountDetails(Account centralAccount, com.neo.springapp.model.Admin manager) {
         Map<String, Object> details = new HashMap<>();
         details.put("accountNumber", centralAccount.getAccountNumber());
         details.put("customerId", centralAccount.getCustomerId());
         details.put("accountName", centralAccount.getName());
         details.put("bankName", "NeoBank");
         details.put("ifscCode", null);
-        details.put("branchCity", city);
-        details.put("managerAdminId", managerId);
-        details.put("managerName", managerName);
-        details.put("managerEmail", managerEmail);
+        details.put("branchCity", manager.getAssignedCity());
+        details.put("managerAdminId", manager.getId());
+        details.put("managerName", manager.getName());
+        details.put("managerEmail", manager.getEmail());
+        details.put("managerRole", manager.getRole());
+        details.put("managerLoginUsername", manager.getManagerLoginUsername());
+        details.put("managerLoginEnabled", manager.getManagerLoginUsername() != null
+                && manager.getManagerLoginPasswordHash() != null
+                && !manager.getManagerLoginPasswordHash().isBlank());
+        details.put("managerLoginLocked", Boolean.TRUE.equals(manager.getManagerLoginLocked()));
         details.put("balance", centralAccount.getBalance() == null ? 0.0 : centralAccount.getBalance());
         details.put("sharedCentralAccount", true);
         return details;
@@ -364,8 +367,7 @@ public class BranchAccountService {
         Account account = accountRepository.findByAccountNumber(DEFAULT_NEOBANK_ACCOUNT);
         if (manager == null || manager.getAssignedCity() == null || manager.getAssignedCity().isBlank()
                 || !isNeoBankOwned(account)) return Map.of("isConfigured", false, "balance", 0.0);
-        Map<String, Object> summary = branchAccountDetails(account, manager.getAssignedCity(), manager.getId(),
-                manager.getName(), manager.getEmail());
+        Map<String, Object> summary = branchAccountDetails(account, manager);
         addLedgerTotals(summary, transactionRepository.summarizeCentralLedger(DEFAULT_NEOBANK_ACCOUNT,
                 manager.getAssignedCity()), account.getBalance(), false);
         summary.put("isConfigured", true);
@@ -468,21 +470,26 @@ public class BranchAccountService {
 
     private void addLedgerTotals(Map<String, Object> summary, Object[] totals, Double balance,
                                  boolean includeOpeningBalance) {
-        double credits = ledgerTotal(totals, 0);
-        double debits = ledgerTotal(totals, 1);
-        double charges = ledgerTotal(totals, 2);
+        Object[] values = unwrapLedgerTotals(totals);
+        double credits = ledgerTotal(values, 0);
+        double debits = ledgerTotal(values, 1);
+        double charges = ledgerTotal(values, 2);
         summary.put("totalCredits", round2(credits));
         summary.put("totalDebits", round2(debits));
         summary.put("totalCharges", round2(charges));
-        summary.put("cibilCharges", round2(ledgerTotal(totals, 4)));
-        summary.put("loanProcessingCharges", round2(ledgerTotal(totals, 5)));
-        summary.put("goldLoanInterest", round2(ledgerTotal(totals, 6)));
-        summary.put("loanInterest", round2(ledgerTotal(totals, 7)));
-        summary.put("fasttagTransactions", round2(ledgerTotal(totals, 8)));
-        summary.put("insuranceTransactions", round2(ledgerTotal(totals, 9)));
-        summary.put("foreclosureCharges", round2(ledgerTotal(totals, 10)));
+        summary.put("cibilCharges", round2(ledgerTotal(values, 4)));
+        summary.put("loanProcessingCharges", round2(ledgerTotal(values, 5)));
+        summary.put("goldLoanInterest", round2(ledgerTotal(values, 6)));
+        summary.put("loanInterest", round2(ledgerTotal(values, 7)));
+        summary.put("fasttagTransactions", round2(ledgerTotal(values, 8)));
+        summary.put("insuranceTransactions", round2(ledgerTotal(values, 9)));
+        summary.put("foreclosureCharges", round2(ledgerTotal(values, 10)));
         if (includeOpeningBalance) summary.put("openingBalance", round2((balance == null ? 0 : balance) - credits + debits));
-        summary.put("lastTransactionDate", totals != null && totals.length > 3 ? totals[3] : null);
+        summary.put("lastTransactionDate", values != null && values.length > 3 ? values[3] : null);
+    }
+
+    private Object[] unwrapLedgerTotals(Object[] totals) {
+        return totals != null && totals.length == 1 && totals[0] instanceof Object[] nested ? nested : totals;
     }
 
     private double ledgerTotal(Object[] totals, int index) {

@@ -56,6 +56,12 @@ public class AdminService {
         return adminRepository.findById(id).orElse(null);
     }
 
+    @Transactional(readOnly = true)
+    public Admin getAdminByManagerLoginUsername(String username) {
+        return username == null || username.isBlank()
+                ? null : adminRepository.findByManagerLoginUsernameIgnoreCase(username.trim());
+    }
+
     public Admin updateAdmin(Long id, Admin adminDetails) {
         Admin admin = adminRepository.findById(id).orElse(null);
         if (admin != null) {
