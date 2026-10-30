@@ -1291,20 +1291,10 @@ public class CreditCardService {
         // Fee is already part of the amount charged to the card; credit it to the admin-linked
         // branch account in real time without any additional debit from the user's account.
         if (fee > 0) {
-            String branchAccountNumber = branchAccountService.getDepositAccountNumber();
-            Double branchBalanceAfter = accountService.creditBalance(branchAccountNumber, fee);
-            Transaction feeTxn = new Transaction();
-            feeTxn.setGlobalTransactionSequence(globalSequence);
-            feeTxn.setAccountNumber(branchAccountNumber);
-            feeTxn.setUserName("NeoBank");
-            feeTxn.setAmount(fee);
-            feeTxn.setType("Credit");
-            feeTxn.setMerchant("Credit Card Transfer Commission - " + card.getAccountNumber());
-            feeTxn.setDescription("Commission (" + feePercent + "%) on card transfer to " + destinationAccountNumber.trim() + " (from " + card.getAccountNumber() + ")");
-            feeTxn.setSourceAccountNumber(card.getAccountNumber());
-            feeTxn.setBalance(branchBalanceAfter != null ? branchBalanceAfter : fee);
-            feeTxn.setStatus("Completed");
-            transactionService.saveTransaction(feeTxn);
+            branchAccountService.recordTreasuryMovement(fee, true,
+                    "Credit Card Transfer Commission - " + card.getAccountNumber(),
+                    "Commission (" + feePercent + "%) on card transfer to " + destinationAccountNumber.trim(),
+                    card.getAccountNumber());
         }
 
         Map<String, Object> result = new HashMap<>();
@@ -1314,7 +1304,7 @@ public class CreditCardService {
         result.put("fee", fee);
         result.put("creditedAmount", creditedAmount);
         result.put("destinationBalanceAfter", destinationBalanceAfter);
-        result.put("branchAccount", branchAccountService.getDepositAccountNumber());
+        result.put("branchAccount", branchAccountService.getAccountNumberForCustomer(card.getAccountNumber()));
         return result;
     }
 

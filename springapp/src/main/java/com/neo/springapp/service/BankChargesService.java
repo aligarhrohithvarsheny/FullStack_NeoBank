@@ -67,8 +67,8 @@ public class BankChargesService {
         String depositAccount = getDepositAccountNumber();
         Account userAccount = accountService.getAccountByNumber(accountNumber);
         if (userAccount == null) return false;
-        Account bankAccount = accountService.getAccountByNumber(depositAccount);
-        if (bankAccount == null) {
+        Account bankAccount = branchAccountService == null ? accountService.getAccountByNumber(depositAccount) : null;
+        if (branchAccountService == null && bankAccount == null) {
             System.err.println("Branch/NeoBank account " + depositAccount + " not found. Charge not applied.");
             return false;
         }
@@ -77,7 +77,11 @@ public class BankChargesService {
             System.err.println("Insufficient balance or debit failed for " + accountNumber + " amount " + amount);
             return false;
         }
-        accountService.creditBalance(depositAccount, amount);
+        if (branchAccountService != null) {
+            branchAccountService.recordTreasuryMovement(amount, true, merchant, description, accountNumber);
+        } else {
+            accountService.creditBalance(depositAccount, amount);
+        }
 
         String name = userName != null && !userName.trim().isEmpty() ? userName : userAccount.getName();
 
@@ -93,19 +97,21 @@ public class BankChargesService {
         debitTxn.setStatus("Completed");
         transactionService.saveTransaction(debitTxn);
 
-        Double bankBalance = accountService.getBalanceByAccountNumber(depositAccount);
-        Transaction creditTxn = new Transaction();
-        creditTxn.setMerchant(merchant + " - " + accountNumber);
-        creditTxn.setAmount(amount);
-        creditTxn.setType("Credit");
-        creditTxn.setDescription(description + " (from " + accountNumber + ")");
-        creditTxn.setAccountNumber(depositAccount);
-        creditTxn.setUserName("NeoBank");
-        creditTxn.setSourceAccountNumber(accountNumber); // debited user account for branch transaction list
-        creditTxn.setBalance(bankBalance != null ? bankBalance : amount);
-        creditTxn.setDate(LocalDateTime.now());
-        creditTxn.setStatus("Completed");
-        transactionService.saveTransaction(creditTxn);
+        if (branchAccountService == null) {
+            Double bankBalance = accountService.getBalanceByAccountNumber(depositAccount);
+            Transaction creditTxn = new Transaction();
+            creditTxn.setMerchant(merchant + " - " + accountNumber);
+            creditTxn.setAmount(amount);
+            creditTxn.setType("Credit");
+            creditTxn.setDescription(description + " (from " + accountNumber + ")");
+            creditTxn.setAccountNumber(depositAccount);
+            creditTxn.setUserName("NeoBank");
+            creditTxn.setSourceAccountNumber(accountNumber);
+            creditTxn.setBalance(bankBalance != null ? bankBalance : amount);
+            creditTxn.setDate(LocalDateTime.now());
+            creditTxn.setStatus("Completed");
+            transactionService.saveTransaction(creditTxn);
+        }
 
         return true;
     }

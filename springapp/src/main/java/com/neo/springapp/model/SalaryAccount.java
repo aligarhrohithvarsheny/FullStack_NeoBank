@@ -74,6 +74,9 @@ public class SalaryAccount {
     @Column(name = "branch_name")
     private String branchName;
 
+    @Column(name = "branch_city", length = 120)
+    private String branchCity;
+
     @Column(name = "ifsc_code")
     private String ifscCode;
 

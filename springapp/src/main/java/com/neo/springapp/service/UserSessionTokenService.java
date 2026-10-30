@@ -36,7 +36,8 @@ public class UserSessionTokenService {
     }
 
     public String issueAdmin(Long adminId, String email, String role) {
-        String scope = "ADMIN".equalsIgnoreCase(role) ? "ADMIN" : "MANAGER";
+        String scope = "ADMIN".equalsIgnoreCase(role) ? "ADMIN"
+                : "HOD".equalsIgnoreCase(role) ? "HOD" : "MANAGER";
         return issue(adminId, email, scope);
     }
 
@@ -56,7 +57,7 @@ public class UserSessionTokenService {
                     || Long.parseLong(values[2]) < Instant.now().getEpochSecond()) return null;
             String scope = values.length == 4 ? values[3] : "USER";
             if (!"USER".equals(scope) && !"CARD360".equals(scope) && !"INSURANCE_GUEST".equals(scope)
-                    && !"ADMIN".equals(scope) && !"MANAGER".equals(scope)) return null;
+                    && !"ADMIN".equals(scope) && !"MANAGER".equals(scope) && !"HOD".equals(scope)) return null;
             return new SessionPrincipal(Long.parseLong(values[0]), values[1], scope);
         } catch (RuntimeException exception) {
             return null;

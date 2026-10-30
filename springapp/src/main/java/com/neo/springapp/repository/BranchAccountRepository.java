@@ -6,4 +6,8 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface BranchAccountRepository extends JpaRepository<BranchAccount, Long> {
+    BranchAccount findByBranchCityIgnoreCase(String branchCity);
+    BranchAccount findByManagerAdminId(Long managerAdminId);
+    boolean existsByAccountNumber(String accountNumber);
+    boolean existsByCustomerId(String customerId);
 }

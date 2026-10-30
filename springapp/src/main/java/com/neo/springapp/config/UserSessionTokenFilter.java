@@ -31,6 +31,7 @@ public class UserSessionTokenFilter extends OncePerRequestFilter {
                 java.util.Collection<GrantedAuthority> authorities = switch (principal.scope()) {
                     case "ADMIN" -> Collections.singletonList(new SimpleGrantedAuthority("ROLE_ADMIN"));
                     case "MANAGER" -> Collections.singletonList(new SimpleGrantedAuthority("ROLE_MANAGER"));
+                    case "HOD" -> Collections.singletonList(new SimpleGrantedAuthority("ROLE_HOD"));
                     case "USER" -> Collections.singletonList(new SimpleGrantedAuthority("ROLE_USER"));
                     default -> Collections.emptyList();
                 };

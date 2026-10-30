@@ -54,6 +54,9 @@ public class Account {
     
     private String address;
 
+    @Column(name = "branch_city", length = 120)
+    private String branchCity;
+
     private boolean verifiedMatrix = false;
     private boolean kycVerified = false;
     private boolean reKycRequired = false;

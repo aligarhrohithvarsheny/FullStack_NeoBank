@@ -226,6 +226,7 @@ public class AdminController {
         response.put("success", true);
         response.put("role", "HOD");
         response.put("admin", createSafeAdminResponse(loggedIn));
+        response.put("sessionToken", userSessionTokenService.issueAdmin(loggedIn.getId(), loggedIn.getEmail(), "HOD"));
         return ResponseEntity.ok(response);
     }
 
@@ -556,7 +557,14 @@ public class AdminController {
      * All user charges, loan interest, KYC/debit charges are deposited here.
      */
     @GetMapping("/branch-account")
-    public ResponseEntity<Map<String, Object>> getBranchAccount() {
+    public ResponseEntity<Map<String, Object>> getBranchAccount(
+            @org.springframework.security.core.annotation.AuthenticationPrincipal
+            com.neo.springapp.service.UserSessionTokenService.SessionPrincipal principal) {
+        if (principal == null || principal.userId() == null
+                || !("MANAGER".equals(principal.scope()) || "ADMIN".equals(principal.scope()))) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("success", false, "message", "A manager session is required."));
+        }
         if (branchAccountService == null) {
             Map<String, Object> fallback = new HashMap<>();
             fallback.put("accountNumber", com.neo.springapp.service.BranchAccountService.DEFAULT_NEOBANK_ACCOUNT);
@@ -565,7 +573,7 @@ public class AdminController {
             fallback.put("isConfigured", false);
             return ResponseEntity.ok(fallback);
         }
-        return ResponseEntity.ok(branchAccountService.getBranchAccountSummary());
+        return ResponseEntity.ok(branchAccountService.getManagerBranchAccountSummary(principal.userId()));
     }
 
     @GetMapping("/branch-account/available")
@@ -590,7 +598,14 @@ public class AdminController {
             @RequestParam(required = false) String toDate,
             @RequestParam(required = false) String search,
             @RequestParam(required = false, defaultValue = "0") int page,
-            @RequestParam(required = false, defaultValue = "20") int size) {
+            @RequestParam(required = false, defaultValue = "20") int size,
+            @org.springframework.security.core.annotation.AuthenticationPrincipal
+            com.neo.springapp.service.UserSessionTokenService.SessionPrincipal principal) {
+        if (principal == null || principal.userId() == null
+                || !("MANAGER".equals(principal.scope()) || "ADMIN".equals(principal.scope()))) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("success", false, "message", "A manager session is required."));
+        }
         if (branchAccountService == null) {
             Map<String, Object> empty = new HashMap<>();
             empty.put("content", List.of());
@@ -606,9 +621,76 @@ public class AdminController {
         if (toDate != null && !toDate.isBlank()) {
             try { to = LocalDate.parse(toDate); } catch (DateTimeParseException ignored) {}
         }
-        Map<String, Object> result = branchAccountService.getBranchAccountTransactions(
-            null, from, to, search, page, size);
+        Map<String, Object> result = branchAccountService.getManagerBranchAccountTransactions(
+            principal.userId(), from, to, search, page, size);
         return ResponseEntity.ok(result);
+    }
+
+    @GetMapping("/hod/branch-accounts")
+    public ResponseEntity<?> getHodBranchAccounts(
+            @org.springframework.security.core.annotation.AuthenticationPrincipal
+            com.neo.springapp.service.UserSessionTokenService.SessionPrincipal principal) {
+        if (!isHod(principal)) return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of(
+                "success", false, "message", "A HOD session is required."));
+        return ResponseEntity.ok(branchAccountService.getBranchAccounts());
+    }
+
+    @PostMapping("/hod/branch-accounts")
+    public ResponseEntity<Map<String, Object>> createHodBranchAccount(
+            @RequestBody Map<String, Object> body,
+            @org.springframework.security.core.annotation.AuthenticationPrincipal
+            com.neo.springapp.service.UserSessionTokenService.SessionPrincipal principal) {
+        if (!isHod(principal)) return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of(
+                "success", false, "message", "A HOD session is required."));
+        if (body == null || body.get("managerAdminId") == null) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "A manager is required."));
+        }
+        Long managerId;
+        Double openingBalance;
+        try {
+            managerId = Long.valueOf(String.valueOf(body.get("managerAdminId")));
+            openingBalance = body.get("openingBalance") == null ? 0.0
+                    : Double.valueOf(String.valueOf(body.get("openingBalance")));
+        } catch (NumberFormatException exception) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "success", false, "message", "Manager ID and opening balance must be valid numbers."));
+        }
+        Map<String, Object> result = branchAccountService.createBranchAccount(
+                managerId, principal.userId(), openingBalance);
+        return Boolean.TRUE.equals(result.get("success"))
+                ? ResponseEntity.ok(result) : ResponseEntity.badRequest().body(result);
+    }
+
+    @GetMapping("/hod/branch-accounts/customers")
+    public ResponseEntity<?> searchHodBranchCustomers(
+            @RequestParam String search,
+            @org.springframework.security.core.annotation.AuthenticationPrincipal
+            com.neo.springapp.service.UserSessionTokenService.SessionPrincipal principal) {
+        if (!isHod(principal)) return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of(
+                "success", false, "message", "A HOD session is required."));
+        return ResponseEntity.ok(branchAccountService.searchCustomerAccounts(search));
+    }
+
+    @PutMapping("/hod/branch-accounts/customer-assignment")
+    public ResponseEntity<Map<String, Object>> assignHodCustomerBranch(
+            @RequestBody Map<String, String> body,
+            @org.springframework.security.core.annotation.AuthenticationPrincipal
+            com.neo.springapp.service.UserSessionTokenService.SessionPrincipal principal) {
+        if (!isHod(principal)) return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of(
+                "success", false, "message", "A HOD session is required."));
+        Map<String, Object> result = branchAccountService.assignCustomerToBranch(
+                body.get("accountNumber"), body.get("branchCity"));
+        return Boolean.TRUE.equals(result.get("success"))
+                ? ResponseEntity.ok(result) : ResponseEntity.badRequest().body(result);
+    }
+
+    private boolean isHod(com.neo.springapp.service.UserSessionTokenService.SessionPrincipal principal) {
+        return principal != null && principal.userId() != null && "HOD".equals(principal.scope());
+    }
+
+    private boolean isBranchManager(com.neo.springapp.service.UserSessionTokenService.SessionPrincipal principal) {
+        return principal != null && principal.userId() != null
+                && ("MANAGER".equals(principal.scope()) || "ADMIN".equals(principal.scope()));
     }
 
     /**
@@ -637,7 +719,12 @@ public class AdminController {
     }
 
     @PutMapping("/branch-account/daily-allocation")
-    public ResponseEntity<Map<String, Object>> saveBranchDailyAllocation(@RequestBody Map<String, Object> body) {
+    public ResponseEntity<Map<String, Object>> saveBranchDailyAllocation(
+            @RequestBody Map<String, Object> body,
+            @org.springframework.security.core.annotation.AuthenticationPrincipal
+            com.neo.springapp.service.UserSessionTokenService.SessionPrincipal principal) {
+        if (!isBranchManager(principal)) return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of("success", false, "message", "A manager session is required."));
         if (branchAccountService == null) {
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(Map.of("success", false, "message", "Branch account service not available"));
         }
@@ -655,14 +742,18 @@ public class AdminController {
     @GetMapping("/branch-account/operations")
     public ResponseEntity<Map<String, Object>> getBranchOperations(
             @RequestParam(required = false) String fromDate,
-            @RequestParam(required = false) String toDate) {
+            @RequestParam(required = false) String toDate,
+            @org.springframework.security.core.annotation.AuthenticationPrincipal
+            com.neo.springapp.service.UserSessionTokenService.SessionPrincipal principal) {
+        if (!isBranchManager(principal)) return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of("success", false, "message", "A manager session is required."));
         if (branchAccountService == null) {
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(Map.of("success", false, "message", "Branch account service not available"));
         }
         try {
             LocalDate from = fromDate == null || fromDate.isBlank() ? LocalDate.now() : LocalDate.parse(fromDate);
             LocalDate to = toDate == null || toDate.isBlank() ? from : LocalDate.parse(toDate);
-            return ResponseEntity.ok(branchAccountService.getBranchOperations(from, to));
+            return ResponseEntity.ok(branchAccountService.getBranchOperations(principal.userId(), from, to));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("success", false, "message", e.getMessage()));
         }
@@ -671,7 +762,10 @@ public class AdminController {
     @GetMapping("/branch-account/daily-allocations")
     public ResponseEntity<List<Map<String, Object>>> getBranchDailyAllocations(
             @RequestParam(required = false) String fromDate,
-            @RequestParam(required = false) String toDate) {
+            @RequestParam(required = false) String toDate,
+            @org.springframework.security.core.annotation.AuthenticationPrincipal
+            com.neo.springapp.service.UserSessionTokenService.SessionPrincipal principal) {
+        if (!isBranchManager(principal)) return ResponseEntity.status(HttpStatus.FORBIDDEN).body(List.of());
         if (branchAccountService == null) return ResponseEntity.ok(List.of());
         LocalDate from = fromDate == null || fromDate.isBlank() ? null : LocalDate.parse(fromDate);
         LocalDate to = toDate == null || toDate.isBlank() ? null : LocalDate.parse(toDate);

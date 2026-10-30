@@ -5,6 +5,7 @@ import com.neo.springapp.model.BranchAccount;
 import com.neo.springapp.model.BranchDailyAllocation;
 import com.neo.springapp.model.Transaction;
 import com.neo.springapp.repository.AccountRepository;
+import com.neo.springapp.repository.AdminRepository;
 import com.neo.springapp.repository.BranchDailyAllocationRepository;
 import com.neo.springapp.repository.BranchAccountRepository;
 import com.neo.springapp.repository.CurrentAccountRepository;
@@ -24,6 +25,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.security.SecureRandom;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -37,11 +39,14 @@ public class BranchAccountService {
 
     /** Allowed branch account name patterns (must match Neo Bank name to verify). */
     private static final Pattern NEOBANK_NAME_PATTERN = Pattern.compile("(?i).*neo\\s*bank.*");
+    private static final SecureRandom RANDOM = new SecureRandom();
 
     @Autowired
     private BranchAccountRepository branchAccountRepository;
     @Autowired
     private AccountRepository accountRepository;
+    @Autowired
+    private AdminRepository adminRepository;
     @Autowired
     private AccountService accountService;
     @Autowired
@@ -56,6 +61,148 @@ public class BranchAccountService {
     /** Resolve the single allowed NeoBank treasury account, ignoring legacy non-NeoBank mappings. */
     public String getDepositAccountNumber() {
         return DEFAULT_NEOBANK_ACCOUNT;
+    }
+
+    public String getAccountNumberForCustomer(String customerAccountNumber) {
+        BranchAccount branch = resolveBranchAccount(customerAccountNumber);
+        return branch == null ? DEFAULT_NEOBANK_ACCOUNT : branch.getAccountNumber();
+    }
+
+    @Transactional
+    public Map<String, Object> createBranchAccount(Long managerAdminId, Long hodId, Double openingBalance) {
+        Map<String, Object> result = new HashMap<>();
+        double openingAmount = openingBalance == null ? 0.0 : openingBalance;
+        if (!Double.isFinite(openingAmount) || openingAmount < 0) {
+            return failure("Opening balance must be a non-negative amount.");
+        }
+        var manager = adminRepository.findById(managerAdminId).orElse(null);
+        if (manager == null || !"MANAGER".equalsIgnoreCase(manager.getRole())) {
+            return failure("Select an existing manager profile.");
+        }
+        String city = manager.getAssignedCity() == null ? "" : manager.getAssignedCity().trim();
+        if (city.isEmpty()) return failure("Assign the manager to a city before creating a branch account.");
+        if (branchAccountRepository.findByManagerAdminId(managerAdminId) != null) {
+            return failure("This manager already has a bank-owned branch account.");
+        }
+        if (branchAccountRepository.findByBranchCityIgnoreCase(city) != null) {
+            return failure("A bank-owned account already exists for " + city + ".");
+        }
+        Account centralAccount = accountRepository.findByAccountNumber(DEFAULT_NEOBANK_ACCOUNT);
+        if (openingAmount > 0 && (!isNeoBankOwned(centralAccount)
+                || centralAccount.getBalance() == null || centralAccount.getBalance() < openingAmount)) {
+            return failure("The central NeoBank treasury does not have enough verified funds for this opening balance.");
+        }
+        BranchAccount account = new BranchAccount();
+        account.setAccountNumber(generateIdentifier("NB", 12, branchAccountRepository::existsByAccountNumber));
+        account.setCustomerId(generateIdentifier("NBC", 9, branchAccountRepository::existsByCustomerId));
+        account.setAccountName("NeoBank " + city + " Branch");
+        account.setIfscCode("NEOB0" + String.format("%06d", RANDOM.nextInt(1_000_000)));
+        account.setBranchCity(city);
+        account.setManagerAdminId(manager.getId());
+        account.setBalance(round2(openingAmount));
+        account.setUpdatedByAdminId(hodId);
+        BranchAccount saved = branchAccountRepository.save(account);
+        if (openingAmount > 0) {
+            double centralBalance = round2(centralAccount.getBalance() - openingAmount);
+            centralAccount.setBalance(centralBalance);
+            accountRepository.save(centralAccount);
+            saveOpeningTransaction(DEFAULT_NEOBANK_ACCOUNT, openingAmount, "Debit",
+                    "Opening funding for " + city + " branch account", centralBalance, saved.getAccountNumber());
+            saveOpeningTransaction(saved.getAccountNumber(), openingAmount, "Credit",
+                    "Opening balance transferred from central NeoBank treasury", round2(openingAmount), DEFAULT_NEOBANK_ACCOUNT);
+        }
+        result.put("success", true);
+        result.put("message", "Bank-owned branch account created.");
+        result.put("branchAccount", branchAccountDetails(saved, manager.getName(), manager.getEmail()));
+        return result;
+    }
+
+    private void saveOpeningTransaction(String accountNumber, double amount, String type, String description,
+                                       double balance, String relatedAccountNumber) {
+        Transaction transaction = new Transaction();
+        transaction.setMerchant("NeoBank Branch Funding");
+        transaction.setAmount(round2(amount));
+        transaction.setType(type);
+        transaction.setDescription(description);
+        transaction.setAccountNumber(accountNumber);
+        transaction.setUserName("NeoBank");
+        transaction.setSourceAccountNumber(type.equals("Credit") ? relatedAccountNumber : null);
+        transaction.setRecipientAccountNumber(type.equals("Debit") ? relatedAccountNumber : null);
+        transaction.setBalance(balance);
+        transaction.setDate(LocalDateTime.now());
+        transaction.setStatus("Completed");
+        transactionRepository.save(transaction);
+    }
+
+    public List<Map<String, Object>> getBranchAccounts() {
+        return branchAccountRepository.findAll().stream()
+                .filter(account -> account.getBranchCity() != null && !account.getBranchCity().isBlank())
+                .map(account -> {
+                    var manager = account.getManagerAdminId() == null ? null
+                            : adminRepository.findById(account.getManagerAdminId()).orElse(null);
+                    return branchAccountDetails(account, manager == null ? null : manager.getName(),
+                            manager == null ? null : manager.getEmail());
+                })
+                .toList();
+    }
+
+    public Map<String, Object> assignCustomerToBranch(String accountNumber, String branchCity) {
+        Account customer = accountRepository.findByAccountNumber(accountNumber);
+        if (customer == null || customer.getName() == null || NEOBANK_NAME_PATTERN.matcher(customer.getName()).matches()) {
+            return failure("Customer account was not found.");
+        }
+        BranchAccount branch = branchAccountRepository.findByBranchCityIgnoreCase(branchCity == null ? "" : branchCity.trim());
+        if (branch == null) return failure("Create a bank-owned account for the selected branch first.");
+        customer.setBranchCity(branch.getBranchCity());
+        accountRepository.save(customer);
+        return Map.of("success", true, "message", "Customer account assigned to " + branch.getBranchCity() + ".");
+    }
+
+    public List<Map<String, Object>> searchCustomerAccounts(String query) {
+        if (query == null || query.isBlank()) return List.of();
+        return accountRepository.searchAccounts(query.trim(),
+                        org.springframework.data.domain.PageRequest.of(0, 20))
+                .getContent().stream()
+                .filter(account -> account.getName() == null || !NEOBANK_NAME_PATTERN.matcher(account.getName()).matches())
+                .map(account -> {
+                    Map<String, Object> row = new HashMap<>();
+                    row.put("name", account.getName());
+                    row.put("accountNumber", account.getAccountNumber());
+                    row.put("accountType", account.getAccountType());
+                    row.put("branchCity", account.getBranchCity());
+                    return row;
+                }).toList();
+    }
+
+    private Map<String, Object> failure(String message) {
+        return Map.of("success", false, "message", message);
+    }
+
+    private Map<String, Object> branchAccountDetails(BranchAccount account, String managerName, String managerEmail) {
+        Map<String, Object> details = new HashMap<>();
+        details.put("id", account.getId());
+        details.put("accountNumber", account.getAccountNumber());
+        details.put("customerId", account.getCustomerId());
+        details.put("accountName", account.getAccountName());
+        details.put("bankName", "NeoBank");
+        details.put("ifscCode", account.getIfscCode());
+        details.put("branchCity", account.getBranchCity());
+        details.put("managerAdminId", account.getManagerAdminId());
+        details.put("managerName", managerName);
+        details.put("managerEmail", managerEmail);
+        details.put("balance", account.getBalance() == null ? 0.0 : account.getBalance());
+        details.put("updatedAt", account.getUpdatedAt());
+        return details;
+    }
+
+    private String generateIdentifier(String prefix, int digits, java.util.function.Predicate<String> exists) {
+        String candidate;
+        do {
+            StringBuilder number = new StringBuilder(prefix);
+            for (int i = 0; i < digits; i++) number.append(RANDOM.nextInt(10));
+            candidate = number.toString();
+        } while (exists.test(candidate));
+        return candidate;
     }
 
     /** Return the verified NeoBank-owned account that can be linked as the treasury account. */
@@ -74,7 +221,9 @@ public class BranchAccountService {
 
     /** Get full branch account record (for display). */
     public BranchAccount getBranchAccount() {
-        return branchAccountRepository.findAll().stream().findFirst().orElse(null);
+        return branchAccountRepository.findAll().stream()
+                .filter(account -> account.getBranchCity() == null || account.getBranchCity().isBlank())
+                .findFirst().orElse(null);
     }
 
     /** Link the existing, verified NeoBank treasury account from the admin or manager dashboard. */
@@ -139,6 +288,10 @@ public class BranchAccountService {
         if (!Double.isFinite(amount) || amount <= 0) {
             throw new IllegalArgumentException("Treasury transaction amount must be greater than zero.");
         }
+        BranchAccount branch = resolveBranchAccount(sourceAccountNumber);
+        if (branch != null) {
+            return recordBranchMovement(branch, amount, credit, merchant, description, sourceAccountNumber);
+        }
         String accountNumber = getDepositAccountNumber();
         Account account = accountRepository.findByAccountNumber(accountNumber);
         if (!isNeoBankOwned(account)) {
@@ -159,6 +312,52 @@ public class BranchAccountService {
         transaction.setDescription(description);
         transaction.setAccountNumber(accountNumber);
         transaction.setUserName("NeoBank");
+        transaction.setSourceAccountNumber(sourceAccountNumber);
+        transaction.setBalance(newBalance);
+        transaction.setDate(LocalDateTime.now());
+        transaction.setStatus("Completed");
+        transactionRepository.save(transaction);
+        return newBalance;
+    }
+
+    private BranchAccount resolveBranchAccount(String sourceAccountNumber) {
+        if (sourceAccountNumber == null || sourceAccountNumber.isBlank()) return null;
+        String city = resolveCustomerCity(sourceAccountNumber);
+        return city == null || city.isBlank() ? null : branchAccountRepository.findByBranchCityIgnoreCase(city.trim());
+    }
+
+    private String resolveCustomerCity(String accountNumber) {
+        Account source = accountRepository.findByAccountNumber(accountNumber);
+        String city = source == null ? null : source.getBranchCity();
+        if ((city == null || city.isBlank()) && currentAccountRepository != null) {
+            var current = currentAccountRepository.findByAccountNumber(accountNumber);
+            if (current != null && current.isPresent()) city = current.get().getCity();
+        }
+        if ((city == null || city.isBlank()) && salaryAccountRepository != null) {
+            var salary = salaryAccountRepository.findByAccountNumber(accountNumber);
+            if (salary != null) city = salary.getBranchCity();
+        }
+        return city;
+    }
+
+    private double recordBranchMovement(BranchAccount branch, double amount, boolean credit, String merchant,
+                                        String description, String sourceAccountNumber) {
+        double currentBalance = branch.getBalance() == null ? 0.0 : branch.getBalance();
+        if (!credit && currentBalance < amount) {
+            throw new IllegalStateException("Insufficient NeoBank branch funds. Available: " + currentBalance
+                    + ", Required: " + amount);
+        }
+        double newBalance = round2(credit ? currentBalance + amount : currentBalance - amount);
+        branch.setBalance(newBalance);
+        branchAccountRepository.save(branch);
+
+        Transaction transaction = new Transaction();
+        transaction.setMerchant(merchant);
+        transaction.setAmount(round2(amount));
+        transaction.setType(credit ? "Credit" : "Debit");
+        transaction.setDescription(description);
+        transaction.setAccountNumber(branch.getAccountNumber());
+        transaction.setUserName("NeoBank " + branch.getBranchCity());
         transaction.setSourceAccountNumber(sourceAccountNumber);
         transaction.setBalance(newBalance);
         transaction.setDate(LocalDateTime.now());
@@ -189,6 +388,24 @@ public class BranchAccountService {
         summary.put("balance", balance != null ? balance : 0.0);
         summary.put("isConfigured", b != null && DEFAULT_NEOBANK_ACCOUNT.equals(b.getAccountNumber()));
         return summary;
+    }
+
+    public Map<String, Object> getManagerBranchAccountSummary(Long managerAdminId) {
+        BranchAccount branch = branchAccountRepository.findByManagerAdminId(managerAdminId);
+        if (branch == null) return Map.of("isConfigured", false, "balance", 0.0);
+        var manager = adminRepository.findById(managerAdminId).orElse(null);
+        Map<String, Object> summary = branchAccountDetails(branch, manager == null ? null : manager.getName(),
+                manager == null ? null : manager.getEmail());
+        summary.put("isConfigured", true);
+        return summary;
+    }
+
+    public Map<String, Object> getManagerBranchAccountTransactions(Long managerAdminId, LocalDate fromDate,
+                                                                    LocalDate toDate, String search,
+                                                                    int page, int size) {
+        BranchAccount branch = branchAccountRepository.findByManagerAdminId(managerAdminId);
+        if (branch == null) return Map.of("content", List.of(), "totalElements", 0L, "totalPages", 0);
+        return getBranchAccountTransactions(branch.getAccountNumber(), fromDate, toDate, search, page, size);
     }
 
     /**
@@ -261,13 +478,16 @@ public class BranchAccountService {
         return allocationMap(allocationRepository.save(allocation));
     }
 
-    public Map<String, Object> getBranchOperations(LocalDate fromDate, LocalDate toDate) {
+    public Map<String, Object> getBranchOperations(Long managerAdminId, LocalDate fromDate, LocalDate toDate) {
+        BranchAccount branch = branchAccountRepository.findByManagerAdminId(managerAdminId);
         LocalDate from = fromDate != null ? fromDate : LocalDate.now();
         LocalDate to = toDate != null ? toDate : from;
         if (to.isBefore(from)) throw new IllegalArgumentException("To date cannot be before from date");
 
         List<Transaction> transactions = transactionRepository.findByDateBetweenOrderByDateDesc(
                 from.atStartOfDay(), to.atTime(LocalTime.MAX));
+        if (branch == null) transactions = List.of();
+        Map<String, Boolean> accountBranchCache = new HashMap<>();
         Map<String, Double> totals = new HashMap<>();
         for (String key : List.of("deposits", "withdrawals", "transfers", "cashDeposits", "cashWithdrawals",
                 "charges", "interestEarned", "processingCharges", "cibilCharges", "loanGiven", "credits", "debits")) {
@@ -275,12 +495,16 @@ public class BranchAccountService {
         }
         List<Map<String, Object>> entries = new ArrayList<>();
         for (Transaction transaction : transactions) {
+            if (!transactionBelongsToBranch(transaction, branch, accountBranchCache)) continue;
+            if (branch.getAccountNumber().equals(transaction.getAccountNumber())
+                    || "NeoBank Branch Funding".equalsIgnoreCase(transaction.getMerchant())) continue;
             double amount = transaction.getAmount() == null ? 0.0 : Math.abs(transaction.getAmount());
             String type = transaction.getType() == null ? "" : transaction.getType().toLowerCase();
             String text = ((transaction.getDescription() == null ? "" : transaction.getDescription()) + " "
                     + (transaction.getMerchant() == null ? "" : transaction.getMerchant())).toLowerCase();
             boolean debit = type.contains("debit") || type.contains("withdraw") || text.contains("debit");
-            boolean loan = type.contains("loan") || text.contains("loan disbursement") || text.contains("loan approved");
+            boolean loan = type.contains("loan") || text.contains("loan disbursement") || text.contains("loan approved")
+                    || (text.contains("loan") && (text.contains("disburs") || text.contains("sanction")));
             boolean interest = text.contains("interest");
             boolean cibil = text.contains("cibil");
             boolean processing = text.contains("processing") || text.contains("charge") || text.contains("fee");
@@ -314,17 +538,28 @@ public class BranchAccountService {
         }
 
         List<Map<String, Object>> accounts = new ArrayList<>();
-        accountRepository.findAll().forEach(account -> accounts.add(accountBalanceMap(
-                account.getAccountNumber(), account.getName(), account.getAccountType(), account.getBalance())));
-        currentAccountRepository.findAll().forEach(account -> accounts.add(accountBalanceMap(
-                account.getAccountNumber(), account.getBusinessName(), "Current", account.getBalance())));
-        salaryAccountRepository.findAll().forEach(account -> accounts.add(accountBalanceMap(
-                account.getAccountNumber(), account.getEmployeeName(), "Salary", account.getBalance())));
+        if (branch != null) {
+            accountRepository.findAll().stream()
+                    .filter(account -> belongsToBranch(account.getAccountNumber(), branch, accountBranchCache))
+                    .forEach(account -> accounts.add(accountBalanceMap(
+                            account.getAccountNumber(), account.getName(), account.getAccountType(), account.getBalance())));
+            currentAccountRepository.findAll().stream()
+                    .filter(account -> belongsToBranch(account.getAccountNumber(), branch, accountBranchCache))
+                    .forEach(account -> accounts.add(accountBalanceMap(
+                            account.getAccountNumber(), account.getBusinessName(), "Current", account.getBalance())));
+            salaryAccountRepository.findAll().stream()
+                    .filter(account -> belongsToBranch(account.getAccountNumber(), branch, accountBranchCache))
+                    .forEach(account -> accounts.add(accountBalanceMap(
+                            account.getAccountNumber(), account.getEmployeeName(), "Salary", account.getBalance())));
+            accounts.add(accountBalanceMap(branch.getAccountNumber(), branch.getAccountName(),
+                    "NeoBank Branch", branch.getBalance()));
+        }
 
         double income = totals.get("charges") + totals.get("interestEarned");
         double expenses = totals.get("loanGiven");
         BranchDailyAllocation allocation = allocationRepository.findByAllocationDate(from).orElse(null);
-        double allocated = allocation != null && allocation.getAllocatedAmount() != null ? allocation.getAllocatedAmount() : 0.0;
+        double allocated = branch != null && allocation != null && allocation.getAllocatedAmount() != null
+                ? allocation.getAllocatedAmount() : 0.0;
         double utilized = totals.get("withdrawals") + totals.get("loanGiven");
         Map<String, Object> result = new HashMap<>();
         result.put("fromDate", from);
@@ -336,10 +571,29 @@ public class BranchAccountService {
         result.put("allocatedAmount", round2(allocated));
         result.put("utilizedAmount", round2(utilized));
         result.put("remainingAllocation", round2(allocated - utilized));
-        result.put("branchBalance", getBranchAccountSummary().get("balance"));
+        result.put("branchBalance", branch == null || branch.getBalance() == null ? 0.0 : branch.getBalance());
         result.put("accounts", accounts);
         result.put("entries", entries);
         return result;
+    }
+
+    private boolean transactionBelongsToBranch(Transaction transaction, BranchAccount branch,
+                                               Map<String, Boolean> accountBranchCache) {
+        if (branch == null) return false;
+        return branch.getAccountNumber().equals(transaction.getAccountNumber())
+                || belongsToBranch(transaction.getAccountNumber(), branch, accountBranchCache)
+                || belongsToBranch(transaction.getSourceAccountNumber(), branch, accountBranchCache)
+                || belongsToBranch(transaction.getRecipientAccountNumber(), branch, accountBranchCache);
+    }
+
+    private boolean belongsToBranch(String accountNumber, BranchAccount branch, Map<String, Boolean> cache) {
+        if (accountNumber == null || accountNumber.isBlank() || branch == null) return false;
+        if (branch.getAccountNumber().equals(accountNumber)) return true;
+        return cache.computeIfAbsent(accountNumber, number -> {
+            String city = resolveCustomerCity(number);
+            return city != null && branch.getBranchCity() != null
+                    && branch.getBranchCity().equalsIgnoreCase(city.trim());
+        });
     }
 
     public List<Map<String, Object>> getDailyAllocations(LocalDate fromDate, LocalDate toDate) {

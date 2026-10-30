@@ -1110,19 +1110,9 @@ public class InsuranceService {
         transactionService.saveTransaction(txn);
 
         if (branchAccountService != null) {
-            String branchNumber = branchAccountService.getDepositAccountNumber();
-            Double branchBalance = accountService.creditBalance(branchNumber, amount);
-            if (branchBalance != null) {
-                Transaction branchTxn = new Transaction();
-                branchTxn.setMerchant("Insurance Premium Income");
-                branchTxn.setAmount(amount);
-                branchTxn.setType("Credit");
-                branchTxn.setDescription("Insurance premium income for policy " + application.getPolicy().getPolicyNumber() + " (from " + accountNumber + ")");
-                branchTxn.setBalance(branchBalance);
-                branchTxn.setAccountNumber(branchNumber);
-                branchTxn.setSourceAccountNumber(accountNumber);
-                transactionService.saveTransaction(branchTxn);
-            }
+            branchAccountService.recordTreasuryMovement(amount, true, "Insurance Premium Income",
+                    "Insurance premium income for policy " + application.getPolicy().getPolicyNumber(),
+                    accountNumber);
         }
 
         // Create insurance payment record
