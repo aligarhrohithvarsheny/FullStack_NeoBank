@@ -14,7 +14,8 @@ public class Transaction {
     private Long id;
 
     private Long globalTransactionSequence; // Global unique transaction sequence across entire bank
-    private String transactionId; // Custom transaction ID like TXN123456
+    @Column(unique = true, length = 40)
+    private String transactionId;
     private String merchant;
     private Double amount;
     private String type; // Debit / Credit / Deposit / Withdraw / Transfer / Loan Credit
@@ -36,10 +37,22 @@ public class Transaction {
     // For branch/credit transactions: account from which amount was debited (source)
     private String sourceAccountNumber;
 
+    @Column(length = 80)
+    private String category;
+
+    @Column(length = 120)
+    private String chargeType;
+
+    @Column(name = "branch_city", length = 120)
+    private String branchCity;
+
+    @Column(length = 80)
+    private String referenceNumber;
+
     // Constructors
     public Transaction() {
         this.date = LocalDateTime.now();
-        this.transactionId = "TXN" + System.currentTimeMillis();
+        this.transactionId = "TXN" + java.util.UUID.randomUUID().toString().replace("-", "").toUpperCase();
     }
 
     public Transaction(String merchant, Double amount, String type, Double balance, String userName, String accountNumber) {

@@ -58,6 +58,8 @@ public class CurrentAccount {
     // Bank Details
     private String branchName = "NeoBank Main Branch";
     private String ifscCode = "EZYV000123";
+    @Column(name = "branch_city", length = 120)
+    private String branchCity;
 
     // Account Details
     private Double balance = 0.0;

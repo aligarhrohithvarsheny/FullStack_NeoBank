@@ -47,6 +47,7 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
     List<Object[]> summarizeYearlyBankFlows(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 
     Optional<Transaction> findByTransactionId(String transactionId);
+    boolean existsByTransactionId(String transactionId);
 
     List<Transaction> findByTransactionIdContainingIgnoreCase(String transactionId);
 
@@ -118,6 +119,55 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
            @Param("minAmount") Double minAmount,
            @Param("maxAmount") Double maxAmount,
            Pageable pageable);
+
+    @Query("SELECT t FROM Transaction t WHERE t.accountNumber = :accountNumber " +
+           "AND (:branchCity IS NULL OR LOWER(COALESCE(t.branchCity, '')) = LOWER(:branchCity)) " +
+           "AND (:fromDate IS NULL OR t.date >= :fromDate) " +
+           "AND (:toDate IS NULL OR t.date <= :toDate) " +
+           "AND (:minAmount IS NULL OR t.amount >= :minAmount) " +
+           "AND (:maxAmount IS NULL OR t.amount <= :maxAmount) " +
+           "AND (:category IS NULL OR LOWER(COALESCE(t.category, '')) = LOWER(:category)) " +
+           "AND (:type IS NULL OR LOWER(COALESCE(t.type, '')) = LOWER(:type)) " +
+           "AND (:status IS NULL OR LOWER(COALESCE(t.status, '')) = LOWER(:status) " +
+           "OR (LOWER(:status) = 'success' AND LOWER(COALESCE(t.status, '')) = 'completed') " +
+           "OR (LOWER(:status) = 'completed' AND LOWER(COALESCE(t.status, '')) = 'success')) " +
+           "AND (:search IS NULL OR LOWER(COALESCE(t.transactionId, '')) LIKE LOWER(CONCAT('%', :search, '%')) " +
+           "OR LOWER(COALESCE(t.description, '')) LIKE LOWER(CONCAT('%', :search, '%')) " +
+           "OR LOWER(COALESCE(t.merchant, '')) LIKE LOWER(CONCAT('%', :search, '%')) " +
+           "OR LOWER(COALESCE(t.referenceNumber, '')) LIKE LOWER(CONCAT('%', :search, '%')) " +
+           "OR LOWER(COALESCE(t.sourceAccountNumber, '')) LIKE LOWER(CONCAT('%', :search, '%')) " +
+           "OR LOWER(COALESCE(t.recipientAccountNumber, '')) LIKE LOWER(CONCAT('%', :search, '%')) " +
+           "OR LOWER(COALESCE(t.chargeType, '')) LIKE LOWER(CONCAT('%', :search, '%'))) " +
+           "ORDER BY t.date DESC")
+    Page<Transaction> searchCentralLedger(
+            @Param("accountNumber") String accountNumber,
+            @Param("branchCity") String branchCity,
+            @Param("fromDate") LocalDateTime fromDate,
+            @Param("toDate") LocalDateTime toDate,
+            @Param("minAmount") Double minAmount,
+            @Param("maxAmount") Double maxAmount,
+            @Param("category") String category,
+            @Param("type") String type,
+            @Param("status") String status,
+            @Param("search") String search,
+            Pageable pageable);
+
+    @Query("SELECT COALESCE(SUM(CASE WHEN LOWER(COALESCE(t.type, '')) = 'credit' THEN COALESCE(t.amount, 0) ELSE 0 END), 0), " +
+           "COALESCE(SUM(CASE WHEN LOWER(COALESCE(t.type, '')) = 'debit' THEN COALESCE(t.amount, 0) ELSE 0 END), 0), " +
+           "COALESCE(SUM(CASE WHEN t.chargeType IS NOT NULL AND t.chargeType <> '' THEN COALESCE(t.amount, 0) ELSE 0 END), 0), " +
+           "MAX(t.date), " +
+           "COALESCE(SUM(CASE WHEN LOWER(COALESCE(t.category, '')) = 'cibil_charge' THEN COALESCE(t.amount, 0) ELSE 0 END), 0), " +
+           "COALESCE(SUM(CASE WHEN LOWER(COALESCE(t.category, '')) = 'loan_processing_charge' THEN COALESCE(t.amount, 0) ELSE 0 END), 0), " +
+           "COALESCE(SUM(CASE WHEN LOWER(COALESCE(t.category, '')) = 'gold_loan_interest' THEN COALESCE(t.amount, 0) ELSE 0 END), 0), " +
+           "COALESCE(SUM(CASE WHEN LOWER(COALESCE(t.category, '')) = 'loan_interest' THEN COALESCE(t.amount, 0) ELSE 0 END), 0), " +
+           "COALESCE(SUM(CASE WHEN LOWER(COALESCE(t.category, '')) = 'fastag' THEN COALESCE(t.amount, 0) ELSE 0 END), 0), " +
+           "COALESCE(SUM(CASE WHEN LOWER(COALESCE(t.category, '')) = 'insurance' THEN COALESCE(t.amount, 0) ELSE 0 END), 0), " +
+           "COALESCE(SUM(CASE WHEN LOWER(COALESCE(t.category, '')) = 'foreclosure' THEN COALESCE(t.amount, 0) ELSE 0 END), 0) " +
+           "FROM Transaction t WHERE t.accountNumber = :accountNumber " +
+           "AND (:branchCity IS NULL OR LOWER(COALESCE(t.branchCity, '')) = LOWER(:branchCity)) " +
+           "AND (t.status IS NULL OR LOWER(t.status) NOT IN ('failed', 'rejected', 'cancelled'))")
+    Object[] summarizeCentralLedger(@Param("accountNumber") String accountNumber,
+                                    @Param("branchCity") String branchCity);
     
     // JPQL Query to find transactions by account number and date range
     @Query("SELECT t FROM Transaction t WHERE t.accountNumber = :accountNumber AND t.date BETWEEN :startDate AND :endDate ORDER BY t.date DESC")

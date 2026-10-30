@@ -34,6 +34,9 @@ public class FasttagService {
     @Autowired
     private AccountService accountService;
 
+    @Autowired(required = false)
+    private BranchAccountService branchAccountService;
+
     @Autowired
     private FasttagStickerGenerator stickerGenerator;
 
@@ -99,7 +102,9 @@ public class FasttagService {
         return sb.toString();
     }
 
+    @Transactional
     public Fasttag rechargeByTag(String fasttagNumber, Double amount, String initiatedBy, String initiatedById) {
+        validateRechargeAmount(amount);
         Fasttag t = fasttagRepository.findByFasttagNumber(fasttagNumber);
         if (t == null) return null;
         double prev = t.getBalance() == null ? 0.0 : t.getBalance();
@@ -133,12 +138,18 @@ public class FasttagService {
         tx.setNewBalance(saved.getBalance());
         tx.setAccountDebited(accountDebited);
         transactionRepository.save(tx);
+        if ("ADMIN".equalsIgnoreCase(initiatedBy) && accountDebited != null && branchAccountService != null) {
+            branchAccountService.recordTreasuryMovement(amount, true, "FASTag Recharge",
+                    "FASTag recharge for tag " + saved.getFasttagNumber(), accountDebited);
+        }
 
         return saved;
     }
 
     // Admin recharge specifying an explicit account to debit (overrides assignedAccountId)
+    @Transactional
     public Fasttag rechargeByTagWithDebitAccount(String fasttagNumber, Double amount, String initiatedById, String accountToDebit) {
+        validateRechargeAmount(amount);
         Fasttag t = fasttagRepository.findByFasttagNumber(fasttagNumber);
         if (t == null) return null;
         double prev = t.getBalance() == null ? 0.0 : t.getBalance();
@@ -172,6 +183,10 @@ public class FasttagService {
         tx.setNewBalance(saved.getBalance());
         tx.setAccountDebited(accountDebited);
         transactionRepository.save(tx);
+        if (branchAccountService != null) {
+            branchAccountService.recordTreasuryMovement(amount, true, "FASTag Recharge",
+                    "FASTag recharge for tag " + saved.getFasttagNumber(), accountDebited);
+        }
 
         return saved;
     }
@@ -372,9 +387,7 @@ public class FasttagService {
 
     @Transactional
     public Fasttag rechargeByVehicleNumber(String vehicleNumber, Double amount, String userId, String debitAccountNumber) {
-        if (amount == null || amount <= 0) {
-            throw new RuntimeException("Recharge amount must be greater than zero");
-        }
+        validateRechargeAmount(amount);
         if (debitAccountNumber == null || debitAccountNumber.isBlank()) {
             throw new RuntimeException("A debit account is required");
         }
@@ -419,8 +432,18 @@ public class FasttagService {
         accountTransaction.setStatus("Completed");
         accountTransaction.setDate(LocalDateTime.now());
         transactionService.saveTransaction(accountTransaction);
+        if (branchAccountService != null) {
+            branchAccountService.recordTreasuryMovement(amount, true, "FASTag Recharge",
+                    "FASTag recharge for vehicle " + saved.getVehicleNumber(), account.getAccountNumber());
+        }
 
         return saved;
+    }
+
+    private void validateRechargeAmount(Double amount) {
+        if (amount == null || !Double.isFinite(amount) || amount <= 0) {
+            throw new IllegalArgumentException("Recharge amount must be greater than zero.");
+        }
     }
 
     /**

@@ -83,6 +83,9 @@ public class AdminController {
     private com.neo.springapp.service.BranchAccountService branchAccountService;
 
     @Autowired
+    private com.neo.springapp.service.PdfService pdfService;
+
+    @Autowired
     private SalaryAccountService salaryAccountService;
 
     @Autowired
@@ -597,6 +600,11 @@ public class AdminController {
             @RequestParam(required = false) String fromDate,
             @RequestParam(required = false) String toDate,
             @RequestParam(required = false) String search,
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) String type,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) Double minAmount,
+            @RequestParam(required = false) Double maxAmount,
             @RequestParam(required = false, defaultValue = "0") int page,
             @RequestParam(required = false, defaultValue = "20") int size,
             @org.springframework.security.core.annotation.AuthenticationPrincipal
@@ -615,15 +623,109 @@ public class AdminController {
         }
         LocalDate from = null;
         LocalDate to = null;
-        if (fromDate != null && !fromDate.isBlank()) {
-            try { from = LocalDate.parse(fromDate); } catch (DateTimeParseException ignored) {}
+        try {
+            if (fromDate != null && !fromDate.isBlank()) from = LocalDate.parse(fromDate);
+            if (toDate != null && !toDate.isBlank()) to = LocalDate.parse(toDate);
+        } catch (DateTimeParseException exception) {
+            return ResponseEntity.badRequest().body(Map.of("success", false,
+                    "message", "Dates must use yyyy-MM-dd format."));
         }
-        if (toDate != null && !toDate.isBlank()) {
-            try { to = LocalDate.parse(toDate); } catch (DateTimeParseException ignored) {}
+        if (from != null && to != null && to.isBefore(from)) return ResponseEntity.badRequest().body(Map.of(
+                "success", false, "message", "To date cannot be before from date."));
+        if ((minAmount != null && minAmount < 0) || (maxAmount != null && maxAmount < 0)
+                || (minAmount != null && maxAmount != null && minAmount > maxAmount)) {
+            return ResponseEntity.badRequest().body(Map.of("success", false,
+                    "message", "Amounts must be non-negative and minimum cannot exceed maximum."));
         }
         Map<String, Object> result = branchAccountService.getManagerBranchAccountTransactions(
-            principal.userId(), from, to, search, page, size);
+            principal.userId(), from, to, search, page, size, category, type, status, minAmount, maxAmount);
         return ResponseEntity.ok(result);
+    }
+
+    @GetMapping("/branch-account/transactions/{transactionId}/receipt")
+    public ResponseEntity<byte[]> getManagerLedgerReceipt(
+            @PathVariable String transactionId,
+            @RequestParam(defaultValue = "false") boolean download,
+            @org.springframework.security.core.annotation.AuthenticationPrincipal
+            com.neo.springapp.service.UserSessionTokenService.SessionPrincipal principal) throws IOException {
+        if (principal == null || principal.userId() == null
+                || !("MANAGER".equals(principal.scope()) || "ADMIN".equals(principal.scope()))) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+        com.neo.springapp.model.Transaction transaction =
+                branchAccountService == null ? null
+                        : branchAccountService.getManagerCentralLedgerTransaction(transactionId, principal.userId());
+        if (transaction == null) return ResponseEntity.notFound().build();
+        String fileName = transaction.getTransactionId().replaceAll("[^A-Za-z0-9_-]", "");
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_PDF)
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        (download ? "attachment" : "inline") + "; filename=\"" + fileName + ".pdf\"")
+                .body(pdfService.generateTransactionReceipt(transaction));
+    }
+
+    @GetMapping("/hod/central-account")
+    public ResponseEntity<?> getHodCentralAccount(
+            @org.springframework.security.core.annotation.AuthenticationPrincipal
+            com.neo.springapp.service.UserSessionTokenService.SessionPrincipal principal) {
+        if (!isHod(principal)) return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of("success", false, "message", "A HOD session is required."));
+        return ResponseEntity.ok(branchAccountService.getBranchAccountSummary());
+    }
+
+    @GetMapping("/hod/central-account/transactions")
+    public ResponseEntity<?> getHodCentralAccountTransactions(
+            @RequestParam(required = false) String fromDate,
+            @RequestParam(required = false) String toDate,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) String type,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) Double minAmount,
+            @RequestParam(required = false) Double maxAmount,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @org.springframework.security.core.annotation.AuthenticationPrincipal
+            com.neo.springapp.service.UserSessionTokenService.SessionPrincipal principal) {
+        if (!isHod(principal)) return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of("success", false, "message", "A HOD session is required."));
+        LocalDate from;
+        LocalDate to;
+        try {
+            from = fromDate == null || fromDate.isBlank() ? null : LocalDate.parse(fromDate);
+            to = toDate == null || toDate.isBlank() ? null : LocalDate.parse(toDate);
+        } catch (DateTimeParseException exception) {
+            return ResponseEntity.badRequest().body(Map.of("success", false,
+                    "message", "Dates must use yyyy-MM-dd format."));
+        }
+        if (from != null && to != null && to.isBefore(from)) return ResponseEntity.badRequest().body(Map.of(
+                "success", false, "message", "To date cannot be before from date."));
+        if ((minAmount != null && minAmount < 0) || (maxAmount != null && maxAmount < 0)
+                || (minAmount != null && maxAmount != null && minAmount > maxAmount)) {
+            return ResponseEntity.badRequest().body(Map.of("success", false,
+                    "message", "Amounts must be non-negative and minimum cannot exceed maximum."));
+        }
+        return ResponseEntity.ok(branchAccountService.getBranchAccountTransactions(
+                com.neo.springapp.service.BranchAccountService.DEFAULT_NEOBANK_ACCOUNT, null,
+                from, to, search, page, size, category, type, status, minAmount, maxAmount));
+    }
+
+    @GetMapping("/hod/central-account/transactions/{transactionId}/receipt")
+    public ResponseEntity<byte[]> getHodLedgerReceipt(
+            @PathVariable String transactionId,
+            @RequestParam(defaultValue = "false") boolean download,
+            @org.springframework.security.core.annotation.AuthenticationPrincipal
+            com.neo.springapp.service.UserSessionTokenService.SessionPrincipal principal) throws IOException {
+        if (!isHod(principal)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        com.neo.springapp.model.Transaction transaction =
+                branchAccountService.getCentralLedgerTransaction(transactionId, null);
+        if (transaction == null) return ResponseEntity.notFound().build();
+        String fileName = transaction.getTransactionId().replaceAll("[^A-Za-z0-9_-]", "");
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_PDF)
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        (download ? "attachment" : "inline") + "; filename=\"" + fileName + ".pdf\"")
+                .body(pdfService.generateTransactionReceipt(transaction));
     }
 
     @GetMapping("/hod/branch-accounts")

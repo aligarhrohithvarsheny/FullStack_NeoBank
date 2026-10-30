@@ -71,6 +71,58 @@ public class PdfService {
         return outputStream.toByteArray();
     }
 
+    public byte[] generateTransactionReceipt(Transaction transaction) throws IOException {
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss");
+        boolean credit = transaction.getType() != null
+                && ("credit".equalsIgnoreCase(transaction.getType())
+                    || "deposit".equalsIgnoreCase(transaction.getType())
+                    || "loan credit".equalsIgnoreCase(transaction.getType()));
+        String html = """
+                <!DOCTYPE html>
+                <html><head><meta charset="UTF-8"><style>
+                body{font-family:Arial,sans-serif;color:#172033;padding:32px}
+                .receipt{max-width:680px;margin:auto;border:1px solid #dbe3ef;border-radius:14px;padding:28px}
+                h1{color:#0876c9;margin-bottom:4px}.muted{color:#5b667a}
+                .amount{font-size:26px;font-weight:bold;color:#0876c9;margin:22px 0}
+                .row{display:flex;justify-content:space-between;gap:20px;border-bottom:1px solid #e8edf4;padding:10px 0}
+                .label{font-weight:bold}.value{text-align:right;overflow-wrap:anywhere}
+                </style></head><body><main class="receipt">
+                <h1>NeoBank</h1><div class="muted">Transaction receipt</div>
+                <div class="amount">%s ₹%s</div>
+                <div class="row"><span class="label">Account</span><span class="value">%s</span></div>
+                <div class="row"><span class="label">Transaction ID</span><span class="value">%s</span></div>
+                <div class="row"><span class="label">Reference</span><span class="value">%s</span></div>
+                <div class="row"><span class="label">Date and time</span><span class="value">%s</span></div>
+                <div class="row"><span class="label">Description</span><span class="value">%s</span></div>
+                <div class="row"><span class="label">Category / charge type</span><span class="value">%s / %s</span></div>
+                <div class="row"><span class="label">Debit account / counterparty</span><span class="value">%s</span></div>
+                <div class="row"><span class="label">Credit account / counterparty</span><span class="value">%s</span></div>
+                <div class="row"><span class="label">Status</span><span class="value">%s</span></div>
+                <div class="row"><span class="label">Available balance after transaction</span><span class="value">₹%s</span></div>
+                </main></body></html>
+                """.formatted(
+                credit ? "Credit" : "Debit",
+                money(transaction.getAmount()),
+                escapeHtml(valueOrDash(transaction.getAccountNumber())),
+                escapeHtml(valueOrDash(transaction.getTransactionId())),
+                escapeHtml(valueOrDash(transaction.getReferenceNumber())),
+                transaction.getDate() == null ? "—" : transaction.getDate().format(formatter),
+                escapeHtml(valueOrDash(transaction.getDescription())),
+                escapeHtml(valueOrDash(transaction.getCategory())),
+                escapeHtml(valueOrDash(transaction.getChargeType())),
+                escapeHtml(valueOrDash(credit ? transaction.getSourceAccountNumber() : transaction.getAccountNumber())),
+                escapeHtml(valueOrDash(transaction.getRecipientAccountNumber())),
+                escapeHtml(valueOrDash(transaction.getStatus())),
+                money(transaction.getBalance()));
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        HtmlConverter.convertToPdf(html, outputStream);
+        return outputStream.toByteArray();
+    }
+
+    private static String valueOrDash(String value) {
+        return value == null || value.isBlank() ? "—" : value;
+    }
+
     private static String money(Double amount) {
         return String.format(java.util.Locale.ROOT, "%.2f", amount == null ? 0.0 : amount);
     }

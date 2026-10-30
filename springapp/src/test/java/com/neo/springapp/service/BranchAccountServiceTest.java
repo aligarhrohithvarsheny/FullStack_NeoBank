@@ -87,9 +87,10 @@ class BranchAccountServiceTest {
 
     @Test
     void ignoresLegacyMappingsToNonTreasuryAccounts() {
-        BranchAccount legacyMapping = new BranchAccount();
-        legacyMapping.setAccountNumber("CUSTOMER123");
-        when(branchAccountRepository.findAll()).thenReturn(List.of(legacyMapping));
+        when(accountRepository.findByAccountNumber(BranchAccountService.DEFAULT_NEOBANK_ACCOUNT)).thenReturn(null);
+        when(accountService.getBalanceByAccountNumber(BranchAccountService.DEFAULT_NEOBANK_ACCOUNT)).thenReturn(0.0);
+        when(transactionRepository.summarizeCentralLedger(BranchAccountService.DEFAULT_NEOBANK_ACCOUNT, null))
+                .thenReturn(new Object[] {0.0, 0.0, 0.0, null});
 
         var summary = service.getBranchAccountSummary();
 
@@ -123,7 +124,6 @@ class BranchAccountServiceTest {
     @Test
     void rejectsLoanDisbursementWhenTreasuryFundsAreInsufficient() {
         neoBankAccount.setBalance(50.0);
-        when(accountRepository.findByAccountNumber("CUSTOMER123")).thenReturn(null);
         when(accountRepository.findByAccountNumber(BranchAccountService.DEFAULT_NEOBANK_ACCOUNT))
             .thenReturn(neoBankAccount);
 
@@ -140,12 +140,9 @@ class BranchAccountServiceTest {
         Account customer = new Account();
         customer.setAccountNumber("CUSTOMER123");
         customer.setBranchCity("Tirupati");
-        BranchAccount branch = new BranchAccount();
-        branch.setAccountNumber("NB123456789012");
-        branch.setBranchCity("Tirupati");
-        branch.setBalance(100.0);
         when(accountRepository.findByAccountNumber("CUSTOMER123")).thenReturn(customer);
-        when(branchAccountRepository.findByBranchCityIgnoreCase("Tirupati")).thenReturn(branch);
+        when(accountRepository.findByAccountNumber(BranchAccountService.DEFAULT_NEOBANK_ACCOUNT))
+            .thenReturn(neoBankAccount);
 
         assertThat(service.recordTreasuryMovement(35.0, false, "Loan Sanction", "Loan funded", "CUSTOMER123"))
             .isEqualTo(65.0);
@@ -156,16 +153,22 @@ class BranchAccountServiceTest {
         verify(transactionRepository, org.mockito.Mockito.times(2)).save(transactions.capture());
         assertThat(transactions.getAllValues())
             .extracting(Transaction::getAccountNumber)
-            .containsExactly("NB123456789012", "NB123456789012");
+            .containsExactly(BranchAccountService.DEFAULT_NEOBANK_ACCOUNT,
+                    BranchAccountService.DEFAULT_NEOBANK_ACCOUNT);
         assertThat(transactions.getAllValues())
             .extracting(Transaction::getBalance)
             .containsExactly(65.0, 85.0);
-        assertThat(branch.getBalance()).isEqualTo(85.0);
-        verify(accountRepository, never()).findByAccountNumber(BranchAccountService.DEFAULT_NEOBANK_ACCOUNT);
+        assertThat(transactions.getAllValues()).extracting(Transaction::getBranchCity)
+                .containsExactly("Tirupati", "Tirupati");
+        assertThat(transactions.getAllValues()).extracting(Transaction::getSourceAccountNumber)
+                .containsExactly(BranchAccountService.DEFAULT_NEOBANK_ACCOUNT, "CUSTOMER123");
+        assertThat(transactions.getAllValues()).extracting(Transaction::getRecipientAccountNumber)
+                .containsExactly("CUSTOMER123", BranchAccountService.DEFAULT_NEOBANK_ACCOUNT);
+        assertThat(neoBankAccount.getBalance()).isEqualTo(85.0);
     }
 
     @Test
-    void createsBranchAccountAndTransfersItsOpeningBalanceFromCentralTreasury() {
+    void enablesManagerBranchAccessWithoutCreatingOrFundingAnotherAccount() {
         Admin manager = new Admin();
         manager.setId(7L);
         manager.setName("Branch Manager");
@@ -173,12 +176,10 @@ class BranchAccountServiceTest {
         manager.setRole("MANAGER");
         manager.setAssignedCity("Tirupati");
         when(adminRepository.findById(7L)).thenReturn(Optional.of(manager));
-        when(branchAccountRepository.save(any(BranchAccount.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
         when(accountRepository.findByAccountNumber(BranchAccountService.DEFAULT_NEOBANK_ACCOUNT))
                 .thenReturn(neoBankAccount);
 
-        var result = service.createBranchAccount(7L, 1L, 40.0);
+        var result = service.createBranchAccount(7L, 1L, 0.0);
 
         assertThat(result).containsEntry("success", true);
         @SuppressWarnings("unchecked")
@@ -187,8 +188,10 @@ class BranchAccountServiceTest {
                 .containsEntry("branchCity", "Tirupati")
                 .containsEntry("managerAdminId", 7L)
                 .containsEntry("bankName", "NeoBank")
-                .containsEntry("balance", 40.0);
-        assertThat(neoBankAccount.getBalance()).isEqualTo(60.0);
-        verify(transactionRepository, org.mockito.Mockito.times(2)).save(any(Transaction.class));
+                .containsEntry("balance", 100.0)
+                .containsEntry("sharedCentralAccount", true);
+        assertThat(neoBankAccount.getBalance()).isEqualTo(100.0);
+        verify(branchAccountRepository, never()).save(any(BranchAccount.class));
+        verify(transactionRepository, never()).save(any(Transaction.class));
     }
 }
