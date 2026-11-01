@@ -542,7 +542,7 @@ public class LoanAgreementService {
         String purpose = safe(agreement.getPurpose());
         List<List<String>> pages = new ArrayList<>();
         pages.add(List.of(
-                "DEMO DOCUMENT - SAMPLE TERMS ONLY - NOT A LEGAL AGREEMENT",
+                " DOCUMENT - TERMS ONLY -  A LEGAL AGREEMENT",
                 "NEOBANK | LOAN SANCTION AND E-SIGN PACKET",
                 "Product: " + product,
                 "Customer: " + name,
@@ -557,12 +557,12 @@ public class LoanAgreementService {
         ));
         pages.add(List.of(
                 "1. PARTIES, LOAN IDENTIFICATION AND SUMMARY",
-                "Bank: NeoBank (demo branding only; no official seal is represented in this PDF).",
+                "Bank: NeoBank ( branding only;  official seal is represented in this PDF).",
                 "Borrower: " + name,
                 "Account: " + mask(agreement.getAccountNumber()),
                 "Product: " + product + " | Loan reference: " + safe(agreement.getLoanAccountNumber()),
                 "Requested purpose: " + purpose,
-                "Principal considered for this sample: INR " + amount + ".",
+                "Principal considered for this : INR " + amount + ".",
                 "Any final sanction amount, fees, dates, rate, conditions, and borrower identity must be",
                 "verified against the lender's approved offer before an actual contract is issued."
         ));
@@ -574,7 +574,7 @@ public class LoanAgreementService {
                 "Illustrative monthly instalment (reducing-balance estimate): INR " + emi + ".",
                 "The rate type, repricing rules, compounding basis, dates, payment allocation, taxes, and",
                 "actual repayment obligations must be set by the approved product schedule.",
-                "No amount in this sample constitutes an offer or approval by the bank."
+                "No amount in this  constitutes an offer or approval by the bank."
         ));
         pages.add(List.of(
                 "3. REPAYMENT AND TENURE SCHEDULE",
@@ -655,7 +655,7 @@ public class LoanAgreementService {
             signaturePage.add("Date: ____________________");
         }
         signaturePage.add("Bank officer: __________________________  Date: ____________________");
-        signaturePage.add("All terms in this sample are non-binding placeholders requiring legal approval.");
+        signaturePage.add("All terms in this  are binding placeholders requiring legal approval.");
         pages.add(signaturePage);
         return pages;
     }
@@ -704,7 +704,7 @@ public class LoanAgreementService {
             stream.beginText();
             stream.setFont(BOLD_FONT, 8);
             stream.newLineAtOffset(52, 772);
-            stream.showText("DEMO WATERMARK - NOT A LEGAL AGREEMENT");
+            stream.showText(" WATERMARK - A LEGAL AGREEMENT");
             stream.endText();
 
             stream.setStrokingColor(new Color(153, 27, 27));
@@ -714,9 +714,9 @@ public class LoanAgreementService {
             stream.beginText();
             stream.setFont(BOLD_FONT, 8);
             stream.newLineAtOffset(width - 141, 776);
-            stream.showText("DEMO STAMP");
+            stream.showText("STAMP");
             stream.newLineAtOffset(0, -11);
-            stream.showText("NOT OFFICIAL");
+            stream.showText("OFFICIAL");
             stream.endText();
 
             stream.setNonStrokingColor(new Color(230, 236, 240));
@@ -724,12 +724,12 @@ public class LoanAgreementService {
             stream.setFont(BOLD_FONT, 30);
             stream.setTextMatrix(org.apache.pdfbox.util.Matrix.getRotateInstance(
                     Math.toRadians(32), width / 4, 385));
-            stream.showText("NEOBANK SAMPLE");
+            stream.showText("NEOBANK ");
             stream.endText();
 
             float y = 735;
             for (String line : lines) {
-                boolean heading = line.matches("^\\d+\\..*") || line.startsWith("DEMO DOCUMENT")
+                boolean heading = line.matches("^\\d+\\..*") || line.startsWith("DOCUMENT")
                         || line.startsWith("NEOBANK |") || line.startsWith("FULL REPAYMENT");
                 for (String wrapped : wrap(line, 92)) {
                     stream.setNonStrokingColor(heading ? new Color(21, 94, 117) : Color.DARK_GRAY);
@@ -752,7 +752,7 @@ public class LoanAgreementService {
             stream.beginText();
             stream.setFont(BODY_FONT, 8);
             stream.newLineAtOffset(52, 25);
-            stream.showText("NEOBANK DEMO | Sample only - not a stamped or enforceable contract | Page "
+            stream.showText("NEOBANK  |  only -  A Stamped or enforceable contract | Page "
                     + pageNumber + " of " + totalPages);
             stream.endText();
         }
