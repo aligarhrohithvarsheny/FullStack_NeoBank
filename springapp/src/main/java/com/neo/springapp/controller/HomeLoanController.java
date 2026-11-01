@@ -104,8 +104,8 @@ public class HomeLoanController {
                     .body(Map.of("success", false, "message", "Staff sign-in required."));
         }
         try {
-            Map<String, Object> agreement = loanAgreementService.issue("HOME_LOAN", id, Map.of());
             HomeLoan provisional = service.awaitSignature(id, admin);
+            Map<String, Object> agreement = loanAgreementService.issue("HOME_LOAN", id, Map.of());
             agreement.put("homeLoan", provisional);
             agreement.put("success", true);
             agreement.put("message", "Provisional approval recorded. Share the agreement link with the customer.");

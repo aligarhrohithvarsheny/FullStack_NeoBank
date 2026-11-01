@@ -452,8 +452,8 @@ public class HomeLoanService {
     @Transactional
     public HomeLoan approve(Long id, String admin) {
         HomeLoan h = get(id);
-        if (!"Documents Verified".equals(h.getStatus()) && !"Awaiting Signature".equals(h.getStatus())) {
-            throw new RuntimeException("All documents must be verified and the customer agreement signed before approval");
+        if (!"Awaiting Signature".equals(h.getStatus())) {
+            throw new RuntimeException("Customer agreement must be signed after document verification before approval");
         }
         Account acc = accountRepository.findByAccountNumber(h.getAccountNumber());
         if (acc == null) throw new RuntimeException("Account not found");

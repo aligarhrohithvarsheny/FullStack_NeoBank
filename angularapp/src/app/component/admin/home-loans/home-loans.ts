@@ -19,6 +19,9 @@ import { LoanAgreementEvent, LoanAgreementService } from '../../../service/loan-
   </header>
   <div class="msg ok" *ngIf="msg && !sel">{{msg}}</div>
   <div class="msg err" *ngIf="err && !sel">{{err}}</div>
+  <div class="msg err" *ngIf="agreementApiChecked && !agreementApiReady">
+    {{agreementApiError}} Loan approval is disabled until the backend agreement API is available.
+  </div>
 
   <div class="stats">
     <button *ngFor="let s of stats()" class="stat" [class.on]="filter===s.key" (click)="filter=s.key">
@@ -79,8 +82,8 @@ import { LoanAgreementEvent, LoanAgreementService } from '../../../service/loan-
           <td class="ra">
             <button class="b p" (click)="open(l)">Open</button>
             <button class="b" *ngIf="canAdvance(l)" (click)="advance(l)">Next ▶</button>
-            <button class="b" *ngIf="l.status==='Awaiting Signature' && l.agreementStatus!=='SIGNED'" (click)="copyAgreementLink(l)">🔗 Share e-sign link</button>
-            <button class="b" *ngIf="l.status==='Awaiting Signature' && l.agreementStatus!=='SIGNED'" (click)="emailAgreementLink(l)">✉ Email new link</button>
+            <button class="b" *ngIf="l.status==='Awaiting Signature' && l.agreementStatus!=='SIGNED'" (click)="copyAgreementLink(l)" [disabled]="!agreementApiReady || !l.agreementId">🔗 Share e-sign link</button>
+            <button class="b" *ngIf="l.status==='Awaiting Signature' && l.agreementStatus!=='SIGNED'" (click)="emailAgreementLink(l)" [disabled]="!agreementApiReady || !l.agreementId">✉ Email new link</button>
             <ng-container *ngIf="l.status==='Awaiting Signature' && l.agreementStatus==='SIGNED'">
               <button class="b" (click)="downloadAgreement(l)">📄 Signed PDF</button>
               <button class="b p" (click)="finalApprove(l)">✔ Final approve &amp; disburse</button>
@@ -169,12 +172,15 @@ import { LoanAgreementEvent, LoanAgreementService } from '../../../service/loan-
         </div>
         <div class="acts">
           <button class="b" *ngIf="canAdvance(sel)" (click)="advance(sel)">Move to next process ▶</button>
-          <button class="b p" *ngIf="sel.status==='Documents Verified'" (click)="approve()">✔ Provisional approve &amp; copy e-sign link</button>
+          <button class="b p" *ngIf="sel.status==='Documents Verified'" (click)="approve()" [disabled]="!agreementApiReady">✔ Provisional approve &amp; copy e-sign link</button>
           <button class="b d" *ngIf="!live(sel) && sel.status!=='Rejected' && sel.status!=='Cancelled'" (click)="reject()">Reject</button>
         </div>
+        <p class="muted" *ngIf="sel.status==='Documents Verified' && !agreementApiReady">
+          {{agreementApiError}} Approval is disabled until the backend agreement API is available.
+        </p>
         <div class="acts" *ngIf="sel.status==='Awaiting Signature'">
-          <button class="b" *ngIf="sel.agreementStatus!=='SIGNED'" (click)="copyAgreementLink()">🔗 Copy customer e-sign link</button>
-          <button class="b" *ngIf="sel.agreementStatus!=='SIGNED'" (click)="emailAgreementLink()">✉ Email new link</button>
+          <button class="b" *ngIf="sel.agreementStatus!=='SIGNED'" (click)="copyAgreementLink()" [disabled]="!agreementApiReady || !sel.agreementId">🔗 Copy customer e-sign link</button>
+          <button class="b" *ngIf="sel.agreementStatus!=='SIGNED'" (click)="emailAgreementLink()" [disabled]="!agreementApiReady || !sel.agreementId">✉ Email new link</button>
           <span class="muted" *ngIf="sel.agreementStatus!=='SIGNED'">Waiting for customer signature</span>
           <ng-container *ngIf="sel.agreementStatus==='SIGNED'">
             <button class="b" (click)="downloadAgreement()">📄 Download signed PDF</button>
@@ -375,6 +381,9 @@ export class AdminHomeLoans implements OnInit, OnDestroy {
     ]
   };
   private pending = ['Submitted', 'Under Review', 'Documents Required', 'Documents Submitted', 'Documents Verified'];
+  agreementApiReady = false;
+  agreementApiChecked = false;
+  agreementApiError = 'Checking the loan agreement service...';
   agreementShareUrl = '';
   private agreementShareLoanId: number | null = null;
   private agreementEvents?: Subscription;
@@ -497,6 +506,9 @@ export class AdminHomeLoans implements OnInit, OnDestroy {
   private loadAgreementSummaries() {
     this.agreementService.getAdminAgreements().subscribe({
       next: summaries => {
+        this.agreementApiReady = true;
+        this.agreementApiChecked = true;
+        this.agreementApiError = '';
         const latest = new Map<number, any>();
         summaries.filter(item => item.loanType === 'HOME_LOAN').forEach(item => {
           if (!latest.has(item.loanId)) latest.set(item.loanId, item);
@@ -513,7 +525,14 @@ export class AdminHomeLoans implements OnInit, OnDestroy {
           });
         }
       },
-      error: error => console.error('Could not load home-loan agreement status.', error)
+      error: error => {
+        this.agreementApiReady = false;
+        this.agreementApiChecked = true;
+        this.agreementApiError = error.status === 404
+          ? 'The deployed backend is missing /api/loan-agreements (HTTP 404).'
+          : `The loan agreement service could not be reached (HTTP ${error.status || 'unknown'}).`;
+        console.error('Could not load home-loan agreement status.', error);
+      }
     });
   }
   private applyAgreementEvent(event: LoanAgreementEvent) {
@@ -583,6 +602,10 @@ export class AdminHomeLoans implements OnInit, OnDestroy {
     });
   }
   approve() {
+    if (!this.agreementApiReady) {
+      this.flash('', `${this.agreementApiError} Approval is blocked to prevent disbursement without an agreement.`);
+      return;
+    }
     if (!confirm('Record provisional approval and issue a demo agreement link? Funds will not be disbursed until the customer signs and staff final-approves.')) return;
     this.http.put<any>(`${this.api}/${this.sel.id}/approve?admin=${this.adm()}`, {}, { headers: this.requestHeaders() }).subscribe({
       next: response => {
