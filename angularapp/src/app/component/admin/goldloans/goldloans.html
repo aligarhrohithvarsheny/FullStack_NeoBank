@@ -160,6 +160,9 @@
             <button *ngIf="loan.agreementStatus !== 'SIGNED'" type="button" class="action-btn history-btn" (click)="copyAgreementLink(loan)">
               🔗 Share e-sign link
             </button>
+            <button *ngIf="loan.agreementStatus !== 'SIGNED'" type="button" class="action-btn history-btn" (click)="emailAgreementLink(loan)">
+              ✉ Email new link
+            </button>
             <span *ngIf="loan.agreementStatus !== 'SIGNED'" class="status-badge">Waiting for customer signature</span>
             <ng-container *ngIf="loan.agreementStatus === 'SIGNED'">
               <button type="button" class="action-btn history-btn" (click)="downloadAgreement(loan)">

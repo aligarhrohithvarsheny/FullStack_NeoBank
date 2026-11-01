@@ -244,7 +244,7 @@ export class Loans implements OnInit, OnDestroy {
           
           // Update in localStorage as backup
           this.saveLoansToStorage();
-          alert(`Provisional approval recorded. Share this customer e-sign link:\n\n${response.shareUrl}`);
+          alert(`Provisional approval recorded. ${response.emailMessage || 'Share the customer e-sign link manually.'}\n\n${response.shareUrl}`);
           console.log('Loan agreement link issued; disbursement waits for signature and final approval.');
         } else {
           alert('Loan approval failed: ' + response.message);
@@ -337,6 +337,21 @@ export class Loans implements OnInit, OnDestroy {
         );
       },
       error: error => alert(error.error?.message || 'Could not create a share link.')
+    });
+  }
+
+  emailAgreementLink(loan: LoanRequest) {
+    if (!loan.agreementId) return;
+    this.agreementService.emailShareLink(loan.agreementId).subscribe({
+      next: response => {
+        loan.shareUrl = response.shareUrl;
+        if (response.emailSent) {
+          alert(response.emailMessage);
+        } else {
+          alert(`${response.emailMessage}\n\nNew link: ${response.shareUrl}`);
+        }
+      },
+      error: error => alert(error.error?.message || 'Could not email the agreement link.')
     });
   }
 

@@ -87,6 +87,7 @@
               </ng-container>
               <ng-container *ngIf="loan.status === 'Awaiting Signature'">
                 <button *ngIf="loan.agreementStatus !== 'SIGNED'" class="view-form-btn" (click)="copyAgreementLink(loan)">🔗 Share e-sign link</button>
+                <button *ngIf="loan.agreementStatus !== 'SIGNED'" class="view-form-btn" (click)="emailAgreementLink(loan)">✉ Email new link</button>
                 <span *ngIf="loan.agreementStatus !== 'SIGNED'" class="processed">Waiting for customer signature</span>
                 <ng-container *ngIf="loan.agreementStatus === 'SIGNED'">
                   <button class="view-form-btn" (click)="downloadAgreement(loan)">📄 Signed PDF</button>

@@ -74,11 +74,17 @@ import { LoanAgreementEvent, LoanAgreementService } from '../../../service/loan-
           <td><b>{{l.applicationId}}</b><small>{{l.applicationDate | date:'mediumDate'}}</small><span class="product">{{loanTypeLabel(loanTypeFor(l))}}</span></td>
           <td>{{l.userName}}<small>A/c {{l.accountNumber}}</small></td>
           <td>₹{{l.amount|number}}</td><td>{{l.tenure}} m</td><td>{{l.interestRate}}%</td>
-          <td><span class="badge" [attr.data-s]="l.status">{{l.status}}</span></td>
+          <td><span class="badge" [attr.data-s]="l.status">{{l.agreementStatus==='SIGNED' ? 'Signed · final approval needed' : l.status}}</span></td>
           <td>{{l.approvalProbability ? l.approvalProbability+'% · '+l.riskBand : '-'}}</td>
           <td class="ra">
             <button class="b p" (click)="open(l)">Open</button>
             <button class="b" *ngIf="canAdvance(l)" (click)="advance(l)">Next ▶</button>
+            <button class="b" *ngIf="l.status==='Awaiting Signature' && l.agreementStatus!=='SIGNED'" (click)="copyAgreementLink(l)">🔗 Share e-sign link</button>
+            <button class="b" *ngIf="l.status==='Awaiting Signature' && l.agreementStatus!=='SIGNED'" (click)="emailAgreementLink(l)">✉ Email new link</button>
+            <ng-container *ngIf="l.status==='Awaiting Signature' && l.agreementStatus==='SIGNED'">
+              <button class="b" (click)="downloadAgreement(l)">📄 Signed PDF</button>
+              <button class="b p" (click)="finalApprove(l)">✔ Final approve &amp; disburse</button>
+            </ng-container>
           </td>
         </tr>
         <tr *ngIf="!filtered().length"><td colspan="8" class="muted c">No applications found</td></tr>
@@ -168,6 +174,7 @@ import { LoanAgreementEvent, LoanAgreementService } from '../../../service/loan-
         </div>
         <div class="acts" *ngIf="sel.status==='Awaiting Signature'">
           <button class="b" *ngIf="sel.agreementStatus!=='SIGNED'" (click)="copyAgreementLink()">🔗 Copy customer e-sign link</button>
+          <button class="b" *ngIf="sel.agreementStatus!=='SIGNED'" (click)="emailAgreementLink()">✉ Email new link</button>
           <span class="muted" *ngIf="sel.agreementStatus!=='SIGNED'">Waiting for customer signature</span>
           <ng-container *ngIf="sel.agreementStatus==='SIGNED'">
             <button class="b" (click)="downloadAgreement()">📄 Download signed PDF</button>
@@ -369,6 +376,7 @@ export class AdminHomeLoans implements OnInit, OnDestroy {
   };
   private pending = ['Submitted', 'Under Review', 'Documents Required', 'Documents Submitted', 'Documents Verified'];
   agreementShareUrl = '';
+  private agreementShareLoanId: number | null = null;
   private agreementEvents?: Subscription;
   constructor(private http: HttpClient, private agreementService: LoanAgreementService) {}
   private poll: any;
@@ -582,25 +590,31 @@ export class AdminHomeLoans implements OnInit, OnDestroy {
         if (!loan) { this.fail({ error: { message: response.message } }); return; }
         loan.agreementId = response.agreementId;
         loan.agreementStatus = response.status;
+        loan.shareUrl = response.shareUrl;
         this.agreementShareUrl = response.shareUrl;
-        this.applyUpdate(loan, 'Provisional approval recorded. Share the demo e-sign link with the customer.');
+        this.agreementShareLoanId = loan.id;
+        this.applyUpdate(loan, `Provisional approval recorded. ${response.emailMessage || 'Share the link manually.'}`);
       },
       error: e => this.fail(e)
     });
   }
 
-  copyAgreementLink() {
-    if (this.agreementShareUrl) {
-      navigator.clipboard.writeText(this.agreementShareUrl).then(
+  copyAgreementLink(loan: any = this.sel) {
+    if (!loan?.agreementId) return;
+    const existingUrl = loan.shareUrl
+      || (this.agreementShareLoanId === loan.id ? this.agreementShareUrl : '');
+    if (existingUrl) {
+      navigator.clipboard.writeText(existingUrl).then(
         () => this.flash('Customer e-sign link copied'),
-        () => this.flash(this.agreementShareUrl)
+        () => this.flash(existingUrl)
       );
       return;
     }
-    if (!this.sel?.agreementId) return;
-    this.agreementService.renewShareLink(this.sel.agreementId).subscribe({
+    this.agreementService.renewShareLink(loan.agreementId).subscribe({
       next: response => {
         this.agreementShareUrl = response.shareUrl;
+        this.agreementShareLoanId = loan.id;
+        loan.shareUrl = response.shareUrl;
         navigator.clipboard.writeText(response.shareUrl).then(
           () => this.flash('Fresh customer e-sign link copied'),
           () => this.flash(response.shareUrl)
@@ -610,14 +624,29 @@ export class AdminHomeLoans implements OnInit, OnDestroy {
     });
   }
 
-  downloadAgreement() {
-    if (!this.sel?.agreementId) return;
-    this.agreementService.downloadAdminPdf(this.sel.agreementId).subscribe({
+  emailAgreementLink(loan: any = this.sel) {
+    if (!loan?.agreementId) return;
+    this.agreementService.emailShareLink(loan.agreementId).subscribe({
+      next: response => {
+        loan.shareUrl = response.shareUrl;
+        this.agreementShareUrl = response.shareUrl;
+        this.agreementShareLoanId = loan.id;
+        this.flash(response.emailSent
+          ? response.emailMessage
+          : `${response.emailMessage} New link: ${response.shareUrl}`);
+      },
+      error: e => this.fail(e)
+    });
+  }
+
+  downloadAgreement(loan: any = this.sel) {
+    if (!loan?.agreementId) return;
+    this.agreementService.downloadAdminPdf(loan.agreementId).subscribe({
       next: blob => {
         const url = URL.createObjectURL(blob);
         const anchor = document.createElement('a');
         anchor.href = url;
-        anchor.download = `neobank-home-loan-agreement-${this.sel.id}.pdf`;
+        anchor.download = `neobank-home-loan-agreement-${loan.id}.pdf`;
         anchor.click();
         URL.revokeObjectURL(url);
       },
@@ -625,12 +654,20 @@ export class AdminHomeLoans implements OnInit, OnDestroy {
     });
   }
 
-  finalApprove() {
-    if (!this.sel?.agreementId || !confirm('Customer signature is recorded. Complete final approval and disburse?')) return;
-    this.http.put<any>(`${this.api}/${this.sel.id}/final-approve?agreementId=${this.sel.agreementId}&admin=${this.adm()}`, {}, {
+  finalApprove(loan: any = this.sel) {
+    if (!loan?.agreementId || !confirm('Customer signature is recorded. Complete final approval and disburse?')) return;
+    this.http.put<any>(`${this.api}/${loan.id}/final-approve?agreementId=${loan.agreementId}&admin=${this.adm()}`, {}, {
       headers: this.requestHeaders()
     }).subscribe({
-      next: response => this.applyUpdate(response, 'Signed agreement approved and loan disbursed'),
+      next: response => {
+        if (this.sel?.id === loan.id) {
+          this.applyUpdate(response, 'Signed agreement approved and loan disbursed');
+          return;
+        }
+        Object.assign(loan, response);
+        this.flash('Signed agreement approved and loan disbursed');
+        this.load();
+      },
       error: e => this.fail(e)
     });
   }

@@ -721,7 +721,9 @@ export class AdminGoldLoans implements OnInit, OnDestroy {
           }
           this.alertService.success(
             status === 'Approved' ? 'Provisional Approval — Share E-sign Link' : 'Loan Rejected',
-            status === 'Approved' ? `${response.message}\n${response.shareUrl}` : response.message || `Gold loan ${status.toLowerCase()} successfully`
+            status === 'Approved'
+              ? `${response.message}\n${response.emailMessage || 'Share the link manually.'}\n${response.shareUrl}`
+              : response.message || `Gold loan ${status.toLowerCase()} successfully`
           );
           this.approving = false;
           this.selectedLoan = null;
@@ -762,6 +764,21 @@ export class AdminGoldLoans implements OnInit, OnDestroy {
         );
       },
       error: error => this.alertService.error('Share Link', error.error?.message || 'Could not create a share link.')
+    });
+  }
+
+  emailAgreementLink(loan: GoldLoan): void {
+    if (!loan.agreementId) return;
+    this.agreementService.emailShareLink(loan.agreementId).subscribe({
+      next: response => {
+        loan.shareUrl = response.shareUrl;
+        if (response.emailSent) {
+          this.alertService.success('Agreement Link Emailed', response.emailMessage);
+        } else {
+          this.alertService.error('Email Not Sent', `${response.emailMessage}\n${response.shareUrl}`);
+        }
+      },
+      error: error => this.alertService.error('Agreement Email', error.error?.message || 'Could not email the agreement link.')
     });
   }
 

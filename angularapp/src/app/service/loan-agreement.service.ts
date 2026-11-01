@@ -64,6 +64,12 @@ export class LoanAgreementService {
     });
   }
 
+  emailShareLink(agreementId: number): Observable<any> {
+    return this.http.post(`${this.apiUrl}/${agreementId}/email-link`, {}, {
+      headers: this.staffHeaders()
+    });
+  }
+
   downloadAdminPdf(agreementId: number): Observable<Blob> {
     return this.http.get(`${this.apiUrl}/${agreementId}/pdf`, {
       headers: this.staffHeaders(),
