@@ -169,7 +169,7 @@ import { LoanAgreementEvent, LoanAgreementService } from '../../../service/loan-
         </div>
         <div class="acts">
           <button class="b" *ngIf="canAdvance(sel)" (click)="advance(sel)">Move to next process ▶</button>
-          <button class="b p" *ngIf="sel.status==='Documents Verified'" (click)="approve()">✔ Provisional approve &amp; share e-sign link</button>
+          <button class="b p" *ngIf="sel.status==='Documents Verified'" (click)="approve()">✔ Provisional approve &amp; copy e-sign link</button>
           <button class="b d" *ngIf="!live(sel) && sel.status!=='Rejected' && sel.status!=='Cancelled'" (click)="reject()">Reject</button>
         </div>
         <div class="acts" *ngIf="sel.status==='Awaiting Signature'">
@@ -593,7 +593,11 @@ export class AdminHomeLoans implements OnInit, OnDestroy {
         loan.shareUrl = response.shareUrl;
         this.agreementShareUrl = response.shareUrl;
         this.agreementShareLoanId = loan.id;
-        this.applyUpdate(loan, `Provisional approval recorded. ${response.emailMessage || 'Share the link manually.'}`);
+        this.applyUpdate(loan, 'Provisional approval recorded.');
+        navigator.clipboard.writeText(response.shareUrl).then(
+          () => this.flash('Provisional approval recorded. E-sign link copied to clipboard.'),
+          () => this.flash(`Provisional approval recorded. Copy this e-sign link: ${response.shareUrl}`)
+        );
       },
       error: e => this.fail(e)
     });
