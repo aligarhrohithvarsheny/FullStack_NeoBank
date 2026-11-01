@@ -1,0 +1,80 @@
+<main class="esign-shell">
+  <header class="brand">
+    <img src="/assets/images/neobank-logo.svg" alt="NeoBank" />
+    <span>Secure loan agreement review</span>
+  </header>
+
+  <div class="notice warning">
+    <strong>DEMO DOCUMENT — NOT A LEGAL AGREEMENT</strong>
+    <p>
+      This workflow records a typed-name demo signature only. The sample terms, watermark, and
+      0.5% stamp-duty estimate are not legally reviewed, stamped, or enforceable. Do not use this
+      document to lend, collect money, or establish legal rights.
+    </p>
+  </div>
+
+  <section *ngIf="loading" class="card state">Loading loan agreement…</section>
+  <section *ngIf="error" class="card error" role="alert">{{ error }}</section>
+
+  <ng-container *ngIf="agreement && !loading">
+    <section class="card summary">
+      <div>
+        <p class="eyebrow">CUSTOMER AGREEMENT</p>
+        <h1>{{ agreement.productName || (agreement.loanType | titlecase) }}</h1>
+        <p>{{ agreement.customerName || 'Customer' }} · {{ agreement.loanAccountNumber || 'Loan application' }}</p>
+      </div>
+      <span class="status" [class.signed]="agreement.status !== 'PENDING_SIGNATURE'">
+        {{ agreement.status === 'PENDING_SIGNATURE' ? 'Signature pending' : agreement.status }}
+      </span>
+      <dl>
+        <div><dt>Principal</dt><dd>{{ agreement.amount | currency:'INR' }}</dd></div>
+        <div><dt>Annual interest</dt><dd>{{ agreement.annualInterestRate }}%</dd></div>
+        <div><dt>Tenure</dt><dd>{{ agreement.tenureMonths }} months</dd></div>
+        <div><dt>Stamp-duty estimate</dt><dd>{{ agreement.stampDuty | currency:'INR' }}</dd></div>
+      </dl>
+      <p class="purpose"><strong>Purpose:</strong> {{ agreement.purpose || 'Not provided' }}</p>
+      <p class="expiry">Link expires {{ agreement.expiresAt | date:'medium' }}</p>
+      <button type="button" class="secondary" (click)="downloadPdf()" [disabled]="!pdfReady">
+        Download agreement PDF
+      </button>
+    </section>
+
+    <section *ngIf="pdfUrl" class="card preview">
+      <h2>Review all pages before continuing</h2>
+      <iframe [src]="pdfUrl" title="Loan agreement sample PDF"></iframe>
+    </section>
+
+    <section *ngIf="agreement.status === 'PENDING_SIGNATURE'" class="card sign-card">
+      <h2>Customer demo e-sign</h2>
+      <p>Enter your full name and the CAPTCHA shown. Your typed name and timestamp will be recorded.</p>
+      <label for="signedName">Full name</label>
+      <input id="signedName" [(ngModel)]="signedName" maxlength="120" autocomplete="name" />
+
+      <div class="captcha-row">
+        <div *ngIf="captcha" class="captcha-image">
+          <img [src]="'data:image/png;base64,' + captcha.image" alt="CAPTCHA challenge" />
+        </div>
+        <button type="button" class="secondary" (click)="refreshCaptcha()" [disabled]="signing">
+          Refresh CAPTCHA
+        </button>
+      </div>
+      <label for="captchaAnswer">CAPTCHA</label>
+      <input id="captchaAnswer" [(ngModel)]="captchaAnswer" maxlength="6" autocomplete="off" />
+
+      <label class="consent">
+        <input type="checkbox" [(ngModel)]="consent" />
+        <span>I reviewed this demo PDF and understand this typed-name action is not a legally valid e-signature.</span>
+      </label>
+      <button class="primary" type="button" (click)="sign()"
+        [disabled]="signing || !captcha || !signedName.trim() || !captchaAnswer.trim() || !consent">
+        {{ signing ? 'Recording…' : 'Record demo signature' }}
+      </button>
+    </section>
+
+    <section *ngIf="agreement.status !== 'PENDING_SIGNATURE'" class="card state success">
+      {{ notice || 'Signature recorded. The bank must still complete final approval.' }}
+      <p *ngIf="agreement.status === 'SIGNED'">The signed PDF is available above. Final approval is still required.</p>
+    </section>
+    <p *ngIf="notice && agreement.status === 'PENDING_SIGNATURE'" class="notice success">{{ notice }}</p>
+  </ng-container>
+</main>

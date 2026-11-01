@@ -1,11 +1,13 @@
-import { Component, OnInit, Inject, PLATFORM_ID } from '@angular/core';
+import { Component, OnInit, OnDestroy, Inject, PLATFORM_ID } from '@angular/core';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { environment } from '../../../../environment/environment';
 import { AlertService } from '../../../service/alert.service';
 import { openLoanDocument, isLoanClosed } from '../../../service/loan-documents';
+import { LoanAgreementEvent, LoanAgreementService } from '../../../service/loan-agreement.service';
+import { Subscription } from 'rxjs';
 
 interface GoldLoan {
   id?: number;
@@ -41,6 +43,9 @@ interface GoldLoan {
   processingCharges?: number;
   renewalCount?: number;
   lastRenewalDate?: string;
+  agreementId?: number;
+  agreementStatus?: string;
+  shareUrl?: string;
 }
 
 interface GoldRate {
@@ -57,7 +62,7 @@ interface GoldRate {
   templateUrl: './goldloans.html',
   styleUrls: ['./goldloans.css']
 })
-export class AdminGoldLoans implements OnInit {
+export class AdminGoldLoans implements OnInit, OnDestroy {
   goldLoans: GoldLoan[] = [];
   filteredLoans: GoldLoan[] = [];
   loading: boolean = false;
@@ -174,11 +179,13 @@ export class AdminGoldLoans implements OnInit {
   paymentAmount: number | null = null;
   paymentAdjustment: 'REDUCE_EMI' | 'REDUCE_TENURE' = 'REDUCE_EMI';
   paymentChequeVerification: any = null;
+  private agreementEvents?: Subscription;
 
   constructor(
     private router: Router,
     @Inject(PLATFORM_ID) private platformId: Object,
     private http: HttpClient,
+    private agreementService: LoanAgreementService,
     private alertService: AlertService
   ) {}
 
@@ -187,9 +194,50 @@ export class AdminGoldLoans implements OnInit {
       this.loadAdminInfo();
       this.loadGoldLoans();
       this.loadCurrentGoldRate();
+      this.agreementService.connectToUpdates();
+      this.agreementEvents = this.agreementService.events$.subscribe(event => this.applyAgreementEvent(event));
     }
   }
 
+  ngOnDestroy(): void {
+    this.agreementEvents?.unsubscribe();
+  }
+
+  private staffHeaders(): HttpHeaders {
+    const token = sessionStorage.getItem('adminSessionToken');
+    return new HttpHeaders(token ? { Authorization: `Bearer ${token}` } : {});
+  }
+
+  private loadAgreementSummaries(): void {
+    this.agreementService.getAdminAgreements().subscribe({
+      next: summaries => {
+        const latest = new Map<number, any>();
+        summaries.filter(item => item.loanType === 'GOLD_LOAN').forEach(item => {
+          if (!latest.has(item.loanId)) latest.set(item.loanId, item);
+        });
+        this.goldLoans.forEach(loan => {
+          const agreement = latest.get(loan.id || 0);
+          if (agreement) {
+            loan.agreementId = agreement.id;
+            loan.agreementStatus = agreement.status;
+          }
+        });
+        this.onFilterChange();
+      },
+      error: error => console.error('Could not load gold-loan agreement status.', error)
+    });
+  }
+
+  private applyAgreementEvent(event: LoanAgreementEvent): void {
+    if (event.loanType !== 'GOLD_LOAN') return;
+    const loan = this.goldLoans.find(item => item.id === event.loanId);
+    if (loan) {
+      loan.agreementId = event.agreementId;
+      loan.agreementStatus = event.status;
+      if (event.status === 'APPROVED') loan.status = 'Approved';
+      this.onFilterChange();
+    }
+  }
   loadAdminInfo() {
     const admin = sessionStorage.getItem('admin');
     if (admin) {
@@ -206,6 +254,7 @@ export class AdminGoldLoans implements OnInit {
     this.http.get(`${environment.apiBaseUrl}/api/gold-loans`).subscribe({
       next: (loans: any) => {
         this.goldLoans = Array.isArray(loans) ? loans : [];
+        this.loadAgreementSummaries();
         this.filterLoans();
         this.loading = false;
       },
@@ -649,19 +698,31 @@ export class AdminGoldLoans implements OnInit {
     this.http.put(
       `${environment.apiBaseUrl}/api/gold-loans/${loan.id}/approve`,
       requestBody,
-      { params: { status, approvedBy: this.adminName } }
+      { params: { status, approvedBy: this.adminName }, headers: this.staffHeaders() }
     ).subscribe({
       next: (response: any) => {
         if (response.success) {
+          if (status === 'Approved') {
+            loan.status = response.goldLoan?.status || 'Awaiting Signature';
+            loan.agreementId = response.agreementId;
+            loan.agreementStatus = response.status || 'PENDING_SIGNATURE';
+            loan.shareUrl = response.shareUrl;
+            this.filterStatus = 'All';
+          }
           if (status === 'Approved' && (this.jewelleryImageOne || this.jewelleryImageTwo)) {
             const formData = new FormData();
             if (this.jewelleryImageOne) formData.append('imageOne', this.jewelleryImageOne);
             if (this.jewelleryImageTwo) formData.append('imageTwo', this.jewelleryImageTwo);
-            this.http.post(`${environment.apiBaseUrl}/api/gold-loans/${loan.id}/jewellery-images`, formData).subscribe({
+            this.http.post(`${environment.apiBaseUrl}/api/gold-loans/${loan.id}/jewellery-images`, formData, {
+              headers: this.staffHeaders()
+            }).subscribe({
               error: () => this.alertService.error('Image Upload', 'Loan approved, but jewellery images could not be saved.')
             });
           }
-          this.alertService.success(status === 'Approved' ? 'Loan Approved' : 'Loan Rejected', response.message || `Gold loan ${status.toLowerCase()} successfully`);
+          this.alertService.success(
+            status === 'Approved' ? 'Provisional Approval — Share E-sign Link' : 'Loan Rejected',
+            status === 'Approved' ? `${response.message}\n${response.shareUrl}` : response.message || `Gold loan ${status.toLowerCase()} successfully`
+          );
           this.approving = false;
           this.selectedLoan = null;
           this.showGoldDetailsModal = false;
@@ -679,6 +740,73 @@ export class AdminGoldLoans implements OnInit {
           ? 'The selected funding allocation has expired. Select a current allocation or ask the HOD to extend/create one.'
           : message);
         this.approving = false;
+      }
+    });
+  }
+
+  copyAgreementLink(loan: GoldLoan): void {
+    if (loan.shareUrl) {
+      navigator.clipboard.writeText(loan.shareUrl).then(
+        () => this.alertService.success('Link Copied', 'Customer e-sign link copied.'),
+        () => this.alertService.info('Customer e-sign link', loan.shareUrl || '')
+      );
+      return;
+    }
+    if (!loan.agreementId) return;
+    this.agreementService.renewShareLink(loan.agreementId).subscribe({
+      next: response => {
+        loan.shareUrl = response.shareUrl;
+        navigator.clipboard.writeText(response.shareUrl).then(
+          () => this.alertService.success('Link Copied', 'Fresh customer e-sign link copied.'),
+          () => this.alertService.info('Customer e-sign link', response.shareUrl)
+        );
+      },
+      error: error => this.alertService.error('Share Link', error.error?.message || 'Could not create a share link.')
+    });
+  }
+
+  downloadAgreement(loan: GoldLoan): void {
+    if (!loan.agreementId) return;
+    this.agreementService.downloadAdminPdf(loan.agreementId).subscribe({
+      next: blob => {
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = `neobank-gold-loan-agreement-${loan.id}.pdf`;
+        anchor.click();
+        URL.revokeObjectURL(url);
+      },
+      error: error => this.alertService.error('Agreement PDF', error.error?.message || 'Could not download the PDF.')
+    });
+  }
+
+  finalApproveGoldLoan(loan: GoldLoan): void {
+    if (!loan.id || !loan.agreementId
+      || !confirm('Customer signature is recorded. Complete final approval and disburse the gold loan?')) {
+      return;
+    }
+    const params = new URLSearchParams({
+      agreementId: String(loan.agreementId),
+      approvedBy: this.adminName
+    });
+    this.approving = true;
+    this.http.post<any>(`${environment.apiBaseUrl}/api/gold-loans/${loan.id}/final-approve?${params}`, {}, {
+      headers: this.staffHeaders()
+    }).subscribe({
+      next: response => {
+        this.approving = false;
+        if (!response?.success) {
+          this.alertService.error('Final Approval', response?.message || 'Could not approve this loan.');
+          return;
+        }
+        loan.status = 'Approved';
+        loan.agreementStatus = 'APPROVED';
+        this.alertService.success('Loan Disbursed', response.message);
+        this.loadGoldLoans();
+      },
+      error: error => {
+        this.approving = false;
+        this.alertService.error('Final Approval', error.error?.message || 'Could not approve this loan.');
       }
     });
   }

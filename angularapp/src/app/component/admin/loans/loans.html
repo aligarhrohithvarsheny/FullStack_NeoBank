@@ -73,6 +73,7 @@
           <td [class.pending]="loan.status === 'Pending'"
               [class.approved]="loan.status === 'Approved'"
               [class.rejected]="loan.status === 'Rejected'"
+              [class.awaiting-signature]="loan.status === 'Awaiting Signature'"
               [class.foreclosed]="loan.status === 'Foreclosed'">
             {{ loan.status }}
           </td>
@@ -80,20 +81,24 @@
           <td>{{ loan.approvalDate ? formatDateTime(loan.approvalDate) : '-' }}</td>
           <td>
             <div class="actions">
-              <ng-container *ngIf="loan.status === 'Pending'; else processedTemplate">
+              <ng-container *ngIf="loan.status === 'Pending'">
                 <button class="approve-btn" (click)="approve(loan)">Approve</button>
                 <button class="reject-btn" (click)="reject(loan)">Reject</button>
               </ng-container>
-              <ng-template #processedTemplate>
-                <ng-container *ngIf="loan.status === 'Approved'; else alreadyProcessed">
-                  <button class="foreclose-action-btn" (click)="forecloseLoanFromTable(loan)">🏦 Foreclose</button>
+              <ng-container *ngIf="loan.status === 'Awaiting Signature'">
+                <button *ngIf="loan.agreementStatus !== 'SIGNED'" class="view-form-btn" (click)="copyAgreementLink(loan)">🔗 Share e-sign link</button>
+                <span *ngIf="loan.agreementStatus !== 'SIGNED'" class="processed">Waiting for customer signature</span>
+                <ng-container *ngIf="loan.agreementStatus === 'SIGNED'">
+                  <button class="view-form-btn" (click)="downloadAgreement(loan)">📄 Signed PDF</button>
+                  <button class="approve-btn" (click)="finalApprove(loan)">Final approve &amp; disburse</button>
                 </ng-container>
-                <ng-template #alreadyProcessed>
-                  <span class="processed">{{ loan.status === 'Foreclosed' ? 'Foreclosed' : 'Processed' }}</span>
-                </ng-template>
-              </ng-template>
+              </ng-container>
+              <button *ngIf="loan.status === 'Approved'" class="foreclose-action-btn" (click)="forecloseLoanFromTable(loan)">🏦 Foreclose</button>
+              <span *ngIf="loan.status === 'Rejected' || loan.status === 'Foreclosed' || loan.status === 'Paid'" class="processed">
+                {{ loan.status }}
+              </span>
 
-              <button class="view-form-btn" (click)="downloadLoanDoc('receipt', loan)" title="Download Loan Receipt" [disabled]="loan.status === 'Pending' || loan.status === 'Rejected'">
+              <button class="view-form-btn" (click)="downloadLoanDoc('receipt', loan)" title="Download Loan Receipt" [disabled]="loan.status !== 'Approved' && loan.status !== 'Foreclosed' && loan.status !== 'Paid'">
                 🧾 Receipt
               </button>
               <button *ngIf="isClosed(loan)" class="view-form-btn" (click)="downloadLoanDoc('noc', loan)" title="Download NOC">

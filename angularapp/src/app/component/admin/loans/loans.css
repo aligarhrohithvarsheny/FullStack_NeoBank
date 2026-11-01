@@ -177,6 +177,11 @@
   font-weight: 600;
 }
 
+.awaiting-signature {
+  color: #8a5b00;
+  font-weight: 700;
+}
+
 .rejected {
   color: #dc3545;
   font-weight: 600;

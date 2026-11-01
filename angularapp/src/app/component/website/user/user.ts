@@ -1061,6 +1061,35 @@ export class User implements OnInit, OnDestroy {
       localStorage.removeItem('neobank_remembered_username');
     }
 
+    if (/^mgr-\d+$/i.test(accNum)) {
+      this.http.post<any>(`${environment.apiBaseUrl}/api/admins/manager-user-login`, {
+        username: accNum,
+        password: this.unifiedPassword
+      }).subscribe({
+        next: response => {
+          this.isUnifiedLoggingIn = false;
+          if (!response?.success || response.role !== 'MANAGER' || !response.sessionToken || !response.admin) {
+            this.errorMessage = response?.message || 'Manager login could not be completed.';
+            return;
+          }
+          sessionStorage.removeItem('currentUser');
+          sessionStorage.removeItem('salaryEmployee');
+          sessionStorage.removeItem('currentAccount');
+          sessionStorage.setItem('admin', JSON.stringify(response.admin));
+          sessionStorage.setItem('userRole', 'MANAGER');
+          sessionStorage.setItem('adminSessionToken', response.sessionToken);
+          sessionStorage.setItem('adminLoginTime', new Date().toISOString());
+          this.alertService.userSuccess('Manager Login Successful', `Welcome ${response.admin.name || response.admin.email}!`);
+          this.router.navigate(['/manager/dashboard']);
+        },
+        error: err => {
+          this.isUnifiedLoggingIn = false;
+          this.errorMessage = err.error?.message || 'Manager login failed. Check your username and password.';
+        }
+      });
+      return;
+    }
+
     // Auto-detect account type by prefix
     if (accNum.startsWith('50')) {
       // Salary account

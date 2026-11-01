@@ -454,7 +454,6 @@ export class ManagerDashboard implements OnInit, OnDestroy {
       this.filterFeatures(); // Initialize filtered features
       this.loadManagerAccessibleFeatures(); // Load features manager can use
       this.checkAndCreateDefaultManager();
-      this.loadSessionHistory(); // Load session history
       this.http.get<{ success: boolean; pendingCount: number }>(`${environment.apiBaseUrl}/api/fraud-alerts/count-pending`).subscribe({
         next: (res) => { if (res.pendingCount !== undefined) this.fraudAlertsPendingCount = res.pendingCount; }
       });
@@ -468,8 +467,11 @@ export class ManagerDashboard implements OnInit, OnDestroy {
     // Start updating session history every 5 seconds (real-time)
     if (isPlatformBrowser(this.platformId)) {
       this.sessionHistoryTimer = setInterval(() => {
-        this.loadSessionHistory();
-      }, 5000);
+        if (this.activeSection === 'session-history' && document.visibilityState === 'visible'
+            && !this.isLoadingSessionHistory) {
+          this.loadSessionHistory();
+        }
+      }, 30000);
       // Real-time 1-second timer to update active session durations live
       this.loginActivityRealTimeTimer = setInterval(() => {
         this.refreshUsedTimes();
@@ -512,12 +514,12 @@ export class ManagerDashboard implements OnInit, OnDestroy {
    * Load session history (login/logout for all users and admins)
    */
   loadSessionHistory(): void {
-    if (!isPlatformBrowser(this.platformId)) return;
+    if (!isPlatformBrowser(this.platformId) || this.isLoadingSessionHistory) return;
     
     if (this.sessionHistoryInitialLoad) {
       this.isLoadingSessionHistory = true;
     }
-    this.http.get<any>(`${environment.apiBaseUrl}/api/session-history/all`).subscribe({
+    this.http.get<any>(`${environment.apiBaseUrl}/api/session-history/all?limit=200`).subscribe({
       next: (response) => {
         if (response && response.success) {
           this.sessionHistory = response.sessions || [];
@@ -2463,6 +2465,11 @@ export class ManagerDashboard implements OnInit, OnDestroy {
       error: (err) => {
         this.branchAccountTransactions = [];
         this.branchTxnsError = err.error?.message || 'Unable to load central account transactions.';
+        if (err.status === 404 && this.ledgerRefreshTimer) {
+          clearInterval(this.ledgerRefreshTimer);
+          this.ledgerRefreshTimer = null;
+          this.branchTxnsError = 'The central-ledger API is not available on the deployed backend. Deploy the backend update, then reload this dashboard.';
+        }
         this.isLoadingBranchTxns = false;
       }
     });

@@ -64,6 +64,26 @@
             <div><small>Central account</small><strong>{{ account.accountNumber }}</strong></div>
             <div><small>Manager email</small><strong>{{ account.managerEmail || '—' }}</strong></div>
             <div><small>Access</small><strong>{{ account.sharedCentralAccount ? 'City-scoped' : 'Unavailable' }}</strong></div>
+            <div *ngIf="account.managerRole === 'MANAGER'">
+              <small>User-login username</small>
+              <strong>{{ account.managerLoginUsername || 'Not created' }}</strong>
+            </div>
+            <div *ngIf="account.managerRole === 'MANAGER'">
+              <small>Login status</small>
+              <strong>{{ !account.managerLoginEnabled ? 'Not created' : (account.managerLoginLocked ? 'Locked — reset credentials' : 'Active') }}</strong>
+            </div>
+          </div>
+          <div class="manager-login-controls" *ngIf="account.managerRole === 'MANAGER'">
+            <button type="button" class="close-button" (click)="generateManagerLogin(account)"
+              [disabled]="generatingManagerLoginId === account.managerAdminId || !account.branchCity">
+              {{ generatingManagerLoginId === account.managerAdminId ? 'Generating…' : (account.managerLoginEnabled ? 'Reset login credentials' : 'Create user-login credentials') }}
+            </button>
+            <div class="manager-login-secret" *ngIf="managerLoginCredentials[account.managerAdminId] as credentials">
+              <strong>Share these credentials securely; the generated password is shown only once.</strong>
+              <span>Username: {{ credentials.username }}</span>
+              <span>Password: {{ credentials.password }}</span>
+              <small>Sign in from the regular user login screen. Access is limited to the assigned city and shared central account.</small>
+            </div>
           </div>
         </article>
       </div>

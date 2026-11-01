@@ -71,6 +71,14 @@
       </button>
       <button
         type="button"
+        (click)="filterStatus = 'Awaiting Signature'; onFilterChange()"
+        [class.active]="filterStatus === 'Awaiting Signature'"
+        class="filter-btn"
+      >
+        Awaiting Signature
+      </button>
+      <button
+        type="button"
         (click)="filterStatus = 'Rejected'; onFilterChange()"
         [class.active]="filterStatus === 'Rejected'"
         class="filter-btn rejected-filter"
@@ -148,6 +156,20 @@
               ✗ Reject
             </button>
           </div>
+          <div *ngIf="loan.status === 'Awaiting Signature'">
+            <button *ngIf="loan.agreementStatus !== 'SIGNED'" type="button" class="action-btn history-btn" (click)="copyAgreementLink(loan)">
+              🔗 Share e-sign link
+            </button>
+            <span *ngIf="loan.agreementStatus !== 'SIGNED'" class="status-badge">Waiting for customer signature</span>
+            <ng-container *ngIf="loan.agreementStatus === 'SIGNED'">
+              <button type="button" class="action-btn history-btn" (click)="downloadAgreement(loan)">
+                📄 Download signed PDF
+              </button>
+              <button type="button" class="action-btn approve-btn" (click)="finalApproveGoldLoan(loan)" [disabled]="approving">
+                ✔ Final approve &amp; disburse
+              </button>
+            </ng-container>
+          </div>
           <div *ngIf="loan.status === 'Approved'">
             <button
               type="button"
@@ -187,7 +209,7 @@
           </div>
           <div>
             <button
-              *ngIf="loan.status !== 'Pending' && loan.status !== 'Rejected'"
+              *ngIf="loan.status === 'Approved' || loan.status === 'Foreclosed' || loan.status === 'Paid'"
               type="button"
               class="action-btn history-btn"
               (click)="downloadLoanDoc('receipt', loan)"

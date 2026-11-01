@@ -2,9 +2,10 @@ import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
-import { concatMap, from, toArray } from 'rxjs';
+import { concatMap, from, toArray, Subscription } from 'rxjs';
 import { printHomeLoanDocuments, printHomeLoanNoc } from '../../../service/home-loan-documents';
 import { environment } from '../../../../environment/environment';
+import { LoanAgreementEvent, LoanAgreementService } from '../../../service/loan-agreement.service';
 
 @Component({
   selector: 'app-admin-home-loans',
@@ -162,9 +163,18 @@ import { environment } from '../../../../environment/environment';
         </div>
         <div class="acts">
           <button class="b" *ngIf="canAdvance(sel)" (click)="advance(sel)">Move to next process ▶</button>
-          <button class="b p" *ngIf="sel.status==='Documents Verified'" (click)="approve()">✔ Approve &amp; Disburse</button>
+          <button class="b p" *ngIf="sel.status==='Documents Verified'" (click)="approve()">✔ Provisional approve &amp; share e-sign link</button>
           <button class="b d" *ngIf="!live(sel) && sel.status!=='Rejected' && sel.status!=='Cancelled'" (click)="reject()">Reject</button>
         </div>
+        <div class="acts" *ngIf="sel.status==='Awaiting Signature'">
+          <button class="b" *ngIf="sel.agreementStatus!=='SIGNED'" (click)="copyAgreementLink()">🔗 Copy customer e-sign link</button>
+          <span class="muted" *ngIf="sel.agreementStatus!=='SIGNED'">Waiting for customer signature</span>
+          <ng-container *ngIf="sel.agreementStatus==='SIGNED'">
+            <button class="b" (click)="downloadAgreement()">📄 Download signed PDF</button>
+            <button class="b p" (click)="finalApprove()">✔ Final approve &amp; disburse</button>
+          </ng-container>
+        </div>
+        <p class="muted" *ngIf="agreementShareUrl">Share link: <a [href]="agreementShareUrl" target="_blank" rel="noopener">{{agreementShareUrl}}</a></p>
       </section>
     </div>
 
@@ -358,15 +368,26 @@ export class AdminHomeLoans implements OnInit, OnDestroy {
     ]
   };
   private pending = ['Submitted', 'Under Review', 'Documents Required', 'Documents Submitted', 'Documents Verified'];
-  constructor(private http: HttpClient) {}
+  agreementShareUrl = '';
+  private agreementEvents?: Subscription;
+  constructor(private http: HttpClient, private agreementService: LoanAgreementService) {}
   private poll: any;
-  ngOnInit() { this.load(); this.poll = setInterval(() => this.load(), 8000); }
-  ngOnDestroy() { clearInterval(this.poll); }
+  ngOnInit() {
+    this.load();
+    this.poll = setInterval(() => this.load(), 8000);
+    this.agreementService.connectToUpdates();
+    this.agreementEvents = this.agreementService.events$.subscribe(event => this.applyAgreementEvent(event));
+  }
+  ngOnDestroy() { clearInterval(this.poll); this.agreementEvents?.unsubscribe(); }
 
   get admin() {
     try { const a = JSON.parse(sessionStorage.getItem('admin') || sessionStorage.getItem('currentAdmin') || '{}'); return a.name || a.email || 'Admin'; } catch { return 'Admin'; }
   }
   private adm() { return encodeURIComponent(this.admin); }
+  private requestHeaders() {
+    const token = sessionStorage.getItem('adminSessionToken');
+    return new HttpHeaders(token ? { Authorization: `Bearer ${token}` } : {});
+  }
   private flash(ok: string, bad = '') { this.msg = ok; this.err = bad; setTimeout(() => { this.msg = ''; this.err = ''; }, 5000); }
   private fail(e: any) { this.busy = false; this.flash('', e?.error?.message || 'Request failed'); }
   loanTypeFor(loan: any): string {
@@ -457,6 +478,7 @@ export class AdminHomeLoans implements OnInit, OnDestroy {
   load() {
     this.http.get<any[]>(this.api).subscribe({ next: r => {
       this.loans = r.map(loan => ({ ...loan, loanType: this.loanTypeFor(loan) }));
+      this.loadAgreementSummaries();
       if (this.sel) {
         const f = this.loans.find(x => x.id === this.sel.id);
         if (f) { this.sel = f; this.refreshEvents(); }
@@ -464,6 +486,42 @@ export class AdminHomeLoans implements OnInit, OnDestroy {
     }, error: e => this.fail(e) });
   }
   private refreshEvents() { if (this.sel) this.http.get<any>(`${this.api}/${this.sel.id}/statement`).subscribe({ next: s => this.events = s.entries, error: () => {} }); }
+  private loadAgreementSummaries() {
+    this.agreementService.getAdminAgreements().subscribe({
+      next: summaries => {
+        const latest = new Map<number, any>();
+        summaries.filter(item => item.loanType === 'HOME_LOAN').forEach(item => {
+          if (!latest.has(item.loanId)) latest.set(item.loanId, item);
+        });
+        this.loans.forEach(loan => Object.assign(loan, {
+          agreementId: latest.get(loan.id)?.id,
+          agreementStatus: latest.get(loan.id)?.status
+        }));
+        if (this.sel) {
+          const current = this.loans.find(loan => loan.id === this.sel.id);
+          if (current) Object.assign(this.sel, {
+            agreementId: current.agreementId,
+            agreementStatus: current.agreementStatus
+          });
+        }
+      },
+      error: error => console.error('Could not load home-loan agreement status.', error)
+    });
+  }
+  private applyAgreementEvent(event: LoanAgreementEvent) {
+    if (event.loanType !== 'HOME_LOAN') return;
+    const loan = this.loans.find(item => item.id === event.loanId);
+    if (loan) {
+      loan.agreementId = event.agreementId;
+      loan.agreementStatus = event.status;
+    }
+    if (this.sel?.id === event.loanId) {
+      this.sel.agreementId = event.agreementId;
+      this.sel.agreementStatus = event.status;
+      if (event.status === 'APPROVED') this.sel.status = 'Approved';
+    }
+    if (loan && event.status === 'APPROVED') loan.status = 'Approved';
+  }
   private fillEdit(l: any) {
     this.edit = { amount: l.amount, tenure: l.tenure, interestRate: l.interestRate, propertyValue: l.propertyValue, purpose: l.purpose, propertyAddress: l.propertyAddress, adminNotes: l.adminNotes };
   }
@@ -516,7 +574,66 @@ export class AdminHomeLoans implements OnInit, OnDestroy {
       error: e => { this.uploading = ''; input.value = ''; this.fail(e); }
     });
   }
-  approve() { if (confirm('Approve and disburse this loan?')) this.http.put<any>(`${this.api}/${this.sel.id}/approve?admin=${this.adm()}`, {}).subscribe({ next: r => this.applyUpdate(r, 'Loan approved and disbursed'), error: e => this.fail(e) }); }
+  approve() {
+    if (!confirm('Record provisional approval and issue a demo agreement link? Funds will not be disbursed until the customer signs and staff final-approves.')) return;
+    this.http.put<any>(`${this.api}/${this.sel.id}/approve?admin=${this.adm()}`, {}, { headers: this.requestHeaders() }).subscribe({
+      next: response => {
+        const loan = response.homeLoan;
+        if (!loan) { this.fail({ error: { message: response.message } }); return; }
+        loan.agreementId = response.agreementId;
+        loan.agreementStatus = response.status;
+        this.agreementShareUrl = response.shareUrl;
+        this.applyUpdate(loan, 'Provisional approval recorded. Share the demo e-sign link with the customer.');
+      },
+      error: e => this.fail(e)
+    });
+  }
+
+  copyAgreementLink() {
+    if (this.agreementShareUrl) {
+      navigator.clipboard.writeText(this.agreementShareUrl).then(
+        () => this.flash('Customer e-sign link copied'),
+        () => this.flash(this.agreementShareUrl)
+      );
+      return;
+    }
+    if (!this.sel?.agreementId) return;
+    this.agreementService.renewShareLink(this.sel.agreementId).subscribe({
+      next: response => {
+        this.agreementShareUrl = response.shareUrl;
+        navigator.clipboard.writeText(response.shareUrl).then(
+          () => this.flash('Fresh customer e-sign link copied'),
+          () => this.flash(response.shareUrl)
+        );
+      },
+      error: e => this.fail(e)
+    });
+  }
+
+  downloadAgreement() {
+    if (!this.sel?.agreementId) return;
+    this.agreementService.downloadAdminPdf(this.sel.agreementId).subscribe({
+      next: blob => {
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = `neobank-home-loan-agreement-${this.sel.id}.pdf`;
+        anchor.click();
+        URL.revokeObjectURL(url);
+      },
+      error: e => this.fail(e)
+    });
+  }
+
+  finalApprove() {
+    if (!this.sel?.agreementId || !confirm('Customer signature is recorded. Complete final approval and disburse?')) return;
+    this.http.put<any>(`${this.api}/${this.sel.id}/final-approve?agreementId=${this.sel.agreementId}&admin=${this.adm()}`, {}, {
+      headers: this.requestHeaders()
+    }).subscribe({
+      next: response => this.applyUpdate(response, 'Signed agreement approved and loan disbursed'),
+      error: e => this.fail(e)
+    });
+  }
   reject() { const r = prompt('Rejection reason?'); if (r !== null) this.http.put<any>(`${this.api}/${this.sel.id}/reject?admin=${this.adm()}&reason=${encodeURIComponent(r)}`, {}).subscribe({ next: x => this.applyUpdate(x, 'Rejected'), error: e => this.fail(e) }); }
 
   // ----- loan account -----

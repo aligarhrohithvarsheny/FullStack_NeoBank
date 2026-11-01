@@ -1,10 +1,12 @@
 import { CurrencyPipe, CommonModule, isPlatformBrowser } from '@angular/common';
-import { Component, OnInit, Inject, PLATFORM_ID } from '@angular/core';
+import { Component, OnInit, OnDestroy, Inject, PLATFORM_ID } from '@angular/core';
 import { Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { environment } from '../../../../environment/environment';
 import { openLoanDocument, isLoanClosed } from '../../../service/loan-documents';
+import { LoanAgreementEvent, LoanAgreementService } from '../../../service/loan-agreement.service';
+import { Subscription } from 'rxjs';
 
 interface LoanRequest {
   id: number;
@@ -14,7 +16,7 @@ interface LoanRequest {
   amount: number;
   tenure: number;
   interestRate: number;
-  status: 'Pending' | 'Approved' | 'Rejected' | 'Foreclosed' | 'Paid';
+  status: 'Pending' | 'Awaiting Signature' | 'Approved' | 'Rejected' | 'Foreclosed' | 'Paid';
   accountNumber: string;
   childAccountNumber?: string; // For education loans with child account
   customerId?: string; // Mapped from account for admin display
@@ -23,6 +25,9 @@ interface LoanRequest {
   applicationDate: string;
   approvalDate?: string;
   personalLoanFormPath?: string; // Path to uploaded Personal Loan form
+  agreementId?: number;
+  agreementStatus?: string;
+  shareUrl?: string;
 }
 
 interface ForeclosureDetails {
@@ -46,8 +51,13 @@ interface ForeclosureDetails {
   styleUrls: ['./loans.css'],
   imports: [CurrencyPipe, CommonModule, FormsModule]
 })
-export class Loans implements OnInit {
-  constructor(private router: Router, @Inject(PLATFORM_ID) private platformId: Object, private http: HttpClient) {}
+export class Loans implements OnInit, OnDestroy {
+  constructor(
+    private router: Router,
+    @Inject(PLATFORM_ID) private platformId: Object,
+    private http: HttpClient,
+    private agreementService: LoanAgreementService
+  ) {}
 
   loanRequests: LoanRequest[] = [];
   loading = false;
@@ -82,13 +92,20 @@ export class Loans implements OnInit {
   }[] = [];
   loadingEmis = false;
   emisError = '';
+  private agreementEvents?: Subscription;
 
   ngOnInit() {
     // Only load in browser, not during SSR
     if (isPlatformBrowser(this.platformId)) {
       console.log('Loans component initialized!');
       this.loadAllLoans();
+      this.agreementService.connectToUpdates();
+      this.agreementEvents = this.agreementService.events$.subscribe(event => this.applyAgreementEvent(event));
     }
+  }
+
+  ngOnDestroy() {
+    this.agreementEvents?.unsubscribe();
   }
 
   loadAllLoans() {
@@ -119,6 +136,7 @@ export class Loans implements OnInit {
           approvalDate: loan.approvalDate,
           personalLoanFormPath: loan.personalLoanFormPath
         }));
+        this.loadAgreementSummaries();
         
         // Also save to localStorage as backup
         this.saveLoansToStorage();
@@ -155,6 +173,36 @@ export class Loans implements OnInit {
     localStorage.setItem('user_loans', JSON.stringify(this.loanRequests));
   }
 
+  private loadAgreementSummaries() {
+    this.agreementService.getAdminAgreements().subscribe({
+      next: summaries => {
+        const latest = new Map<number, any>();
+        summaries
+          .filter(agreement => agreement.loanType === 'LOAN')
+          .forEach(agreement => {
+            if (!latest.has(agreement.loanId)) latest.set(agreement.loanId, agreement);
+          });
+        this.loanRequests.forEach(loan => {
+          const agreement = latest.get(loan.id);
+          if (agreement) {
+            loan.agreementId = agreement.id;
+            loan.agreementStatus = agreement.status;
+          }
+        });
+      },
+      error: error => console.error('Could not load loan agreement status.', error)
+    });
+  }
+
+  private applyAgreementEvent(event: LoanAgreementEvent) {
+    if (event.loanType !== 'LOAN') return;
+    const loan = this.loanRequests.find(item => item.id === event.loanId);
+    if (!loan) return;
+    loan.agreementId = event.agreementId;
+    loan.agreementStatus = event.status;
+    if (event.status === 'APPROVED') loan.status = 'Approved';
+  }
+
   // Navigate back to admin dashboard
   goBack() {
     // Check if accessed from manager dashboard
@@ -174,12 +222,6 @@ export class Loans implements OnInit {
     
     console.log('Approving loan:', loan);
     
-    const updatedLoan = {
-      ...loan,
-      status: 'Approved',
-      approvalDate: new Date().toISOString()
-    };
-    
     // Ensure ID is a number
     const loanId = typeof loan.id === 'number' ? loan.id : Number(loan.id);
     if (isNaN(loanId)) {
@@ -187,21 +229,23 @@ export class Loans implements OnInit {
       return;
     }
     // Update loan in MySQL database using enhanced approval endpoint
-    this.http.put(`${environment.apiBaseUrl}/api/loans/${loanId}/approve?status=Approved`, {}).subscribe({
+    this.http.put<any>(`${environment.apiBaseUrl}/api/loans/${loanId}/approve?status=Approved`, {}, {
+      headers: this.agreementService.staffHeaders()
+    }).subscribe({
       next: (response: any) => {
         console.log('Loan approved in MySQL:', response);
         
         if (response.success) {
-          loan.status = 'Approved';
-          loan.approvalDate = new Date().toISOString();
+          loan.status = response.loan?.status || 'Awaiting Signature';
+          loan.approvalDate = response.loan?.approvalDate || new Date().toISOString();
+          loan.agreementId = response.agreementId;
+          loan.agreementStatus = response.status || 'PENDING_SIGNATURE';
+          loan.shareUrl = response.shareUrl;
           
           // Update in localStorage as backup
           this.saveLoansToStorage();
-          
-          // Show enhanced notification with transaction details
-          this.showLoanApprovalNotification(loan, response.transaction, response.loan.amount);
-          
-          console.log('✅ Loan approval completed successfully');
+          alert(`Provisional approval recorded. Share this customer e-sign link:\n\n${response.shareUrl}`);
+          console.log('Loan agreement link issued; disbursement waits for signature and final approval.');
         } else {
           alert('Loan approval failed: ' + response.message);
         }
@@ -220,12 +264,6 @@ export class Loans implements OnInit {
   reject(loan: LoanRequest) {
     if (!isPlatformBrowser(this.platformId)) return;
     
-    const updatedLoan = {
-      ...loan,
-      status: 'Rejected',
-      approvalDate: new Date().toISOString()
-    };
-    
     // Ensure ID is a number
     const loanId = typeof loan.id === 'number' ? loan.id : Number(loan.id);
     if (isNaN(loanId)) {
@@ -233,7 +271,9 @@ export class Loans implements OnInit {
       return;
     }
     // Update loan in MySQL database
-    this.http.put(`${environment.apiBaseUrl}/api/loans/${loanId}/approve?status=Rejected`, {}).subscribe({
+    this.http.put(`${environment.apiBaseUrl}/api/loans/${loanId}/approve?status=Rejected`, {}, {
+      headers: this.agreementService.staffHeaders()
+    }).subscribe({
       next: (response: any) => {
         console.log('Loan rejected in MySQL:', response);
         
@@ -249,6 +289,69 @@ export class Loans implements OnInit {
         console.error('Error rejecting loan:', err);
         alert('Failed to reject loan. Please try again.');
       }
+    });
+  }
+
+  finalApprove(loan: LoanRequest) {
+    if (!loan.agreementId || !confirm('Customer signature is recorded. Complete final approval and disburse this loan?')) {
+      return;
+    }
+    const adminName = JSON.parse(sessionStorage.getItem('admin') || '{}').name || 'Admin';
+    const params = new URLSearchParams({
+      agreementId: String(loan.agreementId),
+      adminName
+    });
+    this.http.post<any>(`${environment.apiBaseUrl}/api/loans/${loan.id}/final-approve?${params}`, {}, {
+      headers: this.agreementService.staffHeaders()
+    }).subscribe({
+      next: response => {
+        if (!response?.success) {
+          alert(response?.message || 'Final approval failed.');
+          return;
+        }
+        loan.status = 'Approved';
+        loan.agreementStatus = 'APPROVED';
+        this.saveLoansToStorage();
+        alert('Signed agreement approved and loan disbursed.');
+        this.loadAllLoans();
+      },
+      error: error => alert(error.error?.message || 'Final approval failed.')
+    });
+  }
+
+  copyAgreementLink(loan: LoanRequest) {
+    if (loan.shareUrl) {
+      navigator.clipboard.writeText(loan.shareUrl).then(
+        () => alert('Customer e-sign link copied.'),
+        () => alert(loan.shareUrl)
+      );
+      return;
+    }
+    if (!loan.agreementId) return;
+    this.agreementService.renewShareLink(loan.agreementId).subscribe({
+      next: result => {
+        loan.shareUrl = result.shareUrl;
+        navigator.clipboard.writeText(result.shareUrl).then(
+          () => alert('A fresh customer e-sign link was copied.'),
+          () => alert(result.shareUrl)
+        );
+      },
+      error: error => alert(error.error?.message || 'Could not create a share link.')
+    });
+  }
+
+  downloadAgreement(loan: LoanRequest) {
+    if (!loan.agreementId) return;
+    this.agreementService.downloadAdminPdf(loan.agreementId).subscribe({
+      next: blob => {
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = `neobank-loan-agreement-${loan.id}.pdf`;
+        anchor.click();
+        URL.revokeObjectURL(url);
+      },
+      error: error => alert(error.error?.message || 'Could not download the agreement PDF.')
     });
   }
 

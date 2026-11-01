@@ -95,6 +95,7 @@ import { KillSwitchesComponent } from './component/admin/kill-switches/kill-swit
 export const routes: Routes = [
   // ------------------ ADMIN ------------------
   { path: 'admin/login', component: Login },
+  { path: 'loan-esign/:token', loadComponent: () => import('./component/website/loan-esign/loan-esign').then(m => m.LoanEsign) },
   { path: 'hod/login', component: HodLogin },
   { path: 'hod/dashboard', component: HodDashboard, canActivate: [hodAuthGuard] },
   { path: 'hod/account-linking', loadComponent: () => import('./component/admin/account-linking/account-linking').then(m => m.AccountLinkingComponent), canActivate: [hodAuthGuard] },

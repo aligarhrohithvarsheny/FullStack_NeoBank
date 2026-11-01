@@ -34,6 +34,8 @@ export class HodDashboard implements OnInit {
   staffSearch = '';
   selectedStaff: any = null;
   branchAccounts: any[] = [];
+  managerLoginCredentials: Record<number, { username: string; password: string }> = {};
+  generatingManagerLoginId: number | null = null;
   centralAccount: any = null;
   centralTransactions: any[] = [];
   centralTransactionFilters = {
@@ -180,7 +182,10 @@ export class HodDashboard implements OnInit {
       next: account => this.centralAccount = account,
       error: err => {
         this.centralAccount = null;
-        this.centralLedgerError = err.error?.message || 'Central account summary is unavailable.';
+        this.centralLedgerError = err.status === 404
+          ? 'The central-account API is not available on the deployed backend. Deploy the backend update, then reload this dashboard.'
+          : err.error?.message || 'Central account summary is unavailable.';
+        if (err.status === 404) this.stopCentralLedgerPolling();
       }
     });
     const params = new URLSearchParams({ page: String(this.centralTransactionsPage), size: '20' });
@@ -196,10 +201,18 @@ export class HodDashboard implements OnInit {
       },
       error: err => {
         this.centralTransactions = [];
-        this.centralLedgerError = err.error?.message || 'Central account transactions are unavailable.';
+        this.centralLedgerError = err.status === 404
+          ? 'The central-ledger API is not available on the deployed backend. Deploy the backend update, then reload this dashboard.'
+          : err.error?.message || 'Central account transactions are unavailable.';
+        if (err.status === 404) this.stopCentralLedgerPolling();
         this.isLoadingCentralLedger = false;
       }
     });
+  }
+
+  private stopCentralLedgerPolling(): void {
+    if (this.ledgerRefreshTimer) clearInterval(this.ledgerRefreshTimer);
+    this.ledgerRefreshTimer = undefined;
   }
 
   applyCentralLedgerFilters(): void {
@@ -246,6 +259,31 @@ export class HodDashboard implements OnInit {
     this.http.get<any[]>(`${environment.apiBaseUrl}/api/admins/hod/branch-accounts`, this.hodAuthOptions()).subscribe({
       next: accounts => this.branchAccounts = accounts || [],
       error: err => this.errorMessage = err.error?.message || 'Branch account data is unavailable.'
+    });
+  }
+
+  generateManagerLogin(account: any): void {
+    const managerId = Number(account?.managerAdminId);
+    if (!managerId || account?.managerRole !== 'MANAGER' || !account?.branchCity) return;
+    if (account.managerLoginEnabled && !confirm('Reset this manager login? The current password will stop working immediately.')) return;
+
+    this.generatingManagerLoginId = managerId;
+    this.http.post<any>(`${environment.apiBaseUrl}/api/admins/hod/staff/${managerId}/manager-login`, {},
+      this.hodAuthOptions()).subscribe({
+      next: credentials => {
+        this.managerLoginCredentials[managerId] = {
+          username: credentials.username,
+          password: credentials.password
+        };
+        account.managerLoginUsername = credentials.username;
+        account.managerLoginEnabled = true;
+        this.generatingManagerLoginId = null;
+        this.errorMessage = '';
+      },
+      error: err => {
+        this.generatingManagerLoginId = null;
+        this.errorMessage = err.error?.message || 'Unable to create manager login credentials.';
+      }
     });
   }
 

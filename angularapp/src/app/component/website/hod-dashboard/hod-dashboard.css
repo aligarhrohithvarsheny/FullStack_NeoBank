@@ -69,6 +69,12 @@
 .branch-account-details div { display: grid; gap: 4px; min-width: 0; }
 .branch-account-details small, .customer-branch-row small { color: #668087; font-size: 11px; }
 .branch-account-details strong { overflow-wrap: anywhere; color: #12313a; font-size: 13px; }
+.manager-login-controls { display: grid; justify-items: start; gap: 10px; margin-top: 16px; }
+.manager-login-controls button:disabled { opacity: .55; cursor: not-allowed; }
+.manager-login-secret { display: grid; gap: 6px; width: 100%; box-sizing: border-box; padding: 12px; border: 1px solid #e8c779; border-radius: 8px; background: #fff9e8; color: #4a3c18; overflow-wrap: anywhere; }
+.manager-login-secret strong { color: #6b4b00; font-size: 12px; }
+.manager-login-secret span { font-family: ui-monospace, monospace; font-size: 13px; }
+.manager-login-secret small { color: #6d6246; }
 .branch-account-create, .customer-branch-assignment { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(220px, 2fr) auto; align-items: center; gap: 10px; margin-top: 18px; padding-top: 18px; border-top: 1px solid #edf2f2; }
 .branch-account-create label, .customer-branch-assignment label { color: #12313a; font-size: 13px; font-weight: 700; }
 .branch-account-create select, .branch-account-create button, .customer-branch-assignment input, .customer-branch-row select { min-width: 0; padding: 10px 12px; border: 1px solid #c9d9db; border-radius: 7px; background: #fff; }
