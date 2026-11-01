@@ -1,6 +1,7 @@
 package com.neo.springapp.repository;
 
 import com.neo.springapp.model.UserLoginHistory;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -21,6 +22,9 @@ public interface UserLoginHistoryRepository extends JpaRepository<UserLoginHisto
     // Find all login history (for admin dashboard)
     @EntityGraph(attributePaths = {"user"})
     List<UserLoginHistory> findAllByOrderByLoginTimeDesc();
+
+    @EntityGraph(attributePaths = {"user"})
+    List<UserLoginHistory> findAllByOrderByLoginTimeDesc(Pageable pageable);
     
     // Find recent login history (last N records)
     @Query("SELECT h FROM UserLoginHistory h ORDER BY h.loginTime DESC")
@@ -30,5 +34,3 @@ public interface UserLoginHistoryRepository extends JpaRepository<UserLoginHisto
     @Query("SELECT h FROM UserLoginHistory h WHERE h.loginDate BETWEEN :startDate AND :endDate ORDER BY h.loginTime DESC")
     List<UserLoginHistory> findByDateRange(java.time.LocalDateTime startDate, java.time.LocalDateTime endDate);
 }
-
-

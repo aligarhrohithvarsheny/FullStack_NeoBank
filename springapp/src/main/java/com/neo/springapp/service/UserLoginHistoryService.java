@@ -4,6 +4,7 @@ import com.neo.springapp.model.User;
 import com.neo.springapp.model.UserLoginHistory;
 import com.neo.springapp.repository.UserLoginHistoryRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -12,6 +13,8 @@ import java.util.List;
 
 @Service
 public class UserLoginHistoryService {
+
+    private static final int MAX_RECENT_LOGIN_HISTORY = 100;
 
     @Autowired
     private UserLoginHistoryRepository loginHistoryRepository;
@@ -86,8 +89,11 @@ public class UserLoginHistoryService {
      */
     @Transactional(readOnly = true)
     public List<UserLoginHistory> getRecentLoginHistory(int limit) {
-        List<UserLoginHistory> all = loginHistoryRepository.findAllByOrderByLoginTimeDesc();
-        return all.stream().limit(limit).collect(java.util.stream.Collectors.toList());
+        int boundedLimit = Math.min(Math.max(limit, 0), MAX_RECENT_LOGIN_HISTORY);
+        if (boundedLimit == 0) {
+            return List.of();
+        }
+        return loginHistoryRepository.findAllByOrderByLoginTimeDesc(PageRequest.of(0, boundedLimit));
     }
 
     /**
@@ -112,4 +118,3 @@ public class UserLoginHistoryService {
         return null;
     }
 }
-
