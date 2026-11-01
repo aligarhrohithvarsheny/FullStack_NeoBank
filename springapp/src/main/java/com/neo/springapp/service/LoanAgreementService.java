@@ -58,6 +58,7 @@ public class LoanAgreementService {
     private final GoldLoanRepository goldLoanRepository;
     private final ObjectMapper objectMapper;
     private final SimpMessagingTemplate messagingTemplate;
+    private final EmailService emailService;
     private final String frontendUrl;
 
     public LoanAgreementService(
@@ -67,6 +68,7 @@ public class LoanAgreementService {
             GoldLoanRepository goldLoanRepository,
             ObjectMapper objectMapper,
             SimpMessagingTemplate messagingTemplate,
+            EmailService emailService,
             @Value("${app.frontend-url:http://localhost:4200}") String frontendUrl) {
         this.agreementRepository = agreementRepository;
         this.loanRepository = loanRepository;
@@ -74,6 +76,7 @@ public class LoanAgreementService {
         this.goldLoanRepository = goldLoanRepository;
         this.objectMapper = objectMapper;
         this.messagingTemplate = messagingTemplate;
+        this.emailService = emailService;
         this.frontendUrl = frontendUrl.replaceAll("/+$", "");
     }
 
@@ -106,7 +109,17 @@ public class LoanAgreementService {
         agreement.setPdfBytes(generatePdf(agreement));
         LoanAgreement saved = agreementRepository.save(agreement);
         publish(saved, "PENDING_SIGNATURE");
-        return issueResponse(saved, token);
+        Map<String, Object> response = issueResponse(saved, token);
+        addEmailStatus(saved, response);
+        return response;
+    }
+
+    @Transactional
+    public Map<String, Object> emailShareLink(Long agreementId) {
+        Map<String, Object> response = renewShareLink(agreementId);
+        LoanAgreement agreement = getAgreement(agreementId);
+        addEmailStatus(agreement, response);
+        return response;
     }
 
     @Transactional
@@ -377,6 +390,25 @@ public class LoanAgreementService {
         result.put("pdfPages", 10);
         result.put("message", "Agreement issued. Copy and share the link with the customer.");
         return result;
+    }
+
+    private void addEmailStatus(LoanAgreement agreement, Map<String, Object> response) {
+        String shareUrl = response.get("shareUrl").toString();
+        boolean emailSent = agreement.getCustomerEmail() != null
+                && emailService.sendLoanAgreementLinkEmail(
+                        agreement.getCustomerEmail(),
+                        agreement.getCustomerName(),
+                        agreement.getProductName(),
+                        shareUrl,
+                        agreement.getExpiresAt() == null ? null : agreement.getExpiresAt().toString());
+        response.put("emailSent", emailSent);
+        if (emailSent) {
+            response.put("emailMessage", "Agreement link emailed to the customer's registered email address.");
+        } else if (agreement.getCustomerEmail() == null || agreement.getCustomerEmail().isBlank()) {
+            response.put("emailMessage", "No registered customer email is available. Copy and share the link manually.");
+        } else {
+            response.put("emailMessage", "Email delivery failed. The link was generated; copy and share it manually or retry.");
+        }
     }
 
     private LoanAgreement getAgreement(Long id) {

@@ -24,12 +24,18 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class LoanAgreementServiceTest {
     private LoanAgreementRepository agreementRepository;
     private LoanRepository loanRepository;
+    private EmailService emailService;
     private LoanAgreementService service;
     private final AtomicReference<LoanAgreement> storedAgreement = new AtomicReference<>();
 
@@ -40,8 +46,11 @@ class LoanAgreementServiceTest {
         HomeLoanRepository homeLoanRepository = mock(HomeLoanRepository.class);
         GoldLoanRepository goldLoanRepository = mock(GoldLoanRepository.class);
         SimpMessagingTemplate messagingTemplate = mock(SimpMessagingTemplate.class);
+        emailService = mock(EmailService.class);
         service = new LoanAgreementService(agreementRepository, loanRepository, homeLoanRepository,
-                goldLoanRepository, new ObjectMapper(), messagingTemplate, "http://localhost:4200");
+                goldLoanRepository, new ObjectMapper(), messagingTemplate, emailService, "http://localhost:4200");
+        when(emailService.sendLoanAgreementLinkEmail(anyString(), anyString(), anyString(), anyString(), anyString()))
+                .thenReturn(true);
 
         when(agreementRepository.findAllByLoanTypeAndLoanIdOrderByIssuedAtDesc(any(), any()))
                 .thenReturn(List.of());
@@ -51,6 +60,8 @@ class LoanAgreementServiceTest {
             storedAgreement.set(agreement);
             return agreement;
         });
+        when(agreementRepository.findById(anyLong())).thenAnswer(invocation ->
+                Optional.ofNullable(storedAgreement.get()));
     }
 
     @Test
@@ -68,6 +79,10 @@ class LoanAgreementServiceTest {
         String shareUrl = response.get("shareUrl").toString();
         assertTrue(shareUrl.startsWith("http://localhost:4200/loan-esign/"));
         assertEquals(500.0, response.get("stampDuty"));
+        assertTrue((Boolean) response.get("emailSent"));
+        verify(emailService).sendLoanAgreementLinkEmail(
+                "customer@example.test", "Example Customer", "Personal Loan",
+                shareUrl, storedAgreement.get().getExpiresAt().toString());
 
         try (var document = Loader.loadPDF(storedAgreement.get().getPdfBytes())) {
             assertTrue(document.getNumberOfPages() >= 10);
@@ -104,5 +119,28 @@ class LoanAgreementServiceTest {
         assertFalse(signed);
         assertEquals(1, storedAgreement.get().getCaptchaAttempts());
         assertTrue(storedAgreement.get().getCaptchaAnswerHash() == null);
+    }
+
+    @Test
+    void emailShareLinkRenewsLinkAndEmailsCustomerAgain() throws Exception {
+        Loan loan = new Loan("Personal Loan", 10_000.0, 6, 8.0);
+        loan.setId(10L);
+        loan.setUserName("Example Customer");
+        loan.setUserEmail("customer@example.test");
+        loan.setAccountNumber("1234567890");
+        loan.setLoanAccountNumber("LOAN-10");
+        when(loanRepository.findById(10L)).thenReturn(Optional.of(loan));
+
+        Map<String, Object> initial = service.issue("LOAN", 10L, Map.of());
+        Map<String, Object> emailed = service.emailShareLink(41L);
+
+        assertTrue(emailed.get("shareUrl").toString().startsWith("http://localhost:4200/loan-esign/"));
+        assertFalse(initial.get("shareUrl").equals(emailed.get("shareUrl")));
+        assertTrue((Boolean) emailed.get("emailSent"));
+        verify(emailService, times(2)).sendLoanAgreementLinkEmail(
+                eq("customer@example.test"),
+                eq("Example Customer"),
+                eq("Personal Loan"),
+                anyString(), anyString());
     }
 }

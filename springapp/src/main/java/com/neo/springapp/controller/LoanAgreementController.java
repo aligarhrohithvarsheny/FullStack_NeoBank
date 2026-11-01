@@ -87,6 +87,16 @@ public class LoanAgreementController {
         }
     }
 
+    @PostMapping("/{agreementId}/email-link")
+    public ResponseEntity<?> emailShareLink(@PathVariable Long agreementId, Authentication authentication) {
+        if (!isStaff(authentication)) return ResponseEntity.status(403).body(Map.of("message", "Staff sign-in required."));
+        try {
+            return ResponseEntity.ok(agreementService.emailShareLink(agreementId));
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
+    }
+
     @GetMapping("/{agreementId}/pdf")
     public ResponseEntity<?> adminPdf(@PathVariable Long agreementId, Authentication authentication) {
         if (!isStaff(authentication)) return ResponseEntity.status(403).body(Map.of("message", "Staff sign-in required."));

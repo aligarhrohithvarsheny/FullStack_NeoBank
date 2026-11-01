@@ -1288,6 +1288,62 @@ public class EmailService {
         return sendOtpEmail(toEmail, otp);
     }
 
+    public boolean sendLoanAgreementLinkEmail(String toEmail, String customerName, String productName,
+                                              String shareUrl, String expiresAt) {
+        if (toEmail == null || toEmail.isBlank() || !toEmail.contains("@")
+                || shareUrl == null || shareUrl.isBlank()) {
+            logger.error("Loan agreement link email not sent: recipient or share link is invalid");
+            recordCustomerNotificationFailure();
+            return false;
+        }
+
+        String recipient = toEmail.trim();
+        String body = "Dear " + (customerName == null || customerName.isBlank() ? "Customer" : customerName.trim())
+                + ",\n\nYour " + (productName == null ? "loan" : productName)
+                + " agreement is ready for review.\n\n"
+                + "Review and complete the requested demo signature using this secure link:\n"
+                + shareUrl + "\n\n"
+                + "This is a non-binding sample document, not a final bank contract or legal e-signature. "
+                + "The bank must complete its final approval separately. Stamp duty shown is an estimate only.\n\n"
+                + "Link expiry: " + (expiresAt == null ? "see the agreement page" : expiresAt) + "\n\n"
+                + "If you did not expect this message, please contact the bank using its official support channels.\n\n"
+                + "NeoBank";
+
+        if (gmailApiOtpService != null && gmailApiOtpService.isConfigured()) {
+            try {
+                gmailApiOtpService.sendPlainTextEmail(recipient,
+                        "NeoBank - Loan Agreement Ready for Review", body);
+                return true;
+            } catch (GmailApiException e) {
+                logger.error("Loan agreement email delivery via Gmail API failed [{}]", e.getOAuthError());
+            }
+        }
+
+        initializeMailSender();
+        JavaMailSender sender = javaMailSender != null
+                ? javaMailSender
+                : mailSender instanceof JavaMailSender resolvedSender ? resolvedSender : null;
+        if (sender == null || !isSmtpCredentialsConfigured()) {
+            logger.error("Loan agreement link email not sent: Gmail API or SMTP is not configured");
+            recordCustomerNotificationFailure();
+            return false;
+        }
+
+        try {
+            SimpleMailMessage message = new SimpleMailMessage();
+            message.setTo(recipient);
+            message.setFrom(getFromEmail());
+            message.setSubject("NeoBank - Loan Agreement Ready for Review");
+            message.setText(body);
+            sender.send(message);
+            return true;
+        } catch (Exception e) {
+            logger.error("Loan agreement link email delivery failed", e);
+            recordCustomerNotificationFailure();
+            return false;
+        }
+    }
+
     private String buildFastagOtpEmailBody(String otp) {
         return "Dear Customer,\n\n" +
                "Your FASTag Login OTP is:\n\n" +
