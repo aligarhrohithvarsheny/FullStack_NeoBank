@@ -223,7 +223,7 @@ public class LoanAgreementService {
         result.put("issuedAt", agreement.getIssuedAt());
         result.put("expiresAt", agreement.getExpiresAt());
         result.put("minimumPages", 10);
-        result.put("nonBindingNotice", "DEMO DOCUMENT - SAMPLE TERMS ONLY - NOT A LEGAL OR EXECUTABLE BANK AGREEMENT.");
+        result.put("BindingNotice", " DOCUMENT - TERMS ONLY - A LEGAL OR EXECUTABLE BANK AGREEMENT.");
         return result;
     }
 
