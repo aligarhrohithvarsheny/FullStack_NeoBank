@@ -62,6 +62,9 @@ public class LoanController {
     @Autowired
     private com.neo.springapp.service.LoanPredictionService loanPredictionService;
 
+    @Autowired
+    private com.neo.springapp.service.LoanAgreementService loanAgreementService;
+
     @Autowired(required = false)
     private com.neo.springapp.service.BankChargesService bankChargesService;
 
@@ -129,7 +132,63 @@ public class LoanController {
 
     // Update loan status (e.g. Admin Approval)
     @PutMapping("/{id}/approve")
-    public ResponseEntity<Map<String, Object>> approveLoan(@PathVariable Long id, @RequestParam String status) {
+    @org.springframework.transaction.annotation.Transactional
+    public ResponseEntity<Map<String, Object>> approveLoan(@PathVariable Long id, @RequestParam String status,
+                                                            org.springframework.security.core.Authentication authentication) {
+        if (!isStaff(authentication)) {
+            return ResponseEntity.status(403).body(Map.of("success", false, "message", "Staff sign-in required."));
+        }
+        if ("Approved".equalsIgnoreCase(status)) {
+            try {
+                Loan loan = loanService.getLoanById(id);
+                if (loan == null) return ResponseEntity.notFound().build();
+                Map<String, Object> agreement = loanAgreementService.issue("LOAN", id, Map.of());
+                Loan pendingSignature = loanService.approveLoan(id, "Awaiting Signature");
+                Map<String, Object> response = new HashMap<>(agreement);
+                response.put("success", true);
+                response.put("loan", pendingSignature);
+                response.put("message", "Provisional approval recorded. Share the agreement link with the customer.");
+                return ResponseEntity.ok(response);
+            } catch (Exception e) {
+                return ResponseEntity.badRequest().body(Map.of("success", false, "message",
+                        e.getMessage() == null ? "Could not issue the agreement." : e.getMessage()));
+            }
+        }
+        return updateLoanStatus(id, status);
+    }
+
+    @PostMapping("/{id}/final-approve")
+    @org.springframework.transaction.annotation.Transactional
+    public ResponseEntity<Map<String, Object>> finalApproveLoan(
+            @PathVariable Long id,
+            @RequestParam Long agreementId,
+            @RequestParam(defaultValue = "Admin") String adminName,
+            org.springframework.security.core.Authentication authentication) {
+        if (!isStaff(authentication)) {
+            return ResponseEntity.status(403).body(Map.of("success", false, "message", "Staff sign-in required."));
+        }
+        try {
+            loanAgreementService.requireSigned(agreementId, "LOAN", id);
+            ResponseEntity<Map<String, Object>> response = updateLoanStatus(id, "Approved");
+            if (response.getStatusCode().is2xxSuccessful()
+                    && Boolean.TRUE.equals(response.getBody() == null ? null : response.getBody().get("success"))) {
+                loanAgreementService.markApproved(agreementId, adminName);
+            }
+            return response;
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", e.getMessage()));
+        }
+    }
+
+    private boolean isStaff(org.springframework.security.core.Authentication authentication) {
+        if (authentication == null
+                || !(authentication.getPrincipal() instanceof com.neo.springapp.service.UserSessionTokenService.SessionPrincipal principal)) {
+            return false;
+        }
+        return "ADMIN".equals(principal.scope()) || "MANAGER".equals(principal.scope());
+    }
+
+    private ResponseEntity<Map<String, Object>> updateLoanStatus(Long id, String status) {
         System.out.println("=== LOAN APPROVAL ===");
         System.out.println("Loan ID: " + id);
         System.out.println("Status: " + status);

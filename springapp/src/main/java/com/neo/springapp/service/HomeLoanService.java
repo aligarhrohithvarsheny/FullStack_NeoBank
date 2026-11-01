@@ -452,7 +452,9 @@ public class HomeLoanService {
     @Transactional
     public HomeLoan approve(Long id, String admin) {
         HomeLoan h = get(id);
-        if (!"Documents Verified".equals(h.getStatus())) throw new RuntimeException("All documents must be verified before approval");
+        if (!"Documents Verified".equals(h.getStatus()) && !"Awaiting Signature".equals(h.getStatus())) {
+            throw new RuntimeException("All documents must be verified and the customer agreement signed before approval");
+        }
         Account acc = accountRepository.findByAccountNumber(h.getAccountNumber());
         if (acc == null) throw new RuntimeException("Account not found");
         double amount = n(h.getAmount());
@@ -502,6 +504,18 @@ public class HomeLoanService {
                         "Loan account", String.valueOf(h.getLoanAccountNumber()),
                         "Approved by", admin == null ? "Admin" : admin));
         return h;
+    }
+
+    @Transactional
+    public HomeLoan awaitSignature(Long id, String admin) {
+        HomeLoan loan = get(id);
+        if (!"Documents Verified".equals(loan.getStatus())) {
+            throw new IllegalStateException("All documents must be verified before provisional approval.");
+        }
+        loan.setStatus("Awaiting Signature");
+        loan.setReviewedBy(admin);
+        touch(loan);
+        return repo.save(loan);
     }
 
     // ---------- Repayments ----------

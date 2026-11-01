@@ -26,6 +26,7 @@ public class HomeLoanController {
     @Autowired private HomeLoanService service;
     @Autowired private HomeLoanAnalysisService analysisService;
     @Autowired private com.neo.springapp.repository.AdminFundTransferRepository transferRepository;
+    @Autowired private com.neo.springapp.service.LoanAgreementService loanAgreementService;
 
     private ResponseEntity<?> run(Supplier<Object> action) {
         try {
@@ -95,7 +96,49 @@ public class HomeLoanController {
     }
 
     @PutMapping("/{id}/approve")
-    public ResponseEntity<?> approve(@PathVariable Long id, @RequestParam String admin) { return run(() -> service.approve(id, admin)); }
+    @org.springframework.transaction.annotation.Transactional
+    public ResponseEntity<?> approve(@PathVariable Long id, @RequestParam String admin,
+                                    @AuthenticationPrincipal SessionPrincipal principal) {
+        if (!isStaff(principal)) {
+            return ResponseEntity.status(org.springframework.http.HttpStatus.FORBIDDEN)
+                    .body(Map.of("success", false, "message", "Staff sign-in required."));
+        }
+        try {
+            Map<String, Object> agreement = loanAgreementService.issue("HOME_LOAN", id, Map.of());
+            HomeLoan provisional = service.awaitSignature(id, admin);
+            agreement.put("homeLoan", provisional);
+            agreement.put("success", true);
+            agreement.put("message", "Provisional approval recorded. Share the agreement link with the customer.");
+            return ResponseEntity.ok(agreement);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message",
+                    e.getMessage() == null ? "Could not issue the agreement." : e.getMessage()));
+        }
+    }
+
+    @PutMapping("/{id}/final-approve")
+    @org.springframework.transaction.annotation.Transactional
+    public ResponseEntity<?> finalApprove(@PathVariable Long id, @RequestParam Long agreementId,
+                                          @RequestParam String admin,
+                                          @AuthenticationPrincipal SessionPrincipal principal) {
+        if (!isStaff(principal)) {
+            return ResponseEntity.status(org.springframework.http.HttpStatus.FORBIDDEN)
+                    .body(Map.of("success", false, "message", "Staff sign-in required."));
+        }
+        try {
+            loanAgreementService.requireSigned(agreementId, "HOME_LOAN", id);
+            HomeLoan approved = service.approve(id, admin);
+            loanAgreementService.markApproved(agreementId, admin);
+            return ResponseEntity.ok(approved);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message",
+                    e.getMessage() == null ? "Could not finalize loan approval." : e.getMessage()));
+        }
+    }
+
+    private boolean isStaff(SessionPrincipal principal) {
+        return principal != null && ("ADMIN".equals(principal.scope()) || "MANAGER".equals(principal.scope()));
+    }
 
     @PutMapping("/{id}/admin-edit")
     public ResponseEntity<?> edit(@PathVariable Long id, @RequestParam String admin, @RequestBody Map<String, Object> fields) {

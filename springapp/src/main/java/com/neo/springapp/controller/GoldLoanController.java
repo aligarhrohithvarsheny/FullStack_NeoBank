@@ -60,6 +60,9 @@ public class GoldLoanController {
     @Autowired
     private EmailService emailService;
 
+    @Autowired
+    private com.neo.springapp.service.LoanAgreementService loanAgreementService;
+
     @Value("${app.upload-dir:uploads}")
     private String uploadDirectory;
 
@@ -215,15 +218,45 @@ public class GoldLoanController {
 
     // Approve or reject gold loan
     @RequestMapping(value = "/{id}/approve", method = {RequestMethod.PUT, RequestMethod.POST})
+    @org.springframework.transaction.annotation.Transactional
     public ResponseEntity<Map<String, Object>> approveGoldLoan(
             @PathVariable Long id,
             @RequestParam String status,
             @RequestParam(required = false, defaultValue = "Admin") String approvedBy,
-            @RequestBody(required = false) Map<String, Object> goldDetails) {
+            @RequestBody(required = false) Map<String, Object> goldDetails,
+            org.springframework.security.core.Authentication authentication) {
         
         Map<String, Object> response = new HashMap<>();
+        if (!isStaff(authentication)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("success", false, "message", "Staff sign-in required."));
+        }
         
         try {
+            if ("Approved".equalsIgnoreCase(status)) {
+                if (goldDetails == null || goldDetails.get("allocationId") == null
+                        || goldDetails.get("performedByAdminId") == null) {
+                    return ResponseEntity.badRequest().body(Map.of("success", false,
+                            "message", "Select a verified allocation and confirm the admin session before approval."));
+                }
+                GoldLoan loan = goldLoanService.getGoldLoanById(id);
+                if (loan == null) return ResponseEntity.notFound().build();
+                if (!"Pending".equalsIgnoreCase(loan.getStatus())
+                        && !"Awaiting Signature".equalsIgnoreCase(loan.getStatus())) {
+                    return ResponseEntity.badRequest().body(Map.of("success", false,
+                            "message", "Only pending gold loans can be provisionally approved."));
+                }
+                Map<String, Object> agreement = loanAgreementService.issue("GOLD_LOAN", id, goldDetails);
+                loan.setStatus("Awaiting Signature");
+                loan.setApprovedBy(approvedBy);
+                loan.setApprovalDate(LocalDateTime.now());
+                goldLoanService.save(loan);
+                response.putAll(agreement);
+                response.put("success", true);
+                response.put("goldLoan", loan);
+                response.put("message", "Provisional approval recorded. Share the agreement link with the customer.");
+                return ResponseEntity.ok(response);
+            }
             GoldLoan approvedLoan = goldLoanService.approveGoldLoan(id, status, approvedBy, goldDetails);
             
             if (approvedLoan != null) {
@@ -251,6 +284,7 @@ public class GoldLoanController {
                             response.put("emailError", emailException.getMessage());
                         }
                     }
+
                 }
                 
                 response.put("success", true);
@@ -267,6 +301,55 @@ public class GoldLoanController {
             response.put("message", "Failed to process gold loan: " + e.getMessage());
             return ResponseEntity.internalServerError().body(response);
         }
+    }
+
+    @PostMapping("/{id}/final-approve")
+    @org.springframework.transaction.annotation.Transactional
+    public ResponseEntity<Map<String, Object>> finalApproveGoldLoan(
+            @PathVariable Long id,
+            @RequestParam Long agreementId,
+            @RequestParam(defaultValue = "Admin") String approvedBy,
+            org.springframework.security.core.Authentication authentication) {
+        if (!isStaff(authentication)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("success", false, "message", "Staff sign-in required."));
+        }
+        try {
+            com.neo.springapp.model.LoanAgreement agreement =
+                    loanAgreementService.requireSigned(agreementId, "GOLD_LOAN", id);
+            GoldLoan approvedLoan = goldLoanService.approveGoldLoan(
+                    id, "Approved", approvedBy, loanAgreementService.approvalContext(agreementId));
+            if (approvedLoan == null) return ResponseEntity.notFound().build();
+            loanAgreementService.markApproved(agreementId, approvedBy);
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("goldLoan", approvedLoan);
+            response.put("message", "Signed gold loan agreement approved and disbursed.");
+            if (approvedLoan.getUserEmail() != null && !approvedLoan.getUserEmail().isBlank()) {
+                try {
+                    byte[] pdfBytes = pdfService.generateGoldLoanReceipt(approvedLoan);
+                    response.put("emailSent", emailService.sendGoldLoanReceiptEmail(
+                            approvedLoan.getUserEmail(), approvedLoan.getLoanAccountNumber(),
+                            approvedLoan.getUserName(), pdfBytes));
+                } catch (Exception e) {
+                    response.put("emailSent", false);
+                    response.put("emailError", e.getMessage());
+                }
+            }
+            response.put("agreementSignedAt", agreement.getSignedAt());
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message",
+                    e.getMessage() == null ? "Could not finalize gold loan approval." : e.getMessage()));
+        }
+    }
+
+    private boolean isStaff(org.springframework.security.core.Authentication authentication) {
+        if (authentication == null
+                || !(authentication.getPrincipal() instanceof com.neo.springapp.service.UserSessionTokenService.SessionPrincipal principal)) {
+            return false;
+        }
+        return "ADMIN".equals(principal.scope()) || "MANAGER".equals(principal.scope());
     }
 
     // Accept terms and conditions by user
