@@ -104,6 +104,11 @@ import { environment } from '../../../../environment/environment';
       <p *ngIf="sel.mandate.productType==='RECURRING_DEPOSIT'">
         RD contribution history is posted separately from loan EMIs. The customer-authorized amount and date cannot be changed here; cancel and request a new consent if terms change.
       </p>
+      <div class="acts" *ngIf="sel.mandate.productType==='RECURRING_DEPOSIT' && sel.mandate.customerConsentAt">
+        <button type="button" class="btn primary" (click)="downloadConsentRecord()" [disabled]="consentDownloadBusy">
+          {{ consentDownloadBusy ? 'Preparing record…' : 'Download customer consent record' }}
+        </button>
+      </div>
       <div class="grid" *ngIf="sel.mandate.productType!=='RECURRING_DEPOSIT'">
         <label>Change savings account<input [(ngModel)]="edit.account" /></label>
         <label>DOB (for new account)<input type="date" [(ngModel)]="edit.dob" /></label>
@@ -171,6 +176,7 @@ export class EcsMandates implements OnInit, OnDestroy {
   sel: any = null;
   edit: any = {};
   busy = false;
+  consentDownloadBusy = false;
   pendingConsentUrl = '';
   loadError = '';
   eligibilityError = '';
@@ -307,6 +313,31 @@ export class EcsMandates implements OnInit, OnDestroy {
   open(m: any) {
     this.edit = { account: m.savingsAccountNumber, dob: '', day: m.debitDay, limit: m.amountLimit };
     this.http.get<any>(`${this.api}/${m.id}`, this.staffOptions()).subscribe({ next: r => this.sel = r, error: e => this.err(e, 'Load failed') });
+  }
+
+  downloadConsentRecord() {
+    if (!this.sel || this.consentDownloadBusy) return;
+    const mandateId = this.sel.mandate.id;
+    this.consentDownloadBusy = true;
+    this.http.get(`${this.api}/${mandateId}/consent-record`, {
+      ...this.staffOptions(),
+      responseType: 'blob'
+    }).subscribe({
+      next: blob => {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `ecs-consent-record-${mandateId}.html`;
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        this.consentDownloadBusy = false;
+      },
+      error: e => {
+        this.consentDownloadBusy = false;
+        this.err(e, 'Could not download the saved customer consent record');
+      }
+    });
   }
 
   private reloadSel() {

@@ -1,14 +1,21 @@
 package com.neo.springapp.controller;
 
 import com.neo.springapp.model.EcsMandate;
+import com.neo.springapp.model.EcsConsentRecord;
 import com.neo.springapp.service.EcsMandateService;
 import com.neo.springapp.service.UserSessionTokenService.SessionPrincipal;
 import org.springframework.security.core.Authentication;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.CacheControl;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import jakarta.servlet.http.HttpServletRequest;
 
+import java.nio.charset.StandardCharsets;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 
@@ -66,6 +73,76 @@ public class EcsMandateController {
                                                                HttpServletRequest servletRequest) {
         return respond(service.confirmConsent(token, request.fullName(), request.consent(),
                 servletRequest.getRemoteAddr()));
+    }
+
+    @GetMapping("/{id}/consent-record")
+    public ResponseEntity<?> downloadConsentRecord(@PathVariable Long id, Authentication authentication) {
+        if (!isStaff(authentication)) {
+            return ResponseEntity.status(403).body(Map.of("message", "Staff sign-in required."));
+        }
+        EcsConsentRecord record = service.consentRecord(id);
+        if (record == null) {
+            return ResponseEntity.status(404).body(Map.of("message", "No recorded customer consent is available."));
+        }
+
+        String html = consentRecordHtml(record);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.TEXT_HTML);
+        headers.setContentDisposition(ContentDisposition.attachment()
+                .filename("ecs-consent-record-" + id + ".html").build());
+        headers.setCacheControl(CacheControl.noStore().cachePrivate());
+        headers.set("X-Content-Type-Options", "nosniff");
+        return ResponseEntity.ok().headers(headers).body(html.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static String consentRecordHtml(EcsConsentRecord record) {
+        String statement = record.getConsentStatement() == null || record.getConsentStatement().isBlank()
+                ? "<p>The exact consent wording was not retained for this legacy authorization. This record contains only the confirmation metadata available in the database.</p>"
+                : "<blockquote>" + escapeHtml(record.getConsentStatement()) + "</blockquote>";
+        String acceptedAt = record.getAcceptedAt() == null ? "Not available"
+                : record.getAcceptedAt().format(DateTimeFormatter.ofPattern("dd MMM uuuu HH:mm:ss"));
+        String remoteAddress = record.getRemoteAddress() == null ? "Not available" : record.getRemoteAddress();
+        return "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">"
+                + "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
+                + "<title>NeoBank ECS Consent Record</title><style>"
+                + "body{font:15px Arial,sans-serif;color:#172033;background:#f3f6fb;padding:28px}"
+                + "main{max-width:760px;margin:auto;background:white;border:2px solid #0876a8;padding:28px}"
+                + "h1{color:#075985;border-bottom:2px solid #0786b5;padding-bottom:12px}"
+                + "h2{font-size:17px;color:#075985;margin-top:24px}table{width:100%;border-collapse:collapse}"
+                + "th,td{text-align:left;padding:10px;border:1px solid #cbd5e1;overflow-wrap:anywhere}"
+                + "th{width:36%;background:#eff8fc}blockquote{margin:12px 0;padding:14px;background:#f7f9fc;border-left:4px solid #0786b5;line-height:1.55}"
+                + ".note{margin-top:24px;padding-top:12px;border-top:1px solid #cbd5e1;color:#526170;font-size:12px}"
+                + "@media print{body{padding:0;background:white}main{border-radius:0}}</style></head><body><main>"
+                + "<h1>NeoBank</h1><h2>Electronic ECS consent record</h2>"
+                + "<table><tbody>"
+                + recordRow("Record type", "Customer authorization audit record")
+                + recordRow("Mandate ID", record.getMandateId())
+                + recordRow("Product account", record.getProductAccountNumber())
+                + recordRow("Product", record.getProductType())
+                + recordRow("Customer", record.getCustomerName())
+                + recordRow("Linked debit account", record.getSavingsAccountNumber())
+                + recordRow("Monthly contribution", "INR " + record.getMonthlyAmount())
+                + recordRow("Maximum monthly debit", "INR " + record.getAmountLimit())
+                + recordRow("Debit day", record.getDebitDay())
+                + recordRow("Consent version", record.getConsentVersion())
+                + recordRow("Confirmed by", record.getConfirmedName())
+                + recordRow("Recorded at (server local time)", acceptedAt)
+                + recordRow("Remote address", remoteAddress)
+                + "</tbody></table><h2>Customer-confirmed statement</h2>" + statement
+                + "<p class=\"note\">This document is generated from the consent record retained by NeoBank. "
+                + "It is an ECS authorization audit record, not a copy of a signed loan agreement.</p>"
+                + "</main></body></html>";
+    }
+
+    private static String recordRow(String label, Object value) {
+        return "<tr><th>" + escapeHtml(label) + "</th><td>"
+                + escapeHtml(value == null ? "Not available" : value) + "</td></tr>";
+    }
+
+    private static String escapeHtml(Object value) {
+        return String.valueOf(value)
+                .replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                .replace("\"", "&quot;").replace("'", "&#39;");
     }
 
     @GetMapping("/{id}")

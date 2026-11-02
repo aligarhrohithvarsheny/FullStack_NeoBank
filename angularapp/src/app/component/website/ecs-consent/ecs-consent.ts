@@ -28,7 +28,7 @@ import { environment } from '../../../../environment/environment';
         <p class="notice">{{ details.notice }}</p>
         <div *ngIf="!completed">
           <label>Account holder full name<input [(ngModel)]="fullName" maxlength="128" autocomplete="name" /></label>
-          <label class="check"><input type="checkbox" [(ngModel)]="consent" /><span>I authorize NeoBank to debit the displayed monthly RD installment from the masked debit account on the displayed debit day, subject to the amount limit. I understand the mandate can be cancelled through the bank.</span></label>
+          <label class="check"><input type="checkbox" [(ngModel)]="consent" /><span>{{ details.consentStatement }}</span></label>
           <button class="primary" (click)="confirm()" [disabled]="busy || !fullName.trim() || !consent">{{ busy ? 'Recording consent…' : 'Confirm ECS authorization' }}</button>
         </div>
         <div *ngIf="completed" class="success">{{ completed }}</div>

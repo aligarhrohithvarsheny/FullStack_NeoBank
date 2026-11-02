@@ -4,6 +4,7 @@ import com.neo.springapp.model.Account;
 import com.neo.springapp.model.CreditCard;
 import com.neo.springapp.model.CreditCardBill;
 import com.neo.springapp.model.EcsMandate;
+import com.neo.springapp.model.EcsConsentRecord;
 import com.neo.springapp.model.EcsMandateEvent;
 import com.neo.springapp.model.EmiPayment;
 import com.neo.springapp.model.GoldLoan;
@@ -14,6 +15,7 @@ import com.neo.springapp.repository.CreditCardBillRepository;
 import com.neo.springapp.repository.CreditCardRepository;
 import com.neo.springapp.repository.EcsMandateEventRepository;
 import com.neo.springapp.repository.EcsMandateRepository;
+import com.neo.springapp.repository.EcsConsentRecordRepository;
 import com.neo.springapp.repository.EmiPaymentRepository;
 import com.neo.springapp.repository.GoldLoanRepository;
 import com.neo.springapp.repository.HomeLoanRepository;
@@ -47,9 +49,13 @@ public class EcsMandateService {
 
     private static final List<String> LIVE_STATUSES = List.of("ACTIVE", "PAUSED", "PENDING_CONSENT");
     private static final SecureRandom RANDOM = new SecureRandom();
+    private static final String RD_ECS_CONSENT_VERSION = "RD_ECS_CONSENT_V1";
+    private static final String RD_ECS_CONSENT_STATEMENT =
+            "I authorize NeoBank to debit the displayed monthly RD installment from the masked debit account on the displayed debit day, subject to the amount limit. I understand the mandate can be cancelled through the bank.";
 
     @Autowired private EcsMandateRepository mandateRepository;
     @Autowired private EcsMandateEventRepository eventRepository;
+    @Autowired private EcsConsentRecordRepository consentRecordRepository;
     @Autowired private EmiPaymentRepository emiPaymentRepository;
     @Autowired private LoanRepository loanRepository;
     @Autowired private GoldLoanRepository goldLoanRepository;
@@ -316,6 +322,8 @@ public class EcsMandateService {
         details.put("amountLimit", mandate.getAmountLimit());
         details.put("debitDay", mandate.getDebitDay());
         details.put("consentExpiresAt", mandate.getConsentExpiresAt());
+        details.put("consentVersion", RD_ECS_CONSENT_VERSION);
+        details.put("consentStatement", RD_ECS_CONSENT_STATEMENT);
         details.put("notice", "This is a separate ECS authorization. If you confirm, the linked account may be debited up to the displayed monthly amount on the selected day. The first debit is no earlier than the following calendar month.");
         return details;
     }
@@ -333,6 +341,22 @@ public class EcsMandateService {
         mandate.setCustomerConsentAt(LocalDateTime.now());
         mandate.setCustomerConsentIp(remoteAddress == null ? null
                 : remoteAddress.substring(0, Math.min(remoteAddress.length(), 64)));
+        EcsConsentRecord consentRecord = new EcsConsentRecord();
+        consentRecord.setMandateDbId(mandate.getId());
+        consentRecord.setMandateId(mandate.getMandateId());
+        consentRecord.setProductType(mandate.getProductType());
+        consentRecord.setProductAccountNumber(mandate.getLoanAccountNumber());
+        consentRecord.setSavingsAccountNumber(mandate.getSavingsAccountNumber());
+        consentRecord.setCustomerName(mandate.getCustomerName());
+        consentRecord.setConfirmedName(name.trim());
+        consentRecord.setMonthlyAmount(mandate.getEmiAmount());
+        consentRecord.setAmountLimit(mandate.getAmountLimit());
+        consentRecord.setDebitDay(mandate.getDebitDay());
+        consentRecord.setConsentVersion(RD_ECS_CONSENT_VERSION);
+        consentRecord.setConsentStatement(RD_ECS_CONSENT_STATEMENT);
+        consentRecord.setAcceptedAt(mandate.getCustomerConsentAt());
+        consentRecord.setRemoteAddress(mandate.getCustomerConsentIp());
+        consentRecordRepository.save(consentRecord);
         mandate.setConsentTokenHash(null);
         mandate.setConsentExpiresAt(null);
         mandate.setStatus("ACTIVE");
@@ -341,6 +365,36 @@ public class EcsMandateService {
         log(mandate, "CUSTOMER_CONSENT", null, mandate.getEmiAmount(),
                 "Customer separately authorized RD monthly contribution debits.", name.trim());
         return ok(mandate, "ECS authorization recorded. Contributions will start on the next eligible monthly date.");
+    }
+
+    @Transactional(readOnly = true)
+    public EcsConsentRecord consentRecord(Long mandateId) {
+        EcsMandate mandate = mandateRepository.findById(mandateId).orElse(null);
+        if (mandate == null || !"RECURRING_DEPOSIT".equals(mandate.getProductType())
+                || mandate.getCustomerConsentAt() == null) {
+            return null;
+        }
+        return consentRecordRepository.findByMandateDbId(mandateId)
+                .orElseGet(() -> legacyConsentRecord(mandate));
+    }
+
+    private EcsConsentRecord legacyConsentRecord(EcsMandate mandate) {
+        if (mandate.getCustomerConsentName() == null || mandate.getCustomerConsentName().isBlank()) return null;
+        EcsConsentRecord record = new EcsConsentRecord();
+        record.setMandateDbId(mandate.getId());
+        record.setMandateId(mandate.getMandateId());
+        record.setProductType(mandate.getProductType());
+        record.setProductAccountNumber(mandate.getLoanAccountNumber());
+        record.setSavingsAccountNumber(mandate.getSavingsAccountNumber());
+        record.setCustomerName(mandate.getCustomerName());
+        record.setConfirmedName(mandate.getCustomerConsentName());
+        record.setMonthlyAmount(mandate.getEmiAmount());
+        record.setAmountLimit(mandate.getAmountLimit());
+        record.setDebitDay(mandate.getDebitDay());
+        record.setConsentVersion("LEGACY_METADATA_ONLY");
+        record.setAcceptedAt(mandate.getCustomerConsentAt());
+        record.setRemoteAddress(mandate.getCustomerConsentIp());
+        return record;
     }
 
     private EcsMandate findPendingConsent(String token) {
