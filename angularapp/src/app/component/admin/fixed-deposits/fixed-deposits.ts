@@ -33,6 +33,11 @@ export class FixedDeposits implements OnInit {
   rdHistory: any[] = [];
   selectedRD: any = null;
   savingRD = false;
+  showEditModal = false;
+  editingDeposit: 'FD' | 'RD' | null = null;
+  savingEdit = false;
+  editTarget: any = null;
+  editForm: any = {};
   fdHistory: any[] = [];
   selectedHistoryFD: any = null;
   
@@ -212,24 +217,150 @@ export class FixedDeposits implements OnInit {
   }
 
   editFD(fd: any) {
-    const principal = fd.status === 'PENDING' ? prompt('Principal amount (only before funding):', fd.principalAmount) : null;
-    if (fd.status === 'PENDING' && principal === null) return;
-    const maturity = prompt('Maturity date (YYYY-MM-DD):', fd.maturityDate || '');
-    if (maturity === null) return;
-    const payout = prompt('Interest payout (Monthly, Quarterly, At Maturity):', fd.interestPayout || 'At Maturity');
-    if (!payout) return;
-    const reason = prompt('Reason for this audited update:');
-    if (!reason?.trim()) return;
-    const body: any = { maturityDate: maturity, interestPayout: payout, remarks: fd.remarks };
-    if (principal !== null) body.principalAmount = Number(principal);
-    this.http.put(`${environment.apiBaseUrl}/api/fixed-deposits/${fd.id}?reason=${encodeURIComponent(reason)}`, body, this.staffOptions()).subscribe({
-      next: (response: any) => {
-        if (response.success) this.alertService.success('Updated', 'FD details and maturity estimate recalculated.');
-        else this.alertService.error('Update Failed', response.message || 'Unable to update FD.');
-        this.loadFixedDeposits();
+    this.editTarget = fd;
+    this.editingDeposit = 'FD';
+    this.editForm = {
+      principalAmount: fd.principalAmount,
+      interestRate: fd.interestRate,
+      tenure: fd.tenure,
+      maturityDate: this.toDateInput(fd.maturityDate),
+      interestPayout: fd.interestPayout || 'At Maturity',
+      remarks: '',
+      reason: ''
+    };
+    this.showEditModal = true;
+  }
+
+  editRD(rd: any) {
+    this.editTarget = rd;
+    this.editingDeposit = 'RD';
+    this.editForm = {
+      monthlyInstallment: rd.monthlyInstallment,
+      tenureMonths: rd.tenureMonths,
+      annualInterestRate: rd.annualInterestRate,
+      startDate: this.toDateInput(rd.startDate),
+      maturityDate: this.toDateInput(rd.maturityDate),
+      remarks: rd.remarks || '',
+      reason: ''
+    };
+    this.showEditModal = true;
+  }
+
+  closeDepositEditModal() {
+    if (this.savingEdit) return;
+    this.showEditModal = false;
+    this.editingDeposit = null;
+    this.editTarget = null;
+    this.editForm = {};
+  }
+
+  updateFDMaturityDate() {
+    this.editForm.maturityDate = this.maturityDateAfterMonths(
+      this.editTarget?.startDate,
+      Number(this.editForm.tenure)
+    );
+  }
+
+  updateRDMaturityDate() {
+    this.editForm.maturityDate = this.maturityDateAfterMonths(
+      this.editForm.startDate,
+      Number(this.editForm.tenureMonths)
+    );
+  }
+
+  saveDepositEdit() {
+    if (!this.editTarget || !this.editingDeposit) return;
+    if (!this.editForm.reason?.trim()) {
+      this.alertService.error('Audit Reason Required', 'Enter a reason for this audited update.');
+      return;
+    }
+
+    if (this.editingDeposit === 'FD') {
+      if (this.editForm.principalAmount <= 0 || this.editForm.interestRate < 0
+          || this.editForm.interestRate > 100 || this.editForm.tenure <= 0
+          || !this.editForm.maturityDate) {
+        this.alertService.error('Validation Error', 'Enter a valid principal, interest rate, tenure, and maturity date.');
+        return;
+      }
+      const body: any = {
+        interestRate: Number(this.editForm.interestRate),
+        tenure: Number(this.editForm.tenure),
+        maturityDate: this.editForm.maturityDate,
+        interestPayout: this.editForm.interestPayout,
+        remarks: this.editForm.remarks
+      };
+      if (this.editTarget.status === 'PENDING') {
+        body.principalAmount = Number(this.editForm.principalAmount);
+      }
+      this.savingEdit = true;
+      this.http.put<any>(
+        `${environment.apiBaseUrl}/api/fixed-deposits/${this.editTarget.id}?reason=${encodeURIComponent(this.editForm.reason.trim())}`,
+        body,
+        this.staffOptions()
+      ).subscribe({
+        next: response => {
+          this.savingEdit = false;
+          if (!response?.success) {
+            this.alertService.error('Update Failed', response?.message || 'Unable to update FD details.');
+            return;
+          }
+          this.alertService.success('FD Updated', 'Details and maturity estimate were saved to history.');
+          this.closeDepositEditModal();
+          this.loadFixedDeposits();
+        },
+        error: err => {
+          this.savingEdit = false;
+          this.alertService.error('FD Update Failed', err.error?.message || 'Unable to update FD details.');
+        }
+      });
+      return;
+    }
+
+    if (this.editForm.monthlyInstallment <= 0 || this.editForm.tenureMonths <= 0
+        || this.editForm.annualInterestRate < 0 || this.editForm.annualInterestRate > 100
+        || !this.editForm.startDate || !this.editForm.maturityDate) {
+      this.alertService.error('Validation Error', 'Enter a valid installment, duration, interest rate, and dates.');
+      return;
+    }
+    this.savingEdit = true;
+    this.http.put<any>(`${environment.apiBaseUrl}/api/recurring-deposits/${this.editTarget.id}`, {
+      monthlyInstallment: Number(this.editForm.monthlyInstallment),
+      tenureMonths: Number(this.editForm.tenureMonths),
+      annualInterestRate: Number(this.editForm.annualInterestRate),
+      startDate: this.editForm.startDate,
+      maturityDate: this.editForm.maturityDate,
+      remarks: this.editForm.remarks,
+      reason: this.editForm.reason.trim()
+    }, this.staffOptions()).subscribe({
+      next: () => {
+        this.savingEdit = false;
+        this.alertService.success('RD Updated', 'Details and estimate were saved to history; no funds were moved.');
+        const updatedRD = this.editTarget;
+        this.closeDepositEditModal();
+        this.loadRecurringDeposits();
+        this.loadRDHistory(updatedRD);
       },
-      error: (e: any) => this.alertService.error('Error', e.error?.message || 'Unable to update FD')
+      error: err => {
+        this.savingEdit = false;
+        this.alertService.error('RD Update Failed', err.error?.message || 'Unable to update RD details.');
+      }
     });
+  }
+
+  private toDateInput(value: string | null | undefined): string {
+    return value ? value.slice(0, 10) : '';
+  }
+
+  private maturityDateAfterMonths(startValue: string | null | undefined, months: number): string {
+    const startDate = this.toDateInput(startValue);
+    if (!startDate || !Number.isInteger(months) || months <= 0) return '';
+    const [year, month, day] = startDate.split('-').map(Number);
+    const targetMonth = month - 1 + months;
+    const targetYear = year + Math.floor(targetMonth / 12);
+    const normalizedMonth = targetMonth % 12 + 1;
+    const lastDay = new Date(Date.UTC(targetYear, normalizedMonth, 0)).getUTCDate();
+    const normalizedDay = Math.min(day, lastDay).toString().padStart(2, '0');
+    return `${targetYear}-${normalizedMonth.toString().padStart(2, '0')}-${normalizedDay}`;
   }
   topUpFD(fd: any) { const amount = prompt('Increase FD amount by:'); if (!amount || Number(amount) <= 0) return; this.http.post(`${environment.apiBaseUrl}/api/fixed-deposits/${fd.id}/admin/top-up?amount=${Number(amount)}&admin=${encodeURIComponent(this.adminName)}`, {}, this.staffOptions()).subscribe({ next: () => this.loadFixedDeposits(), error: (e: any) => this.alertService.error('Error', e.error?.message || 'Unable to increase FD') }); }
   closeFD(fd: any) {
@@ -333,33 +464,6 @@ export class FixedDeposits implements OnInit {
         this.savingRD = false;
         this.alertService.error('RD Record', err.error?.message || 'Unable to save RD details.');
       }
-    });
-  }
-
-  editRD(rd: any) {
-    const monthlyInstallment = prompt('Monthly installment amount:', String(rd.monthlyInstallment));
-    if (monthlyInstallment === null) return;
-    const tenureMonths = prompt('Duration in months:', String(rd.tenureMonths));
-    if (tenureMonths === null) return;
-    const annualInterestRate = prompt('Annual interest rate (%):', String(rd.annualInterestRate));
-    if (annualInterestRate === null) return;
-    const maturityDate = prompt('Maturity date (YYYY-MM-DD):', rd.maturityDate);
-    if (maturityDate === null) return;
-    const reason = prompt('Reason for this audited update:');
-    if (!reason?.trim()) return;
-    this.http.put<any>(`${environment.apiBaseUrl}/api/recurring-deposits/${rd.id}`, {
-      monthlyInstallment: Number(monthlyInstallment),
-      tenureMonths: Number(tenureMonths),
-      annualInterestRate: Number(annualInterestRate),
-      maturityDate,
-      reason
-    }, this.staffOptions()).subscribe({
-      next: () => {
-        this.loadRecurringDeposits();
-        this.loadRDHistory(rd);
-        this.alertService.success('RD Updated', 'Details and estimated values updated; no funds were moved.');
-      },
-      error: err => this.alertService.error('RD Update', err.error?.message || 'Unable to update RD details.')
     });
   }
 

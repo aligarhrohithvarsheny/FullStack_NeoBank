@@ -258,4 +258,49 @@
       </div>
     </div>
   </div>
+
+  <div *ngIf="showEditModal" class="modal-overlay" (click)="closeDepositEditModal()">
+    <div class="modal-content deposit-edit-modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <div>
+          <h2>Edit {{ editingDeposit === 'FD' ? 'Fixed Deposit' : 'Recurring Deposit' }}</h2>
+          <p>Changes are recorded in the deposit history.</p>
+        </div>
+        <button type="button" class="close-btn" (click)="closeDepositEditModal()" [disabled]="savingEdit" aria-label="Close edit form">×</button>
+      </div>
+      <form *ngIf="editTarget" (ngSubmit)="saveDepositEdit()">
+        <div class="modal-body">
+          <div class="deposit-edit-summary">
+            <div><span>Customer</span><strong>{{ editTarget.userName || editTarget.customerName || 'Customer' }}</strong></div>
+            <div><span>Linked account</span><strong>{{ editTarget.accountNumber }}</strong></div>
+            <div><span>{{ editingDeposit === 'FD' ? 'FD account' : 'Scheme' }}</span><strong>{{ editTarget.fdAccountNumber || editTarget.schemeName }}</strong></div>
+            <div><span>Status</span><strong>{{ editTarget.status || 'DETAILS ONLY' }}</strong></div>
+          </div>
+          <div class="deposit-edit-fields" *ngIf="editingDeposit === 'FD'">
+            <label *ngIf="editTarget.status === 'PENDING'"><span>Principal amount (₹)</span><input type="number" name="fdPrincipal" [(ngModel)]="editForm.principalAmount" min="1" step="0.01" required /></label>
+            <label *ngIf="editTarget.status !== 'PENDING'"><span>Principal amount (₹)</span><input type="number" [value]="editForm.principalAmount" readonly /><small>Principal can only be changed before funding.</small></label>
+            <label><span>Annual interest rate (%)</span><input type="number" name="fdRate" [(ngModel)]="editForm.interestRate" min="0" max="100" step="0.01" required /></label>
+            <label><span>Tenure (months)</span><input type="number" name="fdTenure" [(ngModel)]="editForm.tenure" (ngModelChange)="updateFDMaturityDate()" min="1" step="1" required /></label>
+            <label><span>Maturity date</span><input type="date" name="fdMaturity" [(ngModel)]="editForm.maturityDate" [min]="editTarget.startDate" required /></label>
+            <label><span>Interest payout</span><select name="fdPayout" [(ngModel)]="editForm.interestPayout" required><option value="Monthly">Monthly</option><option value="Quarterly">Quarterly</option><option value="At Maturity">At Maturity</option></select></label>
+            <label class="deposit-edit-wide"><span>Remarks</span><textarea name="fdRemarks" [(ngModel)]="editForm.remarks" rows="2"></textarea></label>
+          </div>
+          <div class="deposit-edit-fields" *ngIf="editingDeposit === 'RD'">
+            <label><span>Monthly installment details (₹)</span><input type="number" name="rdInstallment" [(ngModel)]="editForm.monthlyInstallment" min="0.01" step="0.01" required /></label>
+            <label><span>Annual interest rate (%)</span><input type="number" name="rdRate" [(ngModel)]="editForm.annualInterestRate" min="0" max="100" step="0.01" required /></label>
+            <label><span>Duration (months)</span><input type="number" name="rdTenure" [(ngModel)]="editForm.tenureMonths" (ngModelChange)="updateRDMaturityDate()" min="1" step="1" required /></label>
+            <label><span>Start date</span><input type="date" name="rdStartDate" [(ngModel)]="editForm.startDate" (ngModelChange)="updateRDMaturityDate()" required /></label>
+            <label><span>Maturity date</span><input type="date" name="rdMaturity" [(ngModel)]="editForm.maturityDate" [min]="editForm.startDate" required /></label>
+            <label class="deposit-edit-wide"><span>Remarks</span><textarea name="rdRemarks" [(ngModel)]="editForm.remarks" rows="2"></textarea></label>
+            <p class="deposit-edit-notice deposit-edit-wide">RD values are informational estimates. Saving changes does not debit installments or transfer funds.</p>
+          </div>
+          <label class="deposit-edit-reason"><span>Audit reason <b>*</b></span><textarea name="editReason" [(ngModel)]="editForm.reason" rows="3" maxlength="500" required placeholder="Explain why these deposit details are being changed"></textarea></label>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn-secondary" (click)="closeDepositEditModal()" [disabled]="savingEdit">Cancel</button>
+          <button type="submit" class="btn-primary" [disabled]="savingEdit">{{ savingEdit ? 'Saving...' : 'Save changes' }}</button>
+        </div>
+      </form>
+    </div>
+  </div>
 </div>

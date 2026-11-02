@@ -493,4 +493,138 @@
   border: 1px solid #ef4444;
 }
 
+.deposit-edit-modal {
+  width: min(760px, 100%);
+  max-height: 92vh;
+  overflow-y: auto;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
 
+.deposit-edit-modal .modal-header h2 {
+  margin: 0;
+  color: #1e293b;
+  font-size: 22px;
+}
+
+.deposit-edit-modal .modal-header p {
+  margin: 6px 0 0;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.deposit-edit-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 22px;
+}
+
+.deposit-edit-summary > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  background: #f8fafc;
+  border-left: 3px solid #f59e0b;
+  border-radius: 8px;
+  overflow-wrap: anywhere;
+}
+
+.deposit-edit-summary span,
+.deposit-edit-fields label > span,
+.deposit-edit-reason > span {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.deposit-edit-summary strong {
+  color: #1e293b;
+  font-size: 14px;
+}
+
+.deposit-edit-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.deposit-edit-fields label,
+.deposit-edit-reason {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.deposit-edit-fields input,
+.deposit-edit-fields select,
+.deposit-edit-fields textarea,
+.deposit-edit-reason textarea {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+  color: #1e293b;
+  font: inherit;
+}
+
+.deposit-edit-fields input:focus,
+.deposit-edit-fields select:focus,
+.deposit-edit-fields textarea:focus,
+.deposit-edit-reason textarea:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+}
+
+.deposit-edit-fields input[readonly] {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.deposit-edit-fields small {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.deposit-edit-wide {
+  grid-column: 1 / -1;
+}
+
+.deposit-edit-notice {
+  margin: 0;
+  padding: 10px 12px;
+  color: #475569;
+  background: #f1f5f9;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.deposit-edit-reason {
+  margin-top: 20px;
+}
+
+.deposit-edit-reason b {
+  color: #dc2626;
+}
+
+@media (max-width: 600px) {
+  .deposit-edit-modal .modal-header,
+  .deposit-edit-modal .modal-body,
+  .deposit-edit-modal .modal-footer {
+    padding: 16px;
+  }
+
+  .deposit-edit-summary,
+  .deposit-edit-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .deposit-edit-wide {
+    grid-column: auto;
+  }
+}
