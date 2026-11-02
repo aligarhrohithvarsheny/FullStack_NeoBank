@@ -63,6 +63,9 @@ public class GoldLoanController {
     @Autowired
     private com.neo.springapp.service.LoanAgreementService loanAgreementService;
 
+    @Autowired
+    private com.neo.springapp.service.GoldLoanApprovalService goldLoanApprovalService;
+
     @Value("${app.upload-dir:uploads}")
     private String uploadDirectory;
 
@@ -304,7 +307,6 @@ public class GoldLoanController {
     }
 
     @PostMapping("/{id}/final-approve")
-    @org.springframework.transaction.annotation.Transactional
     public ResponseEntity<Map<String, Object>> finalApproveGoldLoan(
             @PathVariable Long id,
             @RequestParam Long agreementId,
@@ -315,12 +317,10 @@ public class GoldLoanController {
                     .body(Map.of("success", false, "message", "Staff sign-in required."));
         }
         try {
-            com.neo.springapp.model.LoanAgreement agreement =
-                    loanAgreementService.requireSigned(agreementId, "GOLD_LOAN", id);
-            GoldLoan approvedLoan = goldLoanService.approveGoldLoan(
-                    id, "Approved", approvedBy, loanAgreementService.approvalContext(agreementId));
-            if (approvedLoan == null) return ResponseEntity.notFound().build();
-            loanAgreementService.markApproved(agreementId, approvedBy);
+            com.neo.springapp.service.GoldLoanApprovalService.FinalApprovalResult result =
+                    goldLoanApprovalService.finalApprove(id, agreementId, approvedBy);
+            if (result == null || result.goldLoan() == null) return ResponseEntity.notFound().build();
+            GoldLoan approvedLoan = result.goldLoan();
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);
             response.put("goldLoan", approvedLoan);
@@ -336,9 +336,9 @@ public class GoldLoanController {
                     response.put("emailError", e.getMessage());
                 }
             }
-            response.put("agreementSignedAt", agreement.getSignedAt());
+            response.put("agreementSignedAt", result.agreementSignedAt());
             return ResponseEntity.ok(response);
-        } catch (Exception e) {
+        } catch (IllegalArgumentException | IllegalStateException e) {
             return ResponseEntity.badRequest().body(Map.of("success", false, "message",
                     e.getMessage() == null ? "Could not finalize gold loan approval." : e.getMessage()));
         }
