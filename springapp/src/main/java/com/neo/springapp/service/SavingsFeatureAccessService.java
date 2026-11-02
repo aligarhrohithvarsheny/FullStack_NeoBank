@@ -2,7 +2,6 @@ package com.neo.springapp.service;
 
 import com.neo.springapp.model.Account;
 import com.neo.springapp.model.BankingProductConfig;
-import com.neo.springapp.model.EmergencyControl;
 import com.neo.springapp.model.SavingsFeature;
 import com.neo.springapp.repository.AccountRepository;
 import com.neo.springapp.repository.BankingProductConfigRepository;
@@ -16,8 +15,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 @Service
 public class SavingsFeatureAccessService {
@@ -36,45 +33,23 @@ public class SavingsFeatureAccessService {
 
     public Map<String, Object> getFeatureAccess(String accountNumber) {
         Account account = requireSavingsAccount(accountNumber);
-        Map<String, Boolean> defaultFeatures = getDefaultFeatures(account.getSavingsProductCode());
-        Map<String, EmergencyControl> overrides = controlService
-                .getFeatureControls(featureKeyPrefix(account.getAccountNumber())).stream()
-                .collect(Collectors.toMap(
-                        control -> control.getScopeKey().toUpperCase(Locale.ROOT),
-                        Function.identity(),
-                        (first, ignored) -> first));
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("accountNumber", account.getAccountNumber());
         response.put("productCode", account.getSavingsProductCode());
         response.put("features", SavingsFeature.IDS.stream().map(feature -> {
-            var override = overrides.get(featureKey(account.getAccountNumber(), feature));
-            boolean inherited = override == null;
-            boolean enabled = inherited
-                    ? defaultFeatures.getOrDefault(feature, false)
-                    : !override.isActive();
             Map<String, Object> featureAccess = new LinkedHashMap<>();
             featureAccess.put("id", feature);
-            featureAccess.put("enabled", enabled);
-            featureAccess.put("inherited", inherited);
-            featureAccess.put("reason", inherited
-                    ? "Using product defaults"
-                    : override.getReason() == null || override.getReason().isBlank()
-                            ? "No reason recorded"
-                            : override.getReason());
+            featureAccess.put("enabled", true);
+            featureAccess.put("inherited", true);
+            featureAccess.put("reason", "Available to all Savings accounts");
             return featureAccess;
         }).toList());
         return response;
     }
 
     public boolean isFeatureEnabled(String accountNumber, String feature) {
-        String featureId = normalizeFeature(feature);
-        Account account = accountRepository.findByAccountNumber(accountNumber == null ? "" : accountNumber.trim());
-        if (account == null || !"SAVINGS".equalsIgnoreCase(account.getAccountType())) {
-            return true;
-        }
-        var override = controlService.getControl("FEATURE", featureKey(account.getAccountNumber(), featureId));
-        if (override != null) return !override.isActive();
-        return getDefaultFeatures(account.getSavingsProductCode()).getOrDefault(featureId, false);
+        normalizeFeature(feature);
+        return true;
     }
 
     public boolean isSavingsAccount(String accountNumber) {
@@ -109,23 +84,12 @@ public class SavingsFeatureAccessService {
 
     public void setFeatureEnabled(String accountNumber, String feature, boolean enabled, String reason, String changedBy) {
         requireSavingsAccount(accountNumber);
-        String featureId = normalizeFeature(feature);
-        controlService.setControl("FEATURE", featureKey(accountNumber, featureId), !enabled, reason, changedBy);
-    }
-
-    private Map<String, Boolean> getDefaultFeatures(String productCode) {
-        if (productCode == null || productCode.isBlank()) {
-            return SavingsFeature.IDS.stream().collect(Collectors.toMap(
-                    Function.identity(), ignored -> true, (first, ignored) -> first, LinkedHashMap::new));
+        normalizeFeature(feature);
+        if (!enabled) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN, "Savings account features cannot be disabled.");
         }
-        LocalDate today = LocalDate.now();
-        BankingProductConfig product = productRepository
-                .findFirstByProductCodeIgnoreCaseAndAccountTypeIgnoreCaseAndStatusAndEffectiveFromLessThanEqualOrderByEffectiveFromDescCreatedAtDesc(
-                        productCode, "SAVINGS", "APPROVED", today);
-        List<String> enabledFeatures = product == null || product.getEnabledFeatures() == null
-                ? List.of() : product.getEnabledFeatures();
-        return SavingsFeature.IDS.stream().collect(Collectors.toMap(
-                Function.identity(), enabledFeatures::contains, (first, ignored) -> first, LinkedHashMap::new));
+        controlService.setControl("FEATURE", featureKey(accountNumber, feature), false, reason, changedBy);
     }
 
     private Account requireSavingsAccount(String accountNumber) {
@@ -140,10 +104,6 @@ public class SavingsFeatureAccessService {
     private String featureKey(String accountNumber, String feature) {
         return accountNumber.trim().toUpperCase(Locale.ROOT) + ":"
                 + feature.toUpperCase(Locale.ROOT);
-    }
-
-    private String featureKeyPrefix(String accountNumber) {
-        return accountNumber.trim().toUpperCase(Locale.ROOT) + ":";
     }
 
     private String normalizeFeature(String feature) {

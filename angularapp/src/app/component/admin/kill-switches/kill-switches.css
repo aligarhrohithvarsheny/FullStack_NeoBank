@@ -52,7 +52,7 @@ button.resume { background: #047857; }
 .cards-heading h3 { margin: 0; font-size: 15px; }
 .cards-heading span { color: #718099; font-size: 12px; }
 .feature-access-list { overflow: hidden; border: 1px solid #dce5ef; border-radius: 12px; background: #fff; }
-.feature-access-row { display: grid; grid-template-columns: minmax(145px, 1fr) minmax(125px, .8fr) minmax(180px, 1.4fr) minmax(145px, auto); align-items: center; gap: 14px; padding: 12px 14px; border-top: 1px solid #e7edf4; }
+.feature-access-row { display: grid; grid-template-columns: minmax(145px, 1fr) minmax(125px, .8fr) minmax(180px, 1.4fr); align-items: center; gap: 14px; padding: 12px 14px; border-top: 1px solid #e7edf4; }
 .feature-access-row:first-child { border-top: 0; }
 .feature-access-header { color: #65748b; background: #f7f9fc; font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
 .feature-name, .feature-state { min-width: 0; }
@@ -84,5 +84,4 @@ th { color: #65748b; font-size: 11px; text-transform: uppercase; letter-spacing:
   .feature-name { grid-column: 1; }
   .feature-state { grid-column: 1; }
   .feature-reason { grid-column: 1 / -1; padding-top: 7px; border-top: 1px solid #eef2f7; }
-  .feature-action { grid-column: 2; grid-row: 1 / span 2; min-width: 0; padding: 9px 10px; white-space: normal; }
 }

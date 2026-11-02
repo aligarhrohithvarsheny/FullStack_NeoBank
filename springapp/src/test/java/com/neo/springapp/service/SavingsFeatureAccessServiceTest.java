@@ -2,7 +2,6 @@ package com.neo.springapp.service;
 
 import com.neo.springapp.model.Account;
 import com.neo.springapp.model.BankingProductConfig;
-import com.neo.springapp.model.EmergencyControl;
 import com.neo.springapp.repository.AccountRepository;
 import com.neo.springapp.repository.BankingProductConfigRepository;
 import org.junit.jupiter.api.Test;
@@ -42,12 +41,6 @@ class SavingsFeatureAccessServiceTest {
                 .findFirstByProductCodeIgnoreCaseAndAccountTypeIgnoreCaseAndStatusAndEffectiveFromLessThanEqualOrderByEffectiveFromDescCreatedAtDesc(
                         eq("premium"), eq("SAVINGS"), eq("APPROVED"), any()))
                 .thenReturn(premium);
-        when(productRepository
-                .findFirstByProductCodeIgnoreCaseAndAccountTypeIgnoreCaseAndStatusAndEffectiveFromLessThanEqualOrderByEffectiveFromDescCreatedAtDesc(
-                        eq("PREMIUM"), eq("SAVINGS"), eq("APPROVED"), any()))
-                .thenReturn(premium);
-        when(controlService.getFeatureControls("ACC123:")).thenReturn(List.of());
-
         var access = service.setSavingsProduct("ACC123", "premium", "Customer upgrade", "admin");
 
         assertThat(account.getSavingsProductCode()).isEqualTo("PREMIUM");
@@ -75,55 +68,38 @@ class SavingsFeatureAccessServiceTest {
     }
 
     @Test
-    void accessSnapshotAppliesAccountOverridesToProductDefaultsInOneBatch() {
+    void accessSnapshotKeepsEveryFeatureEnabledDespiteProductDefaultsAndOldOverrides() {
         Account account = savingsAccount("PREMIUM");
-        BankingProductConfig product = savingsProduct("PREMIUM", "accounts");
-        EmergencyControl disabledAccounts = new EmergencyControl();
-        disabledAccounts.setScopeKey("ACC123:ACCOUNTS");
-        disabledAccounts.setActive(true);
         when(accountRepository.findByAccountNumber("ACC123")).thenReturn(account);
-        when(productRepository
-                .findFirstByProductCodeIgnoreCaseAndAccountTypeIgnoreCaseAndStatusAndEffectiveFromLessThanEqualOrderByEffectiveFromDescCreatedAtDesc(
-                        eq("PREMIUM"), eq("SAVINGS"), eq("APPROVED"), any()))
-                .thenReturn(product);
-        when(controlService.getFeatureControls("ACC123:")).thenReturn(List.of(disabledAccounts));
 
         @SuppressWarnings("unchecked")
         List<java.util.Map<String, Object>> features =
                 (List<java.util.Map<String, Object>>) service.getFeatureAccess("ACC123").get("features");
 
-        assertThat(features).filteredOn(feature -> "accounts".equals(feature.get("id")))
-                .singleElement()
-                .satisfies(feature -> {
-                    assertThat(feature.get("enabled")).isEqualTo(false);
-                    assertThat(feature.get("inherited")).isEqualTo(false);
-                });
-        assertThat(features).filteredOn(feature -> "ai-assistant".equals(feature.get("id")))
-                .singleElement()
-                .satisfies(feature -> {
-                    assertThat(feature.get("enabled")).isEqualTo(false);
+        assertThat(features).hasSize(com.neo.springapp.model.SavingsFeature.IDS.size())
+                .allSatisfy(feature -> {
+                    assertThat(feature.get("enabled")).isEqualTo(true);
                     assertThat(feature.get("inherited")).isEqualTo(true);
                 });
-        verify(controlService).getFeatureControls("ACC123:");
     }
 
     @Test
-    void featureCheckUsesTheNormalizedAccountOverride() {
-        Account account = savingsAccount("PREMIUM");
-        EmergencyControl disabledAccounts = new EmergencyControl();
-        disabledAccounts.setActive(true);
-        when(accountRepository.findByAccountNumber("ACC123")).thenReturn(account);
-        when(controlService.getControl("FEATURE", "ACC123:ACCOUNTS")).thenReturn(disabledAccounts);
+    void featureCheckIgnoresHistoricalDisabledOverrides() {
+        assertThat(service.isFeatureEnabled("ACC123", "accounts")).isTrue();
+    }
 
-        assertThat(service.isFeatureEnabled("ACC123", "accounts")).isFalse();
+    @Test
+    void adminsCannotDisableSavingsFeatures() {
+        when(accountRepository.findByAccountNumber("ACC123")).thenReturn(savingsAccount("PREMIUM"));
+
+        assertThatThrownBy(() -> service.setFeatureEnabled(
+                "ACC123", "accounts", false, "No reason", "admin"))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Savings account features cannot be disabled.");
     }
 
     @Test
     void featureCheckLeavesNonSavingsAccountsUnaffected() {
-        Account account = savingsAccount("PREMIUM");
-        account.setAccountType("CURRENT");
-        when(accountRepository.findByAccountNumber("ACC123")).thenReturn(account);
-
         assertThat(service.isFeatureEnabled("ACC123", "accounts")).isTrue();
     }
 

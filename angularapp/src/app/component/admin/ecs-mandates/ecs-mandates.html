@@ -1,0 +1,161 @@
+<div class="ecs-wrap">
+  <div class="ecs-head">
+    <div>
+      <button class="btn" (click)="back()">← Back</button>
+      <h2>ECS Mandates (Auto-Debit)</h2>
+    </div>
+    <div class="live">● Live · refreshed {{ lastRefresh | date:'mediumTime' }}</div>
+  </div>
+  <div class="card error" *ngIf="loadError || eligibilityError" role="alert">
+    <div *ngIf="loadError">{{ loadError }}</div><div *ngIf="eligibilityError">{{ eligibilityError }}</div>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><b>{{ count('ACTIVE') }}</b><span>Active</span></div>
+    <div class="stat warn"><b>{{ count('PENDING_CONSENT') }}</b><span>Awaiting customer consent</span></div>
+    <div class="stat"><b>{{ count('PAUSED') }}</b><span>Paused</span></div>
+    <div class="stat"><b>{{ count('CANCELLED') }}</b><span>Cancelled</span></div>
+    <div class="stat warn"><b>{{ cancelRequests() }}</b><span>Cancel requests</span></div>
+  </div>
+
+  <div class="card">
+    <h3>Link ECS Mandate</h3>
+    <div class="grid">
+      <label>Loan / Deposit / Credit Card No.<input [(ngModel)]="form.loanAccountNumber" list="eligible" placeholder="Product account number" />
+        <datalist id="eligible"><option *ngFor="let l of eligible" [value]="l.loanAccountNumber">{{ l.customerName }} - {{ l.loanType }}</option></datalist>
+      </label>
+      <label>Savings Account No.<input [(ngModel)]="form.savingsAccountNumber" placeholder="Blank = loan's account" /></label>
+      <label>Date of Birth<input type="date" [(ngModel)]="form.dob" /></label>
+      <label>Debit Date (day of month)<input type="number" min="1" max="31" [(ngModel)]="form.debitDay" /></label>
+      <label>Amount Limit (₹)<input type="number" [(ngModel)]="form.amountLimit" placeholder="Defaults to EMI" /></label>
+    </div>
+    <button class="btn" (click)="fetch()" [disabled]="busy">Fetch Details</button>
+    <div *ngIf="fetched" class="fetched">
+      <div><b>Customer:</b> {{ fetched.customerName }} ({{ fetched.customerId }})</div>
+      <div><b>Savings A/c:</b> {{ fetched.savingsAccountNumber }} · Balance ₹{{ fetched.accountBalance }}</div>
+      <div><b>Product:</b> {{ fetched.loan?.loanType }} · {{ fetched.loan?.productType === 'RECURRING_DEPOSIT' ? 'Monthly installment' : 'Due' }} ₹{{ fetched.emiAmount }} · Pending {{ fetched.pendingEmis }}/{{ fetched.totalEmis }} <span *ngIf="fetched.nextDueDate">· Next due {{ fetched.nextDueDate }}</span></div>
+      <div *ngIf="fetched.loan?.productType==='RECURRING_DEPOSIT'"><b>RD projection:</b> ₹{{ fetched.loan?.estimatedInterest }} estimated interest · ₹{{ fetched.loan?.estimatedMaturityAmount }} estimated maturity. No debit until customer consent.</div>
+      <div [style.color]="fetched.dobMatches ? 'green' : 'crimson'">DOB {{ fetched.dobMatches ? 'verified' : 'does not match' }}</div>
+      <div *ngIf="fetched.existingMandate" style="color:crimson">A mandate is already linked to this loan.</div>
+      <button class="btn primary" (click)="link()" [disabled]="busy || !fetched.dobMatches || fetched.existingMandate">{{ fetched.loan?.productType === 'RECURRING_DEPOSIT' ? 'Request customer ECS consent' : 'Link Mandate' }}</button>
+    </div>
+  </div>
+
+  <div class="card consent-link" *ngIf="pendingConsentUrl">
+    <h3>Customer ECS consent link</h3>
+    <p>The mandate is pending and cannot debit until the customer opens this link and confirms.</p>
+    <div class="link-row"><input readonly [value]="pendingConsentUrl" aria-label="Customer ECS consent URL" />
+      <button class="btn primary" type="button" (click)="copyConsentUrl()">Copy link</button></div>
+  </div>
+
+  <div class="card">
+    <div class="filters">
+      <select aria-label="Filter mandates by status" [(ngModel)]="statusFilter">
+        <option>ALL</option><option>ACTIVE</option><option>PENDING_CONSENT</option><option>PAUSED</option><option>CANCELLED</option><option>CANCEL_REQUESTED</option>
+      </select>
+      <input type="search" aria-label="Search ECS mandates" [(ngModel)]="search"
+        placeholder="Search mandate, customer, account, amount, schedule, status, activity, or date" />
+      <button *ngIf="search" type="button" class="clear-search" (click)="search = ''">Clear search</button>
+      <span class="match-count">{{ filtered().length }} of {{ mandates.length }} mandates</span>
+    </div>
+    <table>
+      <thead><tr><th>Mandate</th><th>Product account</th><th>Debit A/c</th><th>Customer</th><th>Day</th><th>Monthly amount</th><th>Limit</th><th>Status</th><th>Debits</th><th>Last debit</th><th>Actions</th></tr></thead>
+      <tbody>
+        <tr *ngFor="let m of filtered()">
+          <td>{{ m.mandateId }}</td><td>{{ m.loanAccountNumber }}</td><td>{{ m.savingsAccountNumber }}</td><td>{{ m.customerName }}</td>
+          <td>{{ m.debitDay }}</td><td>₹{{ m.emiAmount }}</td><td>₹{{ m.amountLimit }}</td>
+          <td><span class="pill {{ m.status }}">{{ m.status }}</span><span *ngIf="m.cancelRequested && m.status!=='CANCELLED'" class="pill REQ">Cancel requested</span></td>
+          <td>{{ m.successfulDebits || 0 }} ok / {{ m.failedDebits || 0 }} failed</td>
+          <td>{{ m.lastDebitStatus || '-' }}<br /><small>{{ m.lastDebitMessage }}</small></td>
+          <td class="acts">
+            <button (click)="open(m)">Manage</button>
+            <button *ngIf="m.status==='ACTIVE'" (click)="act(m,'pause')">Pause</button>
+            <button *ngIf="m.status==='PAUSED'" (click)="act(m,'resume')">Resume</button>
+            <button *ngIf="m.status==='ACTIVE' && m.productType!=='RECURRING_DEPOSIT'" (click)="act(m,'debit-now')">Debit now</button>
+            <button *ngIf="m.status!=='CANCELLED'" class="danger" (click)="act(m,'cancel')">Cancel</button>
+            <button *ngIf="m.cancelRequested && m.status!=='CANCELLED'" (click)="reject(m)">Reject request</button>
+          </td>
+        </tr>
+        <tr *ngIf="!filtered().length"><td colspan="11" style="text-align:center">
+          {{ mandates.length ? 'No mandates match your search and status filter.' : 'No mandates found.' }}
+        </td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="modal" *ngIf="sel" (click)="sel=null">
+    <section class="manage-dialog" role="dialog" aria-modal="true" aria-labelledby="manage-title"
+      (click)="$event.stopPropagation()">
+      <header class="manage-header">
+        <div>
+          <p class="manage-eyebrow">ECS MANDATE DETAILS</p>
+          <h3 id="manage-title">{{ sel.mandate.mandateId }} <span class="pill" [ngClass]="sel.mandate.status">{{ sel.mandate.status }}</span></h3>
+        </div>
+        <button class="icon-close" type="button" aria-label="Close mandate details" (click)="sel=null">×</button>
+      </header>
+
+      <div class="manage-content">
+        <section class="mandate-summary">
+          <p>{{ sel.loan?.loanType || 'Loan' }} <strong>{{ sel.mandate.loanAccountNumber }}</strong>
+            <span class="summary-arrow">→</span> Savings <strong>{{ sel.mandate.savingsAccountNumber }}</strong>
+            <span class="summary-separator">·</span> Balance <strong>₹{{ sel.accountBalance | number:'1.0-2' }}</strong>
+          </p>
+          <p *ngIf="sel.mandate.cancelRequested" class="cancel-notice">Cancel requested: {{ sel.mandate.cancelReason }}</p>
+          <p *ngIf="sel.mandate.productType==='RECURRING_DEPOSIT'" class="rd-notice">
+            RD contribution history is posted separately from loan EMIs. The customer-authorized amount and date cannot be changed here; cancel and request a new consent if terms change.
+          </p>
+        </section>
+
+        <div class="manage-actions" *ngIf="sel.mandate.productType==='RECURRING_DEPOSIT' && sel.mandate.customerConsentAt">
+          <button type="button" class="btn primary consent-download" (click)="downloadConsentRecord()" [disabled]="consentDownloadBusy">
+            {{ consentDownloadBusy ? 'Preparing record…' : 'Download customer consent record' }}
+          </button>
+        </div>
+
+        <section class="edit-panel" *ngIf="sel.mandate.productType!=='RECURRING_DEPOSIT'">
+          <div class="grid">
+            <label>Change savings account<input [(ngModel)]="edit.account" /></label>
+            <label>DOB (for new account)<input type="date" [(ngModel)]="edit.dob" /></label>
+            <label>Debit day<input type="number" min="1" max="31" [(ngModel)]="edit.day" /></label>
+            <label>Amount limit<input type="number" [(ngModel)]="edit.limit" /></label>
+          </div>
+          <div class="manage-actions">
+            <button type="button" (click)="changeAccount()">Update account</button>
+            <button type="button" (click)="changeDate()">Update date</button>
+            <button type="button" (click)="changeLimit()">Update limit</button>
+          </div>
+        </section>
+
+        <p class="history-note" *ngIf="!sel.emis?.length">Repayment history is available under mandate activity.</p>
+        <section class="history-section" *ngIf="sel.emis?.length">
+          <h4>EMI schedule</h4>
+          <div class="scroll"><table>
+            <thead><tr><th>#</th><th>Due</th><th>Amount</th><th>Status</th><th>Paid on</th><th>Balance after</th></tr></thead>
+            <tbody><tr *ngFor="let e of sel.emis"><td>{{ e.emiNumber }}</td><td>{{ e.dueDate }}</td><td>₹{{ e.totalAmount }}</td><td>{{ e.status }}</td><td>{{ e.paymentDate | date:'short' }}</td><td>{{ e.balanceAfterPayment }}</td></tr></tbody>
+          </table></div>
+        </section>
+
+        <section class="history-section" *ngIf="sel.mandate.productType==='RECURRING_DEPOSIT'">
+          <h4>RD contribution ledger</h4>
+          <div class="scroll" *ngIf="sel.contributions?.length"><table>
+            <thead><tr><th>Month</th><th>Amount</th><th>Source account</th><th>Transaction</th><th>Posted</th></tr></thead>
+            <tbody><tr *ngFor="let contribution of sel.contributions"><td>{{ contribution.contributionMonth }}</td><td>₹{{ contribution.amount | number:'1.2-2' }}</td><td>{{ contribution.sourceAccountNumber }}</td><td>{{ contribution.transactionId }}</td><td>{{ contribution.postedDate | date:'shortDate' }}</td></tr></tbody>
+          </table></div>
+          <p class="history-note" *ngIf="!sel.contributions?.length">No RD contributions have been posted.</p>
+        </section>
+
+        <section class="history-section">
+          <h4>Activity</h4>
+          <div class="scroll"><table>
+            <thead><tr><th>When</th><th>Event</th><th>Amount</th><th>Message</th><th>By</th></tr></thead>
+            <tbody><tr *ngFor="let ev of sel.events"><td>{{ ev.createdAt | date:'short' }}</td><td>{{ ev.eventType }}</td><td>{{ ev.amount }}</td><td>{{ ev.message }}</td><td>{{ ev.actor }}</td></tr></tbody>
+          </table></div>
+        </section>
+      </div>
+
+      <footer class="manage-footer">
+        <button type="button" class="footer-close" (click)="sel=null">Close</button>
+      </footer>
+    </section>
+  </div>
+</div>

@@ -674,7 +674,6 @@ export class Userdashboard implements OnInit, OnDestroy, AfterViewInit {
         if (this.userAccountNumber) {
           this.loadCurrentBalanceFromMySQL();
           this.loadRecentTransactions();
-          if (this.isSavingsAccount) this.loadSavingsFeatureAccess();
         }
       }, 5000);
       this.startSessionTimer();
@@ -833,14 +832,6 @@ export class Userdashboard implements OnInit, OnDestroy, AfterViewInit {
 
   selectFeature(feature: string | null) {
     this.isSidebarOpen = false;
-    const featureId = feature === 'cards360' ? 'card' : feature;
-    if (featureId && !this.isSavingsFeatureEnabled(featureId)) {
-      if (!this.savingsFeatureAccessLoaded) this.loadSavingsFeatureAccess();
-      this.showTemporaryError(this.savingsFeatureAccessLoaded
-        ? 'This feature is disabled for your savings account.'
-        : 'Savings feature access is being checked. Please try again shortly.');
-      return;
-    }
     if (feature === 'cards360') {
       this.openCards360();
       return;
@@ -866,8 +857,7 @@ export class Userdashboard implements OnInit, OnDestroy, AfterViewInit {
   }
 
   isSavingsFeatureEnabled(featureId: string): boolean {
-    return !this.isSavingsAccount
-      || (this.savingsFeatureAccessLoaded && this.savingsFeatureAccess[featureId] === true);
+    return true;
   }
 
   private loadSavingsFeatureAccess(): void {
@@ -908,11 +898,6 @@ export class Userdashboard implements OnInit, OnDestroy, AfterViewInit {
         }
         this.savingsFeatureAccess = nextAccess;
         this.savingsFeatureAccessLoaded = true;
-        if (this.selectedFeature && !this.isSavingsFeatureEnabled(this.selectedFeature)) {
-          this.selectedFeature = null;
-          this.stopUpiPolling();
-          this.showTemporaryError('An administrator disabled the feature you were using.');
-        }
         this.savingsFeatureAccessRequestInFlight = false;
       },
       error: error => {
@@ -1056,7 +1041,6 @@ export class Userdashboard implements OnInit, OnDestroy, AfterViewInit {
         this.username = user.name || 'User';
         this.userAccountNumber = user.accountNumber || 'ACC001';
         this.isSavingsAccount = String(user.account?.accountType || user.accountType || '').toUpperCase() === 'SAVINGS';
-        if (this.isSavingsAccount) this.loadSavingsFeatureAccess();
         // Use cached balance if available
         const cachedBalance = localStorage.getItem(`balance_${this.userAccountNumber}`);
         if (cachedBalance) {
@@ -1155,7 +1139,6 @@ export class Userdashboard implements OnInit, OnDestroy, AfterViewInit {
           this.username = userData.account?.name || userData.username || this.username;
           this.userAccountNumber = userData.accountNumber || this.userAccountNumber;
           this.isSavingsAccount = String(userData.account?.accountType || userData.accountType || '').toUpperCase() === 'SAVINGS';
-          if (this.isSavingsAccount) this.loadSavingsFeatureAccess();
           
           // Load current balance from MySQL (also in background)
           this.loadCurrentBalanceFromMySQL();

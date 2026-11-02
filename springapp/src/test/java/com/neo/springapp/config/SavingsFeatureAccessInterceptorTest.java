@@ -27,19 +27,19 @@ class SavingsFeatureAccessInterceptorTest {
     }
 
     @Test
-    void blocksPaymentLinkRequestsWhenUpiPayIsDisabled() throws Exception {
+    void allowsPaymentLinkRequestsWhenSavingsFeaturesAreEnabled() throws Exception {
         var principal = new UserSessionTokenService.SessionPrincipal(1L, "ACC123", "USER");
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken(principal, null, List.of()));
-        when(featureAccessService.isFeatureEnabled("ACC123", "upi-pay")).thenReturn(false);
+        when(featureAccessService.isFeatureEnabled("ACC123", "upi-pay")).thenReturn(true);
         var request = new MockHttpServletRequest("POST", "/api/payment-gateway/payment-links");
         var response = new MockHttpServletResponse();
 
         boolean allowed = interceptor.preHandle(request, response, new Object());
 
-        assertThat(allowed).isFalse();
-        assertThat(response.getStatus()).isEqualTo(423);
-        assertThat(response.getContentAsString()).contains("This feature is disabled");
+        assertThat(allowed).isTrue();
+        assertThat(response.getStatus()).isEqualTo(200);
+        assertThat(response.getContentAsString()).isEmpty();
         verify(featureAccessService).isFeatureEnabled("ACC123", "upi-pay");
     }
 }

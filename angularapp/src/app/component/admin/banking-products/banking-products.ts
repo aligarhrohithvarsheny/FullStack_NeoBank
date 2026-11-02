@@ -168,12 +168,6 @@ export class BankingProducts implements OnInit {
     });
   }
 
-  toggleFeature(featureId: string, enabled: boolean): void {
-    this.form.enabledFeatures = enabled
-      ? [...new Set([...this.form.enabledFeatures, featureId])]
-      : this.form.enabledFeatures.filter(feature => feature !== featureId);
-  }
-
   private createEmptyForm() {
     return {
       productCode: '',

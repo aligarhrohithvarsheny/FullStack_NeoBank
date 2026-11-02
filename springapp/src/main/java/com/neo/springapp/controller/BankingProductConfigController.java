@@ -87,7 +87,8 @@ public class BankingProductConfigController {
         if (!SavingsFeature.ID_SET.containsAll(enabledFeatures)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "One or more savings features are invalid.");
         }
-        product.setEnabledFeatures(enabledFeatures);
+        product.setEnabledFeatures("SAVINGS".equalsIgnoreCase(request.accountType().trim())
+                ? SavingsFeature.IDS : List.of());
         product.setEffectiveFrom(request.effectiveFrom());
         product.setRequestedBy(request.requestedBy().trim());
         product.setStatus("PENDING_APPROVAL");

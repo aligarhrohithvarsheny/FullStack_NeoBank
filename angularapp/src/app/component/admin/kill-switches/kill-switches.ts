@@ -241,35 +241,6 @@ export class KillSwitchesComponent implements OnInit {
     });
   }
 
-  toggleFeature(feature: SavingsFeatureControl): void {
-    if (!this.selectedAccount) return;
-    const action = feature.enabled ? 'Disable' : 'Enable';
-    const reason = this.reason.trim();
-    if (!reason) {
-      this.alertService.warning('Reason required', 'Enter a reason before changing customer feature access.');
-      return;
-    }
-    if (this.isSaving || !window.confirm(`${action} ${this.featureLabel(feature.id)} for account ${this.selectedAccount.accountNumber}?`)) return;
-
-    this.isSaving = true;
-    this.http.put<any>(
-      `${this.controlUrl}/accounts/${encodeURIComponent(this.selectedAccount.accountNumber)}/features/${encodeURIComponent(feature.id)}`,
-      { active: feature.enabled, reason },
-      { headers: this.adminHeaders() }
-    ).subscribe({
-      next: response => {
-        this.accountFeatures = response.features || [];
-        this.reason = '';
-        this.isSaving = false;
-        this.alertService.success('Feature access updated', `${this.featureLabel(feature.id)} access updated immediately.`);
-      },
-      error: error => {
-        this.isSaving = false;
-        this.showError(error, `Unable to ${action.toLowerCase()} this feature.`);
-      }
-    });
-  }
-
   featureLabel(id: string): string {
     return id.replace(/-/g, ' ').replace(/\b\w/g, letter => letter.toUpperCase());
   }
