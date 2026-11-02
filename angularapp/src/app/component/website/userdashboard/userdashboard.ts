@@ -175,6 +175,7 @@ export class Userdashboard implements OnInit, OnDestroy, AfterViewInit {
   selectedRDDetails: any = null;
   rdHistory: any[] = [];
   rdContributions: any[] = [];
+  isLoadingRDReceipt = false;
   showFDForm: boolean = false;
   fdForm = {
     planId: null as number | null,
@@ -2441,6 +2442,42 @@ export class Userdashboard implements OnInit, OnDestroy, AfterViewInit {
     this.http.get<any[]>(`${environment.apiBaseUrl}/api/recurring-deposits/${rd.id}/contributions`, this.customerAuthOptions()).subscribe({
       next: contributions => this.rdContributions = contributions || [],
       error: err => this.alertService.error('RD Contributions', err.error?.message || 'Unable to load RD contributions.')
+    });
+  }
+
+  downloadRDReceipt(rd: any) {
+    this.isLoadingRDReceipt = true;
+    this.http.get<any[]>(
+      `${environment.apiBaseUrl}/api/recurring-deposits/${rd.id}/contributions`,
+      this.customerAuthOptions()
+    ).subscribe({
+      next: contributions => {
+        void import('../../../service/term-deposit-receipt').then(({ printTermDepositReceipt }) => {
+          printTermDepositReceipt({
+            product: 'RD',
+            accountHolder: rd.customerName || this.username,
+            linkedAccountNumber: rd.accountNumber,
+            productAccountNumber: rd.rdAccountNumber || `RD-${rd.id}`,
+            schemeName: rd.schemeName,
+            status: rd.status,
+            startDate: rd.startDate,
+            maturityDate: rd.maturityDate,
+            tenureMonths: Number(rd.tenureMonths),
+            monthlyInstallment: Number(rd.monthlyInstallment),
+            interestRate: Number(rd.annualInterestRate),
+            estimatedInterest: Number(rd.estimatedInterest),
+            maturityAmount: Number(rd.estimatedMaturityAmount),
+            payoutInstruction: rd.payoutInstruction,
+            contributions
+          });
+        }).catch(error => {
+          this.alertService.error('RD Receipt', error instanceof Error ? error.message : 'Unable to generate the RD receipt.');
+        }).finally(() => this.isLoadingRDReceipt = false);
+      },
+      error: error => {
+        this.isLoadingRDReceipt = false;
+        this.alertService.error('RD Receipt', error.error?.message || 'Unable to load the RD contribution history.');
+      }
     });
   }
 

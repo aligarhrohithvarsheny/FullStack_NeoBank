@@ -88,6 +88,7 @@
           <button *ngIf="rd.shareUrl" class="btn-view" (click)="copyRDShareLink(rd)">Copy link</button>
           <button *ngIf="rd.status === 'SIGNED'" class="btn-approve" (click)="approveRD(rd)">Approve RD</button>
           <button *ngIf="rd.status === 'DETAILS_ONLY'" class="btn-view" (click)="editRD(rd)">Edit</button>
+          <button type="button" class="btn-view" (click)="downloadRDReceipt(rd)" [disabled]="receiptLoadingRDId === rd.id">{{ receiptLoadingRDId === rd.id ? 'Loading...' : 'Print / save receipt' }}</button>
           <button class="btn-view" (click)="loadRDHistory(rd)">Details / history</button>
         </td>
       </tr></tbody>
@@ -160,6 +161,7 @@
                   (click)="processFDMaturity(fd)" class="btn-process">Process Maturity</button>
           <button (click)="viewFDDetails(fd)" class="btn-view">View</button>
           <button (click)="loadFDHistory(fd)" class="btn-view">History</button>
+          <button type="button" (click)="downloadFDReceipt(fd)" class="btn-view">Receipt</button>
           <button *ngIf="fd.status === 'PENDING' || fd.status === 'ACTIVE'" (click)="editFD(fd)" class="btn-view">Edit</button>
           <button *ngIf="fd.status === 'ACTIVE'" (click)="topUpFD(fd)" class="btn-process">Increase</button>
           <button *ngIf="fd.status === 'ACTIVE'" (click)="closeFD(fd)" class="btn-reject">Close</button>

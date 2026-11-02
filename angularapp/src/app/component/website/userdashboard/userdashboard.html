@@ -967,7 +967,10 @@
               <div class="ud-info-row"><span>Customer acknowledgement:</span><span>{{ rd.signedAt ? (rd.signedAt | date:'dd/MM/yyyy HH:mm') : 'Pending' }}</span></div>
               <div class="ud-info-row"><span>Admin approval:</span><span>{{ rd.approvedAt ? (rd.approvedAt | date:'dd/MM/yyyy HH:mm') : 'Pending' }}</span></div>
             </div>
-            <div class="ud-invest-foot"><button type="button" class="ud-btn-outline ud-btn-sm" (click)="viewRDDetails(rd)">View details, contributions & history</button></div>
+            <div class="ud-invest-foot">
+              <button type="button" class="ud-btn-outline ud-btn-sm" (click)="viewRDDetails(rd)">View details, contributions & history</button>
+              <button type="button" class="ud-btn-primary ud-btn-sm" (click)="downloadRDReceipt(rd)" [disabled]="isLoadingRDReceipt">{{ isLoadingRDReceipt ? 'Loading receipt...' : 'Print / save receipt' }}</button>
+            </div>
           </div>
         </div>
         <section *ngIf="selectedRDDetails" class="ud-feature-card">

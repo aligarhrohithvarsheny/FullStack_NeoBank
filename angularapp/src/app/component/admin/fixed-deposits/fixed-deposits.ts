@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, Inject, PLATFORM_ID } from '@angular/core';
+import { Component, OnInit, Inject, PLATFORM_ID } from '@angular/core';
 import { Router } from '@angular/router';
 import { isPlatformBrowser } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -14,7 +14,7 @@ import { environment } from '../../../../environment/environment';
   styleUrls: ['./fixed-deposits.css'],
   imports: [FormsModule, CommonModule]
 })
-export class FixedDeposits implements OnInit, OnDestroy {
+export class FixedDeposits implements OnInit {
   fixedDeposits: any[] = [];
   isLoadingFDs: boolean = false;
   selectedFD: any = null;
@@ -41,7 +41,7 @@ export class FixedDeposits implements OnInit, OnDestroy {
   editForm: any = {};
   fdHistory: any[] = [];
   selectedHistoryFD: any = null;
-  private rdRefreshTimer: any;
+  receiptLoadingRDId: number | null = null;
   
   // Approval modal properties
   showApprovalModal: boolean = false;
@@ -70,14 +70,7 @@ export class FixedDeposits implements OnInit, OnDestroy {
       this.loadFixedDeposits();
       this.loadTermPlans();
       this.loadRecurringDeposits();
-      this.rdRefreshTimer = setInterval(() => {
-        if (this.activeProduct === 'RD' && !this.isLoadingRDs) this.loadRecurringDeposits(true);
-      }, 10000);
     }
-  }
-
-  ngOnDestroy() {
-    if (this.rdRefreshTimer) clearInterval(this.rdRefreshTimer);
   }
 
   loadTermPlans() {
@@ -451,7 +444,6 @@ export class FixedDeposits implements OnInit, OnDestroy {
 
   setProduct(type: 'FD' | 'RD') {
     this.activeProduct = type;
-    if (type === 'RD') this.loadRecurringDeposits();
   }
 
   createRDRecord() {
@@ -525,6 +517,66 @@ export class FixedDeposits implements OnInit, OnDestroy {
     this.http.get<any[]>(`${environment.apiBaseUrl}/api/fixed-deposits/${fd.id}/history/events`, this.staffOptions()).subscribe({
       next: history => this.fdHistory = history || [],
       error: err => this.alertService.error('FD History', err.error?.message || 'Unable to load FD history.')
+    });
+  }
+
+  async downloadFDReceipt(fd: any) {
+    try {
+      const { printTermDepositReceipt } = await import('../../../service/term-deposit-receipt');
+      printTermDepositReceipt({
+        product: 'FD',
+        accountHolder: fd.userName,
+        linkedAccountNumber: fd.accountNumber,
+        productAccountNumber: fd.fdAccountNumber,
+        schemeName: fd.schemeName,
+        status: fd.status,
+        startDate: fd.startDate || fd.applicationDate,
+        maturityDate: fd.maturityDate,
+        tenureMonths: Number(fd.tenure),
+        principalAmount: Number(fd.principalAmount),
+        interestRate: Number(fd.interestRate),
+        interestAmount: Number(fd.interestAmount),
+        maturityAmount: Number(fd.maturityAmount),
+        payoutInstruction: fd.interestPayout,
+        closureDate: fd.closureDate,
+        prematureClosurePenalty: Number(fd.prematureClosurePenalty),
+        prematureClosureAmount: Number(fd.prematureClosureAmount)
+      });
+    } catch (error) {
+      this.alertService.error('FD Receipt', error instanceof Error ? error.message : 'Unable to generate the FD receipt.');
+    }
+  }
+
+  downloadRDReceipt(rd: any) {
+    this.receiptLoadingRDId = Number(rd.id);
+    this.http.get<any[]>(`${environment.apiBaseUrl}/api/recurring-deposits/${rd.id}/contributions`, this.staffOptions()).subscribe({
+      next: contributions => {
+        void import('../../../service/term-deposit-receipt').then(({ printTermDepositReceipt }) => {
+          printTermDepositReceipt({
+            product: 'RD',
+            accountHolder: rd.customerName,
+            linkedAccountNumber: rd.accountNumber,
+            productAccountNumber: rd.rdAccountNumber || `RD-${rd.id}`,
+            schemeName: rd.schemeName,
+            status: rd.status,
+            startDate: rd.startDate,
+            maturityDate: rd.maturityDate,
+            tenureMonths: Number(rd.tenureMonths),
+            monthlyInstallment: Number(rd.monthlyInstallment),
+            interestRate: Number(rd.annualInterestRate),
+            estimatedInterest: Number(rd.estimatedInterest),
+            maturityAmount: Number(rd.estimatedMaturityAmount),
+            payoutInstruction: rd.payoutInstruction,
+            contributions
+          });
+        }).catch(error => {
+          this.alertService.error('RD Receipt', error instanceof Error ? error.message : 'Unable to generate the RD receipt.');
+        }).finally(() => this.receiptLoadingRDId = null);
+      },
+      error: err => {
+        this.receiptLoadingRDId = null;
+        this.alertService.error('RD Receipt', err.error?.message || 'Unable to load the RD contribution history.');
+      }
     });
   }
 }
