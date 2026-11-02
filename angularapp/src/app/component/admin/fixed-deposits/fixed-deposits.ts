@@ -21,6 +21,10 @@ export class FixedDeposits implements OnInit {
   fdStatusFilter: string = 'PENDING';
   fdSearchQuery: string = '';
   adminName: string = 'Admin';
+  fdToClose: any = null;
+  fdClosureReason = '';
+  fdClosureConfirmed = false;
+  isClosingFD = false;
   termPlans: any[] = [];
   showPlanForm = false;
   planForm: any = { productType: 'FD', schemeName: '', days: 30, durationMonths: null, years: 1, minimumAmount: 1000, maximumAmount: 10000000, interestRate: 7, payoutDate: 'At Maturity' };
@@ -366,21 +370,62 @@ export class FixedDeposits implements OnInit {
   }
   topUpFD(fd: any) { const amount = prompt('Increase FD amount by:'); if (!amount || Number(amount) <= 0) return; this.http.post(`${environment.apiBaseUrl}/api/fixed-deposits/${fd.id}/admin/top-up?amount=${Number(amount)}&admin=${encodeURIComponent(this.adminName)}`, {}, this.staffOptions()).subscribe({ next: () => this.loadFixedDeposits(), error: (e: any) => this.alertService.error('Error', e.error?.message || 'Unable to increase FD') }); }
   closeFD(fd: any) {
-    const reason = prompt('Reason for closing this FD:');
-    if (!reason?.trim() || !confirm('Close this fixed deposit and credit the calculated closure/maturity amount to the linked account?')) return;
-    this.http.post(`${environment.apiBaseUrl}/api/fixed-deposits/${fd.id}/admin/close?reason=${encodeURIComponent(reason)}`, {}, this.staffOptions()).subscribe({
+    this.fdToClose = fd;
+    this.fdClosureReason = '';
+    this.fdClosureConfirmed = false;
+  }
+
+  cancelFDClose() {
+    if (this.isClosingFD) return;
+    this.fdToClose = null;
+    this.fdClosureReason = '';
+    this.fdClosureConfirmed = false;
+  }
+
+  confirmFDClose() {
+    if (!this.fdToClose || this.isClosingFD) return;
+    const reason = this.fdClosureReason.trim();
+    if (!reason) {
+      this.alertService.error('Closure Reason Required', 'Enter a reason for closing this fixed deposit.');
+      return;
+    }
+    if (!this.fdClosureConfirmed) {
+      this.alertService.error('Confirmation Required', 'Confirm that you have reviewed the closure details before proceeding.');
+      return;
+    }
+
+    this.isClosingFD = true;
+    this.http.post<any>(
+      `${environment.apiBaseUrl}/api/fixed-deposits/${this.fdToClose.id}/admin/close?reason=${encodeURIComponent(reason)}`,
+      {},
+      this.staffOptions()
+    ).subscribe({
       next: (response: any) => {
         if (response.success) {
           this.alertService.success('FD Closed', 'The calculated closure amount was credited and recorded.');
+          this.cancelFDCloseAfterCompletion();
           this.loadFixedDeposits();
-        } else this.alertService.error('Close Failed', response.message || 'Unable to close FD.');
+        } else {
+          this.isClosingFD = false;
+          this.alertService.error('Close Failed', response.message || 'Unable to close FD.');
+        }
       },
-      error: (e: any) => this.alertService.error('Error', e.error?.message || 'Unable to close FD')
+      error: (e: any) => {
+        this.isClosingFD = false;
+        this.alertService.error('FD Closure Failed', e.error?.message || 'Unable to close FD.');
+      }
     });
   }
 
+  private cancelFDCloseAfterCompletion() {
+    this.isClosingFD = false;
+    this.fdToClose = null;
+    this.fdClosureReason = '';
+    this.fdClosureConfirmed = false;
+  }
+
   isFDMatured(fd: any): boolean {
-    if (!fd || !fd.maturityDate || fd.isMatured) return false;
+    if (!fd || !fd.maturityDate) return false;
     const maturityDate = new Date(fd.maturityDate);
     const today = new Date();
     return maturityDate <= today;

@@ -581,6 +581,41 @@
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
 }
 
+.fd-close-modal {
+  width: min(680px, 100%);
+  max-height: 90vh;
+  overflow-y: auto;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, .3);
+}
+.fd-close-modal .modal-header p {
+  margin: 6px 0 0;
+  color: #64748b;
+  font-size: 13px;
+}
+.fd-close-modal .modal-body { display: grid; gap: 18px; }
+.fd-close-notice {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid #f3d28a;
+  border-radius: 8px;
+  background: #fffbeb;
+  color: #7c4a03;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.fd-close-confirm {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  color: #334155;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.fd-close-confirm input { margin-top: 3px; flex: 0 0 auto; }
+.fd-close-modal .btn-reject:disabled { opacity: .55; cursor: not-allowed; }
+
 .deposit-edit-fields input[readonly] {
   background: #f1f5f9;
   color: #64748b;

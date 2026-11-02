@@ -44,7 +44,6 @@ import { AdminProfile } from './component/admin/profile/profile';
 import { ManagerDashboard } from './component/admin/manager/dashboard';
 import { CompleteProfile } from './component/admin/complete-profile/complete-profile';
 import { Investments } from './component/admin/investments/investments';
-import { FixedDeposits } from './component/admin/fixed-deposits/fixed-deposits';
 import { EmiManagement } from './component/admin/emi-management/emi-management';
 import { EcsMandates } from './component/admin/ecs-mandates/ecs-mandates';
 import { CreditCards } from './component/admin/credit-cards/credit-cards';
@@ -130,7 +129,7 @@ export const routes: Routes = [
   { path: 'admin/profile', component: AdminProfile, canActivate: [adminAuthGuard] },
   { path: 'admin/complete-profile', component: CompleteProfile, canActivate: [adminAuthGuard] },
   { path: 'admin/investments', component: Investments, canActivate: [adminAuthGuard] },
-  { path: 'admin/fixed-deposits', component: FixedDeposits, canActivate: [adminAuthGuard] },
+  { path: 'admin/fixed-deposits', loadComponent: () => import('./component/admin/fixed-deposits/fixed-deposits').then(m => m.FixedDeposits), canActivate: [adminAuthGuard] },
   { path: 'admin/emi-management', component: EmiManagement, canActivate: [adminAuthGuard] },
   { path: 'admin/ecs-mandates', component: EcsMandates, canActivate:[adminAuthGuard] },
   { path: 'admin/credit-cards', component: CreditCards, canActivate: [adminAuthGuard] },

@@ -329,4 +329,48 @@
       </form>
     </div>
   </div>
+
+  <div *ngIf="fdToClose" class="modal-overlay" (click)="cancelFDClose()">
+    <section class="modal-content fd-close-modal" role="dialog" aria-modal="true" aria-labelledby="fd-close-title" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <div>
+          <h2 id="fd-close-title">Close Fixed Deposit</h2>
+          <p>Review the account details and record the closure reason.</p>
+        </div>
+        <button type="button" class="close-btn" (click)="cancelFDClose()" [disabled]="isClosingFD" aria-label="Close form">×</button>
+      </div>
+      <form (ngSubmit)="confirmFDClose()">
+        <div class="modal-body">
+          <div class="deposit-edit-summary">
+            <div><span>Customer</span><strong>{{ fdToClose.userName || 'Customer' }}</strong></div>
+            <div><span>FD account</span><strong>{{ fdToClose.fdAccountNumber || 'Not available' }}</strong></div>
+            <div><span>Linked account</span><strong>{{ fdToClose.accountNumber || 'Not available' }}</strong></div>
+            <div><span>Status</span><strong>{{ fdToClose.status }}</strong></div>
+            <div><span>Principal</span><strong>₹{{ fdToClose.principalAmount | number:'1.2-2' }}</strong></div>
+            <div><span>Interest rate</span><strong>{{ fdToClose.interestRate }}% p.a.</strong></div>
+            <div><span>Maturity date</span><strong>{{ fdToClose.maturityDate | date:'dd/MM/yyyy' }}</strong></div>
+            <div><span>Estimated maturity amount</span><strong>₹{{ fdToClose.maturityAmount | number:'1.2-2' }}</strong></div>
+          </div>
+          <p class="fd-close-notice" *ngIf="!isFDMatured(fdToClose)">
+            This FD has not reached maturity. The actual premature-closure amount and any applicable penalty will be calculated by the bank during processing and may differ from the maturity estimate shown above.
+          </p>
+          <p class="fd-close-notice" *ngIf="isFDMatured(fdToClose)">
+            This FD has reached maturity. The bank will calculate and record the final payable amount during processing.
+          </p>
+          <label class="deposit-edit-reason">
+            <span>Closure reason <b>*</b></span>
+            <textarea name="fdClosureReason" [(ngModel)]="fdClosureReason" rows="3" maxlength="500" required placeholder="Explain why this fixed deposit is being closed"></textarea>
+          </label>
+          <label class="fd-close-confirm">
+            <input type="checkbox" name="fdClosureConfirmed" [(ngModel)]="fdClosureConfirmed" />
+            <span>I have reviewed the FD and linked account details. I understand the final closure amount will be calculated by the bank and credited to the linked account.</span>
+          </label>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn-secondary" (click)="cancelFDClose()" [disabled]="isClosingFD">Cancel</button>
+          <button type="submit" class="btn-reject" [disabled]="isClosingFD || !fdClosureReason.trim() || !fdClosureConfirmed">{{ isClosingFD ? 'Processing closure...' : 'Confirm FD closure' }}</button>
+        </div>
+      </form>
+    </section>
+  </div>
 </div>
