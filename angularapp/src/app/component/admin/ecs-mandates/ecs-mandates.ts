@@ -1,7 +1,7 @@
 import { Component, OnInit, OnDestroy, Inject, PLATFORM_ID } from '@angular/core';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { AlertService } from '../../../service/alert.service';
 import { environment } from '../../../../environment/environment';
@@ -19,9 +19,13 @@ import { environment } from '../../../../environment/environment';
     </div>
     <div class="live">● Live · refreshed {{ lastRefresh | date:'mediumTime' }}</div>
   </div>
+  <div class="card error" *ngIf="loadError || eligibilityError" role="alert">
+    <div *ngIf="loadError">{{ loadError }}</div><div *ngIf="eligibilityError">{{ eligibilityError }}</div>
+  </div>
 
   <div class="stats">
     <div class="stat"><b>{{ count('ACTIVE') }}</b><span>Active</span></div>
+    <div class="stat warn"><b>{{ count('PENDING_CONSENT') }}</b><span>Awaiting customer consent</span></div>
     <div class="stat"><b>{{ count('PAUSED') }}</b><span>Paused</span></div>
     <div class="stat"><b>{{ count('CANCELLED') }}</b><span>Cancelled</span></div>
     <div class="stat warn"><b>{{ cancelRequests() }}</b><span>Cancel requests</span></div>
@@ -30,7 +34,7 @@ import { environment } from '../../../../environment/environment';
   <div class="card">
     <h3>Link ECS Mandate</h3>
     <div class="grid">
-      <label>Loan / Credit Card No.<input [(ngModel)]="form.loanAccountNumber" list="eligible" placeholder="Loan or card number" />
+      <label>Loan / Deposit / Credit Card No.<input [(ngModel)]="form.loanAccountNumber" list="eligible" placeholder="Product account number" />
         <datalist id="eligible"><option *ngFor="let l of eligible" [value]="l.loanAccountNumber">{{ l.customerName }} - {{ l.loanType }}</option></datalist>
       </label>
       <label>Savings Account No.<input [(ngModel)]="form.savingsAccountNumber" placeholder="Blank = loan's account" /></label>
@@ -42,17 +46,25 @@ import { environment } from '../../../../environment/environment';
     <div *ngIf="fetched" class="fetched">
       <div><b>Customer:</b> {{ fetched.customerName }} ({{ fetched.customerId }})</div>
       <div><b>Savings A/c:</b> {{ fetched.savingsAccountNumber }} · Balance ₹{{ fetched.accountBalance }}</div>
-      <div><b>Product:</b> {{ fetched.loan?.loanType }} · Due ₹{{ fetched.emiAmount }} · Pending {{ fetched.pendingEmis }}/{{ fetched.totalEmis }} · Next due {{ fetched.nextDueDate }}</div>
+      <div><b>Product:</b> {{ fetched.loan?.loanType }} · {{ fetched.loan?.productType === 'RECURRING_DEPOSIT' ? 'Monthly installment' : 'Due' }} ₹{{ fetched.emiAmount }} · Pending {{ fetched.pendingEmis }}/{{ fetched.totalEmis }} <span *ngIf="fetched.nextDueDate">· Next due {{ fetched.nextDueDate }}</span></div>
+      <div *ngIf="fetched.loan?.productType==='RECURRING_DEPOSIT'"><b>RD projection:</b> ₹{{ fetched.loan?.estimatedInterest }} estimated interest · ₹{{ fetched.loan?.estimatedMaturityAmount }} estimated maturity. No debit until customer consent.</div>
       <div [style.color]="fetched.dobMatches ? 'green' : 'crimson'">DOB {{ fetched.dobMatches ? 'verified' : 'does not match' }}</div>
       <div *ngIf="fetched.existingMandate" style="color:crimson">A mandate is already linked to this loan.</div>
-      <button class="btn primary" (click)="link()" [disabled]="busy || !fetched.dobMatches || fetched.existingMandate">Link Mandate</button>
+      <button class="btn primary" (click)="link()" [disabled]="busy || !fetched.dobMatches || fetched.existingMandate">{{ fetched.loan?.productType === 'RECURRING_DEPOSIT' ? 'Request customer ECS consent' : 'Link Mandate' }}</button>
     </div>
+  </div>
+
+  <div class="card consent-link" *ngIf="pendingConsentUrl">
+    <h3>Customer ECS consent link</h3>
+    <p>The mandate is pending and cannot debit until the customer opens this link and confirms.</p>
+    <div class="link-row"><input readonly [value]="pendingConsentUrl" aria-label="Customer ECS consent URL" />
+      <button class="btn primary" type="button" (click)="copyConsentUrl()">Copy link</button></div>
   </div>
 
   <div class="card">
     <div class="filters">
       <select aria-label="Filter mandates by status" [(ngModel)]="statusFilter">
-        <option>ALL</option><option>ACTIVE</option><option>PAUSED</option><option>CANCELLED</option><option>CANCEL_REQUESTED</option>
+        <option>ALL</option><option>ACTIVE</option><option>PENDING_CONSENT</option><option>PAUSED</option><option>CANCELLED</option><option>CANCEL_REQUESTED</option>
       </select>
       <input type="search" aria-label="Search ECS mandates" [(ngModel)]="search"
         placeholder="Search mandate, customer, account, amount, schedule, status, activity, or date" />
@@ -60,7 +72,7 @@ import { environment } from '../../../../environment/environment';
       <span class="match-count">{{ filtered().length }} of {{ mandates.length }} mandates</span>
     </div>
     <table>
-      <thead><tr><th>Mandate</th><th>Loan / Card No.</th><th>Savings A/c</th><th>Customer</th><th>Day</th><th>Due</th><th>Limit</th><th>Status</th><th>Debits</th><th>Last debit</th><th>Actions</th></tr></thead>
+      <thead><tr><th>Mandate</th><th>Product account</th><th>Debit A/c</th><th>Customer</th><th>Day</th><th>Monthly amount</th><th>Limit</th><th>Status</th><th>Debits</th><th>Last debit</th><th>Actions</th></tr></thead>
       <tbody>
         <tr *ngFor="let m of filtered()">
           <td>{{ m.mandateId }}</td><td>{{ m.loanAccountNumber }}</td><td>{{ m.savingsAccountNumber }}</td><td>{{ m.customerName }}</td>
@@ -72,7 +84,7 @@ import { environment } from '../../../../environment/environment';
             <button (click)="open(m)">Manage</button>
             <button *ngIf="m.status==='ACTIVE'" (click)="act(m,'pause')">Pause</button>
             <button *ngIf="m.status==='PAUSED'" (click)="act(m,'resume')">Resume</button>
-            <button *ngIf="m.status==='ACTIVE'" (click)="act(m,'debit-now')">Debit now</button>
+            <button *ngIf="m.status==='ACTIVE' && m.productType!=='RECURRING_DEPOSIT'" (click)="act(m,'debit-now')">Debit now</button>
             <button *ngIf="m.status!=='CANCELLED'" class="danger" (click)="act(m,'cancel')">Cancel</button>
             <button *ngIf="m.cancelRequested && m.status!=='CANCELLED'" (click)="reject(m)">Reject request</button>
           </td>
@@ -89,7 +101,10 @@ import { environment } from '../../../../environment/environment';
       <h3>{{ sel.mandate.mandateId }} · {{ sel.mandate.status }}</h3>
       <p>{{ sel.loan?.loanType || 'Loan' }} {{ sel.mandate.loanAccountNumber }} → Savings {{ sel.mandate.savingsAccountNumber }} · Balance ₹{{ sel.accountBalance }}</p>
       <p *ngIf="sel.mandate.cancelRequested">Cancel requested: {{ sel.mandate.cancelReason }}</p>
-      <div class="grid">
+      <p *ngIf="sel.mandate.productType==='RECURRING_DEPOSIT'">
+        RD contribution history is posted separately from loan EMIs. The customer-authorized amount and date cannot be changed here; cancel and request a new consent if terms change.
+      </p>
+      <div class="grid" *ngIf="sel.mandate.productType!=='RECURRING_DEPOSIT'">
         <label>Change savings account<input [(ngModel)]="edit.account" /></label>
         <label>DOB (for new account)<input type="date" [(ngModel)]="edit.dob" /></label>
         <label>Debit day<input type="number" min="1" max="31" [(ngModel)]="edit.day" /></label>
@@ -107,6 +122,12 @@ import { environment } from '../../../../environment/environment';
         <tbody><tr *ngFor="let e of sel.emis"><td>{{ e.emiNumber }}</td><td>{{ e.dueDate }}</td><td>₹{{ e.totalAmount }}</td><td>{{ e.status }}</td><td>{{ e.paymentDate | date:'short' }}</td><td>{{ e.balanceAfterPayment }}</td></tr></tbody>
       </table></div>
       <p *ngIf="!sel.emis?.length">Repayment history is available under mandate activity.</p>
+      <h4 *ngIf="sel.mandate.productType==='RECURRING_DEPOSIT'">RD contribution ledger</h4>
+      <div class="scroll" *ngIf="sel.contributions?.length"><table>
+        <thead><tr><th>Month</th><th>Amount</th><th>Source account</th><th>Transaction</th><th>Posted</th></tr></thead>
+        <tbody><tr *ngFor="let contribution of sel.contributions"><td>{{ contribution.contributionMonth }}</td><td>₹{{ contribution.amount | number:'1.2-2' }}</td><td>{{ contribution.sourceAccountNumber }}</td><td>{{ contribution.transactionId }}</td><td>{{ contribution.postedDate | date:'shortDate' }}</td></tr></tbody>
+      </table></div>
+      <p *ngIf="sel.mandate.productType==='RECURRING_DEPOSIT' && !sel.contributions?.length">No RD contributions have been posted.</p>
       <h4>Activity</h4>
       <div class="scroll"><table>
         <thead><tr><th>When</th><th>Event</th><th>Amount</th><th>Message</th><th>By</th></tr></thead>
@@ -117,6 +138,7 @@ import { environment } from '../../../../environment/environment';
 </div>`,
   styles: [`
 .ecs-wrap{padding:20px;font-family:Segoe UI,Arial,sans-serif;color:#1f2937}
+.error{color:#991b1b;background:#fef2f2}
 .ecs-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
 .live{color:#16a34a;font-size:13px}
 .stats{display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap}
@@ -128,6 +150,7 @@ label{display:flex;flex-direction:column;font-size:13px;gap:4px}
 input,select{padding:7px;border:1px solid #cbd5e1;border-radius:6px}
 .btn,button{padding:6px 12px;border:1px solid #cbd5e1;border-radius:6px;background:#f8fafc;cursor:pointer;margin:2px}
 .btn.primary{background:#2563eb;color:#fff;border-color:#2563eb}.danger{color:#dc2626}
+.PENDING_CONSENT{background:#d97706}.link-row{display:flex;gap:8px}.link-row input{flex:1;min-width:0}
 .fetched{margin-top:10px;padding:10px;background:#f1f5f9;border-radius:8px;display:grid;gap:4px}
 .filters{display:flex;gap:10px;margin-bottom:10px;align-items:center;flex-wrap:wrap}.filters input{flex:1;min-width:240px}.filters select{min-width:150px}.clear-search{white-space:nowrap}.match-count{margin-left:auto;color:#64748b;font-size:12px;white-space:nowrap}
 table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:7px;border-bottom:1px solid #e5e7eb;text-align:left}
@@ -148,6 +171,9 @@ export class EcsMandates implements OnInit, OnDestroy {
   sel: any = null;
   edit: any = {};
   busy = false;
+  pendingConsentUrl = '';
+  loadError = '';
+  eligibilityError = '';
   lastRefresh = new Date();
   private timer: any;
   private api = `${environment.apiBaseUrl}/api/ecs-mandates`;
@@ -158,7 +184,6 @@ export class EcsMandates implements OnInit, OnDestroy {
   ngOnInit() {
     if (!isPlatformBrowser(this.platformId)) return;
     this.refresh();
-    this.http.get<any[]>(`${this.api}/eligible-loans`).subscribe({ next: r => this.eligible = r, error: () => {} });
     this.timer = setInterval(() => this.refresh(), 10000);
   }
 
@@ -167,13 +192,18 @@ export class EcsMandates implements OnInit, OnDestroy {
   back() { this.router.navigate(['/admin/dashboard']); }
 
   refresh() {
-    this.http.get<any[]>(this.api).subscribe({
+    this.http.get<any[]>(`${this.api}/eligible-loans`, this.staffOptions()).subscribe({
+      next: rows => { this.eligible = rows || []; this.eligibilityError = ''; },
+      error: e => { this.eligibilityError = e?.error?.message || `Eligible products unavailable (HTTP ${e?.status || 'unknown'}).`; }
+    });
+    this.http.get<any[]>(this.api, this.staffOptions()).subscribe({
       next: r => {
         this.mandates = r;
+        this.loadError = '';
         this.lastRefresh = new Date();
         if (this.sel) this.reloadSel();
       },
-      error: () => {}
+      error: e => { this.loadError = e?.error?.message || `Mandates unavailable (HTTP ${e?.status || 'unknown'}).`; }
     });
   }
 
@@ -230,7 +260,7 @@ export class EcsMandates implements OnInit, OnDestroy {
     const params: any = { loanAccountNumber: f.loanAccountNumber };
     if (f.savingsAccountNumber) params.savingsAccountNumber = f.savingsAccountNumber;
     if (f.dob) params.dob = f.dob;
-    this.http.get<any>(`${this.api}/fetch`, { params }).subscribe({
+    this.http.get<any>(`${this.api}/fetch`, { ...this.staffOptions(), params }).subscribe({
       next: r => { this.fetched = r; this.busy = false; if (!f.savingsAccountNumber) f.savingsAccountNumber = r.savingsAccountNumber; },
       error: e => { this.fetched = null; this.busy = false; this.err(e, 'Could not fetch details'); }
     });
@@ -238,10 +268,11 @@ export class EcsMandates implements OnInit, OnDestroy {
 
   link() {
     this.busy = true;
-    this.http.post<any>(`${this.api}/link`, { ...this.form, admin: this.admin() }).subscribe({
+    this.http.post<any>(`${this.api}/link`, { ...this.form, admin: this.admin() }, this.staffOptions()).subscribe({
       next: r => {
         this.busy = false;
         this.alert.success('ECS Mandate', r.message);
+        this.pendingConsentUrl = r.consentUrl || '';
         this.fetched = null;
         this.form = { loanAccountNumber: '', savingsAccountNumber: '', dob: '', debitDay: 5, amountLimit: null };
         this.refresh();
@@ -250,8 +281,16 @@ export class EcsMandates implements OnInit, OnDestroy {
     });
   }
 
+  copyConsentUrl() {
+    if (!this.pendingConsentUrl) return;
+    navigator.clipboard.writeText(this.pendingConsentUrl).then(
+      () => this.alert.success('ECS Consent', 'Customer consent link copied'),
+      () => this.alert.warning('ECS Consent', `Copy this customer link: ${this.pendingConsentUrl}`)
+    );
+  }
+
   act(m: any, action: string) {
-    this.http.post<any>(`${this.api}/${m.id}/${action}`, { admin: this.admin() }).subscribe({
+    this.http.post<any>(`${this.api}/${m.id}/${action}`, { admin: this.admin() }, this.staffOptions()).subscribe({
       next: r => { this.alert.success('ECS Mandate', r.message || 'Done'); this.refresh(); },
       error: e => { this.err(e, 'Action failed'); this.refresh(); }
     });
@@ -259,7 +298,7 @@ export class EcsMandates implements OnInit, OnDestroy {
 
   reject(m: any) {
     const note = prompt('Reason for rejecting the cancel request (optional)') ?? '';
-    this.http.post<any>(`${this.api}/${m.id}/reject-cancel`, { admin: this.admin(), note }).subscribe({
+    this.http.post<any>(`${this.api}/${m.id}/reject-cancel`, { admin: this.admin(), note }, this.staffOptions()).subscribe({
       next: r => { this.alert.success('ECS Mandate', r.message || 'Rejected'); this.refresh(); },
       error: e => this.err(e, 'Action failed')
     });
@@ -267,15 +306,18 @@ export class EcsMandates implements OnInit, OnDestroy {
 
   open(m: any) {
     this.edit = { account: m.savingsAccountNumber, dob: '', day: m.debitDay, limit: m.amountLimit };
-    this.http.get<any>(`${this.api}/${m.id}`).subscribe({ next: r => this.sel = r, error: e => this.err(e, 'Load failed') });
+    this.http.get<any>(`${this.api}/${m.id}`, this.staffOptions()).subscribe({ next: r => this.sel = r, error: e => this.err(e, 'Load failed') });
   }
 
   private reloadSel() {
-    this.http.get<any>(`${this.api}/${this.sel.mandate.id}`).subscribe({ next: r => this.sel = r, error: () => {} });
+    this.http.get<any>(`${this.api}/${this.sel.mandate.id}`, this.staffOptions()).subscribe({
+      next: r => this.sel = r,
+      error: e => this.err(e, 'Could not refresh mandate details')
+    });
   }
 
   private put(path: string, body: any) {
-    this.http.put<any>(`${this.api}/${this.sel.mandate.id}/${path}`, { ...body, admin: this.admin() }).subscribe({
+    this.http.put<any>(`${this.api}/${this.sel.mandate.id}/${path}`, { ...body, admin: this.admin() }, this.staffOptions()).subscribe({
       next: r => { this.alert.success('ECS Mandate', r.message || 'Updated'); this.refresh(); this.reloadSel(); },
       error: e => this.err(e, 'Update failed')
     });
@@ -284,4 +326,9 @@ export class EcsMandates implements OnInit, OnDestroy {
   changeAccount() { this.put('account', { savingsAccountNumber: this.edit.account, dob: this.edit.dob }); }
   changeDate() { this.put('date', { debitDay: this.edit.day }); }
   changeLimit() { this.put('limit', { amountLimit: this.edit.limit }); }
+
+  private staffOptions() {
+    const token = sessionStorage.getItem('adminSessionToken') || '';
+    return { headers: new HttpHeaders(token ? { Authorization: `Bearer ${token}` } : {}) };
+  }
 }

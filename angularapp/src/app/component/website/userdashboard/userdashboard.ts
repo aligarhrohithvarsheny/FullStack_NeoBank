@@ -50,6 +50,14 @@ interface CancelledChequeAccount {
   ifsc: string;
 }
 
+interface CustomerNominee {
+  id?: number;
+  nomineeName: string;
+  relationship: string;
+  sharePercentage: number;
+  createdAt?: string;
+}
+
 @Component({
   selector: 'app-userdashboard',
   standalone: true,
@@ -104,6 +112,9 @@ export class Userdashboard implements OnInit, OnDestroy, AfterViewInit {
   error: string = '';
   errorTimeout: any = null;
   userProfile: any = null;
+  customerNominees: CustomerNominee[] = [];
+  isLoadingNominees = false;
+  nomineeLoadError = '';
   
   // QR Code properties
   qrCodeImage: string = '';
@@ -163,6 +174,7 @@ export class Userdashboard implements OnInit, OnDestroy, AfterViewInit {
   isLoadingRDs: boolean = false;
   selectedRDDetails: any = null;
   rdHistory: any[] = [];
+  rdContributions: any[] = [];
   showFDForm: boolean = false;
   fdForm = {
     planId: null as number | null,
@@ -838,6 +850,9 @@ export class Userdashboard implements OnInit, OnDestroy, AfterViewInit {
     }
 
     this.selectedFeature = feature;
+    if (feature === 'accounts') {
+      this.loadCustomerNominees();
+    }
     if (feature === 'deposit-request') {
       this.depositMessage = '';
       this.depositError = '';
@@ -1173,6 +1188,37 @@ export class Userdashboard implements OnInit, OnDestroy, AfterViewInit {
           }
         }
       });
+  }
+
+  refreshAccountDetails() {
+    this.loadUserProfile();
+    this.loadCustomerNominees();
+  }
+
+  loadCustomerNominees() {
+    const accountNumber = this.userAccountNumber.trim();
+    if (!accountNumber || accountNumber === 'ACC001') {
+      this.customerNominees = [];
+      this.nomineeLoadError = 'Account number is not available.';
+      return;
+    }
+
+    this.isLoadingNominees = true;
+    this.nomineeLoadError = '';
+    this.http.get<CustomerNominee[]>(
+      `${environment.apiBaseUrl}/api/customer-nominees/account/${encodeURIComponent(accountNumber)}`
+    ).subscribe({
+      next: nominees => {
+        this.customerNominees = Array.isArray(nominees) ? nominees : [];
+        this.isLoadingNominees = false;
+      },
+      error: error => {
+        console.error('Unable to load account nominees:', error);
+        this.customerNominees = [];
+        this.nomineeLoadError = 'Nomination details could not be loaded. Please refresh and try again.';
+        this.isLoadingNominees = false;
+      }
+    });
   }
 
 
@@ -2391,6 +2437,10 @@ export class Userdashboard implements OnInit, OnDestroy, AfterViewInit {
     this.http.get<any[]>(`${environment.apiBaseUrl}/api/recurring-deposits/${rd.id}/history`, this.customerAuthOptions()).subscribe({
       next: history => this.rdHistory = history || [],
       error: err => this.alertService.error('RD History', err.error?.message || 'Unable to load RD history.')
+    });
+    this.http.get<any[]>(`${environment.apiBaseUrl}/api/recurring-deposits/${rd.id}/contributions`, this.customerAuthOptions()).subscribe({
+      next: contributions => this.rdContributions = contributions || [],
+      error: err => this.alertService.error('RD Contributions', err.error?.message || 'Unable to load RD contributions.')
     });
   }
 

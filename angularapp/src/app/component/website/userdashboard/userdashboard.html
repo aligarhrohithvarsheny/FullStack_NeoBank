@@ -945,25 +945,37 @@
           <div><h2>Recurring Deposits</h2><p>View recurring-deposit details and the recorded history for your account.</p></div>
           <button type="button" class="ud-chip-btn" (click)="loadFeatureData()" [disabled]="isLoadingRDs">Refresh</button>
         </div>
-        <p class="ud-text-muted">These records are informational estimates only. No installments are debited and no maturity proceeds are paid through this screen.</p>
+        <p class="ud-text-muted">Projected interest and maturity value are estimates. Installments are debited only after staff approval and your separate ECS consent. Maturity proceeds are not paid automatically.</p>
         <div *ngIf="isLoadingRDs" class="ud-empty">Loading recurring deposits...</div>
         <div *ngIf="!isLoadingRDs && recurringDeposits.length === 0" class="ud-empty">No recurring-deposit details are available for this account.</div>
         <div *ngIf="!isLoadingRDs && recurringDeposits.length > 0" class="ud-invest-list">
           <div *ngFor="let rd of recurringDeposits" class="ud-invest-card">
-            <div class="ud-invest-head"><h3>{{ rd.schemeName || 'Recurring Deposit' }}</h3><span class="ud-status-badge">{{ rd.status || 'DETAILS ONLY' }}</span></div>
+            <div class="ud-invest-head"><h3>{{ rd.schemeName || 'Recurring Deposit' }}</h3><span class="ud-status-badge">{{ rd.status || 'DETAILS_ONLY' }}</span></div>
             <div class="ud-invest-body">
+              <div class="ud-info-row"><span>RD account:</span><span>{{ rd.rdAccountNumber || 'Pending setup' }}</span></div>
+              <div class="ud-info-row"><span>Linked account / balance:</span><span>{{ rd.linkedAccount?.accountNumber }} · &#8377;{{ rd.linkedAccount?.balance | number:'1.2-2' }}</span></div>
               <div class="ud-info-row"><span>Monthly installment:</span><span>&#8377;{{ rd.monthlyInstallment | number:'1.2-2' }}</span></div>
               <div class="ud-info-row"><span>Annual interest:</span><span>{{ rd.annualInterestRate }}%</span></div>
               <div class="ud-info-row"><span>Duration:</span><span>{{ rd.tenureMonths }} months</span></div>
               <div class="ud-info-row"><span>Start date:</span><span>{{ rd.startDate | date:'dd/MM/yyyy' }}</span></div>
               <div class="ud-info-row"><span>Maturity date:</span><span>{{ rd.maturityDate | date:'dd/MM/yyyy' }}</span></div>
+              <div class="ud-info-row"><span>Projected principal:</span><span>&#8377;{{ rd.estimatedPrincipal | number:'1.2-2' }}</span></div>
+              <div class="ud-info-row"><span>Estimated interest:</span><span>&#8377;{{ rd.estimatedInterest | number:'1.2-2' }}</span></div>
               <div class="ud-info-row"><span>Estimated maturity value:</span><span>&#8377;{{ rd.estimatedMaturityAmount | number:'1.2-2' }}</span></div>
+              <div class="ud-info-row"><span>Payout instruction:</span><span>{{ rd.payoutInstruction || 'At maturity' }}</span></div>
+              <div class="ud-info-row"><span>Contributed so far:</span><span>&#8377;{{ (rd.paidPrincipal || 0) | number:'1.2-2' }} ({{ rd.paidInstallments || 0 }} installments)</span></div>
+              <div class="ud-info-row"><span>Customer acknowledgement:</span><span>{{ rd.signedAt ? (rd.signedAt | date:'dd/MM/yyyy HH:mm') : 'Pending' }}</span></div>
+              <div class="ud-info-row"><span>Admin approval:</span><span>{{ rd.approvedAt ? (rd.approvedAt | date:'dd/MM/yyyy HH:mm') : 'Pending' }}</span></div>
             </div>
-            <div class="ud-invest-foot"><button type="button" class="ud-btn-outline ud-btn-sm" (click)="viewRDDetails(rd)">View history</button></div>
+            <div class="ud-invest-foot"><button type="button" class="ud-btn-outline ud-btn-sm" (click)="viewRDDetails(rd)">View details, contributions & history</button></div>
           </div>
         </div>
         <section *ngIf="selectedRDDetails" class="ud-feature-card">
-          <div class="ud-feature-header"><h3>History — {{ selectedRDDetails.schemeName || 'Recurring Deposit' }}</h3><button type="button" class="ud-btn-outline ud-btn-sm" (click)="selectedRDDetails = null; rdHistory = []">Close</button></div>
+          <div class="ud-feature-header"><h3>History — {{ selectedRDDetails.schemeName || 'Recurring Deposit' }}</h3><button type="button" class="ud-btn-outline ud-btn-sm" (click)="selectedRDDetails = null; rdHistory = []; rdContributions = []">Close</button></div>
+          <h4>Contribution ledger</h4>
+          <div *ngIf="rdContributions.length === 0" class="ud-empty">No contributions have been posted.</div>
+          <div *ngFor="let contribution of rdContributions" class="ud-info-row"><span>{{ contribution.contributionMonth }} · &#8377;{{ contribution.amount | number:'1.2-2' }}</span><span>{{ contribution.postedDate | date:'dd/MM/yyyy' }} · {{ contribution.transactionId }}</span></div>
+          <h4>Account history</h4>
           <div *ngIf="rdHistory.length === 0" class="ud-empty">No history events recorded.</div>
           <div *ngFor="let event of rdHistory" class="ud-info-row"><span>{{ event.occurredAt | date:'dd/MM/yyyy HH:mm' }} · {{ event.action }}</span><span>{{ event.details || event.reason }}</span></div>
         </section>
@@ -981,8 +993,67 @@
 
       <!-- Accounts -->
       <div *ngIf="selectedFeature === 'accounts'" class="ud-feature-card">
-        <div class="ud-feature-header"><h2>Account Details</h2><button (click)="loadUserProfile()" class="ud-chip-btn">Refresh</button></div>
-        <div class="ud-account-grid"><div class="ud-info-row"><span>Account Number:</span><span>{{ userAccountNumber }}</span></div><div class="ud-info-row"><span>Holder:</span><span>{{ username }}</span></div><div class="ud-info-row"><span>Balance:</span><span class="ud-text-success">&#8377;{{ currentBalance | number:'1.2-2' }}</span></div><div class="ud-info-row" *ngIf="userProfile?.email"><span>Email:</span><span>{{ userProfile.email }}</span></div></div>
+        <div class="ud-feature-header">
+          <div>
+            <h2>Account Details</h2>
+            <p>Review your account profile, balance, and nomination information.</p>
+          </div>
+          <button type="button" (click)="refreshAccountDetails()" class="ud-chip-btn">Refresh</button>
+        </div>
+        <div class="ud-account-details">
+          <div class="ud-account-details-overview">
+            <div class="ud-account-number">
+              <span>Account Number</span>
+              <strong>{{ userAccountNumber || 'Not available' }}</strong>
+            </div>
+            <div class="ud-account-overview-stat">
+              <span>Current Balance</span>
+              <strong>&#8377;{{ (userProfile?.account?.balance ?? currentBalance) | number:'1.2-2' }}</strong>
+            </div>
+            <div class="ud-account-overview-stat">
+              <span>Product Name</span>
+              <strong>{{ userProfile?.account?.savingsProductCode || userProfile?.account?.accountType || 'Not available' }}</strong>
+            </div>
+          </div>
+
+          <section class="ud-account-section" aria-labelledby="account-basic-details-heading">
+            <h3 id="account-basic-details-heading">Basic Details</h3>
+            <div class="ud-account-fields">
+              <div class="ud-account-field"><span>Account Holder</span><strong>{{ userProfile?.account?.name || username || 'Not available' }}</strong></div>
+              <div class="ud-account-field"><span>Customer ID</span><strong>{{ userProfile?.account?.customerId || 'Not available' }}</strong></div>
+              <div class="ud-account-field"><span>Account Type</span><strong>{{ userProfile?.account?.accountType || 'Not available' }}</strong></div>
+              <div class="ud-account-field"><span>Branch</span><strong>{{ userProfile?.account?.branchCity || 'Not available' }}</strong></div>
+              <div class="ud-account-field"><span>Status</span><strong>{{ userProfile?.account?.status || 'Not available' }}</strong></div>
+              <div class="ud-account-field"><span>Opening Date</span><strong>{{ userProfile?.account?.createdAt ? (userProfile.account.createdAt | date:'dd-MM-yyyy') : 'Not available' }}</strong></div>
+              <div class="ud-account-field"><span>Registered Email</span><strong>{{ userProfile?.email || 'Not available' }}</strong></div>
+              <div class="ud-account-field"><span>Currency</span><strong>INR</strong></div>
+            </div>
+          </section>
+
+          <section class="ud-account-section" aria-labelledby="account-balance-details-heading">
+            <h3 id="account-balance-details-heading">Balance Details</h3>
+            <div class="ud-account-fields ud-account-balance-fields">
+              <div class="ud-account-field"><span>Current Balance</span><strong>&#8377;{{ (userProfile?.account?.balance ?? currentBalance) | number:'1.2-2' }}</strong></div>
+              <div class="ud-account-field"><span>Available Balance</span><strong>Not provided</strong></div>
+              <div class="ud-account-field"><span>Amount on Hold</span><strong>Not provided</strong></div>
+              <div class="ud-account-field"><span>Lien / Overdraft</span><strong>Not provided</strong></div>
+            </div>
+          </section>
+
+          <section class="ud-account-section" aria-labelledby="account-nomination-details-heading">
+            <h3 id="account-nomination-details-heading">Nomination Details</h3>
+            <p class="ud-nominee-state" *ngIf="isLoadingNominees">Loading nomination details...</p>
+            <p class="ud-nominee-state ud-nominee-error" *ngIf="!isLoadingNominees && nomineeLoadError">{{ nomineeLoadError }}</p>
+            <p class="ud-nominee-state" *ngIf="!isLoadingNominees && !nomineeLoadError && !customerNominees.length">Not Registered</p>
+            <div class="ud-account-fields" *ngIf="!isLoadingNominees && !nomineeLoadError && customerNominees.length">
+              <ng-container *ngFor="let nominee of customerNominees; let first = first">
+                <div class="ud-account-field"><span>{{ first ? 'Nominee' : 'Additional Nominee' }}</span><strong>{{ nominee.nomineeName }}</strong></div>
+                <div class="ud-account-field"><span>Relationship</span><strong>{{ nominee.relationship }}</strong></div>
+                <div class="ud-account-field"><span>Share</span><strong>{{ nominee.sharePercentage }}%</strong></div>
+              </ng-container>
+            </div>
+          </section>
+        </div>
         <div class="ud-form-actions" style="margin-top:16px"><button (click)="selectFeature('transaction')" class="ud-btn-outline">View Transactions</button><button (click)="selectFeature('transferfunds')" class="ud-btn-primary">Transfer Funds</button></div>
         <section class="ud-cancelled-cheque-section" aria-labelledby="cancelled-cheque-heading">
           <h3 id="cancelled-cheque-heading">Cancelled Cheque</h3>

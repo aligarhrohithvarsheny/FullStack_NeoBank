@@ -4,8 +4,8 @@
       <i class="fa fa-arrow-left"></i> Back
     </button>
     <h1><i class="fa fa-piggy-bank"></i> Fixed Deposits Management</h1>
-    <button class="refresh-btn" (click)="loadFixedDeposits()" [disabled]="isLoadingFDs">
-      <i class="fa fa-sync-alt" [class.fa-spin]="isLoadingFDs"></i> Refresh
+    <button class="refresh-btn" (click)="activeProduct === 'RD' ? loadRecurringDeposits() : loadFixedDeposits()" [disabled]="activeProduct === 'RD' ? isLoadingRDs : isLoadingFDs">
+      <i class="fa fa-sync-alt" [class.fa-spin]="activeProduct === 'RD' ? isLoadingRDs : isLoadingFDs"></i> Refresh
     </button>
   </div>
 
@@ -56,7 +56,7 @@
       <h2>Recurring-deposit details</h2>
       <button class="btn-process" (click)="showRDForm = !showRDForm">{{ showRDForm ? 'Cancel' : 'Add RD details' }}</button>
     </div>
-    <p class="rd-notice">Details-only records: this screen does not debit installments or process maturity payouts.</p>
+    <p class="rd-notice">Customer terms acknowledgement, staff approval, and ECS consent are separate steps. No debit occurs before the customer separately authorizes an ECS mandate; maturity proceeds are not paid automatically.</p>
     <div *ngIf="showRDForm" class="filters-bar rd-form">
       <input [(ngModel)]="rdForm.accountNumber" placeholder="Linked customer account number" />
       <select [(ngModel)]="rdForm.planId">
@@ -68,23 +68,47 @@
       <input type="number" [(ngModel)]="rdForm.monthlyInstallment" placeholder="Monthly installment details" min="1" />
       <input type="date" [(ngModel)]="rdForm.startDate" />
       <input [(ngModel)]="rdForm.remarks" placeholder="Admin remarks (optional)" />
-      <button class="btn-approve" (click)="createRDRecord()" [disabled]="savingRD">Save details only</button>
+      <button class="btn-approve" (click)="createRDRecord()" [disabled]="savingRD">Save RD terms</button>
     </div>
     <div *ngIf="isLoadingRDs" class="loading-state"><p>Loading RD records...</p></div>
     <div *ngIf="!isLoadingRDs && recurringDeposits.length === 0" class="no-data"><p>No RD detail records found.</p></div>
     <table class="data-table" *ngIf="!isLoadingRDs && recurringDeposits.length">
-      <thead><tr><th>Customer</th><th>Linked account</th><th>Scheme</th><th>Monthly amount</th><th>Rate</th><th>Duration</th><th>Maturity date</th><th>Estimated value</th><th>Actions</th></tr></thead>
+      <thead><tr><th>Customer / RD account</th><th>Linked account / balance</th><th>Scheme / payout</th><th>Installment</th><th>Estimate: principal + interest</th><th>Estimated maturity</th><th>Paid ledger</th><th>Status</th><th>Actions</th></tr></thead>
       <tbody><tr *ngFor="let rd of recurringDeposits">
-        <td>{{ rd.customerName }}</td><td>{{ rd.accountNumber }}</td><td>{{ rd.schemeName }}</td>
-        <td>₹{{ rd.monthlyInstallment | number:'1.2-2' }}</td><td>{{ rd.annualInterestRate }}%</td>
-        <td>{{ rd.tenureMonths }} months</td><td>{{ rd.maturityDate | date:'dd/MM/yyyy' }}</td>
-        <td>₹{{ rd.estimatedMaturityAmount | number:'1.2-2' }}</td>
-        <td><button class="btn-view" (click)="editRD(rd)">Edit</button><button class="btn-view" (click)="loadRDHistory(rd)">History</button></td>
+        <td>{{ rd.customerName }}<br /><small>{{ rd.rdAccountNumber || ('RD-' + rd.id) }}</small></td>
+        <td>{{ rd.linkedAccount?.accountNumber || rd.accountNumber }}<br /><small>Balance ₹{{ rd.linkedAccount?.balance | number:'1.2-2' }}</small></td>
+        <td>{{ rd.schemeName }}<br /><small>{{ rd.payoutInstruction || 'At maturity' }}</small></td>
+        <td>₹{{ rd.monthlyInstallment | number:'1.2-2' }} / month<br /><small>{{ rd.annualInterestRate }}% p.a. · {{ rd.tenureMonths }} months</small></td>
+        <td>₹{{ rd.estimatedPrincipal | number:'1.2-2' }} principal<br /><small>+ ₹{{ rd.estimatedInterest | number:'1.2-2' }} estimated interest</small></td>
+        <td>₹{{ rd.estimatedMaturityAmount | number:'1.2-2' }}<br /><small>{{ rd.maturityDate | date:'dd/MM/yyyy' }}</small></td>
+        <td>₹{{ rd.paidPrincipal || 0 | number:'1.2-2' }}<br /><small>{{ rd.paidInstallments || 0 }} / {{ rd.tenureMonths }} installments</small></td>
+        <td><span class="status-badge">{{ rd.status }}</span><br /><small *ngIf="rd.signedAt">Signed {{ rd.signedAt | date:'short' }}</small></td>
+        <td>
+          <button *ngIf="rd.status === 'DETAILS_ONLY' || rd.status === 'PENDING_SIGNATURE'" class="btn-process" (click)="issueRDShareLink(rd)">Generate review link</button>
+          <button *ngIf="rd.shareUrl" class="btn-view" (click)="copyRDShareLink(rd)">Copy link</button>
+          <button *ngIf="rd.status === 'SIGNED'" class="btn-approve" (click)="approveRD(rd)">Approve RD</button>
+          <button *ngIf="rd.status === 'DETAILS_ONLY'" class="btn-view" (click)="editRD(rd)">Edit</button>
+          <button class="btn-view" (click)="loadRDHistory(rd)">Details / history</button>
+        </td>
       </tr></tbody>
     </table>
     <section *ngIf="selectedRD" class="plan-management">
       <h3>RD record history — {{ selectedRD.accountNumber }}</h3>
-      <p class="rd-notice">Record history only; no customer funds have been moved.</p>
+      <div class="details-grid">
+        <div class="detail-item"><span class="label">Linked account:</span><span class="value">{{ selectedRD.linkedAccount?.accountNumber || selectedRD.accountNumber }}</span></div>
+        <div class="detail-item"><span class="label">Current account balance:</span><span class="value">₹{{ selectedRD.linkedAccount?.balance | number:'1.2-2' }}</span></div>
+        <div class="detail-item"><span class="label">Estimated interest:</span><span class="value">₹{{ selectedRD.estimatedInterest | number:'1.2-2' }}</span></div>
+        <div class="detail-item"><span class="label">Estimated maturity / payout:</span><span class="value">₹{{ selectedRD.estimatedMaturityAmount | number:'1.2-2' }} · {{ selectedRD.payoutInstruction || 'At maturity' }}</span></div>
+        <div class="detail-item"><span class="label">Customer acknowledgement:</span><span class="value">{{ selectedRD.signedName || 'Pending' }} {{ selectedRD.signedAt ? ('· ' + (selectedRD.signedAt | date:'short')) : '' }}</span></div>
+        <div class="detail-item"><span class="label">Admin approval:</span><span class="value">{{ selectedRD.approvedBy || 'Pending' }} {{ selectedRD.approvedAt ? ('· ' + (selectedRD.approvedAt | date:'short')) : '' }}</span></div>
+      </div>
+      <p class="rd-notice">Projected interest and maturity value are estimates. ECS debits require separate customer consent. Maturity payout requires separate bank processing.</p>
+      <h4>Posted contributions</h4>
+      <table class="data-table" *ngIf="rdContributions.length"><thead><tr><th>Month</th><th>Amount</th><th>Source account</th><th>Transaction</th><th>Posted</th></tr></thead>
+        <tbody><tr *ngFor="let contribution of rdContributions"><td>{{ contribution.contributionMonth }}</td><td>₹{{ contribution.amount | number:'1.2-2' }}</td><td>{{ contribution.sourceAccountNumber }}</td><td>{{ contribution.transactionId }}</td><td>{{ contribution.postedDate | date:'dd/MM/yyyy' }}</td></tr></tbody>
+      </table>
+      <p *ngIf="!rdContributions.length">No contributions have been posted.</p>
+      <h4>Record history</h4>
       <table class="data-table"><thead><tr><th>When</th><th>Action</th><th>Staff</th><th>Reason</th><th>Details</th></tr></thead>
         <tbody><tr *ngFor="let event of rdHistory"><td>{{ event.occurredAt | date:'dd/MM/yyyy HH:mm' }}</td><td>{{ event.action }}</td><td>{{ event.performedBy }}</td><td>{{ event.reason }}</td><td>{{ event.details }}</td></tr></tbody>
       </table>

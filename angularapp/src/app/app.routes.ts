@@ -143,6 +143,8 @@ export const routes: Routes = [
   { path: 'admin/admin-open-account', component: AdminOpenAccount, canActivate: [adminOrManagerAuthGuard] },
   { path: 'admin/family-banking', component: FamilyBankingAdminComponent, canActivate: [adminAuthGuard] },
   { path: 'admin/positive-pay', component: AdminPositivePayComponent, canActivate: [adminAuthGuard] },
+  { path: 'rd-review/:token', loadComponent: () => import('./component/website/rd-review/rd-review').then(m => m.RecurringDepositReviewComponent) },
+  { path: 'ecs-consent/:token', loadComponent: () => import('./component/website/ecs-consent/ecs-consent').then(m => m.EcsConsentComponent) },
 
   // ------------------ WEBSITE ------------------
   {

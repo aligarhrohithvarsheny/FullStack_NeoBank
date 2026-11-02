@@ -10,11 +10,14 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDate;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
@@ -66,5 +69,38 @@ class RecurringDepositServiceTest {
         verifyNoMoreInteractions(accountService);
         verify(historyService).record(eq("RD"), eq(17L), eq("123456"), eq("DETAILS_CREATED"),
                 eq("ADMIN:1"), eq("Admin-created record; no funds moved."), any());
+    }
+
+    @Test
+    void issuesReviewLinkBeforeTermsCanBeAcknowledged() {
+        ReflectionTestUtils.setField(service, "frontendUrl", "http://localhost:4200");
+        RecurringDeposit rd = new RecurringDeposit();
+        rd.setId(17L);
+        rd.setStatus("DETAILS_ONLY");
+        rd.setAccountNumber("123456");
+        rd.setMonthlyInstallment(1000.0);
+        rd.setTenureMonths(12);
+        rd.setAnnualInterestRate(12.0);
+        rd.setMaturityDate(LocalDate.of(2027, 1, 1));
+        when(repository.findById(17L)).thenReturn(Optional.of(rd));
+        when(repository.save(any(RecurringDeposit.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var result = service.issueShareLink(17L, "ADMIN:1");
+
+        assertEquals("PENDING_SIGNATURE", rd.getStatus());
+        assertEquals(64, rd.getShareTokenHash().length());
+        assertTrue(result.get("shareUrl").toString().contains("/rd-review/"));
+        verify(historyService).record(eq("RD"), eq(17L), eq("123456"), eq("REVIEW_LINK_ISSUED"),
+                eq("ADMIN:1"), any(), any());
+    }
+
+    @Test
+    void adminApprovalRequiresCustomerAcknowledgement() {
+        RecurringDeposit rd = new RecurringDeposit();
+        rd.setId(17L);
+        rd.setStatus("PENDING_SIGNATURE");
+        when(repository.findById(17L)).thenReturn(Optional.of(rd));
+
+        assertThrows(IllegalStateException.class, () -> service.approve(17L, "ADMIN:1"));
     }
 }

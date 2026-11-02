@@ -14,5 +14,6 @@ public interface EcsMandateRepository extends JpaRepository<EcsMandate, Long> {
     List<EcsMandate> findByLoanAccountNumberOrderByCreatedAtDesc(String loanAccountNumber);
     List<EcsMandate> findByStatus(String status);
     Optional<EcsMandate> findByMandateId(String mandateId);
+    Optional<EcsMandate> findByConsentTokenHash(String consentTokenHash);
     boolean existsByLoanAccountNumberAndStatusIn(String loanAccountNumber, List<String> statuses);
 }

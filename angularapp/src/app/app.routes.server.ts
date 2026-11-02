@@ -1,6 +1,14 @@
 import { RenderMode, ServerRoute } from '@angular/ssr';
 
 export const serverRoutes: ServerRoute[] = [
+  {
+    path: 'rd-review/:token',
+    renderMode: RenderMode.Client
+  },
+  {
+    path: 'ecs-consent/:token',
+    renderMode: RenderMode.Client
+  },
   // Auth-protected routes must be client-rendered so guards can check sessionStorage
   {
     path: 'admin/chat',

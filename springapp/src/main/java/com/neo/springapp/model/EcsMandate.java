@@ -1,5 +1,6 @@
 package com.neo.springapp.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.Data;
 import java.time.LocalDate;
@@ -19,6 +20,7 @@ public class EcsMandate {
 
     private String loanAccountNumber;
     private String loanType; // Personal / Education / Gold ... etc.
+    private String productType;
     private String savingsAccountNumber; // Account debited every month
     private String customerName;
     private String customerId;
@@ -47,6 +49,19 @@ public class EcsMandate {
     private String lastDebitMessage;
     private Integer successfulDebits = 0;
     private Integer failedDebits = 0;
+
+    @JsonIgnore
+    @Column(length = 64)
+    private String consentTokenHash;
+
+    private LocalDateTime consentExpiresAt;
+    private LocalDateTime customerConsentAt;
+
+    @Column(length = 128)
+    private String customerConsentName;
+
+    @Column(length = 64)
+    private String customerConsentIp;
 
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

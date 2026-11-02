@@ -9,6 +9,7 @@ import com.neo.springapp.model.EmiPayment;
 import com.neo.springapp.model.GoldLoan;
 import com.neo.springapp.model.HomeLoan;
 import com.neo.springapp.model.Loan;
+import com.neo.springapp.model.RecurringDeposit;
 import com.neo.springapp.repository.CreditCardBillRepository;
 import com.neo.springapp.repository.CreditCardRepository;
 import com.neo.springapp.repository.EcsMandateEventRepository;
@@ -17,12 +18,20 @@ import com.neo.springapp.repository.EmiPaymentRepository;
 import com.neo.springapp.repository.GoldLoanRepository;
 import com.neo.springapp.repository.HomeLoanRepository;
 import com.neo.springapp.repository.LoanRepository;
+import com.neo.springapp.repository.RecurringDepositContributionRepository;
+import com.neo.springapp.repository.RecurringDepositRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.SecureRandom;
+import java.util.Base64;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -36,7 +45,8 @@ import java.util.stream.Collectors;
 @SuppressWarnings("null")
 public class EcsMandateService {
 
-    private static final List<String> LIVE_STATUSES = List.of("ACTIVE", "PAUSED");
+    private static final List<String> LIVE_STATUSES = List.of("ACTIVE", "PAUSED", "PENDING_CONSENT");
+    private static final SecureRandom RANDOM = new SecureRandom();
 
     @Autowired private EcsMandateRepository mandateRepository;
     @Autowired private EcsMandateEventRepository eventRepository;
@@ -46,15 +56,40 @@ public class EcsMandateService {
     @Autowired private HomeLoanRepository homeLoanRepository;
     @Autowired private CreditCardRepository creditCardRepository;
     @Autowired private CreditCardBillRepository creditCardBillRepository;
+    @Autowired private RecurringDepositRepository recurringDepositRepository;
+    @Autowired private RecurringDepositContributionRepository recurringDepositContributionRepository;
     @Autowired private AccountService accountService;
     @Autowired private EmiService emiService;
     @Autowired private HomeLoanService homeLoanService;
     @Autowired private CreditCardService creditCardService;
+    @Autowired private RecurringDepositEcsService recurringDepositEcsService;
+    @Value("${app.frontend-url:http://localhost:4200}")
+    private String frontendUrl;
 
     // ---------- Loan / account lookup ----------
 
     private Map<String, Object> resolveLoan(String loanAccountNumber) {
         Map<String, Object> info = new LinkedHashMap<>();
+        RecurringDeposit recurringDeposit = recurringDepositRepository.findByRdAccountNumber(loanAccountNumber).orElse(null);
+        if (recurringDeposit != null) {
+            info.put("productType", "RECURRING_DEPOSIT");
+            info.put("loanAccountNumber", recurringDeposit.getRdAccountNumber());
+            info.put("loanType", "Recurring Deposit");
+            info.put("status", recurringDeposit.getStatus());
+            info.put("amount", recurringDeposit.getPaidPrincipal());
+            info.put("tenure", recurringDeposit.getTenureMonths());
+            info.put("interestRate", recurringDeposit.getAnnualInterestRate());
+            info.put("accountNumber", recurringDeposit.getAccountNumber());
+            info.put("userName", recurringDeposit.getCustomerName());
+            info.put("customerName", recurringDeposit.getCustomerName());
+            info.put("rdId", recurringDeposit.getId());
+            info.put("monthlyInstallment", recurringDeposit.getMonthlyInstallment());
+            info.put("paidInstallments", recurringDeposit.getPaidInstallments());
+            info.put("estimatedInterest", recurringDeposit.getEstimatedInterest());
+            info.put("estimatedMaturityAmount", recurringDeposit.getEstimatedMaturityAmount());
+            info.put("payoutInstruction", recurringDeposit.getPayoutInstruction());
+            return info;
+        }
         Loan loan = loanRepository.findByLoanAccountNumber(loanAccountNumber).orElse(null);
         if (loan != null) {
             info.put("productType", "LOAN");
@@ -126,6 +161,9 @@ public class EcsMandateService {
         if ("CREDIT_CARD".equals(product.get("productType"))) {
             CreditCard card = creditCardRepository.findByCardNumber(loanAccountNumber).orElse(null);
             return card == null ? null : nextCardMinimumDue(card.getId());
+        }
+        if ("RECURRING_DEPOSIT".equals(product.get("productType"))) {
+            return (Double) product.get("monthlyInstallment");
         }
         List<EmiPayment> emis = emisOf(loanAccountNumber);
         return emis.stream().filter(e -> "Pending".equals(e.getStatus())).findFirst()
@@ -199,6 +237,12 @@ public class EcsMandateService {
             total = pending;
             nextDueDate = bills.isEmpty() ? null : bills.get(0).getDueDate() == null
                     ? null : bills.get(0).getDueDate().toLocalDate();
+        } else if ("RECURRING_DEPOSIT".equals(product.get("productType"))) {
+            RecurringDeposit recurringDeposit = recurringDepositRepository
+                    .findByRdAccountNumber(loanAccountNumber.trim()).orElse(null);
+            pending = recurringDeposit == null ? 0
+                    : Math.max(0, recurringDeposit.getTenureMonths() - recurringDeposit.getPaidInstallments());
+            total = recurringDeposit == null ? 0 : recurringDeposit.getTenureMonths();
         }
 
         res.put("success", true);
@@ -218,7 +262,7 @@ public class EcsMandateService {
         return res;
     }
 
-    /** Approved loans, home loans, and active credit cards without a live ECS mandate. */
+    /** Approved loans, home loans, approved recurring deposits, and active credit cards. */
     public List<Map<String, Object>> eligibleLoans() {
         List<Map<String, Object>> out = new ArrayList<>();
         for (Loan l : loanRepository.findByStatus("Approved")) {
@@ -232,6 +276,12 @@ public class EcsMandateService {
         }
         for (CreditCard card : creditCardRepository.findByStatus("Active")) {
             if (!card.isBlocked() && !card.isDeactivated()) addEligible(out, card.getCardNumber());
+        }
+        for (RecurringDeposit rd : recurringDepositRepository.findByStatus("APPROVED")) {
+            int paid = rd.getPaidInstallments() == null ? 0 : rd.getPaidInstallments();
+            if (rd.getTenureMonths() != null && paid < rd.getTenureMonths()) {
+                addEligible(out, rd.getRdAccountNumber());
+            }
         }
         return out;
     }
@@ -250,6 +300,58 @@ public class EcsMandateService {
         r.put("success", false);
         r.put("message", message);
         return r;
+    }
+
+    @Transactional(readOnly = true)
+    public Map<String, Object> consentDetails(String token) {
+        EcsMandate mandate = findPendingConsent(token);
+        Map<String, Object> details = new LinkedHashMap<>();
+        details.put("mandateId", mandate.getMandateId());
+        details.put("productType", mandate.getProductType());
+        details.put("loanAccountNumber", mandate.getLoanAccountNumber());
+        details.put("loanType", mandate.getLoanType());
+        details.put("customerName", mandate.getCustomerName());
+        details.put("savingsAccountNumber", maskAccountNumber(mandate.getSavingsAccountNumber()));
+        details.put("monthlyAmount", mandate.getEmiAmount());
+        details.put("amountLimit", mandate.getAmountLimit());
+        details.put("debitDay", mandate.getDebitDay());
+        details.put("consentExpiresAt", mandate.getConsentExpiresAt());
+        details.put("notice", "This is a separate ECS authorization. If you confirm, the linked account may be debited up to the displayed monthly amount on the selected day. The first debit is no earlier than the following calendar month.");
+        return details;
+    }
+
+    @Transactional
+    public Map<String, Object> confirmConsent(String token, String name, boolean consent, String remoteAddress) {
+        EcsMandate mandate = findPendingConsent(token);
+        if (!consent) return fail("Confirm the recurring-deposit ECS authorization to continue.");
+        if (name == null || !mandate.getCustomerName().equalsIgnoreCase(name.trim())) {
+            return fail("Enter the account holder's full name to confirm this ECS authorization.");
+        }
+        RecurringDeposit deposit = recurringDepositRepository.findByRdAccountNumber(mandate.getLoanAccountNumber())
+                .orElseThrow(() -> new IllegalStateException("The recurring-deposit record is no longer available."));
+        mandate.setCustomerConsentName(name.trim());
+        mandate.setCustomerConsentAt(LocalDateTime.now());
+        mandate.setCustomerConsentIp(remoteAddress == null ? null
+                : remoteAddress.substring(0, Math.min(remoteAddress.length(), 64)));
+        mandate.setConsentTokenHash(null);
+        mandate.setConsentExpiresAt(null);
+        mandate.setStatus("ACTIVE");
+        mandateRepository.save(mandate);
+        recurringDepositEcsService.activateAfterConsent(deposit.getId(), name.trim());
+        log(mandate, "CUSTOMER_CONSENT", null, mandate.getEmiAmount(),
+                "Customer separately authorized RD monthly contribution debits.", name.trim());
+        return ok(mandate, "ECS authorization recorded. Contributions will start on the next eligible monthly date.");
+    }
+
+    private EcsMandate findPendingConsent(String token) {
+        if (token == null || token.isBlank()) throw new IllegalArgumentException("The ECS consent link is invalid.");
+        EcsMandate mandate = mandateRepository.findByConsentTokenHash(sha256(token))
+                .orElseThrow(() -> new IllegalArgumentException("The ECS consent link is invalid or expired."));
+        if (!"PENDING_CONSENT".equals(mandate.getStatus()) || mandate.getConsentExpiresAt() == null
+                || !mandate.getConsentExpiresAt().isAfter(LocalDateTime.now())) {
+            throw new IllegalStateException("The ECS consent link is no longer available.");
+        }
+        return mandate;
     }
 
     // ---------- Admin actions ----------
@@ -294,6 +396,7 @@ public class EcsMandateService {
         m.setMandateId("ECS" + System.currentTimeMillis());
         m.setLoanAccountNumber(loanNo);
         m.setLoanType((String) loan.get("loanType"));
+        m.setProductType(String.valueOf(loan.get("productType")));
         m.setSavingsAccountNumber(savings);
         m.setCustomerName(account.getName());
         m.setCustomerId(account.getCustomerId());
@@ -302,6 +405,33 @@ public class EcsMandateService {
         m.setAmountLimit(limit);
         m.setEmiAmount(emi);
         m.setCreatedBy(admin);
+        if ("RECURRING_DEPOSIT".equals(loan.get("productType"))) {
+            if (!"Approved".equalsIgnoreCase(String.valueOf(loan.get("status")))) {
+                return fail("Only admin-approved recurring deposits can request an ECS mandate");
+            }
+            Integer paidInstallments = toInt(loan.get("paidInstallments"));
+            Integer totalInstallments = toInt(loan.get("tenure"));
+            if (paidInstallments != null && totalInstallments != null && paidInstallments >= totalInstallments) {
+                return fail("All scheduled RD installments have already been posted.");
+            }
+            if (!savings.equals(loan.get("accountNumber"))) {
+                return fail("RD contributions must debit the customer account linked to the recurring deposit");
+            }
+            String consentToken = newConsentToken();
+            m.setStatus("PENDING_CONSENT");
+            m.setConsentTokenHash(sha256(consentToken));
+            m.setConsentExpiresAt(LocalDateTime.now().plusDays(7));
+            m = mandateRepository.save(m);
+            log(m, "CONSENT_REQUESTED", null, emi,
+                    "Separate customer ECS consent requested; no debit will occur until confirmed.", admin);
+            Map<String, Object> response = new LinkedHashMap<>();
+            response.put("success", true);
+            response.put("message", "ECS consent link created. No installment will be debited until the customer confirms.");
+            response.put("mandate", m);
+            response.put("consentUrl", frontendUrl.replaceAll("/+$", "") + "/ecs-consent/" + consentToken);
+            response.put("consentExpiresAt", m.getConsentExpiresAt());
+            return response;
+        }
         m = mandateRepository.save(m);
         syncPendingEmiAccount(loanNo, savings);
         log(m, "LINKED", null, null, "Mandate linked: debit on day " + day + ", limit ₹" + limit, admin);
@@ -318,6 +448,9 @@ public class EcsMandateService {
         EcsMandate m = mandateRepository.findById(id).orElse(null);
         if (m == null) return fail("Mandate not found");
         if ("CANCELLED".equals(m.getStatus())) return fail("Mandate is cancelled");
+        if ("RECURRING_DEPOSIT".equals(m.getProductType())) {
+            return fail("The RD-linked debit account cannot be changed; cancel and request a new customer consent.");
+        }
         if (newSavings == null || newSavings.isBlank()) return fail("New savings account number is required");
         Account account = accountService.getAccountByNumber(newSavings.trim());
         if (account == null) return fail("Savings account not found");
@@ -338,6 +471,9 @@ public class EcsMandateService {
         EcsMandate m = mandateRepository.findById(id).orElse(null);
         if (m == null) return fail("Mandate not found");
         if ("CANCELLED".equals(m.getStatus())) return fail("Mandate is cancelled");
+        if ("RECURRING_DEPOSIT".equals(m.getProductType())) {
+            return fail("The RD debit date is part of customer consent; cancel and request a new mandate to change it.");
+        }
         if (day == null || day < 1 || day > 31) return fail("Debit date must be between 1 and 31");
         Integer old = m.getDebitDay();
         m.setDebitDay(day);
@@ -351,6 +487,9 @@ public class EcsMandateService {
         EcsMandate m = mandateRepository.findById(id).orElse(null);
         if (m == null) return fail("Mandate not found");
         if ("CANCELLED".equals(m.getStatus())) return fail("Mandate is cancelled");
+        if ("RECURRING_DEPOSIT".equals(m.getProductType())) {
+            return fail("The RD amount is fixed by the signed installment; cancel and reissue consent to change it.");
+        }
         Double emi = currentEmiAmount(m.getLoanAccountNumber());
         if (limit == null || limit <= 0 || (emi != null && limit < emi)) {
             return fail("Amount limit must be positive and at least the current due amount (₹" + emi + ")");
@@ -397,6 +536,9 @@ public class EcsMandateService {
         m.setCancelledAt(LocalDateTime.now());
         mandateRepository.save(m);
         log(m, "CANCELLED", null, null, "Mandate cancelled by " + admin, admin);
+        if ("RECURRING_DEPOSIT".equals(m.getProductType())) {
+            recurringDepositEcsService.releaseMandate(m.getLoanAccountNumber(), admin);
+        }
         return ok(m, "Mandate cancelled");
     }
 
@@ -504,6 +646,11 @@ public class EcsMandateService {
         r.put("emis", emisOf(m.getLoanAccountNumber()));
         r.put("events", eventRepository.findByMandateDbIdOrderByCreatedAtDesc(m.getId()));
         r.put("accountBalance", accountService.getBalanceByAccountNumber(m.getSavingsAccountNumber()));
+        if ("RECURRING_DEPOSIT".equals(m.getProductType())) {
+            r.put("contributions", recurringDepositRepository.findByRdAccountNumber(m.getLoanAccountNumber())
+                    .map(rd -> recurringDepositContributionRepository
+                            .findByRecurringDepositIdOrderByPostedDateDesc(rd.getId())).orElse(List.of()));
+        }
         return r;
     }
 
@@ -549,6 +696,9 @@ public class EcsMandateService {
             m.setLastAttemptDate(today);
             mandateRepository.save(m);
             return 0;
+        }
+        if ("RECURRING_DEPOSIT".equals(product.get("productType"))) {
+            return recurringDepositEcsService.debitContribution(m, today) ? 1 : 0;
         }
         if ("HOME_LOAN".equals(product.get("productType"))) return debitHomeLoan(m, today);
         if ("CREDIT_CARD".equals(product.get("productType"))) return debitCreditCardMinimum(m, today);
@@ -759,6 +909,26 @@ public class EcsMandateService {
 
     private static String str(Object o) {
         return o == null || o.toString().isBlank() ? null : o.toString().trim();
+    }
+
+    private static String newConsentToken() {
+        byte[] bytes = new byte[32];
+        RANDOM.nextBytes(bytes);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+    }
+
+    private static String sha256(String value) {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8));
+            return java.util.HexFormat.of().formatHex(digest);
+        } catch (Exception e) {
+            throw new IllegalStateException("Could not securely process the ECS consent token.", e);
+        }
+    }
+
+    private static String maskAccountNumber(String accountNumber) {
+        if (accountNumber == null || accountNumber.length() <= 4) return "****";
+        return "*".repeat(accountNumber.length() - 4) + accountNumber.substring(accountNumber.length() - 4);
     }
 
     private static Integer toInt(Object o) {

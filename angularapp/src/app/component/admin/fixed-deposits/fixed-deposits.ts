@@ -1,4 +1,4 @@
-import { Component, OnInit, Inject, PLATFORM_ID } from '@angular/core';
+import { Component, OnInit, OnDestroy, Inject, PLATFORM_ID } from '@angular/core';
 import { Router } from '@angular/router';
 import { isPlatformBrowser } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -14,7 +14,7 @@ import { environment } from '../../../../environment/environment';
   styleUrls: ['./fixed-deposits.css'],
   imports: [FormsModule, CommonModule]
 })
-export class FixedDeposits implements OnInit {
+export class FixedDeposits implements OnInit, OnDestroy {
   fixedDeposits: any[] = [];
   isLoadingFDs: boolean = false;
   selectedFD: any = null;
@@ -32,6 +32,7 @@ export class FixedDeposits implements OnInit {
   rdForm: any = { accountNumber: '', planId: null, monthlyInstallment: 1000, startDate: new Date().toISOString().slice(0, 10), remarks: '' };
   rdHistory: any[] = [];
   selectedRD: any = null;
+  rdContributions: any[] = [];
   savingRD = false;
   showEditModal = false;
   editingDeposit: 'FD' | 'RD' | null = null;
@@ -40,6 +41,7 @@ export class FixedDeposits implements OnInit {
   editForm: any = {};
   fdHistory: any[] = [];
   selectedHistoryFD: any = null;
+  private rdRefreshTimer: any;
   
   // Approval modal properties
   showApprovalModal: boolean = false;
@@ -68,7 +70,14 @@ export class FixedDeposits implements OnInit {
       this.loadFixedDeposits();
       this.loadTermPlans();
       this.loadRecurringDeposits();
+      this.rdRefreshTimer = setInterval(() => {
+        if (this.activeProduct === 'RD' && !this.isLoadingRDs) this.loadRecurringDeposits(true);
+      }, 10000);
     }
+  }
+
+  ngOnDestroy() {
+    if (this.rdRefreshTimer) clearInterval(this.rdRefreshTimer);
   }
 
   loadTermPlans() {
@@ -425,13 +434,13 @@ export class FixedDeposits implements OnInit {
     return { headers: new HttpHeaders(token ? { Authorization: `Bearer ${token}` } : {}) };
   }
 
-  private loadRecurringDeposits() {
+  loadRecurringDeposits(silent = false) {
     this.isLoadingRDs = true;
     this.http.get<any[]>(`${environment.apiBaseUrl}/api/recurring-deposits`, this.staffOptions()).subscribe({
       next: rows => { this.recurringDeposits = rows || []; this.isLoadingRDs = false; },
       error: err => {
         this.isLoadingRDs = false;
-        this.alertService.error('RD Load', err.error?.message || 'Unable to load recurring-deposit records.');
+        if (!silent) this.alertService.error('RD Load', err.error?.message || 'Unable to load recurring-deposit records.');
       }
     });
   }
@@ -472,6 +481,42 @@ export class FixedDeposits implements OnInit {
     this.http.get<any[]>(`${environment.apiBaseUrl}/api/recurring-deposits/${rd.id}/history`, this.staffOptions()).subscribe({
       next: history => this.rdHistory = history || [],
       error: err => this.alertService.error('RD History', err.error?.message || 'Unable to load RD history.')
+    });
+    this.http.get<any[]>(`${environment.apiBaseUrl}/api/recurring-deposits/${rd.id}/contributions`, this.staffOptions()).subscribe({
+      next: contributions => this.rdContributions = contributions || [],
+      error: err => this.alertService.error('RD Contributions', err.error?.message || 'Unable to load RD contributions.')
+    });
+  }
+
+  issueRDShareLink(rd: any) {
+    this.http.post<any>(`${environment.apiBaseUrl}/api/recurring-deposits/${rd.id}/share-link`, {}, this.staffOptions()).subscribe({
+      next: response => {
+        rd.shareUrl = response.shareUrl;
+        rd.status = response.status;
+        this.alertService.success('RD Review Link', 'Customer review link generated. Copy and share it with the customer.');
+        this.copyRDShareLink(rd);
+      },
+      error: err => this.alertService.error('RD Review Link', err.error?.message || 'Unable to generate the customer review link.')
+    });
+  }
+
+  copyRDShareLink(rd: any) {
+    if (!rd?.shareUrl) return;
+    navigator.clipboard.writeText(rd.shareUrl).then(
+      () => this.alertService.success('RD Review Link', 'Customer review link copied'),
+      () => this.alertService.warning('RD Review Link', `Copy this customer link: ${rd.shareUrl}`)
+    );
+  }
+
+  approveRD(rd: any) {
+    if (!confirm(`Approve recurring deposit ${rd.rdAccountNumber || rd.id} after checking the recorded customer acknowledgement?`)) return;
+    this.http.post<any>(`${environment.apiBaseUrl}/api/recurring-deposits/${rd.id}/approve`, {}, this.staffOptions()).subscribe({
+      next: updated => {
+        Object.assign(rd, updated);
+        this.alertService.success('RD Approved', 'RD approved. It can now be selected for a separate ECS consent request.');
+        this.loadRecurringDeposits();
+      },
+      error: err => this.alertService.error('RD Approval', err.error?.message || 'Unable to approve this RD.')
     });
   }
 
