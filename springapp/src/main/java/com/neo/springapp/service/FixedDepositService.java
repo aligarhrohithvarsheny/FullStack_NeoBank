@@ -39,6 +39,9 @@ public class FixedDepositService {
     @Autowired
     private TermDepositPlanRepository termDepositPlanRepository;
 
+    @Autowired
+    private DepositManagementHistoryService depositHistoryService;
+
     private static final String OTP_REASON_FD_FORECLOSURE = "FD (Fixed Deposit) Withdrawal / Foreclosure";
 
     /**
@@ -114,13 +117,18 @@ public class FixedDepositService {
             if (fixedDeposit.getPlanId() != null) {
                 TermDepositPlan plan = termDepositPlanRepository.findById(fixedDeposit.getPlanId())
                         .filter(p -> Boolean.TRUE.equals(p.getActive()))
+                        .filter(p -> p.getProductType() == null || "FD".equalsIgnoreCase(p.getProductType()))
                         .orElseThrow(() -> new IllegalArgumentException("Selected term-deposit plan is not available"));
                 if (fixedDeposit.getPrincipalAmount() == null || fixedDeposit.getPrincipalAmount() < (plan.getMinimumAmount() == null ? 0 : plan.getMinimumAmount())
                         || (plan.getMaximumAmount() != null && fixedDeposit.getPrincipalAmount() > plan.getMaximumAmount())) {
                     throw new IllegalArgumentException("Amount is outside the selected plan limits");
                 }
                 fixedDeposit.setSchemeName(plan.getSchemeName());
-                fixedDeposit.setTenure(plan.getDays() != null ? Math.max(1, (int) Math.ceil(plan.getDays() / 30.0)) : fixedDeposit.getTenure());
+                fixedDeposit.setTenure(plan.getDurationMonths() != null
+                        ? plan.getDurationMonths()
+                        : (plan.getDays() != null
+                            ? Math.max(1, (int) Math.ceil(plan.getDays() / 30.0))
+                            : fixedDeposit.getTenure()));
                 fixedDeposit.setYears(plan.getYears());
                 fixedDeposit.setInterestRate(plan.getInterestRate());
                 fixedDeposit.setInterestPayout(plan.getPayoutDate());
@@ -407,6 +415,7 @@ public class FixedDepositService {
             response.put("message", "Fixed Deposit maturity processed successfully");
             response.put("fixedDeposit", savedFD);
             response.put("maturityAmount", fixedDeposit.getMaturityAmount());
+            response.put("newBalance", newBalance);
             
         } catch (Exception e) {
             response.put("success", false);
@@ -447,33 +456,95 @@ public class FixedDepositService {
     /**
      * Update FD (for manager/admin updates)
      */
-    public Map<String, Object> updateFixedDeposit(Long fdId, FixedDeposit fdDetails) {
+    @Transactional
+    public Map<String, Object> updateFixedDeposit(Long fdId, FixedDeposit fdDetails,
+                                                   String reason, String actor) {
         Map<String, Object> response = new HashMap<>();
         
         try {
             FixedDeposit fixedDeposit = fixedDepositRepository.findById(fdId)
                 .orElseThrow(() -> new RuntimeException("Fixed Deposit not found"));
 
-            if (fdDetails.getPrincipalAmount() != null) fixedDeposit.setPrincipalAmount(fdDetails.getPrincipalAmount());
-            if (fdDetails.getTenure() != null) fixedDeposit.setTenure(fdDetails.getTenure());
-            if (fdDetails.getInterestPayout() != null) fixedDeposit.setInterestPayout(fdDetails.getInterestPayout());
-            if (fdDetails.getMaturityDate() != null) fixedDeposit.setMaturityDate(fdDetails.getMaturityDate());
+            if (reason == null || reason.isBlank()) {
+                throw new IllegalArgumentException("An audit reason is required.");
+            }
+            if (!List.of("PENDING", "ACTIVE").contains(fixedDeposit.getStatus())) {
+                throw new IllegalStateException("Only pending or active fixed deposits can be edited.");
+            }
+            if ("ACTIVE".equals(fixedDeposit.getStatus())
+                    && (fixedDeposit.getMonthsInterestCredited() != null && fixedDeposit.getMonthsInterestCredited() > 0
+                        || fixedDeposit.getTotalInterestCredited() != null && fixedDeposit.getTotalInterestCredited() > 0)) {
+                throw new IllegalStateException("Financial terms cannot be edited after an interest payout.");
+            }
+            String before = "principal=" + fixedDeposit.getPrincipalAmount() + ", rate="
+                    + fixedDeposit.getInterestRate() + ", tenure=" + fixedDeposit.getTenure()
+                    + ", maturityDate=" + fixedDeposit.getMaturityDate() + ", payout="
+                    + fixedDeposit.getInterestPayout();
+            if (fdDetails.getPrincipalAmount() != null) {
+                if (!"PENDING".equals(fixedDeposit.getStatus())) {
+                    throw new IllegalStateException("Principal can only be edited before the FD is funded.");
+                }
+                if (fdDetails.getPrincipalAmount() <= 0) {
+                    throw new IllegalArgumentException("Principal amount must be greater than zero.");
+                }
+                fixedDeposit.setPrincipalAmount(fdDetails.getPrincipalAmount());
+            }
+            if (fdDetails.getInterestRate() != null) {
+                if (fdDetails.getInterestRate() < 0 || fdDetails.getInterestRate() > 100) {
+                    throw new IllegalArgumentException("Interest rate must be between 0 and 100 percent.");
+                }
+                fixedDeposit.setInterestRate(fdDetails.getInterestRate());
+            }
+            if (fdDetails.getInterestPayout() != null) {
+                String payout = fdDetails.getInterestPayout().trim();
+                if (!List.of("Monthly", "Quarterly", "At Maturity").contains(payout)) {
+                    throw new IllegalArgumentException("Interest payout must be Monthly, Quarterly, or At Maturity.");
+                }
+                fixedDeposit.setInterestPayout(payout);
+            }
+            if (fdDetails.getTenure() != null) {
+                if (fdDetails.getTenure() <= 0) {
+                    throw new IllegalArgumentException("Tenure must be greater than zero.");
+                }
+                fixedDeposit.setTenure(fdDetails.getTenure());
+            }
+            if (fdDetails.getMaturityDate() != null) {
+                if (fixedDeposit.getStartDate() == null
+                        || !fdDetails.getMaturityDate().isAfter(fixedDeposit.getStartDate())) {
+                    throw new IllegalArgumentException("Maturity date must be after the start date.");
+                }
+                long months = java.time.temporal.ChronoUnit.MONTHS.between(
+                        fixedDeposit.getStartDate(), fdDetails.getMaturityDate());
+                if (months <= 0 || !fixedDeposit.getStartDate().plusMonths(months).equals(fdDetails.getMaturityDate())) {
+                    throw new IllegalArgumentException("Maturity date must align to a whole number of months from the start date.");
+                }
+                fixedDeposit.setTenure(Math.toIntExact(months));
+                fixedDeposit.setMaturityDate(fdDetails.getMaturityDate());
+            } else if (fdDetails.getTenure() != null) {
+                fixedDeposit.setMaturityDate(fixedDeposit.getStartDate().plusMonths(fixedDeposit.getTenure()));
+            }
             if (fdDetails.getRemarks() != null) {
                 fixedDeposit.setRemarks(fdDetails.getRemarks());
             }
-            if (fdDetails.getStatus() != null) {
-                fixedDeposit.setStatus(fdDetails.getStatus());
+            if (fixedDeposit.getTenure() == null || fixedDeposit.getTenure() <= 0) {
+                throw new IllegalArgumentException("Tenure must be greater than zero.");
             }
-            if (fixedDeposit.getTenure() != null) {
-                int years = (int) Math.ceil(fixedDeposit.getTenure() / 12.0);
-                fixedDeposit.setYears(years);
-                fixedDeposit.setInterestRate(calculateInterestRateByYears(years));
+            fixedDeposit.setYears((int) Math.ceil(fixedDeposit.getTenure() / 12.0));
+            if (fixedDeposit.getStartDate() == null) fixedDeposit.setStartDate(LocalDate.now());
+            if (fixedDeposit.getMaturityDate() == null) {
                 fixedDeposit.setMaturityDate(fixedDeposit.getStartDate().plusMonths(fixedDeposit.getTenure()));
-                fixedDeposit.setMaturityAmount(calculateMaturityAmount(fixedDeposit.getPrincipalAmount(), fixedDeposit.getInterestRate(), fixedDeposit.getTenure()));
-                fixedDeposit.setInterestAmount(calculateInterestAmount(fixedDeposit.getPrincipalAmount(), fixedDeposit.getInterestRate(), fixedDeposit.getTenure()));
             }
+            fixedDeposit.setMaturityAmount(calculateMaturityAmount(
+                    fixedDeposit.getPrincipalAmount(), fixedDeposit.getInterestRate(), fixedDeposit.getTenure()));
+            fixedDeposit.setInterestAmount(calculateInterestAmount(
+                    fixedDeposit.getPrincipalAmount(), fixedDeposit.getInterestRate(), fixedDeposit.getTenure()));
 
             FixedDeposit savedFD = fixedDepositRepository.save(fixedDeposit);
+            depositHistoryService.record("FD", savedFD.getId(), savedFD.getAccountNumber(), "DETAILS_UPDATED",
+                    actor, reason, before + " -> principal=" + savedFD.getPrincipalAmount() + ", rate="
+                            + savedFD.getInterestRate() + ", tenure=" + savedFD.getTenure()
+                            + ", maturityDate=" + savedFD.getMaturityDate() + ", payout="
+                            + savedFD.getInterestPayout());
 
             response.put("success", true);
             response.put("message", "Fixed Deposit updated successfully");
@@ -501,13 +572,35 @@ public class FixedDepositService {
     }
 
     @Transactional
-    public Map<String, Object> adminClose(Long fdId, String closedBy) {
-        FixedDeposit fd = fixedDepositRepository.findById(fdId).orElseThrow(() -> new IllegalArgumentException("Fixed Deposit not found"));
+    public Map<String, Object> adminClose(Long fdId, String closedBy, String reason) {
+        if (reason == null || reason.isBlank()) throw new IllegalArgumentException("A closure reason is required.");
+        FixedDeposit fd = fixedDepositRepository.findById(fdId)
+                .orElseThrow(() -> new IllegalArgumentException("Fixed Deposit not found"));
         if (!"ACTIVE".equals(fd.getStatus())) throw new IllegalArgumentException("Only active FDs can be closed");
-        Double amount = fd.getMaturityAmount() != null ? fd.getMaturityAmount() : fd.getPrincipalAmount();
-        Double balance = accountService.creditBalance(fd.getAccountNumber(), amount);
-        fd.setStatus("CLOSED"); fd.setClosureDate(LocalDate.now()); fd.setClosedBy(closedBy); fd.setPrematureClosureAmount(amount);
-        return Map.of("success", true, "fixedDeposit", fixedDepositRepository.save(fd), "newBalance", balance);
+        Map<String, Object> result;
+        if (fd.getMaturityDate() != null && !fd.getMaturityDate().isAfter(LocalDate.now())) {
+            result = processMaturity(fdId, closedBy);
+        } else {
+            result = processPrematureClosure(fdId, closedBy);
+        }
+        if (!Boolean.TRUE.equals(result.get("success"))) {
+            throw new IllegalStateException(String.valueOf(result.getOrDefault("message", "FD closure failed.")));
+        }
+        FixedDeposit closed = fixedDepositRepository.findById(fdId)
+                .orElseThrow(() -> new IllegalArgumentException("Fixed Deposit not found after closure."));
+        closed.setRemarks(appendReason(closed.getRemarks(), reason));
+        fixedDepositRepository.save(closed);
+        depositHistoryService.record("FD", closed.getId(), closed.getAccountNumber(), "ADMIN_CLOSED",
+                closedBy, reason, "status=" + closed.getStatus() + ", closureAmount="
+                        + closed.getPrematureClosureAmount() + ", accountBalanceAfter="
+                        + (result.get("newBalance") == null ? result.get("fixedDeposit") : result.get("newBalance")));
+        result.put("fixedDeposit", closed);
+        return result;
+    }
+
+    private String appendReason(String existing, String reason) {
+        return existing == null || existing.isBlank() ? "Admin closure: " + reason
+                : existing + " | Admin closure: " + reason;
     }
 
     /**
@@ -598,7 +691,36 @@ public class FixedDepositService {
 
             // Calculate monthly interest
             // Monthly interest = (Principal * Annual Rate) / 12
-            Double monthlyInterest = (fixedDeposit.getPrincipalAmount() * fixedDeposit.getInterestRate()) / (12 * 100);
+            String payout = fixedDeposit.getInterestPayout() == null
+                    ? "AT MATURITY" : fixedDeposit.getInterestPayout().trim().toUpperCase(java.util.Locale.ROOT);
+            int payoutMonths;
+            if ("MONTHLY".equals(payout)) {
+                payoutMonths = 1;
+            } else if ("QUARTERLY".equals(payout)) {
+                payoutMonths = 3;
+            } else if ("AT MATURITY".equals(payout)) {
+                response.put("success", true);
+                response.put("skipped", true);
+                response.put("message", "Interest is payable at maturity; no periodic credit is due.");
+                return response;
+            } else {
+                response.put("success", false);
+                response.put("message", "Unsupported FD interest payout frequency.");
+                return response;
+            }
+
+            int creditedMonths = fixedDeposit.getMonthsInterestCredited() == null
+                    ? 0 : fixedDeposit.getMonthsInterestCredited();
+            LocalDate nextCreditDate = fixedDeposit.getStartDate().plusMonths(creditedMonths + payoutMonths);
+            if (today.isBefore(nextCreditDate)) {
+                response.put("success", true);
+                response.put("skipped", true);
+                response.put("message", "No interest credit is due yet.");
+                return response;
+            }
+
+            Double monthlyInterest = fixedDeposit.getPrincipalAmount() * fixedDeposit.getInterestRate()
+                    * payoutMonths / (12 * 100);
             monthlyInterest = Math.round(monthlyInterest * 100.0) / 100.0;
 
             // Credit interest to user account
@@ -625,15 +747,18 @@ public class FixedDepositService {
 
             // Update FD interest tracking
             fixedDeposit.setLastInterestCreditDate(today);
-            fixedDeposit.setMonthsInterestCredited(fixedDeposit.getMonthsInterestCredited() + 1);
-            fixedDeposit.setTotalInterestCredited(fixedDeposit.getTotalInterestCredited() + monthlyInterest);
+            fixedDeposit.setMonthsInterestCredited(creditedMonths + payoutMonths);
+            double totalInterestCredited = fixedDeposit.getTotalInterestCredited() == null
+                    ? 0.0 : fixedDeposit.getTotalInterestCredited();
+            fixedDeposit.setTotalInterestCredited(totalInterestCredited + monthlyInterest);
 
             FixedDeposit savedFD = fixedDepositRepository.save(fixedDeposit);
 
             response.put("success", true);
-            response.put("message", "Monthly interest credited successfully");
+            response.put("message", payoutMonths == 3
+                    ? "Quarterly interest credited successfully" : "Monthly interest credited successfully");
             response.put("fixedDeposit", savedFD);
-            response.put("monthlyInterest", monthlyInterest);
+            response.put("interestCredited", monthlyInterest);
             response.put("totalInterestCredited", savedFD.getTotalInterestCredited());
             
         } catch (Exception e) {
@@ -663,7 +788,9 @@ public class FixedDepositService {
             }
 
             Map<String, Object> result = processMonthlyInterestCredit(fd.getId());
-            if ((Boolean) result.get("success")) {
+            if (Boolean.TRUE.equals(result.get("skipped"))) {
+                continue;
+            } else if (Boolean.TRUE.equals(result.get("success"))) {
                 successCount++;
             } else {
                 failureCount++;
@@ -1158,4 +1285,3 @@ public class FixedDepositService {
         return response;
     }
 }
-

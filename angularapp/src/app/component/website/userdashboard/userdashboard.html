@@ -135,7 +135,7 @@
       <div class="cb-strip-submenu" *ngIf="expandedSidebarCategory === 'withdrawal'">
         <button type="button" class="cb-strip-subitem" [class.active]="selectedFeature === 'atm-simulator'" (click)="selectFeature('atm-simulator')">ATM Withdrawal</button>
       </div>
-      <div class="cb-strip-item" [class.active]="['fixed-deposits', 'deposit-request'].includes(selectedFeature || '')" role="button" tabindex="0" [attr.aria-expanded]="expandedSidebarCategory === 'deposits'" (click)="toggleSidebarCategory('deposits')" (keydown.enter)="toggleSidebarCategory('deposits')" (keydown.space)="toggleSidebarCategory('deposits')">
+      <div class="cb-strip-item" [class.active]="['fixed-deposits', 'recurring-deposits', 'deposit-request'].includes(selectedFeature || '')" role="button" tabindex="0" [attr.aria-expanded]="expandedSidebarCategory === 'deposits'" (click)="toggleSidebarCategory('deposits')" (keydown.enter)="toggleSidebarCategory('deposits')" (keydown.space)="toggleSidebarCategory('deposits')">
         <div class="cb-strip-icon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><rect x="2" y="7" width="20" height="5" rx="2"/><line x1="12" y1="12" x2="12" y2="17"/></svg>
         </div>
@@ -144,6 +144,7 @@
       </div>
       <div class="cb-strip-submenu" *ngIf="expandedSidebarCategory === 'deposits'">
         <button type="button" class="cb-strip-subitem" [class.active]="selectedFeature === 'fixed-deposits'" (click)="selectFeature('fixed-deposits')">Fixed Deposits</button>
+        <button type="button" class="cb-strip-subitem" [class.active]="selectedFeature === 'recurring-deposits'" (click)="selectFeature('recurring-deposits')">Recurring Deposits</button>
         <button type="button" class="cb-strip-subitem" [class.active]="selectedFeature === 'deposit-request'" (click)="selectFeature('deposit-request')">Cash Deposit Slip</button>
       </div>
       <div class="cb-strip-item" [class.active]="['loan', 'loan-payment', 'goldloan', 'homeloan', 'ecs-mandate', 'ml-loan-prediction'].includes(selectedFeature || '')" role="button" tabindex="0" [attr.aria-expanded]="expandedSidebarCategory === 'loans'" (click)="toggleSidebarCategory('loans')" (keydown.enter)="toggleSidebarCategory('loans')" (keydown.space)="toggleSidebarCategory('loans')">
@@ -814,18 +815,14 @@
           <div *ngFor="let fd of fixedDeposits" class="ud-invest-card" [ngClass]="getFDStatusClass(fd.status)">
             <div class="ud-invest-head"><h3>FD: {{ fd.fdAccountNumber }}</h3><span class="ud-status-badge" [ngClass]="getFDStatusClass(fd.status)">{{ fd.status }}</span></div>
             <div class="ud-invest-body"><div class="ud-info-row"><span>Principal:</span><span>&#8377;{{ fd.principalAmount | number:'1.2-2' }}</span></div><div class="ud-info-row"><span>Interest:</span><span>{{ fd.interestRate }}% p.a.</span></div><div class="ud-info-row"><span>Tenure:</span><span>{{ fd.tenure }} months</span></div><div class="ud-info-row"><span>Maturity:</span><span class="ud-text-success">&#8377;{{ fd.maturityAmount | number:'1.2-2' }}</span></div><div class="ud-info-row"><span>Start:</span><span>{{ fd.startDate | date:'dd/MM/yyyy' }}</span></div><div class="ud-info-row"><span>Maturity Date:</span><span>{{ fd.maturityDate | date:'dd/MM/yyyy' }}</span></div></div>
-            <div class="ud-invest-foot" *ngIf="fd.status === 'ACTIVE'"><button (click)="openForeclosureModal(fd)" class="ud-btn-outline ud-btn-sm">Foreclose</button><button (click)="openTopUpModal(fd)" class="ud-btn-primary ud-btn-sm">Top-up</button><button (click)="downloadFDReceipt(fd)" class="ud-btn-receipt ud-btn-sm" title="Download FD Receipt"><i class="fa fa-download"></i> Receipt</button></div>
+            <div class="ud-invest-foot" *ngIf="fd.status === 'ACTIVE'"><span class="ud-text-muted">For closure, contact an administrator.</span><button (click)="openTopUpModal(fd)" class="ud-btn-primary ud-btn-sm">Top-up</button><button (click)="downloadFDReceipt(fd)" class="ud-btn-receipt ud-btn-sm" title="Download FD Receipt"><i class="fa fa-download"></i> Receipt</button></div>
             <div class="ud-invest-foot" *ngIf="fd.status === 'MATURED' || fd.status === 'PREMATURE_CLOSED'"><button (click)="downloadFDReceipt(fd)" class="ud-btn-receipt ud-btn-sm" title="Download FD Receipt"><i class="fa fa-download"></i> Download Receipt</button></div>
           </div>
         </div>
-        <div *ngIf="showFDForm && termDepositPlans.length > 0" class="ud-form-group" style="margin:16px 0;padding:14px;background:#f8f9ff;border:1px solid #dbe3ef;border-radius:8px;"><label>Admin Term Deposit Plan *</label><select [(ngModel)]="fdForm.planId" class="ud-input"><option [ngValue]="null">Select a plan</option><option *ngFor="let plan of termDepositPlans" [ngValue]="plan.id">{{ plan.schemeName }} | {{ plan.days }} days | {{ plan.interestRate }}% | {{ plan.payoutDate }}</option></select></div>
+        <div *ngIf="showFDForm && termDepositPlans.length > 0" class="ud-form-group" style="margin:16px 0;padding:14px;background:#f8f9ff;border:1px solid #dbe3ef;border-radius:8px;"><label>Admin Term Deposit Plan *</label><select [(ngModel)]="fdForm.planId" class="ud-input"><option [ngValue]="null">Select a plan</option><option *ngFor="let plan of termDepositPlans" [ngValue]="plan.id">{{ plan.schemeName }} | {{ plan.durationMonths || (plan.days ? (plan.days / 30 | number:'1.0-0') + ' months' : '—') }} | {{ plan.interestRate }}% | {{ plan.payoutDate }}</option></select></div>
         <!-- FD Form Modal -->
         <div *ngIf="showFDForm" class="ud-modal-overlay" (click)="closeFDForm()"><div class="ud-modal" (click)="$event.stopPropagation()"><div class="ud-modal-head"><h3>Open New Fixed Deposit</h3><button (click)="closeFDForm()" class="ud-close-btn">&times;</button></div><div class="ud-modal-body"><div class="ud-form-grid"><div class="ud-form-group"><label>Principal (&#8377;) *</label><input type="number" [(ngModel)]="fdForm.principalAmount" class="ud-input" min="1000"/></div><div class="ud-form-group"><label>Interest Rate (%)</label><input type="number" [(ngModel)]="fdForm.interestRate" class="ud-input" min="3" max="10" step="0.1"/></div><div class="ud-form-group"><label>Tenure (Months)</label><input type="number" [(ngModel)]="fdForm.tenure" class="ud-input" min="6" max="120"/></div><div class="ud-form-group"><label>Interest Payout</label><select [(ngModel)]="fdForm.interestPayout" class="ud-input"><option value="At Maturity">At Maturity</option><option value="Monthly">Monthly</option><option value="Quarterly">Quarterly</option></select></div></div></div><div class="ud-modal-foot"><button (click)="closeFDForm()" class="ud-btn-outline">Cancel</button><button (click)="submitFD()" [disabled]="isSubmittingFD" class="ud-btn-primary">{{ isSubmittingFD ? 'Submitting...' : 'Submit' }}</button></div></div></div>
         <!-- Foreclosure Modal -->
-        <div *ngIf="showForeclosureModal" class="ud-modal-overlay" (click)="closeForeclosureModal()"><div class="ud-modal" (click)="$event.stopPropagation()"><div class="ud-modal-head"><h3>Foreclose Fixed Deposit</h3><button (click)="closeForeclosureModal()" class="ud-close-btn">&times;</button></div><div class="ud-modal-body"><div *ngIf="foreclosureDetails" class="ud-foreclosure-info"><div class="ud-info-row"><span>Principal:</span><span>&#8377;{{ foreclosureDetails.principalAmount | number:'1.2-2' }}</span></div><div class="ud-info-row"><span>Interest Earned:</span><span>&#8377;{{ foreclosureDetails.interestEarned | number:'1.2-2' }}</span></div><div class="ud-info-row"><span>Penalty ({{ foreclosureDetails.penaltyRate }}%):</span><span class="ud-text-danger">-&#8377;{{ foreclosureDetails.penalty | number:'1.2-2' }}</span></div><div class="ud-info-row"><span>Closure Amount:</span><span class="ud-text-success">&#8377;{{ foreclosureDetails.closureAmount | number:'1.2-2' }}</span></div></div><div *ngIf="isLoadingForeclosure" class="ud-empty">Calculating...</div></div><div class="ud-modal-foot"><button (click)="closeForeclosureModal()" class="ud-btn-outline">Cancel</button><button (click)="processForeclosure()" [disabled]="!foreclosureDetails || isProcessingForeclosure" class="ud-btn-primary">{{ isProcessingForeclosure ? (foreclosureOtpSent ? 'Processing...' : 'Send OTP...') : (foreclosureOtpSent ? 'Verify & Confirm' : 'Confirm') }}</button></div></div></div>
-
-        <!-- FD Foreclosure OTP Modal -->
-        <div *ngIf="showForeclosureOtpModal" class="ud-modal-overlay" (click)="closeForeclosureOtpModal()"><div class="ud-modal" (click)="$event.stopPropagation()"><div class="ud-modal-head"><h3>Verify OTP for FD Foreclosure</h3><button (click)="closeForeclosureOtpModal()" class="ud-close-btn">&times;</button></div><div class="ud-modal-body" style="text-align:center"><p style="margin-bottom:12px">An OTP has been sent to your registered email address.</p><div class="ud-form-group"><input type="text" [(ngModel)]="foreclosureOtpCode" placeholder="Enter 6-digit OTP" class="ud-input" maxlength="6" style="text-align:center;font-size:20px;letter-spacing:8px" /><p style="font-size:12px;color:#666;margin-top:8px">Check your email for the OTP code</p></div></div><div class="ud-modal-foot"><button (click)="closeForeclosureOtpModal()" class="ud-btn-outline">Cancel</button><button (click)="processForeclosure()" [disabled]="isProcessingForeclosure || !foreclosureOtpCode" class="ud-btn-primary">{{ isProcessingForeclosure ? 'Verifying...' : 'Verify & Process' }}</button></div></div></div>
         <!-- FD Receipt Preview Modal -->
         <div *ngIf="showFDReceiptModal" class="ud-modal-overlay" (click)="closeFDReceiptModal()">
           <div class="ud-modal ud-receipt-modal" (click)="$event.stopPropagation()">
@@ -940,6 +937,36 @@
         </div>
         <!-- Top-up Modal -->
         <div *ngIf="showTopUpModal" class="ud-modal-overlay" (click)="closeTopUpModal()"><div class="ud-modal" (click)="$event.stopPropagation()"><div class="ud-modal-head"><h3>Increase FD Amount</h3><button (click)="closeTopUpModal()" class="ud-close-btn">&times;</button></div><div class="ud-modal-body"><div class="ud-form-group"><label>Additional Amount (&#8377;) *</label><input type="number" [(ngModel)]="topUpAmount" class="ud-input" min="1000"/></div><div *ngIf="selectedFDForTopUp" class="ud-info-box"><p>Current: &#8377;{{ selectedFDForTopUp.principalAmount | number:'1.2-2' }}</p><p>New: &#8377;{{ (selectedFDForTopUp.principalAmount + (topUpAmount || 0)) | number:'1.2-2' }}</p></div></div><div class="ud-modal-foot"><button (click)="closeTopUpModal()" class="ud-btn-outline">Cancel</button><button (click)="processTopUp()" [disabled]="!topUpAmount || topUpAmount <= 0 || isProcessingTopUp" class="ud-btn-primary">{{ isProcessingTopUp ? 'Processing...' : 'Confirm' }}</button></div></div></div>
+      </div>
+
+      <!-- Recurring Deposit Details -->
+      <div *ngIf="selectedFeature === 'recurring-deposits'" class="ud-feature-card">
+        <div class="ud-feature-header">
+          <div><h2>Recurring Deposits</h2><p>View recurring-deposit details and the recorded history for your account.</p></div>
+          <button type="button" class="ud-chip-btn" (click)="loadFeatureData()" [disabled]="isLoadingRDs">Refresh</button>
+        </div>
+        <p class="ud-text-muted">These records are informational estimates only. No installments are debited and no maturity proceeds are paid through this screen.</p>
+        <div *ngIf="isLoadingRDs" class="ud-empty">Loading recurring deposits...</div>
+        <div *ngIf="!isLoadingRDs && recurringDeposits.length === 0" class="ud-empty">No recurring-deposit details are available for this account.</div>
+        <div *ngIf="!isLoadingRDs && recurringDeposits.length > 0" class="ud-invest-list">
+          <div *ngFor="let rd of recurringDeposits" class="ud-invest-card">
+            <div class="ud-invest-head"><h3>{{ rd.schemeName || 'Recurring Deposit' }}</h3><span class="ud-status-badge">{{ rd.status || 'DETAILS ONLY' }}</span></div>
+            <div class="ud-invest-body">
+              <div class="ud-info-row"><span>Monthly installment:</span><span>&#8377;{{ rd.monthlyInstallment | number:'1.2-2' }}</span></div>
+              <div class="ud-info-row"><span>Annual interest:</span><span>{{ rd.annualInterestRate }}%</span></div>
+              <div class="ud-info-row"><span>Duration:</span><span>{{ rd.tenureMonths }} months</span></div>
+              <div class="ud-info-row"><span>Start date:</span><span>{{ rd.startDate | date:'dd/MM/yyyy' }}</span></div>
+              <div class="ud-info-row"><span>Maturity date:</span><span>{{ rd.maturityDate | date:'dd/MM/yyyy' }}</span></div>
+              <div class="ud-info-row"><span>Estimated maturity value:</span><span>&#8377;{{ rd.estimatedMaturityAmount | number:'1.2-2' }}</span></div>
+            </div>
+            <div class="ud-invest-foot"><button type="button" class="ud-btn-outline ud-btn-sm" (click)="viewRDDetails(rd)">View history</button></div>
+          </div>
+        </div>
+        <section *ngIf="selectedRDDetails" class="ud-feature-card">
+          <div class="ud-feature-header"><h3>History — {{ selectedRDDetails.schemeName || 'Recurring Deposit' }}</h3><button type="button" class="ud-btn-outline ud-btn-sm" (click)="selectedRDDetails = null; rdHistory = []">Close</button></div>
+          <div *ngIf="rdHistory.length === 0" class="ud-empty">No history events recorded.</div>
+          <div *ngFor="let event of rdHistory" class="ud-info-row"><span>{{ event.occurredAt | date:'dd/MM/yyyy HH:mm' }} · {{ event.action }}</span><span>{{ event.details || event.reason }}</span></div>
+        </section>
       </div>
 
       <!-- EMI Monitoring -->

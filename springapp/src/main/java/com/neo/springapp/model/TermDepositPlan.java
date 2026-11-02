@@ -14,7 +14,10 @@ public class TermDepositPlan {
 
     @Column(nullable = false)
     private String schemeName;
+    @Column(length = 12)
+    private String productType = "FD";
     private Integer days;
+    private Integer durationMonths;
     private Integer years;
     private Double minimumAmount;
     private Double maximumAmount;

@@ -10,6 +10,11 @@
   </div>
 
   <div class="filters-bar">
+    <button class="btn-process" [class.active]="activeProduct === 'FD'" (click)="setProduct('FD')">Fixed deposits</button>
+    <button class="btn-process" [class.active]="activeProduct === 'RD'" (click)="setProduct('RD')">Recurring deposits</button>
+  </div>
+
+  <div class="filters-bar" *ngIf="activeProduct === 'FD'">
     <select [(ngModel)]="fdStatusFilter" (change)="loadFixedDeposits()">
       <option value="PENDING">Pending</option>
       <option value="ACTIVE">Active</option>
@@ -26,23 +31,67 @@
       <button class="btn-process" (click)="showPlanForm = !showPlanForm">{{ showPlanForm ? 'Close' : 'Create Plan' }}</button>
     </div>
     <div *ngIf="showPlanForm" class="filters-bar" style="margin-top:15px;display:grid;grid-template-columns:repeat(4,1fr);gap:10px;">
+      <select [(ngModel)]="planForm.productType">
+        <option value="FD">Fixed deposit scheme</option>
+        <option value="RD">Recurring deposit scheme</option>
+      </select>
       <input [(ngModel)]="planForm.schemeName" placeholder="Scheme name" />
-      <input type="number" [(ngModel)]="planForm.days" placeholder="Days" min="1" />
-      <input type="number" [(ngModel)]="planForm.years" placeholder="Years" min="1" />
+      <input *ngIf="planForm.productType === 'FD'" type="number" [(ngModel)]="planForm.days" placeholder="Duration (days)" min="1" />
+      <input type="number" [(ngModel)]="planForm.durationMonths" placeholder="Duration (months)" min="1" />
       <input type="number" [(ngModel)]="planForm.interestRate" placeholder="Interest %" min="0" step="0.01" />
-      <input type="number" [(ngModel)]="planForm.minimumAmount" placeholder="Minimum amount" min="0" />
-      <input type="number" [(ngModel)]="planForm.maximumAmount" placeholder="Maximum amount" min="0" />
+      <input type="number" [(ngModel)]="planForm.minimumAmount" [placeholder]="planForm.productType === 'RD' ? 'Minimum monthly installment' : 'Minimum principal'" min="0" />
+      <input type="number" [(ngModel)]="planForm.maximumAmount" [placeholder]="planForm.productType === 'RD' ? 'Maximum monthly installment' : 'Maximum principal'" min="0" />
       <input [(ngModel)]="planForm.payoutDate" placeholder="Payout date/scheme" />
-      <input type="number" [(ngModel)]="planForm.interestAmount" placeholder="Interest amount (optional)" min="0" />
       <button class="btn-approve" (click)="saveTermPlan()" [disabled]="savingPlan">Save Plan</button>
     </div>
     <div *ngIf="termPlans.length" style="overflow:auto;margin-top:14px;">
-      <table class="data-table"><thead><tr><th>Scheme</th><th>Days</th><th>Years</th><th>Interest</th><th>Amount Range</th><th>Payout</th><th>Status</th><th></th></tr></thead>
-        <tbody><tr *ngFor="let plan of termPlans"><td>{{ plan.schemeName }}</td><td>{{ plan.days }}</td><td>{{ plan.years }}</td><td>{{ plan.interestRate }}%</td><td>₹{{ plan.minimumAmount }} - ₹{{ plan.maximumAmount }}</td><td>{{ plan.payoutDate }}</td><td>{{ plan.active ? 'Active' : 'Inactive' }}</td><td><button *ngIf="plan.active" class="btn-reject" (click)="deactivateTermPlan(plan)">Deactivate</button></td></tr></tbody>
+      <table class="data-table"><thead><tr><th>Product</th><th>Scheme</th><th>Duration</th><th>Annual interest</th><th>Amount range</th><th>Payout</th><th>Status</th><th></th></tr></thead>
+        <tbody><tr *ngFor="let plan of termPlans"><td>{{ (plan.productType || 'FD') }}</td><td>{{ plan.schemeName }}</td><td>{{ plan.productType === 'RD' ? plan.durationMonths + ' months' : (plan.durationMonths ? plan.durationMonths + ' months' : plan.days + ' days') }}</td><td>{{ plan.interestRate }}%</td><td>₹{{ plan.minimumAmount }} - ₹{{ plan.maximumAmount }}</td><td>{{ plan.payoutDate }}</td><td>{{ plan.active ? 'Active' : 'Inactive' }}</td><td><button *ngIf="plan.active" class="btn-reject" (click)="deactivateTermPlan(plan)">Deactivate</button></td></tr></tbody>
       </table>
     </div>
   </section>
 
+  <div *ngIf="activeProduct === 'RD'" class="rd-management">
+    <div class="page-header">
+      <h2>Recurring-deposit details</h2>
+      <button class="btn-process" (click)="showRDForm = !showRDForm">{{ showRDForm ? 'Cancel' : 'Add RD details' }}</button>
+    </div>
+    <p class="rd-notice">Details-only records: this screen does not debit installments or process maturity payouts.</p>
+    <div *ngIf="showRDForm" class="filters-bar rd-form">
+      <input [(ngModel)]="rdForm.accountNumber" placeholder="Linked customer account number" />
+      <select [(ngModel)]="rdForm.planId">
+        <option [ngValue]="null">Select RD scheme</option>
+        <option *ngFor="let plan of plansFor('RD')" [ngValue]="plan.id">
+          {{ plan.schemeName }} · {{ plan.durationMonths }} months · {{ plan.interestRate }}%
+        </option>
+      </select>
+      <input type="number" [(ngModel)]="rdForm.monthlyInstallment" placeholder="Monthly installment details" min="1" />
+      <input type="date" [(ngModel)]="rdForm.startDate" />
+      <input [(ngModel)]="rdForm.remarks" placeholder="Admin remarks (optional)" />
+      <button class="btn-approve" (click)="createRDRecord()" [disabled]="savingRD">Save details only</button>
+    </div>
+    <div *ngIf="isLoadingRDs" class="loading-state"><p>Loading RD records...</p></div>
+    <div *ngIf="!isLoadingRDs && recurringDeposits.length === 0" class="no-data"><p>No RD detail records found.</p></div>
+    <table class="data-table" *ngIf="!isLoadingRDs && recurringDeposits.length">
+      <thead><tr><th>Customer</th><th>Linked account</th><th>Scheme</th><th>Monthly amount</th><th>Rate</th><th>Duration</th><th>Maturity date</th><th>Estimated value</th><th>Actions</th></tr></thead>
+      <tbody><tr *ngFor="let rd of recurringDeposits">
+        <td>{{ rd.customerName }}</td><td>{{ rd.accountNumber }}</td><td>{{ rd.schemeName }}</td>
+        <td>₹{{ rd.monthlyInstallment | number:'1.2-2' }}</td><td>{{ rd.annualInterestRate }}%</td>
+        <td>{{ rd.tenureMonths }} months</td><td>{{ rd.maturityDate | date:'dd/MM/yyyy' }}</td>
+        <td>₹{{ rd.estimatedMaturityAmount | number:'1.2-2' }}</td>
+        <td><button class="btn-view" (click)="editRD(rd)">Edit</button><button class="btn-view" (click)="loadRDHistory(rd)">History</button></td>
+      </tr></tbody>
+    </table>
+    <section *ngIf="selectedRD" class="plan-management">
+      <h3>RD record history — {{ selectedRD.accountNumber }}</h3>
+      <p class="rd-notice">Record history only; no customer funds have been moved.</p>
+      <table class="data-table"><thead><tr><th>When</th><th>Action</th><th>Staff</th><th>Reason</th><th>Details</th></tr></thead>
+        <tbody><tr *ngFor="let event of rdHistory"><td>{{ event.occurredAt | date:'dd/MM/yyyy HH:mm' }}</td><td>{{ event.action }}</td><td>{{ event.performedBy }}</td><td>{{ event.reason }}</td><td>{{ event.details }}</td></tr></tbody>
+      </table>
+    </section>
+  </div>
+
+  <ng-container *ngIf="activeProduct === 'FD'">
   <div *ngIf="isLoadingFDs" class="loading-state">
     <p>Loading fixed deposits...</p>
   </div>
@@ -78,9 +127,7 @@
         <td>{{ fd.maturityDate | date:'dd/MM/yyyy' }}</td>
         <td>
           <span class="status-badge" [ngClass]="fd.status.toLowerCase()">{{ fd.status }}</span>
-          <span *ngIf="fd.status === 'PREMATURE_CLOSED' || fd.foreclosureOtpVerified !== undefined" class="otp-badge" [ngClass]="fd.foreclosureOtpVerified ? 'otp-verified' : 'otp-not-verified'">
-            {{ fd.foreclosureOtpVerified ? 'OTP Verified' : 'OTP Not Verified' }}
-          </span>
+          <span class="otp-badge">{{ fd.interestPayout || 'At Maturity' }} payout</span>
         </td>
         <td>
           <button *ngIf="fd.status === 'PENDING'" (click)="approveFixedDeposit(fd)" class="btn-approve">Approve</button>
@@ -88,6 +135,7 @@
           <button *ngIf="fd.status === 'ACTIVE' && isFDMatured(fd)" 
                   (click)="processFDMaturity(fd)" class="btn-process">Process Maturity</button>
           <button (click)="viewFDDetails(fd)" class="btn-view">View</button>
+          <button (click)="loadFDHistory(fd)" class="btn-view">History</button>
           <button *ngIf="fd.status === 'PENDING' || fd.status === 'ACTIVE'" (click)="editFD(fd)" class="btn-view">Edit</button>
           <button *ngIf="fd.status === 'ACTIVE'" (click)="topUpFD(fd)" class="btn-process">Increase</button>
           <button *ngIf="fd.status === 'ACTIVE'" (click)="closeFD(fd)" class="btn-reject">Close</button>
@@ -95,12 +143,23 @@
       </tr>
     </tbody>
   </table>
+  </ng-container>
+
+  <section *ngIf="selectedHistoryFD" class="plan-management" style="margin-top:20px">
+    <h3>FD history — {{ selectedHistoryFD.fdAccountNumber }}</h3>
+    <p>Linked account: {{ selectedHistoryFD.accountNumber }}</p>
+    <div *ngIf="fdHistory.length === 0" class="no-data">No management history has been recorded.</div>
+    <table class="data-table" *ngIf="fdHistory.length">
+      <thead><tr><th>When</th><th>Action</th><th>Staff</th><th>Reason</th><th>Details</th></tr></thead>
+      <tbody><tr *ngFor="let event of fdHistory"><td>{{ event.occurredAt | date:'dd/MM/yyyy HH:mm' }}</td><td>{{ event.action }}</td><td>{{ event.performedBy }}</td><td>{{ event.reason }}</td><td>{{ event.details }}</td></tr></tbody>
+      </table>
+  </section>
 
   <!-- Approval Modal -->
   <div *ngIf="showApprovalModal" class="modal-overlay" (click)="closeApprovalModal()">
     <div class="modal-content approval-modal" (click)="$event.stopPropagation()">
       <div class="modal-header">
-        <h2>Approve Fixed Deposit</h2>
+        <h2>{{ fdToApprove?.status === 'PENDING' ? 'Approve Fixed Deposit' : 'Fixed Deposit Details' }}</h2>
         <button (click)="closeApprovalModal()" class="close-btn">×</button>
       </div>
       <div class="modal-body" *ngIf="fdToApprove">
@@ -182,7 +241,7 @@
           </div>
         </div>
         
-        <div class="approval-reason-section">
+        <div class="approval-reason-section" *ngIf="fdToApprove.status === 'PENDING'">
           <h3>Approval Reason (Optional)</h3>
           <textarea 
             [(ngModel)]="approvalReason" 
@@ -193,12 +252,10 @@
       </div>
       <div class="modal-footer">
         <button (click)="closeApprovalModal()" class="btn-secondary">Cancel</button>
-        <button (click)="confirmApproval()" [disabled]="isApproving" class="btn-primary">
+        <button *ngIf="fdToApprove?.status === 'PENDING'" (click)="confirmApproval()" [disabled]="isApproving" class="btn-primary">
           {{ isApproving ? 'Approving...' : 'Approve FD' }}
         </button>
       </div>
     </div>
   </div>
 </div>
-
-

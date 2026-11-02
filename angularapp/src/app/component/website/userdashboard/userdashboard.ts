@@ -159,6 +159,10 @@ export class Userdashboard implements OnInit, OnDestroy, AfterViewInit {
   fixedDeposits: any[] = [];
   termDepositPlans: any[] = [];
   isLoadingFDs: boolean = false;
+  recurringDeposits: any[] = [];
+  isLoadingRDs: boolean = false;
+  selectedRDDetails: any = null;
+  rdHistory: any[] = [];
   showFDForm: boolean = false;
   fdForm = {
     planId: null as number | null,
@@ -168,17 +172,6 @@ export class Userdashboard implements OnInit, OnDestroy, AfterViewInit {
     interestPayout: 'At Maturity'
   };
   isSubmittingFD: boolean = false;
-  
-  // FD Foreclosure properties
-  showForeclosureModal: boolean = false;
-  selectedFDForForeclosure: any = null;
-  foreclosureDetails: any = null;
-  isLoadingForeclosure: boolean = false;
-  isProcessingForeclosure: boolean = false;
-  isRequestingForeclosureOtp: boolean = false;
-  showForeclosureOtpModal: boolean = false;
-  foreclosureOtpCode: string = '';
-  foreclosureOtpSent: boolean = false;
   
   // FD Top-up properties
   showTopUpModal: boolean = false;
@@ -793,6 +786,8 @@ export class Userdashboard implements OnInit, OnDestroy, AfterViewInit {
       this.loadInvestments();
     } else if (this.selectedFeature === 'fixed-deposits') {
       this.loadFixedDeposits();
+    } else if (this.selectedFeature === 'recurring-deposits') {
+      this.loadRecurringDeposits();
     } else if (this.selectedFeature === 'emi-monitoring') {
       this.resetEMIFilters(); // Initialize filters
       this.loadEMIs();
@@ -2297,8 +2292,8 @@ export class Userdashboard implements OnInit, OnDestroy, AfterViewInit {
     if (!this.userAccountNumber) return;
     
     this.isLoadingFDs = true;
-    this.http.get<any[]>(`${environment.apiBaseUrl}/api/term-deposit-plans`).subscribe({ next: plans => this.termDepositPlans = plans || [], error: () => this.termDepositPlans = [] });
-    this.http.get(`${environment.apiBaseUrl}/api/fixed-deposits/account/${this.userAccountNumber}`).subscribe({
+    this.http.get<any[]>(`${environment.apiBaseUrl}/api/term-deposit-plans?productType=FD`).subscribe({ next: plans => this.termDepositPlans = plans || [], error: () => this.termDepositPlans = [] });
+    this.http.get(`${environment.apiBaseUrl}/api/fixed-deposits/account/${encodeURIComponent(this.userAccountNumber)}`, this.customerAuthOptions()).subscribe({
       next: (fds: any) => {
         this.fixedDeposits = fds || [];
         this.isLoadingFDs = false;
@@ -2354,12 +2349,13 @@ export class Userdashboard implements OnInit, OnDestroy, AfterViewInit {
       planId: selectedPlan?.id,
       principalAmount: this.fdForm.principalAmount,
       interestRate: selectedPlan?.interestRate || this.fdForm.interestRate,
-      tenure: selectedPlan?.days ? Math.max(1, Math.ceil(selectedPlan.days / 30)) : this.fdForm.tenure,
+      tenure: selectedPlan?.durationMonths
+        || (selectedPlan?.days ? Math.max(1, Math.ceil(selectedPlan.days / 30)) : this.fdForm.tenure),
       interestPayout: selectedPlan?.payoutDate || this.fdForm.interestPayout,
       schemeName: selectedPlan?.schemeName
     };
     
-    this.http.post(`${environment.apiBaseUrl}/api/fixed-deposits`, fdData).subscribe({
+    this.http.post(`${environment.apiBaseUrl}/api/fixed-deposits`, fdData, this.customerAuthOptions()).subscribe({
       next: (response: any) => {
         if (response.success) {
           this.alertService.success('Success', 'Fixed Deposit application submitted successfully');
@@ -2378,6 +2374,39 @@ export class Userdashboard implements OnInit, OnDestroy, AfterViewInit {
       }
     });
   }
+
+  private loadRecurringDeposits() {
+    this.isLoadingRDs = true;
+    this.http.get<any[]>(`${environment.apiBaseUrl}/api/recurring-deposits/mine`, this.customerAuthOptions()).subscribe({
+      next: rows => { this.recurringDeposits = rows || []; this.isLoadingRDs = false; },
+      error: err => {
+        this.isLoadingRDs = false;
+        this.alertService.error('RD Details', err.error?.message || 'Unable to load recurring-deposit details.');
+      }
+    });
+  }
+
+  viewRDDetails(rd: any) {
+    this.selectedRDDetails = rd;
+    this.http.get<any[]>(`${environment.apiBaseUrl}/api/recurring-deposits/${rd.id}/history`, this.customerAuthOptions()).subscribe({
+      next: history => this.rdHistory = history || [],
+      error: err => this.alertService.error('RD History', err.error?.message || 'Unable to load RD history.')
+    });
+  }
+
+  private customerAuthOptions() {
+    let token = sessionStorage.getItem('jwt') || '';
+    const rawUser = sessionStorage.getItem('currentUser');
+    if (rawUser) {
+      try {
+        const user = JSON.parse(rawUser);
+        token = user.authToken || token;
+      } catch (error) {
+        console.error('Unable to read customer session for deposit details:', error);
+      }
+    }
+    return { headers: new HttpHeaders(token ? { Authorization: `Bearer ${token}` } : {}) };
+  }
   
   getFDStatusClass(status: string): string {
     switch(status?.toUpperCase()) {
@@ -2388,115 +2417,6 @@ export class Userdashboard implements OnInit, OnDestroy, AfterViewInit {
       case 'CLOSED': case 'PREMATURE_CLOSED': return 'status-closed';
       default: return 'status-default';
     }
-  }
-  
-  // FD Foreclosure Methods
-  openForeclosureModal(fd: any) {
-    this.selectedFDForForeclosure = fd;
-    this.showForeclosureModal = true;
-    this.foreclosureDetails = null;
-    this.loadForeclosureDetails();
-  }
-  
-  closeForeclosureModal() {
-    this.showForeclosureModal = false;
-    this.selectedFDForForeclosure = null;
-    this.foreclosureDetails = null;
-    this.foreclosureOtpSent = false;
-    this.foreclosureOtpCode = '';
-    this.showForeclosureOtpModal = false;
-  }
-  
-  loadForeclosureDetails() {
-    if (!this.selectedFDForForeclosure) return;
-    
-    this.isLoadingForeclosure = true;
-    this.http.get(`${environment.apiBaseUrl}/api/fixed-deposits/${this.selectedFDForForeclosure.id}/foreclosure/calculate`).subscribe({
-      next: (response: any) => {
-        if (response.success) {
-          this.foreclosureDetails = response;
-        } else {
-          this.alertService.error('Error', response.message || 'Failed to calculate foreclosure details');
-        }
-        this.isLoadingForeclosure = false;
-      },
-      error: (err: any) => {
-        console.error('Error loading foreclosure details:', err);
-        this.alertService.error('Error', err.error?.message || 'Failed to load foreclosure details');
-        this.isLoadingForeclosure = false;
-      }
-    });
-  }
-  
-  processForeclosure() {
-    if (!this.selectedFDForForeclosure || !this.foreclosureDetails) return;
-    
-    // If OTP hasn't been requested yet, request it first
-    if (!this.foreclosureOtpSent) {
-      this.requestForeclosureOtp();
-      return;
-    }
-    
-    // OTP was sent, now verify it
-    if (!this.foreclosureOtpCode || this.foreclosureOtpCode.trim() === '') {
-      this.alertService.error('Validation Error', 'Please enter the OTP');
-      return;
-    }
-    
-    if (!confirm(`Are you sure you want to foreclose this FD? You will receive ₹${this.foreclosureDetails.closureAmount.toFixed(2)} after penalty deduction.`)) {
-      return;
-    }
-    
-    this.isProcessingForeclosure = true;
-    const url = `${environment.apiBaseUrl}/api/fixed-deposits/${this.selectedFDForForeclosure.id}/foreclosure?closedBy=${this.username}&otp=${encodeURIComponent(this.foreclosureOtpCode.trim())}`;
-    
-    this.http.post(url, {}).subscribe({
-      next: (response: any) => {
-        if (response.success) {
-          this.alertService.success('Success', 'FD foreclosed successfully. Amount credited to your account.');
-          this.closeForeclosureModal();
-          this.loadFixedDeposits();
-          this.loadCurrentBalanceFromMySQL();
-        } else {
-          this.alertService.error('Error', response.message || 'Failed to foreclose FD');
-        }
-        this.isProcessingForeclosure = false;
-      },
-      error: (err: any) => {
-        console.error('Error processing foreclosure:', err);
-        this.alertService.error('Error', err.error?.message || 'Failed to foreclose FD');
-        this.isProcessingForeclosure = false;
-      }
-    });
-  }
-  
-  requestForeclosureOtp() {
-    if (!this.selectedFDForForeclosure) return;
-    
-    this.isRequestingForeclosureOtp = true;
-    this.http.post(`${environment.apiBaseUrl}/api/fixed-deposits/${this.selectedFDForForeclosure.id}/foreclosure/request-otp`, {}).subscribe({
-      next: (response: any) => {
-        if (response.success) {
-          this.foreclosureOtpSent = true;
-          this.showForeclosureOtpModal = true;
-          this.foreclosureOtpCode = '';
-          this.alertService.success('Success', 'OTP sent to your registered email address.');
-        } else {
-          this.alertService.error('Error', response.message || 'Failed to send OTP');
-        }
-        this.isRequestingForeclosureOtp = false;
-      },
-      error: (err: any) => {
-        console.error('Error requesting OTP:', err);
-        this.alertService.error('Error', err.error?.message || 'Failed to send OTP');
-        this.isRequestingForeclosureOtp = false;
-      }
-    });
-  }
-  
-  closeForeclosureOtpModal() {
-    this.showForeclosureOtpModal = false;
-    this.foreclosureOtpCode = '';
   }
   
   // FD Receipt Download Methods
@@ -2652,7 +2572,7 @@ export class Userdashboard implements OnInit, OnDestroy, AfterViewInit {
     }
     
     this.isProcessingTopUp = true;
-    this.http.post(`${environment.apiBaseUrl}/api/fixed-deposits/${this.selectedFDForTopUp.id}/top-up?additionalAmount=${this.topUpAmount}&requestedBy=${this.username}`, {}).subscribe({
+    this.http.post(`${environment.apiBaseUrl}/api/fixed-deposits/${this.selectedFDForTopUp.id}/top-up?additionalAmount=${this.topUpAmount}&requestedBy=${encodeURIComponent(this.username)}`, {}, this.customerAuthOptions()).subscribe({
       next: (response: any) => {
         if (response.success) {
           this.alertService.success('Success', 'FD amount increased successfully');
