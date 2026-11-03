@@ -69,4 +69,25 @@ public class SavingsUpiTransaction {
     @JsonIgnore
     @Column(name = "user_agent", length = 512)
     private String userAgent;
+
+    @Column(name = "location_latitude")
+    private Double locationLatitude;
+
+    @Column(name = "location_longitude")
+    private Double locationLongitude;
+
+    @Column(name = "location_accuracy_meters")
+    private Double locationAccuracyMeters;
+
+    @Column(name = "sender_phone", length = 50)
+    private String senderPhone;
+
+    @Column(name = "sender_address", length = 1024)
+    private String senderAddress;
+
+    @Column(name = "receiver_phone", length = 50)
+    private String receiverPhone;
+
+    @Column(name = "receiver_address", length = 1024)
+    private String receiverAddress;
 }

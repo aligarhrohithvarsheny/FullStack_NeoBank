@@ -125,10 +125,88 @@
           <span>{{ loan.status || 'Status not recorded' }} · {{ loan.amount | currency:'INR':'symbol':'1.0-0' }}</span>
           <span *ngIf="loan.interestRate !== undefined">Interest {{ loan.interestRate }}%</span>
           <span *ngIf="loan.createdAt || loan.applicationDate">Opened {{ (loan.createdAt || loan.applicationDate) | date:'mediumDate' }}</span>
+          <button type="button" class="file-action" *ngIf="hasPersonalLoanForm(loan)" (click)="downloadPersonalLoanForm(loan)">
+            Download loan application
+          </button>
         </article>
         <p class="empty-state" *ngIf="!loans.length && !resourceFailure('loans') && !resourceFailure('goldLoans')">No loans found.</p>
         <p class="resource-error" *ngIf="resourceFailure('loans') || resourceFailure('goldLoans')">Some loan information could not be loaded.</p>
       </section>
+
+      <section class="data-card">
+        <div class="section-heading"><h2>Home, car & crop loans</h2><span>{{ homeLoans.length }} application(s)</span></div>
+        <article class="record-card" *ngFor="let loan of homeLoans">
+          <strong>{{ loan.loanType || 'Home' }} loan · {{ loan.applicationId || loan.loanAccountNumber || ('Application ' + loan.id) }}</strong>
+          <span>{{ loan.status || 'Status not recorded' }} · {{ loan.amount | currency:'INR':'symbol':'1.0-0' }}</span>
+          <span>{{ loan.tenure || '—' }} months · {{ loan.interestRate || '—' }}% annual interest</span>
+          <span *ngIf="loan.applicationDate">Applied {{ loan.applicationDate | date:'mediumDate' }}</span>
+          <div class="file-actions" *ngIf="homeLoanDocuments(loan).length">
+            <button type="button" class="file-action" *ngFor="let file of homeLoanDocuments(loan)"
+              (click)="downloadHomeLoanDocument(loan, file)">Download {{ file.label }}</button>
+          </div>
+        </article>
+        <p class="empty-state" *ngIf="!homeLoans.length && !resourceFailure('homeLoans')">No home, car or crop loan applications found.</p>
+        <p class="resource-error" *ngIf="resourceFailure('homeLoans')">{{ resourceFailure('homeLoans') }}</p>
+      </section>
+
+      <section class="data-card">
+        <div class="section-heading"><h2>Recurring deposits</h2><span>{{ recurringDeposits.length }} record(s)</span></div>
+        <article class="record-card" *ngFor="let deposit of recurringDeposits">
+          <strong>{{ deposit.schemeName || 'Recurring deposit' }} · {{ deposit.rdAccountNumber || ('RD ' + deposit.id) }}</strong>
+          <span>{{ deposit.status || 'Status not recorded' }} · Monthly installment {{ deposit.monthlyInstallment | currency:'INR':'symbol':'1.2-2' }}</span>
+          <span *ngIf="deposit.annualInterestRate !== undefined">Interest {{ deposit.annualInterestRate }}% · Tenure {{ deposit.tenureMonths || '—' }} months</span>
+          <span>Estimated principal {{ deposit.estimatedPrincipal | currency:'INR':'symbol':'1.2-2' }} · Interest {{ deposit.estimatedInterest | currency:'INR':'symbol':'1.2-2' }}</span>
+          <span *ngIf="deposit.maturityDate">Maturity {{ deposit.maturityDate | date:'mediumDate' }} · Expected value {{ deposit.estimatedMaturityAmount | currency:'INR':'symbol':'1.2-2' }}</span>
+          <span>Paid installments {{ deposit.paidInstallments || 0 }}</span>
+          <span *ngIf="deposit.payoutInstruction">Payout {{ deposit.payoutInstruction }}</span>
+        </article>
+        <p class="empty-state" *ngIf="!recurringDeposits.length && !resourceFailure('recurringDeposits')">No recurring deposits found.</p>
+        <p class="resource-error" *ngIf="resourceFailure('recurringDeposits')">{{ resourceFailure('recurringDeposits') }}</p>
+      </section>
+
+      <section class="data-card">
+        <div class="section-heading"><h2>ECS mandates</h2><span>{{ ecsMandates.length }} mandate(s)</span></div>
+        <article class="record-card" *ngFor="let mandate of ecsMandates">
+          <strong>{{ mandate.productType || mandate.loanType || 'ECS mandate' }} · {{ mandate.mandateId || ('Mandate ' + mandate.id) }}</strong>
+          <span>{{ mandate.status || 'Status not recorded' }} · Product account {{ mandate.loanAccountNumber || '—' }}</span>
+          <span>Debit account {{ mandate.savingsAccountNumber || '—' }} · Monthly limit {{ mandate.amountLimit | currency:'INR':'symbol':'1.2-2' }}</span>
+          <span *ngIf="mandate.customerConsentAt">Customer consent recorded {{ mandate.customerConsentAt | date:'medium' }} by {{ mandate.customerConsentName || 'customer' }}</span>
+          <button type="button" class="file-action" *ngIf="hasEcsConsent(mandate)" (click)="downloadEcsConsent(mandate)">
+            Download consent record
+          </button>
+        </article>
+        <p class="empty-state" *ngIf="!ecsMandates.length && !resourceFailure('ecsMandates')">No ECS mandates found for this account.</p>
+        <p class="resource-error" *ngIf="resourceFailure('ecsMandates')">{{ resourceFailure('ecsMandates') }}</p>
+      </section>
+
+      <section class="data-card">
+        <div class="section-heading"><h2>Uploaded bank forms & records</h2><span>{{ bankFormUploads.length }} file(s)</span></div>
+        <article class="record-card" *ngFor="let upload of bankFormUploads">
+          <strong>{{ upload.formName || upload.formCode || 'Bank form' }}</strong>
+          <span>{{ upload.originalFileName || 'Uploaded document' }} · {{ upload.accountType || 'Account' }}</span>
+          <span>Uploaded {{ upload.uploadedAt | date:'medium' }} by {{ upload.uploadedByAdmin || 'staff' }}</span>
+          <span *ngIf="upload.remarks">{{ upload.remarks }}</span>
+          <button type="button" class="file-action" *ngIf="upload.id" (click)="downloadBankForm(upload)">Download file</button>
+        </article>
+        <p class="empty-state" *ngIf="!bankFormUploads.length && !resourceFailure('bankFormUploads')">No uploaded bank forms or account records found.</p>
+        <p class="resource-error" *ngIf="resourceFailure('bankFormUploads')">{{ resourceFailure('bankFormUploads') }}</p>
+      </section>
+
+      <section class="data-card">
+        <div class="section-heading"><h2>Loan e-sign agreements</h2><span>{{ loanAgreements.length }} agreement(s)</span></div>
+        <article class="record-card" *ngFor="let agreement of loanAgreements">
+          <strong>{{ agreement.productName || agreement.loanType || 'Loan agreement' }} · {{ agreement.loanAccountNumber || 'Application' }}</strong>
+          <span>{{ agreement.status || 'Status not recorded' }} · {{ agreement.amount | currency:'INR':'symbol':'1.0-0' }}</span>
+          <span *ngIf="agreement.issuedAt">Issued {{ agreement.issuedAt | date:'medium' }}</span>
+          <span *ngIf="agreement.signedAt">Signed {{ agreement.signedAt | date:'medium' }} by {{ agreement.signedName || agreement.customerName || 'customer' }}</span>
+          <button type="button" class="file-action" *ngIf="hasSignedAgreement(agreement)" (click)="downloadLoanAgreement(agreement)">
+            Download signed agreement
+          </button>
+        </article>
+        <p class="empty-state" *ngIf="!loanAgreements.length && !resourceFailure('loanAgreements')">No loan e-sign agreements found.</p>
+        <p class="resource-error" *ngIf="resourceFailure('loanAgreements')">{{ resourceFailure('loanAgreements') }}</p>
+      </section>
+      <p class="resource-error download-error" role="alert" *ngIf="resourceFailure('downloads')">{{ resourceFailure('downloads') }}</p>
 
       <section class="data-card">
         <div class="section-heading"><h2>Complaints & service</h2><span>{{ complaints.length }} case(s)</span></div>

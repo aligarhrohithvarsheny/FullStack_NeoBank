@@ -5421,6 +5421,7 @@
           <h4>Request / device information</h4>
           <span>IP address: {{tx.sourceIp || 'Not recorded'}}</span>
           <span>Location: {{tx.location || 'Not recorded'}}</span>
+          <span *ngIf="tx.locationAccuracyMeters != null">Location accuracy: ±{{tx.locationAccuracyMeters | number:'1.0-0'}} m</span>
           <span>Browser / device: {{tx.userAgent || 'Not recorded'}}</span>
           <small>Location is not inferred from the IP address.</small>
         </article>

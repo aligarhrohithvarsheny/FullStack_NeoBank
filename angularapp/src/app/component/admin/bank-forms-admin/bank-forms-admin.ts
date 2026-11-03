@@ -198,7 +198,9 @@ export class BankFormsAdminComponent implements OnInit {
       aadhaarNumber: this.verifiedAccount.aadhaarNumber,
       panNumber: this.verifiedAccount.panNumber,
       phone: this.verifiedAccount.phone,
-      email: this.verifiedAccount.email
+      email: this.verifiedAccount.email,
+      dateOfBirth: this.verifiedAccount.dateOfBirth,
+      address: this.verifiedAccount.address
     }).subscribe({
       next: (resp) => {
         this.isDownloading = false;
@@ -431,6 +433,8 @@ export class BankFormsAdminComponent implements OnInit {
             panNumber: res.account.panNumber,
             phone: res.account.phone,
             email: res.account.email,
+            dateOfBirth: res.account.dateOfBirth,
+            address: res.account.address,
             balance: res.account.balance
           };
           this.verifiedHolderName = this.verifiedAccount.holderName;

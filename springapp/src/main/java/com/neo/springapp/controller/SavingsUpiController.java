@@ -57,8 +57,27 @@ public class SavingsUpiController {
                 ? (String) body.get("transactionPin")
                 : (String) body.get("pin");
         String remark = (String) body.getOrDefault("remark", "");
+        String forwardedFor = request.getHeader("X-Forwarded-For");
+        String sourceIp = forwardedFor == null || forwardedFor.isBlank()
+                ? request.getRemoteAddr() : forwardedFor.split(",", 2)[0].trim();
+        if (sourceIp != null && sourceIp.length() > 64) sourceIp = sourceIp.substring(0, 64);
         return ResponseEntity.ok(savingsUpiService.sendMoney(accountNumber, receiverUpiId, amount, pin, remark,
-                request.getRemoteAddr(), request.getHeader("User-Agent")));
+                sourceIp, request.getHeader("User-Agent"),
+                numberValue(body.get("locationLatitude")),
+                numberValue(body.get("locationLongitude")),
+                numberValue(body.get("locationAccuracyMeters"))));
+    }
+
+    private Double numberValue(Object value) {
+        if (value instanceof Number number) return number.doubleValue();
+        if (value instanceof String text) {
+            try {
+                return Double.valueOf(text);
+            } catch (NumberFormatException ignored) {
+                return null;
+            }
+        }
+        return null;
     }
 
     // ── Forgot UPI PIN (reset via registered phone) ───────────────────────────

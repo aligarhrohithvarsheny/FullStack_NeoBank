@@ -27,6 +27,8 @@ final class BankFormPdfBuilder {
     private static final float PAGE_WIDTH = PDRectangle.A4.getWidth();
     private static final float PAGE_HEIGHT = PDRectangle.A4.getHeight();
     private static final float CONTENT_WIDTH = PAGE_WIDTH - (2 * MARGIN);
+    private static final float FOOTER_HEIGHT = 70f;
+    private static final float FOOTER_TEXT_WIDTH = CONTENT_WIDTH;
 
     private static final String BANK_NAME = "NeoBank";
     private static final String BANK_TAGLINE = "Relationship Beyond Banking";
@@ -44,6 +46,9 @@ final class BankFormPdfBuilder {
     private PDPage page;
     private PDPageContentStream stream;
     private float y;
+    private String adminName;
+    private FormDefinition form;
+    private String generatedAt;
 
     byte[] build(
             FormDefinition form,
@@ -55,27 +60,33 @@ final class BankFormPdfBuilder {
             String aadhaarNumber,
             String panNumber,
             String phone,
-            String email) throws IOException {
+            String email,
+            String dateOfBirth,
+            String address) throws IOException {
         document = new PDDocument();
+        this.adminName = adminName == null || adminName.isBlank() ? "Admin" : adminName;
+        this.form = form;
+        this.generatedAt = LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss"));
         try {
             newPage();
-            drawHeader();
             drawTitle(form);
-            drawAccountBlock(accountNumber, accountType, holderName, customerId, phone, email, aadhaarNumber);
+            drawAccountBlock(accountNumber, accountType, holderName, customerId, phone, email,
+                    aadhaarNumber, dateOfBirth, address);
             drawSection("Common Information (All Forms)");
             int index = 1;
             for (String field : BankFormCatalog.COMMON_FIELDS) {
                 drawField(index++, field, prefillValue(
-                        field, accountNumber, holderName, customerId, aadhaarNumber, panNumber, phone, email));
+                        field, accountNumber, holderName, customerId, aadhaarNumber, panNumber, phone, email,
+                        dateOfBirth, address));
             }
             drawSection("Form Specific Information");
             for (String field : form.fields()) {
                 drawField(index++, field, prefillValue(
-                        field, accountNumber, holderName, customerId, aadhaarNumber, panNumber, phone, email));
+                        field, accountNumber, holderName, customerId, aadhaarNumber, panNumber, phone, email,
+                        dateOfBirth, address));
             }
             drawTerms();
             drawSignatures();
-            drawFooter(adminName, form);
 
             closeStream();
             ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -112,7 +123,9 @@ final class BankFormPdfBuilder {
             String customerId,
             String phone,
             String email,
-            String aadhaarNumber) throws IOException {
+            String aadhaarNumber,
+            String dateOfBirth,
+            String address) throws IOException {
         if (accountNumber == null || accountNumber.isBlank()) {
             return;
         }
@@ -123,6 +136,8 @@ final class BankFormPdfBuilder {
         drawLabelValue("Customer ID", blankToLine(customerId));
         drawLabelValue("Mobile", blankToLine(phone));
         drawLabelValue("Email", blankToLine(email));
+        drawLabelValue("Date of Birth", blankToLine(dateOfBirth));
+        drawLabelValue("Residential Address", blankToLine(address));
         drawLabelValue("Aadhaar", maskAadhaar(aadhaarNumber));
         drawLabelValue("IFSC Code", BANK_IFSC);
         drawLabelValue("Branch", BANK_BRANCH + " (" + BANK_BRANCH_CODE + ")");
@@ -147,7 +162,7 @@ final class BankFormPdfBuilder {
     }
 
     private void drawLabelValue(String label, String value) throws IOException {
-        writeLine(label + ": " + sanitize(value), fontRegular, 9, 3);
+        writeWrapped(label + ": " + sanitize(value), fontRegular, 9, 3);
     }
 
     private void drawTerms() throws IOException {
@@ -178,14 +193,6 @@ final class BankFormPdfBuilder {
         y -= 10;
     }
 
-    private void drawFooter(String adminName, FormDefinition form) throws IOException {
-        String generatedAt = LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss"));
-        writeLine("Generated on " + generatedAt + " IST  |  Prepared by: "
-                        + (adminName != null ? adminName : "Admin")
-                        + "  |  " + BANK_NAME + " — " + form.code(),
-                fontRegular, 8, 0);
-    }
-
     private void drawRule() throws IOException {
         ensureSpace(8);
         stream.setLineWidth(0.5f);
@@ -212,17 +219,21 @@ final class BankFormPdfBuilder {
     }
 
     private void writeLine(String text, PDType1Font font, float size, float gapAfter) throws IOException {
-        ensureSpace(size + gapAfter);
-        stream.beginText();
-        stream.setFont(font, size);
-        stream.newLineAtOffset(MARGIN, y);
-        stream.showText(sanitize(text));
-        stream.endText();
-        y -= size + gapAfter;
+        List<String> lines = wrapText(text, font, size, CONTENT_WIDTH);
+        for (String line : lines) {
+            ensureSpace(size + 2);
+            stream.beginText();
+            stream.setFont(font, size);
+            stream.newLineAtOffset(MARGIN, y);
+            stream.showText(sanitize(line));
+            stream.endText();
+            y -= size + 2;
+        }
+        y -= gapAfter;
     }
 
     private void writeWrapped(String text, PDType1Font font, float size, float gapAfter) throws IOException {
-        List<String> lines = wrapText(text, font, size, CONTENT_WIDTH);
+        List<String> lines = wrapText(text, font, size, CONTENT_WIDTH - 12);
         for (String line : lines) {
             ensureSpace(size + 2);
             stream.beginText();
@@ -266,19 +277,46 @@ final class BankFormPdfBuilder {
         document.addPage(page);
         stream = new PDPageContentStream(document, page);
         y = PAGE_HEIGHT - MARGIN;
+        drawHeader();
     }
 
     private void ensureSpace(float needed) throws IOException {
-        if (y - needed < MARGIN) {
+        if (y - needed < MARGIN + FOOTER_HEIGHT) {
             newPage();
         }
     }
 
     private void closeStream() throws IOException {
         if (stream != null) {
+            drawPageFooter();
             stream.close();
             stream = null;
         }
+    }
+
+    private void drawPageFooter() throws IOException {
+        float footerY = MARGIN + FOOTER_HEIGHT - 8;
+        stream.setLineWidth(0.5f);
+        stream.moveTo(MARGIN, footerY + 10);
+        stream.lineTo(PAGE_WIDTH - MARGIN, footerY + 10);
+        stream.stroke();
+        String text = "Generated " + generatedAt + " IST | Prepared by " + adminName
+                + " | " + BANK_NAME + " - " + form.code()
+                + " | Page " + document.getNumberOfPages();
+        String footer = fitLine(text, fontRegular, 7, FOOTER_TEXT_WIDTH);
+        stream.beginText();
+        stream.setFont(fontRegular, 7);
+        stream.newLineAtOffset(MARGIN, footerY);
+        stream.showText(sanitize(footer));
+        stream.endText();
+    }
+
+    private String fitLine(String text, PDType1Font font, float size, float maxWidth) throws IOException {
+        String sanitized = sanitize(text);
+        while (!sanitized.isEmpty() && font.getStringWidth(sanitized) / 1000f * size > maxWidth) {
+            sanitized = sanitized.substring(0, sanitized.length() - 1);
+        }
+        return sanitized;
     }
 
     private static String prefillValue(
@@ -289,7 +327,9 @@ final class BankFormPdfBuilder {
             String aadhaarNumber,
             String panNumber,
             String phone,
-            String email) {
+            String email,
+            String dateOfBirth,
+            String address) {
         if (field == null) {
             return "";
         }
@@ -311,6 +351,13 @@ final class BankFormPdfBuilder {
         }
         if (normalized.contains("email") && email != null && !email.isBlank()) {
             return email.trim();
+        }
+        if ((normalized.contains("date of birth") || normalized.equals("dob"))
+                && dateOfBirth != null && !dateOfBirth.isBlank()) {
+            return dateOfBirth.trim();
+        }
+        if (normalized.contains("address") && address != null && !address.isBlank()) {
+            return address.trim();
         }
         if ((normalized.equals("name") || normalized.startsWith("name(") || normalized.contains("holder"))
                 && holderName != null && !holderName.isBlank()) {

@@ -52,6 +52,8 @@ export interface VerifiedAccountDetails {
   panNumber?: string;
   phone?: string;
   email?: string;
+  dateOfBirth?: string;
+  address?: string;
   balance?: number;
 }
 
@@ -65,6 +67,8 @@ export interface BankFormDownloadOptions {
   panNumber?: string;
   phone?: string;
   email?: string;
+  dateOfBirth?: string;
+  address?: string;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -105,6 +109,8 @@ export class BankFormService {
     if (options.panNumber) params = params.set('panNumber', options.panNumber);
     if (options.phone) params = params.set('phone', options.phone);
     if (options.email) params = params.set('email', options.email);
+    if (options.dateOfBirth) params = params.set('dateOfBirth', options.dateOfBirth);
+    if (options.address) params = params.set('address', options.address);
     return this.http.get(`${this.baseUrl}/download/${encodeURIComponent(formCode)}`, {
       params,
       responseType: 'blob',

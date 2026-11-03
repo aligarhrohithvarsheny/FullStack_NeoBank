@@ -50,7 +50,9 @@ public class BankFormController {
             @RequestParam(value = "aadhaarNumber", required = false) String aadhaarNumber,
             @RequestParam(value = "panNumber", required = false) String panNumber,
             @RequestParam(value = "phone", required = false) String phone,
-            @RequestParam(value = "email", required = false) String email) {
+            @RequestParam(value = "email", required = false) String email,
+            @RequestParam(value = "dateOfBirth", required = false) String dateOfBirth,
+            @RequestParam(value = "address", required = false) String address) {
         try {
             byte[] pdf = bankFormService.buildBlankFormPdf(
                     formCode,
@@ -62,7 +64,9 @@ public class BankFormController {
                     aadhaarNumber,
                     panNumber,
                     phone,
-                    email);
+                    email,
+                    dateOfBirth,
+                    address);
             if (pdf == null || pdf.length == 0) {
                 return errorResponse(500, "PDF generation returned empty content");
             }

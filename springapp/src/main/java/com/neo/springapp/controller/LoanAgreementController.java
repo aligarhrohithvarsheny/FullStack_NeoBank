@@ -77,6 +77,16 @@ public class LoanAgreementController {
         return ResponseEntity.ok(agreementService.adminSummaries());
     }
 
+    @GetMapping("/account/{accountNumber}")
+    public ResponseEntity<?> accountSummaries(@PathVariable String accountNumber, Authentication authentication) {
+        if (!isStaff(authentication)) return ResponseEntity.status(403).body(Map.of("message", "Staff sign-in required."));
+        try {
+            return ResponseEntity.ok(agreementService.adminSummariesForAccount(accountNumber));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
+    }
+
     @PostMapping("/{agreementId}/share-link")
     public ResponseEntity<?> renewShareLink(@PathVariable Long agreementId, Authentication authentication) {
         if (!isStaff(authentication)) return ResponseEntity.status(403).body(Map.of("message", "Staff sign-in required."));

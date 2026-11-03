@@ -12,9 +12,15 @@ public final class BankFormCatalog {
             "Name",
             "Customer ID",
             "Aadhaar Number",
+            "PAN Number",
+            "Registered Mobile Number",
+            "Email Address",
+            "Residential Address",
             "Signature",
+            "Date and Place",
             "Bank Name (NeoBank)",
-            "Terms and Conditions (I Accept)"
+            "Terms and Conditions (I Accept)",
+            "Customer Consent and Data-Use Authorization"
     );
 
     public static List<String> allFieldsFor(FormDefinition form) {
@@ -24,7 +30,14 @@ public final class BankFormCatalog {
     }
 
     private static final List<String> LOAN_FIELDS = List.of(
-            "Loan Amount", "Income", "Employment Details", "Documents Upload", "Loan Tenure", "EMI Details"
+            "Loan Product and Purpose", "Requested Loan Amount", "Approved Loan Amount",
+            "Applicant Income and Employment Details", "Co-applicant / Guarantor Details",
+            "Tenure and Repayment Frequency", "Annual Interest Rate and Rate Type",
+            "Processing Fee, Taxes and Legal Charges", "EMI and Repayment Schedule",
+            "Linked Repayment Account", "ECS / Auto-debit Mandate Status",
+            "Security, Collateral and Recovery Terms", "Documents Submitted",
+            "Share Agreement Link", "Customer CAPTCHA E-sign Consent",
+            "Final Approval and Disbursement Details"
     );
 
     private static final List<String> ACCOUNT_OPENING_FIELDS = List.of(
@@ -67,6 +80,13 @@ public final class BankFormCatalog {
         list.add(new FormDefinition(14, "gold-loan", "Gold Loan Application", "Loan Application Forms", LOAN_FIELDS));
         list.add(new FormDefinition(15, "education-loan", "Education Loan Application", "Loan Application Forms", LOAN_FIELDS));
         list.add(new FormDefinition(16, "business-loan", "Business Loan Application", "Loan Application Forms", LOAN_FIELDS));
+        list.add(new FormDefinition(61, "crop-loan", "Crop / Farmer Loan Application", "Loan Application Forms",
+                List.of("Crop Loan Product and Purpose", "Requested Loan Amount", "Crop Name and Season",
+                        "Farm Location and Land Area", "Land Ownership / Record Details",
+                        "Cultivation Cost Estimate", "Agriculture and Crop Estimates",
+                        "Tenure, Interest Rate and Repayment Schedule", "Linked Repayment Account",
+                        "ECS / Auto-debit Consent", "Crop Insurance Details", "Supporting Documents",
+                        "Customer Agreement Review and E-sign Status")));
 
         list.add(new FormDefinition(17, "deposit", "Deposit Form", "Transaction Forms",
                 List.of("Account Number", "Deposit Amount", "Deposit Mode", "Reference Number", "Remarks")));
@@ -86,6 +106,35 @@ public final class BankFormCatalog {
                 List.of("Account Number", "Biller Category", "Consumer Number", "Amount", "Payment Reference")));
         list.add(new FormDefinition(25, "recharge", "Recharge Form", "Transaction Forms",
                 List.of("Account Number", "Mobile/Operator", "Recharge Amount", "Plan Type", "Reference")));
+        list.add(new FormDefinition(62, "fixed-deposit-application", "Fixed Deposit Application",
+                "Deposit Application Forms",
+                List.of("Linked Funding Account", "Deposit Scheme", "Principal Amount", "Tenure",
+                        "Interest Rate", "Interest Payout Frequency", "Maturity Date",
+                        "Maturity Instruction / Allocation Account", "Nominee Details",
+                        "Premature Closure Terms", "Customer Declaration")));
+        list.add(new FormDefinition(63, "recurring-deposit-application", "Recurring Deposit Application",
+                "Deposit Application Forms",
+                List.of("Linked Funding Account", "RD Scheme", "Monthly Installment",
+                        "Annual Interest Rate", "Tenure and Start Date", "Calculated Principal",
+                        "Estimated Interest and Maturity Amount", "Maturity Date",
+                        "Payout / Allocation Account", "ECS Mandate and Separate Consent Status",
+                        "Customer Review and E-sign Acknowledgement")));
+        list.add(new FormDefinition(64, "ecs-mandate-authorization", "ECS Mandate Authorization",
+                "Mandate and Consent Forms",
+                List.of("Product / Loan Account Number", "Linked Debit Account Number",
+                        "Mandate Reference", "Authorized Maximum Debit", "Installment Amount",
+                        "Debit Frequency and Debit Day", "Mandate Start and End Date",
+                        "Customer Consent Version and Wording", "Customer Name and Consent Timestamp",
+                        "Consent Network Address", "Mandate Status and Audit History",
+                        "Revocation and Dispute Instructions")));
+        list.add(new FormDefinition(65, "loan-agreement-esign-review", "Loan Agreement E-sign Review",
+                "Loan Application Forms",
+                List.of("Loan Product and Loan Account Number", "Sanctioned Principal",
+                        "Interest Rate and Tenure", "Complete Repayment Schedule",
+                        "Fees, Taxes and Stamp Duty", "Security and Recovery Terms",
+                        "Share Link and Expiry", "CAPTCHA Verification",
+                        "Customer Typed Name and Signature Timestamp",
+                        "Agreement Status and Final Bank Approval")));
 
         list.add(new FormDefinition(26, "card-block", "Card Block Form", "Card Services Forms",
                 List.of("Card Number", "Account Number", "Reason for Block", "Temporary/Permanent", "OTP")));

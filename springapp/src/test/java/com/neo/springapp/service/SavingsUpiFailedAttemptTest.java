@@ -98,12 +98,13 @@ class SavingsUpiFailedAttemptTest {
         User receiver = createEnabledUser("ACC-200", "recipient@neobank", "Recipient", 25.0);
         when(userRepository.findByAccountNumber("ACC-100")).thenReturn(Optional.of(sender));
         when(userRepository.findByAccountNumber("ACC-200")).thenReturn(Optional.of(receiver));
+        when(userRepository.findByUpiId("sender@neobank")).thenReturn(Optional.of(sender));
         when(userRepository.findByUpiId("recipient@neobank")).thenReturn(Optional.of(receiver));
         when(transactionRepository.findBySenderAccountOrderByCreatedAtDesc("ACC-100")).thenReturn(List.of());
 
         Map<String, Object> response = service.sendMoney(
                 "ACC-100", "recipient@neobank", new BigDecimal("125.50"), "123456", "Test payment",
-                "203.0.113.8", "Mozilla/5.0 test browser");
+                "203.0.113.8", "Mozilla/5.0 test browser", 37.422, -122.084, 12.5);
 
         assertThat(response).containsEntry("success", true);
         assertThat(sender.getAccount().getBalance()).isEqualTo(374.5);
@@ -116,6 +117,20 @@ class SavingsUpiFailedAttemptTest {
         assertThat(savedTransaction.getValue().getReceiverCredited()).isTrue();
         assertThat(savedTransaction.getValue().getSourceIp()).isEqualTo("203.0.113.8");
         assertThat(savedTransaction.getValue().getUserAgent()).isEqualTo("Mozilla/5.0 test browser");
+        assertThat(savedTransaction.getValue().getLocationLatitude()).isEqualTo(37.422);
+        assertThat(savedTransaction.getValue().getLocationLongitude()).isEqualTo(-122.084);
+        assertThat(savedTransaction.getValue().getLocationAccuracyMeters()).isEqualTo(12.5);
+
+        when(transactionRepository.findAllOrderByCreatedAtDesc()).thenReturn(List.of(savedTransaction.getValue()));
+        Map<String, Object> adminDetails = service.adminListAllTransactions().get(0);
+        assertThat(adminDetails).containsEntry("sourceIp", "203.0.113.8")
+                .containsEntry("location", "37.42200, -122.08400")
+                .containsEntry("senderDebited", true)
+                .containsEntry("receiverCredited", true);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> senderProfile = (Map<String, Object>) adminDetails.get("senderProfile");
+        assertThat(senderProfile).containsEntry("phone", "555-0100");
+        assertThat(savedTransaction.getValue().getSenderPhone()).isEqualTo("555-0100");
     }
 
     private User createEnabledUser(String accountNumber, String upiId, String name, double balance) {

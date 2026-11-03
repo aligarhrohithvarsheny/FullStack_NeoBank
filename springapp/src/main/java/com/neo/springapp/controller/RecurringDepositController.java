@@ -46,6 +46,12 @@ public class RecurringDepositController {
         return ResponseEntity.ok(service.adminViews());
     }
 
+    @GetMapping("/admin/account/{accountNumber}")
+    public ResponseEntity<?> adminAccount(@PathVariable String accountNumber, Authentication authentication) {
+        if (!isStaff(authentication)) return forbidden();
+        return ResponseEntity.ok(service.customerViews(accountNumber));
+    }
+
     @PostMapping
     public ResponseEntity<?> create(@RequestBody CreateRequest request, Authentication authentication) {
         if (!isStaff(authentication)) return forbidden();

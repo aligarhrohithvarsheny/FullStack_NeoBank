@@ -37,6 +37,11 @@ public class EcsMandateController {
         return isStaff(authentication) ? ResponseEntity.ok(service.all()) : forbidden();
     }
 
+    @GetMapping("/admin/account/{accountNumber}")
+    public ResponseEntity<?> adminAccount(@PathVariable String accountNumber, Authentication authentication) {
+        return isStaff(authentication) ? ResponseEntity.ok(service.forAccount(accountNumber)) : forbidden();
+    }
+
     @GetMapping("/eligible-loans")
     public ResponseEntity<?> eligibleLoans(Authentication authentication) {
         return isStaff(authentication) ? ResponseEntity.ok(service.eligibleLoans()) : forbidden();

@@ -181,6 +181,16 @@ public class SavingsUpiService {
     public Map<String, Object> sendMoney(String senderAccountNumber, String receiverUpiId,
                                          BigDecimal amount, String pin, String remark,
                                          String sourceIp, String userAgent) {
+        return sendMoney(senderAccountNumber, receiverUpiId, amount, pin, remark, sourceIp, userAgent,
+                null, null, null);
+    }
+
+    @Transactional
+    public Map<String, Object> sendMoney(String senderAccountNumber, String receiverUpiId,
+                                         BigDecimal amount, String pin, String remark,
+                                         String sourceIp, String userAgent,
+                                         Double locationLatitude, Double locationLongitude,
+                                         Double locationAccuracyMeters) {
         Map<String, Object> res = new HashMap<>();
 
         // Validate inputs
@@ -264,8 +274,19 @@ public class SavingsUpiService {
         txn.setRemark(remark);
         txn.setPaymentMethod("UPI");
         txn.setRiskScore(riskScore);
-        txn.setSourceIp(sourceIp);
+        txn.setSourceIp(truncate(sourceIp, 64));
         txn.setUserAgent(truncate(userAgent, 512));
+        Map<String, Object> senderProfile = participantProfile(senderAccountNumber, sender.getUpiId());
+        Map<String, Object> receiverProfile = participantProfile(receiverAccount, rUpi);
+        txn.setSenderPhone((String) senderProfile.get("phone"));
+        txn.setSenderAddress((String) senderProfile.get("address"));
+        txn.setReceiverPhone((String) receiverProfile.get("phone"));
+        txn.setReceiverAddress((String) receiverProfile.get("address"));
+        if (isValidLocation(locationLatitude, locationLongitude, locationAccuracyMeters)) {
+            txn.setLocationLatitude(locationLatitude);
+            txn.setLocationLongitude(locationLongitude);
+            txn.setLocationAccuracyMeters(locationAccuracyMeters);
+        }
 
         boolean flagged = riskScore >= 70;
         txn.setFraudFlagged(flagged);
@@ -329,7 +350,7 @@ public class SavingsUpiService {
         attempt.setFraudFlagged(false);
         attempt.setSenderDebited(false);
         attempt.setReceiverCredited(false);
-        attempt.setSourceIp(sourceIp);
+        attempt.setSourceIp(truncate(sourceIp, 64));
         attempt.setUserAgent(truncate(userAgent, 512));
         attempt.setCreatedAt(LocalDateTime.now());
         savingsUpiTxnRepo.save(attempt);
@@ -463,38 +484,79 @@ public class SavingsUpiService {
         details.put("receiverCredited", txn.getReceiverCredited());
         details.put("sourceIp", txn.getSourceIp());
         details.put("userAgent", txn.getUserAgent());
-        details.put("location", "Not recorded");
-        details.put("senderProfile", participantProfile(txn.getSenderAccount(), null));
-        details.put("receiverProfile", participantProfile(txn.getReceiverAccount(), txn.getReceiverUpiId()));
+        details.put("location", formatLocation(txn));
+        details.put("locationAccuracyMeters", txn.getLocationAccuracyMeters());
+        details.put("senderProfile", transactionProfile(txn.getSenderAccount(), txn.getSenderUpiId(),
+                txn.getSenderPhone(), txn.getSenderAddress()));
+        details.put("receiverProfile", transactionProfile(txn.getReceiverAccount(), txn.getReceiverUpiId(),
+                txn.getReceiverPhone(), txn.getReceiverAddress()));
         return details;
+    }
+
+    private Map<String, Object> transactionProfile(String accountNumber, String upiId,
+                                                  String phone, String address) {
+        if (available(phone).equals("Not available") || available(address).equals("Not available")) {
+            Map<String, Object> currentProfile = participantProfile(accountNumber, upiId);
+            if (available(phone).equals("Not available")) phone = (String) currentProfile.get("phone");
+            if (available(address).equals("Not available")) address = (String) currentProfile.get("address");
+        }
+        Map<String, Object> profile = new LinkedHashMap<>();
+        profile.put("phone", available(phone));
+        profile.put("address", available(address));
+        return profile;
     }
 
     private Map<String, Object> participantProfile(String accountNumber, String upiId) {
         Map<String, Object> profile = new LinkedHashMap<>();
         profile.put("phone", "Not available");
         profile.put("address", "Not available");
-        if (accountNumber == null) return profile;
 
-        Account savings = accountRepository.findByAccountNumber(accountNumber);
+        User user = upiId == null ? null : userRepository.findByUpiId(upiId).orElse(null);
+        if (user == null && accountNumber != null) {
+            user = userRepository.findByAccountNumber(accountNumber).orElse(null);
+        }
+        Account savings = user == null ? null : user.getAccount();
         if (savings != null) {
-            profile.put("phone", savings.getPhone());
+            profile.put("phone", available(savings.getPhone()));
             profile.put("address", joinAddress(savings.getAddress(), savings.getBranchCity()));
             return profile;
         }
 
-        SalaryAccount salary = upiId == null ? null : salaryAccountRepository.findByUpiId(upiId);
+        SalaryAccount salary = accountNumber == null ? null : salaryAccountRepository.findByAccountNumber(accountNumber);
+        if (salary == null && upiId != null) salary = salaryAccountRepository.findByUpiId(upiId);
         if (salary != null) {
-            profile.put("phone", salary.getMobileNumber());
-            profile.put("address", salary.getAddress());
+            profile.put("phone", available(salary.getMobileNumber()));
+            profile.put("address", available(salary.getAddress()));
             return profile;
         }
 
-        CurrentAccount current = upiId == null ? null : currentAccountRepository.findByUpiId(upiId).orElse(null);
+        CurrentAccount current = accountNumber == null ? null
+                : currentAccountRepository.findByAccountNumber(accountNumber).orElse(null);
+        if (current == null && upiId != null) {
+            current = currentAccountRepository.findByUpiId(upiId).orElse(null);
+        }
         if (current != null) {
-            profile.put("phone", current.getMobile());
+            profile.put("phone", available(current.getMobile()));
             profile.put("address", joinAddress(current.getShopAddress(), current.getCity(), current.getState()));
         }
         return profile;
+    }
+
+    private boolean isValidLocation(Double latitude, Double longitude, Double accuracy) {
+        return latitude != null && longitude != null
+                && Double.isFinite(latitude) && latitude >= -90 && latitude <= 90
+                && Double.isFinite(longitude) && longitude >= -180 && longitude <= 180
+                && (accuracy == null || (Double.isFinite(accuracy) && accuracy >= 0));
+    }
+
+    private String formatLocation(SavingsUpiTransaction txn) {
+        if (txn.getLocationLatitude() == null || txn.getLocationLongitude() == null) return "Not recorded";
+        return String.format(Locale.ROOT, "%.5f, %.5f",
+                txn.getLocationLatitude(), txn.getLocationLongitude());
+    }
+
+    private String available(String value) {
+        return value == null || value.isBlank() ? "Not available" : value;
     }
 
     private String joinAddress(String... parts) {

@@ -280,18 +280,36 @@ public class LoanAgreementService {
 
     @Transactional(readOnly = true)
     public List<Map<String, Object>> adminSummaries() {
-        return agreementRepository.findAllByOrderByIssuedAtDesc().stream().map(agreement -> {
-            Map<String, Object> summary = new HashMap<>();
-            summary.put("id", agreement.getId());
-            summary.put("loanType", agreement.getLoanType());
-            summary.put("loanId", agreement.getLoanId());
-            summary.put("status", agreement.getStatus());
-            summary.put("issuedAt", agreement.getIssuedAt());
-            summary.put("expiresAt", agreement.getExpiresAt());
-            summary.put("signedAt", agreement.getSignedAt());
-            summary.put("signedName", agreement.getSignedName());
-            return summary;
-        }).toList();
+        return agreementRepository.findAllByOrderByIssuedAtDesc().stream().map(this::adminSummary).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> adminSummariesForAccount(String accountNumber) {
+        if (accountNumber == null || accountNumber.isBlank()) {
+            throw new IllegalArgumentException("Account number is required.");
+        }
+        return agreementRepository.findAllByAccountNumberIgnoreCaseOrderByIssuedAtDesc(accountNumber.trim())
+                .stream().map(this::adminSummary).toList();
+    }
+
+    private Map<String, Object> adminSummary(LoanAgreement agreement) {
+        Map<String, Object> summary = new HashMap<>();
+        summary.put("id", agreement.getId());
+        summary.put("loanType", agreement.getLoanType());
+        summary.put("loanId", agreement.getLoanId());
+        summary.put("loanAccountNumber", agreement.getLoanAccountNumber());
+        summary.put("accountNumber", agreement.getAccountNumber());
+        summary.put("productName", agreement.getProductName());
+        summary.put("customerName", agreement.getCustomerName());
+        summary.put("amount", agreement.getAmount());
+        summary.put("tenureMonths", agreement.getTenureMonths());
+        summary.put("annualInterestRate", agreement.getAnnualInterestRate());
+        summary.put("status", agreement.getStatus());
+        summary.put("issuedAt", agreement.getIssuedAt());
+        summary.put("expiresAt", agreement.getExpiresAt());
+        summary.put("signedAt", agreement.getSignedAt());
+        summary.put("signedName", agreement.getSignedName());
+        return summary;
     }
 
     private void populateLoanSnapshot(LoanAgreement agreement, Map<String, Object> context) {

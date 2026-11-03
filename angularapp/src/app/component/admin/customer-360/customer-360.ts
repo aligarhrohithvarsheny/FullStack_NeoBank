@@ -43,6 +43,11 @@ export class Customer360 implements OnInit {
   kycRecords: any[] = [];
   complaints: any[] = [];
   loans: any[] = [];
+  homeLoans: any[] = [];
+  recurringDeposits: any[] = [];
+  ecsMandates: any[] = [];
+  bankFormUploads: any[] = [];
+  loanAgreements: any[] = [];
   nominees: any[] = [];
   linkedAccounts: any[] = [];
   currentAccount: any | null = null;
@@ -179,7 +184,14 @@ export class Customer360 implements OnInit {
         ['history', 'changes'], { 'X-Admin-Email': this.getAdminEmail() }),
       fixedDeposits: this.resource(`${root}/api/fixed-deposits/account/${encodeURIComponent(accountNumber)}`,
         ['fixedDeposits', 'deposits']),
-      goldLoans: this.resource(`${root}/api/gold-loans/account/${encodeURIComponent(accountNumber)}`, ['loans'])
+      goldLoans: this.resource(`${root}/api/gold-loans/account/${encodeURIComponent(accountNumber)}`, ['loans']),
+      homeLoans: this.resource(`${root}/api/home-loans/account/${encodeURIComponent(accountNumber)}`, ['loans', 'applications']),
+      recurringDeposits: this.resource(`${root}/api/recurring-deposits/admin/account/${encodeURIComponent(accountNumber)}`,
+        ['recurringDeposits', 'deposits']),
+      ecsMandates: this.resource(`${root}/api/ecs-mandates/admin/account/${encodeURIComponent(accountNumber)}`, ['mandates']),
+      bankFormUploads: this.resource(`${root}/api/admin/bank-forms/uploads?accountNumber=${encodeURIComponent(accountNumber)}`,
+        ['uploads']),
+      loanAgreements: this.resource(`${root}/api/loan-agreements/account/${encodeURIComponent(accountNumber)}`, ['agreements'])
     };
 
     forkJoin(requests).pipe(
@@ -204,7 +216,12 @@ export class Customer360 implements OnInit {
       this.transactions = resources['transactions'].rows;
       this.kycRecords = resources['kyc'].rows;
       this.complaints = resources['complaints'].rows;
+      this.homeLoans = resources['homeLoans'].rows;
       this.loans = [...resources['loans'].rows, ...resources['goldLoans'].rows];
+      this.recurringDeposits = resources['recurringDeposits'].rows;
+      this.ecsMandates = resources['ecsMandates'].rows;
+      this.bankFormUploads = resources['bankFormUploads'].rows;
+      this.loanAgreements = resources['loanAgreements'].rows;
       this.nominees = resources['nominees'].rows;
       this.linkedAccounts = [
         ...resources['currentAccounts'].rows.filter(account =>
@@ -262,6 +279,85 @@ export class Customer360 implements OnInit {
     return this.resourceErrors[name] || '';
   }
 
+  homeLoanDocuments(loan: any): Array<{ type: string; label: string; index?: number; fileName: string }> {
+    const documents: Array<{ type: string; label: string; index?: number; fileName: string }> = [];
+    const singles: Array<[string, string, string]> = [
+      ['fdReceiptPath', 'fdReceipt', 'FD receipt'],
+      ['modelDocPath', 'model', 'Loan model'],
+      ['signaturePath', 'signature', 'Signature'],
+      ['vehicleInvoicePath', 'vehicleInvoice', 'Vehicle invoice'],
+      ['landRecordPath', 'landRecord', 'Land record'],
+      ['agricultureEstimatePath', 'agricultureEstimate', 'Agriculture estimate'],
+      ['cropEstimatePath', 'cropEstimate', 'Crop estimate']
+    ];
+    for (const [pathKey, type, label] of singles) {
+      const path = loan?.[pathKey];
+      if (typeof path === 'string' && path.trim()) {
+        documents.push({ type, label, fileName: path.split(/[\\/]/).pop() || label });
+      }
+    }
+    const images = typeof loan?.vehicleImagePaths === 'string'
+      ? loan.vehicleImagePaths.split(',').filter((path: string) => path.trim())
+      : [];
+    images.forEach((path: string, index: number) => documents.push({
+      type: 'vehicleImages',
+      label: `Vehicle image ${index + 1}`,
+      index,
+      fileName: path.trim().split(/[\\/]/).pop() || `vehicle-image-${index + 1}`
+    }));
+    return documents;
+  }
+
+  downloadBankForm(upload: any): void {
+    this.downloadFile(
+      `${environment.apiBaseUrl}/api/admin/bank-forms/uploads/${encodeURIComponent(String(upload.id))}/file`,
+      upload.originalFileName || `bank-form-${upload.id}`
+    );
+  }
+
+  downloadHomeLoanDocument(loan: any, document: { type: string; index?: number; fileName: string }): void {
+    const query = document.index === undefined ? '' : `?index=${document.index}`;
+    this.downloadFile(
+      `${environment.apiBaseUrl}/api/home-loans/${encodeURIComponent(String(loan.id))}/documents/${encodeURIComponent(document.type)}/file${query}`,
+      document.fileName
+    );
+  }
+
+  downloadPersonalLoanForm(loan: any): void {
+    this.downloadFile(
+      `${environment.apiBaseUrl}/api/loans/download-personal-loan-form/${encodeURIComponent(String(loan.id))}`,
+      `personal-loan-application-${loan.id}.pdf`
+    );
+  }
+
+  downloadEcsConsent(mandate: any): void {
+    this.downloadFile(
+      `${environment.apiBaseUrl}/api/ecs-mandates/${encodeURIComponent(String(mandate.id))}/consent-record`,
+      `ecs-consent-record-${mandate.id}.html`
+    );
+  }
+
+  downloadLoanAgreement(agreement: any): void {
+    this.downloadFile(
+      `${environment.apiBaseUrl}/api/loan-agreements/${encodeURIComponent(String(agreement.id))}/pdf`,
+      `signed-loan-agreement-${agreement.id}.pdf`
+    );
+  }
+
+  hasSignedAgreement(agreement: any): boolean {
+    return ['SIGNED', 'APPROVED'].includes(String(agreement?.status || '').toUpperCase());
+  }
+
+  hasEcsConsent(mandate: any): boolean {
+    return String(mandate?.productType || '').toUpperCase() === 'RECURRING_DEPOSIT'
+      && Boolean(mandate?.customerConsentAt || mandate?.customerConsentName);
+  }
+
+  hasPersonalLoanForm(loan: any): boolean {
+    return Boolean(loan?.id && loan?.personalLoanFormPath
+      && String(loan?.type || '').toLowerCase().includes('personal'));
+  }
+
   private resource(
     url: string,
     keys: string[],
@@ -285,6 +381,31 @@ export class Customer360 implements OnInit {
 
   private adminRequestOptions(headers?: Record<string, string>): { headers: HttpHeaders } {
     return { headers: this.adminRequestHeaders(headers) };
+  }
+
+  private downloadFile(url: string, fileName: string): void {
+    this.http.get(url, {
+      headers: this.adminRequestHeaders(),
+      responseType: 'blob'
+    }).subscribe({
+      next: blob => {
+        if (!blob.size) {
+          this.resourceErrors['downloads'] = 'The requested file was empty.';
+          return;
+        }
+        const objectUrl = URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = objectUrl;
+        anchor.download = fileName;
+        anchor.click();
+        URL.revokeObjectURL(objectUrl);
+        delete this.resourceErrors['downloads'];
+      },
+      error: error => {
+        this.handleAdminAuthError(error);
+        this.resourceErrors['downloads'] = error?.error?.message || 'Unable to download the requested file.';
+      }
+    });
   }
 
   private adminRequestHeaders(headers?: Record<string, string>): HttpHeaders {

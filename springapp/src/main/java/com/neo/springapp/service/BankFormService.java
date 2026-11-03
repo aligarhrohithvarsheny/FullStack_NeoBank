@@ -83,6 +83,23 @@ public class BankFormService {
             String panNumber,
             String phone,
             String email) throws IOException {
+        return buildBlankFormPdf(formCode, adminName, accountNumber, accountType, holderName,
+                customerId, aadhaarNumber, panNumber, phone, email, null, null);
+    }
+
+    public byte[] buildBlankFormPdf(
+            String formCode,
+            String adminName,
+            String accountNumber,
+            String accountType,
+            String holderName,
+            String customerId,
+            String aadhaarNumber,
+            String panNumber,
+            String phone,
+            String email,
+            String dateOfBirth,
+            String address) throws IOException {
         FormDefinition form = BankFormCatalog.findByCode(formCode)
                 .orElseThrow(() -> new IllegalArgumentException("Unknown form code: " + formCode));
 
@@ -96,7 +113,9 @@ public class BankFormService {
                 aadhaarNumber,
                 panNumber,
                 phone,
-                email);
+                email,
+                dateOfBirth,
+                address);
     }
 
     /** Backward-compatible overload used by existing callers. */
@@ -117,7 +136,9 @@ public class BankFormService {
                 stringValue(profile, "aadhaarNumber"),
                 stringValue(profile, "panNumber"),
                 stringValue(profile, "phone"),
-                stringValue(profile, "email"));
+                stringValue(profile, "email"),
+                stringValue(profile, "dateOfBirth"),
+                stringValue(profile, "address"));
     }
 
     public Optional<BankFormUpload> findUpload(Long id) {
@@ -350,6 +371,8 @@ public class BankFormService {
                     m.put("panNumber", a.getPan());
                     m.put("phone", a.getPhone());
                     m.put("email", "");
+                    m.put("dateOfBirth", a.getDob());
+                    m.put("address", a.getAddress());
                     return m;
                 }
             }
@@ -366,6 +389,8 @@ public class BankFormService {
                     m.put("panNumber", a.getPanNumber());
                     m.put("phone", a.getMobileNumber());
                     m.put("email", a.getEmail());
+                    m.put("dateOfBirth", a.getDob());
+                    m.put("address", a.getAddress());
                     return m;
                 }
             }
@@ -383,6 +408,7 @@ public class BankFormService {
                     m.put("panNumber", a.getPanNumber());
                     m.put("phone", a.getMobile());
                     m.put("email", a.getEmail());
+                    m.put("address", joinAddress(a.getShopAddress(), a.getCity(), a.getState(), a.getPincode()));
                     return m;
                 }
             }
@@ -589,6 +615,13 @@ public class BankFormService {
             return "regular";
         }
         return accountType.trim().toLowerCase();
+    }
+
+    private static String joinAddress(String... parts) {
+        return Arrays.stream(parts)
+                .filter(part -> part != null && !part.isBlank())
+                .reduce((first, second) -> first + ", " + second)
+                .orElse("");
     }
 
     private static String extension(String filename) {

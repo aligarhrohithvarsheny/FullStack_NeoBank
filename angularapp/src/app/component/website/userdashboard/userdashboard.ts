@@ -1821,11 +1821,42 @@ export class Userdashboard implements OnInit, OnDestroy, AfterViewInit {
     this.upiSendError = '';
     this.upiSendSuccess = '';
     const sentAmount = this.upiSendForm.amount;
+    const sendPayment = (location?: { latitude: number; longitude: number; accuracy: number }) => {
+      this.sendUpiPayment(sentAmount, location);
+    };
+
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      sendPayment();
+      return;
+    }
+
+    try {
+      navigator.geolocation.getCurrentPosition(
+        position => sendPayment({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracy: position.coords.accuracy
+        }),
+        () => sendPayment(),
+        { enableHighAccuracy: false, maximumAge: 60_000, timeout: 5_000 }
+      );
+    } catch {
+      sendPayment();
+    }
+  }
+
+  private sendUpiPayment(
+    sentAmount: number,
+    location?: { latitude: number; longitude: number; accuracy: number }
+  ) {
     this.http.post(`${environment.apiBaseUrl}/api/savings-upi/send/${this.userAccountNumber}`, {
       receiverUpiId: this.upiSendForm.receiverUpiId,
       amount: this.upiSendForm.amount,
       remark: this.upiSendForm.remark,
-      transactionPin: this.upiSendForm.transactionPin
+      transactionPin: this.upiSendForm.transactionPin,
+      locationLatitude: location?.latitude,
+      locationLongitude: location?.longitude,
+      locationAccuracyMeters: location?.accuracy
     }).subscribe({
       next: (res: any) => {
         this.isSubmittingUpiSend = false;

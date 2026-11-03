@@ -1195,6 +1195,9 @@
             </div>
             <div *ngIf="upiSendError" class="upi-error-msg">{{upiSendError}}</div>
             <div *ngIf="upiSendSuccess" class="upi-success-msg">{{upiSendSuccess}}</div>
+            <small *ngIf="upiSendVerified" style="display:block;margin:8px 0;color:#64748b;">
+              Your browser may ask to share your location for this transaction. Payment proceeds if location access is denied.
+            </small>
             <button *ngIf="upiSendVerified" class="ud-btn-primary" (click)="submitUpiSend()"
               [disabled]="isSubmittingUpiSend || !upiSendForm.amount || upiSendForm.transactionPin.length !== 6">
               {{isSubmittingUpiSend ? 'Processing...' : 'Pay ₹' + upiSendForm.amount}}

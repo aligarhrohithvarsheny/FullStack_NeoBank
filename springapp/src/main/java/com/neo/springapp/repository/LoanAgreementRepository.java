@@ -11,4 +11,5 @@ public interface LoanAgreementRepository extends JpaRepository<LoanAgreement, Lo
     Optional<LoanAgreement> findTopByLoanTypeAndLoanIdOrderByIssuedAtDesc(String loanType, Long loanId);
     List<LoanAgreement> findAllByLoanTypeAndLoanIdOrderByIssuedAtDesc(String loanType, Long loanId);
     List<LoanAgreement> findAllByOrderByIssuedAtDesc();
+    List<LoanAgreement> findAllByAccountNumberIgnoreCaseOrderByIssuedAtDesc(String accountNumber);
 }
