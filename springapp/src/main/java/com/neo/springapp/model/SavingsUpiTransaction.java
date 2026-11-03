@@ -1,5 +1,6 @@
 package com.neo.springapp.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.Data;
 import java.math.BigDecimal;
@@ -54,4 +55,18 @@ public class SavingsUpiTransaction {
 
     @Column(name = "created_at")
     private LocalDateTime createdAt = LocalDateTime.now();
+
+    @Column(name = "sender_debited")
+    private Boolean senderDebited = false;
+
+    @Column(name = "receiver_credited")
+    private Boolean receiverCredited = false;
+
+    @JsonIgnore
+    @Column(name = "source_ip", length = 64)
+    private String sourceIp;
+
+    @JsonIgnore
+    @Column(name = "user_agent", length = 512)
+    private String userAgent;
 }

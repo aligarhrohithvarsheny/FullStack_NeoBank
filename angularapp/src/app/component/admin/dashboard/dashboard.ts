@@ -271,6 +271,7 @@ export class Dashboard implements OnInit, OnDestroy {
   adminUpiSearchTerm = '';
   adminUpiFromDate = '';
   adminUpiToDate = '';
+  selectedAdminUpiTransaction: any = null;
 
   get filteredAdminUpiTransactions(): any[] {
     return this.filterAdminUpiTransactions(this.adminUpiTransactions);
@@ -735,9 +736,25 @@ export class Dashboard implements OnInit, OnDestroy {
   }
 
   // ---- Admin UPI Management ----
+  private getAdminUpiOptions(): { headers: HttpHeaders } {
+    const token = typeof sessionStorage !== 'undefined'
+      ? sessionStorage.getItem('adminSessionToken')
+      : null;
+    const headers = new HttpHeaders();
+    return { headers: token ? headers.set('Authorization', 'Bearer ' + token) : headers };
+  }
+
+  openAdminUpiTransactionDetails(transaction: any): void {
+    this.selectedAdminUpiTransaction = transaction;
+  }
+
+  closeAdminUpiTransactionDetails(): void {
+    this.selectedAdminUpiTransaction = null;
+  }
+
   loadAdminUpiAccounts() {
     this.isLoadingAdminUpiAccounts = true;
-    this.http.get<any>(`${environment.apiBaseUrl}/api/admins/upi/savings/accounts`).subscribe({
+    this.http.get<any>(`${environment.apiBaseUrl}/api/admins/upi/savings/accounts`, this.getAdminUpiOptions()).subscribe({
       next: (res: any) => { this.adminUpiAccounts = res?.accounts || []; this.isLoadingAdminUpiAccounts = false; },
       error: () => { this.adminUpiAccounts = []; this.isLoadingAdminUpiAccounts = false; }
     });
@@ -745,7 +762,7 @@ export class Dashboard implements OnInit, OnDestroy {
 
   loadAdminUpiTransactions() {
     this.isLoadingAdminUpiTxns = true;
-    this.http.get<any>(`${environment.apiBaseUrl}/api/admins/upi/savings/transactions`).subscribe({
+    this.http.get<any>(`${environment.apiBaseUrl}/api/admins/upi/savings/transactions`, this.getAdminUpiOptions()).subscribe({
       next: (res: any) => { this.adminUpiTransactions = res?.transactions || []; this.isLoadingAdminUpiTxns = false; },
       error: (err: any) => {
         this.adminUpiTransactions = [];
@@ -757,7 +774,7 @@ export class Dashboard implements OnInit, OnDestroy {
 
   loadAdminUpiFlagged() {
     this.isLoadingAdminUpiFlagged = true;
-    this.http.get<any>(`${environment.apiBaseUrl}/api/admins/upi/savings/flagged`).subscribe({
+    this.http.get<any>(`${environment.apiBaseUrl}/api/admins/upi/savings/flagged`, this.getAdminUpiOptions()).subscribe({
       next: (res: any) => { this.adminUpiFlagged = res?.transactions || []; this.isLoadingAdminUpiFlagged = false; },
       error: (err: any) => {
         this.adminUpiFlagged = [];
@@ -768,7 +785,7 @@ export class Dashboard implements OnInit, OnDestroy {
   }
 
   toggleAdminUpi(accountNumber: string, enable: boolean) {
-    this.http.put(`${environment.apiBaseUrl}/api/admins/upi/savings/toggle/${accountNumber}?enable=${enable}`, {}).subscribe({
+    this.http.put(`${environment.apiBaseUrl}/api/admins/upi/savings/toggle/${accountNumber}?enable=${enable}`, {}, this.getAdminUpiOptions()).subscribe({
       next: () => this.loadAdminUpiAccounts(),
       error: (err: any) => this.alertService.error('Error', err?.error?.message || 'Failed to toggle UPI')
     });

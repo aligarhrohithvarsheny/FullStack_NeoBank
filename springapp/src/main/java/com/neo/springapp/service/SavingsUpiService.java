@@ -174,15 +174,22 @@ public class SavingsUpiService {
     @Transactional
     public Map<String, Object> sendMoney(String senderAccountNumber, String receiverUpiId,
                                          BigDecimal amount, String pin, String remark) {
+        return sendMoney(senderAccountNumber, receiverUpiId, amount, pin, remark, null, null);
+    }
+
+    @Transactional
+    public Map<String, Object> sendMoney(String senderAccountNumber, String receiverUpiId,
+                                         BigDecimal amount, String pin, String remark,
+                                         String sourceIp, String userAgent) {
         Map<String, Object> res = new HashMap<>();
 
         // Validate inputs
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
-            recordFailedAttempt(senderAccountNumber, receiverUpiId, amount, "Invalid amount", null);
+            recordFailedAttempt(senderAccountNumber, receiverUpiId, amount, "Invalid amount", null, sourceIp, userAgent);
             res.put("success", false); res.put("error", "Invalid amount"); return res;
         }
         if (amount.compareTo(new BigDecimal("100000")) > 0) {
-            recordFailedAttempt(senderAccountNumber, receiverUpiId, amount, "Amount exceeds UPI limit of ₹1,00,000", null);
+            recordFailedAttempt(senderAccountNumber, receiverUpiId, amount, "Amount exceeds UPI limit of ₹1,00,000", null, sourceIp, userAgent);
             res.put("success", false); res.put("error", "Amount exceeds UPI limit of ₹1,00,000"); return res;
         }
 
@@ -190,26 +197,26 @@ public class SavingsUpiService {
         User sender = userRepository.findByAccountNumber(senderAccountNumber).orElse(null);
         if (sender == null) { res.put("success", false); res.put("error", "Sender not found"); return res; }
         if (!Boolean.TRUE.equals(sender.getUpiEnabled())) {
-            recordFailedAttempt(senderAccountNumber, receiverUpiId, amount, "UPI is not enabled for this account", sender);
+            recordFailedAttempt(senderAccountNumber, receiverUpiId, amount, "UPI is not enabled for this account", sender, sourceIp, userAgent);
             res.put("success", false); res.put("error", "UPI is not enabled for your account"); return res;
         }
         if (!Boolean.TRUE.equals(sender.getTransactionPinSet()) || sender.getTransactionPin() == null) {
-            recordFailedAttempt(senderAccountNumber, receiverUpiId, amount, "UPI PIN is not set", sender);
+            recordFailedAttempt(senderAccountNumber, receiverUpiId, amount, "UPI PIN is not set", sender, sourceIp, userAgent);
             res.put("success", false); res.put("error", "Please set your UPI PIN first"); return res;
         }
         if (!encoder.matches(pin, sender.getTransactionPin())) {
-            recordFailedAttempt(senderAccountNumber, receiverUpiId, amount, "Incorrect UPI PIN", sender);
+            recordFailedAttempt(senderAccountNumber, receiverUpiId, amount, "Incorrect UPI PIN", sender, sourceIp, userAgent);
             res.put("success", false); res.put("error", "Incorrect UPI PIN"); return res;
         }
 
         Account senderAcc = sender.getAccount();
         if (senderAcc == null) {
-            recordFailedAttempt(senderAccountNumber, receiverUpiId, amount, "Account not found", sender);
+            recordFailedAttempt(senderAccountNumber, receiverUpiId, amount, "Account not found", sender, sourceIp, userAgent);
             res.put("success", false); res.put("error", "Account not found"); return res;
         }
         emergencyControlService.assertAccountNotIsolated(senderAccountNumber);
         if (senderAcc.getBalance() == null || senderAcc.getBalance() < amount.doubleValue()) {
-            recordFailedAttempt(senderAccountNumber, receiverUpiId, amount, "Insufficient balance", sender);
+            recordFailedAttempt(senderAccountNumber, receiverUpiId, amount, "Insufficient balance", sender, sourceIp, userAgent);
             res.put("success", false); res.put("error", "Insufficient balance"); return res;
         }
 
@@ -225,18 +232,18 @@ public class SavingsUpiService {
 
         // Verify receiver UPI ID
         if (receiverUpiId == null || receiverUpiId.isBlank()) {
-            recordFailedAttempt(senderAccountNumber, receiverUpiId, amount, "Receiver UPI ID is required", sender);
+            recordFailedAttempt(senderAccountNumber, receiverUpiId, amount, "Receiver UPI ID is required", sender, sourceIp, userAgent);
             res.put("success", false); res.put("error", "Receiver UPI ID is required"); return res;
         }
         String rUpi = receiverUpiId.trim().toLowerCase();
         if (rUpi.equals(sender.getUpiId())) {
-            recordFailedAttempt(senderAccountNumber, receiverUpiId, amount, "Cannot send money to your own UPI ID", sender);
+            recordFailedAttempt(senderAccountNumber, receiverUpiId, amount, "Cannot send money to your own UPI ID", sender, sourceIp, userAgent);
             res.put("success", false); res.put("error", "Cannot send money to yourself"); return res;
         }
         Map<String, Object> verify = verifyUpiId(rUpi);
         if (!Boolean.TRUE.equals(verify.get("verified"))) {
             String error = verify.getOrDefault("error", "Invalid receiver UPI ID").toString();
-            recordFailedAttempt(senderAccountNumber, receiverUpiId, amount, error, sender);
+            recordFailedAttempt(senderAccountNumber, receiverUpiId, amount, error, sender, sourceIp, userAgent);
             res.put("success", false); res.put("error", error); return res;
         }
         String receiverName = (String) verify.get("name");
@@ -257,6 +264,8 @@ public class SavingsUpiService {
         txn.setRemark(remark);
         txn.setPaymentMethod("UPI");
         txn.setRiskScore(riskScore);
+        txn.setSourceIp(sourceIp);
+        txn.setUserAgent(truncate(userAgent, 512));
 
         boolean flagged = riskScore >= 70;
         txn.setFraudFlagged(flagged);
@@ -269,12 +278,20 @@ public class SavingsUpiService {
             return res;
         }
 
-        // Deduct from sender
+        // Credit must be confirmed before this transaction is reported as successful.
+        if (!creditReceiver(receiverType, receiverAccount, rUpi, amount)) {
+            recordFailedAttempt(senderAccountNumber, receiverUpiId, amount,
+                    "Receiver account could not be credited", sender, sourceIp, userAgent);
+            res.put("success", false);
+            res.put("error", "Receiver account could not be credited. No money was debited.");
+            return res;
+        }
+        txn.setReceiverCredited(true);
+
+        // Both account updates run in the same transaction, so a failed debit rolls back the credit.
         senderAcc.setBalance(senderAcc.getBalance() - amount.doubleValue());
         accountRepository.save(senderAcc);
-
-        // Credit receiver
-        creditReceiver(receiverType, receiverAccount, rUpi, amount);
+        txn.setSenderDebited(true);
 
         txn.setStatus("SUCCESS");
         savingsUpiTxnRepo.save(txn);
@@ -289,7 +306,7 @@ public class SavingsUpiService {
     }
 
     private void recordFailedAttempt(String senderAccountNumber, String receiverUpiId, BigDecimal amount,
-                                     String failureReason, User knownSender) {
+                                     String failureReason, User knownSender, String sourceIp, String userAgent) {
         User sender = knownSender != null
                 ? knownSender
                 : userRepository.findByAccountNumber(senderAccountNumber).orElse(null);
@@ -310,34 +327,44 @@ public class SavingsUpiService {
         attempt.setPaymentMethod("UPI");
         attempt.setStatus("FAILED");
         attempt.setFraudFlagged(false);
+        attempt.setSenderDebited(false);
+        attempt.setReceiverCredited(false);
+        attempt.setSourceIp(sourceIp);
+        attempt.setUserAgent(truncate(userAgent, 512));
         attempt.setCreatedAt(LocalDateTime.now());
         savingsUpiTxnRepo.save(attempt);
     }
 
-    private void creditReceiver(String accountType, String accountNumber, String upiId, BigDecimal amount) {
+    private boolean creditReceiver(String accountType, String accountNumber, String upiId, BigDecimal amount) {
         switch (accountType) {
             case "SAVINGS" -> {
                 User receiver = userRepository.findByAccountNumber(accountNumber).orElse(null);
-                if (receiver != null && receiver.getAccount() != null) {
-                    Account acc = receiver.getAccount();
-                    acc.setBalance((acc.getBalance() == null ? 0 : acc.getBalance()) + amount.doubleValue());
-                    accountRepository.save(acc);
-                }
+                if (receiver == null || receiver.getAccount() == null) return false;
+                Account acc = receiver.getAccount();
+                acc.setBalance((acc.getBalance() == null ? 0 : acc.getBalance()) + amount.doubleValue());
+                accountRepository.save(acc);
+                return true;
             }
             case "SALARY" -> {
                 SalaryAccount sa = salaryAccountRepository.findByUpiId(upiId);
-                if (sa != null) {
-                    sa.setBalance((sa.getBalance() == null ? 0 : sa.getBalance()) + amount.doubleValue());
-                    salaryAccountRepository.save(sa);
-                }
+                if (sa == null) return false;
+                sa.setBalance((sa.getBalance() == null ? 0 : sa.getBalance()) + amount.doubleValue());
+                salaryAccountRepository.save(sa);
+                return true;
             }
             case "CURRENT" -> {
-                currentAccountRepository.findByUpiId(upiId).ifPresent(ca -> {
-                    ca.setBalance((ca.getBalance() == null ? 0 : ca.getBalance()) + amount.doubleValue());
-                    currentAccountRepository.save(ca);
-                });
+                CurrentAccount ca = currentAccountRepository.findByUpiId(upiId).orElse(null);
+                if (ca == null) return false;
+                ca.setBalance((ca.getBalance() == null ? 0 : ca.getBalance()) + amount.doubleValue());
+                currentAccountRepository.save(ca);
+                return true;
             }
+            default -> { return false; }
         }
+    }
+
+    private String truncate(String value, int maxLength) {
+        return value == null || value.length() <= maxLength ? value : value.substring(0, maxLength);
     }
 
     // ── Transaction History ───────────────────────────────────────────────────
@@ -408,11 +435,70 @@ public class SavingsUpiService {
     }
 
     // ── Admin: all savings UPI transactions ───────────────────────────────────
-    public List<SavingsUpiTransaction> adminListAllTransactions() {
-        return savingsUpiTxnRepo.findAllOrderByCreatedAtDesc();
+    public List<Map<String, Object>> adminListAllTransactions() {
+        return savingsUpiTxnRepo.findAllOrderByCreatedAtDesc().stream().map(this::toAdminTransaction).toList();
     }
 
-    public List<SavingsUpiTransaction> adminListFlaggedTransactions() {
-        return savingsUpiTxnRepo.findFlagged();
+    public List<Map<String, Object>> adminListFlaggedTransactions() {
+        return savingsUpiTxnRepo.findFlagged().stream().map(this::toAdminTransaction).toList();
+    }
+
+    private Map<String, Object> toAdminTransaction(SavingsUpiTransaction txn) {
+        Map<String, Object> details = new LinkedHashMap<>();
+        details.put("id", txn.getId());
+        details.put("transactionRef", txn.getTransactionRef());
+        details.put("senderAccount", txn.getSenderAccount());
+        details.put("senderUpiId", txn.getSenderUpiId());
+        details.put("senderName", txn.getSenderName());
+        details.put("receiverAccount", txn.getReceiverAccount());
+        details.put("receiverUpiId", txn.getReceiverUpiId());
+        details.put("receiverName", txn.getReceiverName());
+        details.put("amount", txn.getAmount());
+        details.put("remark", txn.getRemark());
+        details.put("status", txn.getStatus());
+        details.put("fraudFlagged", txn.getFraudFlagged());
+        details.put("riskScore", txn.getRiskScore());
+        details.put("createdAt", txn.getCreatedAt());
+        details.put("senderDebited", txn.getSenderDebited());
+        details.put("receiverCredited", txn.getReceiverCredited());
+        details.put("sourceIp", txn.getSourceIp());
+        details.put("userAgent", txn.getUserAgent());
+        details.put("location", "Not recorded");
+        details.put("senderProfile", participantProfile(txn.getSenderAccount(), null));
+        details.put("receiverProfile", participantProfile(txn.getReceiverAccount(), txn.getReceiverUpiId()));
+        return details;
+    }
+
+    private Map<String, Object> participantProfile(String accountNumber, String upiId) {
+        Map<String, Object> profile = new LinkedHashMap<>();
+        profile.put("phone", "Not available");
+        profile.put("address", "Not available");
+        if (accountNumber == null) return profile;
+
+        Account savings = accountRepository.findByAccountNumber(accountNumber);
+        if (savings != null) {
+            profile.put("phone", savings.getPhone());
+            profile.put("address", joinAddress(savings.getAddress(), savings.getBranchCity()));
+            return profile;
+        }
+
+        SalaryAccount salary = upiId == null ? null : salaryAccountRepository.findByUpiId(upiId);
+        if (salary != null) {
+            profile.put("phone", salary.getMobileNumber());
+            profile.put("address", salary.getAddress());
+            return profile;
+        }
+
+        CurrentAccount current = upiId == null ? null : currentAccountRepository.findByUpiId(upiId).orElse(null);
+        if (current != null) {
+            profile.put("phone", current.getMobile());
+            profile.put("address", joinAddress(current.getShopAddress(), current.getCity(), current.getState()));
+        }
+        return profile;
+    }
+
+    private String joinAddress(String... parts) {
+        return Arrays.stream(parts).filter(part -> part != null && !part.isBlank())
+                .reduce((left, right) -> left + ", " + right).orElse("Not available");
     }
 }

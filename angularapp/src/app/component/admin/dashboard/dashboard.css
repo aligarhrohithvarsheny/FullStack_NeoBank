@@ -9986,6 +9986,98 @@ app-admin-dashboard .dashboard-container {
   outline: 2px solid rgba(13, 148, 136, .2);
   border-color: #0d9488;
 }
+.admin-upi-details-button {
+  padding: 7px 10px;
+  color: #0f766e;
+  background: #f0fdfa;
+  border: 1px solid #99f6e4;
+  border-radius: 7px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.admin-upi-detail-backdrop {
+  position: fixed;
+  z-index: 1200;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, .62);
+}
+.admin-upi-detail-dialog {
+  width: min(900px, 100%);
+  max-height: 90vh;
+  overflow: auto;
+  padding: 22px;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 24px 70px rgba(15, 23, 42, .28);
+}
+.admin-upi-detail-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  margin-bottom: 18px;
+}
+.admin-upi-detail-header h3 {
+  margin: 0 0 5px;
+  color: #0f172a;
+  font-size: 20px;
+}
+.admin-upi-detail-header span,
+.admin-upi-detail-card span,
+.admin-upi-detail-card small {
+  display: block;
+  margin-top: 7px;
+  color: #64748b;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.admin-upi-detail-header button {
+  width: 34px;
+  height: 34px;
+  color: #475569;
+  background: #f1f5f9;
+  border: 0;
+  border-radius: 50%;
+  font-size: 22px;
+  cursor: pointer;
+}
+.admin-upi-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.admin-upi-detail-card {
+  padding: 15px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 11px;
+}
+.admin-upi-detail-card h4 {
+  margin: 0 0 10px;
+  color: #0f766e;
+  font-size: 13px;
+}
+.admin-upi-detail-card strong {
+  color: #0f172a;
+  font-size: 14px;
+}
+.admin-upi-detail-card b {
+  display: block;
+  margin-top: 12px;
+  font-size: 12px;
+}
+.admin-upi-detail-card .confirmed { color: #047857; }
+.admin-upi-detail-card .unconfirmed { color: #b45309; }
+@media (max-width: 640px) {
+  .admin-upi-detail-backdrop { padding: 10px; }
+  .admin-upi-detail-dialog { padding: 16px; }
+  .admin-upi-detail-grid { grid-template-columns: 1fr; }
+}
 .admin-upi-clear-filters {
   min-height: 40px;
   padding: 8px 14px;

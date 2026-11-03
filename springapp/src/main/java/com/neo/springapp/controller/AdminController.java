@@ -2085,7 +2085,10 @@ public class AdminController {
      * List all savings UPI accounts.
      */
     @GetMapping("/upi/savings/accounts")
-    public ResponseEntity<Map<String, Object>> adminListSavingsUpiAccounts() {
+    public ResponseEntity<Map<String, Object>> adminListSavingsUpiAccounts(
+            @org.springframework.security.core.annotation.AuthenticationPrincipal
+            com.neo.springapp.service.UserSessionTokenService.SessionPrincipal principal) {
+        if (!isStaff(principal)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         Map<String, Object> response = new HashMap<>();
         try {
             response.put("success", true);
@@ -2104,7 +2107,10 @@ public class AdminController {
     @PutMapping("/upi/savings/toggle/{accountNumber}")
     public ResponseEntity<Map<String, Object>> adminToggleSavingsUpi(
             @PathVariable String accountNumber,
-            @RequestParam boolean enable) {
+            @RequestParam boolean enable,
+            @org.springframework.security.core.annotation.AuthenticationPrincipal
+            com.neo.springapp.service.UserSessionTokenService.SessionPrincipal principal) {
+        if (!isStaff(principal)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         Map<String, Object> response = new HashMap<>();
         try {
             response.put("success", true);
@@ -2121,7 +2127,10 @@ public class AdminController {
      * List all savings UPI transactions.
      */
     @GetMapping("/upi/savings/transactions")
-    public ResponseEntity<Map<String, Object>> adminListSavingsUpiTransactions() {
+    public ResponseEntity<Map<String, Object>> adminListSavingsUpiTransactions(
+            @org.springframework.security.core.annotation.AuthenticationPrincipal
+            com.neo.springapp.service.UserSessionTokenService.SessionPrincipal principal) {
+        if (!isStaff(principal)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         Map<String, Object> response = new HashMap<>();
         try {
             response.put("success", true);
@@ -2138,7 +2147,10 @@ public class AdminController {
      * List flagged / fraudulent savings UPI transactions.
      */
     @GetMapping("/upi/savings/flagged")
-    public ResponseEntity<Map<String, Object>> adminListFlaggedSavingsUpiTransactions() {
+    public ResponseEntity<Map<String, Object>> adminListFlaggedSavingsUpiTransactions(
+            @org.springframework.security.core.annotation.AuthenticationPrincipal
+            com.neo.springapp.service.UserSessionTokenService.SessionPrincipal principal) {
+        if (!isStaff(principal)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         Map<String, Object> response = new HashMap<>();
         try {
             response.put("success", true);
@@ -2149,5 +2161,10 @@ public class AdminController {
             response.put("message", "Error fetching flagged transactions: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
+    }
+
+    private boolean isStaff(com.neo.springapp.service.UserSessionTokenService.SessionPrincipal principal) {
+        return principal != null && ("ADMIN".equals(principal.scope())
+                || "MANAGER".equals(principal.scope()) || "HOD".equals(principal.scope()));
     }
 }

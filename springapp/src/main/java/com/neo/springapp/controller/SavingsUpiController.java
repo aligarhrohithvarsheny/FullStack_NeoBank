@@ -4,6 +4,7 @@ import com.neo.springapp.model.SavingsUpiTransaction;
 import com.neo.springapp.service.SavingsUpiService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
@@ -47,7 +48,8 @@ public class SavingsUpiController {
     // ── Send money ────────────────────────────────────────────────────────────
     @PostMapping("/send/{accountNumber}")
     public ResponseEntity<Map<String, Object>> sendMoney(@PathVariable String accountNumber,
-                                                          @RequestBody Map<String, Object> body) {
+                                                          @RequestBody Map<String, Object> body,
+                                                          jakarta.servlet.http.HttpServletRequest request) {
         String receiverUpiId = (String) body.get("receiverUpiId");
         BigDecimal amount = new BigDecimal(body.get("amount").toString());
         // Accept both 'transactionPin' (frontend) and 'pin' (legacy) field names
@@ -55,7 +57,8 @@ public class SavingsUpiController {
                 ? (String) body.get("transactionPin")
                 : (String) body.get("pin");
         String remark = (String) body.getOrDefault("remark", "");
-        return ResponseEntity.ok(savingsUpiService.sendMoney(accountNumber, receiverUpiId, amount, pin, remark));
+        return ResponseEntity.ok(savingsUpiService.sendMoney(accountNumber, receiverUpiId, amount, pin, remark,
+                request.getRemoteAddr(), request.getHeader("User-Agent")));
     }
 
     // ── Forgot UPI PIN (reset via registered phone) ───────────────────────────
@@ -93,23 +96,36 @@ public class SavingsUpiController {
 
     // ── Admin endpoints ───────────────────────────────────────────────────────
     @GetMapping("/admin/accounts")
-    public ResponseEntity<List<Map<String, Object>>> adminListAccounts() {
+    public ResponseEntity<List<Map<String, Object>>> adminListAccounts(
+            @AuthenticationPrincipal com.neo.springapp.service.UserSessionTokenService.SessionPrincipal principal) {
+        if (!isStaff(principal)) return ResponseEntity.status(403).build();
         return ResponseEntity.ok(savingsUpiService.adminListAllUpiAccounts());
     }
 
     @PutMapping("/admin/toggle/{accountNumber}")
     public ResponseEntity<Map<String, Object>> adminToggle(@PathVariable String accountNumber,
-                                                            @RequestParam boolean enable) {
+                                                            @RequestParam boolean enable,
+            @AuthenticationPrincipal com.neo.springapp.service.UserSessionTokenService.SessionPrincipal principal) {
+        if (!isStaff(principal)) return ResponseEntity.status(403).build();
         return ResponseEntity.ok(savingsUpiService.adminToggleUpi(accountNumber, enable));
     }
 
     @GetMapping("/admin/transactions")
-    public ResponseEntity<List<SavingsUpiTransaction>> adminTransactions() {
+    public ResponseEntity<List<Map<String, Object>>> adminTransactions(
+            @AuthenticationPrincipal com.neo.springapp.service.UserSessionTokenService.SessionPrincipal principal) {
+        if (!isStaff(principal)) return ResponseEntity.status(403).build();
         return ResponseEntity.ok(savingsUpiService.adminListAllTransactions());
     }
 
     @GetMapping("/admin/flagged")
-    public ResponseEntity<List<SavingsUpiTransaction>> adminFlagged() {
+    public ResponseEntity<List<Map<String, Object>>> adminFlagged(
+            @AuthenticationPrincipal com.neo.springapp.service.UserSessionTokenService.SessionPrincipal principal) {
+        if (!isStaff(principal)) return ResponseEntity.status(403).build();
         return ResponseEntity.ok(savingsUpiService.adminListFlaggedTransactions());
+    }
+
+    private boolean isStaff(com.neo.springapp.service.UserSessionTokenService.SessionPrincipal principal) {
+        return principal != null && ("ADMIN".equals(principal.scope())
+                || "MANAGER".equals(principal.scope()) || "HOD".equals(principal.scope()));
     }
 }
