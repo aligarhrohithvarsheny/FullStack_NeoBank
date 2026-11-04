@@ -188,6 +188,29 @@
   animation: slideInUp 0.6s ease-out 0.3s both;
 }
 
+.closure-page-link {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin: 0 0 24px;
+  padding: 16px 18px;
+  color: #172033;
+  text-decoration: none;
+  background: #fff7ed;
+  border: 1px solid #fdba74;
+  border-radius: 12px;
+}
+
+.closure-page-link span:first-child { display: grid; gap: 4px; }
+.closure-page-link small { color: #7c5a43; font-size: 12px; }
+.closure-page-link-action { color: #9a3412; font-size: 12px; font-weight: 700; white-space: nowrap; }
+.closure-page-link:hover { background: #ffedd5; }
+
+@media (max-width: 520px) {
+  .closure-page-link { align-items: flex-start; flex-direction: column; }
+}
+
 @keyframes slideInUp {
   from {
     opacity: 0;

@@ -43,6 +43,7 @@ export class BankFormsAdminComponent implements OnInit {
   uploadRemarks = '';
   selectedFile: File | null = null;
   verifiedAccount: VerifiedAccountDetails | null = null;
+  verifiedProductDetails: Array<{ label: string; value: string }> = [];
   isVerifyingAccount = false;
   isAccountVerified = false;
   verifiedHolderName = '';
@@ -94,6 +95,14 @@ export class BankFormsAdminComponent implements OnInit {
 
   get canDownloadPdf(): boolean {
     return !!this.selectedForm && this.isAccountVerified && !!this.verifiedAccount;
+  }
+
+  get isProductForm(): boolean {
+    return !!this.selectedForm && this.accountTypeForForm(this.selectedForm.code) !== null;
+  }
+
+  get accountLookupLabel(): string {
+    return this.isProductForm ? 'Loan / Deposit / Product or linked savings account number' : 'Account Number';
   }
 
   get formSelectOptions(): BankFormDefinition[] {
@@ -163,6 +172,12 @@ export class BankFormsAdminComponent implements OnInit {
   onFormSelected(): void {
     this.resetVerification();
     this.selectedFile = null;
+    const formAccountType = this.selectedForm ? this.accountTypeForForm(this.selectedForm.code) : null;
+    if (formAccountType) {
+      this.uploadAccountType = formAccountType;
+    } else if (['homeloan', 'fixeddeposit', 'recurringdeposit', 'ecs'].includes(String(this.uploadAccountType))) {
+      this.uploadAccountType = 'regular';
+    }
   }
 
   onLookupModeChange(): void {
@@ -173,6 +188,7 @@ export class BankFormsAdminComponent implements OnInit {
     this.isAccountVerified = false;
     this.verifiedHolderName = '';
     this.verifiedAccount = null;
+    this.verifiedProductDetails = [];
     this.accountVerificationError = '';
     this.accountUploads = [];
   }
@@ -418,7 +434,8 @@ export class BankFormsAdminComponent implements OnInit {
     this.bankFormService.verifyAccount({
       accountNumber: hasAccount ? this.uploadAccountNumber.trim() : undefined,
       accountType: this.uploadAccountType,
-      customerId: hasCustomerId ? this.uploadCustomerId.trim() : undefined
+      customerId: hasCustomerId ? this.uploadCustomerId.trim() : undefined,
+      formCode: this.selectedForm?.code
     }).subscribe({
       next: (res) => {
         this.isVerifyingAccount = false;
@@ -435,8 +452,15 @@ export class BankFormsAdminComponent implements OnInit {
             email: res.account.email,
             dateOfBirth: res.account.dateOfBirth,
             address: res.account.address,
-            balance: res.account.balance
+            balance: res.account.balance,
+            productAccountNumber: res.account.productAccountNumber,
+            linkedSavingsAccountNumber: res.account.linkedSavingsAccountNumber,
+            formDetails: res.account.formDetails || {},
+            ecsMandates: res.account.ecsMandates || []
           };
+          this.verifiedProductDetails = Object.entries(this.verifiedAccount.formDetails || {})
+            .filter(([, value]) => !!value)
+            .map(([label, value]) => ({ label, value }));
           this.verifiedHolderName = this.verifiedAccount.holderName;
           this.uploadAccountNumber = this.verifiedAccount.accountNumber;
           this.uploadCustomerId = this.verifiedAccount.customerId || this.uploadCustomerId;
@@ -568,8 +592,23 @@ export class BankFormsAdminComponent implements OnInit {
   }
 
   private normalizeAccountType(value?: string): BankFormAccountType {
-    const allowed: BankFormAccountType[] = ['regular', 'salary', 'current', 'loan', 'goldloan', 'cheque'];
+    const allowed: BankFormAccountType[] = [
+      'regular', 'salary', 'current', 'loan', 'goldloan', 'cheque',
+      'homeloan', 'fixeddeposit', 'recurringdeposit', 'ecs'
+    ];
     const normalized = (value || 'regular').trim().toLowerCase() as BankFormAccountType;
     return allowed.includes(normalized) ? normalized : 'regular';
+  }
+
+  private accountTypeForForm(code: string): BankFormAccountType | null {
+    if (['home-loan', 'car-loan', 'crop-loan'].includes(code)) return 'homeloan';
+    if (code === 'gold-loan') return 'goldloan';
+    if (['personal-loan', 'education-loan', 'business-loan', 'loan-agreement-esign-review'].includes(code)) {
+      return 'loan';
+    }
+    if (code === 'fixed-deposit-application') return 'fixeddeposit';
+    if (code === 'recurring-deposit-application') return 'recurringdeposit';
+    if (code === 'ecs-mandate-authorization') return 'ecs';
+    return null;
   }
 }

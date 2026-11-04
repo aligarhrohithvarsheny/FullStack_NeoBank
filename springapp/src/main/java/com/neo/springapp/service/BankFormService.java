@@ -8,6 +8,7 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -32,6 +33,41 @@ public class BankFormService {
     private final LoanRepository loanRepository;
     private final GoldLoanRepository goldLoanRepository;
     private final ChequeRepository chequeRepository;
+    private final HomeLoanRepository homeLoanRepository;
+    private final FixedDepositRepository fixedDepositRepository;
+    private final RecurringDepositRepository recurringDepositRepository;
+    private final EcsMandateRepository ecsMandateRepository;
+    private final EmiPaymentRepository emiPaymentRepository;
+
+    @Autowired
+    public BankFormService(
+            BankFormUploadRepository bankFormUploadRepository,
+            BankFormUploadHistoryRepository bankFormUploadHistoryRepository,
+            AccountRepository accountRepository,
+            SalaryAccountRepository salaryAccountRepository,
+            CurrentAccountRepository currentAccountRepository,
+            LoanRepository loanRepository,
+            GoldLoanRepository goldLoanRepository,
+            ChequeRepository chequeRepository,
+            HomeLoanRepository homeLoanRepository,
+            FixedDepositRepository fixedDepositRepository,
+            RecurringDepositRepository recurringDepositRepository,
+            EcsMandateRepository ecsMandateRepository,
+            EmiPaymentRepository emiPaymentRepository) {
+        this.bankFormUploadRepository = bankFormUploadRepository;
+        this.bankFormUploadHistoryRepository = bankFormUploadHistoryRepository;
+        this.accountRepository = accountRepository;
+        this.salaryAccountRepository = salaryAccountRepository;
+        this.currentAccountRepository = currentAccountRepository;
+        this.loanRepository = loanRepository;
+        this.goldLoanRepository = goldLoanRepository;
+        this.chequeRepository = chequeRepository;
+        this.homeLoanRepository = homeLoanRepository;
+        this.fixedDepositRepository = fixedDepositRepository;
+        this.recurringDepositRepository = recurringDepositRepository;
+        this.ecsMandateRepository = ecsMandateRepository;
+        this.emiPaymentRepository = emiPaymentRepository;
+    }
 
     public BankFormService(
             BankFormUploadRepository bankFormUploadRepository,
@@ -42,14 +78,9 @@ public class BankFormService {
             LoanRepository loanRepository,
             GoldLoanRepository goldLoanRepository,
             ChequeRepository chequeRepository) {
-        this.bankFormUploadRepository = bankFormUploadRepository;
-        this.bankFormUploadHistoryRepository = bankFormUploadHistoryRepository;
-        this.accountRepository = accountRepository;
-        this.salaryAccountRepository = salaryAccountRepository;
-        this.currentAccountRepository = currentAccountRepository;
-        this.loanRepository = loanRepository;
-        this.goldLoanRepository = goldLoanRepository;
-        this.chequeRepository = chequeRepository;
+        this(bankFormUploadRepository, bankFormUploadHistoryRepository, accountRepository,
+                salaryAccountRepository, currentAccountRepository, loanRepository, goldLoanRepository,
+                chequeRepository, null, null, null, null, null);
     }
 
     public List<Map<String, Object>> listFormDefinitions() {
@@ -103,6 +134,12 @@ public class BankFormService {
         FormDefinition form = BankFormCatalog.findByCode(formCode)
                 .orElseThrow(() -> new IllegalArgumentException("Unknown form code: " + formCode));
 
+        Map<String, Object> productRecord = isAmbiguousFormRecord(formCode, accountNumber)
+                ? null
+                : resolveFormRecord(formCode, accountNumber);
+        Map<String, String> productDetails = productRecord == null
+                ? Map.of()
+                : stringMap(productRecord.get("formDetails"));
         return new BankFormPdfBuilder().build(
                 form,
                 adminName,
@@ -115,7 +152,8 @@ public class BankFormService {
                 phone,
                 email,
                 dateOfBirth,
-                address);
+                address,
+                productDetails);
     }
 
     /** Backward-compatible overload used by existing callers. */
@@ -200,7 +238,10 @@ public class BankFormService {
             throw new IllegalArgumentException("Only PDF, JPG, JPEG, PNG, or WEBP files are allowed");
         }
 
-        Map<String, Object> accountInfo = resolveAccount(accountNumber, accountType);
+        Map<String, Object> accountInfo = resolveFormRecord(formCode, accountNumber);
+        if (accountInfo == null) {
+            accountInfo = resolveAccount(accountNumber, accountType);
+        }
         if (accountInfo == null) {
             throw new IllegalArgumentException("Account not found for the given account number and type");
         }
@@ -313,22 +354,80 @@ public class BankFormService {
     }
 
     @Transactional(readOnly = true)
-    public Map<String, Object> verifyAccount(String accountNumber, String accountType, String customerId) {
+    public Map<String, Object> verifyAccount(
+            String accountNumber, String accountType, String customerId, String formCode) {
         Map<String, Object> info = null;
+        String lookupNumber = accountNumber;
         if (customerId != null && !customerId.isBlank()) {
             info = resolveByCustomerId(customerId.trim());
+            if (info != null && formCode != null && !formCode.isBlank()) {
+                lookupNumber = stringValue(info, "accountNumber");
+                info = resolveFormRecord(formCode, lookupNumber);
+            }
         } else if (accountNumber != null && !accountNumber.isBlank()) {
-            info = resolveAccount(accountNumber, accountType);
+            lookupNumber = accountNumber;
         }
         Map<String, Object> response = new LinkedHashMap<>();
+        if (formCode != null && !formCode.isBlank() && isAmbiguousFormRecord(formCode, lookupNumber)) {
+            response.put("success", false);
+            response.put("message", "More than one product matches this linked account. Enter the specific loan, FD, RD, or mandate account number.");
+            return response;
+        }
+        if (info == null && accountNumber != null && !accountNumber.isBlank()
+                && (customerId == null || customerId.isBlank())) {
+            info = formCode == null || formCode.isBlank()
+                    ? resolveAccount(accountNumber, accountType)
+                    : resolveFormRecord(formCode, accountNumber);
+        }
         if (info == null) {
             response.put("success", false);
-            response.put("message", "Account not found for the given account number or customer ID");
+            response.put("message", formCode == null || formCode.isBlank()
+                    ? "Account not found for the given account number or customer ID"
+                    : "No matching product was found for this form and account number");
             return response;
         }
         response.put("success", true);
         response.put("account", info);
         return response;
+    }
+
+    private boolean isAmbiguousFormRecord(String formCode, String reference) {
+        if (reference == null || reference.isBlank()) return false;
+        String code = formCode.toLowerCase(Locale.ROOT);
+        if (code.equals("fixed-deposit-application") && fixedDepositRepository != null) {
+            return fixedDepositRepository.findByFdAccountNumber(reference).isEmpty()
+                    && fixedDepositRepository.findByAccountNumber(reference).size() > 1;
+        }
+        if (code.equals("recurring-deposit-application") && recurringDepositRepository != null) {
+            return recurringDepositRepository.findByRdAccountNumber(reference).isEmpty()
+                    && recurringDepositRepository.findByAccountNumberOrderByCreatedAtDesc(reference).size() > 1;
+        }
+        if (code.equals("ecs-mandate-authorization") && ecsMandateRepository != null) {
+            return ecsMandateRepository.findByLoanAccountNumberOrderByCreatedAtDesc(reference).isEmpty()
+                    && ecsMandateRepository.findBySavingsAccountNumberOrderByCreatedAtDesc(reference).size() > 1;
+        }
+        if (code.equals("gold-loan") && goldLoanRepository != null) {
+            return goldLoanRepository.findByLoanAccountNumber(reference).isEmpty()
+                    && goldLoanRepository.findByAccountNumber(reference).size() > 1;
+        }
+        if (Set.of("home-loan", "car-loan", "crop-loan").contains(code) && homeLoanRepository != null
+                && homeLoanRepository.findByLoanAccountNumber(reference).isEmpty()) {
+            String expectedType = code.equals("home-loan") ? "HOME" : code.equals("car-loan") ? "CAR" : "CROP";
+            return homeLoanRepository.findByAccountNumberOrderByApplicationDateDesc(reference).stream()
+                    .filter(candidate -> matchesHomeLoanType(candidate, expectedType)).count() > 1;
+        }
+        if (Set.of("personal-loan", "education-loan", "business-loan").contains(code)
+                && loanRepository != null && loanRepository.findByLoanAccountNumber(reference).isEmpty()) {
+            String expectedType = code.substring(0, code.indexOf("-loan"));
+            return loanRepository.findByAccountNumber(reference).stream()
+                    .filter(candidate -> typeMatches(candidate.getType(), expectedType)).count() > 1;
+        }
+        return false;
+    }
+
+    /** Backward-compatible lookup used by existing callers without form context. */
+    public Map<String, Object> verifyAccount(String accountNumber, String accountType, String customerId) {
+        return verifyAccount(accountNumber, accountType, customerId, null);
     }
 
     public Map<String, Object> toUploadDto(BankFormUpload upload) {
@@ -350,97 +449,481 @@ public class BankFormService {
         return dto;
     }
 
-    private Map<String, Object> resolveAccount(String accountNumber, String accountType) {
-        if (accountNumber == null || accountNumber.isBlank()) {
+    private Map<String, Object> resolveFormRecord(String formCode, String reference) {
+        if (formCode == null || reference == null || reference.isBlank()) {
             return null;
         }
-        String num = accountNumber.trim();
-        String type = normalizeAccountType(accountType);
+        String code = formCode.trim().toLowerCase(Locale.ROOT);
+        String number = reference.trim();
+        if (code.equals("fixed-deposit-application") && fixedDepositRepository != null) {
+            FixedDeposit deposit = fixedDepositRepository.findByFdAccountNumber(number).orElse(null);
+            if (deposit == null) {
+                deposit = fixedDepositRepository.findByAccountNumber(number).stream().findFirst().orElse(null);
+            }
+            return deposit == null ? null : fixedDepositInfo(deposit);
+        }
+        if (code.equals("recurring-deposit-application") && recurringDepositRepository != null) {
+            RecurringDeposit deposit = recurringDepositRepository.findByRdAccountNumber(number).orElse(null);
+            if (deposit == null) {
+                deposit = recurringDepositRepository.findByAccountNumberOrderByCreatedAtDesc(number)
+                        .stream().findFirst().orElse(null);
+            }
+            return deposit == null ? null : recurringDepositInfo(deposit);
+        }
+        if (code.equals("ecs-mandate-authorization") && ecsMandateRepository != null) {
+            List<EcsMandate> mandates = ecsMandateRepository.findByLoanAccountNumberOrderByCreatedAtDesc(number);
+            if (mandates.isEmpty()) {
+                mandates = ecsMandateRepository.findBySavingsAccountNumberOrderByCreatedAtDesc(number);
+            }
+            return mandates.isEmpty() ? null : ecsMandateInfo(mandates.get(0));
+        }
+        if (code.equals("gold-loan") && goldLoanRepository != null) {
+            GoldLoan loan = goldLoanRepository.findByLoanAccountNumber(number).orElse(null);
+            if (loan == null) {
+                loan = goldLoanRepository.findByAccountNumber(number).stream().findFirst().orElse(null);
+            }
+            return loan == null ? null : goldLoanInfo(
+                    loan, true, ecsMandatesFor(loan.getLoanAccountNumber(), loan.getAccountNumber()));
+        }
+        if (Set.of("home-loan", "car-loan", "crop-loan").contains(code) && homeLoanRepository != null) {
+            String expectedType = code.equals("home-loan") ? "HOME" : code.equals("car-loan") ? "CAR" : "CROP";
+            HomeLoan loan = homeLoanRepository.findByLoanAccountNumber(number)
+                    .filter(candidate -> matchesHomeLoanType(candidate, expectedType))
+                    .orElseGet(() -> homeLoanRepository.findByAccountNumberOrderByApplicationDateDesc(number)
+                            .stream().filter(candidate -> matchesHomeLoanType(candidate, expectedType))
+                            .findFirst().orElse(null));
+            return loan == null ? null : homeLoanInfo(loan);
+        }
+        if (Set.of("personal-loan", "education-loan", "business-loan").contains(code)
+                && loanRepository != null) {
+            String expectedType = code.substring(0, code.indexOf("-loan"));
+            Loan loan = loanRepository.findByLoanAccountNumber(number)
+                    .filter(candidate -> typeMatches(candidate.getType(), expectedType))
+                    .orElseGet(() -> loanRepository.findByAccountNumber(number).stream()
+                            .filter(candidate -> typeMatches(candidate.getType(), expectedType))
+                            .findFirst().orElse(null));
+            return loan == null ? null : generalLoanInfo(
+                    loan, ecsMandatesFor(loan.getLoanAccountNumber(), loan.getAccountNumber()));
+        }
+        if (code.equals("loan-agreement-esign-review")) {
+            Map<String, Object> resolved = resolveAnyLoanByNumber(number);
+            if (resolved != null) {
+                return resolved;
+            }
+        }
+        return null;
+    }
 
-        switch (type) {
+    private Map<String, Object> resolveAnyLoanByNumber(String number) {
+        if (homeLoanRepository != null) {
+            HomeLoan loan = homeLoanRepository.findByLoanAccountNumber(number).orElse(null);
+            if (loan != null) return homeLoanInfo(loan);
+        }
+        if (goldLoanRepository != null) {
+            GoldLoan loan = goldLoanRepository.findByLoanAccountNumber(number).orElse(null);
+            if (loan != null) return goldLoanInfo(
+                    loan, true, ecsMandatesFor(loan.getLoanAccountNumber(), loan.getAccountNumber()));
+        }
+        if (loanRepository != null) {
+            Loan loan = loanRepository.findByLoanAccountNumber(number).orElse(null);
+            if (loan != null) return generalLoanInfo(
+                    loan, ecsMandatesFor(loan.getLoanAccountNumber(), loan.getAccountNumber()));
+        }
+        return null;
+    }
+
+    private Map<String, Object> homeLoanInfo(HomeLoan loan) {
+        Map<String, Object> info = baseProductInfo(
+                loan.getLoanAccountNumber(), loan.getAccountNumber(), loan.getUserName(), "homeloan",
+                loan.getAmount());
+        Map<String, String> details = new LinkedHashMap<>();
+        put(details, "Loan Product and Purpose", joinValues(loan.getLoanType(), loan.getPurpose()));
+        put(details, "Loan Product and Loan Account Number",
+                joinValues(loan.getLoanType(), loan.getLoanAccountNumber()));
+        put(details, "Loan Account Number", loan.getLoanAccountNumber());
+        put(details, "Application ID", loan.getApplicationId());
+        put(details, "Requested Loan Amount", loan.getAmount());
+        put(details, "Approved Loan Amount", isApproved(loan.getStatus()) ? loan.getAmount() : null);
+        put(details, "Sanctioned Principal", isApproved(loan.getStatus()) ? loan.getAmount() : null);
+        put(details, "Tenure and Repayment Frequency", loan.getTenure() == null ? null : loan.getTenure() + " months");
+        put(details, "Interest Rate and Tenure", loan.getInterestRate() == null ? null
+                : loan.getInterestRate() + "% p.a.; " + loan.getTenure() + " months");
+        put(details, "Annual Interest Rate and Rate Type", loan.getInterestRate() == null ? null : loan.getInterestRate() + "% p.a.");
+        put(details, "EMI and Repayment Schedule", loan.getEmi());
+        put(details, "Complete Repayment Schedule", repaymentSchedule(loan.getLoanAccountNumber()));
+        put(details, "Processing Fee, Taxes and Legal Charges",
+                joinValues(loan.getProcessingFee(), loan.getGstOnFee(), loan.getLegalCharges()));
+        put(details, "Final Approval and Disbursement Details", joinValues(loan.getStatus(), loan.getApprovalDate(), loan.getNetDisbursed()));
+        put(details, "Disbursed Amount", loan.getNetDisbursed());
+        put(details, "Loan Status", loan.getStatus());
+        put(details, "Linked Repayment Account", loan.getAccountNumber());
+        put(details, "Purpose and Review Notes", joinValues(loan.getPurpose(), loan.getAdminNotes()));
+        if (loan.getLoanType() != null && loan.getLoanType().equalsIgnoreCase("CAR")) {
+            put(details, "Vehicle Details", joinValues(loan.getVehicleMakeModel(), loan.getVehicleYear(), loan.getVehicleRegistrationNumber()));
+        }
+        if (loan.getLoanType() != null && (loan.getLoanType().equalsIgnoreCase("CROP")
+                || loan.getLoanType().equalsIgnoreCase("FARMER"))) {
+            put(details, "Crop Name and Season", joinValues(loan.getCropName(), loan.getCropSeason()));
+            put(details, "Farm Location and Land Area", joinValues(loan.getFarmLocation(), loan.getLandArea(), loan.getLandAreaUnit()));
+            put(details, "Cultivation Cost Estimate", loan.getCultivationCostEstimate());
+        }
+        List<EcsMandate> mandates = ecsMandatesFor(loan.getLoanAccountNumber(), loan.getAccountNumber());
+        put(details, "ECS / Auto-debit Mandate Status", mandateSummary(mandates));
+        put(details, "Complete ECS Mandate Details", mandateDetails(mandates));
+        info.put("formDetails", details);
+        info.put("ecsMandates", mandates.stream().map(BankFormService::mandateSummaryMap).toList());
+        enrichProductInfo(info, loan.getAccountNumber());
+        return info;
+    }
+
+    private Map<String, Object> generalLoanInfo(Loan loan, List<EcsMandate> mandates) {
+        Map<String, Object> info = baseProductInfo(loan.getLoanAccountNumber(), loan.getAccountNumber(),
+                loan.getUserName(), "loan", loan.getAmount());
+        Map<String, String> details = new LinkedHashMap<>();
+        put(details, "Loan Product and Purpose", joinValues(loan.getType(), loan.getPurpose()));
+        put(details, "Loan Product and Loan Account Number", joinValues(loan.getType(), loan.getLoanAccountNumber()));
+        put(details, "Loan Account Number", loan.getLoanAccountNumber());
+        put(details, "Requested Loan Amount", loan.getAmount());
+        put(details, "Approved Loan Amount", isApproved(loan.getStatus()) ? loan.getAmount() : null);
+        put(details, "Sanctioned Principal", isApproved(loan.getStatus()) ? loan.getAmount() : null);
+        put(details, "Tenure and Repayment Frequency", loan.getTenure() == null ? null : loan.getTenure() + " months");
+        put(details, "Interest Rate and Tenure", loan.getInterestRate() == null ? null
+                : loan.getInterestRate() + "% p.a.; " + loan.getTenure() + " months");
+        put(details, "Annual Interest Rate and Rate Type", loan.getInterestRate() == null ? null : loan.getInterestRate() + "% p.a.");
+        put(details, "Loan Status", loan.getStatus());
+        put(details, "Linked Repayment Account", loan.getAccountNumber());
+        put(details, "ECS / Auto-debit Mandate Status", mandateSummary(mandates));
+        put(details, "Complete ECS Mandate Details", mandateDetails(mandates));
+        put(details, "Complete Repayment Schedule", repaymentSchedule(loan.getLoanAccountNumber()));
+        put(details, "Final Approval and Disbursement Details", joinValues(loan.getStatus(), loan.getApprovalDate()));
+        info.put("formDetails", details);
+        info.put("ecsMandates", mandates.stream().map(BankFormService::mandateSummaryMap).toList());
+        enrichProductInfo(info, loan.getAccountNumber());
+        return info;
+    }
+
+    private Map<String, Object> goldLoanInfo(GoldLoan loan, boolean detailed, List<EcsMandate> mandates) {
+        Map<String, Object> info = baseProductInfo(loan.getLoanAccountNumber(), loan.getAccountNumber(),
+                loan.getUserName(), "goldloan", loan.getLoanAmount());
+        if (!detailed) return info;
+        Map<String, String> details = new LinkedHashMap<>();
+        put(details, "Loan Product and Purpose", loan.getPurpose());
+        put(details, "Loan Product and Loan Account Number", joinValues("Gold Loan", loan.getLoanAccountNumber()));
+        put(details, "Loan Account Number", loan.getLoanAccountNumber());
+        put(details, "Requested Loan Amount", loan.getLoanAmount());
+        put(details, "Approved Loan Amount", isApproved(loan.getStatus()) ? loan.getLoanAmount() : null);
+        put(details, "Sanctioned Principal", isApproved(loan.getStatus()) ? loan.getLoanAmount() : null);
+        put(details, "Tenure and Repayment Frequency", loan.getTenure() == null ? null : loan.getTenure() + " months");
+        put(details, "Interest Rate and Tenure", loan.getInterestRate() == null ? null
+                : loan.getInterestRate() + "% p.a.; " + loan.getTenure() + " months");
+        put(details, "Annual Interest Rate and Rate Type", loan.getInterestRate() == null ? null : loan.getInterestRate() + "% p.a.");
+        put(details, "Gold Collateral", joinValues(loan.getGoldDescription(), loan.getGoldPurity(), loan.getVerifiedGoldGrams()));
+        put(details, "Loan Status", loan.getStatus());
+        put(details, "Linked Repayment Account", loan.getAccountNumber());
+        put(details, "ECS / Auto-debit Mandate Status", mandateSummary(mandates));
+        put(details, "Complete ECS Mandate Details", mandateDetails(mandates));
+        put(details, "Complete Repayment Schedule", repaymentSchedule(loan.getLoanAccountNumber()));
+        info.put("formDetails", details);
+        info.put("ecsMandates", mandates.stream().map(BankFormService::mandateSummaryMap).toList());
+        enrichProductInfo(info, loan.getAccountNumber());
+        return info;
+    }
+
+    private Map<String, Object> fixedDepositInfo(FixedDeposit deposit) {
+        Map<String, Object> info = baseProductInfo(deposit.getFdAccountNumber(), deposit.getAccountNumber(),
+                deposit.getUserName(), "fixeddeposit", deposit.getPrincipalAmount());
+        Map<String, String> details = new LinkedHashMap<>();
+        put(details, "Linked Funding Account", deposit.getAccountNumber());
+        put(details, "Deposit Scheme", deposit.getSchemeName());
+        put(details, "Principal Amount", deposit.getPrincipalAmount());
+        put(details, "Tenure", deposit.getTenure() == null ? null : deposit.getTenure() + " months");
+        put(details, "Interest Rate", deposit.getInterestRate());
+        put(details, "Interest Payout Frequency", deposit.getInterestPayout());
+        put(details, "Maturity Date", deposit.getMaturityDate());
+        put(details, "FD Status", deposit.getStatus());
+        put(details, "Maturity Amount", deposit.getMaturityAmount());
+        put(details, "Interest Amount", deposit.getInterestAmount());
+        List<EcsMandate> mandates = ecsMandatesFor(deposit.getFdAccountNumber(), deposit.getAccountNumber());
+        put(details, "ECS Mandate and Separate Consent Status", mandateSummary(mandates));
+        put(details, "Complete ECS Mandate Details", mandateDetails(mandates));
+        info.put("formDetails", details);
+        info.put("ecsMandates", mandates.stream().map(BankFormService::mandateSummaryMap).toList());
+        enrichProductInfo(info, deposit.getAccountNumber());
+        return info;
+    }
+
+    private Map<String, Object> recurringDepositInfo(RecurringDeposit deposit) {
+        Map<String, Object> info = baseProductInfo(deposit.getRdAccountNumber(), deposit.getAccountNumber(),
+                deposit.getCustomerName(), "recurringdeposit", deposit.getEstimatedMaturityAmount());
+        Map<String, String> details = new LinkedHashMap<>();
+        put(details, "Linked Funding Account", deposit.getAccountNumber());
+        put(details, "RD Scheme", deposit.getSchemeName());
+        put(details, "Monthly Installment", deposit.getMonthlyInstallment());
+        put(details, "Annual Interest Rate", deposit.getAnnualInterestRate());
+        put(details, "Tenure and Start Date", joinValues(deposit.getTenureMonths() == null ? null : deposit.getTenureMonths() + " months", deposit.getStartDate()));
+        put(details, "Calculated Principal", deposit.getEstimatedPrincipal());
+        put(details, "Estimated Interest and Maturity Amount", joinValues(deposit.getEstimatedInterest(), deposit.getEstimatedMaturityAmount()));
+        put(details, "Maturity Date", deposit.getMaturityDate());
+        put(details, "Payout / Allocation Account", deposit.getPayoutInstruction());
+        put(details, "RD Status", deposit.getStatus());
+        put(details, "Paid Installments", deposit.getPaidInstallments());
+        List<EcsMandate> mandates = ecsMandatesFor(deposit.getRdAccountNumber(), deposit.getAccountNumber());
+        put(details, "ECS Mandate and Separate Consent Status", mandateSummary(mandates));
+        put(details, "Complete ECS Mandate Details", mandateDetails(mandates));
+        info.put("formDetails", details);
+        info.put("ecsMandates", mandates.stream().map(BankFormService::mandateSummaryMap).toList());
+        enrichProductInfo(info, deposit.getAccountNumber());
+        return info;
+    }
+
+    private Map<String, Object> ecsMandateInfo(EcsMandate mandate) {
+        Map<String, Object> info = baseProductInfo(mandate.getLoanAccountNumber(),
+                mandate.getSavingsAccountNumber(), mandate.getCustomerName(), "ecs", mandate.getEmiAmount());
+        Map<String, String> details = new LinkedHashMap<>();
+        put(details, "Product / Loan Account Number", joinValues(mandate.getProductType(), mandate.getLoanAccountNumber()));
+        put(details, "Linked Debit Account Number", mandate.getSavingsAccountNumber());
+        put(details, "Mandate Reference", mandate.getMandateId());
+        put(details, "Authorized Maximum Debit", mandate.getAmountLimit());
+        put(details, "Installment Amount", mandate.getEmiAmount());
+        put(details, "Debit Frequency and Debit Day", mandate.getDebitDay() == null ? null : "Monthly, day " + mandate.getDebitDay());
+        put(details, "Customer Name and Consent Timestamp", joinValues(mandate.getCustomerName(), mandate.getCustomerConsentAt()));
+        put(details, "Consent Network Address", mandate.getCustomerConsentIp());
+        put(details, "Mandate Status and Audit History", joinValues(mandate.getStatus(), mandate.getLastDebitStatus(), mandate.getSuccessfulDebits(), mandate.getFailedDebits()));
+        put(details, "Complete ECS Mandate Details", mandateDetails(List.of(mandate)));
+        info.put("formDetails", details);
+        info.put("ecsMandates", List.of(mandateSummaryMap(mandate)));
+        enrichProductInfo(info, mandate.getSavingsAccountNumber());
+        return info;
+    }
+
+    private Map<String, Object> baseProductInfo(
+            String productNumber, String linkedAccount, String holderName, String type, Object balance) {
+        Map<String, Object> info = resolveCustomerAccount(linkedAccount);
+        if (info == null) info = new LinkedHashMap<>();
+        info.put("accountNumber", firstNonBlank(productNumber, linkedAccount));
+        info.put("holderName", firstNonBlank(holderName, stringValue(info, "holderName")));
+        info.put("accountType", type);
+        info.put("balance", balance);
+        info.put("productAccountNumber", productNumber);
+        info.put("linkedSavingsAccountNumber", linkedAccount);
+        return info;
+    }
+
+    private void enrichProductInfo(Map<String, Object> info, String accountNumber) {
+        Map<String, Object> linked = resolveCustomerAccount(accountNumber);
+        if (linked == null) return;
+        for (String key : List.of("customerId", "aadhaarNumber", "panNumber", "phone", "email", "dateOfBirth", "address")) {
+            if (info.get(key) == null || String.valueOf(info.get(key)).isBlank()) {
+                info.put(key, linked.get(key));
+            }
+        }
+        info.put("linkedAccountDetails", linked);
+    }
+
+    private Map<String, Object> resolveCustomerAccount(String accountNumber) {
+        if (accountNumber == null || accountNumber.isBlank()) return null;
+        for (String type : List.of("regular", "salary", "current")) {
+            Map<String, Object> account = resolveAccount(accountNumber, type);
+            if (account != null) return account;
+        }
+        return null;
+    }
+
+    private List<EcsMandate> ecsMandatesFor(String loanAccountNumber) {
+        return ecsMandatesFor(loanAccountNumber, null);
+    }
+
+    private List<EcsMandate> ecsMandatesFor(String productAccountNumber, String savingsAccountNumber) {
+        if (ecsMandateRepository == null) return List.of();
+        Map<String, EcsMandate> byMandate = new LinkedHashMap<>();
+        if (productAccountNumber != null && !productAccountNumber.isBlank()) {
+            ecsMandateRepository.findByLoanAccountNumberOrderByCreatedAtDesc(productAccountNumber)
+                    .forEach(mandate -> byMandate.putIfAbsent(mandateKey(mandate), mandate));
+        }
+        if (savingsAccountNumber != null && !savingsAccountNumber.isBlank()) {
+            ecsMandateRepository.findBySavingsAccountNumberOrderByCreatedAtDesc(savingsAccountNumber)
+                    .forEach(mandate -> byMandate.putIfAbsent(mandateKey(mandate), mandate));
+        }
+        return new ArrayList<>(byMandate.values());
+    }
+
+    private static String mandateKey(EcsMandate mandate) {
+        if (mandate.getMandateId() != null && !mandate.getMandateId().isBlank()) return mandate.getMandateId();
+        return mandate.getId() == null
+                ? "instance-" + System.identityHashCode(mandate)
+                : "id-" + mandate.getId();
+    }
+
+    private String repaymentSchedule(String loanAccountNumber) {
+        if (emiPaymentRepository == null || loanAccountNumber == null || loanAccountNumber.isBlank()) return null;
+        return emiPaymentRepository.findByLoanAccountNumberOrderByEmiNumberAsc(loanAccountNumber).stream()
+                .map(payment -> joinValues(
+                        "EMI " + payment.getEmiNumber(),
+                        payment.getDueDate(),
+                        "principal " + payment.getPrincipalAmount(),
+                        "interest " + payment.getInterestAmount(),
+                        "total " + payment.getTotalAmount(),
+                        payment.getStatus(),
+                        payment.getRemainingPrincipal()))
+                .reduce((first, second) -> first + "; " + second)
+                .orElse(null);
+    }
+
+    private static Map<String, Object> mandateSummaryMap(EcsMandate mandate) {
+        Map<String, Object> summary = new LinkedHashMap<>();
+        summary.put("mandateId", mandate.getMandateId());
+        summary.put("loanAccountNumber", mandate.getLoanAccountNumber());
+        summary.put("savingsAccountNumber", mandate.getSavingsAccountNumber());
+        summary.put("status", mandate.getStatus());
+        summary.put("emiAmount", mandate.getEmiAmount());
+        summary.put("amountLimit", mandate.getAmountLimit());
+        summary.put("debitDay", mandate.getDebitDay());
+        summary.put("consentAt", mandate.getCustomerConsentAt());
+        summary.put("consentIp", mandate.getCustomerConsentIp());
+        return summary;
+    }
+
+    private static String mandateSummary(List<EcsMandate> mandates) {
+        if (mandates == null || mandates.isEmpty()) return "No ECS mandate on record";
+        return mandates.stream().map(m -> joinValues(m.getMandateId(), m.getStatus(), m.getEmiAmount()))
+                .reduce((first, second) -> first + "; " + second).orElse("");
+    }
+
+    private static String mandateDetails(List<EcsMandate> mandates) {
+        if (mandates == null || mandates.isEmpty()) return null;
+        return mandates.stream().map(m -> joinValues(
+                        m.getMandateId(), "status " + m.getStatus(),
+                        "debit account " + m.getSavingsAccountNumber(),
+                        "limit " + m.getAmountLimit(), "installment " + m.getEmiAmount(),
+                        "debit day " + m.getDebitDay(), "consented " + m.getCustomerConsentAt(),
+                        "consent IP " + m.getCustomerConsentIp()))
+                .reduce((first, second) -> first + "; " + second).orElse(null);
+    }
+
+    private static boolean matchesHomeLoanType(HomeLoan loan, String expected) {
+        String actual = loan.getLoanType() == null ? "HOME" : loan.getLoanType().toUpperCase(Locale.ROOT);
+        return expected.equals(actual) || (expected.equals("CROP") && actual.equals("FARMER"));
+    }
+
+    private static boolean typeMatches(String actual, String expected) {
+        return actual != null && actual.toLowerCase(Locale.ROOT).contains(expected);
+    }
+
+    private static boolean isApproved(String status) {
+        return status != null && status.trim().equalsIgnoreCase("approved");
+    }
+
+    private static void put(Map<String, String> details, String key, Object value) {
+        if (value != null && !String.valueOf(value).isBlank()) {
+            details.put(key, String.valueOf(value));
+        }
+    }
+
+    private static String joinValues(Object... values) {
+        return Arrays.stream(values).filter(Objects::nonNull).map(String::valueOf)
+                .filter(value -> !value.isBlank()).reduce((first, second) -> first + " | " + second).orElse("");
+    }
+
+    private static String firstNonBlank(String preferred, String fallback) {
+        return preferred != null && !preferred.isBlank() ? preferred : fallback;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, String> stringMap(Object value) {
+        if (!(value instanceof Map<?, ?> source)) return Map.of();
+        Map<String, String> result = new LinkedHashMap<>();
+        source.forEach((key, entry) -> {
+            if (key != null && entry != null) result.put(String.valueOf(key), String.valueOf(entry));
+        });
+        return result;
+    }
+
+    private Map<String, Object> resolveAccount(String accountNumber, String accountType) {
+        if (accountNumber == null || accountNumber.isBlank()) return null;
+        String num = accountNumber.trim();
+        switch (normalizeAccountType(accountType)) {
             case "regular" -> {
-                Account a = accountRepository.findByAccountNumber(num);
-                if (a != null) {
-                    Map<String, Object> m = new LinkedHashMap<>();
-                    m.put("accountNumber", a.getAccountNumber());
-                    m.put("holderName", a.getName());
-                    m.put("accountType", "regular");
-                    m.put("balance", a.getBalance());
-                    m.put("customerId", a.getCustomerId());
-                    m.put("aadhaarNumber", a.getAadharNumber());
-                    m.put("panNumber", a.getPan());
-                    m.put("phone", a.getPhone());
-                    m.put("email", "");
-                    m.put("dateOfBirth", a.getDob());
-                    m.put("address", a.getAddress());
-                    return m;
+                if (accountRepository == null) return null;
+                Account account = accountRepository.findByAccountNumber(num);
+                if (account != null) {
+                    Map<String, Object> result = new LinkedHashMap<>();
+                    result.put("accountNumber", account.getAccountNumber());
+                    result.put("holderName", account.getName());
+                    result.put("accountType", "regular");
+                    result.put("balance", account.getBalance());
+                    result.put("customerId", account.getCustomerId());
+                    result.put("aadhaarNumber", account.getAadharNumber());
+                    result.put("panNumber", account.getPan());
+                    result.put("phone", account.getPhone());
+                    result.put("email", "");
+                    result.put("dateOfBirth", account.getDob());
+                    result.put("address", account.getAddress());
+                    return result;
                 }
             }
             case "salary" -> {
-                SalaryAccount a = salaryAccountRepository.findByAccountNumber(num);
-                if (a != null) {
-                    Map<String, Object> m = new LinkedHashMap<>();
-                    m.put("accountNumber", a.getAccountNumber());
-                    m.put("holderName", a.getEmployeeName());
-                    m.put("accountType", "salary");
-                    m.put("balance", a.getBalance());
-                    m.put("customerId", a.getCustomerId());
-                    m.put("aadhaarNumber", a.getAadharNumber());
-                    m.put("panNumber", a.getPanNumber());
-                    m.put("phone", a.getMobileNumber());
-                    m.put("email", a.getEmail());
-                    m.put("dateOfBirth", a.getDob());
-                    m.put("address", a.getAddress());
-                    return m;
+                if (salaryAccountRepository == null) return null;
+                SalaryAccount account = salaryAccountRepository.findByAccountNumber(num);
+                if (account != null) {
+                    Map<String, Object> result = new LinkedHashMap<>();
+                    result.put("accountNumber", account.getAccountNumber());
+                    result.put("holderName", account.getEmployeeName());
+                    result.put("accountType", "salary");
+                    result.put("balance", account.getBalance());
+                    result.put("customerId", account.getCustomerId());
+                    result.put("aadhaarNumber", account.getAadharNumber());
+                    result.put("panNumber", account.getPanNumber());
+                    result.put("phone", account.getMobileNumber());
+                    result.put("email", account.getEmail());
+                    result.put("dateOfBirth", account.getDob());
+                    result.put("address", account.getAddress());
+                    return result;
                 }
             }
             case "current" -> {
-                Optional<CurrentAccount> ca = currentAccountRepository.findByAccountNumber(num);
-                if (ca.isPresent()) {
-                    CurrentAccount a = ca.get();
-                    Map<String, Object> m = new LinkedHashMap<>();
-                    m.put("accountNumber", a.getAccountNumber());
-                    m.put("holderName", a.getBusinessName() != null ? a.getBusinessName() : a.getOwnerName());
-                    m.put("accountType", "current");
-                    m.put("balance", a.getBalance());
-                    m.put("customerId", a.getCustomerId());
-                    m.put("aadhaarNumber", a.getAadharNumber());
-                    m.put("panNumber", a.getPanNumber());
-                    m.put("phone", a.getMobile());
-                    m.put("email", a.getEmail());
-                    m.put("address", joinAddress(a.getShopAddress(), a.getCity(), a.getState(), a.getPincode()));
-                    return m;
+                if (currentAccountRepository == null) return null;
+                Optional<CurrentAccount> current = currentAccountRepository.findByAccountNumber(num);
+                if (current.isPresent()) {
+                    CurrentAccount account = current.get();
+                    Map<String, Object> result = new LinkedHashMap<>();
+                    result.put("accountNumber", account.getAccountNumber());
+                    result.put("holderName", account.getBusinessName() != null
+                            ? account.getBusinessName() : account.getOwnerName());
+                    result.put("accountType", "current");
+                    result.put("balance", account.getBalance());
+                    result.put("customerId", account.getCustomerId());
+                    result.put("aadhaarNumber", account.getAadharNumber());
+                    result.put("panNumber", account.getPanNumber());
+                    result.put("phone", account.getMobile());
+                    result.put("email", account.getEmail());
+                    result.put("address", joinAddress(account.getShopAddress(), account.getCity(),
+                            account.getState(), account.getPincode()));
+                    return result;
                 }
             }
             case "loan" -> {
+                if (loanRepository == null) return null;
                 Optional<Loan> byLoanNumber = loanRepository.findByLoanAccountNumber(num);
-                if (byLoanNumber.isPresent()) {
-                    return loanInfo(byLoanNumber.get());
-                }
+                if (byLoanNumber.isPresent()) return loanInfo(byLoanNumber.get());
                 List<Loan> byAccount = loanRepository.findByAccountNumber(num);
-                if (!byAccount.isEmpty()) {
-                    return loanInfo(byAccount.get(0));
-                }
+                if (!byAccount.isEmpty()) return loanInfo(byAccount.get(0));
             }
             case "goldloan" -> {
+                if (goldLoanRepository == null) return null;
                 Optional<GoldLoan> byLoanNumber = goldLoanRepository.findByLoanAccountNumber(num);
-                if (byLoanNumber.isPresent()) {
-                    return goldLoanInfo(byLoanNumber.get());
-                }
+                if (byLoanNumber.isPresent()) return goldLoanInfo(byLoanNumber.get());
                 List<GoldLoan> byAccount = goldLoanRepository.findByAccountNumber(num);
-                if (!byAccount.isEmpty()) {
-                    return goldLoanInfo(byAccount.get(0));
-                }
+                if (!byAccount.isEmpty()) return goldLoanInfo(byAccount.get(0));
             }
             case "cheque" -> {
+                if (chequeRepository == null) return null;
                 List<Cheque> cheques = chequeRepository.findByAccountNumber(num);
                 if (!cheques.isEmpty()) {
-                    Cheque c = cheques.get(0);
-                    Map<String, Object> m = new LinkedHashMap<>();
-                    m.put("accountNumber", c.getAccountNumber());
-                    m.put("holderName", c.getAccountHolderName());
-                    m.put("accountType", "cheque");
-                    return m;
+                    Map<String, Object> result = new LinkedHashMap<>();
+                    result.put("accountNumber", cheques.get(0).getAccountNumber());
+                    result.put("holderName", cheques.get(0).getAccountHolderName());
+                    result.put("accountType", "cheque");
+                    return result;
                 }
             }
             default -> {

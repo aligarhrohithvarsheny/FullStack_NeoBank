@@ -62,6 +62,7 @@ import { CurrentAccountDashboard } from './component/website/current-account-das
 import { FasttagLogin } from './component/website/fasttag-login/fasttag-login';
 import { FasttagDashboard } from './component/website/fasttag-dashboard/fasttag-dashboard';
 import { ChequeManagementComponent } from './component/admin/cheque-management/cheque-management.component';
+import { ChequeBookClosureComponent } from './component/admin/cheque-book-closure/cheque-book-closure.component';
 import { SavingsChequeManagementComponent } from './component/admin/savings-cheque-management/savings-cheque-management.component';
 import { BusinessChequeManagementComponent } from './component/admin/business-cheque-management/business-cheque-management.component';
 import { AiSecurityDashboardComponent } from './component/admin/ai-security-dashboard/ai-security-dashboard';
@@ -117,6 +118,7 @@ export const routes: Routes = [
   { path: 'admin/kyc', component: Kyc, canActivate: [adminAuthGuard] },
   { path: 'admin/cheques', component: AdminCheques, canActivate: [adminAuthGuard] },
   { path: 'admin/cheque-draw-management', component: ChequeManagementComponent, canActivate: [adminAuthGuard] },
+  { path: 'admin/cheque-book-closure', component: ChequeBookClosureComponent, canActivate: [adminAuthGuard] },
   { path: 'admin/savings-cheque-management', component: SavingsChequeManagementComponent, canActivate: [adminAuthGuard] },
   { path: 'admin/business-cheque-management', component: BusinessChequeManagementComponent, canActivate: [adminAuthGuard] },
   { path: 'admin/gold-loans', component: AdminGoldLoans, canActivate: [adminAuthGuard] },

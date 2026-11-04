@@ -10046,6 +10046,25 @@ app-admin-dashboard .dashboard-container {
   font-size: 22px;
   cursor: pointer;
 }
+.admin-upi-transfer-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.admin-upi-transfer-summary > div {
+  display: grid;
+  align-content: start;
+  gap: 7px;
+  min-width: 0;
+  padding: 13px;
+  background: #f0fdfa;
+  border: 1px solid #ccfbf1;
+  border-radius: 10px;
+}
+.admin-upi-transfer-summary small { color: #64748b; font-size: 10px; font-weight: 700; text-transform: uppercase; }
+.admin-upi-transfer-summary strong { color: #0f172a; font-size: 14px; overflow-wrap: anywhere; }
+.admin-upi-risk-flagged { color: #b91c1c !important; }
 .admin-upi-detail-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -10076,6 +10095,7 @@ app-admin-dashboard .dashboard-container {
 @media (max-width: 640px) {
   .admin-upi-detail-backdrop { padding: 10px; }
   .admin-upi-detail-dialog { padding: 16px; }
+  .admin-upi-transfer-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .admin-upi-detail-grid { grid-template-columns: 1fr; }
 }
 .admin-upi-clear-filters {

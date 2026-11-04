@@ -4,6 +4,8 @@ import jakarta.persistence.*;
 import lombok.Data;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
 
 @Data
 @Entity
@@ -146,6 +148,9 @@ public class HomeLoan {
     // ML analysis snapshot
     private Double approvalProbability;
     private String riskBand;
+
+    @Transient
+    private List<Map<String, Object>> availableDocuments = List.of();
 
     public HomeLoan() {
         this.applicationDate = LocalDateTime.now();

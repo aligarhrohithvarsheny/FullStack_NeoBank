@@ -171,8 +171,11 @@ public class HomeLoanController {
                     .contentType(MediaType.parseMediaType(ct == null ? "application/octet-stream" : ct))
                     .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + p.getFileName() + "\"")
                     .body(new FileSystemResource(p));
-        } catch (Exception e) {
-            return ResponseEntity.notFound().build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(404).body(Map.of("message", e.getMessage()));
+        } catch (java.io.IOException e) {
+            return ResponseEntity.internalServerError()
+                    .body(Map.of("message", "The requested loan document could not be read."));
         }
     }
 

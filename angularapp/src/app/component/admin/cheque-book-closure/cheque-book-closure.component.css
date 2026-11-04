@@ -1,0 +1,54 @@
+:host {
+  display: block;
+  min-height: 100vh;
+  padding: 24px;
+  background: #f3f6fb;
+  color: #172033;
+  font-family: Inter, "Segoe UI", Arial, sans-serif;
+}
+
+.closure-page { max-width: 1440px; margin: 0 auto; display: grid; gap: 18px; }
+.closure-header { display: flex; justify-content: space-between; align-items: center; gap: 20px; padding: 24px 28px; color: #fff; background: linear-gradient(120deg, #123f67, #087e8b); border-radius: 16px; }
+.closure-header h1 { margin: 3px 0 6px; font-size: 26px; }
+.closure-header p { margin: 0; color: #d7eff2; font-size: 13px; }
+.closure-header .eyebrow { font-size: 10px; font-weight: 800; letter-spacing: 1.1px; }
+.back-button, .search-button, .close-button { min-height: 40px; padding: 9px 15px; border: 0; border-radius: 8px; font: inherit; font-size: 12px; font-weight: 750; cursor: pointer; }
+.back-button { color: #0f4660; background: #fff; white-space: nowrap; }
+.closure-card { min-width: 0; padding: 20px; background: #fff; border: 1px solid #e4eaf1; border-radius: 13px; box-shadow: 0 4px 16px rgba(20, 45, 70, .05); }
+.section-title { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 16px; }
+.section-title h2 { margin: 0; font-size: 16px; }
+.section-title p { margin: 5px 0 0; color: #6b7789; font-size: 12px; }
+.count-chip { flex: 0 0 auto; padding: 5px 9px; color: #075985; background: #e8f4fa; border-radius: 20px; font-size: 11px; font-weight: 700; }
+.form-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 14px; }
+.field { display: grid; gap: 7px; color: #34445a; font-size: 11px; font-weight: 750; }
+.input-action { display: flex; gap: 8px; }
+.field input { width: 100%; min-width: 0; height: 42px; padding: 0 12px; color: #172033; background: #fff; border: 1px solid #cbd5e1; border-radius: 8px; font: inherit; font-size: 13px; }
+.field input:focus { outline: 2px solid #b6e2eb; border-color: #07869b; }
+.search-button { color: #fff; background: #087e8b; white-space: nowrap; }
+.close-button { color: #fff; background: #c62828; white-space: nowrap; }
+.search-button:disabled, .close-button:disabled { opacity: .58; cursor: not-allowed; }
+.help-text { margin: 10px 0 0; color: #768397; font-size: 11px; }
+.table-wrap { width: 100%; overflow-x: auto; border: 1px solid #e5eaf0; border-radius: 9px; }
+table { width: 100%; min-width: 920px; border-collapse: collapse; table-layout: auto; }
+th, td { padding: 13px 15px; border-bottom: 1px solid #e8edf2; text-align: left; vertical-align: middle; font-size: 12px; line-height: 1.45; white-space: normal; overflow-wrap: anywhere; }
+th { color: #5b687a; background: #f5f8fb; font-size: 10px; font-weight: 800; letter-spacing: .45px; text-transform: uppercase; }
+tbody tr:last-child td { border-bottom: 0; }
+tbody tr:hover { background: #f8fbfd; }
+.status-chip { display: inline-block; padding: 4px 9px; color: #067647; background: #e8f7ef; border-radius: 20px; font-size: 10px; font-weight: 800; }
+.status-chip.closed { color: #b42318; background: #feeceb; }
+.loading-state, .empty-state { margin: 0; padding: 18px; color: #78869a; text-align: center; font-size: 12px; }
+.lookup-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 10px; max-width: 760px; }
+.lookup-result { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin: 16px 0 0; }
+.lookup-result div { min-width: 0; padding: 11px; background: #f5f8fb; border: 1px solid #e8edf2; border-radius: 8px; }
+.lookup-result dt { color: #6b7789; font-size: 10px; font-weight: 800; text-transform: uppercase; }
+.lookup-result dd { margin: 5px 0 0; font-size: 12px; overflow-wrap: anywhere; }
+
+@media (max-width: 700px) {
+  :host { padding: 14px; }
+  .closure-header { align-items: flex-start; flex-direction: column; padding: 20px; }
+  .form-row, .lookup-row { grid-template-columns: 1fr; }
+  .close-button, .lookup-row > .search-button { justify-self: start; }
+  .closure-card { padding: 15px; }
+  .input-action { align-items: stretch; flex-direction: column; }
+  .input-action .search-button { width: 100%; }
+}

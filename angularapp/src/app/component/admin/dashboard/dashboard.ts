@@ -215,6 +215,7 @@ export class Dashboard implements OnInit, OnDestroy {
     { section: 'emi-management', icon: 'fa-calendar-check', label: 'EMI Management', description: 'Track and manage EMI payments', gradient: 'linear-gradient(135deg, #89f7fe, #66a6ff)', route: 'emi-management' },
     { section: 'cheques', icon: 'fa-file-invoice', label: 'Cheque Management', description: 'Process cheque requests', gradient: 'linear-gradient(135deg, #fddb92, #d1fdff)', featureKey: 'cheques', route: 'cheques' },
     { section: 'cheque-draw', icon: 'fa-receipt', label: 'Cheque Draw Requests', description: 'Manage salary cheque draws', gradient: 'linear-gradient(135deg, #c1dfc4, #deecdd)', route: 'cheque-draw-management' },
+    { section: 'cheque-book-closure', icon: 'fa-lock', label: 'Cheque Book Closure', description: 'Close salary, savings or current account cheque books and review closure history', gradient: 'linear-gradient(135deg, #fb923c, #c2410c)', route: 'cheque-book-closure' },
     { section: 'business-cheque-draw', icon: 'fa-building', label: 'Business Cheque Draw', description: 'Manage business cheque requests', gradient: 'linear-gradient(135deg, #e0c3fc, #8ec5fc)', route: 'business-cheque-management' },
     { section: 'savings-cheque-draw', icon: 'fa-money-check', label: 'Savings Cheque Draw', description: 'Manage savings cheque requests', gradient: 'linear-gradient(135deg, #e0c3fc, #8ec5fc)', route: 'savings-cheque-management' },
     { section: 'cards', icon: 'fa-credit-card', label: 'Manage Cards', description: 'Manage debit cards', gradient: 'linear-gradient(135deg, #ff9a9e, #fecfef)', featureKey: 'cards', route: 'cards' },
@@ -493,6 +494,7 @@ export class Dashboard implements OnInit, OnDestroy {
         { section: 'cheques', icon: 'fa-file-invoice', label: 'Cheque Management', featureKey: 'cheques' },
         { section: 'positive-pay', icon: 'fa-shield-alt', label: 'Positive Pay Requests', action: () => this.navigateTo('positive-pay') },
         { section: 'cheque-draw', icon: 'fa-receipt', label: 'Cheque Draw Requests', action: () => this.navigateTo('cheque-draw-management') },
+        { section: 'cheque-book-closure', icon: 'fa-lock', label: 'Cheque Book Closure', action: () => this.navigateTo('cheque-book-closure') },
         { section: 'business-cheque-draw', icon: 'fa-building', label: 'Business Cheque Draw', action: () => this.navigateTo('business-cheque-management') },
         { section: 'savings-cheque-draw', icon: 'fa-money-check', label: 'Savings Cheque Draw', action: () => this.navigateTo('savings-cheque-management') }
       ]

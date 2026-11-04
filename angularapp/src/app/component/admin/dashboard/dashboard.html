@@ -5381,19 +5381,37 @@
     <section class="admin-upi-detail-dialog" role="dialog" aria-modal="true" aria-labelledby="admin-upi-detail-title" (click)="$event.stopPropagation()">
       <header class="admin-upi-detail-header">
         <div>
-          <h3 id="admin-upi-detail-title">UPI transaction details</h3>
-          <span>{{tx.transactionRef || 'Reference unavailable'}} · {{tx.createdAt | date:'dd/MM/yyyy h:mm:ss a'}}</span>
+          <h3 id="admin-upi-detail-title">UPI transfer details</h3>
+          <span>Reference {{tx.transactionRef || 'Not recorded'}} · {{tx.createdAt ? (tx.createdAt | date:'dd/MM/yyyy h:mm:ss a') : 'Time not recorded'}}</span>
         </div>
         <button type="button" aria-label="Close transaction details" (click)="closeAdminUpiTransactionDetails()">×</button>
       </header>
+      <div class="admin-upi-transfer-summary">
+        <div>
+          <small>Transfer amount</small>
+          <strong>₹{{tx.amount | number:'1.2-2'}}</strong>
+        </div>
+        <div>
+          <small>Transfer status</small>
+          <span class="admin-upi-outcome" [ngClass]="getAdminUpiStatusClass(tx.status)">{{tx.status || 'Not recorded'}}</span>
+        </div>
+        <div>
+          <small>Payment rail</small>
+          <strong>{{tx.paymentMethod || 'UPI'}}</strong>
+        </div>
+        <div>
+          <small>Risk review</small>
+          <strong [class.admin-upi-risk-flagged]="tx.fraudFlagged">{{tx.fraudFlagged ? 'Flagged' : 'Not flagged'}}</strong>
+        </div>
+      </div>
       <div class="admin-upi-detail-grid">
         <article class="admin-upi-detail-card">
           <h4>Sender</h4>
           <strong>{{tx.senderName || 'Not recorded'}}</strong>
           <span>Account: {{tx.senderAccount || 'Not recorded'}}</span>
           <span>UPI ID: {{tx.senderUpiId || 'Not recorded'}}</span>
-          <span>Phone: {{tx.senderProfile?.phone || 'Not available'}}</span>
-          <span>Address: {{tx.senderProfile?.address || 'Not available'}}</span>
+          <span>Phone: {{tx.senderProfile?.phone || 'Not recorded'}}</span>
+          <span>Address: {{tx.senderProfile?.address || 'Not recorded'}}</span>
           <b [class.confirmed]="tx.senderDebited === true" [class.unconfirmed]="tx.senderDebited !== true">
             Sender debited: {{tx.senderDebited === null || tx.senderDebited === undefined ? 'Not recorded for this transaction' : (tx.senderDebited ? 'Yes' : 'No')}}
           </b>
@@ -5403,27 +5421,27 @@
           <strong>{{tx.receiverName || 'Not recorded'}}</strong>
           <span>Account: {{tx.receiverAccount || 'Not recorded'}}</span>
           <span>UPI ID: {{tx.receiverUpiId || 'Not recorded'}}</span>
-          <span>Phone: {{tx.receiverProfile?.phone || 'Not available'}}</span>
-          <span>Address: {{tx.receiverProfile?.address || 'Not available'}}</span>
+          <span>Phone: {{tx.receiverProfile?.phone || 'Not recorded'}}</span>
+          <span>Address: {{tx.receiverProfile?.address || 'Not recorded'}}</span>
           <b [class.confirmed]="tx.receiverCredited === true" [class.unconfirmed]="tx.receiverCredited !== true">
             Receiver credited: {{tx.receiverCredited === null || tx.receiverCredited === undefined ? 'Not recorded for this transaction' : (tx.receiverCredited ? 'Yes' : 'No')}}
           </b>
         </article>
         <article class="admin-upi-detail-card">
           <h4>Payment</h4>
-          <strong>₹{{tx.amount | number:'1.2-2'}}</strong>
-          <span>Status: {{tx.status || 'Not recorded'}}</span>
+          <span>Transaction ID: {{tx.transactionRef || 'Not recorded'}}</span>
+          <span>Transaction time: {{tx.createdAt ? (tx.createdAt | date:'medium') : 'Not recorded'}}</span>
           <span>Remark: {{tx.remark || 'None'}}</span>
-          <span>Fraud review: {{tx.fraudFlagged ? 'Flagged' : 'Not flagged'}}</span>
           <span>Risk score: {{tx.riskScore ?? 'Not recorded'}}</span>
+          <span>Review status: {{tx.fraudFlagged ? 'Flagged for review' : 'No fraud flag recorded'}}</span>
         </article>
         <article class="admin-upi-detail-card">
           <h4>Request / device information</h4>
           <span>IP address: {{tx.sourceIp || 'Not recorded'}}</span>
-          <span>Location: {{tx.location || 'Not recorded'}}</span>
-          <span *ngIf="tx.locationAccuracyMeters != null">Location accuracy: ±{{tx.locationAccuracyMeters | number:'1.0-0'}} m</span>
+          <span>Customer location coordinates: {{tx.location || 'Not recorded'}}</span>
+          <span>Location accuracy: {{tx.locationAccuracyMeters != null ? ('±' + (tx.locationAccuracyMeters | number:'1.0-0') + ' m') : 'Not recorded'}}</span>
           <span>Browser / device: {{tx.userAgent || 'Not recorded'}}</span>
-          <small>Location is not inferred from the IP address.</small>
+          <small>Location is captured only when supplied by the customer's device; it is not inferred from IP.</small>
         </article>
       </div>
     </section>

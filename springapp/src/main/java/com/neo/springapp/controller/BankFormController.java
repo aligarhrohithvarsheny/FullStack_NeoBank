@@ -88,14 +88,15 @@ public class BankFormController {
     public ResponseEntity<Map<String, Object>> verifyAccount(
             @RequestParam(required = false) String accountNumber,
             @RequestParam(defaultValue = "regular") String accountType,
-            @RequestParam(required = false) String customerId) {
+            @RequestParam(required = false) String customerId,
+            @RequestParam(required = false) String formCode) {
         if ((accountNumber == null || accountNumber.isBlank()) && (customerId == null || customerId.isBlank())) {
             Map<String, Object> response = new HashMap<>();
             response.put("success", false);
             response.put("message", "Enter account number or customer ID");
             return ResponseEntity.badRequest().body(response);
         }
-        return ResponseEntity.ok(bankFormService.verifyAccount(accountNumber, accountType, customerId));
+        return ResponseEntity.ok(bankFormService.verifyAccount(accountNumber, accountType, customerId, formCode));
     }
 
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)

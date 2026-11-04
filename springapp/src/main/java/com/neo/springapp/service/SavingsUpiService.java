@@ -477,6 +477,7 @@ public class SavingsUpiService {
         details.put("amount", txn.getAmount());
         details.put("remark", txn.getRemark());
         details.put("status", txn.getStatus());
+        details.put("paymentMethod", txn.getPaymentMethod());
         details.put("fraudFlagged", txn.getFraudFlagged());
         details.put("riskScore", txn.getRiskScore());
         details.put("createdAt", txn.getCreatedAt());
@@ -485,6 +486,8 @@ public class SavingsUpiService {
         details.put("sourceIp", txn.getSourceIp());
         details.put("userAgent", txn.getUserAgent());
         details.put("location", formatLocation(txn));
+        details.put("locationLatitude", txn.getLocationLatitude());
+        details.put("locationLongitude", txn.getLocationLongitude());
         details.put("locationAccuracyMeters", txn.getLocationAccuracyMeters());
         details.put("senderProfile", transactionProfile(txn.getSenderAccount(), txn.getSenderUpiId(),
                 txn.getSenderPhone(), txn.getSenderAddress()));

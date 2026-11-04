@@ -191,7 +191,17 @@ public class HomeLoanService {
     }
 
     public List<HomeLoan> all() { return repo.findAllByOrderByApplicationDateDesc(); }
-    public List<HomeLoan> byAccount(String acc) { return repo.findByAccountNumberOrderByApplicationDateDesc(acc); }
+    public List<HomeLoan> byAccount(String acc) {
+        List<HomeLoan> loans = repo.findByAccountNumberOrderByApplicationDateDesc(acc);
+        for (HomeLoan loan : loans) {
+            try {
+                loan.setAvailableDocuments(availableDocuments(loan));
+            } catch (IOException e) {
+                throw new java.io.UncheckedIOException("Unable to check home-loan documents.", e);
+            }
+        }
+        return loans;
+    }
     public HomeLoan get(Long id) { return repo.findById(id).orElseThrow(() -> new RuntimeException("Home loan not found")); }
 
     private List<String> requiredDocTypes(HomeLoan loan) {
@@ -299,20 +309,79 @@ public class HomeLoanService {
     }
 
     public Map<String, Object> documentFile(Long id, String type, Integer index) throws IOException {
-        HomeLoan h = get(id);
-        if (!DOC_TYPES.contains(type)) throw new RuntimeException("Unknown document type");
-        List<String> paths = documentPaths(h, type);
+        if (!DOC_TYPES.contains(type)) throw new IllegalArgumentException("Unknown document type");
+        HomeLoanRepository.HomeLoanDocumentPaths documentPaths = repo.findDocumentPathsById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Home loan not found."));
+        List<String> paths = documentPaths(documentPaths, type);
         int selectedIndex = index == null ? 0 : index;
-        if (selectedIndex < 0 || selectedIndex >= paths.size()) throw new RuntimeException("Document not uploaded");
+        if (selectedIndex < 0 || selectedIndex >= paths.size()) throw new IllegalArgumentException("Document not uploaded");
         String name = paths.get(selectedIndex);
-        if (name == null) throw new RuntimeException("Document not uploaded");
-        Path uploadDir = homeLoanUploadDir();
-        Path p = uploadDir.resolve(name).normalize();
-        if (!p.startsWith(uploadDir.normalize()) || !Files.exists(p)) throw new RuntimeException("File missing");
+        if (name == null) throw new IllegalArgumentException("Document not uploaded");
+        Path p = resolveDocumentPath(name);
+        if (p == null) throw new IllegalArgumentException("The document is not available on the server.");
         Map<String, Object> m = new HashMap<>();
         m.put("path", p);
         m.put("name", name);
         return m;
+    }
+
+    private List<Map<String, Object>> availableDocuments(HomeLoan loan) throws IOException {
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (String type : DOC_TYPES) {
+            List<String> paths = documentPaths(loan, type);
+            for (int index = 0; index < paths.size(); index++) {
+                String name = paths.get(index);
+                Path path = resolveDocumentPath(name);
+                if (path == null) continue;
+                Map<String, Object> document = new LinkedHashMap<>();
+                document.put("type", type);
+                document.put("index", "vehicleImages".equals(type) ? index : null);
+                document.put("name", path.getFileName().toString());
+                document.put("label", docLabel(type) + ("vehicleImages".equals(type) ? " " + (index + 1) : ""));
+                result.add(document);
+            }
+        }
+        return result;
+    }
+
+    private Path resolveDocumentPath(String storedName) throws IOException {
+        if (storedName == null || storedName.isBlank()) return null;
+        Path uploadRootPath = Paths.get(uploadRoot).toAbsolutePath().normalize();
+        Path documentDirectory = homeLoanUploadDir().toAbsolutePath().normalize();
+        Path storedPath;
+        try {
+            storedPath = Paths.get(storedName.trim());
+        } catch (java.nio.file.InvalidPathException e) {
+            return null;
+        }
+        List<Path> candidates = new ArrayList<>();
+        if (storedPath.isAbsolute()) {
+            candidates.add(storedPath.normalize());
+        } else {
+            candidates.add(documentDirectory.resolve(storedPath).normalize());
+            candidates.add(uploadRootPath.resolve(storedPath).normalize());
+        }
+        Path realUploadRoot;
+        Path realDocumentDirectory;
+        try {
+            realUploadRoot = uploadRootPath.toRealPath();
+            realDocumentDirectory = documentDirectory.toRealPath();
+        } catch (java.nio.file.NoSuchFileException e) {
+            return null;
+        }
+        if (!realDocumentDirectory.startsWith(realUploadRoot)) return null;
+        for (Path candidate : candidates) {
+            if (!candidate.startsWith(uploadRootPath)) continue;
+            try {
+                Path realPath = candidate.toRealPath();
+                if (realPath.startsWith(realDocumentDirectory) && Files.isRegularFile(realPath)) {
+                    return realPath;
+                }
+            } catch (java.nio.file.NoSuchFileException e) {
+                // A stale database path should not be advertised as a downloadable document.
+            }
+        }
+        return null;
     }
 
     private boolean allDocsVerified(HomeLoan h) {
@@ -323,6 +392,23 @@ public class HomeLoanService {
 
     private List<String> documentPaths(HomeLoan h, String type) {
         String path = documentPath(h, type);
+        if (path == null || path.isBlank()) return List.of();
+        if ("vehicleImages".equals(type)) return Arrays.stream(path.split(",")).filter(p -> !p.isBlank()).toList();
+        return List.of(path);
+    }
+
+    private List<String> documentPaths(HomeLoanRepository.HomeLoanDocumentPaths loan, String type) {
+        String path = switch (type) {
+            case "fdReceipt" -> loan.getFdReceiptPath();
+            case "model" -> loan.getModelDocPath();
+            case "signature" -> loan.getSignaturePath();
+            case "vehicleInvoice" -> loan.getVehicleInvoicePath();
+            case "vehicleImages" -> loan.getVehicleImagePaths();
+            case "landRecord" -> loan.getLandRecordPath();
+            case "agricultureEstimate" -> loan.getAgricultureEstimatePath();
+            case "cropEstimate" -> loan.getCropEstimatePath();
+            default -> null;
+        };
         if (path == null || path.isBlank()) return List.of();
         if ("vehicleImages".equals(type)) return Arrays.stream(path.split(",")).filter(p -> !p.isBlank()).toList();
         return List.of(path);

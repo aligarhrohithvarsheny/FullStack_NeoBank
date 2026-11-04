@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
+import { RouterLink } from '@angular/router';
 import { ChequeService } from '../../../service/cheque.service';
 import { AlertService } from '../../../service/alert.service';
 import { environment } from '../../../../environment/environment';
@@ -16,7 +17,7 @@ import {
 @Component({
   selector: 'app-cheque-management',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, RouterLink],
   templateUrl: './cheque-management.component.html',
   styleUrls: ['./cheque-management.component.css']
 })
@@ -67,16 +68,6 @@ export class ChequeManagementComponent implements OnInit, OnDestroy {
   // Audit log
   auditLog: any[] = [];
   showAuditLog: boolean = false;
-
-  // Cheque book closure
-  closureAccountNumber: string = '';
-  closureBooks: any[] = [];
-  closureHistory: any[] = [];
-  isLoadingClosureBooks: boolean = false;
-  isClosingBooks: boolean = false;
-  chequeLookupNumber: string = '';
-  chequeLookupResult: any = null;
-  isLookingUpCheque: boolean = false;
 
   // Signature Verification
   signatureDocUrl: SafeResourceUrl | null = null;
@@ -162,86 +153,6 @@ export class ChequeManagementComponent implements OnInit, OnDestroy {
   onSearch() {
     this.currentPage = 0;
     this.loadCheques();
-  }
-
-  fetchChequeBooksForClosure() {
-    const accountNumber = this.closureAccountNumber?.trim();
-    if (!accountNumber) {
-      this.alertService.error('Missing Info', 'Enter an account number to fetch cheque books');
-      return;
-    }
-
-    this.isLoadingClosureBooks = true;
-    this.chequeService.getChequeBooksByAccountNumber(accountNumber).subscribe({
-      next: (books: any[]) => {
-        this.closureBooks = books || [];
-        this.isLoadingClosureBooks = false;
-        this.loadChequeClosureHistory(accountNumber);
-      },
-      error: (err: any) => {
-        this.isLoadingClosureBooks = false;
-        this.closureBooks = [];
-        this.alertService.error('Unable to load cheque books', err?.error?.error || 'Please check the account number and try again.');
-      }
-    });
-  }
-
-  lookupChequeByNumber() {
-    const chequeNumber = this.chequeLookupNumber?.trim();
-    if (!chequeNumber) {
-      this.alertService.error('Missing Info', 'Enter a cheque number to fetch its data');
-      return;
-    }
-
-    this.isLookingUpCheque = true;
-    this.chequeLookupResult = null;
-    this.chequeService.lookupChequeByNumber(chequeNumber).subscribe({
-      next: result => {
-        this.chequeLookupResult = result;
-        this.isLookingUpCheque = false;
-      },
-      error: err => {
-        this.isLookingUpCheque = false;
-        this.alertService.error('Cheque Not Found', err?.error?.error || 'No cheque was found for that number');
-      }
-    });
-  }
-
-  loadChequeClosureHistory(accountNumber: string) {
-    const account = accountNumber?.trim();
-    if (!account) {
-      this.closureHistory = [];
-      return;
-    }
-    this.chequeService.getChequeBookClosureHistory(account).subscribe({
-      next: (history: any[]) => this.closureHistory = history || [],
-      error: () => this.closureHistory = []
-    });
-  }
-
-  closeChequeBooksForAccount() {
-    const accountNumber = this.closureAccountNumber?.trim();
-    if (!accountNumber) {
-      this.alertService.error('Missing Info', 'Enter an account number first');
-      return;
-    }
-
-    if (!confirm(`Close all active cheque books for ${accountNumber}?\n\nOnce closed, all cheque numbers from this account will become invalid for future use.`)) {
-      return;
-    }
-
-    this.isClosingBooks = true;
-    this.chequeService.closeChequeBooksByAccountNumber(accountNumber, 'Admin closed cheque book from dashboard', this.adminName).subscribe({
-      next: (response: any) => {
-        this.isClosingBooks = false;
-        this.alertService.success('Cheque Book Closed', response?.message || 'Cheque book closure saved successfully');
-        this.fetchChequeBooksForClosure();
-      },
-      error: (err: any) => {
-        this.isClosingBooks = false;
-        this.alertService.error('Closure Failed', err?.error?.error || 'Unable to close cheque books for this account');
-      }
-    });
   }
 
   /**

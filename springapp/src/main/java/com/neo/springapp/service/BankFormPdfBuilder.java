@@ -16,6 +16,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 /**
  * Lightweight PDF generator for bank forms. Uses PDFBox directly instead of html2pdf
@@ -62,7 +63,8 @@ final class BankFormPdfBuilder {
             String phone,
             String email,
             String dateOfBirth,
-            String address) throws IOException {
+            String address,
+            Map<String, String> productDetails) throws IOException {
         document = new PDDocument();
         this.adminName = adminName == null || adminName.isBlank() ? "Admin" : adminName;
         this.form = form;
@@ -81,9 +83,19 @@ final class BankFormPdfBuilder {
             }
             drawSection("Form Specific Information");
             for (String field : form.fields()) {
-                drawField(index++, field, prefillValue(
+                String value = prefillValue(
                         field, accountNumber, holderName, customerId, aadhaarNumber, panNumber, phone, email,
-                        dateOfBirth, address));
+                        dateOfBirth, address);
+                if ((value == null || value.isBlank()) && productDetails != null) {
+                    value = productDetails.get(field);
+                }
+                drawField(index++, field, value);
+            }
+            if (productDetails != null && !productDetails.isEmpty()) {
+                drawSection("Verified Product, Disbursement and ECS Details");
+                for (Map.Entry<String, String> detail : productDetails.entrySet()) {
+                    drawField(index++, detail.getKey(), detail.getValue());
+                }
             }
             drawTerms();
             drawSignatures();

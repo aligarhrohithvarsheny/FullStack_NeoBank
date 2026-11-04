@@ -3,7 +3,9 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../environment/environment';
 
-export type BankFormAccountType = 'regular' | 'loan' | 'goldloan' | 'cheque' | 'salary' | 'current';
+export type BankFormAccountType =
+  | 'regular' | 'loan' | 'goldloan' | 'cheque' | 'salary' | 'current'
+  | 'homeloan' | 'fixeddeposit' | 'recurringdeposit' | 'ecs';
 
 export interface BankFormDefinition {
   id: number;
@@ -55,6 +57,10 @@ export interface VerifiedAccountDetails {
   dateOfBirth?: string;
   address?: string;
   balance?: number;
+  productAccountNumber?: string;
+  linkedSavingsAccountNumber?: string;
+  formDetails?: Record<string, string>;
+  ecsMandates?: Array<Record<string, string | number | null>>;
 }
 
 export interface BankFormDownloadOptions {
@@ -85,6 +91,7 @@ export class BankFormService {
     accountNumber?: string;
     accountType?: string;
     customerId?: string;
+    formCode?: string;
   }): Observable<any> {
     let params = new HttpParams();
     if (options.accountNumber) {
@@ -95,6 +102,9 @@ export class BankFormService {
     }
     if (options.customerId) {
       params = params.set('customerId', options.customerId);
+    }
+    if (options.formCode) {
+      params = params.set('formCode', options.formCode);
     }
     return this.http.get(`${this.baseUrl}/verify-account`, { params });
   }

@@ -2,7 +2,7 @@
   <div class="section-header">
     <h2><i class="fa fa-file-alt"></i> Bank Forms Center</h2>
     <p class="section-sub">
-      Search and select any of 60 NeoBank forms, enter account number, and upload the application.
+      Select a NeoBank form, enter its loan/deposit account number or linked savings account, and verify the customer.
       Download PDF includes NeoBank logo, branch/IFSC details, all common + form-specific fields, and full terms &amp; conditions.
     </p>
   </div>
@@ -79,7 +79,7 @@
           }}
         </button>
         <p class="pdf-hint" *ngIf="selectedForm && !canDownloadPdf">
-          Enter account number or customer ID in Step 2 and verify to unlock PDF download with auto-filled customer details.
+          Verify with a customer ID or the selected product/account number to auto-fill customer, product, disbursement, repayment, and available ECS details.
         </p>
       </div>
     </div>
@@ -92,14 +92,16 @@
       </div>
       <div class="submit-row">
         <div class="field-block" *ngIf="lookupMode === 'accountNumber'">
-          <label>Account Type</label>
-          <select [(ngModel)]="uploadAccountType" (change)="resetVerification()">
+          <label *ngIf="!isProductForm">Account Type</label>
+          <select *ngIf="!isProductForm" [(ngModel)]="uploadAccountType" (change)="resetVerification()">
             <option *ngFor="let t of accountTypes" [value]="t.value">{{ t.label }}</option>
           </select>
+          <label *ngIf="isProductForm">Product Type</label>
+          <input *ngIf="isProductForm" type="text" [value]="selectedForm?.name" readonly />
         </div>
         <div class="field-block grow" *ngIf="lookupMode === 'accountNumber'">
-          <label>Account Number</label>
-          <input type="text" [(ngModel)]="uploadAccountNumber" placeholder="Enter account number" (input)="resetVerification()" />
+          <label>{{ accountLookupLabel }}</label>
+          <input type="text" [(ngModel)]="uploadAccountNumber" [placeholder]="'Enter ' + accountLookupLabel.toLowerCase()" (input)="resetVerification()" />
         </div>
         <div class="field-block grow" *ngIf="lookupMode === 'customerId'">
           <label>Customer ID</label>
@@ -119,10 +121,23 @@
           <div><span>Account #</span><strong>{{ verifiedAccount.accountNumber }}</strong></div>
           <div><span>Customer ID</span><strong>{{ verifiedAccount.customerId || '-' }}</strong></div>
           <div><span>Account Type</span><strong>{{ verifiedAccount.accountType }}</strong></div>
+          <div *ngIf="verifiedAccount.productAccountNumber"><span>Product Account #</span><strong>{{ verifiedAccount.productAccountNumber }}</strong></div>
+          <div *ngIf="verifiedAccount.linkedSavingsAccountNumber"><span>Linked Savings #</span><strong>{{ verifiedAccount.linkedSavingsAccountNumber }}</strong></div>
           <div><span>Mobile</span><strong>{{ verifiedAccount.phone || '-' }}</strong></div>
           <div><span>Email</span><strong>{{ verifiedAccount.email || '-' }}</strong></div>
           <div><span>Aadhaar</span><strong>{{ verifiedAccount.aadhaarNumber || '-' }}</strong></div>
           <div><span>PAN</span><strong>{{ verifiedAccount.panNumber || '-' }}</strong></div>
+        </div>
+        <div class="details-grid product-details-grid" *ngIf="verifiedProductDetails.length">
+          <div *ngFor="let detail of verifiedProductDetails">
+            <span>{{ detail.label }}</span><strong>{{ detail.value }}</strong>
+          </div>
+        </div>
+        <div class="details-grid product-details-grid" *ngIf="verifiedAccount.ecsMandates?.length">
+          <div *ngFor="let mandate of verifiedAccount.ecsMandates">
+            <span>ECS {{ mandate['mandateId'] || 'Mandate' }} · {{ mandate['status'] || 'Unknown' }}</span>
+            <strong>Debit account {{ mandate['savingsAccountNumber'] || '-' }} · Installment {{ mandate['emiAmount'] || '-' }}</strong>
+          </div>
         </div>
       </div>
       <p class="verify-error" *ngIf="accountVerificationError">{{ accountVerificationError }}</p>

@@ -1,0 +1,146 @@
+<main class="closure-page">
+  <header class="closure-header">
+    <div>
+      <p class="eyebrow">ADMINISTRATION · CHEQUE OPERATIONS</p>
+      <h1>Cheque Book Closure</h1>
+      <p>Find cheque books, close active books and review the account's closure history.</p>
+    </div>
+    <button type="button" class="back-button" (click)="goBack()">Back to dashboard</button>
+  </header>
+
+  <section class="closure-card">
+    <div class="section-title">
+      <div>
+        <h2>Close cheque books</h2>
+        <p>Search by salary, savings or current account number.</p>
+      </div>
+    </div>
+
+    <div class="form-row">
+      <label class="field">
+        <span>Account number</span>
+        <div class="input-action">
+          <input type="text" [(ngModel)]="closureAccountNumber"
+            (keyup.enter)="fetchChequeBooksForClosure()"
+            placeholder="Enter account number" autocomplete="off">
+          <button type="button" class="search-button" (click)="fetchChequeBooksForClosure()"
+            [disabled]="isLoadingClosureBooks">
+            {{ isLoadingClosureBooks ? 'Loading…' : 'Find books' }}
+          </button>
+        </div>
+      </label>
+      <button type="button" class="close-button" (click)="closeChequeBooksForAccount()"
+        [disabled]="isClosingBooks || !hasActiveBooks">
+        {{ isClosingBooks ? 'Closing…' : 'Close active cheque books' }}
+      </button>
+    </div>
+    <p class="help-text">Closing a book invalidates its remaining cheque numbers. Confirm carefully before proceeding.</p>
+  </section>
+
+  <section class="closure-card" aria-labelledby="books-heading">
+    <div class="section-title">
+      <div>
+        <h2 id="books-heading">Cheque books</h2>
+        <p *ngIf="closureAccountNumber">Account {{ closureAccountNumber }}</p>
+      </div>
+      <span class="count-chip" *ngIf="!isLoadingClosureBooks">{{ closureBooks.length }} book(s)</span>
+    </div>
+    <p class="loading-state" *ngIf="isLoadingClosureBooks">Loading cheque books…</p>
+    <div class="table-wrap" *ngIf="!isLoadingClosureBooks && closureBooks.length">
+      <table>
+        <thead>
+          <tr>
+            <th>Account</th>
+            <th>Account type</th>
+            <th>Book number</th>
+            <th>Serial range</th>
+            <th>Generated</th>
+            <th>Used</th>
+            <th>Available</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let book of closureBooks">
+            <td>{{ book.accountNumber || '—' }}</td>
+            <td>{{ book.accountType || '—' }}</td>
+            <td>{{ book.chequeBookNumber || 'Legacy book' }}</td>
+            <td>{{ book.serialFrom || '—' }} – {{ book.serialTo || '—' }}</td>
+            <td>{{ book.generatedCount ?? 0 }}</td>
+            <td>{{ book.usedCount ?? 0 }}</td>
+            <td>{{ book.availableCount ?? 0 }}</td>
+            <td><span class="status-chip" [class.closed]="(book.status || '').toUpperCase() === 'CLOSED'">
+              {{ book.status || 'Unknown' }}
+            </span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="empty-state" *ngIf="!isLoadingClosureBooks && closureAccountNumber && !closureBooks.length">
+      No cheque books were found for this account.
+    </p>
+    <p class="empty-state" *ngIf="!isLoadingClosureBooks && !closureAccountNumber">
+      Enter an account number to view its cheque books.
+    </p>
+  </section>
+
+  <section class="closure-card" aria-labelledby="history-heading">
+    <div class="section-title">
+      <div>
+        <h2 id="history-heading">Closure history</h2>
+        <p>Previous administrative closure actions for this account.</p>
+      </div>
+      <span class="count-chip">{{ closureHistory.length }} record(s)</span>
+    </div>
+    <div class="table-wrap" *ngIf="closureHistory.length">
+      <table>
+        <thead>
+          <tr>
+            <th>Book number</th>
+            <th>Closed by</th>
+            <th>Reason</th>
+            <th>Closed at</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let item of closureHistory">
+            <td>{{ item.chequeBookNumber || 'Legacy book' }}</td>
+            <td>{{ item.closedBy || '—' }}</td>
+            <td>{{ item.reason || 'Admin closure' }}</td>
+            <td>{{ item.closedAt | date:'medium' }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="empty-state" *ngIf="!closureHistory.length">
+      Closure history will appear here after you search an account.
+    </p>
+  </section>
+
+  <section class="closure-card" aria-labelledby="lookup-heading">
+    <div class="section-title">
+      <div>
+        <h2 id="lookup-heading">Look up a cheque</h2>
+        <p>Check cheque number, account, type and current status.</p>
+      </div>
+    </div>
+    <div class="lookup-row">
+      <label class="field">
+        <span>Cheque number</span>
+        <input type="text" [(ngModel)]="chequeLookupNumber"
+          (keyup.enter)="lookupChequeByNumber()" placeholder="Enter cheque number" autocomplete="off">
+      </label>
+      <button type="button" class="search-button" (click)="lookupChequeByNumber()" [disabled]="isLookingUpCheque">
+        {{ isLookingUpCheque ? 'Searching…' : 'Search cheque' }}
+      </button>
+    </div>
+    <dl class="lookup-result" *ngIf="chequeLookupResult">
+      <div><dt>Cheque</dt><dd>{{ chequeLookupResult.chequeNumber || '—' }}</dd></div>
+      <div><dt>Account</dt><dd>{{ chequeLookupResult.accountNumber || '—' }}</dd></div>
+      <div><dt>Account type</dt><dd>{{ chequeLookupResult.accountType || '—' }}</dd></div>
+      <div><dt>Status</dt><dd>{{ chequeLookupResult.status || '—' }}</dd></div>
+      <div><dt>Amount</dt><dd>{{ chequeLookupResult.amount ?? '—' }}</dd></div>
+      <div *ngIf="chequeLookupResult.usedReference"><dt>Used reference</dt><dd>{{ chequeLookupResult.usedReference }}</dd></div>
+    </dl>
+  </section>
+</main>

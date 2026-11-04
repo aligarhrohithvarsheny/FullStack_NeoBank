@@ -280,32 +280,14 @@ export class Customer360 implements OnInit {
   }
 
   homeLoanDocuments(loan: any): Array<{ type: string; label: string; index?: number; fileName: string }> {
-    const documents: Array<{ type: string; label: string; index?: number; fileName: string }> = [];
-    const singles: Array<[string, string, string]> = [
-      ['fdReceiptPath', 'fdReceipt', 'FD receipt'],
-      ['modelDocPath', 'model', 'Loan model'],
-      ['signaturePath', 'signature', 'Signature'],
-      ['vehicleInvoicePath', 'vehicleInvoice', 'Vehicle invoice'],
-      ['landRecordPath', 'landRecord', 'Land record'],
-      ['agricultureEstimatePath', 'agricultureEstimate', 'Agriculture estimate'],
-      ['cropEstimatePath', 'cropEstimate', 'Crop estimate']
-    ];
-    for (const [pathKey, type, label] of singles) {
-      const path = loan?.[pathKey];
-      if (typeof path === 'string' && path.trim()) {
-        documents.push({ type, label, fileName: path.split(/[\\/]/).pop() || label });
-      }
-    }
-    const images = typeof loan?.vehicleImagePaths === 'string'
-      ? loan.vehicleImagePaths.split(',').filter((path: string) => path.trim())
+    return Array.isArray(loan?.availableDocuments)
+      ? loan.availableDocuments.map((document: any) => ({
+          type: String(document.type),
+          label: String(document.label || document.name || 'Loan document'),
+          index: document.index === null || document.index === undefined ? undefined : Number(document.index),
+          fileName: String(document.name || 'loan-document')
+        }))
       : [];
-    images.forEach((path: string, index: number) => documents.push({
-      type: 'vehicleImages',
-      label: `Vehicle image ${index + 1}`,
-      index,
-      fileName: path.trim().split(/[\\/]/).pop() || `vehicle-image-${index + 1}`
-    }));
-    return documents;
   }
 
   downloadBankForm(upload: any): void {
