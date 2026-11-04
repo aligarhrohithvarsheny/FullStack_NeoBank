@@ -1,4 +1,20 @@
-<div class="container-fluid p-4">
+<div class="allocation-dashboard-shell" [class.has-allocation-sidebar]="isAllocationAccountLogin">
+  <aside class="allocation-dashboard-sidebar" *ngIf="isAllocationAccountLogin">
+    <div class="allocation-sidebar-brand">
+      <span class="allocation-brand-mark"><i class="fas fa-landmark"></i></span>
+      <div><strong>FA ACCOUNT</strong><small>Funds allocation</small></div>
+    </div>
+    <nav aria-label="Allocation account navigation">
+      <button type="button" [class.active]="activeSection === 'overview'" (click)="navigateDashboardSection('overview')"><i class="fas fa-chart-pie"></i><span>Overview</span></button>
+      <button type="button" [class.active]="activeSection === 'account'" (click)="navigateDashboardSection('account')"><i class="fas fa-university"></i><span>Account details</span></button>
+      <button type="button" [class.active]="activeSection === 'transactions'" (click)="navigateDashboardSection('transactions')"><i class="fas fa-exchange-alt"></i><span>Transactions</span></button>
+      <button type="button" [class.active]="activeSection === 'charges'" (click)="navigateDashboardSection('charges')"><i class="fas fa-receipt"></i><span>Charges</span></button>
+      <button type="button" [class.active]="activeSection === 'requests'" (click)="navigateDashboardSection('requests')"><i class="fas fa-paper-plane"></i><span>Operation requests</span></button>
+    </nav>
+    <div class="allocation-sidebar-footer"><i class="fas fa-shield-alt"></i> Allocation access</div>
+  </aside>
+
+<div class="container-fluid p-4" [class.allocation-dashboard-content]="isAllocationAccountLogin">
   <div class="row">
     <div class="col-12">
       <div class="d-flex justify-content-between align-items-center mb-4">
@@ -56,7 +72,7 @@
     </div>
 
     <!-- Account Header -->
-    <div class="row mb-4">
+    <div class="row mb-4" id="allocation-account">
       <div class="col-12">
         <div class="card border-left-primary">
           <div class="card-body">
@@ -178,7 +194,7 @@
       </div>
     </div>
 
-    <section class="allocation-activity-section" *ngIf="isAllocationAccountLogin">
+    <section class="allocation-activity-section" id="allocation-overview" *ngIf="isAllocationAccountLogin">
       <div class="allocation-section-heading">
         <div><span>Account activity</span><small>Totals from allocation transactions and charge records</small></div>
       </div>
@@ -200,8 +216,65 @@
       </div>
     </section>
 
+    <section class="allocation-request-section" id="allocation-requests" *ngIf="isAllocationAccountLogin && activeSection === 'requests'">
+      <div class="allocation-section-heading">
+        <div><span>Operation requests</span><small>Submit a top-up, deposit, or transfer request to your HOD</small></div>
+      </div>
+      <div class="allocation-request-notice"><i class="fas fa-info-circle"></i> Requests do not move funds. Your HOD must review and approve them, then settle them through the approved banking workflow.</div>
+      <p class="alert alert-success" *ngIf="requestSuccess" role="status">{{ requestSuccess }}</p>
+      <p class="alert alert-danger" *ngIf="requestError" role="alert">{{ requestError }}</p>
+      <form class="allocation-request-form" (ngSubmit)="submitOperationRequest()">
+        <label>Request type
+          <select [(ngModel)]="requestType" name="requestType">
+            <option value="TOP_UP">Add funds / top-up</option>
+            <option value="DEPOSIT">Deposit funds</option>
+            <option value="TRANSFER">Transfer request</option>
+          </select>
+        </label>
+        <label>Amount (₹)
+          <input type="number" name="requestAmount" [(ngModel)]="requestAmount" min="0.01" step="0.01" required>
+        </label>
+        <label *ngIf="requestType === 'TRANSFER'">Destination account
+          <input type="text" name="requestDestinationAccount" [(ngModel)]="requestDestinationAccount" maxlength="50" required>
+        </label>
+        <label *ngIf="requestType === 'TRANSFER'">Recipient name
+          <input type="text" name="requestDestinationName" [(ngModel)]="requestDestinationName" maxlength="150">
+        </label>
+        <label>Reference
+          <input type="text" name="requestReference" [(ngModel)]="requestReference" maxlength="100" placeholder="Optional transaction or deposit reference">
+        </label>
+        <label class="request-description">Reason / details
+          <textarea name="requestDescription" [(ngModel)]="requestDescription" maxlength="500" rows="3" placeholder="Add context for the HOD reviewer"></textarea>
+        </label>
+        <button type="submit" class="btn btn-primary" [disabled]="isSubmittingRequest">
+          <i class="fas" [ngClass]="isSubmittingRequest ? 'fa-spinner fa-spin' : 'fa-paper-plane'"></i>
+          {{ isSubmittingRequest ? 'Submitting…' : 'Submit for HOD review' }}
+        </button>
+      </form>
+
+      <div class="allocation-request-history">
+        <h6>Request history</h6>
+        <div class="table-responsive">
+          <table class="table table-hover">
+            <thead class="table-light"><tr><th>Submitted</th><th>Request</th><th>Amount</th><th>Destination / reference</th><th>Status</th><th>Review</th></tr></thead>
+            <tbody>
+              <tr *ngFor="let request of operationRequests">
+                <td>{{ request.createdAt | date:'dd/MM/yyyy HH:mm' }}</td>
+                <td>{{ request.requestType }}<small class="d-block text-muted">{{ request.description || '—' }}</small></td>
+                <td>{{ formatCurrency(request.amount) }}</td>
+                <td>{{ request.destinationAccountNumber || request.externalReference || '—' }}</td>
+                <td><span class="request-status" [ngClass]="'status-' + (request.status || 'pending').toLowerCase()">{{ request.status }}</span></td>
+                <td>{{ request.reviewedAt ? ((request.reviewedByName || 'HOD') + ' · ' + (request.reviewedAt | date:'short')) : 'Awaiting HOD' }}<small *ngIf="request.reviewNote" class="d-block text-muted">{{ request.reviewNote }}</small></td>
+              </tr>
+              <tr *ngIf="!operationRequests.length"><td colspan="6" class="text-center text-muted">No requests submitted.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
     <!-- Tabs -->
-    <div class="row">
+    <div class="row" id="allocation-transactions">
       <div class="col-12">
         <div class="card">
           <div class="card-header">
@@ -331,9 +404,10 @@
                       <td>{{ formatCurrency(txn.balance) }}</td>
                       <td>{{ txn.date | date: 'short' }}</td>
                       <td>{{ txn.description || txn.linkedTransactionId || '—' }}<small class="d-block text-muted">{{ txn.performedByName || '—' }}</small></td>
+                      <td><button type="button" class="btn btn-sm btn-outline-primary" (click)="openTransactionDetails(txn)">Details</button></td>
                     </tr>
                     <tr *ngIf="accountTransactions.length === 0">
-                      <td colspan="7" class="text-center text-muted">No transactions found</td>
+                      <td colspan="8" class="text-center text-muted">No transactions found</td>
                     </tr>
                   </tbody>
                 </table>
@@ -356,7 +430,7 @@
             </div>
 
             <!-- Charges Tab -->
-            <div *ngIf="activeTab === 'charges'">
+            <div id="allocation-charges" *ngIf="activeTab === 'charges'">
               <div class="alert alert-info">
                 <i class="fas fa-info-circle"></i>
                 <strong>Charge Summary:</strong> All charges are automatically debited from users and credited to this account.
@@ -427,7 +501,7 @@
                 <h6>Recent charge activity</h6>
                 <div class="table-responsive">
                   <table class="table table-hover">
-                    <thead class="table-light"><tr><th>Date</th><th>Charge</th><th>Customer / account</th><th>Collected</th><th>Credited</th><th>Reference</th><th>Status</th></tr></thead>
+                    <thead class="table-light"><tr><th>Date</th><th>Charge</th><th>Customer / account</th><th>Collected</th><th>Credited</th><th>Reference</th><th>Status</th><th></th></tr></thead>
                     <tbody>
                       <tr *ngFor="let charge of dashboardCharges">
                         <td>{{ charge.createdAt | date:'short' }}</td>
@@ -437,8 +511,9 @@
                         <td>{{ formatCurrency(charge.creditedAmount) }}</td>
                         <td>{{ charge.creditReference || charge.transactionId || '—' }}</td>
                         <td>{{ charge.creditStatus || charge.collectionStatus }}</td>
+                        <td><button type="button" class="btn btn-sm btn-outline-primary" (click)="openChargeDetails(charge)">Details</button></td>
                       </tr>
-                      <tr *ngIf="!dashboardCharges.length"><td colspan="7" class="text-center text-muted">No charge records found</td></tr>
+                      <tr *ngIf="!dashboardCharges.length"><td colspan="8" class="text-center text-muted">No charge records found</td></tr>
                     </tbody>
                   </table>
                 </div>
@@ -455,4 +530,52 @@
     <i class="fas fa-info-circle fa-3x mb-3"></i>
     <p>Select an allocation to view linked account details</p>
   </div>
+</div>
+
+<div class="allocation-details-backdrop" *ngIf="selectedTransaction as transaction" (click)="closeActivityDetails()">
+  <section class="allocation-details-dialog" role="dialog" aria-modal="true" aria-labelledby="allocation-transaction-title" (click)="$event.stopPropagation()">
+    <header><div><span class="details-eyebrow">Allocation ledger</span><h3 id="allocation-transaction-title">Transaction details</h3></div><button type="button" class="details-close" aria-label="Close transaction details" (click)="closeActivityDetails()">×</button></header>
+    <div class="details-amount-row"><span class="badge" [ngClass]="transaction.type === 'DEBIT' ? 'badge-danger' : 'badge-success'">{{ transaction.type }}</span><strong>{{ formatCurrency(transaction.amount) }}</strong></div>
+    <dl class="allocation-detail-list">
+      <div><dt>Transaction ID</dt><dd>{{ transaction.transactionId || 'Not recorded' }}</dd></div>
+      <div><dt>Status</dt><dd>{{ transaction.status || 'Not recorded' }}</dd></div>
+      <div><dt>Date and time</dt><dd>{{ transaction.date | date:'dd/MM/yyyy HH:mm:ss' }}</dd></div>
+      <div><dt>Product / type</dt><dd>{{ transaction.productType || 'Not recorded' }}</dd></div>
+      <div><dt>Balance after</dt><dd>{{ formatCurrency(transaction.balanceAfter) }}</dd></div>
+      <div><dt>Customer</dt><dd>{{ transaction.userName || 'Not recorded' }}</dd></div>
+      <div><dt>Customer account</dt><dd>{{ transaction.userAccountNumber || 'Not recorded' }}</dd></div>
+      <div><dt>Linked transaction</dt><dd>{{ transaction.linkedTransactionId || 'Not recorded' }}</dd></div>
+      <div><dt>Reference number</dt><dd>{{ transaction.referenceNumber || 'Not recorded' }}</dd></div>
+      <div><dt>Performed by</dt><dd>{{ transaction.performedByName || 'Not recorded' }}</dd></div>
+      <div class="details-wide"><dt>Description</dt><dd>{{ transaction.description || 'No description recorded' }}</dd></div>
+      <div class="details-wide"><dt>Remarks</dt><dd>{{ transaction.remarks || 'No remarks recorded' }}</dd></div>
+    </dl>
+  </section>
+</div>
+
+<div class="allocation-details-backdrop" *ngIf="selectedCharge as charge" (click)="closeActivityDetails()">
+  <section class="allocation-details-dialog" role="dialog" aria-modal="true" aria-labelledby="allocation-charge-title" (click)="$event.stopPropagation()">
+    <header><div><span class="details-eyebrow">Allocation charge ledger</span><h3 id="allocation-charge-title">Charge details</h3></div><button type="button" class="details-close" aria-label="Close charge details" (click)="closeActivityDetails()">×</button></header>
+    <div class="details-amount-row"><span class="badge badge-success">{{ charge.chargeType }}</span><strong>{{ formatCurrency(charge.amount) }}</strong></div>
+    <dl class="allocation-detail-list">
+      <div><dt>Charge transaction ID</dt><dd>{{ charge.transactionId || 'Not recorded' }}</dd></div>
+      <div><dt>Created</dt><dd>{{ charge.createdAt | date:'dd/MM/yyyy HH:mm:ss' }}</dd></div>
+      <div><dt>Credited at</dt><dd>{{ charge.creditedAt ? (charge.creditedAt | date:'dd/MM/yyyy HH:mm:ss') : 'Not credited' }}</dd></div>
+      <div><dt>Collection status</dt><dd>{{ charge.collectionStatus || 'Not recorded' }}</dd></div>
+      <div><dt>Credit status</dt><dd>{{ charge.creditStatus || 'Not recorded' }}</dd></div>
+      <div><dt>Net credited</dt><dd>{{ formatCurrency(charge.creditedAmount) }}</dd></div>
+      <div><dt>Tax withheld</dt><dd>{{ formatCurrency(charge.taxAmount) }}</dd></div>
+      <div><dt>Credit reference</dt><dd>{{ charge.creditReference || 'Not recorded' }}</dd></div>
+      <div><dt>Customer</dt><dd>{{ charge.userName || 'Not recorded' }} · {{ charge.userAccountNumber || 'Account not recorded' }}</dd></div>
+      <div><dt>Product</dt><dd>{{ charge.userProductType || 'Not recorded' }}</dd></div>
+      <div><dt>Linked transaction</dt><dd>{{ charge.linkedTransactionId || 'Not recorded' }}</dd></div>
+      <div><dt>Linked loan / deposit</dt><dd>{{ charge.linkedLoanId || charge.linkedDepositId || 'Not recorded' }}</dd></div>
+      <div><dt>Processed by</dt><dd>{{ charge.processedByAdminName || (charge.processedByAdminId ? ('Admin #' + charge.processedByAdminId) : 'Not recorded') }}</dd></div>
+      <div><dt>Reconciliation</dt><dd>{{ charge.reconciliationStatus || 'Not recorded' }}</dd></div>
+      <div class="details-wide"><dt>Description</dt><dd>{{ charge.description || 'No description recorded' }}</dd></div>
+      <div class="details-wide" *ngIf="charge.reconciliationNotes"><dt>Reconciliation notes</dt><dd>{{ charge.reconciliationNotes }}</dd></div>
+      <div class="details-wide" *ngIf="charge.failureReason"><dt>Failure reason</dt><dd>{{ charge.failureReason }}</dd></div>
+    </dl>
+  </section>
+</div>
 </div>

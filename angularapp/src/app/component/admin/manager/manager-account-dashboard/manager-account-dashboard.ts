@@ -24,6 +24,7 @@ export class ManagerAccountDashboardComponent implements OnInit, OnDestroy {
   errorMessage = '';
   
   activeTab = 'overview';
+  activeSection = 'overview';
   transactionPage = 0;
   transactionSize = 10;
   isAllocationAccountLogin = false;
@@ -32,6 +33,18 @@ export class ManagerAccountDashboardComponent implements OnInit, OnDestroy {
   transactionTotalPages = 0;
   lastRefreshedAt: Date | null = null;
   isRefreshing = false;
+  selectedTransaction: any = null;
+  selectedCharge: any = null;
+  operationRequests: any[] = [];
+  requestType = 'TOP_UP';
+  requestAmount: number | null = null;
+  requestDestinationAccount = '';
+  requestDestinationName = '';
+  requestReference = '';
+  requestDescription = '';
+  requestSuccess = '';
+  requestError = '';
+  isSubmittingRequest = false;
   private allocationRefreshTimer?: ReturnType<typeof setInterval>;
 
   constructor(
@@ -134,6 +147,7 @@ export class ManagerAccountDashboardComponent implements OnInit, OnDestroy {
    */
   switchTab(tab: string): void {
     this.activeTab = tab;
+    this.activeSection = tab === 'transactions' ? 'transactions' : tab === 'charges' ? 'charges' : 'overview';
     this.errorMessage = '';
 
     if (tab === 'transactions') {
@@ -142,6 +156,85 @@ export class ManagerAccountDashboardComponent implements OnInit, OnDestroy {
       if (this.isAllocationAccountLogin) this.loadAllocationDashboard(true);
       else this.loadChargeSummary();
     }
+  }
+
+  navigateDashboardSection(section: 'overview' | 'account' | 'transactions' | 'charges' | 'requests'): void {
+    this.activeSection = section;
+    if (section === 'transactions' || section === 'charges' || section === 'overview') {
+      this.switchTab(section === 'account' ? 'overview' : section);
+    }
+    const target = document.getElementById(`allocation-${section}`);
+    target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  submitOperationRequest(): void {
+    this.requestError = '';
+    this.requestSuccess = '';
+    if (!this.requestAmount || this.requestAmount <= 0) {
+      this.requestError = 'Enter an amount greater than zero.';
+      return;
+    }
+    if (this.requestType === 'TRANSFER' && !this.requestDestinationAccount.trim()) {
+      this.requestError = 'Enter the transfer destination account.';
+      return;
+    }
+    const token = sessionStorage.getItem('allocationAccountSessionToken') || '';
+    if (!token) {
+      this.logoutAllocationAccount();
+      return;
+    }
+    this.isSubmittingRequest = true;
+    this.accountService.submitAllocationRequest(token, {
+      requestType: this.requestType,
+      amount: this.requestAmount,
+      destinationAccountNumber: this.requestDestinationAccount.trim() || null,
+      destinationName: this.requestDestinationName.trim() || null,
+      externalReference: this.requestReference.trim() || null,
+      description: this.requestDescription.trim() || null
+    }).subscribe({
+      next: (response: any) => {
+        this.isSubmittingRequest = false;
+        if (!response?.success) {
+          this.requestError = response?.message || 'Unable to submit this request.';
+          return;
+        }
+        if (response.request) this.operationRequests = [response.request, ...this.operationRequests];
+        this.requestAmount = null;
+        this.requestDestinationAccount = '';
+        this.requestDestinationName = '';
+        this.requestReference = '';
+        this.requestDescription = '';
+        this.requestSuccess = 'Request sent to the HOD for review. No funds have moved.';
+      },
+      error: (error: any) => {
+        this.isSubmittingRequest = false;
+        this.requestError = error.error?.message || 'Unable to submit this request.';
+      }
+    });
+  }
+
+  private loadOperationRequests(): void {
+    const token = sessionStorage.getItem('allocationAccountSessionToken') || '';
+    if (!token) return;
+    this.accountService.getMyAllocationRequests(token).subscribe({
+      next: (response: any) => this.operationRequests = response?.requests || [],
+      error: () => this.requestError = 'Unable to load your submitted requests.'
+    });
+  }
+
+  openTransactionDetails(transaction: any): void {
+    this.selectedTransaction = transaction;
+    this.selectedCharge = null;
+  }
+
+  openChargeDetails(charge: any): void {
+    this.selectedCharge = charge;
+    this.selectedTransaction = null;
+  }
+
+  closeActivityDetails(): void {
+    this.selectedTransaction = null;
+    this.selectedCharge = null;
   }
 
   private loadAllocationDashboard(silent: boolean): void {
@@ -184,6 +277,7 @@ export class ManagerAccountDashboardComponent implements OnInit, OnDestroy {
           totalCharges: account.totalChargesCollected || 0
         };
         this.lastRefreshedAt = response.lastUpdated ? new Date(response.lastUpdated) : new Date();
+        this.loadOperationRequests();
         this.errorMessage = '';
         this.loading = false;
         this.isRefreshing = false;

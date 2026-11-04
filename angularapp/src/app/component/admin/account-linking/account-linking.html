@@ -128,6 +128,9 @@
                     <button type="button" class="btn btn-sm btn-outline-info" (click)="openAllocationHistory(account)" [disabled]="historyLoading">
                       <i class="fas fa-history"></i> View history
                     </button>
+                    <button type="button" class="btn btn-sm btn-outline-warning" (click)="openOperationRequests(account)" [disabled]="operationRequestsLoading || !getAllocationForAccount(account)">
+                      <i class="fas fa-inbox"></i> Operation requests
+                    </button>
                     <button type="button" class="btn btn-sm"
                       [ngClass]="isAllocationExpired(getAllocationForAccount(account)) ? 'btn-warning' : 'btn-outline-secondary'"
                       (click)="editAllocationDetails(account)" [disabled]="loading || !getAllocationForAccount(account)">
@@ -260,6 +263,50 @@
             <button type="button" class="btn btn-sm btn-outline-secondary" (click)="changeAllocationHistoryPage(-1)" [disabled]="historyPage === 0">Previous</button>
             <button type="button" class="btn btn-sm btn-outline-secondary" (click)="changeAllocationHistoryPage(1)" [disabled]="historyPage >= historyTotalPages - 1">Next</button>
           </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <div class="row" *ngIf="selectedOperationAccount as operationAccount">
+    <div class="col-12">
+      <section class="allocation-history-panel">
+        <div class="allocation-history-heading">
+          <div>
+            <span class="account-linking-eyebrow">Allocation {{ getAllocationForAccount(operationAccount)?.allocationId || operationAccount.allocationId }}</span>
+            <h5>FA account operation requests</h5>
+            <p>{{ operationAccount.accountHolderName }} · {{ operationAccount.accountNumber }}</p>
+          </div>
+          <div class="d-flex gap-2">
+            <button type="button" class="btn btn-outline-secondary" (click)="loadOperationRequests()" [disabled]="operationRequestsLoading">Refresh</button>
+            <button type="button" class="btn btn-outline-secondary" (click)="selectedOperationAccount = null">Close</button>
+          </div>
+        </div>
+        <p class="allocation-request-review-note">Approval records the HOD decision only. No funds move automatically; settle using the approved banking workflow.</p>
+        <div class="allocation-history-loading" *ngIf="operationRequestsLoading">Loading requests…</div>
+        <div class="allocation-history-table-wrap" *ngIf="!operationRequestsLoading">
+          <table class="table table-hover allocation-history-table">
+            <thead><tr><th>Requested</th><th>Type</th><th>Amount</th><th>Destination / reference</th><th>Details</th><th>Status</th><th>Review note</th><th>Action</th></tr></thead>
+            <tbody>
+              <tr *ngFor="let request of allocationOperationRequests">
+                <td>{{ request.createdAt | date:'dd/MM/yyyy HH:mm' }}</td>
+                <td>{{ request.requestType }}</td>
+                <td>{{ request.amount | currency:'INR':'symbol':'1.2-2' }}</td>
+                <td>{{ request.destinationAccountNumber || '—' }}<small class="d-block text-muted">{{ request.destinationName || request.externalReference || '—' }}</small></td>
+                <td>{{ request.description || '—' }}</td>
+                <td><span class="request-status" [ngClass]="'status-' + (request.status || 'pending').toLowerCase()">{{ request.status }}</span></td>
+                <td>{{ request.reviewNote || (request.reviewedByName || 'Awaiting review') }}</td>
+                <td>
+                  <div class="request-review-actions" *ngIf="request.status === 'PENDING'; else reviewedRequest">
+                    <button type="button" class="btn btn-sm btn-success" (click)="reviewOperationRequest(request, 'APPROVED')" [disabled]="reviewingOperationRequestId === request.id">Approve</button>
+                    <button type="button" class="btn btn-sm btn-outline-danger" (click)="reviewOperationRequest(request, 'REJECTED')" [disabled]="reviewingOperationRequestId === request.id">Reject</button>
+                  </div>
+                  <ng-template #reviewedRequest><small>{{ request.reviewedByName || 'Reviewed' }}<br>{{ request.reviewedAt | date:'short' }}</small></ng-template>
+                </td>
+              </tr>
+              <tr *ngIf="!allocationOperationRequests.length"><td colspan="8" class="history-empty">No operation requests for this allocation.</td></tr>
+            </tbody>
+          </table>
         </div>
       </section>
     </div>

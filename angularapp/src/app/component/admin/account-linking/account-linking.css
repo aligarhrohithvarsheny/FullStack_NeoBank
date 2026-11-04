@@ -130,6 +130,12 @@
   font-size: 10px;
   font-weight: 700;
 }
+.allocation-request-review-note { margin: 16px 0; padding: 10px 12px; border-left: 3px solid #d29624; color: #66501b; background: #fff9e9; font-size: 12px; }
+.request-review-actions { display: flex; gap: 5px; }
+.request-status { display: inline-block; padding: 4px 8px; border-radius: 4px; background: #eef2f1; color: #52646b; font-size: 10px; font-weight: 700; }
+.request-status.status-pending { color: #875b0b; background: #fff2cc; }
+.request-status.status-approved { color: #126044; background: #ddf5e9; }
+.request-status.status-rejected { color: #923b36; background: #fbe4e2; }
 
 @media (max-width: 640px) {
   .allocation-history-panel { padding: 15px; }

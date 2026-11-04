@@ -50,6 +50,10 @@ export class AccountLinkingComponent implements OnInit {
   historyDebitCount = 0;
   historyCreditCount = 0;
   historyTab: 'allocation' | 'edits' | 'debits' | 'credits' = 'allocation';
+  selectedOperationAccount: any | null = null;
+  allocationOperationRequests: any[] = [];
+  operationRequestsLoading = false;
+  reviewingOperationRequestId: number | null = null;
   readonly bankOptions = [
     { name: 'NeoBank', ifscCode: 'NEOB0000001' },
     { name: 'ExyVault', ifscCode: 'EZYV000123' }
@@ -434,6 +438,54 @@ export class AccountLinkingComponent implements OnInit {
 
   get allocationCreditHistory(): any[] {
     return this.allocationTransactions.filter(transaction => transaction.type === 'CREDIT');
+  }
+
+  openOperationRequests(account: any): void {
+    this.selectedOperationAccount = account;
+    this.allocationOperationRequests = [];
+    this.loadOperationRequests(account);
+  }
+
+  loadOperationRequests(account: any = this.selectedOperationAccount): void {
+    const allocationId = Number(account?.allocationId);
+    const token = sessionStorage.getItem('adminSessionToken') || '';
+    if (!allocationId || !token) return;
+    this.operationRequestsLoading = true;
+    this.accountService.getHodAllocationRequests(allocationId, token).subscribe({
+      next: (response: any) => {
+        this.allocationOperationRequests = response?.requests || [];
+        this.operationRequestsLoading = false;
+      },
+      error: error => {
+        this.errorMessage = error.error?.message || 'Unable to load allocation operation requests.';
+        this.operationRequestsLoading = false;
+      }
+    });
+  }
+
+  reviewOperationRequest(request: any, decision: 'APPROVED' | 'REJECTED'): void {
+    if (!this.selectedOperationAccount || !request?.id || request.status !== 'PENDING') return;
+    const verb = decision === 'APPROVED' ? 'approve' : 'reject';
+    if (!confirm(`${verb[0].toUpperCase()}${verb.slice(1)} this request? This records the decision only; no funds move automatically.`)) return;
+    const token = sessionStorage.getItem('adminSessionToken') || '';
+    const allocationId = Number(this.selectedOperationAccount.allocationId);
+    if (!token || !allocationId) return;
+    const reviewNote = window.prompt('Optional HOD review note:', '') || '';
+
+    this.reviewingOperationRequestId = Number(request.id);
+    this.accountService.reviewHodAllocationRequest(allocationId, Number(request.id), token, {
+      decision,
+      reviewNote
+    }).subscribe({
+      next: () => {
+        this.reviewingOperationRequestId = null;
+        this.loadOperationRequests();
+      },
+      error: error => {
+        this.reviewingOperationRequestId = null;
+        this.errorMessage = error.error?.message || `Unable to ${verb} this request.`;
+      }
+    });
   }
 
   createAllocation(): void {

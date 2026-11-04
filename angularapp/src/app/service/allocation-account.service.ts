@@ -103,6 +103,30 @@ export class AllocationAccountService {
     });
   }
 
+  getMyAllocationRequests(token: string): Observable<any> {
+    return this.http.get(`${this.apiUrl}/allocation-account/requests`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+  }
+
+  submitAllocationRequest(token: string, payload: any): Observable<any> {
+    return this.http.post(`${this.apiUrl}/allocation-account/requests`, payload, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+  }
+
+  getHodAllocationRequests(allocationId: number, token: string): Observable<any> {
+    return this.http.get(`${this.apiUrl}/hod/allocations/${allocationId}/account-requests`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+  }
+
+  reviewHodAllocationRequest(allocationId: number, requestId: number, token: string, payload: any): Observable<any> {
+    return this.http.put(`${this.apiUrl}/hod/allocations/${allocationId}/account-requests/${requestId}`, payload, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+  }
+
   getAllocationHistory(allocationId: number, token: string, page = 0, size = 100): Observable<any> {
     return this.http.get(`${this.apiUrl}/hod/allocations/${allocationId}/history`, {
       params: { page: String(page), size: String(size) },

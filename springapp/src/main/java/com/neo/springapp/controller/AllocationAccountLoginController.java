@@ -3,7 +3,11 @@ package com.neo.springapp.controller;
 import com.neo.springapp.entity.AllocationAccount;
 import com.neo.springapp.entity.ChargeTransaction;
 import com.neo.springapp.model.AllocationUtilization;
+import com.neo.springapp.model.Admin;
+import com.neo.springapp.model.AllocationAccountOperationRequest;
 import com.neo.springapp.model.FundsAllocation;
+import com.neo.springapp.repository.AdminRepository;
+import com.neo.springapp.repository.AllocationAccountOperationRequestRepository;
 import com.neo.springapp.repository.AllocationUtilizationRepository;
 import com.neo.springapp.repository.AllocationAccountRepository;
 import com.neo.springapp.repository.ChargeTransactionRepository;
@@ -45,6 +49,8 @@ public class AllocationAccountLoginController {
     private final AllocationAccountRepository linkedAccountRepository;
     private final AllocationUtilizationRepository utilizationRepository;
     private final ChargeTransactionRepository chargeTransactionRepository;
+    private final AllocationAccountOperationRequestRepository operationRequestRepository;
+    private final AdminRepository adminRepository;
     private final PasswordService passwordService;
     private final UserSessionTokenService tokenService;
     private final SecureRandom secureRandom = new SecureRandom();
@@ -54,12 +60,16 @@ public class AllocationAccountLoginController {
             AllocationAccountRepository linkedAccountRepository,
             AllocationUtilizationRepository utilizationRepository,
             ChargeTransactionRepository chargeTransactionRepository,
+            AllocationAccountOperationRequestRepository operationRequestRepository,
+            AdminRepository adminRepository,
             PasswordService passwordService,
             UserSessionTokenService tokenService) {
         this.allocationRepository = allocationRepository;
         this.linkedAccountRepository = linkedAccountRepository;
         this.utilizationRepository = utilizationRepository;
         this.chargeTransactionRepository = chargeTransactionRepository;
+        this.operationRequestRepository = operationRequestRepository;
+        this.adminRepository = adminRepository;
         this.passwordService = passwordService;
         this.tokenService = tokenService;
     }
@@ -270,6 +280,114 @@ public class AllocationAccountLoginController {
         return ResponseEntity.ok(response);
     }
 
+    @GetMapping("/allocation-account/requests")
+    public ResponseEntity<Map<String, Object>> getMyOperationRequests(
+            @AuthenticationPrincipal SessionPrincipal principal) {
+        FundsAllocation allocation = resolveAllocationSession(principal);
+        if (allocation == null) return error(HttpStatus.FORBIDDEN, "An allocation account session is required.");
+        List<Map<String, Object>> requests = operationRequestRepository
+                .findByAllocationRecordIdOrderByCreatedAtDesc(allocation.getId()).stream()
+                .map(this::operationRequestData).toList();
+        return ResponseEntity.ok(Map.of("success", true, "requests", requests));
+    }
+
+    @PostMapping("/allocation-account/requests")
+    public ResponseEntity<Map<String, Object>> submitOperationRequest(
+            @RequestBody OperationRequestPayload payload,
+            @AuthenticationPrincipal SessionPrincipal principal) {
+        FundsAllocation allocation = resolveAllocationSession(principal);
+        if (allocation == null || !isAllocationActive(allocation)) {
+            return error(HttpStatus.FORBIDDEN, "An active allocation account session is required.");
+        }
+        if (payload == null || payload.amount() == null || payload.amount().signum() <= 0
+                || payload.amount().precision() > 19 || payload.amount().scale() > 2) {
+            return error(HttpStatus.BAD_REQUEST, "Enter a valid request amount greater than zero.");
+        }
+        String requestType = payload.requestType() == null ? "" : payload.requestType().trim().toUpperCase(java.util.Locale.ROOT);
+        if (!List.of("TOP_UP", "DEPOSIT", "TRANSFER").contains(requestType)) {
+            return error(HttpStatus.BAD_REQUEST, "Request type must be TOP_UP, DEPOSIT, or TRANSFER.");
+        }
+        if ("TRANSFER".equals(requestType)
+                && (payload.destinationAccountNumber() == null || payload.destinationAccountNumber().isBlank())) {
+            return error(HttpStatus.BAD_REQUEST, "A destination account number is required for transfer requests.");
+        }
+        if (payload.destinationAccountNumber() != null && payload.destinationAccountNumber().length() > 50
+                || payload.destinationName() != null && payload.destinationName().length() > 150
+                || payload.externalReference() != null && payload.externalReference().length() > 100
+                || payload.description() != null && payload.description().length() > 500) {
+            return error(HttpStatus.BAD_REQUEST, "One or more request details exceed the allowed length.");
+        }
+
+        AllocationAccountOperationRequest request = new AllocationAccountOperationRequest();
+        request.setAllocationRecordId(allocation.getId());
+        request.setAllocationReference(allocation.getAllocationId());
+        request.setRequestType(requestType);
+        request.setAmount(payload.amount());
+        request.setDestinationAccountNumber(clean(payload.destinationAccountNumber()));
+        request.setDestinationName(clean(payload.destinationName()));
+        request.setExternalReference(clean(payload.externalReference()));
+        request.setDescription(clean(payload.description()));
+        request.setStatus("PENDING");
+        AllocationAccountOperationRequest saved = operationRequestRepository.save(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
+                "success", true,
+                "message", "Request submitted for HOD review. No funds have moved.",
+                "request", operationRequestData(saved)));
+    }
+
+    @GetMapping("/hod/allocations/{allocationId}/account-requests")
+    public ResponseEntity<Map<String, Object>> getAllocationOperationRequests(
+            @PathVariable Long allocationId,
+            @AuthenticationPrincipal SessionPrincipal principal) {
+        FundsAllocation allocation = requireHodOwnedAllocation(allocationId, principal);
+        if (allocation == null) return error(HttpStatus.FORBIDDEN, "A HOD session for this allocation is required.");
+        List<Map<String, Object>> requests = operationRequestRepository
+                .findByAllocationRecordIdOrderByCreatedAtDesc(allocationId).stream()
+                .map(this::operationRequestData).toList();
+        return ResponseEntity.ok(Map.of("success", true, "requests", requests));
+    }
+
+    @org.springframework.web.bind.annotation.PutMapping("/hod/allocations/{allocationId}/account-requests/{requestId}")
+    @Transactional
+    public ResponseEntity<Map<String, Object>> reviewAllocationOperationRequest(
+            @PathVariable Long allocationId,
+            @PathVariable Long requestId,
+            @RequestBody ReviewDecisionPayload payload,
+            @AuthenticationPrincipal SessionPrincipal principal) {
+        FundsAllocation allocation = requireHodOwnedAllocation(allocationId, principal);
+        if (allocation == null) return error(HttpStatus.FORBIDDEN, "A HOD session for this allocation is required.");
+        String decision = payload == null || payload.decision() == null
+                ? "" : payload.decision().trim().toUpperCase(java.util.Locale.ROOT);
+        if (!List.of("APPROVED", "REJECTED").contains(decision)) {
+            return error(HttpStatus.BAD_REQUEST, "Decision must be APPROVED or REJECTED.");
+        }
+        Optional<AllocationAccountOperationRequest> requestResult = operationRequestRepository
+                .findByIdAndAllocationRecordId(requestId, allocationId);
+        if (requestResult.isEmpty()) return error(HttpStatus.NOT_FOUND, "Operation request not found.");
+        AllocationAccountOperationRequest request = requestResult.get();
+        if (!"PENDING".equalsIgnoreCase(request.getStatus())) {
+            return error(HttpStatus.CONFLICT, "This operation request has already been reviewed.");
+        }
+        String reviewNote = clean(payload.reviewNote());
+        if (reviewNote != null && reviewNote.length() > 500) {
+            return error(HttpStatus.BAD_REQUEST, "Review note cannot exceed 500 characters.");
+        }
+        Admin reviewer = adminRepository.findById(principal.userId()).orElse(null);
+        request.setStatus(decision);
+        request.setReviewedAt(LocalDateTime.now());
+        request.setReviewedByAdminId(principal.userId());
+        request.setReviewedByName(reviewer == null ? null : reviewer.getName());
+        request.setReviewNote(reviewNote);
+        AllocationAccountOperationRequest saved = operationRequestRepository.save(request);
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("success", true);
+        response.put("message", "Request " + decision.toLowerCase(java.util.Locale.ROOT)
+                + ". No funds moved automatically; settle through the approved banking workflow.");
+        response.put("request", operationRequestData(saved));
+        return ResponseEntity.ok(response);
+    }
+
     private Map<String, Object> allocationDashboardData(FundsAllocation allocation) {
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("id", allocation.getId());
@@ -308,6 +426,10 @@ public class AllocationAccountLoginController {
         data.put("upiCharges", account.getUpiCharges());
         data.put("paymentGatewayCharges", account.getPaymentGatewayCharges());
         data.put("totalChargesCollected", account.getTotalChargesCollected());
+        data.put("linkedAt", account.getLinkedAt());
+        data.put("verifiedAt", account.getVerifiedAt());
+        data.put("linkedByAdminName", account.getLinkedByAdminName());
+        data.put("verifiedByAdminId", account.getVerifiedByAdminId());
         return data;
     }
 
@@ -381,8 +503,11 @@ public class AllocationAccountLoginController {
         data.put("userAccountNumber", transaction.getUserAccountNumber());
         data.put("userName", transaction.getUserName());
         data.put("linkedTransactionId", transaction.getLinkedTransactionId());
+        data.put("referenceNumber", transaction.getReferenceNumber());
         data.put("description", transaction.getDescription());
+        data.put("remarks", transaction.getRemarks());
         data.put("performedByName", transaction.getPerformedByName());
+        data.put("performedByAdminId", transaction.getPerformedByAdminId());
         data.put("status", transaction.getStatus());
         data.put("transactionDate", transaction.getTransactionDate());
         return data;
@@ -400,9 +525,61 @@ public class AllocationAccountLoginController {
         data.put("creditReference", charge.getCreditReferenceNumber());
         data.put("userAccountNumber", charge.getUserAccountNumber());
         data.put("userName", charge.getUserName());
+        data.put("userProductType", charge.getUserProductType());
+        data.put("linkedTransactionId", charge.getLinkedTransactionId());
+        data.put("linkedLoanId", charge.getLinkedLoanId());
+        data.put("linkedDepositId", charge.getLinkedDepositId());
+        data.put("taxAmount", charge.getTaxAmount());
+        data.put("failureReason", charge.getFailureReason());
+        data.put("processedByAdminId", charge.getProcessedByAdminId());
+        data.put("processedByAdminName", charge.getProcessedByAdminName());
+        data.put("reconciliationStatus", charge.getReconciliationStatus());
+        data.put("reconciliationNotes", charge.getReconciliationNotes());
         data.put("createdAt", charge.getCreatedAt());
         data.put("creditedAt", charge.getCreditedAt());
         return data;
+    }
+
+    private Map<String, Object> operationRequestData(AllocationAccountOperationRequest request) {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("id", request.getId());
+        data.put("allocationId", request.getAllocationReference());
+        data.put("requestType", request.getRequestType());
+        data.put("amount", request.getAmount());
+        data.put("destinationAccountNumber", request.getDestinationAccountNumber());
+        data.put("destinationName", request.getDestinationName());
+        data.put("externalReference", request.getExternalReference());
+        data.put("description", request.getDescription());
+        data.put("status", request.getStatus());
+        data.put("createdAt", request.getCreatedAt());
+        data.put("reviewedAt", request.getReviewedAt());
+        data.put("reviewedByName", request.getReviewedByName());
+        data.put("reviewedByAdminId", request.getReviewedByAdminId());
+        data.put("reviewNote", request.getReviewNote());
+        return data;
+    }
+
+    private FundsAllocation resolveAllocationSession(SessionPrincipal principal) {
+        if (principal == null || !"ALLOCATION_ACCOUNT".equals(principal.scope())
+                || principal.userId() == null || principal.userId() >= 0
+                || principal.accountNumber() == null || !principal.accountNumber().startsWith("ALLOCATION:")) {
+            return null;
+        }
+        FundsAllocation allocation = allocationRepository.findById(-principal.userId()).orElse(null);
+        if (allocation == null || !("ALLOCATION:" + allocation.getAllocationId()).equals(principal.accountNumber())
+                || !isAllocationActive(allocation)) return null;
+        AllocationAccount account = linkedAccountRepository.findByAllocationId(allocation.getId()).orElse(null);
+        return account != null && isLinkedAccountApproved(account) ? allocation : null;
+    }
+
+    private FundsAllocation requireHodOwnedAllocation(Long allocationId, SessionPrincipal principal) {
+        if (principal == null || !"HOD".equals(principal.scope()) || principal.userId() == null) return null;
+        FundsAllocation allocation = allocationRepository.findById(allocationId).orElse(null);
+        return allocation != null && principal.userId().equals(allocation.getAllocatedByAdminId()) ? allocation : null;
+    }
+
+    private String clean(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 
     private String normalize(String value) {
@@ -435,4 +612,8 @@ public class AllocationAccountLoginController {
     }
 
     public record LoginRequest(String username, String password) {}
+    public record OperationRequestPayload(String requestType, BigDecimal amount,
+                                          String destinationAccountNumber, String destinationName,
+                                          String externalReference, String description) {}
+    public record ReviewDecisionPayload(String decision, String reviewNote) {}
 }

@@ -2,11 +2,15 @@ package com.neo.springapp.controller;
 
 import com.neo.springapp.entity.AllocationAccount;
 import com.neo.springapp.model.AllocationUtilization;
+import com.neo.springapp.model.AllocationAccountOperationRequest;
 import com.neo.springapp.model.FundsAllocation;
+import com.neo.springapp.model.Admin;
 import com.neo.springapp.repository.AllocationAccountRepository;
+import com.neo.springapp.repository.AllocationAccountOperationRequestRepository;
 import com.neo.springapp.repository.AllocationUtilizationRepository;
 import com.neo.springapp.repository.ChargeTransactionRepository;
 import com.neo.springapp.repository.FundsAllocationRepository;
+import com.neo.springapp.repository.AdminRepository;
 import com.neo.springapp.service.PasswordService;
 import com.neo.springapp.service.UserSessionTokenService;
 import com.neo.springapp.service.UserSessionTokenService.SessionPrincipal;
@@ -30,6 +34,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -40,6 +45,8 @@ class AllocationAccountLoginControllerTest {
     @Mock private AllocationAccountRepository linkedAccountRepository;
     @Mock private AllocationUtilizationRepository utilizationRepository;
     @Mock private ChargeTransactionRepository chargeTransactionRepository;
+    @Mock private AllocationAccountOperationRequestRepository operationRequestRepository;
+    @Mock private AdminRepository adminRepository;
     @Mock private PasswordService passwordService;
     @Mock private UserSessionTokenService tokenService;
 
@@ -51,7 +58,8 @@ class AllocationAccountLoginControllerTest {
     void setUp() {
         controller = new AllocationAccountLoginController(
             allocationRepository, linkedAccountRepository, utilizationRepository,
-            chargeTransactionRepository, passwordService, tokenService);
+            chargeTransactionRepository, operationRequestRepository, adminRepository,
+            passwordService, tokenService);
         allocation = new FundsAllocation();
         allocation.setId(12L);
         allocation.setAllocationId("FA-2026-00012");
@@ -198,5 +206,54 @@ class AllocationAccountLoginControllerTest {
         assertThat(response.getBody().get("transactions")).asList().hasSize(1);
         assertThat(((Map<?, ?>) response.getBody().get("summary")).get("loansOpened")).isEqualTo(1L);
         assertThat(((Map<?, ?>) response.getBody().get("summary")).get("loanDebits")).isEqualTo(250.0);
+    }
+
+    @Test
+    void operationRequestIsAuditedAsPendingWithoutChangingAllocationBalance() {
+        when(allocationRepository.findById(12L)).thenReturn(Optional.of(allocation));
+        when(linkedAccountRepository.findByAllocationId(12L)).thenReturn(Optional.of(linkedAccount));
+        when(operationRequestRepository.save(any(AllocationAccountOperationRequest.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        ResponseEntity<Map<String, Object>> response = controller.submitOperationRequest(
+                new AllocationAccountLoginController.OperationRequestPayload(
+                        "TRANSFER", new BigDecimal("125.50"), "9876543210", "Recipient", "REF-1", "Vendor payment"),
+                new SessionPrincipal(-12L, "ALLOCATION:FA-2026-00012", "ALLOCATION_ACCOUNT"));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(((Map<?, ?>) response.getBody().get("request")).get("status")).isEqualTo("PENDING");
+        assertThat(allocation.getCurrentBalance()).isEqualTo(5000.0);
+        verify(utilizationRepository, never()).save(any(AllocationUtilization.class));
+    }
+
+    @Test
+    void owningHodCanReviewRequestWithoutPostingFunds() {
+        Admin hod = new Admin();
+        hod.setId(7L);
+        hod.setName("HOD Reviewer");
+        hod.setRole("HOD");
+        AllocationAccountOperationRequest request = new AllocationAccountOperationRequest();
+        request.setId(44L);
+        request.setAllocationRecordId(12L);
+        request.setAllocationReference("FA-2026-00012");
+        request.setRequestType("TRANSFER");
+        request.setAmount(new BigDecimal("125.50"));
+        request.setStatus("PENDING");
+
+        when(allocationRepository.findById(12L)).thenReturn(Optional.of(allocation));
+        when(operationRequestRepository.findByIdAndAllocationRecordId(44L, 12L)).thenReturn(Optional.of(request));
+        when(adminRepository.findById(7L)).thenReturn(Optional.of(hod));
+        when(operationRequestRepository.save(request)).thenReturn(request);
+
+        ResponseEntity<Map<String, Object>> response = controller.reviewAllocationOperationRequest(
+                12L, 44L, new AllocationAccountLoginController.ReviewDecisionPayload("APPROVED", "Verify payout separately"),
+                new SessionPrincipal(7L, "hod@example.com", "HOD"));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(request.getStatus()).isEqualTo("APPROVED");
+        assertThat(request.getReviewedByAdminId()).isEqualTo(7L);
+        assertThat(request.getReviewNote()).isEqualTo("Verify payout separately");
+        assertThat(allocation.getCurrentBalance()).isEqualTo(5000.0);
+        verify(utilizationRepository, never()).save(any(AllocationUtilization.class));
     }
 }
