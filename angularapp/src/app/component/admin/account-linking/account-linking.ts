@@ -37,6 +37,19 @@ export class AccountLinkingComponent implements OnInit {
   managers: any[] = [];
   showCreateAllocation = false;
   creatingAllocation = false;
+  allocationLoginCredentials: Record<number, { username: string; password: string }> = {};
+  creatingAllocationLoginId: number | null = null;
+  selectedHistoryAccount: any | null = null;
+  allocationHistoryInfo: any = null;
+  allocationHistory: any[] = [];
+  allocationTransactions: any[] = [];
+  historyLoading = false;
+  historyPage = 0;
+  historyTotalPages = 0;
+  historyTotalTransactions = 0;
+  historyDebitCount = 0;
+  historyCreditCount = 0;
+  historyTab: 'allocation' | 'edits' | 'debits' | 'credits' = 'allocation';
   readonly bankOptions = [
     { name: 'NeoBank', ifscCode: 'NEOB0000001' },
     { name: 'ExyVault', ifscCode: 'EZYV000123' }
@@ -302,6 +315,125 @@ export class AccountLinkingComponent implements OnInit {
         this.errorMessage = error.error?.message || 'Failed to load branch managers.';
       }
     });
+  }
+
+  createAllocationAccountLogin(account: any): void {
+    const allocationId = Number(account?.allocationId);
+    const allocation = this.getAllocationForAccount(account);
+    const hod = this.getHodSession();
+    const token = sessionStorage.getItem('adminSessionToken') || '';
+    if (!allocationId || !allocation || !hod?.id || !token || sessionStorage.getItem('userRole') !== 'HOD') {
+      this.errorMessage = 'Sign in with a HOD account to create allocation login access.';
+      return;
+    }
+    if (allocation.allocationLoginEnabled && !confirm('Reset this allocation login? The current password will stop working immediately.')) return;
+
+    this.creatingAllocationLoginId = allocationId;
+    this.errorMessage = '';
+    this.successMessage = '';
+    this.accountService.createAllocationAccountLogin(allocationId, token).subscribe({
+      next: (response: any) => {
+        this.creatingAllocationLoginId = null;
+        if (!response?.success || !response.username || !response.password) {
+          this.errorMessage = response?.message || 'Allocation login could not be created.';
+          return;
+        }
+        allocation.allocationLoginEnabled = true;
+        this.allocationLoginCredentials[allocationId] = {
+          username: response.username,
+          password: response.password
+        };
+        this.successMessage = 'Allocation login created. Share the temporary password securely; it is shown only once.';
+      },
+      error: error => {
+        this.creatingAllocationLoginId = null;
+        this.errorMessage = error.error?.message || 'Unable to create allocation login.';
+      }
+    });
+  }
+
+  openAllocationHistory(account: any): void {
+    this.selectedHistoryAccount = account;
+    this.historyTab = 'allocation';
+    this.historyPage = 0;
+    this.allocationHistoryInfo = null;
+    this.allocationHistory = [];
+    this.allocationTransactions = [];
+    this.loadAllocationHistoryPage();
+  }
+
+  changeAllocationHistoryPage(direction: number): void {
+    const nextPage = this.historyPage + direction;
+    if (nextPage < 0 || nextPage >= this.historyTotalPages) return;
+    this.historyPage = nextPage;
+    this.loadAllocationHistoryPage();
+  }
+
+  private loadAllocationHistoryPage(): void {
+    const account = this.selectedHistoryAccount;
+    const allocationId = Number(account?.allocationId);
+    const token = sessionStorage.getItem('adminSessionToken') || '';
+    if (!allocationId || !token) {
+      this.errorMessage = 'A signed-in HOD session is required to view allocation history.';
+      return;
+    }
+
+    this.historyLoading = true;
+    this.accountService.getAllocationHistory(allocationId, token, this.historyPage).subscribe({
+      next: (response: any) => {
+        this.allocationHistoryInfo = response?.allocation || null;
+        this.allocationHistory = response?.allocationHistory || [];
+        this.allocationTransactions = response?.transactions || [];
+        this.historyTotalPages = response?.transactionTotalPages || 0;
+        this.historyTotalTransactions = response?.transactionTotalElements || 0;
+        this.historyDebitCount = response?.totalDebits || 0;
+        this.historyCreditCount = response?.totalCredits || 0;
+        this.historyLoading = false;
+      },
+      error: error => {
+        this.historyLoading = false;
+        this.errorMessage = error.error?.message || 'Unable to load allocation history.';
+      }
+    });
+  }
+
+  get allocationEditHistory(): any[] {
+    const savedEdits = this.allocationHistory.filter(event => event.eventType !== 'CREATED');
+    const allocation = this.allocationHistoryInfo;
+    if (savedEdits.length || !allocation?.updatedAt || allocation.updatedAt === allocation.createdAt) return savedEdits;
+    return [{
+      eventType: 'CURRENT_SAVED_STATE',
+      changedAt: allocation.updatedAt,
+      newAmount: allocation.allocatedAmount,
+      newValidTill: allocation.validTill,
+      newDescription: allocation.description,
+      newStatus: allocation.status,
+      summary: 'Current saved state; previous values were not tracked.'
+    }];
+  }
+
+  get allocationCreationHistory(): any[] {
+    const savedCreation = this.allocationHistory.filter(event => event.eventType === 'CREATED');
+    const allocation = this.allocationHistoryInfo;
+    if (savedCreation.length || !allocation?.createdAt) return savedCreation;
+    return [{
+      eventType: 'CURRENT_RECORD',
+      changedAt: allocation.createdAt,
+      performedByName: allocation.allocatedByName,
+      newAmount: allocation.allocatedAmount,
+      newValidTill: allocation.validTill,
+      newDescription: allocation.description,
+      newStatus: allocation.status,
+      summary: 'Original allocation record; detailed creation snapshot is unavailable.'
+    }];
+  }
+
+  get allocationDebitHistory(): any[] {
+    return this.allocationTransactions.filter(transaction => transaction.type === 'DEBIT');
+  }
+
+  get allocationCreditHistory(): any[] {
+    return this.allocationTransactions.filter(transaction => transaction.type === 'CREDIT');
   }
 
   createAllocation(): void {

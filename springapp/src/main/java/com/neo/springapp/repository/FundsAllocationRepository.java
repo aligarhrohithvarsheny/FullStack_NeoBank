@@ -17,6 +17,8 @@ public interface FundsAllocationRepository extends JpaRepository<FundsAllocation
 
     Optional<FundsAllocation> findByAllocationId(String allocationId);
 
+        Optional<FundsAllocation> findByAllocationLoginUsername(String allocationLoginUsername);
+
     Page<FundsAllocation> findByManagerId(Long managerId, Pageable pageable);
 
     Page<FundsAllocation> findByStatus(String status, Pageable pageable);

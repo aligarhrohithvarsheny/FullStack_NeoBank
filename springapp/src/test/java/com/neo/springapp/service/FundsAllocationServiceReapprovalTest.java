@@ -3,11 +3,13 @@ package com.neo.springapp.service;
 import com.neo.springapp.entity.AllocationAccount;
 import com.neo.springapp.model.Admin;
 import com.neo.springapp.model.FundsAllocation;
+import com.neo.springapp.model.FundsAllocationHistory;
 import com.neo.springapp.repository.AdminRepository;
 import com.neo.springapp.repository.AllocationAccountRepository;
 import com.neo.springapp.repository.AllocationMetricsRepository;
 import com.neo.springapp.repository.AllocationUtilizationRepository;
 import com.neo.springapp.repository.FundsAllocationRepository;
+import com.neo.springapp.repository.FundsAllocationHistoryRepository;
 import com.neo.springapp.service.AccountService;
 import com.neo.springapp.service.TransactionService;
 import org.junit.jupiter.api.BeforeEach;
@@ -28,6 +30,7 @@ import static org.mockito.Mockito.when;
 class FundsAllocationServiceReapprovalTest {
 
     @Mock private FundsAllocationRepository allocationRepository;
+    @Mock private FundsAllocationHistoryRepository allocationHistoryRepository;
     @Mock private AllocationAccountRepository allocationAccountRepository;
     @Mock private AllocationMetricsRepository metricsRepository;
     @Mock private AllocationUtilizationRepository utilizationRepository;
@@ -41,6 +44,7 @@ class FundsAllocationServiceReapprovalTest {
     void setUp() {
         service = new FundsAllocationService();
         ReflectionTestUtils.setField(service, "allocationRepository", allocationRepository);
+        ReflectionTestUtils.setField(service, "allocationHistoryRepository", allocationHistoryRepository);
         ReflectionTestUtils.setField(service, "allocationAccountRepository", allocationAccountRepository);
         ReflectionTestUtils.setField(service, "metricsRepository", metricsRepository);
         ReflectionTestUtils.setField(service, "utilizationRepository", utilizationRepository);
@@ -79,5 +83,11 @@ class FundsAllocationServiceReapprovalTest {
         assertThat(linkedAccount.getTotalAllocated()).isEqualByComparingTo("1200.00");
         assertThat(linkedAccount.getCurrentBalance()).isEqualByComparingTo("725.00");
         assertThat(linkedAccount.getAccountBalance()).isEqualByComparingTo("725.00");
+        org.mockito.ArgumentCaptor<FundsAllocationHistory> historyCaptor =
+            org.mockito.ArgumentCaptor.forClass(FundsAllocationHistory.class);
+        org.mockito.Mockito.verify(allocationHistoryRepository).save(historyCaptor.capture());
+        assertThat(historyCaptor.getValue().getEventType()).isEqualTo("REAPPROVED");
+        assertThat(historyCaptor.getValue().getPreviousAmount()).isEqualTo(0.0);
+        assertThat(historyCaptor.getValue().getNewAmount()).isEqualTo(1200.0);
     }
 }

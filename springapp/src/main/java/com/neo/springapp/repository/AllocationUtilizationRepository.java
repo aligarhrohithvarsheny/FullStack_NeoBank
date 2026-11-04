@@ -19,6 +19,8 @@ public interface AllocationUtilizationRepository extends JpaRepository<Allocatio
 
     Page<AllocationUtilization> findByAllocationId(Long allocationId, Pageable pageable);
 
+    Page<AllocationUtilization> findByAllocationIdOrderByTransactionDateDesc(Long allocationId, Pageable pageable);
+
     Page<AllocationUtilization> findByAllocationIdAndTransactionType(Long allocationId, String transactionType, Pageable pageable);
 
     Page<AllocationUtilization> findByAllocationIdAndProductType(Long allocationId, String productType, Pageable pageable);

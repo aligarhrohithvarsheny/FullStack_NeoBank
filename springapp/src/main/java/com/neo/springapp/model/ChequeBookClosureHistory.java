@@ -42,6 +42,9 @@ public class ChequeBookClosureHistory {
     @Column(name = "closed_count")
     private Integer closedCount;
 
+    @Column(name = "closed_cheque_numbers", columnDefinition = "TEXT")
+    private String closedChequeNumbers;
+
     @Column(name = "status", nullable = false, length = 20)
     private String status = "CLOSED";
 
@@ -96,6 +99,9 @@ public class ChequeBookClosureHistory {
 
     public Integer getClosedCount() { return closedCount; }
     public void setClosedCount(Integer closedCount) { this.closedCount = closedCount; }
+
+    public String getClosedChequeNumbers() { return closedChequeNumbers; }
+    public void setClosedChequeNumbers(String closedChequeNumbers) { this.closedChequeNumbers = closedChequeNumbers; }
 
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }

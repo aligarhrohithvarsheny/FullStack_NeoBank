@@ -909,13 +909,8 @@ public class SavingsChequeDrawService {
 
     @Transactional
     public Map<String, Object> getAvailableChequeLeaves(Long accountId) {
-        Account account = accountRepository.findById(accountId)
+        accountRepository.findById(accountId)
                 .orElseThrow(() -> new RuntimeException("Savings account not found"));
-
-        long existingCount = chequeLeafRepository.countByAccountId(accountId);
-        if (existingCount == 0) {
-            allocateChequeLeaves(accountId, account.getId());
-        }
 
         List<SavingsChequeLeaf> availableLeaves = chequeLeafRepository
                 .findByAccountIdAndStatusOrderByLeafNumberAsc(accountId, "AVAILABLE");
@@ -940,30 +935,6 @@ public class SavingsChequeDrawService {
         return response;
     }
 
-    private synchronized void allocateChequeLeaves(Long accountId, Long userId) {
-        if (chequeLeafRepository.countByAccountId(accountId) > 0) {
-            return;
-        }
-
-        // Use a different range prefix (B-series) to differentiate from salary cheque leaves
-        List<SavingsChequeLeaf> allLeaves = chequeLeafRepository.findAll();
-        long maxNum = 500000; // Start from 500000 to separate from salary leaves
-        for (SavingsChequeLeaf existing : allLeaves) {
-            try {
-                long num = Long.parseLong(existing.getLeafNumber());
-                if (num > maxNum) maxNum = num;
-            } catch (NumberFormatException ignored) {}
-        }
-
-        List<SavingsChequeLeaf> newLeaves = new ArrayList<>();
-        for (int i = 1; i <= MAX_CHEQUE_LEAVES; i++) {
-            String leafNumber = String.format("%06d", maxNum + i);
-            SavingsChequeLeaf leaf = new SavingsChequeLeaf(accountId, userId, leafNumber);
-            newLeaves.add(leaf);
-        }
-        chequeLeafRepository.saveAll(newLeaves);
-    }
-
     @Transactional
     public void releaseChequeLeaf(Long chequeRequestId) {
         SavingsChequeRequest request = chequeRequestRepository.findById(chequeRequestId).orElse(null);
@@ -973,10 +944,22 @@ public class SavingsChequeDrawService {
                 .findByLeafNumberAndAccountId(request.getSerialNumber(), request.getAccountId())
                 .orElse(null);
         if (leaf != null && "USED".equals(leaf.getStatus())) {
-            leaf.setStatus("AVAILABLE");
+            boolean closedBook = chequeBankRangeRepository.findByAccountId(request.getAccountId()).stream()
+                    .anyMatch(range -> "CLOSED".equalsIgnoreCase(range.getStatus())
+                            && isSerialInRange(leaf.getLeafNumber(), range.getSerialFrom(), range.getSerialTo()));
+            leaf.setStatus(closedBook ? "CLOSED" : "AVAILABLE");
             leaf.setUsedChequeRequestId(null);
             leaf.setUsedAt(null);
             chequeLeafRepository.save(leaf);
+        }
+    }
+
+    private boolean isSerialInRange(String serial, String from, String to) {
+        try {
+            long value = Long.parseLong(serial);
+            return value >= Long.parseLong(from) && value <= Long.parseLong(to);
+        } catch (NumberFormatException ignored) {
+            return serial.compareTo(from) >= 0 && serial.compareTo(to) <= 0;
         }
     }
 

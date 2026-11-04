@@ -1,14 +1,19 @@
 <div class="container-fluid p-4">
   <div class="row">
     <div class="col-12">
-      <h2 class="mb-4">
-        <i class="fas fa-wallet"></i> Linked Account Dashboard
-      </h2>
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="mb-0">
+          <i class="fas fa-wallet"></i> {{ isAllocationAccountLogin ? 'Allocated Fund Account Dashboard' : 'Linked Account Dashboard' }}
+        </h2>
+        <button *ngIf="isAllocationAccountLogin" type="button" class="btn btn-outline-secondary" (click)="logoutAllocationAccount()">
+          <i class="fas fa-sign-out-alt"></i> Sign out
+        </button>
+      </div>
     </div>
   </div>
 
   <!-- Select Allocation -->
-  <div class="row mb-4">
+  <div class="row mb-4" *ngIf="!isAllocationAccountLogin">
     <div class="col-md-6">
       <div class="card">
         <div class="card-body">
@@ -169,7 +174,7 @@
       <div class="col-12">
         <div class="card">
           <div class="card-header">
-            <ul class="nav nav-tabs card-header-tabs" role="tablist">
+            <ul class="nav nav-tabs card-header-tabs" role="tablist" *ngIf="!isAllocationAccountLogin">
               <li class="nav-item">
                 <a 
                   class="nav-link" 
@@ -203,6 +208,13 @@
           <div class="card-body">
             <!-- Overview Tab -->
             <div *ngIf="activeTab === 'overview'">
+              <div class="alert alert-info" *ngIf="isAllocationAccountLogin">
+                <strong>Allocation {{ linkedAccount.allocationId }}</strong>
+                <span> · {{ linkedAccount.status }} · Valid through {{ linkedAccount.validTill | date:'mediumDate' }}</span>
+                <span class="d-block mt-1">Products: {{ linkedAccount.productTypes || 'Not specified' }}</span>
+                <span class="d-block" *ngIf="linkedAccount.description">Purpose: {{ linkedAccount.description }}</span>
+                <small class="d-block mt-1">Read-only allocation account access.</small>
+              </div>
               <div class="row">
                 <div class="col-md-6">
                   <h6 class="card-title">Charge Breakdown</h6>

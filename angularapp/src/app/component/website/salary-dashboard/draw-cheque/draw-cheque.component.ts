@@ -36,6 +36,7 @@ export class DrawChequeComponent implements OnInit, OnDestroy {
 
   // Form states
   isSubmitting: boolean = false;
+  isRequestingChequeBook = false;
   formValid: boolean = false;
   showForm: boolean = true;
   successMessage: string = '';
@@ -127,6 +128,27 @@ export class DrawChequeComponent implements OnInit, OnDestroy {
         console.error('Error loading cheque leaves:', err);
         this.availableLeaves = [];
         this.isLoadingLeaves = false;
+      }
+    });
+  }
+
+  requestNewChequeBook(): void {
+    if (!this.account?.id || this.isRequestingChequeBook || this.isLoadingLeaves) return;
+    if (!confirm('Request a new 30-number cheque book? ₹199 will be debited from your account.')) return;
+
+    this.isRequestingChequeBook = true;
+    this.chequeService.requestNewChequeBook(this.account.id, 'SALARY').subscribe({
+      next: response => {
+        this.isRequestingChequeBook = false;
+        this.availableBalance = response.balanceAfterCharge;
+        this.account!.balance = response.balanceAfterCharge;
+        this.successMessage = `${response.message} Numbers ${response.serialFrom}–${response.serialTo}.`;
+        this.errorMessage = '';
+        this.loadAvailableLeaves();
+      },
+      error: err => {
+        this.isRequestingChequeBook = false;
+        this.errorMessage = err?.error?.error || err?.error?.message || 'Unable to issue a new cheque book.';
       }
     });
   }

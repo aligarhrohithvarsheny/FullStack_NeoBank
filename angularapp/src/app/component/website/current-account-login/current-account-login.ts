@@ -59,7 +59,10 @@ export class CurrentAccountLogin {
         this.isLoggingIn = false;
         if (res.success) {
           if (this.isBrowser) {
-            sessionStorage.setItem('currentAccount', JSON.stringify(res.account));
+            sessionStorage.setItem('currentAccount', JSON.stringify({
+              ...res.account,
+              sessionToken: res.token
+            }));
           }
           this.router.navigate(['/website/current-account-dashboard']);
         } else {

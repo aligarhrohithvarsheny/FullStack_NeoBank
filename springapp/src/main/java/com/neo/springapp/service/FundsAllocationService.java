@@ -24,6 +24,8 @@ public class FundsAllocationService {
 
     @Autowired
     private FundsAllocationRepository allocationRepository;
+    @Autowired
+    private FundsAllocationHistoryRepository allocationHistoryRepository;
 
     @Autowired
     private AllocationAccountRepository allocationAccountRepository;
@@ -105,6 +107,8 @@ public class FundsAllocationService {
         allocation.setTotalCredited(0.0);
 
         FundsAllocation saved = allocationRepository.save(allocation);
+        recordAllocationHistory(saved, "CREATED", hodAdmin, null, null, null, null,
+            "Allocation created and saved");
 
         // Create corresponding metrics record
         AllocationRealTimeMetrics metrics = new AllocationRealTimeMetrics();
@@ -211,6 +215,11 @@ public class FundsAllocationService {
             return result;
         }
 
+        Double previousAmount = allocation.getAllocatedAmount();
+        LocalDate previousValidTill = allocation.getValidTill();
+        String previousDescription = allocation.getDescription();
+        String previousStatus = allocation.getStatus();
+
         boolean expiredCompletedAllocation = "COMPLETED".equals(allocation.getStatus()) &&
             allocation.getValidTill() != null && allocation.getValidTill().isBefore(LocalDate.now());
         if (!"ACTIVE".equals(allocation.getStatus()) && !expiredCompletedAllocation) {
@@ -250,6 +259,9 @@ public class FundsAllocationService {
 
         allocation.setUpdatedAt(LocalDateTime.now());
         FundsAllocation updated = allocationRepository.save(allocation);
+        recordAllocationHistory(updated, expiredCompletedAllocation ? "REAPPROVED" : "EDITED", hod,
+            previousAmount, previousValidTill, previousDescription, previousStatus,
+            expiredCompletedAllocation ? "Expired allocation extended and reapproved" : "Allocation changes saved");
 
         // Update metrics
         Optional<AllocationRealTimeMetrics> metricsOpt = metricsRepository.findByAllocationId(allocationId);
@@ -280,6 +292,10 @@ public class FundsAllocationService {
             result.put("message", "Allocation not found");
             return result;
         }
+        Double previousAmount = allocation.getAllocatedAmount();
+        LocalDate previousValidTill = allocation.getValidTill();
+        String previousDescription = allocation.getDescription();
+        String previousStatus = allocation.getStatus();
 
         allocation.setStatus("CANCELLED");
         allocation.setCancelledAt(LocalDateTime.now());
@@ -288,6 +304,10 @@ public class FundsAllocationService {
         allocation.setUpdatedAt(LocalDateTime.now());
 
         FundsAllocation updated = allocationRepository.save(allocation);
+        Admin hod = adminRepository.findById(hodAdminId).orElse(null);
+        recordAllocationHistory(updated, "CANCELLED", hod, previousAmount, previousValidTill,
+            previousDescription, previousStatus,
+            "Allocation cancelled: " + (reason == null ? "No reason provided" : reason));
 
         result.put("success", true);
         result.put("message", "Allocation cancelled successfully");
@@ -315,11 +335,17 @@ public class FundsAllocationService {
             return result;
         }
 
+        Double previousAmount = allocation.getAllocatedAmount();
+        LocalDate previousValidTill = allocation.getValidTill();
+        String previousDescription = allocation.getDescription();
+        String previousStatus = allocation.getStatus();
         allocation.setStatus("PAUSED");
         allocation.setNotes((allocation.getNotes() != null ? allocation.getNotes() + "; " : "") + "Paused: " + reason);
         allocation.setUpdatedAt(LocalDateTime.now());
 
         FundsAllocation updated = allocationRepository.save(allocation);
+        recordAllocationHistory(updated, "PAUSED", null, previousAmount, previousValidTill,
+            previousDescription, previousStatus, "Allocation paused: " + (reason == null ? "No reason provided" : reason));
 
         result.put("success", true);
         result.put("message", "Allocation paused successfully");
@@ -347,10 +373,16 @@ public class FundsAllocationService {
             return result;
         }
 
+        Double previousAmount = allocation.getAllocatedAmount();
+        LocalDate previousValidTill = allocation.getValidTill();
+        String previousDescription = allocation.getDescription();
+        String previousStatus = allocation.getStatus();
         allocation.setStatus("ACTIVE");
         allocation.setUpdatedAt(LocalDateTime.now());
 
         FundsAllocation updated = allocationRepository.save(allocation);
+        recordAllocationHistory(updated, "RESUMED", null, previousAmount, previousValidTill,
+            previousDescription, previousStatus, "Allocation resumed");
 
         result.put("success", true);
         result.put("message", "Allocation resumed successfully");
@@ -396,6 +428,27 @@ public class FundsAllocationService {
 
     // Helper methods
 
+    private void recordAllocationHistory(FundsAllocation allocation, String eventType, Admin actor,
+                                         Double previousAmount, LocalDate previousValidTill,
+                                         String previousDescription, String previousStatus, String summary) {
+        FundsAllocationHistory history = new FundsAllocationHistory();
+        history.setAllocationRecordId(allocation.getId());
+        history.setAllocationReference(allocation.getAllocationId());
+        history.setEventType(eventType);
+        history.setPerformedByAdminId(actor == null ? null : actor.getId());
+        history.setPerformedByName(actor == null ? null : actor.getName());
+        history.setPreviousAmount(previousAmount);
+        history.setNewAmount(allocation.getAllocatedAmount());
+        history.setPreviousValidTill(previousValidTill);
+        history.setNewValidTill(allocation.getValidTill());
+        history.setPreviousDescription(previousDescription);
+        history.setNewDescription(allocation.getDescription());
+        history.setPreviousStatus(previousStatus);
+        history.setNewStatus(allocation.getStatus());
+        history.setSummary(summary);
+        allocationHistoryRepository.save(history);
+    }
+
     private Map<String, Object> buildAllocationDTO(FundsAllocation allocation) {
         Map<String, Object> dto = new LinkedHashMap<>();
         dto.put("id", allocation.getId());
@@ -435,6 +488,8 @@ public class FundsAllocationService {
         dto.put("accountStatus", allocation.getAccountStatus());
         dto.put("accountVerificationStatus", allocation.getAccountVerificationStatus());
         dto.put("chequeVerificationStatus", allocation.getChequeVerificationStatus());
+        dto.put("allocationLoginEnabled", allocation.getAllocationLoginUsername() != null
+            && !allocation.getAllocationLoginUsername().isBlank());
         dto.put("chargeManagementEnabled", allocation.getChargeManagementEnabled());
         dto.put("createdAt", allocation.getCreatedAt());
         dto.put("updatedAt", allocation.getUpdatedAt());

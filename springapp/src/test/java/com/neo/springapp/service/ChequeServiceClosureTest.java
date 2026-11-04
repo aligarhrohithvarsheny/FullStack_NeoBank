@@ -1,6 +1,7 @@
 package com.neo.springapp.service;
 
 import com.neo.springapp.model.ChequeBankRange;
+import com.neo.springapp.model.ChequeBookClosureHistory;
 import com.neo.springapp.model.ChequeLeaf;
 import com.neo.springapp.model.SalaryAccount;
 import com.neo.springapp.repository.AccountRepository;
@@ -22,6 +23,8 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentCaptor.forClass;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -83,15 +86,26 @@ class ChequeServiceClosureTest {
         leaf.setLeafNumber("000001");
         leaf.setStatus("AVAILABLE");
 
+        ChequeLeaf usedLeaf = new ChequeLeaf();
+        usedLeaf.setId(2L);
+        usedLeaf.setSalaryAccountId(10L);
+        usedLeaf.setUserId(90L);
+        usedLeaf.setLeafNumber("000002");
+        usedLeaf.setStatus("USED");
+
         when(salaryAccountRepository.findByAccountNumber("SAL-900")).thenReturn(salaryAccount);
         when(chequeBankRangeRepository.findBySalaryAccountId(10L)).thenReturn(List.of(range));
-        when(chequeLeafRepository.findBySalaryAccountIdOrderByLeafNumberAsc(10L)).thenReturn(List.of(leaf));
+        when(chequeLeafRepository.findBySalaryAccountIdOrderByLeafNumberAsc(10L)).thenReturn(List.of(leaf, usedLeaf));
 
         Map<String, Object> result = service.closeChequeBooksForAccount("SAL-900", "admin@neobank.com", "Manual closure");
 
         assertThat(result.get("success")).isEqualTo(true);
         assertThat(range.getStatus()).isEqualTo("CLOSED");
         assertThat(leaf.getStatus()).isEqualTo("CLOSED");
+        assertThat(usedLeaf.getStatus()).isEqualTo("USED");
         assertThat(result.get("closedBooks")).isEqualTo(1);
+        org.mockito.ArgumentCaptor<ChequeBookClosureHistory> historyCaptor = forClass(ChequeBookClosureHistory.class);
+        verify(closureHistoryRepository).save(historyCaptor.capture());
+        assertThat(historyCaptor.getValue().getClosedChequeNumbers()).isEqualTo("000001,000002");
     }
 }

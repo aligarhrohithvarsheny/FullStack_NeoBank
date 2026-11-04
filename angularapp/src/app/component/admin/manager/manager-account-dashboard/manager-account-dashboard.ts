@@ -2,6 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { HttpClientModule } from '@angular/common/http';
+import { Router } from '@angular/router';
 import { AllocationAccountService } from '../../../../service/allocation-account.service';
 import { ChargeManagementService } from '../../../../service/charge-management.service';
 
@@ -25,13 +26,24 @@ export class ManagerAccountDashboardComponent implements OnInit {
   activeTab = 'overview';
   transactionPage = 0;
   transactionSize = 10;
+  isAllocationAccountLogin = false;
 
   constructor(
     private accountService: AllocationAccountService,
-    private chargeService: ChargeManagementService
+    private chargeService: ChargeManagementService,
+    private router: Router
   ) {}
 
   ngOnInit(): void {
+    this.isAllocationAccountLogin = sessionStorage.getItem('userRole') === 'ALLOCATION_ACCOUNT';
+    if (this.isAllocationAccountLogin) {
+      const session = JSON.parse(sessionStorage.getItem('allocationAccount') || '{}');
+      this.allocationId = Number(session.allocationRecordId) || 0;
+      if (!sessionStorage.getItem('allocationAccountSessionToken') || !this.allocationId) {
+        this.logoutAllocationAccount();
+        return;
+      }
+    }
     this.loadAccountData();
   }
 
@@ -42,6 +54,38 @@ export class ManagerAccountDashboardComponent implements OnInit {
     if (!this.allocationId) return;
     
     this.loading = true;
+
+    if (this.isAllocationAccountLogin) {
+      const token = sessionStorage.getItem('allocationAccountSessionToken') || '';
+      this.accountService.getMyAllocationAccount(token).subscribe({
+        next: (response: any) => {
+          if (response?.success) {
+            const allocation = response.allocation || {};
+            const account = response.account || {};
+            this.linkedAccount = {
+              ...account,
+              ...allocation,
+              ...account,
+              currentBalance: allocation.currentBalance ?? account.currentBalance,
+              totalAllocated: allocation.allocatedAmount ?? account.totalAllocated,
+              totalDebited: allocation.totalDebited ?? account.totalDebited,
+              totalCredited: allocation.totalCredited ?? account.totalCredited
+            };
+            this.errorMessage = '';
+          } else {
+            this.linkedAccount = null;
+            this.errorMessage = response?.message || 'Allocation account details are unavailable.';
+          }
+          this.loading = false;
+        },
+        error: (error: any) => {
+          this.linkedAccount = null;
+          this.errorMessage = error.error?.message || 'Failed to load this allocation account.';
+          this.loading = false;
+        }
+      });
+      return;
+    }
     
     // Load account details
     this.accountService.getLinkedAccountForAllocation(this.allocationId).subscribe(
@@ -169,5 +213,12 @@ export class ManagerAccountDashboardComponent implements OnInit {
    */
   printAccount(): void {
     window.print();
+  }
+
+  logoutAllocationAccount(): void {
+    sessionStorage.removeItem('allocationAccount');
+    sessionStorage.removeItem('allocationAccountSessionToken');
+    sessionStorage.removeItem('userRole');
+    this.router.navigate(['/website/user']);
   }
 }

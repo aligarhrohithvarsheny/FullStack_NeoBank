@@ -10,7 +10,9 @@ import com.neo.springapp.model.LinkedAccount;
 import com.neo.springapp.service.CurrentAccountService;
 import com.neo.springapp.service.SessionHistoryService;
 import com.neo.springapp.service.UserSessionTokenService.SessionPrincipal;
+import com.neo.springapp.service.UserSessionTokenService;
 import com.neo.springapp.repository.NetBankingServiceControlRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
@@ -35,6 +37,9 @@ import java.util.Optional;
 @RestController
 @RequestMapping("/api/current-accounts")
 public class CurrentAccountController {
+
+    @Autowired
+    private UserSessionTokenService userSessionTokenService;
 
     private final CurrentAccountService currentAccountService;
     private final SessionHistoryService sessionHistoryService;
@@ -494,6 +499,13 @@ public class CurrentAccountController {
             Map<String, Object> result = currentAccountService.authenticate(accountNumber, password);
             // Check per-customer net banking status on successful login
             if (result.containsKey("success") && Boolean.TRUE.equals(result.get("success"))) {
+                Object accountObject = result.get("account");
+                if (accountObject instanceof CurrentAccount account) {
+                    result.put("token", userSessionTokenService.issue(account.getId(), account.getAccountNumber()));
+                } else if (accountObject instanceof Map<?, ?> account) {
+                    result.put("token", userSessionTokenService.issue(
+                            Long.valueOf(account.get("id").toString()), account.get("accountNumber").toString()));
+                }
                 try {
                     Object accountObj = result.get("account");
                     Boolean netBankingEnabled = null;

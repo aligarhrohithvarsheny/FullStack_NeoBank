@@ -112,6 +112,24 @@ export const managerAuthGuard: CanActivateFn = () => {
   return router.createUrlTree(['/admin/login']);
 };
 
+export const allocationAccountAuthGuard: CanActivateFn = () => {
+  const router = inject(Router);
+  const platformId = inject(PLATFORM_ID);
+  if (!isPlatformBrowser(platformId)) return false;
+
+  const account = sessionStorage.getItem('allocationAccount');
+  const token = sessionStorage.getItem('allocationAccountSessionToken');
+  if (account && token && sessionStorage.getItem('userRole') === 'ALLOCATION_ACCOUNT') {
+    try {
+      if (JSON.parse(account)?.allocationRecordId) return true;
+    } catch {
+      sessionStorage.removeItem('allocationAccount');
+      sessionStorage.removeItem('allocationAccountSessionToken');
+    }
+  }
+  return router.createUrlTree(['/website/user']);
+};
+
 export const adminOrManagerAuthGuard: CanActivateFn = () => {
   const router = inject(Router);
   const platformId = inject(PLATFORM_ID);

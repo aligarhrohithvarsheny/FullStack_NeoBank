@@ -1,3 +1,17 @@
+.allocation-login-credentials {
+  display: grid;
+  gap: 4px;
+  max-width: 280px;
+  margin-top: 8px;
+  padding: 10px;
+  color: #14532d;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 6px;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.allocation-login-credentials small { color: #475569; }
 .container-fluid {
   background-color: #f8f9fa;
 }
@@ -65,6 +79,64 @@
 .expiry-overdue { color: #b42318; font-weight: 700; }
 .account-action-buttons { display: flex; flex-direction: column; align-items: flex-start; gap: 7px; min-width: 150px; }
 .account-action-buttons .btn { white-space: nowrap; }
+.allocation-history-panel {
+  margin-bottom: 24px;
+  padding: 22px;
+  border: 1px solid #d6e5e1;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 8px 26px rgba(18, 61, 67, 0.08);
+}
+.allocation-history-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+.allocation-history-heading h5 { margin: 4px 0; color: #173c40; font-weight: 700; }
+.allocation-history-heading p { margin: 0; color: #647579; font-size: 13px; }
+.allocation-history-tabs {
+  display: flex;
+  gap: 4px;
+  margin: 18px 0 12px;
+  border-bottom: 1px solid #d6e5e1;
+  overflow-x: auto;
+}
+.allocation-history-tabs button {
+  flex: 0 0 auto;
+  padding: 10px 13px;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  color: #51666a;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 600;
+}
+.allocation-history-tabs button.active { border-bottom-color: #0f766e; color: #0f766e; }
+.allocation-history-loading,
+.history-empty { padding: 24px !important; color: #647579; text-align: center; }
+.allocation-history-table-wrap { overflow-x: auto; }
+.allocation-history-table { min-width: 980px; font-size: 12px; vertical-align: middle; }
+.allocation-history-table th { white-space: nowrap; }
+.allocation-history-table td { max-width: 260px; overflow-wrap: anywhere; }
+.allocation-history-pagination { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding-top: 12px; color: #647579; font-size: 12px; }
+.allocation-history-pagination > div { display: flex; gap: 6px; }
+.history-event-badge {
+  display: inline-block;
+  padding: 3px 7px;
+  border-radius: 4px;
+  color: #155e57;
+  background: #e3f4ef;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+@media (max-width: 640px) {
+  .allocation-history-panel { padding: 15px; }
+  .allocation-history-heading { align-items: flex-start; }
+  .allocation-history-heading .btn { flex: 0 0 auto; }
+  .allocation-history-pagination { align-items: flex-start; flex-direction: column; }
+}
 
 .account-edit-panel,
 .allocation-edit-panel {

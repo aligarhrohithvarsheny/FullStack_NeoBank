@@ -84,6 +84,25 @@ export class AllocationAccountService {
     return this.http.get(`${this.apiUrl}/hod/account/${allocationId}`);
   }
 
+  createAllocationAccountLogin(allocationId: number, token: string): Observable<any> {
+    return this.http.post(`${this.apiUrl}/hod/allocations/${allocationId}/account-login`, {}, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+  }
+
+  getMyAllocationAccount(token: string): Observable<any> {
+    return this.http.get(`${this.apiUrl}/allocation-account/me`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+  }
+
+  getAllocationHistory(allocationId: number, token: string, page = 0, size = 100): Observable<any> {
+    return this.http.get(`${this.apiUrl}/hod/allocations/${allocationId}/history`, {
+      params: { page: String(page), size: String(size) },
+      headers: { Authorization: `Bearer ${token}` }
+    });
+  }
+
   // ==================== ACCOUNT VERIFICATION (ADMIN) ====================
 
   /**

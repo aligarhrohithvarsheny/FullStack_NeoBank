@@ -1061,6 +1061,42 @@ export class User implements OnInit, OnDestroy {
       localStorage.removeItem('neobank_remembered_username');
     }
 
+    if (/^fund-\d+$/i.test(accNum)) {
+      this.http.post<any>(`${environment.apiBaseUrl}/api/allocation-account/login`, {
+        username: accNum,
+        password: this.unifiedPassword
+      }).subscribe({
+        next: response => {
+          this.isUnifiedLoggingIn = false;
+          if (!response?.success || response.role !== 'ALLOCATION_ACCOUNT' || !response.sessionToken || !response.allocationRecordId) {
+            this.errorMessage = response?.message || 'Allocation account login could not be completed.';
+            return;
+          }
+          sessionStorage.removeItem('currentUser');
+          sessionStorage.removeItem('salaryEmployee');
+          sessionStorage.removeItem('currentAccount');
+          sessionStorage.removeItem('admin');
+          sessionStorage.removeItem('adminSessionToken');
+          sessionStorage.removeItem('adminLoginTime');
+          sessionStorage.setItem('allocationAccount', JSON.stringify({
+            allocationRecordId: response.allocationRecordId,
+            allocationId: response.allocationId,
+            accountHolderName: response.accountHolderName,
+            loginTime: new Date().toISOString()
+          }));
+          sessionStorage.setItem('allocationAccountSessionToken', response.sessionToken);
+          sessionStorage.setItem('userRole', 'ALLOCATION_ACCOUNT');
+          this.alertService.userSuccess('Login Successful', `Welcome ${response.accountHolderName || 'Allocation Account'}!`);
+          this.router.navigate(['/allocation/account-dashboard']);
+        },
+        error: err => {
+          this.isUnifiedLoggingIn = false;
+          this.errorMessage = err.error?.message || 'Allocation account login failed. Check your username and password.';
+        }
+      });
+      return;
+    }
+
     if (/^mgr-\d+$/i.test(accNum)) {
       this.http.post<any>(`${environment.apiBaseUrl}/api/admins/manager-user-login`, {
         username: accNum,
@@ -1108,6 +1144,7 @@ export class User implements OnInit, OnDestroy {
               companyName: acc.companyName,
               designation: acc.designation,
               email: acc.email,
+              authToken: res.token,
               loginTime: new Date().toISOString()
             };
             sessionStorage.setItem('salaryEmployee', JSON.stringify(sessionData));
@@ -1149,6 +1186,7 @@ export class User implements OnInit, OnDestroy {
               overdraftLimit: acc.overdraftLimit,
               overdraftEnabled: acc.overdraftEnabled,
               status: acc.status,
+              sessionToken: res.token,
               loginTime: new Date().toISOString()
             };
             sessionStorage.setItem('currentAccount', JSON.stringify(sessionData));
@@ -1273,6 +1311,7 @@ export class User implements OnInit, OnDestroy {
             companyName: acc.companyName,
             designation: acc.designation,
             email: acc.email,
+            authToken: res.token,
             loginTime: new Date().toISOString()
           };
           sessionStorage.setItem('salaryEmployee', JSON.stringify(sessionData));
@@ -1328,6 +1367,7 @@ export class User implements OnInit, OnDestroy {
             companyName: account.companyName,
             designation: account.designation,
             email: account.email,
+            authToken: response.token,
             loginTime: new Date().toISOString()
           };
           sessionStorage.setItem('salaryEmployee', JSON.stringify(sessionData));
@@ -1467,6 +1507,7 @@ export class User implements OnInit, OnDestroy {
             overdraftLimit: acc.overdraftLimit,
             overdraftEnabled: acc.overdraftEnabled,
             status: acc.status,
+            sessionToken: res.token,
             loginTime: new Date().toISOString()
           };
           sessionStorage.setItem('currentAccount', JSON.stringify(sessionData));

@@ -99,8 +99,13 @@
                 <i class="fas fa-spinner fa-spin"></i> Loading your cheque book...
               </small>
               <small class="form-hint warning-hint" *ngIf="!isLoadingLeaves && availableLeaves.length === 0">
-                <i class="fas fa-exclamation-triangle"></i> No cheque leaves available. All 30 leaves have been used.
+                <i class="fas fa-exclamation-triangle"></i>
+                {{ totalAllocated === 0 ? 'You do not have a cheque book yet.' : 'All cheque numbers in your book have been used or closed.' }}
               </small>
+              <button type="button" class="btn btn-secondary" *ngIf="!isLoadingLeaves && availableLeaves.length === 0"
+                (click)="requestNewChequeBook()" [disabled]="isRequestingChequeBook">
+                {{ isRequestingChequeBook ? 'Issuing…' : 'Get 30 new cheque numbers — ₹199' }}
+              </button>
             </div>
 
             <!-- Cheque Date -->

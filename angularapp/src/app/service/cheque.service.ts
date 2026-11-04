@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../environment/environment';
 import {
@@ -273,6 +273,12 @@ export class ChequeService {
     return this.http.get<ChequeLeafResponse>(
       `${this.apiBaseUrl}/draw/leaves/${salaryAccountId}`
     );
+  }
+
+  requestNewChequeBook(accountId: number, accountType: 'SALARY' | 'SAVINGS' | 'CURRENT'): Observable<any> {
+    const token = JSON.parse(sessionStorage.getItem('salaryEmployee') || '{}').authToken;
+    const headers = new HttpHeaders(token ? { Authorization: `Bearer ${token}` } : {});
+    return this.http.post<any>(`${this.apiBaseUrl}/draw/request-book`, { accountId, accountType }, { headers });
   }
 
   /**

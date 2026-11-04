@@ -125,12 +125,30 @@
                     <button type="button" class="btn btn-sm btn-outline-primary" (click)="editLinkedAccount(account)" [disabled]="loading">
                       <i class="fas fa-pen"></i> Edit details
                     </button>
+                    <button type="button" class="btn btn-sm btn-outline-info" (click)="openAllocationHistory(account)" [disabled]="historyLoading">
+                      <i class="fas fa-history"></i> View history
+                    </button>
                     <button type="button" class="btn btn-sm"
                       [ngClass]="isAllocationExpired(getAllocationForAccount(account)) ? 'btn-warning' : 'btn-outline-secondary'"
                       (click)="editAllocationDetails(account)" [disabled]="loading || !getAllocationForAccount(account)">
                       <i class="fas" [ngClass]="isAllocationExpired(getAllocationForAccount(account)) ? 'fa-redo' : 'fa-sliders-h'"></i>
                       {{ isAllocationExpired(getAllocationForAccount(account)) ? 'Reapprove' : 'Edit allocation' }}
                     </button>
+                    <ng-container *ngIf="getAllocationForAccount(account) as allocation">
+                      <button type="button" class="btn btn-sm btn-outline-success"
+                        *ngIf="allocation.status === 'ACTIVE' && !isAllocationExpired(allocation) && account.verificationStatus === 'VERIFIED' && account.accountStatus === 'ACTIVE'"
+                        (click)="createAllocationAccountLogin(account)"
+                        [disabled]="creatingAllocationLoginId === account.allocationId">
+                        <i class="fas" [ngClass]="creatingAllocationLoginId === account.allocationId ? 'fa-spinner fa-spin' : 'fa-key'"></i>
+                        {{ creatingAllocationLoginId === account.allocationId ? 'Creating…' : (allocation.allocationLoginEnabled ? 'Reset login' : 'Create login') }}
+                      </button>
+                      <div class="allocation-login-credentials" *ngIf="allocationLoginCredentials[account.allocationId] as credentials">
+                        <strong>Share securely; password is shown once.</strong>
+                        <span>Username: {{ credentials.username }}</span>
+                        <span>Password: {{ credentials.password }}</span>
+                        <small>Sign in from the existing User Login screen to view this allocation account.</small>
+                      </div>
+                    </ng-container>
                     <button type="button" class="btn btn-sm btn-info" (click)="downloadChequeImage(account)"
                       *ngIf="getAllocationForAccount(account)?.chequeImageUrl" title="View cheque image">
                       <i class="fas fa-file-download"></i> Cheque
@@ -145,6 +163,105 @@
           </table>
         </div>
       </div>
+    </div>
+  </div>
+
+  <div class="row" *ngIf="selectedHistoryAccount as historyAccount">
+    <div class="col-12">
+      <section class="allocation-history-panel">
+        <div class="allocation-history-heading">
+          <div>
+            <span class="account-linking-eyebrow">Allocation {{ getAllocationForAccount(historyAccount)?.allocationId || historyAccount.allocationId }}</span>
+            <h5>Allocation account history</h5>
+            <p>{{ historyAccount.accountHolderName }} · {{ historyAccount.accountNumber }}</p>
+          </div>
+          <button type="button" class="btn btn-outline-secondary" (click)="selectedHistoryAccount = null">Close history</button>
+        </div>
+
+        <div class="allocation-history-tabs" role="tablist" aria-label="Allocation history types">
+          <button type="button" role="tab" [attr.aria-selected]="historyTab === 'allocation'" [class.active]="historyTab === 'allocation'" (click)="historyTab = 'allocation'">
+            Allocation ({{ allocationCreationHistory.length }})
+          </button>
+          <button type="button" role="tab" [attr.aria-selected]="historyTab === 'edits'" [class.active]="historyTab === 'edits'" (click)="historyTab = 'edits'">
+            Edits / saves ({{ allocationEditHistory.length }})
+          </button>
+          <button type="button" role="tab" [attr.aria-selected]="historyTab === 'debits'" [class.active]="historyTab === 'debits'" (click)="historyTab = 'debits'">
+            Debits ({{ historyDebitCount }})
+          </button>
+          <button type="button" role="tab" [attr.aria-selected]="historyTab === 'credits'" [class.active]="historyTab === 'credits'" (click)="historyTab = 'credits'">
+            Credits ({{ historyCreditCount }})
+          </button>
+        </div>
+
+        <div class="allocation-history-loading" *ngIf="historyLoading">Loading saved history…</div>
+
+        <div class="allocation-history-table-wrap" *ngIf="!historyLoading && historyTab === 'allocation'">
+          <table class="table table-hover allocation-history-table">
+            <thead><tr><th>Saved at</th><th>Event</th><th>Saved by</th><th>Amount</th><th>Valid until</th><th>Purpose</th><th>Status</th></tr></thead>
+            <tbody>
+              <tr *ngFor="let event of allocationCreationHistory">
+                <td>{{ event.changedAt | date:'dd/MM/yyyy HH:mm:ss' }}</td>
+                <td><span class="history-event-badge">{{ event.eventType }}</span></td>
+                <td>{{ event.performedByName || (event.performedByAdminId ? ('Admin #' + event.performedByAdminId) : 'Not recorded') }}</td>
+                <td>{{ event.newAmount | currency:'INR':'symbol':'1.2-2' }}</td>
+                <td>{{ event.newValidTill | date:'mediumDate' }}</td>
+                <td>{{ event.newDescription || '—' }}</td>
+                <td>{{ event.newStatus || '—' }}</td>
+              </tr>
+              <tr *ngIf="!allocationCreationHistory.length"><td colspan="7" class="history-empty">No allocation creation history recorded.</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="allocation-history-table-wrap" *ngIf="!historyLoading && historyTab === 'edits'">
+          <table class="table table-hover allocation-history-table">
+            <thead><tr><th>Saved at</th><th>Change</th><th>Saved by</th><th>Amount</th><th>Validity</th><th>Purpose</th><th>Status</th><th>Summary</th></tr></thead>
+            <tbody>
+              <tr *ngFor="let event of allocationEditHistory">
+                <td>{{ event.changedAt | date:'dd/MM/yyyy HH:mm:ss' }}</td>
+                <td><span class="history-event-badge">{{ event.eventType }}</span></td>
+                <td>{{ event.performedByName || (event.performedByAdminId ? ('Admin #' + event.performedByAdminId) : 'Not recorded') }}</td>
+                <td>{{ event.previousAmount != null ? (event.previousAmount | currency:'INR':'symbol':'1.2-2') : 'Not captured' }} → {{ event.newAmount != null ? (event.newAmount | currency:'INR':'symbol':'1.2-2') : 'Not recorded' }}</td>
+                <td>{{ event.previousValidTill ? (event.previousValidTill | date:'mediumDate') : 'Not captured' }} → {{ event.newValidTill ? (event.newValidTill | date:'mediumDate') : 'Not recorded' }}</td>
+                <td>{{ event.previousDescription || 'Not captured' }} → {{ event.newDescription || '—' }}</td>
+                <td>{{ event.previousStatus || 'Not captured' }} → {{ event.newStatus || 'Not recorded' }}</td>
+                <td>{{ event.summary || '—' }}</td>
+              </tr>
+              <tr *ngIf="!allocationEditHistory.length"><td colspan="8" class="history-empty">No allocation edits or saves recorded.</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="allocation-history-table-wrap" *ngIf="!historyLoading && (historyTab === 'debits' || historyTab === 'credits')">
+          <table class="table table-hover allocation-history-table">
+            <thead><tr><th>Date</th><th>Transaction</th><th>Product</th><th>Customer / account</th><th>Reference</th><th>Amount</th><th>Balance after</th><th>Status</th><th>Details / actor</th></tr></thead>
+            <tbody>
+              <tr *ngFor="let transaction of (historyTab === 'debits' ? allocationDebitHistory : allocationCreditHistory)">
+                <td>{{ transaction.transactionDate | date:'dd/MM/yyyy HH:mm:ss' }}</td>
+                <td>{{ transaction.transactionId || '—' }}</td>
+                <td>{{ transaction.productType || '—' }}</td>
+                <td>{{ transaction.userName || '—' }}<small class="d-block text-muted">{{ transaction.userAccountNumber || '—' }}</small></td>
+                <td>{{ transaction.referenceNumber || transaction.linkedTransactionId || '—' }}</td>
+                <td [class.debit-value]="transaction.type === 'DEBIT'" [class.credit-value]="transaction.type === 'CREDIT'">{{ transaction.amount | currency:'INR':'symbol':'1.2-2' }}</td>
+                <td>{{ transaction.balanceAfter | currency:'INR':'symbol':'1.2-2' }}</td>
+                <td>{{ transaction.status || '—' }}</td>
+                <td>{{ transaction.description || transaction.remarks || '—' }}<small class="d-block text-muted">{{ transaction.performedByName || (transaction.performedByAdminId ? ('Admin #' + transaction.performedByAdminId) : '—') }}</small></td>
+              </tr>
+              <tr *ngIf="(historyTab === 'debits' ? allocationDebitHistory : allocationCreditHistory).length === 0">
+                <td colspan="9" class="history-empty">No {{ historyTab === 'debits' ? 'debit' : 'credit' }} history recorded.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="allocation-history-pagination" *ngIf="!historyLoading && (historyTab === 'debits' || historyTab === 'credits') && historyTotalPages > 1">
+          <span>Showing {{ allocationTransactions.length }} of {{ historyTotalTransactions }} transactions · Page {{ historyPage + 1 }} of {{ historyTotalPages }}</span>
+          <div>
+            <button type="button" class="btn btn-sm btn-outline-secondary" (click)="changeAllocationHistoryPage(-1)" [disabled]="historyPage === 0">Previous</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" (click)="changeAllocationHistoryPage(1)" [disabled]="historyPage >= historyTotalPages - 1">Next</button>
+          </div>
+        </div>
+      </section>
     </div>
   </div>
 

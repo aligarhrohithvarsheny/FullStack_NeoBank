@@ -46,6 +46,7 @@ export class ChequeComponent implements OnInit {
 
   // Form states
   isSubmitting: boolean = false;
+  isRequestingChequeBook = false;
   formValid: boolean = false;
   successMessage: string = '';
   errorMessage: string = '';
@@ -120,6 +121,28 @@ export class ChequeComponent implements OnInit {
       error: () => {
         this.availableLeaves = [];
         this.isLoadingLeaves = false;
+      }
+    });
+  }
+
+  requestNewChequeBook(): void {
+    const account = this.account;
+    if (!account?.id || this.isRequestingChequeBook || this.isLoadingLeaves) return;
+    if (!confirm('Request a new 30-number cheque book? ₹199 will be debited from your account.')) return;
+
+    this.isRequestingChequeBook = true;
+    this.savingsChequeService.requestNewChequeBook(account.id).subscribe({
+      next: response => {
+        this.isRequestingChequeBook = false;
+        this.availableBalance = response.balanceAfterCharge;
+        account.balance = response.balanceAfterCharge;
+        this.successMessage = `${response.message} Numbers ${response.serialFrom}–${response.serialTo}.`;
+        this.errorMessage = '';
+        this.loadAvailableLeaves();
+      },
+      error: err => {
+        this.isRequestingChequeBook = false;
+        this.errorMessage = err?.error?.message || err?.error?.error || 'Unable to issue a new cheque book.';
       }
     });
   }

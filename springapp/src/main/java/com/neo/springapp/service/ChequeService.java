@@ -9,6 +9,9 @@ import com.neo.springapp.model.ChequeBankRange;
 import com.neo.springapp.model.BusinessChequeBankRange;
 import com.neo.springapp.model.ChequeLeaf;
 import com.neo.springapp.model.BusinessChequeLeaf;
+import com.neo.springapp.model.SavingsChequeBankRange;
+import com.neo.springapp.model.SavingsChequeLeaf;
+import com.neo.springapp.model.SavingsChequeRequest;
 import com.neo.springapp.model.ChequeRequest;
 import com.neo.springapp.model.BusinessChequeRequest;
 import com.neo.springapp.repository.ChequeRepository;
@@ -22,6 +25,9 @@ import com.neo.springapp.repository.BusinessChequeLeafRepository;
 import com.neo.springapp.repository.ChequeBookClosureHistoryRepository;
 import com.neo.springapp.repository.ChequeRequestRepository;
 import com.neo.springapp.repository.BusinessChequeRequestRepository;
+import com.neo.springapp.repository.SavingsChequeBankRangeRepository;
+import com.neo.springapp.repository.SavingsChequeLeafRepository;
+import com.neo.springapp.repository.SavingsChequeRequestRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -77,6 +83,15 @@ public class ChequeService {
 
     @Autowired
     private ChequeBookClosureHistoryRepository chequeBookClosureHistoryRepository;
+
+    @Autowired
+    private SavingsChequeBankRangeRepository savingsChequeBankRangeRepository;
+
+    @Autowired
+    private SavingsChequeLeafRepository savingsChequeLeafRepository;
+
+    @Autowired
+    private SavingsChequeRequestRepository savingsChequeRequestRepository;
 
     public ChequeService(ChequeRepository chequeRepository, AccountRepository accountRepository, 
                         AccountService accountService, TransactionService transactionService,
@@ -237,22 +252,28 @@ public class ChequeService {
         SalaryAccount salaryAccount = salaryAccountRepository.findByAccountNumber(cleanAcc);
         if (salaryAccount != null) {
             List<ChequeBankRange> ranges = chequeBankRangeRepository.findBySalaryAccountId(salaryAccount.getId());
+            List<ChequeLeaf> leaves = chequeLeafRepository.findBySalaryAccountIdOrderByLeafNumberAsc(salaryAccount.getId());
             if (!ranges.isEmpty()) {
-                List<ChequeLeaf> leaves = chequeLeafRepository.findBySalaryAccountIdOrderByLeafNumberAsc(salaryAccount.getId());
                 for (ChequeBankRange range : ranges) {
-                    books.add(buildChequeBookMap(salaryAccount.getAccountNumber(), "Salary", range.getChequeBookNumber(), "SALARY",
+                    Map<String, Object> book = buildChequeBookMap(salaryAccount.getAccountNumber(), "Salary", range.getChequeBookNumber(), "SALARY",
                             range.getSerialFrom(), range.getSerialTo(), range.getStatus(), range.getIssuedDate(),
                             countGenerated(range.getSerialFrom(), range.getSerialTo(), leaves),
-                            countUsed(range.getSerialFrom(), range.getSerialTo(), leaves)));
+                            countUsed(range.getSerialFrom(), range.getSerialTo(), leaves));
+                    book.put("availableCount", countAvailable(range.getSerialFrom(), range.getSerialTo(), leaves));
+                    book.put("chequeNumbers", salaryLeafDetails(leaves, range.getSerialFrom(), range.getSerialTo()));
+                    books.add(book);
                 }
             }
-            List<ChequeLeaf> leaves = chequeLeafRepository.findBySalaryAccountIdOrderByLeafNumberAsc(salaryAccount.getId());
             if (ranges.isEmpty() && !leaves.isEmpty()) {
                 String first = leaves.get(0).getLeafNumber();
                 String last = leaves.get(leaves.size() - 1).getLeafNumber();
-                books.add(buildChequeBookMap(salaryAccount.getAccountNumber(), "Salary", "LEGACY-SALARY", "SALARY",
-                    first, last, "ACTIVE", salaryAccount.getCreatedAt() != null ? salaryAccount.getCreatedAt().toLocalDate() : LocalDateTime.now().toLocalDate(),
-                    leaves.size(), (int) leaves.stream().filter(l -> "USED".equalsIgnoreCase(l.getStatus())).count()));
+                Map<String, Object> book = buildChequeBookMap(salaryAccount.getAccountNumber(), "Salary", "LEGACY-SALARY", "SALARY",
+                    first, last, hasAvailableSalaryLeaf(leaves) ? "ACTIVE" : "CLOSED",
+                    salaryAccount.getCreatedAt() != null ? salaryAccount.getCreatedAt().toLocalDate() : LocalDateTime.now().toLocalDate(),
+                    leaves.size(), (int) leaves.stream().filter(l -> "USED".equalsIgnoreCase(l.getStatus())).count());
+                book.put("availableCount", countAvailable(first, last, leaves));
+                book.put("chequeNumbers", salaryLeafDetails(leaves, first, last));
+                books.add(book);
             }
         }
 
@@ -260,40 +281,77 @@ public class ChequeService {
         if (currentOpt.isPresent()) {
             CurrentAccount currentAccount = currentOpt.get();
             List<BusinessChequeBankRange> ranges = businessChequeBankRangeRepository.findByCurrentAccountId(currentAccount.getId());
+            List<BusinessChequeLeaf> leaves = businessChequeLeafRepository
+                    .findByCurrentAccountIdOrderByLeafNumberAsc(currentAccount.getId());
             if (!ranges.isEmpty()) {
-                List<BusinessChequeLeaf> leaves = businessChequeLeafRepository.findByCurrentAccountIdOrderByLeafNumberAsc(currentAccount.getId());
                 for (BusinessChequeBankRange range : ranges) {
-                    books.add(buildChequeBookMap(currentAccount.getAccountNumber(), "Business", range.getChequeBookNumber(), "CURRENT",
+                    Map<String, Object> book = buildChequeBookMap(currentAccount.getAccountNumber(), "Business", range.getChequeBookNumber(), "CURRENT",
                             range.getSerialFrom(), range.getSerialTo(), range.getStatus(), range.getIssuedDate(),
                             countGenerated(range.getSerialFrom(), range.getSerialTo(), leaves),
-                            countUsed(range.getSerialFrom(), range.getSerialTo(), leaves)));
+                            countUsed(range.getSerialFrom(), range.getSerialTo(), leaves));
+                    book.put("availableCount", countAvailable(range.getSerialFrom(), range.getSerialTo(), leaves));
+                    book.put("chequeNumbers", businessLeafDetails(leaves, range.getSerialFrom(), range.getSerialTo()));
+                    books.add(book);
                 }
             }
-            List<BusinessChequeLeaf> leaves = businessChequeLeafRepository.findByCurrentAccountIdOrderByLeafNumberAsc(currentAccount.getId());
             if (ranges.isEmpty() && !leaves.isEmpty()) {
                 String first = leaves.get(0).getLeafNumber();
                 String last = leaves.get(leaves.size() - 1).getLeafNumber();
-                books.add(buildChequeBookMap(currentAccount.getAccountNumber(), "Business", "LEGACY-CURRENT", "CURRENT",
-                    first, last, "ACTIVE", currentAccount.getCreatedAt() != null ? currentAccount.getCreatedAt().toLocalDate() : LocalDateTime.now().toLocalDate(),
-                    leaves.size(), (int) leaves.stream().filter(l -> "USED".equalsIgnoreCase(l.getStatus())).count()));
+                Map<String, Object> book = buildChequeBookMap(currentAccount.getAccountNumber(), "Business", "LEGACY-CURRENT", "CURRENT",
+                    first, last, hasAvailableBusinessLeaf(leaves) ? "ACTIVE" : "CLOSED",
+                    currentAccount.getCreatedAt() != null ? currentAccount.getCreatedAt().toLocalDate() : LocalDateTime.now().toLocalDate(),
+                    leaves.size(), (int) leaves.stream().filter(l -> "USED".equalsIgnoreCase(l.getStatus())).count());
+                book.put("availableCount", countAvailable(first, last, leaves));
+                book.put("chequeNumbers", businessLeafDetails(leaves, first, last));
+                books.add(book);
             }
         }
 
         Account savingsAccount = accountRepository.findByAccountNumber(cleanAcc);
         if (savingsAccount != null) {
+            List<SavingsChequeBankRange> ranges = savingsChequeBankRangeRepository.findByAccountId(savingsAccount.getId());
+            List<SavingsChequeLeaf> leaves = savingsChequeLeafRepository.findByAccountIdOrderByLeafNumberAsc(savingsAccount.getId());
+            for (SavingsChequeBankRange range : ranges) {
+                Map<String, Object> book = buildChequeBookMap(savingsAccount.getAccountNumber(),
+                        savingsAccount.getAccountType() != null ? savingsAccount.getAccountType() : "Savings",
+                        range.getChequeBookNumber(), "SAVINGS", range.getSerialFrom(), range.getSerialTo(),
+                        range.getStatus(), range.getIssuedDate(), countGenerated(range.getSerialFrom(), range.getSerialTo(), leaves),
+                        countUsed(range.getSerialFrom(), range.getSerialTo(), leaves));
+                book.put("availableCount", countAvailable(range.getSerialFrom(), range.getSerialTo(), leaves));
+                book.put("chequeNumbers", savingsLeafDetails(leaves, range.getSerialFrom(), range.getSerialTo()));
+                books.add(book);
+            }
+            if (ranges.isEmpty() && !leaves.isEmpty()) {
+                String first = leaves.get(0).getLeafNumber();
+                String last = leaves.get(leaves.size() - 1).getLeafNumber();
+                Map<String, Object> book = buildChequeBookMap(savingsAccount.getAccountNumber(),
+                        savingsAccount.getAccountType() != null ? savingsAccount.getAccountType() : "Savings",
+                        "LEGACY-SAVINGS-LEAVES", "SAVINGS", first, last,
+                        hasAvailableSavingsLeaf(leaves) ? "ACTIVE" : "CLOSED",
+                        LocalDateTime.now().toLocalDate(), leaves.size(),
+                        (int) leaves.stream().filter(l -> "USED".equalsIgnoreCase(l.getStatus())).count());
+                book.put("availableCount", countAvailable(first, last, leaves));
+                book.put("chequeNumbers", savingsLeafDetails(leaves, first, last));
+                books.add(book);
+            }
             List<Cheque> cheques = chequeRepository.findByAccountNumber(cleanAcc);
-            if (!cheques.isEmpty() && books.stream().noneMatch(b -> "SAVINGS".equals(b.get("bookType")))) {
+            if (!cheques.isEmpty()) {
                 String first = cheques.stream().map(Cheque::getChequeNumber).min(String::compareTo).orElse(cleanAcc);
                 String last = cheques.stream().map(Cheque::getChequeNumber).max(String::compareTo).orElse(cleanAcc);
-                books.add(buildChequeBookMap(savingsAccount.getAccountNumber(), savingsAccount.getAccountType() != null ? savingsAccount.getAccountType() : "Savings",
-                    "LEGACY-SAVINGS", "SAVINGS", first, last, "ACTIVE", LocalDateTime.now().toLocalDate(),
-                    cheques.size(), (int) cheques.stream().filter(c -> !c.isAvailable()).count()));
+                Map<String, Object> book = buildChequeBookMap(savingsAccount.getAccountNumber(), savingsAccount.getAccountType() != null ? savingsAccount.getAccountType() : "Savings",
+                    "LEGACY-SAVINGS-CHEQUES", "SAVINGS", first, last,
+                    cheques.stream().anyMatch(Cheque::isAvailable) ? "ACTIVE" : "CLOSED", LocalDateTime.now().toLocalDate(),
+                    cheques.size(), (int) cheques.stream().filter(c -> !c.isAvailable()).count());
+                book.put("availableCount", (int) cheques.stream().filter(Cheque::isAvailable).count());
+                book.put("chequeNumbers", legacyChequeDetails(cheques));
+                books.add(book);
             }
         }
 
         return books;
     }
 
+    @Transactional
     public Map<String, Object> closeChequeBooksForAccount(String accountNumber, String closedBy, String reason) {
         if (accountNumber == null || accountNumber.isBlank()) {
             throw new IllegalArgumentException("Account number is required");
@@ -308,23 +366,28 @@ public class ChequeService {
         SalaryAccount salaryAccount = salaryAccountRepository.findByAccountNumber(cleanAcc);
         if (salaryAccount != null) {
             List<ChequeBankRange> ranges = chequeBankRangeRepository.findBySalaryAccountId(salaryAccount.getId());
-            for (ChequeBankRange range : ranges) {
-                if (!"CLOSED".equalsIgnoreCase(range.getStatus())) {
-                    range.setStatus("CLOSED");
-                    range.setUpdatedAt(now);
-                    chequeBankRangeRepository.save(range);
-                    closedBooks++;
-                    chequeBookClosureHistoryRepository.save(new ChequeBookClosureHistory(cleanAcc, "Salary", range.getChequeBookNumber(), "SALARY",
-                            range.getSerialFrom(), range.getSerialTo(), adminName, closureReason, 30));
-                }
-            }
-
             List<ChequeLeaf> leaves = chequeLeafRepository.findBySalaryAccountIdOrderByLeafNumberAsc(salaryAccount.getId());
-            for (ChequeLeaf leaf : leaves) {
-                if (!"CLOSED".equalsIgnoreCase(leaf.getStatus())) {
-                    leaf.setStatus("CLOSED");
-                    chequeLeafRepository.save(leaf);
-                }
+            for (ChequeBankRange range : ranges) {
+                if ("CLOSED".equalsIgnoreCase(range.getStatus())) continue;
+                range.setStatus("CLOSED");
+                range.setUpdatedAt(now);
+                chequeBankRangeRepository.save(range);
+                closedBooks++;
+                List<String> numbers = leaves.stream()
+                        .filter(leaf -> isInRange(leaf.getLeafNumber(), range.getSerialFrom(), range.getSerialTo()))
+                        .map(ChequeLeaf::getLeafNumber)
+                        .toList();
+                closeAvailableLeaves(leaves, range.getSerialFrom(), range.getSerialTo());
+                saveClosureHistory(cleanAcc, "Salary", range.getChequeBookNumber(), "SALARY",
+                        range.getSerialFrom(), range.getSerialTo(), adminName, closureReason,
+                        numbers.isEmpty() ? serialRangeNumbers(range.getSerialFrom(), range.getSerialTo()) : numbers);
+            }
+            if (ranges.isEmpty() && !leaves.isEmpty()) {
+                List<String> numbers = leaves.stream().map(ChequeLeaf::getLeafNumber).toList();
+                closeAvailableLeaves(leaves, null, null);
+                closedBooks++;
+                saveClosureHistory(cleanAcc, "Salary", "LEGACY-SALARY", "SALARY",
+                        numbers.get(0), numbers.get(numbers.size() - 1), adminName, closureReason, numbers);
             }
         }
 
@@ -332,44 +395,81 @@ public class ChequeService {
         if (currentOpt.isPresent()) {
             CurrentAccount currentAccount = currentOpt.get();
             List<BusinessChequeBankRange> ranges = businessChequeBankRangeRepository.findByCurrentAccountId(currentAccount.getId());
+            List<BusinessChequeLeaf> leaves = businessChequeLeafRepository
+                    .findByCurrentAccountIdOrderByLeafNumberAsc(currentAccount.getId());
             for (BusinessChequeBankRange range : ranges) {
-                if (!"CLOSED".equalsIgnoreCase(range.getStatus())) {
-                    range.setStatus("CLOSED");
-                    range.setUpdatedAt(now);
-                    businessChequeBankRangeRepository.save(range);
-                    closedBooks++;
-                    chequeBookClosureHistoryRepository.save(new ChequeBookClosureHistory(cleanAcc, "Business", range.getChequeBookNumber(), "CURRENT",
-                            range.getSerialFrom(), range.getSerialTo(), adminName, closureReason, 30));
-                }
+                if ("CLOSED".equalsIgnoreCase(range.getStatus())) continue;
+                range.setStatus("CLOSED");
+                range.setUpdatedAt(now);
+                businessChequeBankRangeRepository.save(range);
+                closedBooks++;
+                List<String> numbers = leaves.stream()
+                        .filter(leaf -> isInRange(leaf.getLeafNumber(), range.getSerialFrom(), range.getSerialTo()))
+                        .map(BusinessChequeLeaf::getLeafNumber)
+                        .toList();
+                closeAvailableBusinessLeaves(leaves, range.getSerialFrom(), range.getSerialTo());
+                saveClosureHistory(cleanAcc, "Business", range.getChequeBookNumber(), "CURRENT",
+                        range.getSerialFrom(), range.getSerialTo(), adminName, closureReason,
+                        numbers.isEmpty() ? serialRangeNumbers(range.getSerialFrom(), range.getSerialTo()) : numbers);
             }
-
-            List<BusinessChequeLeaf> leaves = businessChequeLeafRepository.findByCurrentAccountIdOrderByLeafNumberAsc(currentAccount.getId());
-            for (BusinessChequeLeaf leaf : leaves) {
-                if (!"CLOSED".equalsIgnoreCase(leaf.getStatus())) {
-                    leaf.setStatus("CLOSED");
-                    businessChequeLeafRepository.save(leaf);
-                }
+            if (ranges.isEmpty() && !leaves.isEmpty()) {
+                List<String> numbers = leaves.stream().map(BusinessChequeLeaf::getLeafNumber).toList();
+                closeAvailableBusinessLeaves(leaves, null, null);
+                closedBooks++;
+                saveClosureHistory(cleanAcc, "Business", "LEGACY-CURRENT", "CURRENT",
+                        numbers.get(0), numbers.get(numbers.size() - 1), adminName, closureReason, numbers);
             }
         }
 
         Account savingsAccount = accountRepository.findByAccountNumber(cleanAcc);
         if (savingsAccount != null) {
+            List<SavingsChequeBankRange> ranges = savingsChequeBankRangeRepository.findByAccountId(savingsAccount.getId());
+            List<SavingsChequeLeaf> leaves = savingsChequeLeafRepository.findByAccountIdOrderByLeafNumberAsc(savingsAccount.getId());
+            for (SavingsChequeBankRange range : ranges) {
+                if ("CLOSED".equalsIgnoreCase(range.getStatus())) continue;
+                range.setStatus("CLOSED");
+                range.setUpdatedAt(now);
+                savingsChequeBankRangeRepository.save(range);
+                closedBooks++;
+                List<String> numbers = leaves.stream()
+                        .filter(leaf -> isInRange(leaf.getLeafNumber(), range.getSerialFrom(), range.getSerialTo()))
+                        .map(SavingsChequeLeaf::getLeafNumber)
+                        .toList();
+                closeAvailableSavingsLeaves(leaves, range.getSerialFrom(), range.getSerialTo());
+                saveClosureHistory(cleanAcc,
+                        savingsAccount.getAccountType() != null ? savingsAccount.getAccountType() : "Savings",
+                        range.getChequeBookNumber(), "SAVINGS", range.getSerialFrom(), range.getSerialTo(),
+                        adminName, closureReason,
+                        numbers.isEmpty() ? serialRangeNumbers(range.getSerialFrom(), range.getSerialTo()) : numbers);
+            }
+            if (ranges.isEmpty() && !leaves.isEmpty()) {
+                List<String> numbers = leaves.stream().map(SavingsChequeLeaf::getLeafNumber).toList();
+                closeAvailableSavingsLeaves(leaves, null, null);
+                closedBooks++;
+                saveClosureHistory(cleanAcc,
+                        savingsAccount.getAccountType() != null ? savingsAccount.getAccountType() : "Savings",
+                        "LEGACY-SAVINGS", "SAVINGS", numbers.get(0), numbers.get(numbers.size() - 1),
+                        adminName, closureReason, numbers);
+            }
+
             List<Cheque> accountCheques = chequeRepository.findByAccountNumber(cleanAcc);
-            if (!accountCheques.isEmpty()) {
-                int activeCheques = 0;
-                for (Cheque cheque : accountCheques) {
-                    if (cheque.isAvailable()) {
-                        cheque.cancel(adminName, closureReason);
-                        chequeRepository.save(cheque);
-                        activeCheques++;
-                    }
+            List<String> closedChequeNumbers = new ArrayList<>();
+            for (Cheque cheque : accountCheques) {
+                if ("ACTIVE".equalsIgnoreCase(cheque.getStatus())) {
+                    cheque.setStatus("CLOSED");
+                    cheque.setCancelledBy(adminName);
+                    cheque.setCancellationReason(closureReason);
+                    cheque.setCancelledDate(now);
+                    chequeRepository.save(cheque);
+                    closedChequeNumbers.add(cheque.getChequeNumber());
                 }
-                if (activeCheques > 0) {
-                    closedBooks++;
-                    chequeBookClosureHistoryRepository.save(new ChequeBookClosureHistory(cleanAcc,
-                            savingsAccount.getAccountType() != null ? savingsAccount.getAccountType() : "Savings",
-                            "LEGACY-SAVINGS", "SAVINGS", null, null, adminName, closureReason, activeCheques));
-                }
+            }
+            if (!closedChequeNumbers.isEmpty()) {
+                closedBooks++;
+                saveClosureHistory(cleanAcc,
+                        savingsAccount.getAccountType() != null ? savingsAccount.getAccountType() : "Savings",
+                        "LEGACY-SAVINGS-CHEQUES", "SAVINGS", null, null,
+                        adminName, closureReason, closedChequeNumbers);
             }
         }
 
@@ -385,6 +485,59 @@ public class ChequeService {
         response.put("closedBy", adminName);
         response.put("reason", closureReason);
         return response;
+    }
+
+    private void closeAvailableLeaves(List<ChequeLeaf> leaves, String from, String to) {
+        for (ChequeLeaf leaf : leaves) {
+            if (isInBookRange(leaf.getLeafNumber(), from, to) && isLeafActive(leaf.getStatus())) {
+                leaf.setStatus("CLOSED");
+                chequeLeafRepository.save(leaf);
+            }
+        }
+    }
+
+    private void closeAvailableBusinessLeaves(List<BusinessChequeLeaf> leaves, String from, String to) {
+        for (BusinessChequeLeaf leaf : leaves) {
+            if (isInBookRange(leaf.getLeafNumber(), from, to) && isLeafActive(leaf.getStatus())) {
+                leaf.setStatus("CLOSED");
+                businessChequeLeafRepository.save(leaf);
+            }
+        }
+    }
+
+    private void closeAvailableSavingsLeaves(List<SavingsChequeLeaf> leaves, String from, String to) {
+        for (SavingsChequeLeaf leaf : leaves) {
+            if (isInBookRange(leaf.getLeafNumber(), from, to) && isLeafActive(leaf.getStatus())) {
+                leaf.setStatus("CLOSED");
+                savingsChequeLeafRepository.save(leaf);
+            }
+        }
+    }
+
+    private boolean isInBookRange(String number, String from, String to) {
+        return from == null && to == null || isInRange(number, from, to);
+    }
+
+    private List<String> serialRangeNumbers(String from, String to) {
+        Integer size = numericRangeSize(from, to);
+        if (size == null || size > 1000) return List.of();
+        List<String> numbers = new ArrayList<>(size);
+        long start = Long.parseLong(from.trim());
+        for (int i = 0; i < size; i++) numbers.add(String.format("%0" + from.trim().length() + "d", start + i));
+        return numbers;
+    }
+
+    private boolean isLeafActive(String status) {
+        return "AVAILABLE".equalsIgnoreCase(status) || "ACTIVE".equalsIgnoreCase(status);
+    }
+
+    private void saveClosureHistory(String accountNumber, String accountType, String bookNumber, String bookType,
+                                    String serialFrom, String serialTo, String closedBy, String reason,
+                                    List<String> chequeNumbers) {
+        ChequeBookClosureHistory entry = new ChequeBookClosureHistory(accountNumber, accountType, bookNumber,
+                bookType, serialFrom, serialTo, closedBy, reason, chequeNumbers.size());
+        entry.setClosedChequeNumbers(String.join(",", chequeNumbers));
+        chequeBookClosureHistoryRepository.save(entry);
     }
 
     public List<Map<String, Object>> getChequeBookClosureHistory(String accountNumber) {
@@ -407,9 +560,42 @@ public class ChequeService {
             item.put("closedCount", entry.getClosedCount());
             item.put("status", entry.getStatus());
             item.put("closedAt", entry.getClosedAt());
+            List<String> numbers = closureNumbers(entry);
+            item.put("closedChequeNumbers", numbers);
+            item.put("chequeNumbers", closureChequeDetails(entry, numbers));
             history.add(item);
         }
         return history;
+    }
+
+    private List<String> closureNumbers(ChequeBookClosureHistory entry) {
+        if (entry.getClosedChequeNumbers() != null && !entry.getClosedChequeNumbers().isBlank()) {
+            return List.of(entry.getClosedChequeNumbers().split(","));
+        }
+        List<String> rangeNumbers = serialRangeNumbers(entry.getSerialFrom(), entry.getSerialTo());
+        if (!rangeNumbers.isEmpty()) return rangeNumbers;
+        if ("SAVINGS".equalsIgnoreCase(entry.getBookType())) {
+            return chequeRepository.findByAccountNumber(entry.getAccountNumber()).stream()
+                    .filter(cheque -> !"ACTIVE".equalsIgnoreCase(cheque.getStatus()))
+                    .map(Cheque::getChequeNumber)
+                    .toList();
+        }
+        return List.of();
+    }
+
+    private List<Map<String, Object>> closureChequeDetails(ChequeBookClosureHistory entry, List<String> numbers) {
+        List<Map<String, Object>> details = new ArrayList<>();
+        for (String number : numbers) {
+            try {
+                details.add(lookupChequeByNumber(number));
+            } catch (IllegalArgumentException ignored) {
+                Map<String, Object> detail = new HashMap<>();
+                detail.put("chequeNumber", number);
+                detail.put("status", "CLOSED");
+                details.add(detail);
+            }
+        }
+        return details;
     }
 
     private Map<String, Object> buildChequeBookMap(String accountNumber, String accountType, String chequeBookNumber,
@@ -443,12 +629,149 @@ public class ChequeService {
         return rangeSize != null ? rangeSize : leaves.size();
     }
 
+    private boolean hasAvailableSalaryLeaf(List<ChequeLeaf> leaves) {
+        return leaves.stream().anyMatch(leaf -> "AVAILABLE".equalsIgnoreCase(leaf.getStatus()));
+    }
+
+    private boolean hasAvailableBusinessLeaf(List<BusinessChequeLeaf> leaves) {
+        return leaves.stream().anyMatch(leaf -> "AVAILABLE".equalsIgnoreCase(leaf.getStatus()));
+    }
+
+    private boolean hasAvailableSavingsLeaf(List<SavingsChequeLeaf> leaves) {
+        return leaves.stream().anyMatch(leaf -> "AVAILABLE".equalsIgnoreCase(leaf.getStatus()));
+    }
+
     private int countUsed(String serialFrom, String serialTo, List<?> leaves) {
         return (int) leaves.stream().filter(leaf -> {
-            String number = leaf instanceof ChequeLeaf ? ((ChequeLeaf) leaf).getLeafNumber() : ((BusinessChequeLeaf) leaf).getLeafNumber();
-            String status = leaf instanceof ChequeLeaf ? ((ChequeLeaf) leaf).getStatus() : ((BusinessChequeLeaf) leaf).getStatus();
+            String number;
+            String status;
+            if (leaf instanceof ChequeLeaf chequeLeaf) {
+                number = chequeLeaf.getLeafNumber();
+                status = chequeLeaf.getStatus();
+            } else if (leaf instanceof BusinessChequeLeaf businessLeaf) {
+                number = businessLeaf.getLeafNumber();
+                status = businessLeaf.getStatus();
+            } else {
+                SavingsChequeLeaf savingsLeaf = (SavingsChequeLeaf) leaf;
+                number = savingsLeaf.getLeafNumber();
+                status = savingsLeaf.getStatus();
+            }
             return isInRange(number, serialFrom, serialTo) && "USED".equalsIgnoreCase(status);
         }).count();
+    }
+
+    private int countAvailable(String serialFrom, String serialTo, List<?> leaves) {
+        return (int) leaves.stream().filter(leaf -> {
+            String number;
+            String status;
+            if (leaf instanceof ChequeLeaf chequeLeaf) {
+                number = chequeLeaf.getLeafNumber();
+                status = chequeLeaf.getStatus();
+            } else if (leaf instanceof BusinessChequeLeaf businessLeaf) {
+                number = businessLeaf.getLeafNumber();
+                status = businessLeaf.getStatus();
+            } else {
+                SavingsChequeLeaf savingsLeaf = (SavingsChequeLeaf) leaf;
+                number = savingsLeaf.getLeafNumber();
+                status = savingsLeaf.getStatus();
+            }
+            return isInRange(number, serialFrom, serialTo) && "AVAILABLE".equalsIgnoreCase(status);
+        }).count();
+    }
+
+    private List<Map<String, Object>> salaryLeafDetails(List<ChequeLeaf> leaves, String from, String to) {
+        return leaves.stream().filter(leaf -> isInRange(leaf.getLeafNumber(), from, to))
+                .map(leaf -> leafDetails(leaf.getLeafNumber(), leaf.getStatus(), leaf.getAllocatedAt(),
+                        leaf.getUsedAt(), leaf.getUsedChequeRequestId(), "SALARY"))
+                .toList();
+    }
+
+    private List<Map<String, Object>> businessLeafDetails(List<BusinessChequeLeaf> leaves, String from, String to) {
+        return leaves.stream().filter(leaf -> isInRange(leaf.getLeafNumber(), from, to))
+                .map(leaf -> leafDetails(leaf.getLeafNumber(), leaf.getStatus(), leaf.getAllocatedAt(),
+                        leaf.getUsedAt(), leaf.getUsedChequeRequestId(), "CURRENT"))
+                .toList();
+    }
+
+    private List<Map<String, Object>> savingsLeafDetails(List<SavingsChequeLeaf> leaves, String from, String to) {
+        return leaves.stream().filter(leaf -> isInRange(leaf.getLeafNumber(), from, to))
+                .map(leaf -> leafDetails(leaf.getLeafNumber(), leaf.getStatus(), leaf.getAllocatedAt(),
+                        leaf.getUsedAt(), leaf.getUsedChequeRequestId(), "SAVINGS"))
+                .toList();
+    }
+
+    private List<Map<String, Object>> legacyChequeDetails(List<Cheque> cheques) {
+        return cheques.stream().map(cheque -> {
+            Map<String, Object> detail = new HashMap<>();
+            detail.put("chequeNumber", cheque.getChequeNumber());
+            detail.put("status", cheque.getStatus());
+            detail.put("amount", cheque.getAmount());
+            detail.put("usedFor", cheque.getUsedFor());
+            detail.put("usedReference", cheque.getUsedReference());
+            detail.put("usedAt", cheque.getUsedDate());
+            detail.put("payeeName", cheque.getPayeeName());
+            detail.put("requestStatus", cheque.getRequestStatus());
+            detail.put("createdAt", cheque.getCreatedAt());
+            detail.put("drawnAt", cheque.getDrawnDate());
+            detail.put("drawnBy", cheque.getDrawnBy());
+            detail.put("bounceReason", cheque.getBounceReason());
+            detail.put("cancellationReason", cheque.getCancellationReason());
+            return detail;
+        }).toList();
+    }
+
+    private Map<String, Object> leafDetails(String leafNumber, String status, LocalDateTime allocatedAt,
+                                            LocalDateTime usedAt, Long requestId, String bookType) {
+        Map<String, Object> detail = new HashMap<>();
+        detail.put("chequeNumber", leafNumber);
+        detail.put("status", status);
+        detail.put("allocatedAt", allocatedAt);
+        detail.put("usedAt", usedAt);
+        if (requestId == null) return detail;
+
+        detail.put("howUsed", "CHEQUE_DRAW");
+        if ("SALARY".equals(bookType)) {
+            chequeRequestRepository.findById(requestId).ifPresent(request ->
+                    addDrawRequestDetails(detail, request.getChequeNumber(), request.getAmount() != null ? request.getAmount().doubleValue() : null,
+                            request.getPayeeName(), request.getRemarks(), request.getStatus(), request.getPayeeAccountNumber(),
+                            request.getTransactionReference(), request.getDebitedFromAccount(), request.getCreditedToAccount(),
+                            request.getClearedAt(), request.getCreatedAt()));
+        } else if ("CURRENT".equals(bookType)) {
+            businessChequeRequestRepository.findById(requestId).ifPresent(request ->
+                    addDrawRequestDetails(detail, request.getChequeNumber(), request.getAmount() != null ? request.getAmount().doubleValue() : null,
+                            request.getPayeeName(), request.getRemarks(), request.getStatus(), request.getPayeeAccountNumber(),
+                            request.getTransactionReference(), request.getDebitedFromAccount(), request.getCreditedToAccount(),
+                            request.getClearedAt(), request.getCreatedAt()));
+        } else {
+            savingsChequeRequestRepository.findById(requestId).ifPresent(request -> {
+                addDrawRequestDetails(detail, request.getChequeNumber(), request.getAmount() != null ? request.getAmount().doubleValue() : null,
+                            request.getPayeeName(), request.getRemarks(), request.getStatus(), request.getPayeeAccountNumber(),
+                            request.getTransactionReference(), request.getDebitedFromAccount(), request.getCreditedToAccount(),
+                            request.getClearedAt(), request.getCreatedAt());
+                detail.put("chequePurpose", request.getChequePurpose());
+                detail.put("goldLoanAccountNumber", request.getGoldLoanAccountNumber());
+                detail.put("homeLoanAccountNumber", request.getHomeLoanAccountNumber());
+            });
+        }
+        return detail;
+    }
+
+    private void addDrawRequestDetails(Map<String, Object> detail, String requestChequeNumber, Double amount,
+                                      String payeeName, String remarks, String status, String payeeAccountNumber,
+                                      String transactionReference, String debitedFromAccount, String creditedToAccount,
+                                      LocalDateTime clearedAt, LocalDateTime createdAt) {
+        detail.put("requestChequeNumber", requestChequeNumber);
+        detail.put("amount", amount);
+        detail.put("payeeName", payeeName);
+        detail.put("remarks", remarks);
+        detail.put("requestStatus", status);
+        detail.put("paidStatus", status);
+        detail.put("payeeAccountNumber", payeeAccountNumber);
+        detail.put("transactionReference", transactionReference);
+        detail.put("debitedFromAccount", debitedFromAccount);
+        detail.put("creditedToAccount", creditedToAccount);
+        detail.put("paidAt", clearedAt);
+        detail.put("requestedAt", createdAt);
     }
 
     private Integer numericRangeSize(String serialFrom, String serialTo) {
@@ -485,30 +808,100 @@ public class ChequeService {
         Optional<Cheque> savings = chequeRepository.findByChequeNumber(number);
         if (savings.isPresent()) {
             Cheque cheque = savings.get();
-            return buildChequeLookup(cheque.getChequeNumber(), cheque.getAccountNumber(),
+            Map<String, Object> result = buildChequeLookup(cheque.getChequeNumber(), cheque.getAccountNumber(),
                     cheque.getAccountType(), "SAVINGS", cheque.getStatus(), cheque.getAmount(),
                     cheque.getUsedFor(), cheque.getUsedReference(), cheque.getCreatedAt());
+            result.putAll(legacyChequeDetails(List.of(cheque)).get(0));
+            return result;
         }
 
         Optional<ChequeRequest> salary = chequeRequestRepository.findByChequeNumber(number);
         if (salary.isPresent()) {
             ChequeRequest request = salary.get();
             SalaryAccount account = salaryAccountRepository.findById(request.getSalaryAccountId()).orElse(null);
-            return buildChequeLookup(request.getChequeNumber(), account != null ? account.getAccountNumber() : null,
+            Map<String, Object> result = buildChequeLookup(request.getChequeNumber(), account != null ? account.getAccountNumber() : null,
                     "Salary", "SALARY", request.getStatus(), request.getAmount() != null ? request.getAmount().doubleValue() : null,
                     null, null, request.getCreatedAt());
+            result.put("serialNumber", request.getSerialNumber());
+            addDrawRequestDetails(result, request.getChequeNumber(), request.getAmount() != null ? request.getAmount().doubleValue() : null,
+                    request.getPayeeName(), request.getRemarks(), request.getStatus(), request.getPayeeAccountNumber(),
+                    request.getTransactionReference(), request.getDebitedFromAccount(), request.getCreditedToAccount(),
+                    request.getClearedAt(), request.getCreatedAt());
+            return result;
         }
 
         Optional<BusinessChequeRequest> business = businessChequeRequestRepository.findByChequeNumber(number);
         if (business.isPresent()) {
             BusinessChequeRequest request = business.get();
             CurrentAccount account = currentAccountRepository.findById(request.getCurrentAccountId()).orElse(null);
-            return buildChequeLookup(request.getChequeNumber(), account != null ? account.getAccountNumber() : null,
+            Map<String, Object> result = buildChequeLookup(request.getChequeNumber(), account != null ? account.getAccountNumber() : null,
                     "Business", "CURRENT", request.getStatus(), request.getAmount() != null ? request.getAmount().doubleValue() : null,
                     null, null, request.getCreatedAt());
+            result.put("serialNumber", request.getSerialNumber());
+            addDrawRequestDetails(result, request.getChequeNumber(), request.getAmount() != null ? request.getAmount().doubleValue() : null,
+                    request.getPayeeName(), request.getRemarks(), request.getStatus(), request.getPayeeAccountNumber(),
+                    request.getTransactionReference(), request.getDebitedFromAccount(), request.getCreditedToAccount(),
+                    request.getClearedAt(), request.getCreatedAt());
+            return result;
+        }
+
+        Optional<SavingsChequeRequest> savingsRequest = savingsChequeRequestRepository.findByChequeNumber(number);
+        if (savingsRequest.isPresent()) {
+            SavingsChequeRequest request = savingsRequest.get();
+            Account account = accountRepository.findById(request.getAccountId()).orElse(null);
+            Map<String, Object> result = buildChequeLookup(request.getChequeNumber(), account != null ? account.getAccountNumber() : null,
+                    account != null ? account.getAccountType() : "Savings", "SAVINGS", request.getStatus(),
+                    request.getAmount() != null ? request.getAmount().doubleValue() : null, null, null, request.getCreatedAt());
+            result.put("serialNumber", request.getSerialNumber());
+            addDrawRequestDetails(result, request.getChequeNumber(), request.getAmount() != null ? request.getAmount().doubleValue() : null,
+                    request.getPayeeName(), request.getRemarks(), request.getStatus(), request.getPayeeAccountNumber(),
+                    request.getTransactionReference(), request.getDebitedFromAccount(), request.getCreditedToAccount(),
+                    request.getClearedAt(), request.getCreatedAt());
+            result.put("chequePurpose", request.getChequePurpose());
+            result.put("goldLoanAccountNumber", request.getGoldLoanAccountNumber());
+            result.put("homeLoanAccountNumber", request.getHomeLoanAccountNumber());
+            return result;
+        }
+
+        Optional<ChequeLeaf> salaryLeaf = chequeLeafRepository.findByLeafNumber(number);
+        if (salaryLeaf.isPresent()) {
+            ChequeLeaf leaf = salaryLeaf.get();
+            SalaryAccount account = salaryAccountRepository.findById(leaf.getSalaryAccountId()).orElse(null);
+            return buildLeafLookup(number, account != null ? account.getAccountNumber() : null, "Salary",
+                    "SALARY", leafDetails(number, leaf.getStatus(), leaf.getAllocatedAt(), leaf.getUsedAt(),
+                            leaf.getUsedChequeRequestId(), "SALARY"));
+        }
+
+        Optional<BusinessChequeLeaf> businessLeaf = businessChequeLeafRepository.findByLeafNumber(number);
+        if (businessLeaf.isPresent()) {
+            BusinessChequeLeaf leaf = businessLeaf.get();
+            CurrentAccount account = currentAccountRepository.findById(leaf.getCurrentAccountId()).orElse(null);
+            return buildLeafLookup(number, account != null ? account.getAccountNumber() : null, "Business",
+                    "CURRENT", leafDetails(number, leaf.getStatus(), leaf.getAllocatedAt(), leaf.getUsedAt(),
+                            leaf.getUsedChequeRequestId(), "CURRENT"));
+        }
+
+        Optional<SavingsChequeLeaf> savingsLeaf = savingsChequeLeafRepository.findByLeafNumber(number);
+        if (savingsLeaf.isPresent()) {
+            SavingsChequeLeaf leaf = savingsLeaf.get();
+            Account account = accountRepository.findById(leaf.getAccountId()).orElse(null);
+            return buildLeafLookup(number, account != null ? account.getAccountNumber() : null,
+                    account != null && account.getAccountType() != null ? account.getAccountType() : "Savings",
+                    "SAVINGS", leafDetails(number, leaf.getStatus(), leaf.getAllocatedAt(), leaf.getUsedAt(),
+                            leaf.getUsedChequeRequestId(), "SAVINGS"));
         }
 
         throw new IllegalArgumentException("Cheque number not found");
+    }
+
+    private Map<String, Object> buildLeafLookup(String chequeNumber, String accountNumber, String accountType,
+                                                 String bookType, Map<String, Object> details) {
+        Map<String, Object> result = buildChequeLookup(chequeNumber, accountNumber, accountType, bookType,
+                String.valueOf(details.get("status")), (Double) details.get("amount"),
+                (String) details.get("howUsed"), (String) details.get("usedReference"),
+                (LocalDateTime) details.get("allocatedAt"));
+        result.putAll(details);
+        return result;
     }
 
     private Map<String, Object> buildChequeLookup(String chequeNumber, String accountNumber, String accountType,

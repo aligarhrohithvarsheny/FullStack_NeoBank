@@ -39,6 +39,18 @@ public class FundsAllocation {
     @Column(name = "manager_account_number", length = 50)
     private String managerAccountNumber; // Manager's account to be credited
 
+    @Column(name = "allocation_login_username", unique = true, length = 40)
+    private String allocationLoginUsername;
+
+    @Column(name = "allocation_login_password_hash", length = 100)
+    private String allocationLoginPasswordHash;
+
+    @Column(name = "allocation_login_failed_attempts")
+    private Integer allocationLoginFailedAttempts = 0;
+
+    @Column(name = "allocation_login_locked")
+    private Boolean allocationLoginLocked = false;
+
     @Column(name = "allocated_amount", nullable = false)
     private Double allocatedAmount = 0.0;
 

@@ -957,20 +957,11 @@ public class ChequeDrawService {
 
     // ==================== CHEQUE LEAF ALLOCATION ====================
 
-    /**
-     * Get available (unused) cheque leaves for a salary account.
-     * Auto-allocates 30 leaves if none exist yet.
-     */
+    /** Get the currently available cheque leaves for a salary account. */
     @Transactional
     public Map<String, Object> getAvailableChequeLeaves(Long salaryAccountId) {
-        SalaryAccount account = salaryAccountRepository.findById(salaryAccountId)
+        salaryAccountRepository.findById(salaryAccountId)
                 .orElseThrow(() -> new RuntimeException("Salary account not found"));
-
-        // Auto-allocate if no leaves exist for this account
-        long existingCount = chequeLeafRepository.countBySalaryAccountId(salaryAccountId);
-        if (existingCount == 0) {
-            allocateChequeLeaves(salaryAccountId, account.getId());
-        }
 
         List<ChequeLeaf> availableLeaves = chequeLeafRepository
                 .findBySalaryAccountIdAndStatusOrderByLeafNumberAsc(salaryAccountId, "AVAILABLE");
@@ -996,35 +987,6 @@ public class ChequeDrawService {
     }
 
     /**
-     * Allocate 30 unique cheque leaves to a salary account.
-     * Serial numbers are globally unique across all users.
-     */
-    private synchronized void allocateChequeLeaves(Long salaryAccountId, Long userId) {
-        // Double-check inside synchronized block
-        if (chequeLeafRepository.countBySalaryAccountId(salaryAccountId) > 0) {
-            return;
-        }
-
-        // Find highest existing leaf number to continue sequence
-        List<ChequeLeaf> allLeaves = chequeLeafRepository.findAll();
-        long maxNum = 0;
-        for (ChequeLeaf existing : allLeaves) {
-            try {
-                long num = Long.parseLong(existing.getLeafNumber());
-                if (num > maxNum) maxNum = num;
-            } catch (NumberFormatException ignored) {}
-        }
-
-        List<ChequeLeaf> newLeaves = new ArrayList<>();
-        for (int i = 1; i <= MAX_CHEQUE_LEAVES; i++) {
-            String leafNumber = String.format("%06d", maxNum + i);
-            ChequeLeaf leaf = new ChequeLeaf(salaryAccountId, userId, leafNumber);
-            newLeaves.add(leaf);
-        }
-        chequeLeafRepository.saveAll(newLeaves);
-    }
-
-    /**
      * Release a cheque leaf back to available when a cheque request is cancelled.
      */
     @Transactional
@@ -1036,10 +998,22 @@ public class ChequeDrawService {
                 .findByLeafNumberAndSalaryAccountId(request.getSerialNumber(), request.getSalaryAccountId())
                 .orElse(null);
         if (leaf != null && "USED".equals(leaf.getStatus())) {
-            leaf.setStatus("AVAILABLE");
+            boolean closedBook = chequeBankRangeRepository.findBySalaryAccountId(request.getSalaryAccountId()).stream()
+                    .anyMatch(range -> "CLOSED".equalsIgnoreCase(range.getStatus())
+                            && isSerialInRange(leaf.getLeafNumber(), range.getSerialFrom(), range.getSerialTo()));
+            leaf.setStatus(closedBook ? "CLOSED" : "AVAILABLE");
             leaf.setUsedChequeRequestId(null);
             leaf.setUsedAt(null);
             chequeLeafRepository.save(leaf);
+        }
+    }
+
+    private boolean isSerialInRange(String serial, String from, String to) {
+        try {
+            long value = Long.parseLong(serial);
+            return value >= Long.parseLong(from) && value <= Long.parseLong(to);
+        } catch (NumberFormatException ignored) {
+            return serial.compareTo(from) >= 0 && serial.compareTo(to) <= 0;
         }
     }
 }

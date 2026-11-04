@@ -10,6 +10,7 @@ import com.neo.springapp.model.SalaryFraudAlert;
 import com.neo.springapp.model.SalaryAccountEditHistory;
 import com.neo.springapp.service.SalaryAccountService;
 import com.neo.springapp.service.SessionHistoryService;
+import com.neo.springapp.service.UserSessionTokenService;
 import com.neo.springapp.repository.NetBankingServiceControlRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -32,6 +33,9 @@ public class SalaryAccountController {
 
     @Autowired
     private NetBankingServiceControlRepository netBankingServiceControlRepository;
+
+    @Autowired
+    private UserSessionTokenService userSessionTokenService;
 
     // ─── Create ──────────────────────────────────────────────
 
@@ -306,6 +310,13 @@ public class SalaryAccountController {
         Map<String, Object> result = salaryAccountService.authenticate(accountNumber, password);
         // Record session history on successful login
         if (result.containsKey("success") && Boolean.TRUE.equals(result.get("success"))) {
+            Object accountObject = result.get("account");
+            if (accountObject instanceof SalaryAccount account) {
+                result.put("token", userSessionTokenService.issue(account.getId(), account.getAccountNumber()));
+            } else if (accountObject instanceof Map<?, ?> account) {
+                result.put("token", userSessionTokenService.issue(
+                        Long.valueOf(account.get("id").toString()), account.get("accountNumber").toString()));
+            }
             try {
                 String clientIp = forwardedFor != null ? forwardedFor.split(",")[0].trim() : "Unknown";
                 String deviceInfo = userAgent != null ? userAgent : "Unknown";
@@ -356,6 +367,13 @@ public class SalaryAccountController {
         Map<String, Object> result = salaryAccountService.authenticateByMobileAndDob(
                 body.get("mobileNumber"), body.get("dob"));
         if (Boolean.TRUE.equals(result.get("success"))) {
+            Object accountObject = result.get("account");
+            if (accountObject instanceof SalaryAccount account) {
+                result.put("token", userSessionTokenService.issue(account.getId(), account.getAccountNumber()));
+            } else if (accountObject instanceof Map<?, ?> account) {
+                result.put("token", userSessionTokenService.issue(
+                        Long.valueOf(account.get("id").toString()), account.get("accountNumber").toString()));
+            }
             try {
                 String clientIp = forwardedFor != null ? forwardedFor.split(",")[0].trim() : "Unknown";
                 String deviceInfo = userAgent != null ? userAgent : "Unknown";

@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { userAuthGuard, insuranceAuthGuard, insuranceGuestAuthGuard, adminAuthGuard, hodAuthGuard, managerAuthGuard, salaryAuthGuard, currentAccountAuthGuard, positivePayAuthGuard, merchantSoundboxAuthGuard, agentAuthGuard, adminOrManagerAuthGuard, pgMerchantAuthGuard } from './guard/auth.guard';
+import { userAuthGuard, insuranceAuthGuard, insuranceGuestAuthGuard, adminAuthGuard, hodAuthGuard, managerAuthGuard, allocationAccountAuthGuard, salaryAuthGuard, currentAccountAuthGuard, positivePayAuthGuard, merchantSoundboxAuthGuard, agentAuthGuard, adminOrManagerAuthGuard, pgMerchantAuthGuard } from './guard/auth.guard';
 
 import { Dashboard } from './component/admin/dashboard/dashboard';
 import { Users } from './component/admin/users/users';
@@ -110,6 +110,7 @@ export const routes: Routes = [
   // ------------------ MANAGER ------------------
   { path: 'manager/dashboard', component: ManagerDashboard, canActivate: [managerAuthGuard] },
   { path: 'manager/account-dashboard', loadComponent: () => import('./component/admin/manager/manager-account-dashboard/manager-account-dashboard').then(m => m.ManagerAccountDashboardComponent), canActivate: [managerAuthGuard] },
+  { path: 'allocation/account-dashboard', loadComponent: () => import('./component/admin/manager/manager-account-dashboard/manager-account-dashboard').then(m => m.ManagerAccountDashboardComponent), canActivate: [allocationAccountAuthGuard] },
   { path: 'admin/users', component: Users, canActivate: [adminAuthGuard] },
   { path: 'admin/loans', component: Loans, canActivate: [adminAuthGuard] },
   { path: 'admin/cards', component: Cards, canActivate: [adminAuthGuard] },

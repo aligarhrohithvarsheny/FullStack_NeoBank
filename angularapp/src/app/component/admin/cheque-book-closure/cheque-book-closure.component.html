@@ -61,18 +61,49 @@
           </tr>
         </thead>
         <tbody>
-          <tr *ngFor="let book of closureBooks">
-            <td>{{ book.accountNumber || '—' }}</td>
-            <td>{{ book.accountType || '—' }}</td>
-            <td>{{ book.chequeBookNumber || 'Legacy book' }}</td>
-            <td>{{ book.serialFrom || '—' }} – {{ book.serialTo || '—' }}</td>
-            <td>{{ book.generatedCount ?? 0 }}</td>
-            <td>{{ book.usedCount ?? 0 }}</td>
-            <td>{{ book.availableCount ?? 0 }}</td>
-            <td><span class="status-chip" [class.closed]="(book.status || '').toUpperCase() === 'CLOSED'">
-              {{ book.status || 'Unknown' }}
-            </span></td>
-          </tr>
+          <ng-container *ngFor="let book of closureBooks">
+            <tr>
+              <td>{{ book.accountNumber || '—' }}</td>
+              <td>{{ book.accountType || '—' }}</td>
+              <td>{{ book.chequeBookNumber || 'Legacy book' }}</td>
+              <td>{{ book.serialFrom || '—' }} – {{ book.serialTo || '—' }}</td>
+              <td>{{ book.generatedCount ?? 0 }}</td>
+              <td>{{ book.usedCount ?? 0 }}</td>
+              <td>{{ book.availableCount ?? 0 }}</td>
+              <td><span class="status-chip" [class.closed]="(book.status || '').toUpperCase() === 'CLOSED'">
+                {{ book.status || 'Unknown' }}
+              </span></td>
+            </tr>
+            <tr class="details-row">
+              <td colspan="8">
+                <details>
+                  <summary>Show all {{ book.chequeNumbers?.length || 0 }} cheque numbers and usage/payment details</summary>
+                  <div class="number-details-grid">
+                    <article class="number-detail" *ngFor="let cheque of book.chequeNumbers">
+                      <strong>Cheque {{ cheque.chequeNumber || cheque.leafNumber }}</strong>
+                      <span>Status: {{ cheque.status || '—' }}</span>
+                      <span *ngIf="cheque.requestChequeNumber">Request number: {{ cheque.requestChequeNumber }}</span>
+                      <span *ngIf="cheque.howUsed || cheque.usedFor">How used: {{ cheque.howUsed || cheque.usedFor }}</span>
+                      <span *ngIf="cheque.payeeName">Payee: {{ cheque.payeeName }}</span>
+                      <span *ngIf="cheque.amount !== null && cheque.amount !== undefined">Amount: ₹{{ cheque.amount }}</span>
+                      <span *ngIf="cheque.requestStatus">Payment/status: {{ cheque.paidStatus || cheque.requestStatus }}</span>
+                      <span *ngIf="cheque.payeeAccountNumber">Transferred to: {{ cheque.payeeAccountNumber }}</span>
+                      <span *ngIf="cheque.debitedFromAccount">Debited from: {{ cheque.debitedFromAccount }}</span>
+                      <span *ngIf="cheque.creditedToAccount">Credited to: {{ cheque.creditedToAccount }}</span>
+                      <span *ngIf="cheque.transactionReference || cheque.usedReference">
+                        Reference: {{ cheque.transactionReference || cheque.usedReference }}
+                      </span>
+                      <span *ngIf="cheque.remarks">Details: {{ cheque.remarks }}</span>
+                      <span *ngIf="cheque.paidAt || cheque.usedAt || cheque.createdAt">
+                        Date: {{ cheque.paidAt || cheque.usedAt || cheque.createdAt | date:'medium' }}
+                      </span>
+                    </article>
+                    <p class="empty-state" *ngIf="!book.chequeNumbers?.length">No individual cheque records are available for this book.</p>
+                  </div>
+                </details>
+              </td>
+            </tr>
+          </ng-container>
         </tbody>
       </table>
     </div>
@@ -100,6 +131,7 @@
             <th>Closed by</th>
             <th>Reason</th>
             <th>Closed at</th>
+            <th>Cheque numbers closed</th>
           </tr>
         </thead>
         <tbody>
@@ -108,6 +140,26 @@
             <td>{{ item.closedBy || '—' }}</td>
             <td>{{ item.reason || 'Admin closure' }}</td>
             <td>{{ item.closedAt | date:'medium' }}</td>
+            <td>
+              <details>
+                <summary>{{ item.closedChequeNumbers?.length || 0 }} number(s)</summary>
+                <div class="number-details-grid compact">
+                  <article class="number-detail" *ngFor="let cheque of item.chequeNumbers">
+                    <strong>{{ cheque.chequeNumber || cheque.leafNumber }}</strong>
+                    <span>Status: {{ cheque.status || '—' }}</span>
+                    <span *ngIf="cheque.requestChequeNumber">Request: {{ cheque.requestChequeNumber }}</span>
+                    <span *ngIf="cheque.howUsed || cheque.usedFor">How used: {{ cheque.howUsed || cheque.usedFor }}</span>
+                    <span *ngIf="cheque.payeeName">Payee: {{ cheque.payeeName }}</span>
+                    <span *ngIf="cheque.amount !== null && cheque.amount !== undefined">Amount: ₹{{ cheque.amount }}</span>
+                    <span *ngIf="cheque.requestStatus">Paid/status: {{ cheque.paidStatus || cheque.requestStatus }}</span>
+                    <span *ngIf="cheque.transactionReference || cheque.usedReference">
+                      Reference: {{ cheque.transactionReference || cheque.usedReference }}
+                    </span>
+                  </article>
+                  <p *ngIf="!item.chequeNumbers?.length">{{ item.closedChequeNumbers?.join(', ') || 'No numbers recorded' }}</p>
+                </div>
+              </details>
+            </td>
           </tr>
         </tbody>
       </table>
@@ -140,7 +192,23 @@
       <div><dt>Account type</dt><dd>{{ chequeLookupResult.accountType || '—' }}</dd></div>
       <div><dt>Status</dt><dd>{{ chequeLookupResult.status || '—' }}</dd></div>
       <div><dt>Amount</dt><dd>{{ chequeLookupResult.amount ?? '—' }}</dd></div>
-      <div *ngIf="chequeLookupResult.usedReference"><dt>Used reference</dt><dd>{{ chequeLookupResult.usedReference }}</dd></div>
+      <div *ngIf="chequeLookupResult.serialNumber"><dt>Leaf / serial number</dt><dd>{{ chequeLookupResult.serialNumber }}</dd></div>
+      <div *ngIf="chequeLookupResult.requestChequeNumber"><dt>Cheque request number</dt><dd>{{ chequeLookupResult.requestChequeNumber }}</dd></div>
+      <div *ngIf="chequeLookupResult.howUsed || chequeLookupResult.usedFor">
+        <dt>How used</dt><dd>{{ chequeLookupResult.howUsed || chequeLookupResult.usedFor }}</dd>
+      </div>
+      <div *ngIf="chequeLookupResult.payeeName"><dt>Payee</dt><dd>{{ chequeLookupResult.payeeName }}</dd></div>
+      <div *ngIf="chequeLookupResult.payeeAccountNumber"><dt>Transferred to</dt><dd>{{ chequeLookupResult.payeeAccountNumber }}</dd></div>
+      <div *ngIf="chequeLookupResult.requestStatus"><dt>Payment / request status</dt><dd>{{ chequeLookupResult.paidStatus || chequeLookupResult.requestStatus }}</dd></div>
+      <div *ngIf="chequeLookupResult.debitedFromAccount"><dt>Debited from</dt><dd>{{ chequeLookupResult.debitedFromAccount }}</dd></div>
+      <div *ngIf="chequeLookupResult.creditedToAccount"><dt>Credited to</dt><dd>{{ chequeLookupResult.creditedToAccount }}</dd></div>
+      <div *ngIf="chequeLookupResult.transactionReference || chequeLookupResult.usedReference">
+        <dt>Transfer / usage reference</dt><dd>{{ chequeLookupResult.transactionReference || chequeLookupResult.usedReference }}</dd>
+      </div>
+      <div *ngIf="chequeLookupResult.remarks"><dt>Details</dt><dd>{{ chequeLookupResult.remarks }}</dd></div>
+      <div *ngIf="chequeLookupResult.paidAt || chequeLookupResult.usedAt || chequeLookupResult.createdAt">
+        <dt>Payment / usage date</dt><dd>{{ chequeLookupResult.paidAt || chequeLookupResult.usedAt || chequeLookupResult.createdAt | date:'medium' }}</dd>
+      </div>
     </dl>
   </section>
 </main>

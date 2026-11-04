@@ -3,7 +3,9 @@ package com.neo.springapp.controller;
 import com.neo.springapp.model.Cheque;
 import com.neo.springapp.service.ChequeService;
 import com.neo.springapp.service.ChequeDrawService;
+import com.neo.springapp.service.ChequeBookIssuanceService;
 import com.neo.springapp.service.PdfService;
+import com.neo.springapp.service.UserSessionTokenService.SessionPrincipal;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpHeaders;
@@ -27,6 +29,9 @@ public class ChequeController {
     @Autowired
     private ChequeDrawService chequeDrawService;
 
+    @Autowired
+    private ChequeBookIssuanceService chequeBookIssuanceService;
+
     public ChequeController(ChequeService chequeService, PdfService pdfService) {
         this.chequeService = chequeService;
         this.pdfService = pdfService;
@@ -46,7 +51,7 @@ public class ChequeController {
                 errorResponse.put("error", "Invalid request data");
                 return ResponseEntity.badRequest().body(errorResponse);
             }
-            
+
             List<Cheque> cheques = chequeService.createChequeLeaves(accountNumber, numberOfLeaves, amount);
             
             Map<String, Object> response = new HashMap<>();
@@ -60,6 +65,28 @@ public class ChequeController {
             Map<String, Object> errorResponse = new HashMap<>();
             errorResponse.put("error", "Failed to create cheque leaves: " + e.getMessage());
             return ResponseEntity.internalServerError().body(errorResponse);
+        }
+    }
+
+    @PostMapping("/draw/request-book")
+    public ResponseEntity<Map<String, Object>> requestChequeBook(
+            @RequestBody Map<String, Object> request,
+            @org.springframework.security.core.annotation.AuthenticationPrincipal SessionPrincipal principal) {
+        if (principal == null || !"USER".equals(principal.scope())) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "User login is required"));
+        }
+        try {
+            Long accountId = Long.valueOf(request.get("accountId").toString());
+            String accountType = request.get("accountType") != null
+                    ? request.get("accountType").toString() : null;
+            return ResponseEntity.ok(chequeBookIssuanceService.requestBook(
+                    accountId, accountType, principal.accountNumber()));
+        } catch (SecurityException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", e.getMessage()));
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("error", "Unable to issue cheque book"));
         }
     }
 
@@ -995,4 +1022,3 @@ public class ChequeController {
         }
     }
 }
-
