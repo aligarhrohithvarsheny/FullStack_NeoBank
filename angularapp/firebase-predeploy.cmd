@@ -1,4 +1,4 @@
 @echo off
 cd /d "%~dp0"
-call npm run build:prod
+call npm.cmd run build:prod
 exit /b %errorlevel%

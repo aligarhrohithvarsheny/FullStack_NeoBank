@@ -11,7 +11,10 @@
       <button type="button" [class.active]="activeSection === 'charges'" (click)="navigateDashboardSection('charges')"><i class="fas fa-receipt"></i><span>Charges</span></button>
       <button type="button" [class.active]="activeSection === 'requests'" (click)="navigateDashboardSection('requests')"><i class="fas fa-paper-plane"></i><span>Operation requests</span></button>
     </nav>
-    <div class="allocation-sidebar-footer"><i class="fas fa-shield-alt"></i> Allocation access</div>
+    <div class="allocation-sidebar-footer">
+      <span><i class="fas fa-shield-alt"></i> Allocation access</span>
+      <button type="button" (click)="logoutAllocationAccount()"><i class="fas fa-sign-out-alt"></i> Sign out</button>
+    </div>
   </aside>
 
 <div class="container-fluid p-4" [class.allocation-dashboard-content]="isAllocationAccountLogin">
@@ -21,9 +24,9 @@
         <h2 class="mb-0">
           <i class="fas fa-wallet"></i> {{ isAllocationAccountLogin ? 'Allocated Fund Account Dashboard' : 'Linked Account Dashboard' }}
         </h2>
-        <button *ngIf="isAllocationAccountLogin" type="button" class="btn btn-outline-secondary" (click)="logoutAllocationAccount()">
-          <i class="fas fa-sign-out-alt"></i> Sign out
-        </button>
+        <p class="allocation-header-identity" *ngIf="isAllocationAccountLogin && linkedAccount">
+          Allocation {{ linkedAccount.allocationId }} · Account {{ linkedAccount.accountNumber }} · {{ linkedAccount.branchName || linkedAccount.city || 'Branch not recorded' }}
+        </p>
         <button *ngIf="isAllocationAccountLogin" type="button" class="btn btn-primary" (click)="loadAccountData()" [disabled]="loading || isRefreshing">
           <i class="fas" [ngClass]="isRefreshing ? 'fa-spinner fa-spin' : 'fa-sync-alt'"></i> Refresh
         </button>
@@ -81,6 +84,10 @@
                 <h5 class="card-title mb-3">Account Details</h5>
                 <div class="row">
                   <div class="col-md-6">
+                    <div class="detail-item" *ngIf="isAllocationAccountLogin">
+                      <strong>Allocation reference:</strong>
+                      <span>{{ linkedAccount.allocationId || '—' }}</span>
+                    </div>
                     <div class="detail-item">
                       <strong>Account Number:</strong>
                       <span class="account-number">{{ linkedAccount.accountNumber }}</span>
@@ -100,7 +107,7 @@
                       <span>{{ linkedAccount.bankName }}</span>
                     </div>
                     <div class="detail-item">
-                      <strong>Branch:</strong>
+                      <strong>Branch / city:</strong>
                       <span>{{ linkedAccount.branchName }}, {{ linkedAccount.city }}</span>
                     </div>
                     <div class="detail-item">
@@ -196,23 +203,32 @@
 
     <section class="allocation-activity-section" id="allocation-overview" *ngIf="isAllocationAccountLogin">
       <div class="allocation-section-heading">
-        <div><span>Account activity</span><small>Totals from allocation transactions and charge records</small></div>
+        <div><span>Allocation activity</span><small>Grouped totals from saved ledger and charge records</small></div>
       </div>
-      <div class="allocation-activity-grid">
-        <article class="activity-metric metric-credit"><span>Funds added / credits</span><strong>{{ formatCurrency(dashboardSummary.fundsAdded) }}</strong><small>{{ dashboardSummary.creditCount || 0 }} credit records</small></article>
-        <article class="activity-metric metric-debit"><span>Transfers / debits</span><strong>{{ formatCurrency(dashboardSummary.totalDebits) }}</strong><small>{{ dashboardSummary.debitCount || 0 }} debit records</small></article>
-        <article class="activity-metric"><span>All transactions</span><strong>{{ dashboardSummary.transactionCount || 0 }}</strong><small>Credits and debits</small></article>
-        <article class="activity-metric metric-debit"><span>Allocation debited</span><strong>{{ formatCurrency(dashboardSummary.allocationDebited) }}</strong><small>Total allocated-fund usage</small></article>
-        <article class="activity-metric"><span>Loans opened</span><strong>{{ dashboardSummary.loansOpened || 0 }}</strong><small>{{ formatCurrency(dashboardSummary.loanDebits) }} debited · ledger records</small></article>
-        <article class="activity-metric"><span>Loans closed / credited</span><strong>{{ dashboardSummary.loansClosedOrCredited || 0 }}</strong><small>{{ formatCurrency(dashboardSummary.loanCredits) }} credited · ledger records</small></article>
-        <article class="activity-metric"><span>FD deposits</span><strong>{{ formatCurrency(dashboardSummary.fdDeposits) }}</strong><small>Separately tagged entries</small></article>
-        <article class="activity-metric"><span>RD deposits</span><strong>{{ formatCurrency(dashboardSummary.rdDeposits) }}</strong><small>Separately tagged entries</small></article>
-        <article class="activity-metric"><span>Other deposits</span><strong>{{ formatCurrency(dashboardSummary.otherDeposits) }}</strong><small>Deposit ledger credits</small></article>
-        <article class="activity-metric metric-credit"><span>Interest collected</span><strong>{{ formatCurrency(dashboardSummary.interestCollected) }}</strong><small>Successful interest charges</small></article>
-        <article class="activity-metric metric-credit"><span>Charges credited</span><strong>{{ formatCurrency(dashboardSummary.allChargesCredited) }}</strong><small>{{ formatCurrency(dashboardSummary.pendingChargeCredits) }} pending</small></article>
-        <article class="activity-metric metric-debit"><span>Charges debited</span><strong>{{ formatCurrency(dashboardSummary.allChargesCollected) }}</strong><small>{{ dashboardSummary.chargeDebitCount || 0 }} collected charge records</small></article>
-        <article class="activity-metric"><span>Fine charges</span><strong>{{ formatCurrency(dashboardSummary.fineCharges) }}</strong><small>Identified by charge description</small></article>
-        <article class="activity-metric"><span>Cheque charges</span><strong>{{ formatCurrency(dashboardSummary.chequeCharges) }}</strong><small>Identified by charge description</small></article>
+      <div class="allocation-breakdown">
+        <section class="allocation-breakdown-group">
+          <h3>Deposits</h3>
+          <div class="allocation-breakdown-row"><span>Allocation deposits</span><strong>{{ formatCurrency(dashboardSummary.allocationDeposits) }}</strong></div>
+          <div class="allocation-breakdown-row"><span>Fixed deposits</span><strong>{{ formatCurrency(dashboardSummary.fdDeposits) }}</strong></div>
+          <div class="allocation-breakdown-row"><span>Recurring deposits</span><strong>{{ formatCurrency(dashboardSummary.rdDeposits) }}</strong></div>
+          <div class="allocation-breakdown-row"><span>Other deposits</span><strong>{{ formatCurrency(dashboardSummary.otherDeposits) }}</strong></div>
+          <small>FD/RD activity is included in allocation deposits; credits are shown separately in the ledger.</small>
+        </section>
+        <section class="allocation-breakdown-group">
+          <h3>Loans and transactions</h3>
+          <div class="allocation-breakdown-row"><span>Loan debit records</span><strong>{{ dashboardSummary.loansOpened || 0 }} · {{ formatCurrency(dashboardSummary.loanDebits) }}</strong></div>
+          <div class="allocation-breakdown-row"><span>Loan credit records</span><strong>{{ dashboardSummary.loansClosedOrCredited || 0 }} · {{ formatCurrency(dashboardSummary.loanCredits) }}</strong></div>
+          <div class="allocation-breakdown-row"><span>Debits / credits</span><strong>{{ dashboardSummary.debitCount || 0 }} / {{ dashboardSummary.creditCount || 0 }}</strong></div>
+          <div class="allocation-breakdown-row"><span>Allocation debited</span><strong>{{ formatCurrency(dashboardSummary.allocationDebited) }}</strong></div>
+        </section>
+        <section class="allocation-breakdown-group">
+          <h3>Charges</h3>
+          <div class="allocation-breakdown-row"><span>Interest collected</span><strong>{{ formatCurrency(dashboardSummary.interestCollected) }}</strong></div>
+          <div class="allocation-breakdown-row"><span>Charges debited / collected</span><strong>{{ formatCurrency(dashboardSummary.allChargesCollected) }}</strong></div>
+          <div class="allocation-breakdown-row"><span>Charges credited</span><strong>{{ formatCurrency(dashboardSummary.allChargesCredited) }}</strong></div>
+          <div class="allocation-breakdown-row"><span>Charges pending credit</span><strong>{{ formatCurrency(dashboardSummary.pendingChargeCredits) }}</strong></div>
+          <div class="allocation-breakdown-row"><span>Fine / cheque charges</span><strong>{{ formatCurrency(dashboardSummary.fineCharges) }} / {{ formatCurrency(dashboardSummary.chequeCharges) }}</strong></div>
+        </section>
       </div>
     </section>
 
@@ -378,40 +394,32 @@
 
             <!-- Transactions Tab -->
             <div *ngIf="activeTab === 'transactions'">
-              <div class="table-responsive">
-                <table class="table table-hover">
-                  <thead class="table-light">
-                    <tr>
-                      <th>Transaction ID</th>
-                      <th>Type</th>
-                      <th>Amount</th>
-                      <th>Product</th>
-                      <th>Balance</th>
-                      <th>Date</th>
-                      <th>Details / actor</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr *ngFor="let txn of accountTransactions">
-                      <td><strong>{{ txn.transactionId }}</strong></td>
-                      <td>
-                        <span [ngClass]="txn.type === 'DEBIT' ? 'badge-danger' : 'badge-success'" class="badge">
-                          {{ txn.type }}
-                        </span>
-                      </td>
-                      <td>{{ formatCurrency(txn.amount) }}</td>
-                      <td>{{ txn.productType }}</td>
-                      <td>{{ formatCurrency(txn.balance) }}</td>
-                      <td>{{ txn.date | date: 'short' }}</td>
-                      <td>{{ txn.description || txn.linkedTransactionId || '—' }}<small class="d-block text-muted">{{ txn.performedByName || '—' }}</small></td>
-                      <td><button type="button" class="btn btn-sm btn-outline-primary" (click)="openTransactionDetails(txn)">Details</button></td>
-                    </tr>
-                    <tr *ngIf="accountTransactions.length === 0">
-                      <td colspan="8" class="text-center text-muted">No transactions found</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
+              <article class="customer-transaction-group" *ngFor="let group of customerTransactionGroups">
+                <header class="customer-transaction-heading">
+                  <div><h3>{{ group.customerName }}</h3><span>Customer account {{ group.accountNumber }}</span></div>
+                  <small>{{ group.transactions.length }} transaction{{ group.transactions.length === 1 ? '' : 's' }}</small>
+                </header>
+                <div class="table-responsive">
+                  <table class="table table-hover">
+                    <thead class="table-light">
+                      <tr><th>Transaction</th><th>Type</th><th>Product</th><th>Amount</th><th>Balance after</th><th>Date</th><th>Reference / details</th><th></th></tr>
+                    </thead>
+                    <tbody>
+                      <tr *ngFor="let txn of group.transactions">
+                        <td><strong>{{ txn.transactionId || '—' }}</strong></td>
+                        <td><span [ngClass]="txn.type === 'DEBIT' ? 'badge-danger' : 'badge-success'" class="badge">{{ txn.type }}</span></td>
+                        <td>{{ txn.productType || '—' }}</td>
+                        <td>{{ formatCurrency(txn.amount) }}</td>
+                        <td>{{ formatCurrency(txn.balance) }}</td>
+                        <td>{{ txn.date | date:'dd/MM/yyyy HH:mm' }}</td>
+                        <td>{{ txn.referenceNumber || txn.linkedTransactionId || txn.description || '—' }}</td>
+                        <td><button type="button" class="btn btn-sm btn-outline-primary" (click)="openTransactionDetails(txn)">Details</button></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </article>
+              <div *ngIf="!customerTransactionGroups.length" class="allocation-empty-state">No allocation transactions recorded.</div>
 
               <!-- Pagination -->
               <nav class="mt-3" *ngIf="accountTransactions.length > 0">

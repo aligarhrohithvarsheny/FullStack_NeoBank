@@ -20,6 +20,14 @@
 .allocation-dashboard-sidebar nav button:hover,.allocation-dashboard-sidebar nav button.active { color: #fff; background: #2b5b5e; }
 .allocation-sidebar-footer { display: flex; align-items: center; gap: 8px; margin-top: auto; padding: 12px 9px; color: #bdd2ce; border-top: 1px solid rgba(231, 242, 239, .18); font-size: 11px; }
 .allocation-dashboard-content { width: calc(100% - 248px); margin-left: 248px; }
+.allocation-dashboard-content .card { border: 1px solid #e1e9e7; border-radius: 6px; box-shadow: none; transition: none; }
+.allocation-dashboard-content .card:hover { box-shadow: none; }
+.allocation-dashboard-content .border-left-primary { border-left: 1px solid #e1e9e7; }
+.allocation-header-identity { margin: 5px 0 0; color: #647579; font-size: 12px; }
+.allocation-sidebar-footer { flex-wrap: wrap; }
+.allocation-sidebar-footer > span { display: flex; align-items: center; gap: 8px; }
+.allocation-sidebar-footer button { display: flex; align-items: center; gap: 8px; width: 100%; padding: 9px; border: 0; border-radius: 5px; color: #f0d7d4; background: transparent; text-align: left; cursor: pointer; }
+.allocation-sidebar-footer button:hover { color: #fff; background: #2b5b5e; }
 .allocation-details-backdrop { position: fixed; z-index: 1100; inset: 0; display: grid; place-items: center; padding: 20px; background: rgba(15, 35, 38, .58); }
 .allocation-details-dialog { width: min(700px, 100%); max-height: 88vh; overflow: auto; padding: 22px; border: 1px solid #d5e3e1; border-radius: 8px; background: #fff; box-shadow: 0 20px 60px rgba(10, 30, 32, .25); }
 .allocation-details-dialog > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
@@ -139,24 +147,6 @@
 .allocation-section-heading { display: flex; justify-content: space-between; margin-bottom: 12px; }
 .allocation-section-heading span { display: block; color: #233e45; font-size: 16px; font-weight: 700; }
 .allocation-section-heading small { color: #687b80; }
-.allocation-activity-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(185px, 1fr));
-  gap: 12px;
-}
-.activity-metric {
-  min-width: 0;
-  padding: 14px 16px;
-  background: #fff;
-  border: 1px solid #dfe8e7;
-  border-left: 3px solid #477c83;
-  border-radius: 6px;
-}
-.activity-metric.metric-credit { border-left-color: #16805d; }
-.activity-metric.metric-debit { border-left-color: #b65b4a; }
-.activity-metric span,
-.activity-metric small { display: block; color: #647579; font-size: 11px; }
-.activity-metric strong { display: block; margin: 6px 0 3px; color: #173c40; font-size: 20px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .allocation-charge-history { margin-top: 24px; }
 .allocation-charge-history h6 { color: #233e45; font-weight: 700; }
 .allocation-charge-history .table { min-width: 900px; font-size: 12px; }
@@ -170,6 +160,19 @@
 .allocation-request-history { margin-top: 22px; }
 .allocation-request-history h6 { color: #233e45; font-weight: 700; }
 .allocation-request-history .table { min-width: 760px; font-size: 12px; }
+.allocation-breakdown { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.allocation-breakdown-group { min-width: 0; padding: 0; }
+.allocation-breakdown-group h3 { margin: 0 0 8px; color: #31555a; font-size: 13px; font-weight: 700; }
+.allocation-breakdown-row { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; font-size: 12px; }
+.allocation-breakdown-row span { color: #647579; }
+.allocation-breakdown-row strong { color: #233e45; text-align: right; font-variant-numeric: tabular-nums; }
+.allocation-breakdown-group > small { display: block; margin-top: 8px; color: #78878a; font-size: 10px; }
+.customer-transaction-group { margin: 0 0 18px; border: 1px solid #e1e9e7; border-radius: 6px; overflow: hidden; }
+.customer-transaction-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; background: #f7faf9; }
+.customer-transaction-heading h3 { margin: 0; color: #27494e; font-size: 13px; font-weight: 700; }
+.customer-transaction-heading span,.customer-transaction-heading small { color: #6a7c7f; font-size: 11px; }
+.customer-transaction-group .table { min-width: 850px; margin: 0; font-size: 12px; }
+.allocation-empty-state { padding: 28px; color: #69797c; text-align: center; }
 .request-status { display: inline-block; padding: 4px 8px; border-radius: 4px; background: #eef2f1; color: #52646b; font-size: 10px; font-weight: 700; }
 .request-status.status-pending { color: #875b0b; background: #fff2cc; }
 .request-status.status-approved { color: #126044; background: #ddf5e9; }
@@ -182,6 +185,8 @@
   display: flex;
   justify-content: space-between;
 }
+.allocation-dashboard-content .detail-item,
+.allocation-dashboard-content .info-item { padding: 8px 0; border-bottom: 0; }
 
 .detail-item:last-child {
   border-bottom: none;
@@ -513,9 +518,7 @@
   .allocation-details-backdrop { padding: 10px; }
   .allocation-details-dialog { padding: 16px; }
   .allocation-live-status { align-items: flex-start; flex-direction: column; }
-  .allocation-activity-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .activity-metric { padding: 12px; }
-  .activity-metric strong { font-size: 17px; }
+  .allocation-breakdown { grid-template-columns: 1fr; gap: 14px; }
   .allocation-request-form { grid-template-columns: 1fr; }
   .allocation-request-form .request-description { grid-column: auto; }
   .col-md-3,
@@ -530,10 +533,6 @@
   }
 
 
-@media (max-width: 480px) {
-  .allocation-detail-list { grid-template-columns: 1fr; }
-  .allocation-detail-list .details-wide { grid-column: auto; }
-}
   .detail-item,
   .charge-item {
     flex-direction: column;
@@ -553,4 +552,9 @@
     padding: 0.5rem 1rem;
     font-size: 0.875rem;
   }
+}
+
+@media (max-width: 480px) {
+  .allocation-detail-list { grid-template-columns: 1fr; }
+  .allocation-detail-list .details-wide { grid-column: auto; }
 }

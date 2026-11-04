@@ -206,6 +206,9 @@ class AllocationAccountLoginControllerTest {
         assertThat(response.getBody().get("transactions")).asList().hasSize(1);
         assertThat(((Map<?, ?>) response.getBody().get("summary")).get("loansOpened")).isEqualTo(1L);
         assertThat(((Map<?, ?>) response.getBody().get("summary")).get("loanDebits")).isEqualTo(250.0);
+        assertThat(((Map<?, ?>) response.getBody().get("summary")).get("allocationDeposits")).isEqualTo(750.0);
+        assertThat(((Map<?, ?>) response.getBody().get("summary")).get("fdDeposits")).isEqualTo(250.0);
+        assertThat(((Map<?, ?>) response.getBody().get("summary")).get("rdDeposits")).isEqualTo(250.0);
     }
 
     @Test

@@ -161,7 +161,7 @@ export class ManagerAccountDashboardComponent implements OnInit, OnDestroy {
   navigateDashboardSection(section: 'overview' | 'account' | 'transactions' | 'charges' | 'requests'): void {
     this.activeSection = section;
     if (section === 'transactions' || section === 'charges' || section === 'overview') {
-      this.switchTab(section === 'account' ? 'overview' : section);
+      this.switchTab(section);
     }
     const target = document.getElementById(`allocation-${section}`);
     target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -296,6 +296,24 @@ export class ManagerAccountDashboardComponent implements OnInit, OnDestroy {
   getAvailableBalance(): number {
     if (!this.linkedAccount) return 0;
     return (this.linkedAccount.currentBalance || 0) - (this.chargesSummary.totalCharges || 0);
+  }
+
+  get customerTransactionGroups(): Array<{ accountNumber: string; customerName: string; transactions: any[] }> {
+    const groups = new Map<string, { accountNumber: string; customerName: string; transactions: any[] }>();
+    for (const transaction of this.accountTransactions) {
+      const accountNumber = String(transaction.userAccountNumber || '').trim() || 'Account not recorded';
+      let group = groups.get(accountNumber);
+      if (!group) {
+        group = {
+          accountNumber,
+          customerName: transaction.userName || 'Customer not recorded',
+          transactions: []
+        };
+        groups.set(accountNumber, group);
+      }
+      group.transactions.push(transaction);
+    }
+    return [...groups.values()];
   }
 
   /**
