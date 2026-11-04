@@ -120,7 +120,7 @@
         </div>
         <div class="allocation-portal-table-wrap">
           <table class="allocation-portal-table">
-            <thead><tr><th>Date</th><th>Customer account</th><th>Product / type</th><th>Amount</th><th>Balance after</th><th>Source debit</th><th>Allocation credit</th><th>Reference / details</th></tr></thead>
+            <thead><tr><th>Date</th><th>Customer account</th><th>Product / type</th><th>Amount</th><th>Balance after</th><th>Source debit</th><th>Allocation credit</th><th>Reference / details</th><th></th></tr></thead>
             <tbody>
               <tr *ngFor="let txn of filteredTransactions">
                 <td>{{ txn.transactionDate | date:'short' }}</td><td>{{ txn.userAccountNumber || '—' }}</td>
@@ -129,8 +129,9 @@
                 <td><span class="allocation-portal-pill">{{ txn.sourceStatus || '—' }}</span></td>
                 <td><span class="allocation-portal-pill" [class.success]="txn.status === 'SUCCESS'">{{ txn.status || '—' }}</span></td>
                 <td>{{ txn.linkedTransactionId || txn.transactionId || '—' }}<small>{{ txn.description || txn.userName || '' }}</small></td>
+                <td><button type="button" class="allocation-portal-detail-button" (click)="openTransactionDetails(txn)">Full details</button></td>
               </tr>
-              <tr *ngIf="filteredTransactions.length === 0"><td colspan="8" class="allocation-portal-empty">No transactions match these filters on this page.</td></tr>
+              <tr *ngIf="filteredTransactions.length === 0"><td colspan="9" class="allocation-portal-empty">No transactions match these filters on this page.</td></tr>
             </tbody>
           </table>
         </div>
@@ -162,11 +163,38 @@
         <div class="allocation-portal-metrics">
           <article><span>Total charges collected</span><strong>{{ formatCurrency(chargesSummary.totalCharges || 0) }}</strong><small>Recorded against this linked account</small></article>
         </div>
-        <div class="allocation-portal-card"><div class="allocation-portal-card-heading"><div><h2>Recent charge activity</h2></div></div>
-          <div class="allocation-portal-table-wrap"><table class="allocation-portal-table"><thead><tr><th>Date</th><th>Charge</th><th>Customer account</th><th>Collected</th><th>Credited</th><th>Status</th></tr></thead><tbody>
-            <tr *ngFor="let charge of dashboardCharges"><td>{{ charge.createdAt | date:'short' }}</td><td>{{ charge.chargeType }}<small>{{ charge.description }}</small></td><td>{{ charge.userAccountNumber || '—' }}</td><td>{{ formatCurrency(charge.amount || 0) }}</td><td>{{ formatCurrency(charge.creditedAmount || 0) }}</td><td>{{ charge.creditStatus || charge.collectionStatus || '—' }}</td></tr>
-            <tr *ngIf="dashboardCharges.length === 0"><td colspan="6" class="allocation-portal-empty">No recent charge activity.</td></tr>
+        <div class="allocation-portal-card">
+          <div class="allocation-portal-card-heading"><div><h2>Charge totals by category and customer account</h2><p>Totals are separated by category and account for the currently displayed page. Use the filters and pagination to review the full history.</p></div></div>
+          <div class="allocation-portal-table-wrap"><table class="allocation-portal-table"><thead><tr><th>Category</th><th>Customer account</th><th>Transactions</th><th>Collected total</th></tr></thead><tbody>
+            <tr *ngFor="let group of chargeCategoryAccountSummaries"><td>{{ group.label }}</td><td>{{ group.accountNumber }}</td><td>{{ group.count }}</td><td>{{ formatCurrency(group.total) }}</td></tr>
+            <tr *ngIf="chargeCategoryAccountSummaries.length === 0"><td colspan="4" class="allocation-portal-empty">No charges on this page for the selected filters.</td></tr>
           </tbody></table></div>
+        </div>
+        <div class="allocation-portal-card">
+          <div class="allocation-portal-card-heading"><div><h2>Charge transaction history</h2><p>Each charge remains separate, with collection, credit, reconciliation, and customer details.</p></div></div>
+          <div class="allocation-portal-filters">
+            <label>Customer account<select [(ngModel)]="chargeAccountFilter"><option value="">All customer accounts</option><option *ngFor="let number of chargeAccountNumbers" [value]="number">{{ number }}</option></select></label>
+            <label>Charge category<select [(ngModel)]="chargeCategoryFilter"><option value="ALL">All categories</option><option *ngFor="let category of chargeCategories" [value]="category.value">{{ category.label }}</option></select></label>
+            <span>{{ chargeTotalElements }} total records · Page {{ chargePage + 1 }}<ng-container *ngIf="chargeTotalPages"> of {{ chargeTotalPages }}</ng-container></span>
+          </div>
+          <div class="allocation-portal-table-wrap"><table class="allocation-portal-table"><thead><tr><th>Date</th><th>Category</th><th>Customer account</th><th>Product / linked item</th><th>Collected</th><th>Net credited</th><th>Collection / credit</th><th>Reconciliation</th><th>Details</th></tr></thead><tbody>
+            <tr *ngFor="let charge of filteredCharges">
+              <td>{{ charge.createdAt | date:'short' }}</td>
+              <td>{{ getChargeCategoryLabel(charge.chargeCategory || 'OTHER') }}<small>{{ charge.chargeType }}</small></td>
+              <td>{{ charge.userName || '—' }}<small>{{ charge.userAccountNumber || 'Account not recorded' }}</small></td>
+              <td>{{ charge.userProductType || '—' }}<small>{{ charge.linkedLoanId || charge.linkedDepositId || '—' }}</small></td>
+              <td>{{ formatCurrency(charge.amount || 0) }}</td>
+              <td>{{ formatCurrency(charge.creditedAmount || 0) }}<small>Tax: {{ formatCurrency(charge.taxAmount || 0) }}</small></td>
+              <td>{{ charge.collectionStatus || '—' }} / {{ charge.creditStatus || '—' }}</td>
+              <td>{{ charge.reconciliationStatus || '—' }}</td>
+              <td><button type="button" class="allocation-portal-detail-button" (click)="openChargeDetails(charge)">Full details</button></td>
+            </tr>
+            <tr *ngIf="filteredCharges.length === 0"><td colspan="9" class="allocation-portal-empty">No charges match these filters on this page.</td></tr>
+          </tbody></table></div>
+          <div class="allocation-portal-pagination">
+            <button type="button" (click)="changeChargePage(-1)" [disabled]="chargePage === 0">Previous</button>
+            <button type="button" (click)="changeChargePage(1)" [disabled]="chargeTotalPages > 0 && chargePage + 1 >= chargeTotalPages">Next</button>
+          </div>
         </div>
       </section>
 
@@ -740,6 +768,7 @@
       <div><dt>Status</dt><dd>{{ transaction.status || 'Not recorded' }}</dd></div>
       <div><dt>Date and time</dt><dd>{{ transaction.date | date:'dd/MM/yyyy HH:mm:ss' }}</dd></div>
       <div><dt>Product / type</dt><dd>{{ transaction.productType || 'Not recorded' }}</dd></div>
+      <div><dt>Source debit status</dt><dd>{{ transaction.sourceStatus || 'Not recorded' }}</dd></div>
       <div><dt>Balance after</dt><dd>{{ formatCurrency(transaction.balanceAfter) }}</dd></div>
       <div><dt>Customer</dt><dd>{{ transaction.userName || 'Not recorded' }}</dd></div>
       <div><dt>Customer account</dt><dd>{{ transaction.userAccountNumber || 'Not recorded' }}</dd></div>
@@ -762,6 +791,8 @@
       <div><dt>Credited at</dt><dd>{{ charge.creditedAt ? (charge.creditedAt | date:'dd/MM/yyyy HH:mm:ss') : 'Not credited' }}</dd></div>
       <div><dt>Collection status</dt><dd>{{ charge.collectionStatus || 'Not recorded' }}</dd></div>
       <div><dt>Credit status</dt><dd>{{ charge.creditStatus || 'Not recorded' }}</dd></div>
+      <div><dt>Overall status</dt><dd>{{ charge.status || 'Not recorded' }}</dd></div>
+      <div><dt>Collection date</dt><dd>{{ charge.collectionDate ? (charge.collectionDate | date:'dd/MM/yyyy HH:mm:ss') : 'Not recorded' }}</dd></div>
       <div><dt>Net credited</dt><dd>{{ formatCurrency(charge.creditedAmount) }}</dd></div>
       <div><dt>Tax withheld</dt><dd>{{ formatCurrency(charge.taxAmount) }}</dd></div>
       <div><dt>Credit reference</dt><dd>{{ charge.creditReference || 'Not recorded' }}</dd></div>
@@ -770,7 +801,12 @@
       <div><dt>Linked transaction</dt><dd>{{ charge.linkedTransactionId || 'Not recorded' }}</dd></div>
       <div><dt>Linked loan / deposit</dt><dd>{{ charge.linkedLoanId || charge.linkedDepositId || 'Not recorded' }}</dd></div>
       <div><dt>Processed by</dt><dd>{{ charge.processedByAdminName || (charge.processedByAdminId ? ('Admin #' + charge.processedByAdminId) : 'Not recorded') }}</dd></div>
+      <div><dt>Processed at</dt><dd>{{ charge.processedAt ? (charge.processedAt | date:'dd/MM/yyyy HH:mm:ss') : 'Not recorded' }}</dd></div>
+      <div><dt>Allocation / linked account IDs</dt><dd>{{ charge.allocationId || 'Not recorded' }} / {{ charge.allocationAccountId || 'Not recorded' }}</dd></div>
       <div><dt>Reconciliation</dt><dd>{{ charge.reconciliationStatus || 'Not recorded' }}</dd></div>
+      <div><dt>Reconciled at</dt><dd>{{ charge.reconciliationDate ? (charge.reconciliationDate | date:'dd/MM/yyyy HH:mm:ss') : 'Not recorded' }}</dd></div>
+      <div><dt>Last updated</dt><dd>{{ charge.updatedAt ? (charge.updatedAt | date:'dd/MM/yyyy HH:mm:ss') : 'Not recorded' }}</dd></div>
+      <div class="details-wide"><dt>Collection details</dt><dd>{{ charge.collectionDetails || 'No collection detail recorded' }}</dd></div>
       <div class="details-wide"><dt>Description</dt><dd>{{ charge.description || 'No description recorded' }}</dd></div>
       <div class="details-wide" *ngIf="charge.reconciliationNotes"><dt>Reconciliation notes</dt><dd>{{ charge.reconciliationNotes }}</dd></div>
       <div class="details-wide" *ngIf="charge.failureReason"><dt>Failure reason</dt><dd>{{ charge.failureReason }}</dd></div>

@@ -96,9 +96,14 @@ export class AllocationAccountService {
     });
   }
 
-  getMyAllocationDashboard(token: string, page = 0, size = 25): Observable<any> {
+  getMyAllocationDashboard(token: string, page = 0, size = 25, chargePage = 0, chargeSize = 50): Observable<any> {
     return this.http.get(`${this.apiUrl}/allocation-account/dashboard`, {
-      params: { page: String(page), size: String(size) },
+      params: {
+        page: String(page),
+        size: String(size),
+        chargePage: String(chargePage),
+        chargeSize: String(chargeSize)
+      },
       headers: { Authorization: `Bearer ${token}` }
     });
   }

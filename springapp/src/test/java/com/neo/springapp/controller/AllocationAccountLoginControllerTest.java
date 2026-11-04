@@ -1,6 +1,7 @@
 package com.neo.springapp.controller;
 
 import com.neo.springapp.entity.AllocationAccount;
+import com.neo.springapp.entity.ChargeTransaction;
 import com.neo.springapp.model.AllocationUtilization;
 import com.neo.springapp.model.AllocationAccountOperationRequest;
 import com.neo.springapp.model.FundsAllocation;
@@ -187,7 +188,7 @@ class AllocationAccountLoginControllerTest {
         when(utilizationRepository.sumByAllocationAndProductTypes(eq(12L), eq("DEBIT"), any())).thenReturn(250.0);
         when(utilizationRepository.countByAllocationAndProductTypes(eq(12L), eq("DEBIT"), any())).thenReturn(1L);
         when(chargeTransactionRepository.findByAllocationIdOrderByCreatedAtDesc(eq(12L), any(Pageable.class)))
-                .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 25), 0));
+                .thenReturn(new PageImpl<>(List.of(sampleCharge()), PageRequest.of(0, 50), 1));
         when(chargeTransactionRepository.sumSuccessfulInterestCharges(12L)).thenReturn(new BigDecimal("0.00"));
         when(chargeTransactionRepository.sumTotalCharges(12L)).thenReturn(new BigDecimal("0.00"));
         when(chargeTransactionRepository.sumCreditedCharges(12L)).thenReturn(new BigDecimal("0.00"));
@@ -199,13 +200,32 @@ class AllocationAccountLoginControllerTest {
         when(chargeTransactionRepository.countByCreditStatus(12L, "PENDING_CREDIT")).thenReturn(0L);
 
         ResponseEntity<Map<String, Object>> response = controller.getMyAllocationDashboard(
-                new SessionPrincipal(-12L, "ALLOCATION:FA-2026-00012", "ALLOCATION_ACCOUNT"), 0, 25);
+                new SessionPrincipal(-12L, "ALLOCATION:FA-2026-00012", "ALLOCATION_ACCOUNT"), 0, 25, 0, 50);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).containsKey("summary");
         assertThat(response.getBody().get("transactions")).asList().hasSize(1);
+        assertThat(response.getBody().get("charges")).asList().hasSize(1);
+        Map<?, ?> charge = (Map<?, ?>) ((List<?>) response.getBody().get("charges")).get(0);
+        assertThat(charge.get("chargeCategory")).isEqualTo("CREDIT_CARD_PROCESSING_FEE");
+        assertThat(charge.get("collectionDetails")).isEqualTo("{\"mode\":\"CARD\"}");
+        assertThat(charge.get("userAccountNumber")).isEqualTo("CUSTOMER-1");
+        assertThat(response.getBody()).containsEntry("chargeTotalElements", 1L);
         assertThat(((Map<?, ?>) response.getBody().get("summary")).get("loansOpened")).isEqualTo(1L);
         assertThat(((Map<?, ?>) response.getBody().get("summary")).get("loanDebits")).isEqualTo(250.0);
+    }
+
+    private ChargeTransaction sampleCharge() {
+        ChargeTransaction charge = new ChargeTransaction();
+        charge.setChargeTransactionId("CT-1");
+        charge.setAllocationId(12L);
+        charge.setAllocationAccountId(21L);
+        charge.setChargeType("OTHER");
+        charge.setChargeDescription("Credit card processing fee");
+        charge.setChargeAmount(new BigDecimal("199.00"));
+        charge.setUserAccountNumber("CUSTOMER-1");
+        charge.setCollectionDetails("{\"mode\":\"CARD\"}");
+        return charge;
     }
 
     @Test

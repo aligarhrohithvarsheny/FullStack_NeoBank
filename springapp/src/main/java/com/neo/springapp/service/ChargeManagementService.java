@@ -39,7 +39,9 @@ import java.util.UUID;
 public class ChargeManagementService {
 
     private static final Set<String> SUPPORTED_CHARGE_TYPES = Set.of(
-        "INTEREST", "CIBIL", "SOUNDBOX", "UPI", "PAYMENT_GATEWAY", "OTHER"
+        "INTEREST", "CIBIL", "SOUNDBOX", "UPI", "PAYMENT_GATEWAY",
+        "PROCESSING", "SMS", "MAINTENANCE", "CHEQUE", "IMPS", "ATM",
+        "CREDIT_CARD_PROCESSING_FEE", "GOLD_LOAN_INTEREST", "EMI", "EMI_BOUNCE", "OTHER"
     );
     
     @Autowired

@@ -37,7 +37,9 @@ public class ChargeManagementController {
      *   linkedTransactionId, linkedLoanId, linkedDepositId
      * }
      * 
-     * chargeType: INTEREST, CIBIL, SOUNDBOX, UPI, PAYMENT_GATEWAY, OTHER
+     * chargeType: INTEREST, CIBIL, SOUNDBOX, UPI, PAYMENT_GATEWAY, PROCESSING, SMS,
+     * MAINTENANCE, CHEQUE, IMPS, ATM, CREDIT_CARD_PROCESSING_FEE,
+     * GOLD_LOAN_INTEREST, EMI, EMI_BOUNCE, OTHER
      */
     @PostMapping("/charges/process")
     public ResponseEntity<?> processCharge(@RequestBody Map<String, Object> request) {
@@ -154,7 +156,9 @@ public class ChargeManagementController {
     /**
      * Get charges by type for an allocation
      * GET /api/charges/{allocationId}/type/{chargeType}
-     * chargeType: INTEREST, CIBIL, SOUNDBOX, UPI, PAYMENT_GATEWAY, OTHER
+     * chargeType: INTEREST, CIBIL, SOUNDBOX, UPI, PAYMENT_GATEWAY, PROCESSING, SMS,
+     * MAINTENANCE, CHEQUE, IMPS, ATM, CREDIT_CARD_PROCESSING_FEE,
+     * GOLD_LOAN_INTEREST, EMI, EMI_BOUNCE, OTHER
      */
     @GetMapping("/charges/{allocationId}/type/{chargeType}")
     public ResponseEntity<?> getChargesByType(

@@ -54,6 +54,8 @@
 .allocation-portal-filters select,.allocation-portal-request-form input,.allocation-portal-request-form select,.allocation-portal-request-form textarea { min-width: 190px; padding: 8px 9px; border: 1px solid #d5e0de; border-radius: 4px; color: #29484a; background: #fff; font: inherit; }
 .allocation-portal-filters > span { margin-left: auto; color: #647579; font-size: 11px; }
 .allocation-portal-pagination { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+.allocation-portal-detail-button { padding: 5px 8px; border: 1px solid #c9ddd7; border-radius: 4px; color: #216452; background: #fff; font-size: 10px; white-space: nowrap; cursor: pointer; }
+.allocation-portal-detail-button:hover { background: #eff8f5; }
 .allocation-portal-deposit-note { padding: 12px 14px; border-left: 3px solid #d29624; border-radius: 4px; color: #66501b; background: #fff9e9; font-size: 12px; }
 .allocation-portal-request-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .allocation-portal-request-form .wide { grid-column: 1 / -1; }

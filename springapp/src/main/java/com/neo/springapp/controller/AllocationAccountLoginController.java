@@ -236,7 +236,9 @@ public class AllocationAccountLoginController {
     public ResponseEntity<Map<String, Object>> getMyAllocationDashboard(
             @AuthenticationPrincipal SessionPrincipal principal,
             @org.springframework.web.bind.annotation.RequestParam(defaultValue = "0") int page,
-            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "25") int size) {
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "25") int size,
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "0") int chargePage,
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "50") int chargeSize) {
         if (principal == null || !"ALLOCATION_ACCOUNT".equals(principal.scope())) {
             return error(HttpStatus.FORBIDDEN, "An allocation account session is required.");
         }
@@ -263,8 +265,9 @@ public class AllocationAccountLoginController {
                 allocationRecordId,
                 PageRequest.of(Math.max(0, page), Math.max(1, Math.min(size, 100)),
                         Sort.by(Sort.Direction.DESC, "transactionDate")));
-        Page<ChargeTransaction> chargePage = chargeTransactionRepository.findByAllocationIdOrderByCreatedAtDesc(
-            allocationRecordId, PageRequest.of(0, 25, Sort.by(Sort.Direction.DESC, "createdAt")));
+        Page<ChargeTransaction> chargeHistoryPage = chargeTransactionRepository.findByAllocationIdOrderByCreatedAtDesc(
+            allocationRecordId, PageRequest.of(Math.max(0, chargePage), Math.max(1, Math.min(chargeSize, 100)),
+                    Sort.by(Sort.Direction.DESC, "createdAt")));
 
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("success", true);
@@ -275,7 +278,10 @@ public class AllocationAccountLoginController {
         response.put("transactionPage", transactionPage.getNumber());
         response.put("transactionTotalPages", transactionPage.getTotalPages());
         response.put("transactionTotalElements", transactionPage.getTotalElements());
-        response.put("charges", chargePage.getContent().stream().map(this::chargeDashboardData).toList());
+        response.put("charges", chargeHistoryPage.getContent().stream().map(this::chargeDashboardData).toList());
+        response.put("chargePage", chargeHistoryPage.getNumber());
+        response.put("chargeTotalPages", chargeHistoryPage.getTotalPages());
+        response.put("chargeTotalElements", chargeHistoryPage.getTotalElements());
         response.put("lastUpdated", LocalDateTime.now());
         return ResponseEntity.ok(response);
     }
@@ -497,6 +503,7 @@ public class AllocationAccountLoginController {
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("transactionId", transaction.getUtilizationId());
         data.put("type", transaction.getTransactionType());
+        data.put("transactionType", transaction.getTransactionType());
         data.put("amount", transaction.getAmount());
         data.put("balanceAfter", transaction.getRemainingBalance());
         data.put("productType", transaction.getProductType());
@@ -518,11 +525,15 @@ public class AllocationAccountLoginController {
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("transactionId", charge.getChargeTransactionId());
         data.put("chargeType", charge.getChargeType());
+        data.put("chargeCategory", chargeCategory(charge));
         data.put("description", charge.getChargeDescription());
         data.put("amount", charge.getChargeAmount());
         data.put("creditedAmount", charge.getNetCreditAmount());
         data.put("collectionStatus", charge.getCollectionStatus());
+        data.put("collectionDate", charge.getCollectionDate());
+        data.put("collectionDetails", charge.getCollectionDetails());
         data.put("creditStatus", charge.getCreditStatus());
+        data.put("status", charge.getStatus());
         data.put("creditReference", charge.getCreditReferenceNumber());
         data.put("userAccountNumber", charge.getUserAccountNumber());
         data.put("userName", charge.getUserName());
@@ -534,11 +545,35 @@ public class AllocationAccountLoginController {
         data.put("failureReason", charge.getFailureReason());
         data.put("processedByAdminId", charge.getProcessedByAdminId());
         data.put("processedByAdminName", charge.getProcessedByAdminName());
+        data.put("processedAt", charge.getProcessedAt());
         data.put("reconciliationStatus", charge.getReconciliationStatus());
+        data.put("reconciliationDate", charge.getReconciliationDate());
         data.put("reconciliationNotes", charge.getReconciliationNotes());
         data.put("createdAt", charge.getCreatedAt());
+        data.put("updatedAt", charge.getUpdatedAt());
         data.put("creditedAt", charge.getCreditedAt());
+        data.put("allocationId", charge.getAllocationId());
+        data.put("allocationAccountId", charge.getAllocationAccountId());
         return data;
+    }
+
+    private String chargeCategory(ChargeTransaction charge) {
+        String type = charge.getChargeType() == null ? "" : charge.getChargeType().toUpperCase(java.util.Locale.ROOT);
+        String text = (type + " " + (charge.getChargeDescription() == null ? "" : charge.getChargeDescription()))
+                .toUpperCase(java.util.Locale.ROOT);
+        if (text.contains("CIBIL")) return "CIBIL";
+        if (text.contains("CREDIT CARD") && text.contains("PROCESS")) return "CREDIT_CARD_PROCESSING_FEE";
+        if (text.contains("GOLD") && text.contains("INTEREST")) return "GOLD_LOAN_INTEREST";
+        if (text.contains("EMI") && (text.contains("BOUNCE") || text.contains("RETURN"))) return "EMI_BOUNCE";
+        if (text.contains("CHEQUE") || text.contains("CHECK")) return "CHEQUE";
+        if (text.contains("SMS") || text.contains("MESSAGE")) return "SMS";
+        if (text.contains("MAINTENANCE") || text.contains("MAINTAIN")) return "MAINTENANCE";
+        if (text.contains("IMPS")) return "IMPS";
+        if (text.contains("ATM")) return "ATM";
+        if (text.contains("PROCESS")) return "PROCESSING";
+        if (text.contains("EMI")) return "EMI";
+        if (text.contains("INTEREST")) return "INTEREST";
+        return "OTHER";
     }
 
     private Map<String, Object> operationRequestData(AllocationAccountOperationRequest request) {

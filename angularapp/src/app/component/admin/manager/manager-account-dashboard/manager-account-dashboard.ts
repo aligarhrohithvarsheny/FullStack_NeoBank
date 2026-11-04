@@ -32,6 +32,27 @@ export class ManagerAccountDashboardComponent implements OnInit, OnDestroy {
   isAllocationAccountLogin = false;
   dashboardSummary: any = {};
   dashboardCharges: any[] = [];
+  chargePage = 0;
+  chargeSize = 50;
+  chargeTotalPages = 0;
+  chargeTotalElements = 0;
+  chargeAccountFilter = '';
+  chargeCategoryFilter = 'ALL';
+  readonly chargeCategories = [
+    { value: 'CIBIL', label: 'CIBIL' },
+    { value: 'PROCESSING', label: 'Processing fee' },
+    { value: 'SMS', label: 'SMS' },
+    { value: 'MAINTENANCE', label: 'Account maintenance' },
+    { value: 'CHEQUE', label: 'Cheque (₹199)' },
+    { value: 'IMPS', label: 'IMPS' },
+    { value: 'ATM', label: 'ATM' },
+    { value: 'CREDIT_CARD_PROCESSING_FEE', label: 'Credit card processing fee' },
+    { value: 'GOLD_LOAN_INTEREST', label: 'Gold loan interest' },
+    { value: 'EMI', label: 'EMI' },
+    { value: 'INTEREST', label: 'Interest' },
+    { value: 'EMI_BOUNCE', label: 'EMI bounce' },
+    { value: 'OTHER', label: 'Other' }
+  ];
   transactionTotalPages = 0;
   lastRefreshedAt: Date | null = null;
   isRefreshing = false;
@@ -211,6 +232,50 @@ export class ManagerAccountDashboardComponent implements OnInit, OnDestroy {
     });
   }
 
+  get filteredCharges(): any[] {
+    return this.dashboardCharges.filter(charge =>
+      (!this.chargeAccountFilter || charge.userAccountNumber === this.chargeAccountFilter)
+      && (this.chargeCategoryFilter === 'ALL' || charge.chargeCategory === this.chargeCategoryFilter));
+  }
+
+  get chargeAccountNumbers(): string[] {
+    return [...new Set(this.dashboardCharges
+      .map(charge => charge.userAccountNumber)
+      .filter((accountNumber): accountNumber is string => !!accountNumber))];
+  }
+
+  get chargeCategoryAccountSummaries(): { category: string; label: string; accountNumber: string; count: number; total: number }[] {
+    const groups = new Map<string, { category: string; label: string; accountNumber: string; count: number; total: number }>();
+    for (const charge of this.filteredCharges) {
+      const category = charge.chargeCategory || 'OTHER';
+      const accountNumber = charge.userAccountNumber || 'Account not recorded';
+      const key = `${category}:${accountNumber}`;
+      const group = groups.get(key) || {
+        category,
+        label: this.getChargeCategoryLabel(category),
+        accountNumber,
+        count: 0,
+        total: 0
+      };
+      group.count++;
+      group.total += Number(charge.amount) || 0;
+      groups.set(key, group);
+    }
+    return [...groups.values()].sort((a, b) => a.label.localeCompare(b.label)
+      || a.accountNumber.localeCompare(b.accountNumber));
+  }
+
+  getChargeCategoryLabel(category: string): string {
+    return this.chargeCategories.find(item => item.value === category)?.label || category.replace(/_/g, ' ');
+  }
+
+  changeChargePage(direction: -1 | 1): void {
+    const nextPage = this.chargePage + direction;
+    if (nextPage < 0 || (this.chargeTotalPages > 0 && nextPage >= this.chargeTotalPages)) return;
+    this.chargePage = nextPage;
+    this.loadAllocationDashboard(true);
+  }
+
   submitOperationRequest(): void {
     this.requestError = '';
     this.requestSuccess = '';
@@ -286,7 +351,9 @@ export class ManagerAccountDashboardComponent implements OnInit, OnDestroy {
     if (!token || !this.allocationId) return;
     if (silent) this.isRefreshing = true;
     else this.loading = true;
-    this.accountService.getMyAllocationDashboard(token, this.transactionPage, this.transactionSize).subscribe({
+    this.accountService.getMyAllocationDashboard(
+      token, this.transactionPage, this.transactionSize, this.chargePage, this.chargeSize
+    ).subscribe({
       next: (response: any) => {
         if (!response?.success) {
           this.errorMessage = response?.message || 'Allocation dashboard data is unavailable.';
@@ -306,6 +373,9 @@ export class ManagerAccountDashboardComponent implements OnInit, OnDestroy {
         };
         this.dashboardSummary = response.summary || {};
         this.dashboardCharges = response.charges || [];
+        this.chargePage = response.chargePage || 0;
+        this.chargeTotalPages = response.chargeTotalPages || 0;
+        this.chargeTotalElements = response.chargeTotalElements || 0;
         this.accountTransactions = (response.transactions || []).map((transaction: any) => ({
           ...transaction,
           balance: transaction.balanceAfter,
