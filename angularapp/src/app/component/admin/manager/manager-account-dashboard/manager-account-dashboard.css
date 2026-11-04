@@ -47,6 +47,19 @@
 .allocation-portal-table td { padding: 10px 9px; border-top: 1px solid #edf1f0; color: #334b4e; vertical-align: top; }
 .allocation-portal-table td small { display: block; margin-top: 3px; color: #78878a; font-size: 10px; }
 .allocation-portal-empty { padding: 22px !important; color: #78878a !important; text-align: center; }
+.allocation-product-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+.allocation-product-card { padding: 15px; }
+.allocation-product-card-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; color: #29484a; font-size: 12px; font-weight: 700; }
+.allocation-product-card-heading strong { padding: 3px 7px; border-radius: 99px; color: #51706c; background: #eef4f2; font-size: 9px; white-space: nowrap; }
+.allocation-product-amounts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 14px 0 8px; }
+.allocation-product-amounts small,.allocation-product-amounts strong { display: block; }
+.allocation-product-amounts small { color: #718084; font-size: 9px; }
+.allocation-product-amounts strong { margin-top: 4px; color: #193f44; font-size: 14px; font-variant-numeric: tabular-nums; }
+.allocation-product-types { color: #849194; font-size: 9px; }
+.allocation-charge-detail-card { border-color: #b8d9cf; box-shadow: 0 8px 26px rgba(18, 61, 67, .08); }
+.allocation-charge-detail-card .allocation-portal-facts > div { padding: 12px 10px; }
+.allocation-charge-detail-card .allocation-portal-facts > div > span { font-size: 10px; }
+.allocation-charge-detail-card .allocation-portal-facts > div > strong { font-size: 11px; line-height: 1.5; }
 .allocation-portal-pill { color: #52646b; background: #eef2f1; }
 .allocation-portal-pill.success { color: #126044; background: #ddf5e9; }
 .allocation-portal-filters { display: flex; align-items: end; gap: 12px; margin: 0 0 14px; }
@@ -87,7 +100,7 @@
 .allocation-dashboard-sidebar nav button:hover,.allocation-dashboard-sidebar nav button.active { color: #fff; background: #2b5b5e; }
 .allocation-sidebar-footer { display: flex; align-items: center; gap: 8px; margin-top: auto; padding: 12px 9px; color: #bdd2ce; border-top: 1px solid rgba(231, 242, 239, .18); font-size: 11px; }
 .allocation-dashboard-content { width: calc(100% - 248px); margin-left: 248px; }
-.allocation-details-backdrop { position: fixed; z-index: 1100; inset: 0; display: grid; place-items: center; padding: 20px; background: rgba(15, 35, 38, .58); }
+.allocation-details-backdrop { position: fixed; z-index: 10000; inset: 0; display: grid; place-items: center; padding: 20px; background: rgba(15, 35, 38, .58); }
 .allocation-details-dialog { width: min(700px, 100%); max-height: 88vh; overflow: auto; padding: 22px; border: 1px solid #d5e3e1; border-radius: 8px; background: #fff; box-shadow: 0 20px 60px rgba(10, 30, 32, .25); }
 .allocation-details-dialog > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
 .allocation-details-dialog h3 { margin: 3px 0 0; color: #183c41; font-size: 20px; }

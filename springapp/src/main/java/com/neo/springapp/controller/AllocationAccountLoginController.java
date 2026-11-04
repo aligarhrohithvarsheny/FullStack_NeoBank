@@ -274,6 +274,7 @@ public class AllocationAccountLoginController {
         response.put("allocation", allocationDashboardData(allocation));
         response.put("account", accountDashboardData(account));
         response.put("summary", dashboardSummary(allocation, account));
+        response.put("productBreakdown", productBreakdown(allocationRecordId));
         response.put("transactions", transactionPage.getContent().stream().map(this::transactionDashboardData).toList());
         response.put("transactionPage", transactionPage.getNumber());
         response.put("transactionTotalPages", transactionPage.getTotalPages());
@@ -499,6 +500,33 @@ public class AllocationAccountLoginController {
         return count == null ? 0 : count;
     }
 
+    private List<Map<String, Object>> productBreakdown(Long allocationId) {
+        Map<String, Map<String, Object>> products = new LinkedHashMap<>();
+        for (Object[] row : utilizationRepository.summarizeSuccessfulActivityByProduct(allocationId)) {
+            String productType = String.valueOf(row[0]);
+            String transactionType = String.valueOf(row[1]);
+            Number count = (Number) row[2];
+            Number amount = (Number) row[3];
+            Map<String, Object> product = products.computeIfAbsent(productType, key -> {
+                Map<String, Object> entry = new LinkedHashMap<>();
+                entry.put("productType", key);
+                entry.put("debitCount", 0L);
+                entry.put("debitAmount", 0.0);
+                entry.put("creditCount", 0L);
+                entry.put("creditAmount", 0.0);
+                return entry;
+            });
+            if ("DEBIT".equals(transactionType)) {
+                product.put("debitCount", count.longValue());
+                product.put("debitAmount", amount.doubleValue());
+            } else if ("CREDIT".equals(transactionType)) {
+                product.put("creditCount", count.longValue());
+                product.put("creditAmount", amount.doubleValue());
+            }
+        }
+        return new ArrayList<>(products.values());
+    }
+
     private Map<String, Object> transactionDashboardData(AllocationUtilization transaction) {
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("transactionId", transaction.getUtilizationId());
@@ -560,7 +588,7 @@ public class AllocationAccountLoginController {
     private String chargeCategory(ChargeTransaction charge) {
         String type = charge.getChargeType() == null ? "" : charge.getChargeType().toUpperCase(java.util.Locale.ROOT);
         String text = (type + " " + (charge.getChargeDescription() == null ? "" : charge.getChargeDescription()))
-                .toUpperCase(java.util.Locale.ROOT);
+                .toUpperCase(java.util.Locale.ROOT).replace('_', ' ').replace('-', ' ');
         if (text.contains("CIBIL")) return "CIBIL";
         if (text.contains("CREDIT CARD") && text.contains("PROCESS")) return "CREDIT_CARD_PROCESSING_FEE";
         if (text.contains("GOLD") && text.contains("INTEREST")) return "GOLD_LOAN_INTEREST";

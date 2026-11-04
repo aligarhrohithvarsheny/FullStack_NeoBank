@@ -388,14 +388,20 @@
   <hr class="my-5">
 
   <!-- Account Linking Form -->
-  <div class="row">
+  <div class="row account-linking-workspace">
     <div class="col-lg-8">
-      <div class="card">
-        <div class="card-header">
-          <h5 class="mb-0">
-            <span class="badge" [style.background]="step === 1 ? '#007bff' : '#28a745'">Step {{ step }}</span>
-            {{ step === 1 ? 'Link New Account' : 'Add Cheque Details' }}
-          </h5>
+      <div class="card account-linking-form-card">
+        <div class="card-header account-linking-form-header">
+          <div>
+            <span class="account-linking-eyebrow">STEP {{ step }} OF 2</span>
+            <h2>{{ step === 1 ? 'Link an allocation account' : 'Submit cheque details' }}</h2>
+            <p>{{ step === 1 ? 'Choose an allocation and verify the internal bank account details.' : 'Provide cheque information for the linked account verification.' }}</p>
+          </div>
+          <div class="account-linking-stepper" aria-label="Account linking progress">
+            <span [class.complete]="step > 1" [class.current]="step === 1"><i class="fas" [ngClass]="step > 1 ? 'fa-check' : 'fa-university'"></i><b>Account details</b></span>
+            <span class="stepper-connector" [class.complete]="step > 1"></span>
+            <span [class.current]="step === 2"><i class="fas fa-file-invoice"></i><b>Cheque verification</b></span>
+          </div>
         </div>
         <div class="card-body">
           <!-- Step 1: Account Details -->
@@ -413,6 +419,14 @@
                   Allocation is required
                 </small>
                 <small class="text-muted" *ngIf="allocations.length === 0">No active, unlinked allocations are available. Create one here to continue.</small>
+              </div>
+
+              <div class="col-12 mb-3" *ngIf="selectedAllocation">
+                <div class="selected-allocation-summary">
+                  <span class="allocation-summary-icon"><i class="fas fa-layer-group"></i></span>
+                  <div><small>SELECTED ALLOCATION</small><strong>{{ selectedAllocation.allocationId }}</strong><span>{{ selectedAllocation.branchName }}<ng-container *ngIf="selectedAllocation.city"> · {{ selectedAllocation.city }}</ng-container></span></div>
+                  <span class="allocation-summary-status">{{ selectedAllocation.status || 'ACTIVE' }}</span>
+                </div>
               </div>
 
               <div class="col-12 mb-3" *ngIf="allocations.length === 0 || showCreateAllocation">
@@ -683,48 +697,17 @@
 
     <!-- Info Sidebar -->
     <div class="col-lg-4">
-      <div class="card bg-light">
-        <div class="card-header">
-          <h6 class="mb-0"><i class="fas fa-question-circle"></i> Account Linking Process</h6>
+      <aside class="account-linking-process-card">
+        <span class="account-linking-eyebrow">WHAT HAPPENS NEXT</span>
+        <h3>Account linking process</h3>
+        <div class="linking-process-steps">
+          <div class="linking-process-step"><span>1</span><div><strong>Verify account</strong><p>Confirm the internal account number and IFSC.</p></div></div>
+          <div class="linking-process-step"><span>2</span><div><strong>Submit cheque details</strong><p>Provide the cheque information for review.</p></div></div>
+          <div class="linking-process-step"><span>3</span><div><strong>Admin approval</strong><p>The account becomes active after verification.</p></div></div>
         </div>
-        <div class="card-body">
-          <div class="d-flex mb-3">
-            <div class="badge bg-primary me-2">1</div>
-            <div>
-              <strong>Add Account Details</strong>
-              <p class="text-muted small mb-0">Enter account number, IFSC, and holder information</p>
-            </div>
-          </div>
-
-          <div class="d-flex mb-3">
-            <div class="badge bg-primary me-2">2</div>
-            <div>
-              <strong>Provide Cheque Details</strong>
-              <p class="text-muted small mb-0">Submit cheque for bank verification</p>
-            </div>
-          </div>
-
-          <div class="d-flex">
-            <div class="badge bg-primary me-2">3</div>
-            <div>
-              <strong>Admin Approval</strong>
-              <p class="text-muted small mb-0">Admin verifies cheque and activates account</p>
-            </div>
-          </div>
-
-          <hr class="my-3">
-
-          <div class="alert alert-warning">
-            <i class="fas fa-exclamation-triangle"></i>
-            <strong>Important:</strong> Only one account can be linked per allocation. All debit/credit transactions will use this account only.
-          </div>
-
-          <div class="alert alert-info">
-            <i class="fas fa-info-circle"></i>
-            <strong>Charges:</strong> Interest, CIBIL, Soundbox, UPI, and Payment Gateway charges will automatically be credited to this account.
-          </div>
-        </div>
-      </div>
+        <div class="linking-process-notice"><i class="fas fa-info-circle"></i><span><strong>One linked account per allocation.</strong> Allocation debits and credits use its verified account.</span></div>
+        <div class="linking-process-notice charge-notice"><i class="fas fa-coins"></i><span>Eligible charges are recorded individually against their customer accounts.</span></div>
+      </aside>
     </div>
   </div>
 </main>

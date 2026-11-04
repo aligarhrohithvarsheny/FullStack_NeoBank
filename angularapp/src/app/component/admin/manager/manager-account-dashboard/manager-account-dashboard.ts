@@ -31,7 +31,9 @@ export class ManagerAccountDashboardComponent implements OnInit, OnDestroy {
   transactionSize = 10;
   isAllocationAccountLogin = false;
   dashboardSummary: any = {};
+  productBreakdown: any[] = [];
   dashboardCharges: any[] = [];
+  selectedAllocationCharge: any = null;
   chargePage = 0;
   chargeSize = 50;
   chargeTotalPages = 0;
@@ -52,6 +54,19 @@ export class ManagerAccountDashboardComponent implements OnInit, OnDestroy {
     { value: 'INTEREST', label: 'Interest' },
     { value: 'EMI_BOUNCE', label: 'EMI bounce' },
     { value: 'OTHER', label: 'Other' }
+  ];
+  readonly allocationProductCategories = [
+    { label: 'Admin deposits', keys: ['ADMIN_DEPOSIT', 'ADMIN_DEPOSITS', 'DEPOSIT', 'DEPOSITS'] },
+    { label: 'Admin withdrawals', keys: ['ADMIN_WITHDRAWAL', 'ADMIN_WITHDRAWALS', 'WITHDRAWAL', 'WITHDRAWALS'] },
+    { label: 'Loans sanctioned', keys: ['LOAN', 'LOANS', 'SANCTIONED_LOAN', 'LOAN_SANCTION', 'PERSONAL_LOAN', 'GOLD_LOAN'] },
+    { label: 'Car loans', keys: ['CAR_LOAN', 'CAR_LOANS', 'AUTO_LOAN', 'VEHICLE_LOAN'] },
+    { label: 'Home loans', keys: ['HOME_LOAN', 'HOME_LOANS', 'HOUSING_LOAN'] },
+    { label: 'Crop loans', keys: ['CROP_LOAN', 'CROP_LOANS', 'AGRICULTURE_LOAN', 'FARM_LOAN'] },
+    { label: 'Subsidies', keys: ['SUBSIDY', 'SUBSIDIES', 'CROP_SUBSIDY', 'EDUCATION_SUBSIDY'] },
+    { label: 'Education loans', keys: ['EDUCATION_LOAN', 'EDUCATION_LOANS', 'STUDENT_LOAN'] },
+    { label: 'Credit card loans', keys: ['CREDIT_CARD_LOAN', 'CREDIT_CARD_LOANS', 'CREDIT_CARD'] },
+    { label: 'FD deposits', keys: ['FD', 'FD_DEPOSIT', 'FIXED_DEPOSIT'] },
+    { label: 'RD deposits', keys: ['RD', 'RD_DEPOSIT', 'RECURRING_DEPOSIT'] }
   ];
   transactionTotalPages = 0;
   lastRefreshedAt: Date | null = null;
@@ -181,7 +196,7 @@ export class ManagerAccountDashboardComponent implements OnInit, OnDestroy {
     }
   }
 
-  navigateDashboardSection(section: 'overview' | 'account' | 'transactions' | 'deposits' | 'charges' | 'requests'): void {
+  navigateDashboardSection(section: 'overview' | 'account' | 'transactions' | 'deposits' | 'fundUse' | 'charges' | 'requests'): void {
     this.activeSection = section;
     this.errorMessage = '';
     this.requestError = '';
@@ -235,7 +250,7 @@ export class ManagerAccountDashboardComponent implements OnInit, OnDestroy {
   get filteredCharges(): any[] {
     return this.dashboardCharges.filter(charge =>
       (!this.chargeAccountFilter || charge.userAccountNumber === this.chargeAccountFilter)
-      && (this.chargeCategoryFilter === 'ALL' || charge.chargeCategory === this.chargeCategoryFilter));
+      && (this.chargeCategoryFilter === 'ALL' || this.getChargeCategory(charge) === this.chargeCategoryFilter));
   }
 
   get chargeAccountNumbers(): string[] {
@@ -247,7 +262,7 @@ export class ManagerAccountDashboardComponent implements OnInit, OnDestroy {
   get chargeCategoryAccountSummaries(): { category: string; label: string; accountNumber: string; count: number; total: number }[] {
     const groups = new Map<string, { category: string; label: string; accountNumber: string; count: number; total: number }>();
     for (const charge of this.filteredCharges) {
-      const category = charge.chargeCategory || 'OTHER';
+      const category = this.getChargeCategory(charge);
       const accountNumber = charge.userAccountNumber || 'Account not recorded';
       const key = `${category}:${accountNumber}`;
       const group = groups.get(key) || {
@@ -267,6 +282,49 @@ export class ManagerAccountDashboardComponent implements OnInit, OnDestroy {
 
   getChargeCategoryLabel(category: string): string {
     return this.chargeCategories.find(item => item.value === category)?.label || category.replace(/_/g, ' ');
+  }
+
+  getChargeCategory(charge: any): string {
+    const rawCategory = String(charge?.chargeCategory || '').toUpperCase();
+    if (this.chargeCategories.some(category => category.value === rawCategory)) return rawCategory;
+    const text = `${charge?.chargeType || ''} ${charge?.description || ''}`
+      .toUpperCase().replace(/[_-]+/g, ' ');
+    if (text.includes('CIBIL')) return 'CIBIL';
+    if (text.includes('CREDIT CARD') && text.includes('PROCESS')) return 'CREDIT_CARD_PROCESSING_FEE';
+    if (text.includes('GOLD') && text.includes('INTEREST')) return 'GOLD_LOAN_INTEREST';
+    if (text.includes('EMI') && (text.includes('BOUNCE') || text.includes('RETURN'))) return 'EMI_BOUNCE';
+    if (text.includes('CHEQUE') || text.includes('CHECK')) return 'CHEQUE';
+    if (text.includes('SMS') || text.includes('MESSAGE')) return 'SMS';
+    if (text.includes('MAINTENANCE') || text.includes('MAINTAIN')) return 'MAINTENANCE';
+    if (text.includes('IMPS')) return 'IMPS';
+    if (text.includes('ATM')) return 'ATM';
+    if (text.includes('PROCESS')) return 'PROCESSING';
+    if (text.includes('EMI')) return 'EMI';
+    if (text.includes('INTEREST')) return 'INTEREST';
+    return 'OTHER';
+  }
+
+  get allocationProductSummary(): { label: string; productTypes: string[]; debitCount: number; debitAmount: number; creditCount: number; creditAmount: number }[] {
+    return this.allocationProductCategories.map(category => {
+      const entries = this.productBreakdown.filter(product =>
+        category.keys.includes(String(product.productType || '').toUpperCase().replace(/[\s-]+/g, '_')));
+      return {
+        label: category.label,
+        productTypes: entries.map(product => product.productType),
+        debitCount: entries.reduce((total, product) => total + Number(product.debitCount || 0), 0),
+        debitAmount: entries.reduce((total, product) => total + Number(product.debitAmount || 0), 0),
+        creditCount: entries.reduce((total, product) => total + Number(product.creditCount || 0), 0),
+        creditAmount: entries.reduce((total, product) => total + Number(product.creditAmount || 0), 0)
+      };
+    });
+  }
+
+  showAllocationChargeDetails(charge: any): void {
+    this.selectedAllocationCharge = charge;
+  }
+
+  closeAllocationChargeDetails(): void {
+    this.selectedAllocationCharge = null;
   }
 
   changeChargePage(direction: -1 | 1): void {
@@ -372,6 +430,7 @@ export class ManagerAccountDashboardComponent implements OnInit, OnDestroy {
           totalCredited: account.totalCredited ?? allocation.totalCredited
         };
         this.dashboardSummary = response.summary || {};
+        this.productBreakdown = response.productBreakdown || [];
         this.dashboardCharges = response.charges || [];
         this.chargePage = response.chargePage || 0;
         this.chargeTotalPages = response.chargeTotalPages || 0;

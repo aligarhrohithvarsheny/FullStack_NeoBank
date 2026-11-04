@@ -182,6 +182,8 @@ class AllocationAccountLoginControllerTest {
         when(linkedAccountRepository.findByAllocationId(12L)).thenReturn(Optional.of(linkedAccount));
         when(utilizationRepository.findByAllocationIdOrderByTransactionDateDesc(eq(12L), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(loanDebit), PageRequest.of(0, 25), 1));
+        when(utilizationRepository.summarizeSuccessfulActivityByProduct(12L))
+                .thenReturn(List.<Object[]>of(new Object[]{"CAR_LOAN", "DEBIT", 2L, 4000.0}));
         when(utilizationRepository.countByAllocationId(12L)).thenReturn(1L);
         when(utilizationRepository.getDebitCount(12L)).thenReturn(1L);
         when(utilizationRepository.getCreditCount(12L)).thenReturn(0L);
@@ -206,6 +208,10 @@ class AllocationAccountLoginControllerTest {
         assertThat(response.getBody()).containsKey("summary");
         assertThat(response.getBody().get("transactions")).asList().hasSize(1);
         assertThat(response.getBody().get("charges")).asList().hasSize(1);
+        assertThat(response.getBody().get("productBreakdown")).asList().hasSize(1);
+        Map<?, ?> carLoan = (Map<?, ?>) ((List<?>) response.getBody().get("productBreakdown")).get(0);
+        assertThat(carLoan.get("productType")).isEqualTo("CAR_LOAN");
+        assertThat(carLoan.get("debitAmount")).isEqualTo(4000.0);
         Map<?, ?> charge = (Map<?, ?>) ((List<?>) response.getBody().get("charges")).get(0);
         assertThat(charge.get("chargeCategory")).isEqualTo("CREDIT_CARD_PROCESSING_FEE");
         assertThat(charge.get("collectionDetails")).isEqualTo("{\"mode\":\"CARD\"}");

@@ -64,4 +64,9 @@ public interface AllocationUtilizationRepository extends JpaRepository<Allocatio
     Page<AllocationUtilization> findByUserAccountNumber(String accountNumber, Pageable pageable);
 
     List<AllocationUtilization> findByAllocationIdOrderByTransactionDateDesc(Long allocationId);
+
+    @Query("SELECT UPPER(au.productType), UPPER(au.transactionType), COUNT(au), COALESCE(SUM(au.amount), 0) " +
+           "FROM AllocationUtilization au WHERE au.allocationId = :allocationId AND UPPER(au.status) = 'SUCCESS' " +
+           "GROUP BY UPPER(au.productType), UPPER(au.transactionType)")
+    List<Object[]> summarizeSuccessfulActivityByProduct(@Param("allocationId") Long allocationId);
 }

@@ -9,6 +9,7 @@
       <button type="button" [class.active]="activeSection === 'account'" (click)="navigateDashboardSection('account')"><i class="fas fa-university"></i>Account details</button>
       <button type="button" [class.active]="activeSection === 'transactions'" (click)="navigateDashboardSection('transactions')"><i class="fas fa-exchange-alt"></i>Transactions</button>
       <button type="button" [class.active]="activeSection === 'deposits'" (click)="navigateDashboardSection('deposits')"><i class="fas fa-piggy-bank"></i>FD / RD deposits</button>
+      <button type="button" [class.active]="activeSection === 'fundUse'" (click)="navigateDashboardSection('fundUse')"><i class="fas fa-hand-holding-usd"></i>Loans & fund use</button>
       <button type="button" [class.active]="activeSection === 'charges'" (click)="navigateDashboardSection('charges')"><i class="fas fa-receipt"></i>Charges</button>
       <button type="button" [class.active]="activeSection === 'requests'" (click)="navigateDashboardSection('requests')"><i class="fas fa-paper-plane"></i>Operation requests</button>
     </nav>
@@ -22,7 +23,7 @@
     <header class="allocation-portal-header">
       <div>
         <span class="allocation-portal-eyebrow">ALLOCATION ACCOUNT</span>
-        <h1>{{ activeSection === 'deposits' ? 'FD / RD deposits' : activeSection === 'account' ? 'Account details' : activeSection === 'transactions' ? 'Transactions' : activeSection === 'charges' ? 'Charges' : activeSection === 'requests' ? 'Operation requests' : 'Overview' }}</h1>
+        <h1>{{ activeSection === 'deposits' ? 'FD / RD deposits' : activeSection === 'fundUse' ? 'Loans & fund use' : activeSection === 'account' ? 'Account details' : activeSection === 'transactions' ? 'Transactions' : activeSection === 'charges' ? 'Charges' : activeSection === 'requests' ? 'Operation requests' : 'Overview' }}</h1>
       </div>
       <div class="allocation-portal-actions">
         <span class="allocation-portal-live"><i class="fas fa-circle"></i> Live data</span>
@@ -159,6 +160,40 @@
         </article>
       </section>
 
+      <section *ngIf="activeSection === 'fundUse'" class="allocation-portal-section">
+        <div class="allocation-portal-deposit-note">This view reports successful entries recorded against this allocation. It does not infer a loan sanction from a customer loan record unless that activity was posted to the allocation ledger.</div>
+        <div class="allocation-product-grid">
+          <article class="allocation-portal-card allocation-product-card" *ngFor="let product of allocationProductSummary">
+            <div class="allocation-product-card-heading"><span>{{ product.label }}</span><strong>{{ product.debitCount + product.creditCount }} entries</strong></div>
+            <div class="allocation-product-amounts">
+              <div><small>Allocated / debited</small><strong>{{ formatCurrency(product.debitAmount) }}</strong></div>
+              <div><small>Returned / credited</small><strong>{{ formatCurrency(product.creditAmount) }}</strong></div>
+            </div>
+            <small class="allocation-product-types">{{ product.productTypes.length ? product.productTypes.join(', ') : 'No successful entries recorded' }}</small>
+          </article>
+        </div>
+        <div class="allocation-portal-card">
+          <div class="allocation-portal-card-heading"><div><h2>Allocation funding and loan activity</h2><p>Sanctioned/deployed loan and other fund movements recorded against this allocation. Details stay tied to each customer account and reference.</p></div></div>
+          <div class="allocation-portal-table-wrap"><table class="allocation-portal-table"><thead><tr><th>Date</th><th>Activity / product</th><th>Customer</th><th>Customer account</th><th>Type</th><th>Amount</th><th>Balance after</th><th>Status</th><th>Reference</th><th></th></tr></thead><tbody>
+            <tr *ngFor="let txn of accountTransactions">
+              <td>{{ txn.transactionDate | date:'short' }}</td>
+              <td>{{ txn.productType || '—' }}<small>{{ txn.description || '—' }}</small></td>
+              <td>{{ txn.userName || '—' }}</td><td>{{ txn.userAccountNumber || '—' }}</td>
+              <td>{{ txn.transactionType || txn.type || '—' }}</td><td>{{ formatCurrency(txn.amount || 0) }}</td>
+              <td>{{ formatCurrency(txn.balanceAfter || 0) }}</td><td>{{ txn.status || '—' }}</td>
+              <td>{{ txn.linkedTransactionId || txn.referenceNumber || txn.transactionId || '—' }}</td>
+              <td><button type="button" class="allocation-portal-detail-button" (click)="openTransactionDetails(txn)">Full details</button></td>
+            </tr>
+            <tr *ngIf="accountTransactions.length === 0"><td colspan="10" class="allocation-portal-empty">No allocation activity on this page.</td></tr>
+          </tbody></table></div>
+          <div class="allocation-portal-pagination">
+            <span>Page {{ transactionPage + 1 }}<ng-container *ngIf="transactionTotalPages"> of {{ transactionTotalPages }}</ng-container></span>
+            <button type="button" (click)="previousPage()" [disabled]="transactionPage === 0">Previous</button>
+            <button type="button" (click)="nextPage()" [disabled]="transactionTotalPages > 0 && transactionPage + 1 >= transactionTotalPages">Next</button>
+          </div>
+        </div>
+      </section>
+
       <section *ngIf="activeSection === 'charges'" class="allocation-portal-section">
         <div class="allocation-portal-metrics">
           <article><span>Total charges collected</span><strong>{{ formatCurrency(chargesSummary.totalCharges || 0) }}</strong><small>Recorded against this linked account</small></article>
@@ -180,20 +215,44 @@
           <div class="allocation-portal-table-wrap"><table class="allocation-portal-table"><thead><tr><th>Date</th><th>Category</th><th>Customer account</th><th>Product / linked item</th><th>Collected</th><th>Net credited</th><th>Collection / credit</th><th>Reconciliation</th><th>Details</th></tr></thead><tbody>
             <tr *ngFor="let charge of filteredCharges">
               <td>{{ charge.createdAt | date:'short' }}</td>
-              <td>{{ getChargeCategoryLabel(charge.chargeCategory || 'OTHER') }}<small>{{ charge.chargeType }}</small></td>
+              <td>{{ getChargeCategoryLabel(getChargeCategory(charge)) }}<small>{{ charge.chargeType }}</small></td>
               <td>{{ charge.userName || '—' }}<small>{{ charge.userAccountNumber || 'Account not recorded' }}</small></td>
               <td>{{ charge.userProductType || '—' }}<small>{{ charge.linkedLoanId || charge.linkedDepositId || '—' }}</small></td>
               <td>{{ formatCurrency(charge.amount || 0) }}</td>
               <td>{{ formatCurrency(charge.creditedAmount || 0) }}<small>Tax: {{ formatCurrency(charge.taxAmount || 0) }}</small></td>
               <td>{{ charge.collectionStatus || '—' }} / {{ charge.creditStatus || '—' }}</td>
               <td>{{ charge.reconciliationStatus || '—' }}</td>
-              <td><button type="button" class="allocation-portal-detail-button" (click)="openChargeDetails(charge)">Full details</button></td>
+              <td><button type="button" class="allocation-portal-detail-button" (click)="showAllocationChargeDetails(charge)">Full details</button></td>
             </tr>
             <tr *ngIf="filteredCharges.length === 0"><td colspan="9" class="allocation-portal-empty">No charges match these filters on this page.</td></tr>
           </tbody></table></div>
           <div class="allocation-portal-pagination">
             <button type="button" (click)="changeChargePage(-1)" [disabled]="chargePage === 0">Previous</button>
             <button type="button" (click)="changeChargePage(1)" [disabled]="chargeTotalPages > 0 && chargePage + 1 >= chargeTotalPages">Next</button>
+          </div>
+        </div>
+        <div class="allocation-portal-card allocation-charge-detail-card" *ngIf="selectedAllocationCharge as charge">
+          <div class="allocation-portal-card-heading">
+            <div><span class="allocation-portal-eyebrow">CHARGE TRANSACTION DETAILS</span><h2>{{ getChargeCategoryLabel(getChargeCategory(charge)) }} · {{ charge.transactionId }}</h2></div>
+            <button type="button" class="allocation-portal-detail-button" (click)="closeAllocationChargeDetails()">Close details</button>
+          </div>
+          <div class="allocation-portal-facts">
+            <div><span>Charge amount</span><strong>{{ formatCurrency(charge.amount || 0) }}</strong></div>
+            <div><span>Net credited / tax</span><strong>{{ formatCurrency(charge.creditedAmount || 0) }} / {{ formatCurrency(charge.taxAmount || 0) }}</strong></div>
+            <div><span>Customer</span><strong>{{ charge.userName || '—' }} · {{ charge.userAccountNumber || 'Account not recorded' }}</strong></div>
+            <div><span>Product / linked item</span><strong>{{ charge.userProductType || '—' }} · {{ charge.linkedLoanId || charge.linkedDepositId || '—' }}</strong></div>
+            <div><span>Collection status / date</span><strong>{{ charge.collectionStatus || '—' }} · {{ charge.collectionDate ? (charge.collectionDate | date:'medium') : 'Not recorded' }}</strong></div>
+            <div><span>Credit status / date</span><strong>{{ charge.creditStatus || '—' }} · {{ charge.creditedAt ? (charge.creditedAt | date:'medium') : 'Not credited' }}</strong></div>
+            <div><span>Overall status</span><strong>{{ charge.status || '—' }}</strong></div>
+            <div><span>Credit reference</span><strong>{{ charge.creditReference || '—' }}</strong></div>
+            <div><span>Linked transaction</span><strong>{{ charge.linkedTransactionId || '—' }}</strong></div>
+            <div><span>Allocation / linked account</span><strong>{{ charge.allocationId || '—' }} / {{ charge.allocationAccountId || '—' }}</strong></div>
+            <div><span>Processed by / at</span><strong>{{ charge.processedByAdminName || charge.processedByAdminId || '—' }} · {{ charge.processedAt ? (charge.processedAt | date:'medium') : 'Not recorded' }}</strong></div>
+            <div><span>Reconciliation status / date</span><strong>{{ charge.reconciliationStatus || '—' }} · {{ charge.reconciliationDate ? (charge.reconciliationDate | date:'medium') : 'Not recorded' }}</strong></div>
+            <div class="details-wide"><span>Description</span><strong>{{ charge.description || 'No description recorded' }}</strong></div>
+            <div class="details-wide"><span>Collection details</span><strong>{{ charge.collectionDetails || 'No collection detail recorded' }}</strong></div>
+            <div class="details-wide" *ngIf="charge.reconciliationNotes"><span>Reconciliation notes</span><strong>{{ charge.reconciliationNotes }}</strong></div>
+            <div class="details-wide" *ngIf="charge.failureReason"><span>Failure reason</span><strong>{{ charge.failureReason }}</strong></div>
           </div>
         </div>
       </section>
