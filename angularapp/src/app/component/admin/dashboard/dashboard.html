@@ -5314,6 +5314,7 @@
               </td>
               <td style="padding:12px 16px;font-size:11px;font-family:monospace;color:#334155;white-space:nowrap;">{{tx.transactionRef || tx.txnId || '—'}}</td>
               <td style="padding:12px 16px;font-size:12px;color:#1e293b;">
+                <span *ngIf="tx.sourceType === 'PAYMENT_LINK'" style="display:inline-block;margin-bottom:4px;padding:2px 6px;border-radius:10px;background:#ede9fe;color:#5b21b6;font-size:10px;font-weight:700;">PAYMENT LINK</span>
                 <strong style="display:block;">{{tx.senderName || 'Sender'}}</strong>
                 <span style="font-size:11px;color:#64748b;">Account: {{tx.senderAccount || '—'}}</span>
                 <span style="display:block;font-size:11px;color:#0d9488;">{{tx.senderUpiId || '—'}}</span>
@@ -5381,7 +5382,7 @@
     <section class="admin-upi-detail-dialog" role="dialog" aria-modal="true" aria-labelledby="admin-upi-detail-title" (click)="$event.stopPropagation()">
       <header class="admin-upi-detail-header">
         <div>
-          <h3 id="admin-upi-detail-title">UPI transfer details</h3>
+          <h3 id="admin-upi-detail-title">{{tx.sourceType === 'PAYMENT_LINK' ? 'UPI payment link details' : 'UPI transfer details'}}</h3>
           <span>Reference {{tx.transactionRef || 'Not recorded'}} · {{tx.createdAt ? (tx.createdAt | date:'dd/MM/yyyy h:mm:ss a') : 'Time not recorded'}}</span>
         </div>
         <button type="button" aria-label="Close transaction details" (click)="closeAdminUpiTransactionDetails()">×</button>
@@ -5408,39 +5409,62 @@
         <article class="admin-upi-detail-card">
           <h4>Sender</h4>
           <strong>{{tx.senderName || 'Not recorded'}}</strong>
-          <span>Account: {{tx.senderAccount || 'Not recorded'}}</span>
-          <span>UPI ID: {{tx.senderUpiId || 'Not recorded'}}</span>
-          <span>Phone: {{tx.senderProfile?.phone || 'Not recorded'}}</span>
-          <span>Address: {{tx.senderProfile?.address || 'Not recorded'}}</span>
-          <b [class.confirmed]="tx.senderDebited === true" [class.unconfirmed]="tx.senderDebited !== true">
-            Sender debited: {{tx.senderDebited === null || tx.senderDebited === undefined ? 'Not recorded for this transaction' : (tx.senderDebited ? 'Yes' : 'No')}}
-          </b>
+          <dl class="admin-upi-detail-list">
+            <div><dt>Account number</dt><dd>{{tx.senderAccount || 'Not recorded'}}</dd></div>
+            <div><dt>UPI ID</dt><dd>{{tx.senderUpiId || 'Not recorded'}}</dd></div>
+            <div><dt>Phone</dt><dd>{{tx.senderProfile?.phone || 'Not recorded'}}</dd></div>
+            <div><dt>Address</dt><dd>{{tx.senderProfile?.address || 'Not recorded'}}</dd></div>
+            <div><dt>Sender debited</dt><dd [class.confirmed]="tx.senderDebited === true" [class.unconfirmed]="tx.senderDebited !== true">{{tx.senderDebited === null || tx.senderDebited === undefined ? 'Not recorded' : (tx.senderDebited ? 'Yes' : 'No')}}</dd></div>
+          </dl>
         </article>
         <article class="admin-upi-detail-card">
           <h4>Receiver</h4>
           <strong>{{tx.receiverName || 'Not recorded'}}</strong>
-          <span>Account: {{tx.receiverAccount || 'Not recorded'}}</span>
-          <span>UPI ID: {{tx.receiverUpiId || 'Not recorded'}}</span>
-          <span>Phone: {{tx.receiverProfile?.phone || 'Not recorded'}}</span>
-          <span>Address: {{tx.receiverProfile?.address || 'Not recorded'}}</span>
-          <b [class.confirmed]="tx.receiverCredited === true" [class.unconfirmed]="tx.receiverCredited !== true">
-            Receiver credited: {{tx.receiverCredited === null || tx.receiverCredited === undefined ? 'Not recorded for this transaction' : (tx.receiverCredited ? 'Yes' : 'No')}}
-          </b>
+          <dl class="admin-upi-detail-list">
+            <div><dt>Account number</dt><dd>{{tx.receiverAccount || 'Not recorded'}}</dd></div>
+            <div><dt>UPI ID</dt><dd>{{tx.receiverUpiId || 'Not recorded'}}</dd></div>
+            <div><dt>Phone</dt><dd>{{tx.receiverProfile?.phone || 'Not recorded'}}</dd></div>
+            <div><dt>Address</dt><dd>{{tx.receiverProfile?.address || 'Not recorded'}}</dd></div>
+            <div><dt>Receiver credited</dt><dd [class.confirmed]="tx.receiverCredited === true" [class.unconfirmed]="tx.receiverCredited !== true">{{tx.receiverCredited === null || tx.receiverCredited === undefined ? 'Not recorded' : (tx.receiverCredited ? 'Yes' : 'No')}}</dd></div>
+          </dl>
         </article>
         <article class="admin-upi-detail-card">
           <h4>Payment</h4>
-          <span>Transaction ID: {{tx.transactionRef || 'Not recorded'}}</span>
-          <span>Transaction time: {{tx.createdAt ? (tx.createdAt | date:'medium') : 'Not recorded'}}</span>
-          <span>Remark: {{tx.remark || 'None'}}</span>
-          <span>Risk score: {{tx.riskScore ?? 'Not recorded'}}</span>
-          <span>Review status: {{tx.fraudFlagged ? 'Flagged for review' : 'No fraud flag recorded'}}</span>
+          <dl class="admin-upi-detail-list">
+            <div><dt>Transaction reference</dt><dd>{{tx.transactionRef || 'Not recorded'}}</dd></div>
+            <div><dt>Transaction record ID</dt><dd>{{tx.id ?? 'Not recorded'}}</dd></div>
+            <div><dt>Transaction time</dt><dd>{{tx.createdAt ? (tx.createdAt | date:'dd/MM/yyyy HH:mm:ss') : 'Not recorded'}}</dd></div>
+            <div><dt>Payment method</dt><dd>{{tx.paymentMethod || 'UPI'}}</dd></div>
+            <div><dt>Attempt result / remark</dt><dd>{{tx.remark || 'No remark recorded'}}</dd></div>
+            <div><dt>Risk score</dt><dd>{{tx.riskScore ?? 'Not recorded'}}<ng-container *ngIf="tx.riskScore != null">/100</ng-container></dd></div>
+            <div><dt>Fraud review</dt><dd>{{tx.fraudFlagged ? 'Flagged for review' : 'Not flagged'}}</dd></div>
+          </dl>
+          <ng-container *ngIf="tx.sourceType === 'PAYMENT_LINK'">
+            <h4 class="admin-upi-detail-subheading">Payment link and settlement</h4>
+            <dl class="admin-upi-detail-list">
+              <div><dt>Link ID</dt><dd>{{tx.linkId || tx.linkReference || 'Not recorded'}}</dd></div>
+              <div><dt>Link status</dt><dd>{{tx.linkStatus || 'Not recorded'}}</dd></div>
+              <div><dt>Linked order</dt><dd>{{tx.orderId || 'Not linked to an order'}}</dd></div>
+              <div><dt>Merchant</dt><dd>{{tx.merchantName || 'Not recorded'}} ({{tx.merchantId || 'ID not recorded'}})</dd></div>
+              <div><dt>Gateway transaction ID</dt><dd>{{tx.txnId || 'Not recorded'}}</dd></div>
+              <div><dt>Payment link amount</dt><dd>{{tx.pgAmount != null ? ('₹' + (tx.pgAmount | number:'1.2-2')) : 'Not recorded'}}</dd></div>
+              <div><dt>Platform fee</dt><dd>{{tx.platformFee != null ? ('₹' + (tx.platformFee | number:'1.2-2')) : 'Not recorded'}}</dd></div>
+              <div><dt>Tax</dt><dd>{{tx.tax != null ? ('₹' + (tx.tax | number:'1.2-2')) : 'Not recorded'}}</dd></div>
+              <div><dt>Net settlement</dt><dd>{{tx.netSettlementAmount != null ? ('₹' + (tx.netSettlementAmount | number:'1.2-2')) : 'Not recorded'}}</dd></div>
+              <div><dt>Settlement status</dt><dd>{{tx.settlementStatus || 'Not recorded'}}</dd></div>
+              <div><dt>Settlement reference</dt><dd>{{tx.settlementReference || 'Not recorded'}}</dd></div>
+              <div><dt>Paid at</dt><dd>{{tx.paidAt ? (tx.paidAt | date:'dd/MM/yyyy HH:mm:ss') : 'Not recorded'}}</dd></div>
+            </dl>
+          </ng-container>
         </article>
         <article class="admin-upi-detail-card">
           <h4>Request / device information</h4>
-          <span>IP address: {{tx.sourceIp || 'Not recorded'}}</span>
-          <span>Customer location coordinates: {{tx.location || 'Not recorded'}}</span>
-          <span>Location accuracy: {{tx.locationAccuracyMeters != null ? ('±' + (tx.locationAccuracyMeters | number:'1.0-0') + ' m') : 'Not recorded'}}</span>
-          <span>Browser / device: {{tx.userAgent || 'Not recorded'}}</span>
+          <dl class="admin-upi-detail-list">
+            <div><dt>IP address</dt><dd>{{tx.sourceIp || 'Not recorded'}}</dd></div>
+            <div><dt>Location coordinates</dt><dd>{{tx.location || (tx.locationLatitude != null && tx.locationLongitude != null ? (tx.locationLatitude + ', ' + tx.locationLongitude) : 'Not supplied by device')}}</dd></div>
+            <div><dt>Location accuracy</dt><dd>{{tx.locationAccuracyMeters != null ? ('±' + (tx.locationAccuracyMeters | number:'1.0-0') + ' m') : 'Not recorded'}}</dd></div>
+            <div><dt>Browser / device</dt><dd>{{tx.userAgent || 'Not recorded'}}</dd></div>
+          </dl>
           <small>Location is captured only when supplied by the customer's device; it is not inferred from IP.</small>
         </article>
       </div>

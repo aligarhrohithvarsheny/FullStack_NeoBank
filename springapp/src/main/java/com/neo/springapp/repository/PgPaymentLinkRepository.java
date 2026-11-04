@@ -18,5 +18,7 @@ public interface PgPaymentLinkRepository extends JpaRepository<PgPaymentLink, Lo
 
     List<PgPaymentLink> findByMerchantIdOrderByCreatedAtDesc(String merchantId);
 
+    List<PgPaymentLink> findByStatusOrderByPaidAtDesc(String status);
+
     List<PgPaymentLink> findByRecipientUpiIdAndStatusOrderByCreatedAtDesc(String recipientUpiId, String status);
 }

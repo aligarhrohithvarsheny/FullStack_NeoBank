@@ -297,6 +297,10 @@ export class Dashboard implements OnInit, OnDestroy {
       const searchableFields = [
         tx.transactionRef,
         tx.txnId,
+        tx.linkId,
+        tx.orderId,
+        tx.merchantId,
+        tx.merchantName,
         tx.senderUpiId,
         tx.receiverUpiId,
         tx.senderAccount,

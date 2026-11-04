@@ -223,7 +223,7 @@ public class LoanAgreementService {
         result.put("issuedAt", agreement.getIssuedAt());
         result.put("expiresAt", agreement.getExpiresAt());
         result.put("minimumPages", 10);
-        result.put("BindingNotice", " DOCUMENT - TERMS ONLY - A LEGAL OR EXECUTABLE BANK AGREEMENT.");
+        result.put("BindingNotice", " DOCUMENT - A LEGAL OR EXECUTABLE BANK AGREEMENT.");
         return result;
     }
 
@@ -661,7 +661,7 @@ public class LoanAgreementService {
                 "10. CUSTOMER REVIEW AND SIGNATURE RECORD",
                 "Review every page, the complete repayment schedule, charges, and all product conditions.",
                 "The customer must receive a final, bank-approved agreement before any real-world signing.",
-                "Signature type: DEMO typed-name confirmation protected by a CAPTCHA.",
+                "Signature type: typed-name confirmation protected by a CAPTCHA.",
                 "This application does not provide a qualified or regulated electronic-signature service."
         ));
         if (agreement.getSignedAt() != null) {
@@ -681,7 +681,7 @@ public class LoanAgreementService {
     private List<List<String>> schedulePages(LoanAgreement agreement) {
         List<List<String>> pages = new ArrayList<>();
         List<String> current = new ArrayList<>();
-        current.add("No. | Due date | Opening principal | Interest | Principal | Instalment | Closing");
+        current.add("No.  | Due date |  Opening principal |  Interest |  Principal |  Instalment |  Closing");
         current.add("--------------------------------------------------------------------------------");
         double opening = agreement.getAmount();
         double monthlyRate = agreement.getAnnualInterestRate() / 1200.0;

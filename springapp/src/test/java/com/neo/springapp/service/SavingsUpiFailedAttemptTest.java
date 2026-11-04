@@ -1,10 +1,18 @@
 package com.neo.springapp.service;
 
 import com.neo.springapp.model.Account;
+import com.neo.springapp.model.PgMerchant;
+import com.neo.springapp.model.PgPaymentLink;
+import com.neo.springapp.model.PgSettlementLedger;
+import com.neo.springapp.model.PgTransaction;
 import com.neo.springapp.model.SavingsUpiTransaction;
 import com.neo.springapp.model.User;
 import com.neo.springapp.repository.AccountRepository;
 import com.neo.springapp.repository.CurrentAccountRepository;
+import com.neo.springapp.repository.PgMerchantRepository;
+import com.neo.springapp.repository.PgPaymentLinkRepository;
+import com.neo.springapp.repository.PgSettlementLedgerRepository;
+import com.neo.springapp.repository.PgTransactionRepository;
 import com.neo.springapp.repository.SalaryAccountRepository;
 import com.neo.springapp.repository.SavingsUpiTransactionRepository;
 import com.neo.springapp.repository.UserRepository;
@@ -13,6 +21,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -131,6 +140,85 @@ class SavingsUpiFailedAttemptTest {
         Map<String, Object> senderProfile = (Map<String, Object>) adminDetails.get("senderProfile");
         assertThat(senderProfile).containsEntry("phone", "555-0100");
         assertThat(savedTransaction.getValue().getSenderPhone()).isEqualTo("555-0100");
+    }
+
+    @Test
+    void paidPaymentLinksAppearInAdminUpiTransactionsWithSettlementDetails() {
+        SavingsUpiService service = new SavingsUpiService();
+        SavingsUpiTransactionRepository upiTransactions = mock(SavingsUpiTransactionRepository.class);
+        PgPaymentLinkRepository paymentLinks = mock(PgPaymentLinkRepository.class);
+        PgMerchantRepository merchants = mock(PgMerchantRepository.class);
+        PgTransactionRepository pgTransactions = mock(PgTransactionRepository.class);
+        PgSettlementLedgerRepository settlementLedger = mock(PgSettlementLedgerRepository.class);
+        ReflectionTestUtils.setField(service, "savingsUpiTxnRepo", upiTransactions);
+        ReflectionTestUtils.setField(service, "paymentLinkRepository", paymentLinks);
+        ReflectionTestUtils.setField(service, "merchantRepository", merchants);
+        ReflectionTestUtils.setField(service, "pgTransactionRepository", pgTransactions);
+        ReflectionTestUtils.setField(service, "settlementLedgerRepository", settlementLedger);
+        UserRepository userRepository = mock(UserRepository.class);
+        CurrentAccountRepository currentAccounts = mock(CurrentAccountRepository.class);
+        ReflectionTestUtils.setField(service, "userRepository", userRepository);
+        ReflectionTestUtils.setField(service, "salaryAccountRepository", mock(SalaryAccountRepository.class));
+        ReflectionTestUtils.setField(service, "currentAccountRepository", currentAccounts);
+        when(userRepository.findByUpiId(any())).thenReturn(Optional.empty());
+        when(userRepository.findByAccountNumber(any())).thenReturn(Optional.empty());
+        when(currentAccounts.findByAccountNumber(any())).thenReturn(Optional.empty());
+        when(currentAccounts.findByUpiId(any())).thenReturn(Optional.empty());
+        when(upiTransactions.findAllOrderByCreatedAtDesc()).thenReturn(List.of());
+
+        LocalDateTime paidAt = LocalDateTime.of(2026, 11, 4, 10, 30);
+        PgPaymentLink link = new PgPaymentLink();
+        link.setId(42L);
+        link.setLinkId("LNK-42");
+        link.setTxnRef("PLK-42");
+        link.setOrderId("ORDER-42");
+        link.setMerchantId("MERCHANT-7");
+        link.setMerchantName("Neo Store");
+        link.setMerchantUpiId("ACC-700@ezyvault");
+        link.setRecipientUpiId("payer@neobank");
+        link.setRecipientName("Payer Name");
+        link.setPayerAccountNumber("ACC-100");
+        link.setPayerName("Payer Name");
+        link.setAmount(new BigDecimal("1250.00"));
+        link.setDescription("Invoice 42");
+        link.setStatus("PAID");
+        link.setPaidAt(paidAt);
+        when(paymentLinks.findByStatusOrderByPaidAtDesc("PAID")).thenReturn(List.of(link));
+
+        PgMerchant merchant = new PgMerchant();
+        merchant.setBusinessName("Neo Store");
+        merchant.setLinkedAccountNumber("ACC-700");
+        when(merchants.findByMerchantId("MERCHANT-7")).thenReturn(Optional.of(merchant));
+
+        PgTransaction pgTransaction = new PgTransaction();
+        pgTransaction.setTransactionId("PGTXN-42");
+        pgTransaction.setFee(new BigDecimal("25.00"));
+        pgTransaction.setTax(new BigDecimal("4.50"));
+        pgTransaction.setNetAmount(new BigDecimal("1220.50"));
+        when(pgTransactions.findByOrderId("ORDER-42")).thenReturn(Optional.of(pgTransaction));
+
+        PgSettlementLedger ledger = new PgSettlementLedger();
+        ledger.setTransactionId("PGTXN-42");
+        ledger.setCreditStatus("CREDITED");
+        ledger.setNetAmount(new BigDecimal("1220.50"));
+        when(settlementLedger.findByTransactionId("PGTXN-42")).thenReturn(List.of(ledger));
+
+        List<Map<String, Object>> result = service.adminListAllTransactions();
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0)).containsEntry("sourceType", "PAYMENT_LINK")
+                .containsEntry("transactionRef", "PLK-42")
+                .containsEntry("txnId", "PGTXN-42")
+                .containsEntry("senderAccount", "ACC-100")
+                .containsEntry("senderUpiId", "payer@neobank")
+                .containsEntry("receiverAccount", "ACC-700")
+                .containsEntry("receiverUpiId", "ACC-700@ezyvault")
+                .containsEntry("paymentMethod", "UPI_PAYMENT_LINK")
+                .containsEntry("senderDebited", true)
+                .containsEntry("receiverCredited", true)
+                .containsEntry("settlementStatus", "CREDITED")
+                .containsEntry("platformFee", new BigDecimal("25.00"))
+                .containsEntry("netSettlementAmount", new BigDecimal("1220.50"));
     }
 
     private User createEnabledUser(String accountNumber, String upiId, String name, double balance) {

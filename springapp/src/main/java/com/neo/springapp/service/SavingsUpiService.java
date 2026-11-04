@@ -20,6 +20,10 @@ public class SavingsUpiService {
     @Autowired private SalaryAccountRepository salaryAccountRepository;
     @Autowired private CurrentAccountRepository currentAccountRepository;
     @Autowired private EmergencyControlService emergencyControlService;
+    @Autowired private PgPaymentLinkRepository paymentLinkRepository;
+    @Autowired private PgMerchantRepository merchantRepository;
+    @Autowired private PgTransactionRepository pgTransactionRepository;
+    @Autowired private PgSettlementLedgerRepository settlementLedgerRepository;
 
     private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder(10);
 
@@ -457,7 +461,19 @@ public class SavingsUpiService {
 
     // ── Admin: all savings UPI transactions ───────────────────────────────────
     public List<Map<String, Object>> adminListAllTransactions() {
-        return savingsUpiTxnRepo.findAllOrderByCreatedAtDesc().stream().map(this::toAdminTransaction).toList();
+        List<Map<String, Object>> transactions = new ArrayList<>(
+                savingsUpiTxnRepo.findAllOrderByCreatedAtDesc().stream()
+                        .map(this::toAdminTransaction).toList());
+        if (paymentLinkRepository != null) {
+            paymentLinkRepository.findByStatusOrderByPaidAtDesc("PAID").stream()
+                    .map(this::toAdminPaymentLinkTransaction)
+                    .forEach(transactions::add);
+        }
+        transactions.sort(Comparator.comparing(
+                (Map<String, Object> txn) -> txn.get("createdAt") instanceof LocalDateTime createdAt
+                        ? createdAt : LocalDateTime.MIN,
+                Comparator.reverseOrder()));
+        return transactions;
     }
 
     public List<Map<String, Object>> adminListFlaggedTransactions() {
@@ -494,6 +510,78 @@ public class SavingsUpiService {
         details.put("receiverProfile", transactionProfile(txn.getReceiverAccount(), txn.getReceiverUpiId(),
                 txn.getReceiverPhone(), txn.getReceiverAddress()));
         return details;
+    }
+
+    private Map<String, Object> toAdminPaymentLinkTransaction(PgPaymentLink link) {
+        Map<String, Object> details = new LinkedHashMap<>();
+        PgMerchant merchant = merchantRepository == null
+                ? null
+                : merchantRepository.findByMerchantId(link.getMerchantId()).orElse(null);
+        String receivingAccount = merchant == null
+                ? null
+                : firstAvailable(merchant.getLinkedAccountNumber(), merchant.getAccountNumber());
+        PgTransaction pgTransaction = pgTransactionRepository == null
+                ? null
+                : pgTransactionRepository.findByOrderId(
+                        firstAvailable(link.getOrderId(), link.getLinkId())).orElse(null);
+        PgSettlementLedger settlement = pgTransaction == null || settlementLedgerRepository == null
+                ? null
+                : settlementLedgerRepository.findByTransactionId(pgTransaction.getTransactionId())
+                        .stream().findFirst().orElse(null);
+
+        details.put("id", "payment-link-" + link.getId());
+        details.put("sourceType", "PAYMENT_LINK");
+        details.put("linkId", link.getLinkId());
+        details.put("linkReference", link.getLinkId());
+        details.put("orderId", link.getOrderId());
+        details.put("transactionRef", firstAvailable(link.getTxnRef(), link.getLinkId()));
+        details.put("txnId", pgTransaction == null ? null : pgTransaction.getTransactionId());
+        details.put("senderAccount", link.getPayerAccountNumber());
+        details.put("senderUpiId", link.getRecipientUpiId());
+        details.put("senderName", link.getPayerName());
+        details.put("receiverAccount", receivingAccount);
+        details.put("receiverUpiId", link.getMerchantUpiId());
+        details.put("receiverName", firstAvailable(link.getMerchantName(),
+                merchant == null ? null : merchant.getBusinessName()));
+        details.put("amount", link.getAmount());
+        details.put("remark", link.getDescription());
+        details.put("status", "SUCCESS");
+        details.put("paymentMethod", "UPI_PAYMENT_LINK");
+        details.put("fraudFlagged", pgTransaction != null && Boolean.TRUE.equals(pgTransaction.getFraudFlagged()));
+        details.put("riskScore", pgTransaction == null ? null : pgTransaction.getRiskScore());
+        details.put("createdAt", link.getPaidAt() != null ? link.getPaidAt() : link.getCreatedAt());
+        details.put("senderDebited", true);
+        details.put("receiverCredited", settlement == null
+                ? null : "CREDITED".equalsIgnoreCase(settlement.getCreditStatus()));
+        details.put("sourceIp", pgTransaction == null ? null : pgTransaction.getIpAddress());
+        details.put("userAgent", pgTransaction == null ? null : pgTransaction.getDeviceInfo());
+        details.put("location", null);
+        details.put("locationLatitude", null);
+        details.put("locationLongitude", null);
+        details.put("locationAccuracyMeters", null);
+        details.put("merchantId", link.getMerchantId());
+        details.put("merchantName", firstAvailable(link.getMerchantName(),
+                merchant == null ? null : merchant.getBusinessName()));
+        details.put("linkDescription", link.getDescription());
+        details.put("linkStatus", link.getStatus());
+        details.put("paidAt", link.getPaidAt());
+        details.put("pgAmount", pgTransaction == null ? null : pgTransaction.getAmount());
+        details.put("platformFee", pgTransaction == null ? null : pgTransaction.getFee());
+        details.put("tax", pgTransaction == null ? null : pgTransaction.getTax());
+        details.put("netSettlementAmount", settlement == null
+                ? (pgTransaction == null ? null : pgTransaction.getNetAmount())
+                : settlement.getNetAmount());
+        details.put("settlementStatus", settlement == null ? "Not recorded" : settlement.getCreditStatus());
+        details.put("settlementReference", settlement == null ? null : settlement.getTransactionId());
+        details.put("senderProfile", transactionProfile(link.getPayerAccountNumber(),
+                link.getRecipientUpiId(), null, null));
+        details.put("receiverProfile", transactionProfile(receivingAccount, link.getMerchantUpiId(),
+                null, null));
+        return details;
+    }
+
+    private static String firstAvailable(String preferred, String fallback) {
+        return preferred != null && !preferred.isBlank() ? preferred : fallback;
     }
 
     private Map<String, Object> transactionProfile(String accountNumber, String upiId,

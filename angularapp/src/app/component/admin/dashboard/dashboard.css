@@ -10085,18 +10085,43 @@ app-admin-dashboard .dashboard-container {
   color: #0f172a;
   font-size: 14px;
 }
-.admin-upi-detail-card b {
-  display: block;
-  margin-top: 12px;
-  font-size: 12px;
+.admin-upi-detail-list {
+  display: grid;
+  gap: 0;
+  margin: 10px 0 0;
 }
-.admin-upi-detail-card .confirmed { color: #047857; }
-.admin-upi-detail-card .unconfirmed { color: #b45309; }
+.admin-upi-detail-list > div {
+  display: grid;
+  grid-template-columns: minmax(100px, .75fr) minmax(0, 1.25fr);
+  gap: 12px;
+  padding: 8px 0;
+  border-top: 1px solid #e2e8f0;
+}
+.admin-upi-detail-list dt {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 600;
+}
+.admin-upi-detail-list dd {
+  margin: 0;
+  color: #1e293b;
+  font-size: 12px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.admin-upi-detail-list dd.confirmed { color: #047857; }
+.admin-upi-detail-list dd.unconfirmed { color: #b45309; }
+.admin-upi-detail-subheading {
+  margin: 16px 0 0 !important;
+  padding-top: 12px;
+  border-top: 1px solid #e2e8f0;
+}
 @media (max-width: 640px) {
   .admin-upi-detail-backdrop { padding: 10px; }
   .admin-upi-detail-dialog { padding: 16px; }
   .admin-upi-transfer-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .admin-upi-detail-grid { grid-template-columns: 1fr; }
+  .admin-upi-detail-list > div { grid-template-columns: minmax(90px, .7fr) minmax(0, 1.3fr); gap: 8px; }
 }
 .admin-upi-clear-filters {
   min-height: 40px;
