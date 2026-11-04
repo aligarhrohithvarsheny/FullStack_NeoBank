@@ -441,11 +441,9 @@ public class AllocationAccountLoginController {
         List<String> depositTypes = List.of("DEPOSIT", "DEPOSITS");
         double loanDebits = sumByProductTypes(allocationId, "DEBIT", loanTypes);
         double loanCredits = sumByProductTypes(allocationId, "CREDIT", loanTypes);
-        double fdDeposits = sumByProductTypes(allocationId, "DEBIT", fdTypes);
-        double rdDeposits = sumByProductTypes(allocationId, "DEBIT", rdTypes);
-        double genericDeposits = sumByProductTypes(allocationId, "DEBIT", depositTypes);
-        double fdDepositCredits = sumByProductTypes(allocationId, "CREDIT", fdTypes);
-        double rdDepositCredits = sumByProductTypes(allocationId, "CREDIT", rdTypes);
+        double fdDeposits = sumByProductTypes(allocationId, "CREDIT", fdTypes);
+        double rdDeposits = sumByProductTypes(allocationId, "CREDIT", rdTypes);
+        double genericDeposits = sumByProductTypes(allocationId, "CREDIT", depositTypes);
 
         Map<String, Object> summary = new LinkedHashMap<>();
         summary.put("totalAllocated", safeDouble(allocation.getAllocatedAmount()));
@@ -466,9 +464,6 @@ public class AllocationAccountLoginController {
         summary.put("fdDeposits", fdDeposits);
         summary.put("rdDeposits", rdDeposits);
         summary.put("otherDeposits", genericDeposits);
-        summary.put("allocationDeposits", fdDeposits + rdDeposits + genericDeposits);
-        summary.put("fdDepositCredits", fdDepositCredits);
-        summary.put("rdDepositCredits", rdDepositCredits);
         summary.put("interestCollected", zeroIfNull(chargeTransactionRepository.sumSuccessfulInterestCharges(allocationId)));
         summary.put("allChargesCollected", zeroIfNull(chargeTransactionRepository.sumTotalCharges(allocationId)));
         summary.put("allChargesCredited", zeroIfNull(chargeTransactionRepository.sumCreditedCharges(allocationId)));
@@ -514,6 +509,7 @@ public class AllocationAccountLoginController {
         data.put("performedByName", transaction.getPerformedByName());
         data.put("performedByAdminId", transaction.getPerformedByAdminId());
         data.put("status", transaction.getStatus());
+        data.put("sourceStatus", transaction.getSourceStatus());
         data.put("transactionDate", transaction.getTransactionDate());
         return data;
     }

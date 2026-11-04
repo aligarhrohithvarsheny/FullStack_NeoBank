@@ -42,6 +42,9 @@ public class FixedDepositService {
     @Autowired
     private DepositManagementHistoryService depositHistoryService;
 
+    @Autowired
+    private AllocationUtilizationService allocationUtilizationService;
+
     private static final String OTP_REASON_FD_FORECLOSURE = "FD (Fixed Deposit) Withdrawal / Foreclosure";
 
     /**
@@ -288,6 +291,11 @@ public class FixedDepositService {
             
             Transaction savedTransaction = transactionService.saveTransaction(transaction);
             fixedDeposit.setTransactionId(savedTransaction.getId().toString());
+            allocationUtilizationService.creditPostedDeposit(
+                    fixedDeposit.getAccountNumber(), fixedDeposit.getUserName(),
+                    fixedDeposit.getPrincipalAmount(), "FD", savedTransaction.getTransactionId(),
+                    "Fixed deposit " + fixedDeposit.getFdAccountNumber() + " principal credited to allocation ledger",
+                    savedTransaction.getStatus());
 
             // Save approval reason if provided
             if (approvalReason != null && !approvalReason.trim().isEmpty()) {
@@ -302,6 +310,9 @@ public class FixedDepositService {
             response.put("transaction", savedTransaction);
             
         } catch (Exception e) {
+            if (e instanceof AllocationUtilizationService.AllocationDepositCreditException allocationCreditException) {
+                throw allocationCreditException;
+            }
             response.put("success", false);
             response.put("message", "Failed to approve fixed deposit: " + e.getMessage());
         }
@@ -401,7 +412,7 @@ public class FixedDepositService {
             transaction.setStatus("Completed");
             transaction.setBalance(newBalance);
             
-            transactionService.saveTransaction(transaction);
+            Transaction savedTransaction = transactionService.saveTransaction(transaction);
 
             // Update FD
             fixedDeposit.setStatus("MATURED");
@@ -1250,7 +1261,12 @@ public class FixedDepositService {
             transaction.setStatus("Completed");
             transaction.setBalance(newBalance);
             
-            transactionService.saveTransaction(transaction);
+            Transaction savedTransaction = transactionService.saveTransaction(transaction);
+            allocationUtilizationService.creditPostedDeposit(
+                    fixedDeposit.getAccountNumber(), fixedDeposit.getUserName(), additionalAmount,
+                    "FD", savedTransaction.getTransactionId(),
+                    "Fixed deposit " + fixedDeposit.getFdAccountNumber() + " top-up credited to allocation ledger",
+                    savedTransaction.getStatus());
 
             // Update FD principal and recalculate maturity amount
             Double newPrincipal = fixedDeposit.getPrincipalAmount() + additionalAmount;
@@ -1278,6 +1294,9 @@ public class FixedDepositService {
             response.put("transaction", transaction);
             
         } catch (Exception e) {
+            if (e instanceof AllocationUtilizationService.AllocationDepositCreditException allocationCreditException) {
+                throw allocationCreditException;
+            }
             response.put("success", false);
             response.put("message", "Failed to increase FD amount: " + e.getMessage());
         }

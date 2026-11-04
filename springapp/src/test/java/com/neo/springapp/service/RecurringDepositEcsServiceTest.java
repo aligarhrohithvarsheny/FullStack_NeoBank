@@ -35,6 +35,7 @@ class RecurringDepositEcsServiceTest {
     @Mock private AccountService accountService;
     @Mock private TransactionService transactionService;
     @Mock private DepositManagementHistoryService historyService;
+    @Mock private AllocationUtilizationService allocationUtilizationService;
     @InjectMocks private RecurringDepositEcsService service;
 
     @Test
@@ -65,6 +66,7 @@ class RecurringDepositEcsServiceTest {
                 + String.format("%02d", today.getMonthValue()))).thenReturn(false);
         when(accountService.getAccountByNumber("123456")).thenReturn(account);
         when(accountService.debitBalance("123456", 1000.0, "Savings")).thenReturn(4000.0);
+        when(transactionService.saveTransaction(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(contributionRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         assertTrue(service.debitContribution(mandate, today));
@@ -74,6 +76,14 @@ class RecurringDepositEcsServiceTest {
         assertEquals("SUCCESS", mandate.getLastDebitStatus());
         verify(transactionService).saveTransaction(any());
         verify(contributionRepository).save(any());
+        verify(allocationUtilizationService).creditPostedDeposit(
+                org.mockito.ArgumentMatchers.eq("123456"),
+                org.mockito.ArgumentMatchers.eq("Test Customer"),
+                org.mockito.ArgumentMatchers.eq(1000.0),
+                org.mockito.ArgumentMatchers.eq("RD"),
+                org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.contains("RD00000017"),
+                org.mockito.ArgumentMatchers.eq("Completed"));
         verify(historyService).record(any(), any(), any(), any(), any(), any(), any());
     }
 

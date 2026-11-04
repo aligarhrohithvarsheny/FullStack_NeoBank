@@ -20,6 +20,14 @@ import java.util.*;
 @SuppressWarnings("null")
 public class AllocationUtilizationService {
 
+    public static class AllocationDepositCreditException extends IllegalStateException {
+        private static final long serialVersionUID = 1L;
+
+        public AllocationDepositCreditException(String message) {
+            super(message);
+        }
+    }
+
     @Autowired
     private AllocationUtilizationRepository utilizationRepository;
 
@@ -165,6 +173,76 @@ public class AllocationUtilizationService {
             String linkedTransactionId,
             String description,
             Long performedByAdminId) {
+        return creditAllocationFunds(allocationId, amount, productType, userAccountNumber, userName,
+                linkedTransactionId, description, performedByAdminId, null);
+    }
+
+    @Transactional
+    public Map<String, Object> creditPostedDeposit(
+            String customerAccountNumber,
+            String userName,
+            Double amount,
+            String productType,
+            String linkedTransactionId,
+            String description,
+            String sourceStatus) {
+        if (customerAccountNumber == null || customerAccountNumber.isBlank()
+                || linkedTransactionId == null || linkedTransactionId.isBlank()) {
+            throw new IllegalArgumentException("A customer account and posted transaction reference are required.");
+        }
+
+        var linkedAccount = allocationAccountRepository.findByAccountNumber(customerAccountNumber.trim())
+                .orElse(null);
+        if (linkedAccount == null) {
+            return Map.of("success", true, "mapped", false, "allocationCreditStatus", "NOT_MAPPED");
+        }
+        if (sourceStatus == null || !("COMPLETED".equalsIgnoreCase(sourceStatus)
+                || "SUCCESS".equalsIgnoreCase(sourceStatus))) {
+            throw new AllocationDepositCreditException("The customer deposit debit is not marked as successfully posted.");
+        }
+        if (!"VERIFIED".equalsIgnoreCase(linkedAccount.getVerificationStatus())
+                || !"ACTIVE".equalsIgnoreCase(linkedAccount.getAccountStatus())) {
+            throw new AllocationDepositCreditException("The matching allocation account is not verified and active.");
+        }
+
+        FundsAllocation allocation = allocationRepository.findById(linkedAccount.getAllocationId()).orElse(null);
+        if (allocation == null || !"ACTIVE".equalsIgnoreCase(allocation.getStatus())
+                || (allocation.getValidTill() != null
+                    && allocation.getValidTill().isBefore(java.time.LocalDate.now()))) {
+            throw new AllocationDepositCreditException("The matching funds allocation is not active.");
+        }
+
+        boolean alreadyPosted = utilizationRepository.findByLinkedTransactionId(linkedTransactionId).stream()
+                .anyMatch(existing -> existing.getAllocationId().equals(allocation.getId())
+                        && productType.equalsIgnoreCase(existing.getProductType()));
+        if (alreadyPosted) {
+            return Map.of("success", true, "mapped", true, "allocationCreditStatus", "SUCCESS",
+                    "allocationId", allocation.getAllocationId());
+        }
+
+        Map<String, Object> result = creditAllocationFunds(allocation.getId(), amount, productType,
+                customerAccountNumber.trim(), userName, linkedTransactionId, description, null, sourceStatus);
+        if (!Boolean.TRUE.equals(result.get("success"))) {
+            throw new AllocationDepositCreditException(
+                    "Unable to credit the matching allocation: " + result.get("message"));
+        }
+        result.put("mapped", true);
+        result.put("allocationCreditStatus",
+                Boolean.TRUE.equals(result.get("success")) ? "SUCCESS" : "NOT_CREDITED");
+        result.put("allocationId", allocation.getAllocationId());
+        return result;
+    }
+
+    private Map<String, Object> creditAllocationFunds(
+            Long allocationId,
+            Double amount,
+            String productType,
+            String userAccountNumber,
+            String userName,
+            String linkedTransactionId,
+            String description,
+            Long performedByAdminId,
+            String sourceStatus) {
 
         Map<String, Object> result = new HashMap<>();
 
@@ -207,6 +285,7 @@ public class AllocationUtilizationService {
         utilization.setPerformedByAdminId(performedByAdminId);
         utilization.setTransactionDate(LocalDateTime.now());
         utilization.setStatus("SUCCESS");
+        utilization.setSourceStatus(sourceStatus);
 
         AllocationUtilization saved = utilizationRepository.save(utilization);
 
@@ -426,6 +505,7 @@ public class AllocationUtilizationService {
         dto.put("description", utilization.getDescription());
         dto.put("transactionDate", utilization.getTransactionDate());
         dto.put("status", utilization.getStatus());
+        dto.put("sourceStatus", utilization.getSourceStatus());
         dto.put("referenceNumber", utilization.getReferenceNumber());
         return dto;
     }

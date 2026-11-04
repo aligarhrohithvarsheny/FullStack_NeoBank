@@ -1,3 +1,68 @@
+.allocation-portal { min-height: 100vh; color: #23383b; background: #f4f7f6; }
+.allocation-portal-sidebar { position: fixed; z-index: 20; inset: 0 auto 0 0; display: flex; flex-direction: column; width: 248px; padding: 18px 13px; color: #e7f2ef; background: #193f44; }
+.allocation-portal-brand { display: flex; align-items: center; gap: 11px; padding: 5px 8px 20px; border-bottom: 1px solid rgba(231, 242, 239, .18); }
+.allocation-portal-brand strong,.allocation-portal-brand small { display: block; }
+.allocation-portal-brand strong { font-size: 15px; }
+.allocation-portal-brand small { margin-top: 3px; color: #bdd2ce; font-size: 11px; }
+.allocation-portal-mark { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 6px; color: #153a3e; background: #74d3b3; }
+.allocation-portal-sidebar nav { display: grid; gap: 5px; padding-top: 18px; }
+.allocation-portal-sidebar nav button { display: flex; align-items: center; gap: 12px; min-height: 42px; padding: 9px 11px; border: 0; border-radius: 5px; color: #d7e8e4; background: transparent; text-align: left; font-size: 13px; cursor: pointer; }
+.allocation-portal-sidebar nav button i { width: 16px; text-align: center; }
+.allocation-portal-sidebar nav button:hover,.allocation-portal-sidebar nav button.active { color: #fff; background: #2b5b5e; }
+.allocation-portal-branch { display: grid; gap: 4px; margin-top: auto; padding: 14px 9px 8px; border-top: 1px solid rgba(231, 242, 239, .18); }
+.allocation-portal-branch small { margin-top: 5px; color: #9fbcb7; font-size: 9px; font-weight: 700; letter-spacing: .08em; }
+.allocation-portal-branch strong { color: #e7f2ef; font-size: 11px; overflow-wrap: anywhere; }
+.allocation-portal-main { width: calc(100% - 248px); min-height: 100vh; margin-left: 248px; padding: 28px clamp(18px, 3vw, 42px); }
+.allocation-portal-header { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin-bottom: 26px; }
+.allocation-portal-header h1 { margin: 4px 0 0; color: #193f44; font-size: clamp(22px, 2.4vw, 30px); font-weight: 700; }
+.allocation-portal-eyebrow { color: #16805d; font-size: 10px; font-weight: 700; letter-spacing: .09em; }
+.allocation-portal-actions { display: flex; align-items: center; gap: 9px; }
+.allocation-portal-live { color: #51706c; font-size: 11px; white-space: nowrap; }
+.allocation-portal-live i { margin-right: 5px; color: #16966e; font-size: 8px; }
+.allocation-portal-refresh,.allocation-portal-logout,.allocation-portal-pagination button { padding: 8px 11px; border: 1px solid #d5e0de; border-radius: 5px; color: #29484a; background: #fff; font-size: 12px; cursor: pointer; }
+.allocation-portal-logout { color: #8c423e; }
+.allocation-portal-refresh:disabled,.allocation-portal-pagination button:disabled { opacity: .5; cursor: default; }
+.allocation-portal-section { display: grid; gap: 16px; }
+.allocation-portal-identity { display: flex; justify-content: space-between; align-items: flex-start; gap: 15px; padding: 20px 22px; border: 1px solid #dce7e4; border-radius: 7px; background: #fff; }
+.allocation-portal-identity h2 { margin: 4px 0; color: #193f44; font-size: 20px; }
+.allocation-portal-identity p { margin: 0; color: #647579; font-size: 12px; }
+.allocation-portal-status,.allocation-portal-pill { display: inline-block; padding: 4px 8px; border-radius: 4px; color: #126044; background: #ddf5e9; font-size: 10px; font-weight: 700; }
+.allocation-portal-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.allocation-portal-metrics article { min-width: 0; padding: 17px 18px; border: 1px solid #dce7e4; border-radius: 7px; background: #fff; }
+.allocation-portal-metrics article span,.allocation-portal-metrics article small { display: block; color: #647579; font-size: 11px; }
+.allocation-portal-metrics article strong { display: block; margin: 8px 0 4px; color: #193f44; font-size: 22px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.allocation-portal-card { min-width: 0; padding: 18px; border: 1px solid #dce7e4; border-radius: 7px; background: #fff; }
+.allocation-portal-card-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; margin-bottom: 14px; }
+.allocation-portal-card-heading h2 { margin: 0; color: #193f44; font-size: 16px; font-weight: 700; }
+.allocation-portal-card-heading p { margin: 5px 0 0; color: #718084; font-size: 11px; }
+.allocation-portal-card-heading button { padding: 5px 9px; border: 1px solid #d5e0de; border-radius: 4px; color: #216452; background: #fff; font-size: 11px; cursor: pointer; }
+.allocation-portal-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 20px; }
+.allocation-portal-facts > div { min-width: 0; padding: 11px 0; border-top: 1px solid #edf1f0; }
+.allocation-portal-facts span,.allocation-portal-facts strong { display: block; }
+.allocation-portal-facts span { color: #718084; font-size: 10px; }
+.allocation-portal-facts strong { margin-top: 4px; color: #29484a; font-size: 12px; overflow-wrap: anywhere; }
+.allocation-portal-table-wrap { width: 100%; overflow-x: auto; }
+.allocation-portal-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+.allocation-portal-table th { padding: 10px 9px; color: #617276; background: #f6f9f8; text-align: left; white-space: nowrap; }
+.allocation-portal-table td { padding: 10px 9px; border-top: 1px solid #edf1f0; color: #334b4e; vertical-align: top; }
+.allocation-portal-table td small { display: block; margin-top: 3px; color: #78878a; font-size: 10px; }
+.allocation-portal-empty { padding: 22px !important; color: #78878a !important; text-align: center; }
+.allocation-portal-pill { color: #52646b; background: #eef2f1; }
+.allocation-portal-pill.success { color: #126044; background: #ddf5e9; }
+.allocation-portal-filters { display: flex; align-items: end; gap: 12px; margin: 0 0 14px; }
+.allocation-portal-filters label,.allocation-portal-request-form label { display: grid; gap: 5px; color: #54676a; font-size: 11px; font-weight: 600; }
+.allocation-portal-filters select,.allocation-portal-request-form input,.allocation-portal-request-form select,.allocation-portal-request-form textarea { min-width: 190px; padding: 8px 9px; border: 1px solid #d5e0de; border-radius: 4px; color: #29484a; background: #fff; font: inherit; }
+.allocation-portal-filters > span { margin-left: auto; color: #647579; font-size: 11px; }
+.allocation-portal-pagination { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+.allocation-portal-deposit-note { padding: 12px 14px; border-left: 3px solid #d29624; border-radius: 4px; color: #66501b; background: #fff9e9; font-size: 12px; }
+.allocation-portal-request-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.allocation-portal-request-form .wide { grid-column: 1 / -1; }
+.allocation-portal-request-form input,.allocation-portal-request-form select,.allocation-portal-request-form textarea { width: 100%; }
+.allocation-portal-request-form button { justify-self: start; padding: 9px 12px; border: 0; border-radius: 4px; color: #fff; background: #216452; font-size: 12px; cursor: pointer; }
+.allocation-portal-alert { display: block; margin: 0 0 14px; padding: 11px 13px; border: 1px solid #f0c5c1; border-radius: 4px; color: #8c423e; background: #fff2f0; font-size: 12px; }
+.allocation-portal-success { color: #126044; font-size: 12px; }
+.allocation-portal-loading { padding: 50px 20px; color: #52646b; text-align: center; }
+
 .allocation-dashboard-sidebar {
   position: fixed;
   z-index: 20;
@@ -20,14 +85,6 @@
 .allocation-dashboard-sidebar nav button:hover,.allocation-dashboard-sidebar nav button.active { color: #fff; background: #2b5b5e; }
 .allocation-sidebar-footer { display: flex; align-items: center; gap: 8px; margin-top: auto; padding: 12px 9px; color: #bdd2ce; border-top: 1px solid rgba(231, 242, 239, .18); font-size: 11px; }
 .allocation-dashboard-content { width: calc(100% - 248px); margin-left: 248px; }
-.allocation-dashboard-content .card { border: 1px solid #e1e9e7; border-radius: 6px; box-shadow: none; transition: none; }
-.allocation-dashboard-content .card:hover { box-shadow: none; }
-.allocation-dashboard-content .border-left-primary { border-left: 1px solid #e1e9e7; }
-.allocation-header-identity { margin: 5px 0 0; color: #647579; font-size: 12px; }
-.allocation-sidebar-footer { flex-wrap: wrap; }
-.allocation-sidebar-footer > span { display: flex; align-items: center; gap: 8px; }
-.allocation-sidebar-footer button { display: flex; align-items: center; gap: 8px; width: 100%; padding: 9px; border: 0; border-radius: 5px; color: #f0d7d4; background: transparent; text-align: left; cursor: pointer; }
-.allocation-sidebar-footer button:hover { color: #fff; background: #2b5b5e; }
 .allocation-details-backdrop { position: fixed; z-index: 1100; inset: 0; display: grid; place-items: center; padding: 20px; background: rgba(15, 35, 38, .58); }
 .allocation-details-dialog { width: min(700px, 100%); max-height: 88vh; overflow: auto; padding: 22px; border: 1px solid #d5e3e1; border-radius: 8px; background: #fff; box-shadow: 0 20px 60px rgba(10, 30, 32, .25); }
 .allocation-details-dialog > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
@@ -147,6 +204,24 @@
 .allocation-section-heading { display: flex; justify-content: space-between; margin-bottom: 12px; }
 .allocation-section-heading span { display: block; color: #233e45; font-size: 16px; font-weight: 700; }
 .allocation-section-heading small { color: #687b80; }
+.allocation-activity-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(185px, 1fr));
+  gap: 12px;
+}
+.activity-metric {
+  min-width: 0;
+  padding: 14px 16px;
+  background: #fff;
+  border: 1px solid #dfe8e7;
+  border-left: 3px solid #477c83;
+  border-radius: 6px;
+}
+.activity-metric.metric-credit { border-left-color: #16805d; }
+.activity-metric.metric-debit { border-left-color: #b65b4a; }
+.activity-metric span,
+.activity-metric small { display: block; color: #647579; font-size: 11px; }
+.activity-metric strong { display: block; margin: 6px 0 3px; color: #173c40; font-size: 20px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .allocation-charge-history { margin-top: 24px; }
 .allocation-charge-history h6 { color: #233e45; font-weight: 700; }
 .allocation-charge-history .table { min-width: 900px; font-size: 12px; }
@@ -160,19 +235,6 @@
 .allocation-request-history { margin-top: 22px; }
 .allocation-request-history h6 { color: #233e45; font-weight: 700; }
 .allocation-request-history .table { min-width: 760px; font-size: 12px; }
-.allocation-breakdown { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
-.allocation-breakdown-group { min-width: 0; padding: 0; }
-.allocation-breakdown-group h3 { margin: 0 0 8px; color: #31555a; font-size: 13px; font-weight: 700; }
-.allocation-breakdown-row { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; font-size: 12px; }
-.allocation-breakdown-row span { color: #647579; }
-.allocation-breakdown-row strong { color: #233e45; text-align: right; font-variant-numeric: tabular-nums; }
-.allocation-breakdown-group > small { display: block; margin-top: 8px; color: #78878a; font-size: 10px; }
-.customer-transaction-group { margin: 0 0 18px; border: 1px solid #e1e9e7; border-radius: 6px; overflow: hidden; }
-.customer-transaction-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; background: #f7faf9; }
-.customer-transaction-heading h3 { margin: 0; color: #27494e; font-size: 13px; font-weight: 700; }
-.customer-transaction-heading span,.customer-transaction-heading small { color: #6a7c7f; font-size: 11px; }
-.customer-transaction-group .table { min-width: 850px; margin: 0; font-size: 12px; }
-.allocation-empty-state { padding: 28px; color: #69797c; text-align: center; }
 .request-status { display: inline-block; padding: 4px 8px; border-radius: 4px; background: #eef2f1; color: #52646b; font-size: 10px; font-weight: 700; }
 .request-status.status-pending { color: #875b0b; background: #fff2cc; }
 .request-status.status-approved { color: #126044; background: #ddf5e9; }
@@ -185,8 +247,6 @@
   display: flex;
   justify-content: space-between;
 }
-.allocation-dashboard-content .detail-item,
-.allocation-dashboard-content .info-item { padding: 8px 0; border-bottom: 0; }
 
 .detail-item:last-child {
   border-bottom: none;
@@ -518,7 +578,9 @@
   .allocation-details-backdrop { padding: 10px; }
   .allocation-details-dialog { padding: 16px; }
   .allocation-live-status { align-items: flex-start; flex-direction: column; }
-  .allocation-breakdown { grid-template-columns: 1fr; gap: 14px; }
+  .allocation-activity-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .activity-metric { padding: 12px; }
+  .activity-metric strong { font-size: 17px; }
   .allocation-request-form { grid-template-columns: 1fr; }
   .allocation-request-form .request-description { grid-column: auto; }
   .col-md-3,
@@ -533,6 +595,10 @@
   }
 
 
+@media (max-width: 480px) {
+  .allocation-detail-list { grid-template-columns: 1fr; }
+  .allocation-detail-list .details-wide { grid-column: auto; }
+}
   .detail-item,
   .charge-item {
     flex-direction: column;
@@ -554,7 +620,24 @@
   }
 }
 
+@media (max-width: 768px) {
+  .allocation-portal-sidebar { position: relative; inset: auto; width: 100%; padding: 10px; }
+  .allocation-portal-brand { padding: 4px 6px 10px; }
+  .allocation-portal-sidebar nav { grid-template-columns: repeat(2, minmax(0, 1fr)); padding-top: 8px; }
+  .allocation-portal-branch { display: none; }
+  .allocation-portal-main { width: 100%; margin-left: 0; padding: 18px 12px; }
+  .allocation-portal-header { align-items: flex-start; flex-direction: column; }
+  .allocation-portal-actions { flex-wrap: wrap; }
+  .allocation-portal-metrics { grid-template-columns: 1fr; }
+  .allocation-portal-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .allocation-portal-filters { align-items: stretch; flex-direction: column; }
+  .allocation-portal-filters select { width: 100%; }
+  .allocation-portal-filters > span { margin-left: 0; }
+  .allocation-portal-request-form { grid-template-columns: 1fr; }
+  .allocation-portal-request-form .wide { grid-column: auto; }
+}
+
 @media (max-width: 480px) {
-  .allocation-detail-list { grid-template-columns: 1fr; }
-  .allocation-detail-list .details-wide { grid-column: auto; }
+  .allocation-portal-facts { grid-template-columns: 1fr; }
+  .allocation-portal-identity { flex-direction: column; }
 }

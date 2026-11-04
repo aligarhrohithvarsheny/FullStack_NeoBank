@@ -441,6 +441,7 @@ export class ManagerDashboard implements OnInit, OnDestroy {
   private sessionTimerHandle: any = null;
   private staffLocationTimer: any = null;
   private ledgerRefreshTimer: ReturnType<typeof setInterval> | null = null;
+  private branchAccountAuthRedirectStarted = false;
 
   ngOnInit() {
     if (isPlatformBrowser(this.platformId)) {
@@ -2438,6 +2439,7 @@ export class ManagerDashboard implements OnInit, OnDestroy {
       error: (err) => {
         console.error('Error loading branch account', err);
         this.branchAccountSummary = null;
+        this.handleBranchAccountAuthorizationError(err);
         this.isLoadingBranchAccount = false;
       }
     });
@@ -2465,6 +2467,7 @@ export class ManagerDashboard implements OnInit, OnDestroy {
       error: (err) => {
         this.branchAccountTransactions = [];
         this.branchTxnsError = err.error?.message || 'Unable to load central account transactions.';
+        this.handleBranchAccountAuthorizationError(err);
         if (err.status === 404 && this.ledgerRefreshTimer) {
           clearInterval(this.ledgerRefreshTimer);
           this.ledgerRefreshTimer = null;
@@ -2501,6 +2504,18 @@ export class ManagerDashboard implements OnInit, OnDestroy {
         this.alertService.error('Transaction receipt', 'Unable to load the transaction receipt.');
       }
     });
+  }
+
+  private handleBranchAccountAuthorizationError(error: any): void {
+    if ((error?.status !== 401 && error?.status !== 403) || this.branchAccountAuthRedirectStarted) return;
+    this.branchAccountAuthRedirectStarted = true;
+    if (this.ledgerRefreshTimer) {
+      clearInterval(this.ledgerRefreshTimer);
+      this.ledgerRefreshTimer = null;
+    }
+    sessionStorage.removeItem('adminSessionToken');
+    this.alertService.error('Manager session expired', 'Please sign in again to access branch account data.');
+    void this.router.navigate(['/admin/login'], { queryParams: { role: 'MANAGER' } });
   }
 
   private managerAuthOptions(): { headers: Record<string, string> } {

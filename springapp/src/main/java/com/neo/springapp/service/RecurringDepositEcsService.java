@@ -26,6 +26,7 @@ public class RecurringDepositEcsService {
     private final AccountService accountService;
     private final TransactionService transactionService;
     private final DepositManagementHistoryService historyService;
+    private final AllocationUtilizationService allocationUtilizationService;
 
     public RecurringDepositEcsService(RecurringDepositRepository recurringDepositRepository,
                                       RecurringDepositContributionRepository contributionRepository,
@@ -33,7 +34,8 @@ public class RecurringDepositEcsService {
                                       EcsMandateEventRepository eventRepository,
                                       AccountService accountService,
                                       TransactionService transactionService,
-                                      DepositManagementHistoryService historyService) {
+                                      DepositManagementHistoryService historyService,
+                                      AllocationUtilizationService allocationUtilizationService) {
         this.recurringDepositRepository = recurringDepositRepository;
         this.contributionRepository = contributionRepository;
         this.mandateRepository = mandateRepository;
@@ -41,6 +43,7 @@ public class RecurringDepositEcsService {
         this.accountService = accountService;
         this.transactionService = transactionService;
         this.historyService = historyService;
+        this.allocationUtilizationService = allocationUtilizationService;
     }
 
     @Transactional
@@ -137,7 +140,7 @@ public class RecurringDepositEcsService {
         transaction.setReferenceNumber(transactionRef);
         transaction.setRecipientAccountNumber(deposit.getRdAccountNumber());
         transaction.setDate(java.time.LocalDateTime.now());
-        transactionService.saveTransaction(transaction);
+        Transaction savedTransaction = transactionService.saveTransaction(transaction);
 
         RecurringDepositContribution contribution = new RecurringDepositContribution();
         contribution.setRecurringDepositId(deposit.getId());
@@ -145,9 +148,14 @@ public class RecurringDepositEcsService {
         contribution.setContributionMonth(contributionMonth);
         contribution.setAmount(amount);
         contribution.setSourceAccountNumber(account.getAccountNumber());
-        contribution.setTransactionId(transaction.getTransactionId());
+        contribution.setTransactionId(savedTransaction.getTransactionId());
         contribution.setPostedDate(today);
         contributionRepository.save(contribution);
+        allocationUtilizationService.creditPostedDeposit(
+                account.getAccountNumber(), account.getName(), amount, "RD",
+                savedTransaction.getTransactionId(),
+                "Recurring deposit " + deposit.getRdAccountNumber() + " contribution for " + contributionMonth,
+                savedTransaction.getStatus());
 
         deposit.setPaidInstallments(deposit.getPaidInstallments() + 1);
         deposit.setPaidPrincipal(round(deposit.getPaidPrincipal() + amount));

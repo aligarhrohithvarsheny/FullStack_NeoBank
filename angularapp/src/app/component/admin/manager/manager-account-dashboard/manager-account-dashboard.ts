@@ -25,6 +25,8 @@ export class ManagerAccountDashboardComponent implements OnInit, OnDestroy {
   
   activeTab = 'overview';
   activeSection = 'overview';
+  transactionAccountFilter = '';
+  transactionProductFilter = 'ALL';
   transactionPage = 0;
   transactionSize = 10;
   isAllocationAccountLogin = false;
@@ -158,13 +160,55 @@ export class ManagerAccountDashboardComponent implements OnInit, OnDestroy {
     }
   }
 
-  navigateDashboardSection(section: 'overview' | 'account' | 'transactions' | 'charges' | 'requests'): void {
+  navigateDashboardSection(section: 'overview' | 'account' | 'transactions' | 'deposits' | 'charges' | 'requests'): void {
     this.activeSection = section;
-    if (section === 'transactions' || section === 'charges' || section === 'overview') {
-      this.switchTab(section);
+    this.errorMessage = '';
+    this.requestError = '';
+    this.requestSuccess = '';
+    if (section === 'transactions') {
+      this.activeTab = 'transactions';
+      this.loadTransactions();
+    } else if (section === 'charges') {
+      this.activeTab = 'charges';
+      if (this.isAllocationAccountLogin) this.loadAllocationDashboard(true);
+      else this.loadChargeSummary();
+    } else if (section === 'overview') {
+      this.activeTab = 'overview';
+    } else if (section === 'requests') {
+      this.loadOperationRequests();
     }
-    const target = document.getElementById(`allocation-${section}`);
-    target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  get transactionAccountNumbers(): string[] {
+    return [...new Set(this.accountTransactions
+      .map(transaction => transaction.userAccountNumber)
+      .filter((accountNumber): accountNumber is string => !!accountNumber))];
+  }
+
+  get filteredTransactions(): any[] {
+    return this.accountTransactions.filter(transaction => {
+      if (this.transactionAccountFilter && transaction.userAccountNumber !== this.transactionAccountFilter) return false;
+      if (this.transactionProductFilter === 'ALL') return true;
+      const product = String(transaction.productType || '').toUpperCase();
+      if (this.transactionProductFilter === 'FD') return product.includes('FD') || product.includes('FIXED');
+      if (this.transactionProductFilter === 'RD') return product.includes('RD') || product.includes('RECURRING');
+      return !product.includes('FD') && !product.includes('FIXED')
+        && !product.includes('RD') && !product.includes('RECURRING');
+    });
+  }
+
+  get fixedDepositTransactions(): any[] {
+    return this.accountTransactions.filter(transaction => {
+      const product = String(transaction.productType || '').toUpperCase();
+      return product.includes('FD') || product.includes('FIXED');
+    });
+  }
+
+  get recurringDepositTransactions(): any[] {
+    return this.accountTransactions.filter(transaction => {
+      const product = String(transaction.productType || '').toUpperCase();
+      return product.includes('RD') || product.includes('RECURRING');
+    });
   }
 
   submitOperationRequest(): void {
@@ -296,24 +340,6 @@ export class ManagerAccountDashboardComponent implements OnInit, OnDestroy {
   getAvailableBalance(): number {
     if (!this.linkedAccount) return 0;
     return (this.linkedAccount.currentBalance || 0) - (this.chargesSummary.totalCharges || 0);
-  }
-
-  get customerTransactionGroups(): Array<{ accountNumber: string; customerName: string; transactions: any[] }> {
-    const groups = new Map<string, { accountNumber: string; customerName: string; transactions: any[] }>();
-    for (const transaction of this.accountTransactions) {
-      const accountNumber = String(transaction.userAccountNumber || '').trim() || 'Account not recorded';
-      let group = groups.get(accountNumber);
-      if (!group) {
-        group = {
-          accountNumber,
-          customerName: transaction.userName || 'Customer not recorded',
-          transactions: []
-        };
-        groups.set(accountNumber, group);
-      }
-      group.transactions.push(transaction);
-    }
-    return [...groups.values()];
   }
 
   /**

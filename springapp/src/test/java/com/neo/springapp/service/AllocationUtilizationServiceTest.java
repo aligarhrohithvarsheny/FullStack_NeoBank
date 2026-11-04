@@ -1,6 +1,7 @@
 package com.neo.springapp.service;
 
 import com.neo.springapp.entity.AllocationAccount;
+import com.neo.springapp.model.AllocationUtilization;
 import com.neo.springapp.model.FundsAllocation;
 import com.neo.springapp.repository.AllocationAccountRepository;
 import com.neo.springapp.repository.AllocationMetricsRepository;
@@ -15,9 +16,11 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.lenient;
@@ -46,6 +49,7 @@ class AllocationUtilizationServiceTest {
 
         allocation = new FundsAllocation();
         allocation.setId(7L);
+        allocation.setAllocationId("FA-7");
         allocation.setAllocationAccountId(9L);
         allocation.setStatus("ACTIVE");
         allocation.setAccountStatus("VERIFIED");
@@ -131,6 +135,70 @@ class AllocationUtilizationServiceTest {
         assertThat(result.get("success")).isEqualTo(false);
         assertThat(allocation.getCurrentBalance()).isEqualTo(100.0);
         assertThat(linkedAccount.getCurrentBalance()).isEqualByComparingTo("100.00");
+        verify(utilizationRepository, never()).save(any());
+    }
+
+    @Test
+    void creditsOnlyAnExactCustomerAccountMatchAndRecordsTheSourceDebitStatus() {
+        linkedAccount.setAllocationId(7L);
+        linkedAccount.setAccountNumber("CUSTOMER-1");
+        linkedAccount.setTotalCredited(BigDecimal.ZERO);
+        when(allocationAccountRepository.findByAccountNumber("CUSTOMER-1"))
+                .thenReturn(Optional.of(linkedAccount));
+        when(utilizationRepository.findByLinkedTransactionId("FD-TXN-1")).thenReturn(List.of());
+
+        var result = service.creditPostedDeposit("CUSTOMER-1", "Customer", 40.0, "FD",
+                "FD-TXN-1", "Fixed deposit principal", "Completed");
+
+        assertThat(result.get("allocationCreditStatus")).isEqualTo("SUCCESS");
+        assertThat(allocation.getCurrentBalance()).isEqualTo(140.0);
+        org.mockito.ArgumentCaptor<AllocationUtilization> ledgerEntry =
+                org.mockito.ArgumentCaptor.forClass(AllocationUtilization.class);
+        verify(utilizationRepository).save(ledgerEntry.capture());
+        assertThat(ledgerEntry.getValue().getUserAccountNumber()).isEqualTo("CUSTOMER-1");
+        assertThat(ledgerEntry.getValue().getSourceStatus()).isEqualTo("Completed");
+    }
+
+    @Test
+    void doesNotCreditWhenTheCustomerAccountDoesNotExactlyMatch() {
+        when(allocationAccountRepository.findByAccountNumber("CUSTOMER-1"))
+                .thenReturn(Optional.empty());
+
+        var result = service.creditPostedDeposit("CUSTOMER-1", "Customer", 40.0, "RD",
+                "RD-TXN-1", "Recurring deposit installment", "Completed");
+
+        assertThat(result.get("allocationCreditStatus")).isEqualTo("NOT_MAPPED");
+        verify(utilizationRepository, never()).save(any());
+    }
+
+    @Test
+    void doesNotCreditAnUnpostedCustomerDebit() {
+        linkedAccount.setAccountNumber("CUSTOMER-1");
+        when(allocationAccountRepository.findByAccountNumber("CUSTOMER-1"))
+                .thenReturn(Optional.of(linkedAccount));
+
+        assertThatThrownBy(() -> service.creditPostedDeposit("CUSTOMER-1", "Customer", 40.0, "FD",
+                "FD-TXN-PENDING", "Fixed deposit principal", "Pending"))
+                .isInstanceOf(AllocationUtilizationService.AllocationDepositCreditException.class);
+        verify(utilizationRepository, never()).save(any());
+    }
+
+    @Test
+    void repeatedPostedDepositReferenceDoesNotCreditTwice() {
+        linkedAccount.setAllocationId(7L);
+        linkedAccount.setAccountNumber("CUSTOMER-1");
+        AllocationUtilization existing = new AllocationUtilization();
+        existing.setAllocationId(7L);
+        existing.setProductType("FD");
+        when(allocationAccountRepository.findByAccountNumber("CUSTOMER-1"))
+                .thenReturn(Optional.of(linkedAccount));
+        when(utilizationRepository.findByLinkedTransactionId("FD-TXN-1")).thenReturn(List.of(existing));
+
+        var result = service.creditPostedDeposit("CUSTOMER-1", "Customer", 40.0, "FD",
+                "FD-TXN-1", "Fixed deposit principal", "Completed");
+
+        assertThat(result.get("allocationCreditStatus")).isEqualTo("SUCCESS");
+        assertThat(allocation.getCurrentBalance()).isEqualTo(100.0);
         verify(utilizationRepository, never()).save(any());
     }
 }

@@ -1718,7 +1718,7 @@ export class Dashboard implements OnInit, OnDestroy {
   loadBranchOperations() {
     this.isLoadingBranchOperations = true;
     const url = `${environment.apiBaseUrl}/api/admins/branch-account/operations?fromDate=${encodeURIComponent(this.branchOperationsDate)}&toDate=${encodeURIComponent(this.branchOperationsToDate)}`;
-    this.http.get<any>(url).subscribe({
+    this.http.get<any>(url, this.getAdminAuthOptions()).subscribe({
       next: (data) => { this.branchOperations = data; this.isLoadingBranchOperations = false; },
       error: () => { this.branchOperations = null; this.isLoadingBranchOperations = false; }
     });
@@ -1726,7 +1726,10 @@ export class Dashboard implements OnInit, OnDestroy {
 
   loadTreasuryAccountSummary() {
     this.isLoadingTreasuryAccount = true;
-    this.http.get<any>(`${environment.apiBaseUrl}/api/admins/branch-account`).subscribe({
+    this.http.get<any>(
+      `${environment.apiBaseUrl}/api/admins/branch-account`,
+      this.getAdminAuthOptions()
+    ).subscribe({
       next: (summary) => {
         this.treasuryAccountSummary = summary;
         this.treasuryAccountNumber = summary?.accountNumber || '';
@@ -1743,7 +1746,10 @@ export class Dashboard implements OnInit, OnDestroy {
 
   fetchNeoBankTreasuryAccount() {
     this.isFetchingTreasuryAccount = true;
-    this.http.get<any>(`${environment.apiBaseUrl}/api/admins/branch-account/available`).subscribe({
+    this.http.get<any>(
+      `${environment.apiBaseUrl}/api/admins/branch-account/available`,
+      this.getAdminAuthOptions()
+    ).subscribe({
       next: (response) => {
         const account = response?.accounts?.[0];
         this.isFetchingTreasuryAccount = false;
@@ -1772,7 +1778,7 @@ export class Dashboard implements OnInit, OnDestroy {
       accountNumber: this.treasuryAccountNumber.trim(),
       accountName: this.treasuryAccountName.trim(),
       ifscCode: this.treasuryAccountIfsc.trim()
-    }).subscribe({
+    }, this.getAdminAuthOptions()).subscribe({
       next: (response) => {
         this.isSavingTreasuryAccount = false;
         if (response?.success) {
@@ -1800,7 +1806,7 @@ export class Dashboard implements OnInit, OnDestroy {
       allocatedAmount: this.branchDailyAllocationAmount,
       note: this.branchDailyAllocationNote,
       allocatedBy: this.adminName
-    }).subscribe({
+    }, this.getAdminAuthOptions()).subscribe({
       next: (response) => {
         this.isSavingBranchAllocation = false;
         if (response?.success) {
@@ -7115,7 +7121,7 @@ export class Dashboard implements OnInit, OnDestroy {
   }
 
   // Support Ticket Methods
-  private getAdminSupportTicketOptions(): { headers: HttpHeaders } {
+  private getAdminAuthOptions(): { headers: HttpHeaders } {
     const token = typeof sessionStorage !== 'undefined'
       ? sessionStorage.getItem('adminSessionToken')
       : null;
@@ -7128,7 +7134,7 @@ export class Dashboard implements OnInit, OnDestroy {
     this.isLoadingSupportTickets = true;
     this.http.get<any>(
       `${environment.apiBaseUrl}/api/support-tickets/all`,
-      this.getAdminSupportTicketOptions()
+      this.getAdminAuthOptions()
     ).subscribe({
       next: (res: any) => {
         this.supportTickets = res.tickets || [];
@@ -7145,7 +7151,7 @@ export class Dashboard implements OnInit, OnDestroy {
   loadSupportTicketStats() {
     this.http.get<any>(
       `${environment.apiBaseUrl}/api/support-tickets/stats`,
-      this.getAdminSupportTicketOptions()
+      this.getAdminAuthOptions()
     ).subscribe({
       next: (res: any) => {
         this.supportTicketStats = {
@@ -7197,7 +7203,7 @@ export class Dashboard implements OnInit, OnDestroy {
     this.http.put<any>(`${environment.apiBaseUrl}/api/support-tickets/${ticket.id}/status`, {
       status: status,
       adminResponse: this.adminResponseText || null
-    }, this.getAdminSupportTicketOptions()).subscribe({
+    }, this.getAdminAuthOptions()).subscribe({
       next: (res: any) => {
         if (res.success) {
           this.alertService.success('Success', `Ticket ${status.toLowerCase().replace('_', ' ')} successfully`);
@@ -7221,7 +7227,7 @@ export class Dashboard implements OnInit, OnDestroy {
     this.http.put<any>(`${environment.apiBaseUrl}/api/support-tickets/${ticket.id}/status`, {
       status: ticket.status === 'OPEN' ? 'IN_PROGRESS' : ticket.status,
       adminResponse: this.adminResponseText
-    }, this.getAdminSupportTicketOptions()).subscribe({
+    }, this.getAdminAuthOptions()).subscribe({
       next: (res: any) => {
         if (res.success) {
           this.alertService.success('Success', 'Response sent successfully');

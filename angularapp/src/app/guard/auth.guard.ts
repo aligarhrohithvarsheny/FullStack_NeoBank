@@ -77,7 +77,8 @@ export const adminAuthGuard: CanActivateFn = () => {
 
   const admin = sessionStorage.getItem('admin');
   const role = sessionStorage.getItem('userRole');
-  if (admin && role === 'ADMIN') {
+  const token = sessionStorage.getItem('adminSessionToken');
+  if (admin && token && role === 'ADMIN') {
     return true;
   }
 
@@ -91,7 +92,8 @@ export const hodAuthGuard: CanActivateFn = () => {
 
   const admin = sessionStorage.getItem('admin');
   const role = sessionStorage.getItem('userRole');
-  if (admin && role === 'HOD') return true;
+  const token = sessionStorage.getItem('adminSessionToken');
+  if (admin && token && role === 'HOD') return true;
   return router.createUrlTree(['/hod/login']);
 };
 
@@ -105,7 +107,8 @@ export const managerAuthGuard: CanActivateFn = () => {
 
   const admin = sessionStorage.getItem('admin');
   const role = sessionStorage.getItem('userRole');
-  if (admin && role === 'MANAGER') {
+  const token = sessionStorage.getItem('adminSessionToken');
+  if (admin && token && role === 'MANAGER') {
     return true;
   }
 
@@ -140,7 +143,8 @@ export const adminOrManagerAuthGuard: CanActivateFn = () => {
 
   const admin = sessionStorage.getItem('admin');
   const role = sessionStorage.getItem('userRole');
-  if (admin && (role === 'ADMIN' || role === 'MANAGER')) {
+  const token = sessionStorage.getItem('adminSessionToken');
+  if (admin && token && (role === 'ADMIN' || role === 'MANAGER')) {
     return true;
   }
 

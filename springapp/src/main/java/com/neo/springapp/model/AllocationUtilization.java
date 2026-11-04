@@ -71,6 +71,9 @@ public class AllocationUtilization {
     @Column(name = "status", length = 30)
     private String status; // SUCCESS, PENDING, FAILED
 
+    @Column(name = "source_status", length = 30)
+    private String sourceStatus;
+
     @Column(name = "remarks", columnDefinition = "TEXT")
     private String remarks;
 
