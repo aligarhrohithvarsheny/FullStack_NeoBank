@@ -8,6 +8,9 @@
         <button *ngIf="isAllocationAccountLogin" type="button" class="btn btn-outline-secondary" (click)="logoutAllocationAccount()">
           <i class="fas fa-sign-out-alt"></i> Sign out
         </button>
+        <button *ngIf="isAllocationAccountLogin" type="button" class="btn btn-primary" (click)="loadAccountData()" [disabled]="loading || isRefreshing">
+          <i class="fas" [ngClass]="isRefreshing ? 'fa-spinner fa-spin' : 'fa-sync-alt'"></i> Refresh
+        </button>
       </div>
     </div>
   </div>
@@ -46,6 +49,12 @@
 
   <!-- Account Overview -->
   <div *ngIf="linkedAccount">
+    <div class="allocation-live-status" *ngIf="isAllocationAccountLogin">
+      <span><i class="fas fa-circle allocation-live-dot"></i> Live account data</span>
+      <span *ngIf="lastRefreshedAt">Last refreshed {{ lastRefreshedAt | date:'shortTime' }} · auto-refresh every 15 seconds</span>
+      <span>Read-only access</span>
+    </div>
+
     <!-- Account Header -->
     <div class="row mb-4">
       <div class="col-12">
@@ -169,12 +178,34 @@
       </div>
     </div>
 
+    <section class="allocation-activity-section" *ngIf="isAllocationAccountLogin">
+      <div class="allocation-section-heading">
+        <div><span>Account activity</span><small>Totals from allocation transactions and charge records</small></div>
+      </div>
+      <div class="allocation-activity-grid">
+        <article class="activity-metric metric-credit"><span>Funds added / credits</span><strong>{{ formatCurrency(dashboardSummary.fundsAdded) }}</strong><small>{{ dashboardSummary.creditCount || 0 }} credit records</small></article>
+        <article class="activity-metric metric-debit"><span>Transfers / debits</span><strong>{{ formatCurrency(dashboardSummary.totalDebits) }}</strong><small>{{ dashboardSummary.debitCount || 0 }} debit records</small></article>
+        <article class="activity-metric"><span>All transactions</span><strong>{{ dashboardSummary.transactionCount || 0 }}</strong><small>Credits and debits</small></article>
+        <article class="activity-metric metric-debit"><span>Allocation debited</span><strong>{{ formatCurrency(dashboardSummary.allocationDebited) }}</strong><small>Total allocated-fund usage</small></article>
+        <article class="activity-metric"><span>Loans opened</span><strong>{{ dashboardSummary.loansOpened || 0 }}</strong><small>{{ formatCurrency(dashboardSummary.loanDebits) }} debited · ledger records</small></article>
+        <article class="activity-metric"><span>Loans closed / credited</span><strong>{{ dashboardSummary.loansClosedOrCredited || 0 }}</strong><small>{{ formatCurrency(dashboardSummary.loanCredits) }} credited · ledger records</small></article>
+        <article class="activity-metric"><span>FD deposits</span><strong>{{ formatCurrency(dashboardSummary.fdDeposits) }}</strong><small>Separately tagged entries</small></article>
+        <article class="activity-metric"><span>RD deposits</span><strong>{{ formatCurrency(dashboardSummary.rdDeposits) }}</strong><small>Separately tagged entries</small></article>
+        <article class="activity-metric"><span>Other deposits</span><strong>{{ formatCurrency(dashboardSummary.otherDeposits) }}</strong><small>Deposit ledger credits</small></article>
+        <article class="activity-metric metric-credit"><span>Interest collected</span><strong>{{ formatCurrency(dashboardSummary.interestCollected) }}</strong><small>Successful interest charges</small></article>
+        <article class="activity-metric metric-credit"><span>Charges credited</span><strong>{{ formatCurrency(dashboardSummary.allChargesCredited) }}</strong><small>{{ formatCurrency(dashboardSummary.pendingChargeCredits) }} pending</small></article>
+        <article class="activity-metric metric-debit"><span>Charges debited</span><strong>{{ formatCurrency(dashboardSummary.allChargesCollected) }}</strong><small>{{ dashboardSummary.chargeDebitCount || 0 }} collected charge records</small></article>
+        <article class="activity-metric"><span>Fine charges</span><strong>{{ formatCurrency(dashboardSummary.fineCharges) }}</strong><small>Identified by charge description</small></article>
+        <article class="activity-metric"><span>Cheque charges</span><strong>{{ formatCurrency(dashboardSummary.chequeCharges) }}</strong><small>Identified by charge description</small></article>
+      </div>
+    </section>
+
     <!-- Tabs -->
     <div class="row">
       <div class="col-12">
         <div class="card">
           <div class="card-header">
-            <ul class="nav nav-tabs card-header-tabs" role="tablist" *ngIf="!isAllocationAccountLogin">
+            <ul class="nav nav-tabs card-header-tabs" role="tablist">
               <li class="nav-item">
                 <a 
                   class="nav-link" 
@@ -284,6 +315,7 @@
                       <th>Product</th>
                       <th>Balance</th>
                       <th>Date</th>
+                      <th>Details / actor</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -298,9 +330,10 @@
                       <td>{{ txn.productType }}</td>
                       <td>{{ formatCurrency(txn.balance) }}</td>
                       <td>{{ txn.date | date: 'short' }}</td>
+                      <td>{{ txn.description || txn.linkedTransactionId || '—' }}<small class="d-block text-muted">{{ txn.performedByName || '—' }}</small></td>
                     </tr>
                     <tr *ngIf="accountTransactions.length === 0">
-                      <td colspan="6" class="text-center text-muted">No transactions found</td>
+                      <td colspan="7" class="text-center text-muted">No transactions found</td>
                     </tr>
                   </tbody>
                 </table>
@@ -309,14 +342,14 @@
               <!-- Pagination -->
               <nav class="mt-3" *ngIf="accountTransactions.length > 0">
                 <ul class="pagination justify-content-center">
-                  <li class="page-item" [ngClass]="{'disabled': transactionPage === 0}">
-                    <a class="page-link" (click)="previousPage()">Previous</a>
+                    <li class="page-item" [ngClass]="{'disabled': transactionPage === 0}">
+                      <button type="button" class="page-link" (click)="previousPage()" [disabled]="transactionPage === 0">Previous</button>
                   </li>
                   <li class="page-item active">
-                    <span class="page-link">Page {{ transactionPage + 1 }}</span>
+                      <span class="page-link">Page {{ transactionPage + 1 }}<ng-container *ngIf="isAllocationAccountLogin && transactionTotalPages"> of {{ transactionTotalPages }}</ng-container></span>
                   </li>
                   <li class="page-item">
-                    <a class="page-link" (click)="nextPage()">Next</a>
+                      <button type="button" class="page-link" (click)="nextPage()" [disabled]="isAllocationAccountLogin && transactionTotalPages > 0 && transactionPage + 1 >= transactionTotalPages">Next</button>
                   </li>
                 </ul>
               </nav>
@@ -388,6 +421,26 @@
                       <p class="charge-amount">{{ formatCurrency(chargesSummary.totalCharges || 0) }}</p>
                     </div>
                   </div>
+                </div>
+              </div>
+              <div class="allocation-charge-history" *ngIf="isAllocationAccountLogin">
+                <h6>Recent charge activity</h6>
+                <div class="table-responsive">
+                  <table class="table table-hover">
+                    <thead class="table-light"><tr><th>Date</th><th>Charge</th><th>Customer / account</th><th>Collected</th><th>Credited</th><th>Reference</th><th>Status</th></tr></thead>
+                    <tbody>
+                      <tr *ngFor="let charge of dashboardCharges">
+                        <td>{{ charge.createdAt | date:'short' }}</td>
+                        <td>{{ charge.chargeType }}<small class="d-block text-muted">{{ charge.description }}</small></td>
+                        <td>{{ charge.userName || '—' }}<small class="d-block text-muted">{{ charge.userAccountNumber || '—' }}</small></td>
+                        <td>{{ formatCurrency(charge.amount) }}</td>
+                        <td>{{ formatCurrency(charge.creditedAmount) }}</td>
+                        <td>{{ charge.creditReference || charge.transactionId || '—' }}</td>
+                        <td>{{ charge.creditStatus || charge.collectionStatus }}</td>
+                      </tr>
+                      <tr *ngIf="!dashboardCharges.length"><td colspan="7" class="text-center text-muted">No charge records found</td></tr>
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </div>

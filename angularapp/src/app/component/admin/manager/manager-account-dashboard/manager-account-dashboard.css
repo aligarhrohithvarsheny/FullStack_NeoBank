@@ -89,6 +89,42 @@
   margin: 0;
 }
 
+.allocation-live-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: -8px 0 18px;
+  color: #52646b;
+  font-size: 12px;
+}
+.allocation-live-dot { margin-right: 5px; color: #16966e; font-size: 8px; }
+.allocation-activity-section { margin: 4px 0 24px; }
+.allocation-section-heading { display: flex; justify-content: space-between; margin-bottom: 12px; }
+.allocation-section-heading span { display: block; color: #233e45; font-size: 16px; font-weight: 700; }
+.allocation-section-heading small { color: #687b80; }
+.allocation-activity-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(185px, 1fr));
+  gap: 12px;
+}
+.activity-metric {
+  min-width: 0;
+  padding: 14px 16px;
+  background: #fff;
+  border: 1px solid #dfe8e7;
+  border-left: 3px solid #477c83;
+  border-radius: 6px;
+}
+.activity-metric.metric-credit { border-left-color: #16805d; }
+.activity-metric.metric-debit { border-left-color: #b65b4a; }
+.activity-metric span,
+.activity-metric small { display: block; color: #647579; font-size: 11px; }
+.activity-metric strong { display: block; margin: 6px 0 3px; color: #173c40; font-size: 20px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.allocation-charge-history { margin-top: 24px; }
+.allocation-charge-history h6 { color: #233e45; font-weight: 700; }
+.allocation-charge-history .table { min-width: 900px; font-size: 12px; }
+
 /* Detail Items */
 .detail-item {
   padding: 0.75rem 0;
@@ -418,6 +454,10 @@
 }
 
 @media (max-width: 768px) {
+  .allocation-live-status { align-items: flex-start; flex-direction: column; }
+  .allocation-activity-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .activity-metric { padding: 12px; }
+  .activity-metric strong { font-size: 17px; }
   .col-md-3,
   .col-md-4,
   .col-md-6 {

@@ -1,14 +1,21 @@
 package com.neo.springapp.controller;
 
 import com.neo.springapp.entity.AllocationAccount;
+import com.neo.springapp.entity.ChargeTransaction;
+import com.neo.springapp.model.AllocationUtilization;
 import com.neo.springapp.model.FundsAllocation;
+import com.neo.springapp.repository.AllocationUtilizationRepository;
 import com.neo.springapp.repository.AllocationAccountRepository;
+import com.neo.springapp.repository.ChargeTransactionRepository;
 import com.neo.springapp.repository.FundsAllocationRepository;
 import com.neo.springapp.service.PasswordService;
 import com.neo.springapp.service.UserSessionTokenService;
 import com.neo.springapp.service.UserSessionTokenService.SessionPrincipal;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -19,8 +26,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.security.SecureRandom;
+import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -32,6 +43,8 @@ public class AllocationAccountLoginController {
 
     private final FundsAllocationRepository allocationRepository;
     private final AllocationAccountRepository linkedAccountRepository;
+    private final AllocationUtilizationRepository utilizationRepository;
+    private final ChargeTransactionRepository chargeTransactionRepository;
     private final PasswordService passwordService;
     private final UserSessionTokenService tokenService;
     private final SecureRandom secureRandom = new SecureRandom();
@@ -39,10 +52,14 @@ public class AllocationAccountLoginController {
     public AllocationAccountLoginController(
             FundsAllocationRepository allocationRepository,
             AllocationAccountRepository linkedAccountRepository,
+            AllocationUtilizationRepository utilizationRepository,
+            ChargeTransactionRepository chargeTransactionRepository,
             PasswordService passwordService,
             UserSessionTokenService tokenService) {
         this.allocationRepository = allocationRepository;
         this.linkedAccountRepository = linkedAccountRepository;
+        this.utilizationRepository = utilizationRepository;
+        this.chargeTransactionRepository = chargeTransactionRepository;
         this.passwordService = passwordService;
         this.tokenService = tokenService;
     }
@@ -204,6 +221,196 @@ public class AllocationAccountLoginController {
 
         return ResponseEntity.ok(Map.of("success", true, "allocation", allocationData, "account", accountData));
     }
+
+    @GetMapping("/allocation-account/dashboard")
+    public ResponseEntity<Map<String, Object>> getMyAllocationDashboard(
+            @AuthenticationPrincipal SessionPrincipal principal,
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "0") int page,
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "25") int size) {
+        if (principal == null || !"ALLOCATION_ACCOUNT".equals(principal.scope())) {
+            return error(HttpStatus.FORBIDDEN, "An allocation account session is required.");
+        }
+        if (principal.userId() == null || principal.userId() >= 0
+                || principal.accountNumber() == null || !principal.accountNumber().startsWith("ALLOCATION:")) {
+            return error(HttpStatus.FORBIDDEN, "The session is not scoped to an allocation account.");
+        }
+
+        Long allocationRecordId = -principal.userId();
+        Optional<FundsAllocation> allocationResult = allocationRepository.findById(allocationRecordId);
+        if (allocationResult.isEmpty()) return error(HttpStatus.NOT_FOUND, "Allocation not found.");
+        FundsAllocation allocation = allocationResult.get();
+        if (!("ALLOCATION:" + allocation.getAllocationId()).equals(principal.accountNumber())) {
+            return error(HttpStatus.FORBIDDEN, "The session does not match this allocation.");
+        }
+        if (!isAllocationActive(allocation)) return error(HttpStatus.FORBIDDEN, "This allocation is inactive or expired.");
+        Optional<AllocationAccount> linkedAccountResult = linkedAccountRepository.findByAllocationId(allocationRecordId);
+        if (linkedAccountResult.isEmpty() || !isLinkedAccountApproved(linkedAccountResult.get())) {
+            return error(HttpStatus.FORBIDDEN, "The linked account is not verified and active.");
+        }
+
+        AllocationAccount account = linkedAccountResult.get();
+        Page<AllocationUtilization> transactionPage = utilizationRepository.findByAllocationIdOrderByTransactionDateDesc(
+                allocationRecordId,
+                PageRequest.of(Math.max(0, page), Math.max(1, Math.min(size, 100)),
+                        Sort.by(Sort.Direction.DESC, "transactionDate")));
+        Page<ChargeTransaction> chargePage = chargeTransactionRepository.findByAllocationIdOrderByCreatedAtDesc(
+            allocationRecordId, PageRequest.of(0, 25, Sort.by(Sort.Direction.DESC, "createdAt")));
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("success", true);
+        response.put("allocation", allocationDashboardData(allocation));
+        response.put("account", accountDashboardData(account));
+        response.put("summary", dashboardSummary(allocation, account));
+        response.put("transactions", transactionPage.getContent().stream().map(this::transactionDashboardData).toList());
+        response.put("transactionPage", transactionPage.getNumber());
+        response.put("transactionTotalPages", transactionPage.getTotalPages());
+        response.put("transactionTotalElements", transactionPage.getTotalElements());
+        response.put("charges", chargePage.getContent().stream().map(this::chargeDashboardData).toList());
+        response.put("lastUpdated", LocalDateTime.now());
+        return ResponseEntity.ok(response);
+    }
+
+    private Map<String, Object> allocationDashboardData(FundsAllocation allocation) {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("id", allocation.getId());
+        data.put("allocationId", allocation.getAllocationId());
+        data.put("allocatedAmount", allocation.getAllocatedAmount());
+        data.put("currentBalance", allocation.getCurrentBalance());
+        data.put("totalDebited", allocation.getTotalDebited());
+        data.put("totalCredited", allocation.getTotalCredited());
+        data.put("status", allocation.getStatus());
+        data.put("validTill", allocation.getValidTill());
+        data.put("productTypes", allocation.getProductTypes());
+        data.put("description", allocation.getDescription());
+        data.put("updatedAt", allocation.getUpdatedAt());
+        return data;
+    }
+
+    private Map<String, Object> accountDashboardData(AllocationAccount account) {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("accountNumber", account.getAccountNumber());
+        data.put("ifscCode", account.getIfscCode());
+        data.put("accountHolderName", account.getAccountHolderName());
+        data.put("bankName", account.getBankName());
+        data.put("accountType", account.getAccountType());
+        data.put("branchName", account.getBranchName());
+        data.put("city", account.getCity());
+        data.put("verificationStatus", account.getVerificationStatus());
+        data.put("accountStatus", account.getAccountStatus());
+        data.put("accountBalance", account.getAccountBalance());
+        data.put("currentBalance", account.getCurrentBalance());
+        data.put("totalAllocated", account.getTotalAllocated());
+        data.put("totalDebited", account.getTotalDebited());
+        data.put("totalCredited", account.getTotalCredited());
+        data.put("interestCharges", account.getInterestCharges());
+        data.put("cibilCharges", account.getCibilCharges());
+        data.put("soundboxCharges", account.getSoundboxCharges());
+        data.put("upiCharges", account.getUpiCharges());
+        data.put("paymentGatewayCharges", account.getPaymentGatewayCharges());
+        data.put("totalChargesCollected", account.getTotalChargesCollected());
+        return data;
+    }
+
+    private Map<String, Object> dashboardSummary(FundsAllocation allocation, AllocationAccount account) {
+        Long allocationId = allocation.getId();
+        List<String> loanTypes = List.of("LOAN", "LOANS", "GOLD_LOAN", "PERSONAL_LOAN", "HOME_LOAN");
+        List<String> fdTypes = List.of("FD", "FD_DEPOSIT", "FIXED_DEPOSIT");
+        List<String> rdTypes = List.of("RD", "RD_DEPOSIT", "RECURRING_DEPOSIT");
+        List<String> depositTypes = List.of("DEPOSIT", "DEPOSITS");
+        double loanDebits = sumByProductTypes(allocationId, "DEBIT", loanTypes);
+        double loanCredits = sumByProductTypes(allocationId, "CREDIT", loanTypes);
+        double fdDeposits = sumByProductTypes(allocationId, "CREDIT", fdTypes);
+        double rdDeposits = sumByProductTypes(allocationId, "CREDIT", rdTypes);
+        double genericDeposits = sumByProductTypes(allocationId, "CREDIT", depositTypes);
+
+        Map<String, Object> summary = new LinkedHashMap<>();
+        summary.put("totalAllocated", safeDouble(allocation.getAllocatedAmount()));
+        summary.put("balance", safeDouble(account.getCurrentBalance() == null
+                ? (account.getAccountBalance() == null ? null : account.getAccountBalance().doubleValue())
+                : account.getCurrentBalance().doubleValue()));
+        summary.put("totalCredits", safeDouble(account.getTotalCredited() == null ? null : account.getTotalCredited().doubleValue()));
+        summary.put("totalDebits", safeDouble(account.getTotalDebited() == null ? null : account.getTotalDebited().doubleValue()));
+        summary.put("allocationDebited", safeDouble(allocation.getTotalDebited()));
+        summary.put("creditCount", utilizationRepository.getCreditCount(allocationId));
+        summary.put("debitCount", utilizationRepository.getDebitCount(allocationId));
+        summary.put("fundsAdded", safeDouble(account.getTotalCredited() == null ? null : account.getTotalCredited().doubleValue()));
+        summary.put("transfersCount", utilizationRepository.countByAllocationId(allocationId));
+        summary.put("loansOpened", countByProductTypes(allocationId, "DEBIT", loanTypes));
+        summary.put("loansClosedOrCredited", countByProductTypes(allocationId, "CREDIT", loanTypes));
+        summary.put("loanDebits", loanDebits);
+        summary.put("loanCredits", loanCredits);
+        summary.put("fdDeposits", fdDeposits);
+        summary.put("rdDeposits", rdDeposits);
+        summary.put("otherDeposits", genericDeposits);
+        summary.put("interestCollected", zeroIfNull(chargeTransactionRepository.sumSuccessfulInterestCharges(allocationId)));
+        summary.put("allChargesCollected", zeroIfNull(chargeTransactionRepository.sumTotalCharges(allocationId)));
+        summary.put("allChargesCredited", zeroIfNull(chargeTransactionRepository.sumCreditedCharges(allocationId)));
+        summary.put("pendingChargeCredits", zeroIfNull(chargeTransactionRepository.sumPendingChargeCredits(allocationId)));
+        summary.put("chargeDebitCount", chargeTransactionRepository.countCollectedCharges(allocationId));
+        summary.put("fineCharges", zeroIfNull(chargeTransactionRepository.sumSuccessfulFineCharges(allocationId)));
+        summary.put("chequeCharges", zeroIfNull(chargeTransactionRepository.sumSuccessfulChequeCharges(allocationId)));
+        summary.put("cibilCharges", zeroIfNull(account.getCibilCharges()));
+        summary.put("soundboxCharges", zeroIfNull(account.getSoundboxCharges()));
+        summary.put("upiCharges", zeroIfNull(account.getUpiCharges()));
+        summary.put("paymentGatewayCharges", zeroIfNull(account.getPaymentGatewayCharges()));
+        summary.put("totalCharges", zeroIfNull(account.getTotalChargesCollected()));
+        summary.put("transactionCount", utilizationRepository.countByAllocationId(allocationId));
+        Long creditedChargeCount = chargeTransactionRepository.countByCreditStatus(allocationId, "CREDITED");
+        Long pendingChargeCount = chargeTransactionRepository.countByCreditStatus(allocationId, "PENDING_CREDIT");
+        summary.put("chargeCount", (creditedChargeCount == null ? 0 : creditedChargeCount)
+            + (pendingChargeCount == null ? 0 : pendingChargeCount));
+        return summary;
+    }
+
+    private double sumByProductTypes(Long allocationId, String transactionType, List<String> productTypes) {
+        return safeDouble(utilizationRepository.sumByAllocationAndProductTypes(allocationId, transactionType, productTypes));
+    }
+
+    private long countByProductTypes(Long allocationId, String transactionType, List<String> productTypes) {
+        Long count = utilizationRepository.countByAllocationAndProductTypes(allocationId, transactionType, productTypes);
+        return count == null ? 0 : count;
+    }
+
+    private Map<String, Object> transactionDashboardData(AllocationUtilization transaction) {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("transactionId", transaction.getUtilizationId());
+        data.put("type", transaction.getTransactionType());
+        data.put("amount", transaction.getAmount());
+        data.put("balanceAfter", transaction.getRemainingBalance());
+        data.put("productType", transaction.getProductType());
+        data.put("userAccountNumber", transaction.getUserAccountNumber());
+        data.put("userName", transaction.getUserName());
+        data.put("linkedTransactionId", transaction.getLinkedTransactionId());
+        data.put("description", transaction.getDescription());
+        data.put("performedByName", transaction.getPerformedByName());
+        data.put("status", transaction.getStatus());
+        data.put("transactionDate", transaction.getTransactionDate());
+        return data;
+    }
+
+    private Map<String, Object> chargeDashboardData(ChargeTransaction charge) {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("transactionId", charge.getChargeTransactionId());
+        data.put("chargeType", charge.getChargeType());
+        data.put("description", charge.getChargeDescription());
+        data.put("amount", charge.getChargeAmount());
+        data.put("creditedAmount", charge.getNetCreditAmount());
+        data.put("collectionStatus", charge.getCollectionStatus());
+        data.put("creditStatus", charge.getCreditStatus());
+        data.put("creditReference", charge.getCreditReferenceNumber());
+        data.put("userAccountNumber", charge.getUserAccountNumber());
+        data.put("userName", charge.getUserName());
+        data.put("createdAt", charge.getCreatedAt());
+        data.put("creditedAt", charge.getCreditedAt());
+        return data;
+    }
+
+    private String normalize(String value) {
+        return value == null ? "" : value.trim().toUpperCase(java.util.Locale.ROOT);
+    }
+
+    private double safeDouble(Double value) { return value == null ? 0 : value; }
+    private BigDecimal zeroIfNull(BigDecimal value) { return value == null ? BigDecimal.ZERO : value; }
 
     private boolean isAllocationActive(FundsAllocation allocation) {
         return "ACTIVE".equalsIgnoreCase(allocation.getStatus())

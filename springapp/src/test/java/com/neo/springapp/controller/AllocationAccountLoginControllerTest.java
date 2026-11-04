@@ -1,8 +1,11 @@
 package com.neo.springapp.controller;
 
 import com.neo.springapp.entity.AllocationAccount;
+import com.neo.springapp.model.AllocationUtilization;
 import com.neo.springapp.model.FundsAllocation;
 import com.neo.springapp.repository.AllocationAccountRepository;
+import com.neo.springapp.repository.AllocationUtilizationRepository;
+import com.neo.springapp.repository.ChargeTransactionRepository;
 import com.neo.springapp.repository.FundsAllocationRepository;
 import com.neo.springapp.service.PasswordService;
 import com.neo.springapp.service.UserSessionTokenService;
@@ -10,23 +13,33 @@ import com.neo.springapp.service.UserSessionTokenService.SessionPrincipal;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.math.BigDecimal;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 
 @ExtendWith(MockitoExtension.class)
 class AllocationAccountLoginControllerTest {
     @Mock private FundsAllocationRepository allocationRepository;
     @Mock private AllocationAccountRepository linkedAccountRepository;
+    @Mock private AllocationUtilizationRepository utilizationRepository;
+    @Mock private ChargeTransactionRepository chargeTransactionRepository;
     @Mock private PasswordService passwordService;
     @Mock private UserSessionTokenService tokenService;
 
@@ -37,7 +50,8 @@ class AllocationAccountLoginControllerTest {
     @BeforeEach
     void setUp() {
         controller = new AllocationAccountLoginController(
-                allocationRepository, linkedAccountRepository, passwordService, tokenService);
+            allocationRepository, linkedAccountRepository, utilizationRepository,
+            chargeTransactionRepository, passwordService, tokenService);
         allocation = new FundsAllocation();
         allocation.setId(12L);
         allocation.setAllocationId("FA-2026-00012");
@@ -137,5 +151,52 @@ class AllocationAccountLoginControllerTest {
         assertThat(principal.scope()).isEqualTo("ALLOCATION_ACCOUNT");
         assertThat(principal.userId()).isEqualTo(-12L);
         assertThat(principal.accountNumber()).isEqualTo("ALLOCATION:FA-2026-00012");
+    }
+
+    @Test
+    void dashboardReturnsLiveTotalsAndRecentLedgerRowsForSignedAllocation() {
+        allocation.setAllocationId("FA-2026-00012");
+        linkedAccount.setCurrentBalance(new BigDecimal("4750.00"));
+        linkedAccount.setTotalDebited(new BigDecimal("250.00"));
+        linkedAccount.setTotalCredited(new BigDecimal("0.00"));
+        AllocationUtilization loanDebit = new AllocationUtilization();
+        loanDebit.setId(21L);
+        loanDebit.setUtilizationId("AU-21");
+        loanDebit.setAllocationId(12L);
+        loanDebit.setTransactionType("DEBIT");
+        loanDebit.setAmount(250.0);
+        loanDebit.setRemainingBalance(4750.0);
+        loanDebit.setProductType("GOLD_LOAN");
+        loanDebit.setTransactionDate(LocalDateTime.now());
+
+        when(allocationRepository.findById(12L)).thenReturn(Optional.of(allocation));
+        when(linkedAccountRepository.findByAllocationId(12L)).thenReturn(Optional.of(linkedAccount));
+        when(utilizationRepository.findByAllocationIdOrderByTransactionDateDesc(eq(12L), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(loanDebit), PageRequest.of(0, 25), 1));
+        when(utilizationRepository.countByAllocationId(12L)).thenReturn(1L);
+        when(utilizationRepository.getDebitCount(12L)).thenReturn(1L);
+        when(utilizationRepository.getCreditCount(12L)).thenReturn(0L);
+        when(utilizationRepository.sumByAllocationAndProductTypes(eq(12L), eq("DEBIT"), any())).thenReturn(250.0);
+        when(utilizationRepository.countByAllocationAndProductTypes(eq(12L), eq("DEBIT"), any())).thenReturn(1L);
+        when(chargeTransactionRepository.findByAllocationIdOrderByCreatedAtDesc(eq(12L), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 25), 0));
+        when(chargeTransactionRepository.sumSuccessfulInterestCharges(12L)).thenReturn(new BigDecimal("0.00"));
+        when(chargeTransactionRepository.sumTotalCharges(12L)).thenReturn(new BigDecimal("0.00"));
+        when(chargeTransactionRepository.sumCreditedCharges(12L)).thenReturn(new BigDecimal("0.00"));
+        when(chargeTransactionRepository.sumPendingChargeCredits(12L)).thenReturn(new BigDecimal("0.00"));
+        when(chargeTransactionRepository.sumSuccessfulFineCharges(12L)).thenReturn(new BigDecimal("0.00"));
+        when(chargeTransactionRepository.sumSuccessfulChequeCharges(12L)).thenReturn(new BigDecimal("0.00"));
+        when(chargeTransactionRepository.countCollectedCharges(12L)).thenReturn(0L);
+        when(chargeTransactionRepository.countByCreditStatus(12L, "CREDITED")).thenReturn(0L);
+        when(chargeTransactionRepository.countByCreditStatus(12L, "PENDING_CREDIT")).thenReturn(0L);
+
+        ResponseEntity<Map<String, Object>> response = controller.getMyAllocationDashboard(
+                new SessionPrincipal(-12L, "ALLOCATION:FA-2026-00012", "ALLOCATION_ACCOUNT"), 0, 25);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).containsKey("summary");
+        assertThat(response.getBody().get("transactions")).asList().hasSize(1);
+        assertThat(((Map<?, ?>) response.getBody().get("summary")).get("loansOpened")).isEqualTo(1L);
+        assertThat(((Map<?, ?>) response.getBody().get("summary")).get("loanDebits")).isEqualTo(250.0);
     }
 }

@@ -21,6 +21,8 @@ public interface AllocationUtilizationRepository extends JpaRepository<Allocatio
 
     Page<AllocationUtilization> findByAllocationIdOrderByTransactionDateDesc(Long allocationId, Pageable pageable);
 
+    long countByAllocationId(Long allocationId);
+
     Page<AllocationUtilization> findByAllocationIdAndTransactionType(Long allocationId, String transactionType, Pageable pageable);
 
     Page<AllocationUtilization> findByAllocationIdAndProductType(Long allocationId, String productType, Pageable pageable);
@@ -46,6 +48,16 @@ public interface AllocationUtilizationRepository extends JpaRepository<Allocatio
 
     @Query("SELECT COALESCE(SUM(au.amount), 0) FROM AllocationUtilization au WHERE au.allocationId = :allocationId AND au.productType = :productType AND au.transactionType = 'DEBIT'")
     Double getTotalDebitedByProduct(@Param("allocationId") Long allocationId, @Param("productType") String productType);
+
+    @Query("SELECT COALESCE(SUM(au.amount), 0) FROM AllocationUtilization au WHERE au.allocationId = :allocationId AND UPPER(au.transactionType) = UPPER(:transactionType) AND UPPER(au.productType) IN :productTypes")
+    Double sumByAllocationAndProductTypes(@Param("allocationId") Long allocationId,
+                                          @Param("transactionType") String transactionType,
+                                          @Param("productTypes") List<String> productTypes);
+
+    @Query("SELECT COUNT(au) FROM AllocationUtilization au WHERE au.allocationId = :allocationId AND UPPER(au.transactionType) = UPPER(:transactionType) AND UPPER(au.productType) IN :productTypes")
+    Long countByAllocationAndProductTypes(@Param("allocationId") Long allocationId,
+                                          @Param("transactionType") String transactionType,
+                                          @Param("productTypes") List<String> productTypes);
 
     List<AllocationUtilization> findByLinkedTransactionId(String linkedTransactionId);
 

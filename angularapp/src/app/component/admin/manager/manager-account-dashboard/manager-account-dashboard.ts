@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { HttpClientModule } from '@angular/common/http';
@@ -13,7 +13,7 @@ import { ChargeManagementService } from '../../../../service/charge-management.s
   templateUrl: './manager-account-dashboard.html',
   styleUrls: ['./manager-account-dashboard.css']
 })
-export class ManagerAccountDashboardComponent implements OnInit {
+export class ManagerAccountDashboardComponent implements OnInit, OnDestroy {
   
   allocationId: number = 0;
   linkedAccount: any = null;
@@ -27,6 +27,12 @@ export class ManagerAccountDashboardComponent implements OnInit {
   transactionPage = 0;
   transactionSize = 10;
   isAllocationAccountLogin = false;
+  dashboardSummary: any = {};
+  dashboardCharges: any[] = [];
+  transactionTotalPages = 0;
+  lastRefreshedAt: Date | null = null;
+  isRefreshing = false;
+  private allocationRefreshTimer?: ReturnType<typeof setInterval>;
 
   constructor(
     private accountService: AllocationAccountService,
@@ -45,6 +51,17 @@ export class ManagerAccountDashboardComponent implements OnInit {
       }
     }
     this.loadAccountData();
+    if (this.isAllocationAccountLogin) {
+      this.allocationRefreshTimer = setInterval(() => {
+        if (typeof document === 'undefined' || document.visibilityState === 'visible') {
+          this.loadAllocationDashboard(true);
+        }
+      }, 15000);
+    }
+  }
+
+  ngOnDestroy(): void {
+    if (this.allocationRefreshTimer) clearInterval(this.allocationRefreshTimer);
   }
 
   /**
@@ -56,34 +73,7 @@ export class ManagerAccountDashboardComponent implements OnInit {
     this.loading = true;
 
     if (this.isAllocationAccountLogin) {
-      const token = sessionStorage.getItem('allocationAccountSessionToken') || '';
-      this.accountService.getMyAllocationAccount(token).subscribe({
-        next: (response: any) => {
-          if (response?.success) {
-            const allocation = response.allocation || {};
-            const account = response.account || {};
-            this.linkedAccount = {
-              ...account,
-              ...allocation,
-              ...account,
-              currentBalance: allocation.currentBalance ?? account.currentBalance,
-              totalAllocated: allocation.allocatedAmount ?? account.totalAllocated,
-              totalDebited: allocation.totalDebited ?? account.totalDebited,
-              totalCredited: allocation.totalCredited ?? account.totalCredited
-            };
-            this.errorMessage = '';
-          } else {
-            this.linkedAccount = null;
-            this.errorMessage = response?.message || 'Allocation account details are unavailable.';
-          }
-          this.loading = false;
-        },
-        error: (error: any) => {
-          this.linkedAccount = null;
-          this.errorMessage = error.error?.message || 'Failed to load this allocation account.';
-          this.loading = false;
-        }
-      });
+      this.loadAllocationDashboard(false);
       return;
     }
     
@@ -107,6 +97,11 @@ export class ManagerAccountDashboardComponent implements OnInit {
    */
   loadTransactions(): void {
     if (!this.allocationId) return;
+
+    if (this.isAllocationAccountLogin) {
+      this.loadAllocationDashboard(true);
+      return;
+    }
 
     this.accountService.getAccountTransactions(this.allocationId, this.transactionPage, this.transactionSize).subscribe(
       (response: any) => {
@@ -144,8 +139,61 @@ export class ManagerAccountDashboardComponent implements OnInit {
     if (tab === 'transactions') {
       this.loadTransactions();
     } else if (tab === 'charges') {
-      this.loadChargeSummary();
+      if (this.isAllocationAccountLogin) this.loadAllocationDashboard(true);
+      else this.loadChargeSummary();
     }
+  }
+
+  private loadAllocationDashboard(silent: boolean): void {
+    const token = sessionStorage.getItem('allocationAccountSessionToken') || '';
+    if (!token || !this.allocationId) return;
+    if (silent) this.isRefreshing = true;
+    else this.loading = true;
+    this.accountService.getMyAllocationDashboard(token, this.transactionPage, this.transactionSize).subscribe({
+      next: (response: any) => {
+        if (!response?.success) {
+          this.errorMessage = response?.message || 'Allocation dashboard data is unavailable.';
+          this.loading = false;
+          this.isRefreshing = false;
+          return;
+        }
+        const allocation = response.allocation || {};
+        const account = response.account || {};
+        this.linkedAccount = {
+          ...allocation,
+          ...account,
+          currentBalance: account.currentBalance ?? allocation.currentBalance,
+          totalAllocated: account.totalAllocated ?? allocation.allocatedAmount,
+          totalDebited: account.totalDebited ?? allocation.totalDebited,
+          totalCredited: account.totalCredited ?? allocation.totalCredited
+        };
+        this.dashboardSummary = response.summary || {};
+        this.dashboardCharges = response.charges || [];
+        this.accountTransactions = (response.transactions || []).map((transaction: any) => ({
+          ...transaction,
+          balance: transaction.balanceAfter,
+          date: transaction.transactionDate
+        }));
+        this.transactionTotalPages = response.transactionTotalPages || 0;
+        this.chargesSummary = {
+          interest: account.interestCharges || 0,
+          cibil: account.cibilCharges || 0,
+          soundbox: account.soundboxCharges || 0,
+          upi: account.upiCharges || 0,
+          paymentGateway: account.paymentGatewayCharges || 0,
+          totalCharges: account.totalChargesCollected || 0
+        };
+        this.lastRefreshedAt = response.lastUpdated ? new Date(response.lastUpdated) : new Date();
+        this.errorMessage = '';
+        this.loading = false;
+        this.isRefreshing = false;
+      },
+      error: (error: any) => {
+        this.errorMessage = error.error?.message || 'Failed to refresh allocation dashboard.';
+        this.loading = false;
+        this.isRefreshing = false;
+      }
+    });
   }
 
   /**
@@ -188,6 +236,7 @@ export class ManagerAccountDashboardComponent implements OnInit {
    * Paginate transactions
    */
   nextPage(): void {
+    if (this.isAllocationAccountLogin && this.transactionPage + 1 >= this.transactionTotalPages) return;
     this.transactionPage++;
     this.loadTransactions();
   }

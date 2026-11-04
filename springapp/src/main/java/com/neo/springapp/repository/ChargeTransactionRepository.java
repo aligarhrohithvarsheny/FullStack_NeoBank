@@ -2,6 +2,8 @@ package com.neo.springapp.repository;
 
 import com.neo.springapp.entity.ChargeTransaction;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -25,6 +27,8 @@ public interface ChargeTransactionRepository extends JpaRepository<ChargeTransac
     // Find by allocation ID
     @Query("SELECT c FROM ChargeTransaction c WHERE c.allocationId = :allocationId ORDER BY c.createdAt DESC")
     List<ChargeTransaction> findByAllocationId(@Param("allocationId") Long allocationId);
+
+    Page<ChargeTransaction> findByAllocationIdOrderByCreatedAtDesc(Long allocationId, Pageable pageable);
     
     // Find by allocation account ID
     @Query("SELECT c FROM ChargeTransaction c WHERE c.allocationAccountId = :accountId ORDER BY c.createdAt DESC")
@@ -67,6 +71,24 @@ public interface ChargeTransactionRepository extends JpaRepository<ChargeTransac
     // Sum total charges for allocation
     @Query("SELECT SUM(c.chargeAmount) FROM ChargeTransaction c WHERE c.allocationId = :allocationId AND c.status = 'SUCCESS'")
     BigDecimal sumTotalCharges(@Param("allocationId") Long allocationId);
+
+    @Query("SELECT COALESCE(SUM(c.netCreditAmount), 0) FROM ChargeTransaction c WHERE c.allocationId = :allocationId AND c.creditStatus = 'CREDITED'")
+    BigDecimal sumCreditedCharges(@Param("allocationId") Long allocationId);
+
+    @Query("SELECT COALESCE(SUM(c.netCreditAmount), 0) FROM ChargeTransaction c WHERE c.allocationId = :allocationId AND c.creditStatus = 'PENDING_CREDIT'")
+    BigDecimal sumPendingChargeCredits(@Param("allocationId") Long allocationId);
+
+    @Query("SELECT COUNT(c) FROM ChargeTransaction c WHERE c.allocationId = :allocationId AND c.collectionStatus = 'COLLECTED'")
+    Long countCollectedCharges(@Param("allocationId") Long allocationId);
+
+    @Query("SELECT COALESCE(SUM(c.chargeAmount), 0) FROM ChargeTransaction c WHERE c.allocationId = :allocationId AND c.status = 'SUCCESS' AND UPPER(c.chargeType) = 'INTEREST'")
+    BigDecimal sumSuccessfulInterestCharges(@Param("allocationId") Long allocationId);
+
+    @Query("SELECT COALESCE(SUM(c.chargeAmount), 0) FROM ChargeTransaction c WHERE c.allocationId = :allocationId AND c.status = 'SUCCESS' AND UPPER(c.chargeDescription) LIKE '%FINE%'")
+    BigDecimal sumSuccessfulFineCharges(@Param("allocationId") Long allocationId);
+
+    @Query("SELECT COALESCE(SUM(c.chargeAmount), 0) FROM ChargeTransaction c WHERE c.allocationId = :allocationId AND c.status = 'SUCCESS' AND (UPPER(c.chargeDescription) LIKE '%CHEQUE%' OR UPPER(c.chargeDescription) LIKE '%CHECK%')")
+    BigDecimal sumSuccessfulChequeCharges(@Param("allocationId") Long allocationId);
     
     // Sum credited amount for allocation account
     @Query("SELECT SUM(c.netCreditAmount) FROM ChargeTransaction c WHERE c.allocationAccountId = :accountId AND c.creditStatus = 'CREDITED'")
