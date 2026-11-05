@@ -18,6 +18,16 @@ import com.neo.springapp.repository.EcsMandateEventRepository;
 import com.neo.springapp.repository.LoanRepository;
 import com.neo.springapp.repository.GoldLoanRepository;
 import com.neo.springapp.repository.HomeLoanRepository;
+import com.neo.springapp.repository.AccountRepository;
+import com.neo.springapp.repository.FixedDepositRepository;
+import com.neo.springapp.repository.RecurringDepositRepository;
+import com.neo.springapp.repository.SalaryAccountRepository;
+import com.neo.springapp.repository.CurrentAccountRepository;
+import com.neo.springapp.repository.CreditCardRepository;
+import com.neo.springapp.repository.SoundboxDeviceRepository;
+import com.neo.springapp.repository.SoundboxTransactionRepository;
+import com.neo.springapp.repository.PgMerchantRepository;
+import com.neo.springapp.repository.PgTransactionRepository;
 import com.neo.springapp.service.PasswordService;
 import com.neo.springapp.service.UserSessionTokenService;
 import com.neo.springapp.service.UserSessionTokenService.SessionPrincipal;
@@ -70,6 +80,16 @@ public class AllocationAccountLoginController {
     @Autowired private LoanRepository loanRepository;
     @Autowired private GoldLoanRepository goldLoanRepository;
     @Autowired private HomeLoanRepository homeLoanRepository;
+    @Autowired private AccountRepository accountRepository;
+    @Autowired private FixedDepositRepository fixedDepositRepository;
+    @Autowired private RecurringDepositRepository recurringDepositRepository;
+    @Autowired private SalaryAccountRepository salaryAccountRepository;
+    @Autowired private CurrentAccountRepository currentAccountRepository;
+    @Autowired private CreditCardRepository creditCardRepository;
+    @Autowired private SoundboxDeviceRepository soundboxDeviceRepository;
+    @Autowired private SoundboxTransactionRepository soundboxTransactionRepository;
+    @Autowired private PgMerchantRepository pgMerchantRepository;
+    @Autowired private PgTransactionRepository pgTransactionRepository;
 
     public AllocationAccountLoginController(
             FundsAllocationRepository allocationRepository,
@@ -303,6 +323,7 @@ public class AllocationAccountLoginController {
         response.put("emiPayments", allocationEmiDashboardData(allocationRecordId));
         response.put("ecsMandates", allocationEcsDashboardData(allocationRecordId));
         response.put("accountDeposits", allocationAccountDepositData(allocationRecordId));
+        response.put("portfolio", allocationPortfolioDashboardData(allocationRecordId));
         response.put("profitability", allocationProfitabilityData(allocationRecordId));
         response.put("lastUpdated", LocalDateTime.now());
         return ResponseEntity.ok(response);
@@ -744,6 +765,195 @@ public class AllocationAccountLoginController {
             if (entry.getTransactionDate() != null && row.get("lastTransactionDate") == null) row.put("lastTransactionDate", entry.getTransactionDate());
         }
         return new ArrayList<>(accounts.values());
+    }
+
+    private Map<String, Object> allocationPortfolioDashboardData(Long allocationId) {
+        Set<String> accountNumbers = allocationCustomerAccounts(allocationId);
+        Map<String, Map<String, Object>> customerAccounts = new LinkedHashMap<>();
+        List<Map<String, Object>> fixedDeposits = new ArrayList<>();
+        List<Map<String, Object>> recurringDeposits = new ArrayList<>();
+        List<Map<String, Object>> creditCards = new ArrayList<>();
+        List<Map<String, Object>> soundboxes = new ArrayList<>();
+        List<Map<String, Object>> paymentGateways = new ArrayList<>();
+
+        for (String accountNumber : accountNumbers) {
+            com.neo.springapp.model.Account savings = accountRepository.findByAccountNumber(accountNumber);
+            com.neo.springapp.model.SalaryAccount salary = salaryAccountRepository.findByAccountNumber(accountNumber);
+            Optional<com.neo.springapp.model.CurrentAccount> business = currentAccountRepository.findByAccountNumber(accountNumber);
+            boolean matched = false;
+            if (savings != null) {
+                matched = true;
+                Map<String, Object> accountRow = new LinkedHashMap<>();
+                accountRow.put("accountNumber", accountNumber);
+                accountRow.put("accountType", "SAVINGS");
+                accountRow.put("holderName", savings.getName());
+                accountRow.put("balance", safeDouble(savings.getBalance()));
+                accountRow.put("status", savings.getStatus());
+                accountRow.put("branch", savings.getBranchCity());
+                accountRow.put("openedAt", savings.getCreatedAt());
+                customerAccounts.put("SAVINGS|" + accountNumber, accountRow);
+            }
+            if (salary != null) {
+                matched = true;
+                Map<String, Object> accountRow = new LinkedHashMap<>();
+                accountRow.put("accountNumber", accountNumber);
+                accountRow.put("accountType", "SALARY");
+                accountRow.put("holderName", salary.getEmployeeName());
+                accountRow.put("balance", safeDouble(salary.getBalance()));
+                accountRow.put("status", salary.getStatus());
+                accountRow.put("branch", salary.getBranchName());
+                accountRow.put("monthlySalary", safeDouble(salary.getMonthlySalary()));
+                accountRow.put("companyName", salary.getCompanyName());
+                accountRow.put("openedAt", null);
+                customerAccounts.put("SALARY|" + accountNumber, accountRow);
+            }
+            if (business.isPresent()) {
+                matched = true;
+                com.neo.springapp.model.CurrentAccount current = business.get();
+                Map<String, Object> accountRow = new LinkedHashMap<>();
+                accountRow.put("accountNumber", accountNumber);
+                accountRow.put("accountType", "BUSINESS CURRENT");
+                accountRow.put("holderName", current.getBusinessName());
+                accountRow.put("ownerName", current.getOwnerName());
+                accountRow.put("balance", safeDouble(current.getBalance()));
+                accountRow.put("status", current.getStatus());
+                accountRow.put("branch", current.getBranchName());
+                accountRow.put("overdraftLimit", safeDouble(current.getOverdraftLimit()));
+                accountRow.put("openedAt", current.getCreatedAt());
+                customerAccounts.put("BUSINESS|" + accountNumber, accountRow);
+            }
+            if (!matched) {
+                Map<String, Object> accountRow = new LinkedHashMap<>();
+                accountRow.put("accountNumber", accountNumber);
+                accountRow.put("accountType", "ACTIVITY ACCOUNT");
+                accountRow.put("holderName", "Account activity matched");
+                accountRow.put("balance", 0.0);
+                accountRow.put("status", "UNKNOWN");
+                customerAccounts.put("ACTIVITY|" + accountNumber, accountRow);
+            }
+        }
+
+        for (com.neo.springapp.model.FixedDeposit fd : fixedDepositRepository.findAll()) {
+            if (!accountNumbers.contains(fd.getAccountNumber())) continue;
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("fdAccountNumber", fd.getFdAccountNumber());
+            row.put("accountNumber", fd.getAccountNumber());
+            row.put("customerName", fd.getUserName());
+            row.put("schemeName", fd.getSchemeName());
+            row.put("principalAmount", safeDouble(fd.getPrincipalAmount()));
+            row.put("interestRate", safeDouble(fd.getInterestRate()));
+            row.put("interestAmount", safeDouble(fd.getInterestAmount()));
+            row.put("totalInterestCredited", safeDouble(fd.getTotalInterestCredited()));
+            row.put("maturityAmount", safeDouble(fd.getMaturityAmount()));
+            row.put("startDate", fd.getStartDate());
+            row.put("maturityDate", fd.getMaturityDate());
+            row.put("status", fd.getStatus());
+            fixedDeposits.add(row);
+        }
+
+        for (com.neo.springapp.model.RecurringDeposit rd : recurringDepositRepository.findAll()) {
+            if (!accountNumbers.contains(rd.getAccountNumber())) continue;
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("rdAccountNumber", rd.getRdAccountNumber());
+            row.put("accountNumber", rd.getAccountNumber());
+            row.put("customerName", rd.getCustomerName());
+            row.put("schemeName", rd.getSchemeName());
+            row.put("monthlyInstallment", safeDouble(rd.getMonthlyInstallment()));
+            row.put("annualInterestRate", safeDouble(rd.getAnnualInterestRate()));
+            row.put("tenureMonths", rd.getTenureMonths());
+            row.put("paidInstallments", rd.getPaidInstallments());
+            row.put("paidPrincipal", safeDouble(rd.getPaidPrincipal()));
+            row.put("estimatedInterest", safeDouble(rd.getEstimatedInterest()));
+            row.put("estimatedMaturityAmount", safeDouble(rd.getEstimatedMaturityAmount()));
+            row.put("startDate", rd.getStartDate());
+            row.put("maturityDate", rd.getMaturityDate());
+            row.put("status", rd.getStatus());
+            recurringDeposits.add(row);
+        }
+
+        for (com.neo.springapp.model.CreditCard card : creditCardRepository.findAll()) {
+            if (!accountNumbers.contains(card.getAccountNumber())) continue;
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("cardNumber", card.getMaskedCardNumber());
+            row.put("accountNumber", card.getAccountNumber());
+            row.put("customerName", card.getUserName());
+            row.put("approvedLimit", safeDouble(card.getApprovedLimit()));
+            row.put("currentBalance", safeDouble(card.getCurrentBalance()));
+            row.put("availableLimit", safeDouble(card.getAvailableLimit()));
+            row.put("userSetSpendingLimit", safeDouble(card.getUserSetSpendingLimit()));
+            row.put("overdueAmount", safeDouble(card.getOverdueAmount()));
+            row.put("nextBillingDate", card.getNextBillingDate());
+            row.put("lastPaidDate", card.getLastPaidDate());
+            row.put("status", card.getStatus());
+            creditCards.add(row);
+        }
+
+        for (com.neo.springapp.model.SoundboxDevice device : soundboxDeviceRepository.findAll()) {
+            if (!accountNumbers.contains(device.getAccountNumber())) continue;
+            double successfulVolume = 0.0;
+            for (com.neo.springapp.model.SoundboxTransaction txn : soundboxTransactionRepository.findByAccountNumberOrderByCreatedAtDesc(device.getAccountNumber())) {
+                if ("SUCCESS".equalsIgnoreCase(txn.getStatus()) && "CREDIT".equalsIgnoreCase(txn.getTxnType())) {
+                    successfulVolume += safeDouble(txn.getAmount());
+                }
+            }
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("deviceId", device.getDeviceId());
+            row.put("accountNumber", device.getAccountNumber());
+            row.put("businessName", device.getBusinessName());
+            row.put("ownerName", device.getOwnerName());
+            row.put("status", device.getStatus());
+            row.put("chargeStatus", device.getChargeStatus());
+            row.put("monthlyCharge", safeDouble(device.getMonthlyCharge()));
+            row.put("deviceCharge", safeDouble(device.getDeviceCharge()));
+            row.put("successfulVolume", successfulVolume);
+            row.put("lastActiveAt", device.getLastActiveAt());
+            soundboxes.add(row);
+        }
+
+        for (String accountNumber : accountNumbers) {
+            Optional<com.neo.springapp.model.PgMerchant> merchantResult = pgMerchantRepository.findByAccountNumber(accountNumber);
+            if (merchantResult.isEmpty()) merchantResult = pgMerchantRepository.findByLinkedAccountNumber(accountNumber);
+            if (merchantResult.isEmpty()) continue;
+            com.neo.springapp.model.PgMerchant merchant = merchantResult.get();
+            double successfulVolume = 0.0;
+            double fees = 0.0;
+            long successfulCount = 0;
+            for (com.neo.springapp.model.PgTransaction txn : pgTransactionRepository.findByMerchantIdOrderByCreatedAtDesc(merchant.getMerchantId())) {
+                if ("SUCCESS".equalsIgnoreCase(txn.getStatus())) {
+                    successfulVolume += safeDouble(txn.getAmount());
+                    fees += safeDouble(txn.getFee());
+                    successfulCount++;
+                }
+            }
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("merchantId", merchant.getMerchantId());
+            row.put("accountNumber", merchant.getAccountNumber());
+            row.put("linkedAccountNumber", merchant.getLinkedAccountNumber());
+            row.put("businessName", merchant.getBusinessName());
+            row.put("businessType", merchant.getBusinessType());
+            row.put("status", merchant.getRegistrationStatus());
+            row.put("active", merchant.getIsActive());
+            row.put("verified", merchant.getIsVerified());
+            row.put("dailyLimit", safeDouble(merchant.getDailyLimit()));
+            row.put("successfulVolume", successfulVolume);
+            row.put("feesCollected", fees);
+            row.put("successfulCount", successfulCount);
+            paymentGateways.add(row);
+        }
+
+        Map<String, Object> portfolio = new LinkedHashMap<>();
+        portfolio.put("accounts", new ArrayList<>(customerAccounts.values()));
+        portfolio.put("fixedDeposits", fixedDeposits);
+        portfolio.put("recurringDeposits", recurringDeposits);
+        portfolio.put("creditCards", creditCards);
+        portfolio.put("soundboxes", soundboxes);
+        portfolio.put("paymentGateways", paymentGateways);
+        portfolio.put("fixedDepositBalance", fixedDeposits.stream().mapToDouble(row -> safeDouble(row.get("principalAmount"))).sum());
+        portfolio.put("recurringDepositBalance", recurringDeposits.stream().mapToDouble(row -> safeDouble(row.get("paidPrincipal"))).sum());
+        portfolio.put("creditCardOutstanding", creditCards.stream().mapToDouble(row -> safeDouble(row.get("currentBalance"))).sum());
+        portfolio.put("soundboxChargeAmount", soundboxes.stream().mapToDouble(row -> safeDouble(row.get("monthlyCharge"))).sum());
+        portfolio.put("paymentGatewayFees", paymentGateways.stream().mapToDouble(row -> safeDouble(row.get("feesCollected"))).sum());
+        return portfolio;
     }
 
     private Map<String, Object> allocationProfitabilityData(Long allocationId) {

@@ -13,6 +13,7 @@
       <button type="button" [class.active]="activeSection === 'loans'" (click)="navigateDashboardSection('loans')"><i class="fas fa-file-invoice-dollar"></i>Loan details & EMIs</button>
       <button type="button" [class.active]="activeSection === 'ecs'" (click)="navigateDashboardSection('ecs')"><i class="fas fa-calendar-check"></i>ECS mandates</button>
       <button type="button" [class.active]="activeSection === 'accounts'" (click)="navigateDashboardSection('accounts')"><i class="fas fa-user-check"></i>Account deposits</button>
+      <button type="button" [class.active]="activeSection === 'portfolio'" (click)="navigateDashboardSection('portfolio')"><i class="fas fa-layer-group"></i>Customer portfolio</button>
       <button type="button" [class.active]="activeSection === 'profitability'" (click)="navigateDashboardSection('profitability')"><i class="fas fa-chart-line"></i>Profit / loss</button>
       <button type="button" [class.active]="activeSection === 'charges'" (click)="navigateDashboardSection('charges')"><i class="fas fa-receipt"></i>Charges</button>
       <button type="button" [class.active]="activeSection === 'requests'" (click)="navigateDashboardSection('requests')"><i class="fas fa-paper-plane"></i>Operation requests</button>
@@ -27,7 +28,7 @@
     <header class="allocation-portal-header">
       <div>
         <span class="allocation-portal-eyebrow">ALLOCATION ACCOUNT</span>
-        <h1>{{ activeSection === 'deposits' ? 'FD / RD deposits' : activeSection === 'fundUse' ? 'Loans & fund use' : activeSection === 'loans' ? 'Loan details & EMI schedule' : activeSection === 'ecs' ? 'ECS mandates' : activeSection === 'accounts' ? 'Customer account deposits' : activeSection === 'profitability' ? 'Profit / loss' : activeSection === 'account' ? 'Account details' : activeSection === 'transactions' ? 'Transactions' : activeSection === 'charges' ? 'Charges' : activeSection === 'requests' ? 'Operation requests' : 'Overview' }}</h1>
+        <h1>{{ activeSection === 'deposits' ? 'FD / RD deposits' : activeSection === 'portfolio' ? 'Customer account portfolio' : activeSection === 'fundUse' ? 'Loans & fund use' : activeSection === 'loans' ? 'Loan details & EMI schedule' : activeSection === 'ecs' ? 'ECS mandates' : activeSection === 'accounts' ? 'Customer account deposits' : activeSection === 'profitability' ? 'Profit / loss' : activeSection === 'account' ? 'Account details' : activeSection === 'transactions' ? 'Transactions' : activeSection === 'charges' ? 'Charges' : activeSection === 'requests' ? 'Operation requests' : 'Overview' }}</h1>
       </div>
       <div class="allocation-portal-actions">
         <span class="allocation-portal-live"><i class="fas fa-circle"></i> Live data</span>
@@ -283,6 +284,55 @@
               <tr *ngIf="filteredAllocationEmiPayments.length === 0"><td colspan="8" class="allocation-portal-empty">No EMI records are linked to this allocation.</td></tr>
             </tbody></table>
           </div>
+        </div>
+      </section>
+
+      <section *ngIf="activeSection === 'portfolio'" class="allocation-portal-section">
+        <div class="allocation-portal-metrics">
+          <article><span>Customer accounts</span><strong>{{ allocationPortfolio.accounts?.length || 0 }}</strong><small>Savings, salary and business accounts</small></article>
+          <article><span>FD + RD balance</span><strong>{{ formatCurrency((allocationPortfolio.fixedDepositBalance || 0) + (allocationPortfolio.recurringDepositBalance || 0)) }}</strong><small>Principal mapped to customer accounts</small></article>
+          <article><span>Credit card outstanding</span><strong>{{ formatCurrency(allocationPortfolio.creditCardOutstanding || 0) }}</strong><small>Approved card limits and usage</small></article>
+        </div>
+
+        <div class="allocation-portal-card">
+          <div class="allocation-portal-card-heading"><div><h2>Customer bank accounts</h2><p>Opened savings, salary and business current accounts linked to this allocation activity.</p></div></div>
+          <div class="allocation-portal-table-wrap"><table class="allocation-portal-table"><thead><tr><th>Account / type</th><th>Holder / business</th><th>Branch</th><th>Available balance</th><th>Status</th><th>Extra details</th></tr></thead><tbody>
+            <tr *ngFor="let account of allocationPortfolio.accounts"><td>{{ account.accountNumber }}<small>{{ account.accountType }}</small></td><td>{{ account.holderName || '—' }}<small>{{ account.ownerName || account.companyName || '—' }}</small></td><td>{{ account.branch || '—' }}</td><td>{{ formatCurrency(account.balance || 0) }}</td><td><span class="allocation-portal-pill">{{ account.status || '—' }}</span></td><td>{{ account.monthlySalary ? ('Monthly salary ' + formatCurrency(account.monthlySalary)) : (account.overdraftLimit ? ('Overdraft ' + formatCurrency(account.overdraftLimit)) : '—') }}</td></tr>
+            <tr *ngIf="!allocationPortfolio.accounts?.length"><td colspan="6" class="allocation-portal-empty">No customer accounts are mapped to this allocation ledger.</td></tr>
+          </tbody></table></div>
+        </div>
+
+        <div class="allocation-portal-card">
+          <div class="allocation-portal-card-heading"><div><h2>Fixed deposits</h2><p>All opened FD records for each mapped customer account.</p></div></div>
+          <div class="allocation-portal-table-wrap"><table class="allocation-portal-table"><thead><tr><th>FD account / customer</th><th>Principal</th><th>Interest rate / earned</th><th>Maturity</th><th>Status</th></tr></thead><tbody>
+            <tr *ngFor="let fd of allocationPortfolio.fixedDeposits"><td>{{ fd.fdAccountNumber }}<small>{{ fd.accountNumber }} · {{ fd.customerName || '—' }}</small></td><td>{{ formatCurrency(fd.principalAmount || 0) }}</td><td>{{ fd.interestRate || 0 }}%<small>{{ formatCurrency(fd.interestAmount || fd.totalInterestCredited || 0) }} interest</small></td><td>{{ fd.maturityAmount ? formatCurrency(fd.maturityAmount) : '—' }}<small>{{ fd.maturityDate ? (fd.maturityDate | date:'mediumDate') : '—' }}</small></td><td><span class="allocation-portal-pill">{{ fd.status || '—' }}</span></td></tr>
+            <tr *ngIf="!allocationPortfolio.fixedDeposits?.length"><td colspan="5" class="allocation-portal-empty">No FD records are linked to mapped customer accounts.</td></tr>
+          </tbody></table></div>
+        </div>
+
+        <div class="allocation-portal-card">
+          <div class="allocation-portal-card-heading"><div><h2>Recurring deposits</h2><p>Monthly RD installments, paid principal and estimated maturity.</p></div></div>
+          <div class="allocation-portal-table-wrap"><table class="allocation-portal-table"><thead><tr><th>RD account / customer</th><th>Monthly installment</th><th>Paid principal / installments</th><th>Rate / maturity</th><th>Status</th></tr></thead><tbody>
+            <tr *ngFor="let rd of allocationPortfolio.recurringDeposits"><td>{{ rd.rdAccountNumber }}<small>{{ rd.accountNumber }} · {{ rd.customerName || '—' }}</small></td><td>{{ formatCurrency(rd.monthlyInstallment || 0) }}</td><td>{{ formatCurrency(rd.paidPrincipal || 0) }}<small>{{ rd.paidInstallments || 0 }} installments</small></td><td>{{ rd.annualInterestRate || 0 }}%<small>{{ rd.maturityDate ? (rd.maturityDate | date:'mediumDate') : '—' }} · {{ formatCurrency(rd.estimatedMaturityAmount || 0) }}</small></td><td><span class="allocation-portal-pill">{{ rd.status || '—' }}</span></td></tr>
+            <tr *ngIf="!allocationPortfolio.recurringDeposits?.length"><td colspan="5" class="allocation-portal-empty">No RD records are linked to mapped customer accounts.</td></tr>
+          </tbody></table></div>
+        </div>
+
+        <div class="allocation-portal-card">
+          <div class="allocation-portal-card-heading"><div><h2>Credit cards</h2><p>Card limits, outstanding usage, overdue amount and billing dates.</p></div></div>
+          <div class="allocation-portal-table-wrap"><table class="allocation-portal-table"><thead><tr><th>Card / customer</th><th>Approved limit</th><th>Outstanding</th><th>Available limit / spending limit</th><th>Billing</th><th>Status</th></tr></thead><tbody>
+            <tr *ngFor="let card of allocationPortfolio.creditCards"><td>{{ card.cardNumber }}<small>{{ card.accountNumber }} · {{ card.customerName || '—' }}</small></td><td>{{ formatCurrency(card.approvedLimit || 0) }}</td><td>{{ formatCurrency(card.currentBalance || 0) }}<small>Overdue {{ formatCurrency(card.overdueAmount || 0) }}</small></td><td>{{ formatCurrency(card.availableLimit || 0) }}<small>User limit {{ formatCurrency(card.userSetSpendingLimit || 0) }}</small></td><td>{{ card.nextBillingDate ? (card.nextBillingDate | date:'mediumDate') : '—' }}<small>Last paid {{ card.lastPaidDate ? (card.lastPaidDate | date:'mediumDate') : '—' }}</small></td><td><span class="allocation-portal-pill">{{ card.status || '—' }}</span></td></tr>
+            <tr *ngIf="!allocationPortfolio.creditCards?.length"><td colspan="6" class="allocation-portal-empty">No credit cards are linked to mapped customer accounts.</td></tr>
+          </tbody></table></div>
+        </div>
+
+        <div class="allocation-portal-card">
+          <div class="allocation-portal-card-heading"><div><h2>Soundbox and payment gateway</h2><p>Device charges, successful payment volume and gateway fees.</p></div></div>
+          <div class="allocation-portal-table-wrap"><table class="allocation-portal-table"><thead><tr><th>Merchant / device</th><th>Account</th><th>Volume / fees</th><th>Charges</th><th>Status / activity</th></tr></thead><tbody>
+            <tr *ngFor="let device of allocationPortfolio.soundboxes"><td>Soundbox {{ device.deviceId }}<small>{{ device.businessName || device.ownerName || '—' }}</small></td><td>{{ device.accountNumber }}</td><td>{{ formatCurrency(device.successfulVolume || 0) }}<small>Successful received volume</small></td><td>{{ formatCurrency((device.monthlyCharge || 0) + (device.deviceCharge || 0)) }}<small>{{ formatCurrency(device.monthlyCharge || 0) }} monthly · {{ formatCurrency(device.deviceCharge || 0) }} device</small></td><td>{{ device.status || '—' }}<small>{{ device.chargeStatus || '—' }}</small></td></tr>
+            <tr *ngFor="let merchant of allocationPortfolio.paymentGateways"><td>Gateway {{ merchant.merchantId }}<small>{{ merchant.businessName || '—' }}</small></td><td>{{ merchant.linkedAccountNumber || merchant.accountNumber || '—' }}</td><td>{{ formatCurrency(merchant.successfulVolume || 0) }}<small>{{ merchant.successfulCount || 0 }} successful · fees {{ formatCurrency(merchant.feesCollected || 0) }}</small></td><td>{{ formatCurrency(merchant.feesCollected || 0) }}<small>Collected gateway fees</small></td><td>{{ merchant.status || '—' }}<small>{{ merchant.active ? 'Active' : 'Inactive' }} · {{ merchant.verified ? 'Verified' : 'Not verified' }}</small></td></tr>
+            <tr *ngIf="!allocationPortfolio.soundboxes?.length && !allocationPortfolio.paymentGateways?.length"><td colspan="5" class="allocation-portal-empty">No soundbox or payment-gateway records are mapped to this allocation.</td></tr>
+          </tbody></table></div>
         </div>
       </section>
 

@@ -44,6 +44,7 @@ export class ManagerAccountDashboardComponent implements OnInit, OnDestroy {
   allocationEmiPayments: any[] = [];
   allocationEcsMandates: any[] = [];
   allocationAccountDeposits: any[] = [];
+  allocationPortfolio: any = {};
   allocationProfitability: any = {};
   loanSearch = '';
   loanTypeFilter = 'ALL';
@@ -205,7 +206,7 @@ export class ManagerAccountDashboardComponent implements OnInit, OnDestroy {
     }
   }
 
-  navigateDashboardSection(section: 'overview' | 'account' | 'transactions' | 'deposits' | 'fundUse' | 'charges' | 'loans' | 'accounts' | 'ecs' | 'profitability' | 'requests'): void {
+  navigateDashboardSection(section: 'overview' | 'account' | 'transactions' | 'deposits' | 'portfolio' | 'fundUse' | 'charges' | 'loans' | 'accounts' | 'ecs' | 'profitability' | 'requests'): void {
     this.activeSection = section;
     this.errorMessage = '';
     this.requestError = '';
@@ -480,6 +481,7 @@ export class ManagerAccountDashboardComponent implements OnInit, OnDestroy {
         this.allocationEmiPayments = response.emiPayments || [];
         this.allocationEcsMandates = response.ecsMandates || [];
         this.allocationAccountDeposits = response.accountDeposits || [];
+        this.allocationPortfolio = response.portfolio || {};
         this.allocationProfitability = response.profitability || {};
         this.chargePage = response.chargePage || 0;
         this.chargeTotalPages = response.chargeTotalPages || 0;
