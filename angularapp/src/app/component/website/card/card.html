@@ -159,8 +159,11 @@
 
       <div class="action-group">
         <h5 class="group-title">Card Security</h5>
-        <button (click)="blockCard()" class="block-btn" [disabled]="card?.status === 'Blocked' || card?.status === 'Deactivated'">
+        <button *ngIf="card?.status !== 'Blocked'" (click)="blockCard()" class="block-btn" [disabled]="card?.status === 'Deactivated'">
           Block Card
+        </button>
+        <button *ngIf="card?.status === 'Blocked'" (click)="unblockCard()" class="block-btn">
+          Unblock Card
         </button>
         <button (click)="deactivateCard()" class="deactivate-btn" [disabled]="card?.status === 'Deactivated'">
           Deactivate Card

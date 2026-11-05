@@ -1,4 +1,4 @@
-import { Component, OnInit, Inject, PLATFORM_ID } from '@angular/core';
+import { Component, OnInit, OnDestroy, Inject, PLATFORM_ID } from '@angular/core';
 import { Router } from '@angular/router';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -25,6 +25,7 @@ interface CardDetails {
   createdAt: string;
   lastUpdated: string;
   replacedBy?: string;
+  salaryAccountId?: number;
 }
 
 interface CardReplacementRequest {
@@ -75,7 +76,7 @@ interface UserProfile {
   templateUrl: './cards.html',
   styleUrls: ['./cards.css']
 })
-export class Cards implements OnInit {
+export class Cards implements OnInit, OnDestroy {
   cards: CardDetails[] = [];
   replacementRequests: CardReplacementRequest[] = [];
   newCardRequests: NewCardRequest[] = [];
@@ -89,6 +90,7 @@ export class Cards implements OnInit {
   cardActionHistory: any[] = [];
   isLoadingCardDetails = false;
   showCardDetailsModal = false;
+  private cardPollInterval: any = null;
 
   constructor(private router: Router, @Inject(PLATFORM_ID) private platformId: Object, private http: HttpClient) {}
 
@@ -97,7 +99,15 @@ export class Cards implements OnInit {
     if (isPlatformBrowser(this.platformId)) {
       this.loadCards();
       this.loadRequests();
+      this.cardPollInterval = setInterval(() => {
+        this.loadCards();
+        this.loadRequests();
+      }, 5000);
     }
+  }
+
+  ngOnDestroy() {
+    if (this.cardPollInterval) clearInterval(this.cardPollInterval);
   }
 
   loadCards() {
@@ -106,13 +116,35 @@ export class Cards implements OnInit {
     forkJoin({
       debit: this.http.get<any>(`${environment.apiBaseUrl}/api/cards?page=0&size=100`).pipe(catchError(() => of({ content: [] }))),
       credit: this.http.get<any[]>(`${environment.apiBaseUrl}/api/credit-cards/all`).pipe(catchError(() => of([]))),
-      virtual: this.http.get<any>(`${environment.apiBaseUrl}/api/virtual-cards/all`).pipe(catchError(() => of({ cards: [] })))
+      virtual: this.http.get<any>(`${environment.apiBaseUrl}/api/virtual-cards/all`).pipe(catchError(() => of({ cards: [] }))),
+      salary: this.http.get<any[]>(`${environment.apiBaseUrl}/api/salary-accounts/all`).pipe(catchError(() => of([])))
     }).subscribe({
-      next: ({ debit, credit, virtual }) => {
+      next: ({ debit, credit, virtual, salary }) => {
         const debitCards = (debit?.content || (Array.isArray(debit) ? debit : [])).map((card: any) => this.normalizeCard(card, 'debit'));
         const creditCards = (Array.isArray(credit) ? credit : []).map((card: any) => this.normalizeCard(card, 'credit'));
         const virtualCards = (virtual?.cards || []).map((card: any) => this.normalizeCard(card, 'virtual'));
-        this.cards = [...debitCards, ...creditCards, ...virtualCards];
+        const salaryCards = (Array.isArray(salary) ? salary : [])
+          .filter((account: any) => account.debitCardNumber)
+          .map((account: any) => ({
+            id: `salary-${account.id}`,
+            salaryAccountId: account.id,
+            userId: account.accountNumber,
+            userName: account.employeeName || account.name || 'Salary Account Holder',
+            userAccountNumber: account.accountNumber,
+            cardNumber: account.debitCardNumber,
+            cardType: 'Salary Debit Card',
+            cvv: account.debitCardCvv,
+            expiry: account.debitCardExpiry,
+            status: account.debitCardStatus || 'Active',
+            cardSource: 'debit' as const,
+            accountType: 'Salary Account',
+            pinSet: !!account.debitCardPinSet,
+            pinLocked: !!account.debitCardPinLocked,
+            blocked: String(account.debitCardStatus || '').toUpperCase() === 'BLOCKED',
+            createdAt: account.createdAt || new Date().toISOString(),
+            lastUpdated: account.updatedAt || new Date().toISOString()
+          }));
+        this.cards = [...debitCards, ...salaryCards, ...creditCards, ...virtualCards];
         this.saveCards();
         this.applyFilters();
       },
@@ -369,7 +401,9 @@ export class Cards implements OnInit {
         ? this.http.put(`${environment.apiBaseUrl}/api/credit-cards/${id}`, { status: 'Blocked' })
         : card.cardSource === 'virtual'
           ? this.http.put(`${environment.apiBaseUrl}/api/virtual-cards/${id}/freeze`, {})
-          : this.http.put(`${environment.apiBaseUrl}/api/cards/${id}/block`, {});
+          : card.salaryAccountId
+            ? this.http.put(`${environment.apiBaseUrl}/api/salary-accounts/debit-card/settings/${card.salaryAccountId}`, { status: 'Blocked' })
+            : this.http.put(`${environment.apiBaseUrl}/api/cards/${id}/block`, {});
       request.subscribe({
         next: (updated: any) => {
           card.status = updated?.status || updated?.card?.status || 'Blocked';
@@ -391,7 +425,9 @@ export class Cards implements OnInit {
         ? this.http.put(`${environment.apiBaseUrl}/api/credit-cards/${id}`, { status: 'Active' })
         : card.cardSource === 'virtual'
           ? this.http.put(`${environment.apiBaseUrl}/api/virtual-cards/${id}/unfreeze`, {})
-          : this.http.put(`${environment.apiBaseUrl}/api/cards/${id}/unblock`, {});
+          : card.salaryAccountId
+            ? this.http.put(`${environment.apiBaseUrl}/api/salary-accounts/debit-card/settings/${card.salaryAccountId}`, { status: 'Active' })
+            : this.http.put(`${environment.apiBaseUrl}/api/cards/${id}/unblock`, {});
       request.subscribe({
         next: (updated: any) => {
           card.status = updated?.status || updated?.card?.status || 'Active';
@@ -413,12 +449,15 @@ export class Cards implements OnInit {
       return;
     }
     if (confirm(`Replace card ending with ${card.cardNumber.slice(-4)} for ${card.userName}?`)) {
-      this.http.post(`${environment.apiBaseUrl}/api/cards/${card.id}/replace-auto`, {}).subscribe({
+      const replaceUrl = card.salaryAccountId
+        ? `${environment.apiBaseUrl}/api/salary-accounts/debit-card/replace/${card.salaryAccountId}`
+        : `${environment.apiBaseUrl}/api/cards/${card.id.split('-').pop()}/replace-auto`;
+      this.http.post(replaceUrl, {}).subscribe({
         next: (updated: any) => {
           if (updated) {
-            card.cardNumber = updated.cardNumber;
-            card.cvv = updated.cvv;
-            card.expiry = updated.expiryDate;
+            card.cardNumber = updated.cardNumber || updated.card?.cardNumber || card.cardNumber;
+            card.cvv = updated.cvv || updated.card?.cvv || card.cvv;
+            card.expiry = updated.expiryDate || updated.card?.expiryDate || card.expiry;
             card.status = updated.status || 'Active';
             card.pinSet = updated.pinSet || false;
             card.pinLocked = false;
@@ -473,7 +512,9 @@ export class Cards implements OnInit {
     const numericId = card.id.split('-').pop();
     const transactionsUrl = card.cardSource === 'credit'
       ? `${environment.apiBaseUrl}/api/credit-cards/${numericId}/transactions`
-      : `${environment.apiBaseUrl}/api/cards/${numericId}/transactions`;
+      : card.salaryAccountId
+        ? `${environment.apiBaseUrl}/api/salary-accounts/debit-card/transactions/${card.salaryAccountId}`
+        : `${environment.apiBaseUrl}/api/cards/${numericId}/transactions`;
     if (card.cardSource !== 'virtual') {
       this.http.get(transactionsUrl).subscribe({
         next: (txns) => { this.cardTransactions = Array.isArray(txns) ? txns : []; },
@@ -481,7 +522,9 @@ export class Cards implements OnInit {
       });
     }
     const historyUrl = card.cardSource === 'debit'
-      ? `${environment.apiBaseUrl}/api/cards/${numericId}/action-history`
+      ? card.salaryAccountId
+        ? `${environment.apiBaseUrl}/api/salary-accounts/debit-card/limit-history/${card.salaryAccountId}`
+        : `${environment.apiBaseUrl}/api/cards/${numericId}/action-history`
       : `${environment.apiBaseUrl}/api/audit/card-history?cardSource=${card.cardSource}&cardId=${numericId}`;
     this.http.get(historyUrl).subscribe({
       next: (history) => {
@@ -537,11 +580,24 @@ export class Cards implements OnInit {
 
   deactivateCard(card: CardDetails) {
     if (confirm(`Deactivate card ending with ${card.cardNumber.slice(-4)} for ${card.userName}? This action cannot be undone.`)) {
-      card.status = 'Deactivated';
-      card.lastUpdated = new Date().toISOString();
-      this.saveCards();
-      this.applyFilters();
-      alert(`Card ending with ${card.cardNumber.slice(-4)} has been deactivated.`);
+      const id = card.id.split('-').pop();
+      const request = card.cardSource === 'credit'
+        ? this.http.put(`${environment.apiBaseUrl}/api/credit-cards/${id}/close`, {})
+        : card.cardSource === 'virtual'
+          ? this.http.put(`${environment.apiBaseUrl}/api/virtual-cards/${id}/deactivate`, {})
+          : card.salaryAccountId
+            ? this.http.put(`${environment.apiBaseUrl}/api/salary-accounts/debit-card/settings/${card.salaryAccountId}`, { status: 'Deactivated' })
+            : this.http.put(`${environment.apiBaseUrl}/api/cards/${id}/deactivate`, {});
+      request.subscribe({
+        next: () => {
+          card.status = 'Deactivated';
+          card.lastUpdated = new Date().toISOString();
+          this.saveCards();
+          this.applyFilters();
+          alert(`Card ending with ${card.cardNumber.slice(-4)} has been deactivated.`);
+        },
+        error: () => alert('Failed to deactivate card on server.')
+      });
     }
   }
 

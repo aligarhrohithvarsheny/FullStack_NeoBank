@@ -1421,7 +1421,7 @@
                 <span class="sdash-stat-value">{{ debitCardInfo.internationalEnabled ? 'Enabled' : 'Disabled' }}</span>
               </div>
               <label class="sdash-toggle">
-                <input type="checkbox" [checked]="debitCardInfo.internationalEnabled" (change)="updateCardSetting('international', !debitCardInfo.internationalEnabled)" [disabled]="isUpdatingCard">
+                <input type="checkbox" [checked]="debitCardInfo.internationalEnabled" (change)="updateCardSetting('internationalEnabled', !debitCardInfo.internationalEnabled)" [disabled]="isUpdatingCard">
                 <span class="sdash-toggle-slider"></span>
               </label>
             </div>
@@ -1431,7 +1431,7 @@
                 <span class="sdash-stat-value">{{ debitCardInfo.onlineEnabled ? 'Enabled' : 'Disabled' }}</span>
               </div>
               <label class="sdash-toggle">
-                <input type="checkbox" [checked]="debitCardInfo.onlineEnabled" (change)="updateCardSetting('online', !debitCardInfo.onlineEnabled)" [disabled]="isUpdatingCard">
+                <input type="checkbox" [checked]="debitCardInfo.onlineEnabled" (change)="updateCardSetting('onlineEnabled', !debitCardInfo.onlineEnabled)" [disabled]="isUpdatingCard">
                 <span class="sdash-toggle-slider"></span>
               </label>
             </div>
@@ -1441,7 +1441,7 @@
                 <span class="sdash-stat-value">{{ debitCardInfo.contactlessEnabled ? 'Enabled' : 'Disabled' }}</span>
               </div>
               <label class="sdash-toggle">
-                <input type="checkbox" [checked]="debitCardInfo.contactlessEnabled" (change)="updateCardSetting('contactless', !debitCardInfo.contactlessEnabled)" [disabled]="isUpdatingCard">
+                <input type="checkbox" [checked]="debitCardInfo.contactlessEnabled" (change)="updateCardSetting('contactlessEnabled', !debitCardInfo.contactlessEnabled)" [disabled]="isUpdatingCard">
                 <span class="sdash-toggle-slider"></span>
               </label>
             </div>
@@ -1466,8 +1466,14 @@
                   <button class="sdash-btn sdash-btn-primary" (click)="updateCardSetting('dailyLimit', debitCardInfo.dailyLimit)" [disabled]="isUpdatingCard">Update Limit</button>
                   <button class="sdash-btn sdash-btn-secondary" (click)="showSetPinForm = !showSetPinForm" [disabled]="isUpdatingCard || debitCardInfo.pinLocked"><i class="fa fa-lock"></i> Set PIN</button>
                   <button class="sdash-btn sdash-btn-secondary" (click)="replaceDebitCard()" [disabled]="isUpdatingCard"><i class="fa fa-refresh"></i> Replace Card</button>
-                  <button class="sdash-btn" [class.sdash-btn-danger]="isCardActive()" [class.sdash-btn-success]="!isCardActive()" (click)="toggleBlockCard()" [disabled]="isUpdatingCard">
+                  <button class="sdash-btn" [class.sdash-btn-danger]="isCardActive()" [class.sdash-btn-success]="!isCardActive()" (click)="toggleBlockCard()" [disabled]="isUpdatingCard || debitCardInfo.status === 'Deactivated'">
                     {{ isCardActive() ? 'Block Card' : 'Unblock Card' }}
+                  </button>
+                  <button class="sdash-btn sdash-btn-danger" (click)="updateCardSetting('status', 'Deactivated')" [disabled]="isUpdatingCard || debitCardInfo.status === 'Deactivated'">
+                    <i class="fa fa-ban"></i> Deactivate Card
+                  </button>
+                  <button class="sdash-btn sdash-btn-secondary" (click)="loadDebitCardInfo()" [disabled]="isUpdatingCard">
+                    <i class="fa fa-sync"></i> Refresh Live
                   </button>
                 </div>
               </div>
@@ -1485,6 +1491,25 @@
             <div class="sdash-stat-card" [class.sdash-card-active]="debitCardInfo.limitIncreaseEnabled">
               <div class="sdash-stat-info"><span class="sdash-stat-label">Limit Increase</span><span class="sdash-stat-value">{{ debitCardInfo.limitIncreaseEnabled ? 'Enabled' : 'Disabled' }}</span></div>
               <label class="sdash-toggle"><input type="checkbox" [checked]="debitCardInfo.limitIncreaseEnabled" (change)="updateCardSetting('limitIncreaseEnabled', !debitCardInfo.limitIncreaseEnabled)" [disabled]="isUpdatingCard"><span class="sdash-toggle-slider"></span></label>
+            </div>
+          </div>
+
+          <div class="sdash-card" style="margin-top:16px;">
+            <div class="sdash-card-header"><h3>Daily Limit History</h3></div>
+            <div class="sdash-card-body">
+              <div *ngIf="cardLimitHistory.length === 0">No limit changes recorded.</div>
+              <table *ngIf="cardLimitHistory.length > 0" class="sdash-table">
+                <thead><tr><th>Date</th><th>Change</th><th>Old Limit</th><th>New Limit</th><th>Changed By</th></tr></thead>
+                <tbody>
+                  <tr *ngFor="let item of cardLimitHistory">
+                    <td>{{ item.createdAt | date:'dd MMM yyyy HH:mm' }}</td>
+                    <td>{{ item.changeType }}</td>
+                    <td>&#8377;{{ item.oldLimit | number:'1.2-2' }}</td>
+                    <td>&#8377;{{ item.newLimit | number:'1.2-2' }}</td>
+                    <td>{{ item.changedBy || 'System' }}</td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </div>
 

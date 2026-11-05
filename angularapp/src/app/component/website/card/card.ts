@@ -1,4 +1,4 @@
-import { Component, OnInit, Inject, PLATFORM_ID, ViewEncapsulation, Input } from '@angular/core';
+import { Component, OnInit, OnDestroy, Inject, PLATFORM_ID, ViewEncapsulation, Input } from '@angular/core';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
@@ -45,7 +45,7 @@ interface UserProfile {
   styleUrls: ['./card.css'],
   encapsulation: ViewEncapsulation.None
 })
-export class Card implements OnInit {
+export class Card implements OnInit, OnDestroy {
   @Input() accountNumberInput = '';
   @Input() accountNameInput = '';
   @Input() accountEmailInput = '';
@@ -79,6 +79,7 @@ export class Card implements OnInit {
   // CIBIL Report Lookup
   cibilReportData: any = null;
   isLoadingCibilReport: boolean = false;
+  private cardPollInterval: any = null;
 
   constructor(private router: Router, @Inject(PLATFORM_ID) private platformId: Object, private http: HttpClient, private alertService: AlertService) {}
 
@@ -94,11 +95,22 @@ export class Card implements OnInit {
           joinDate: new Date().toISOString().split('T')[0]
         };
         this.loadUserCard();
+        this.startCardPolling();
         return;
       }
       this.loadUserProfile();
       this.loadUserCard();
+      this.startCardPolling();
     }
+  }
+
+  ngOnDestroy() {
+    if (this.cardPollInterval) clearInterval(this.cardPollInterval);
+  }
+
+  private startCardPolling() {
+    if (this.cardPollInterval) clearInterval(this.cardPollInterval);
+    this.cardPollInterval = setInterval(() => this.loadUserCard(), 5000);
   }
 
   // Method to refresh card data (can be called when user returns to page)
@@ -563,6 +575,25 @@ export class Card implements OnInit {
       });
       }
     );
+  }
+
+  unblockCard() {
+    if (!this.card || !this.userProfile) return;
+    this.http.get(`${environment.apiBaseUrl}/api/cards/account/${this.userProfile.accountNumber}`).subscribe({
+      next: (cards: any) => {
+        if (!cards?.length) return;
+        const backendCard = cards[0];
+        this.http.put(`${environment.apiBaseUrl}/api/cards/${backendCard.id}/unblock`, {}).subscribe({
+          next: () => {
+            this.card!.status = 'Active';
+            this.card!.lastUpdated = new Date().toISOString();
+            this.saveCard();
+            this.alertService.cardSuccess('Card Unblocked', 'Your debit card is active again.');
+          },
+          error: () => this.alertService.cardError('Card Unblocking Failed', 'Failed to unblock card. Please try again.')
+        });
+      }
+    });
   }
 
   deactivateCard() {

@@ -21,7 +21,12 @@ public interface AllocationUtilizationRepository extends JpaRepository<Allocatio
 
     Page<AllocationUtilization> findByAllocationIdOrderByTransactionDateDesc(Long allocationId, Pageable pageable);
 
-    long countByAllocationId(Long allocationId);
+    @Query("SELECT COUNT(au) FROM AllocationUtilization au WHERE au.allocationId = :allocationId AND UPPER(au.status) = 'SUCCESS'")
+    long countSuccessfulByAllocationId(@Param("allocationId") Long allocationId);
+
+    @Query("SELECT au FROM AllocationUtilization au WHERE au.allocationId = :allocationId AND UPPER(au.status) = 'SUCCESS' ORDER BY au.transactionDate DESC")
+    Page<AllocationUtilization> findSuccessfulByAllocationIdOrderByTransactionDateDesc(
+            @Param("allocationId") Long allocationId, Pageable pageable);
 
     Page<AllocationUtilization> findByAllocationIdAndTransactionType(Long allocationId, String transactionType, Pageable pageable);
 
@@ -34,27 +39,27 @@ public interface AllocationUtilizationRepository extends JpaRepository<Allocatio
             @Param("toDate") LocalDateTime toDate,
             Pageable pageable);
 
-    @Query("SELECT COALESCE(SUM(au.amount), 0) FROM AllocationUtilization au WHERE au.allocationId = :allocationId AND au.transactionType = 'DEBIT'")
+    @Query("SELECT COALESCE(SUM(au.amount), 0) FROM AllocationUtilization au WHERE au.allocationId = :allocationId AND au.transactionType = 'DEBIT' AND UPPER(au.status) = 'SUCCESS'")
     Double getTotalDebited(@Param("allocationId") Long allocationId);
 
-    @Query("SELECT COALESCE(SUM(au.amount), 0) FROM AllocationUtilization au WHERE au.allocationId = :allocationId AND au.transactionType = 'CREDIT'")
+    @Query("SELECT COALESCE(SUM(au.amount), 0) FROM AllocationUtilization au WHERE au.allocationId = :allocationId AND au.transactionType = 'CREDIT' AND UPPER(au.status) = 'SUCCESS'")
     Double getTotalCredited(@Param("allocationId") Long allocationId);
 
-    @Query("SELECT COUNT(au) FROM AllocationUtilization au WHERE au.allocationId = :allocationId AND au.transactionType = 'DEBIT'")
+    @Query("SELECT COUNT(au) FROM AllocationUtilization au WHERE au.allocationId = :allocationId AND au.transactionType = 'DEBIT' AND UPPER(au.status) = 'SUCCESS'")
     Long getDebitCount(@Param("allocationId") Long allocationId);
 
-    @Query("SELECT COUNT(au) FROM AllocationUtilization au WHERE au.allocationId = :allocationId AND au.transactionType = 'CREDIT'")
+    @Query("SELECT COUNT(au) FROM AllocationUtilization au WHERE au.allocationId = :allocationId AND au.transactionType = 'CREDIT' AND UPPER(au.status) = 'SUCCESS'")
     Long getCreditCount(@Param("allocationId") Long allocationId);
 
-    @Query("SELECT COALESCE(SUM(au.amount), 0) FROM AllocationUtilization au WHERE au.allocationId = :allocationId AND au.productType = :productType AND au.transactionType = 'DEBIT'")
+    @Query("SELECT COALESCE(SUM(au.amount), 0) FROM AllocationUtilization au WHERE au.allocationId = :allocationId AND au.productType = :productType AND au.transactionType = 'DEBIT' AND UPPER(au.status) = 'SUCCESS'")
     Double getTotalDebitedByProduct(@Param("allocationId") Long allocationId, @Param("productType") String productType);
 
-    @Query("SELECT COALESCE(SUM(au.amount), 0) FROM AllocationUtilization au WHERE au.allocationId = :allocationId AND UPPER(au.transactionType) = UPPER(:transactionType) AND UPPER(au.productType) IN :productTypes")
+    @Query("SELECT COALESCE(SUM(au.amount), 0) FROM AllocationUtilization au WHERE au.allocationId = :allocationId AND UPPER(au.transactionType) = UPPER(:transactionType) AND UPPER(au.productType) IN :productTypes AND UPPER(au.status) = 'SUCCESS'")
     Double sumByAllocationAndProductTypes(@Param("allocationId") Long allocationId,
                                           @Param("transactionType") String transactionType,
                                           @Param("productTypes") List<String> productTypes);
 
-    @Query("SELECT COUNT(au) FROM AllocationUtilization au WHERE au.allocationId = :allocationId AND UPPER(au.transactionType) = UPPER(:transactionType) AND UPPER(au.productType) IN :productTypes")
+    @Query("SELECT COUNT(au) FROM AllocationUtilization au WHERE au.allocationId = :allocationId AND UPPER(au.transactionType) = UPPER(:transactionType) AND UPPER(au.productType) IN :productTypes AND UPPER(au.status) = 'SUCCESS'")
     Long countByAllocationAndProductTypes(@Param("allocationId") Long allocationId,
                                           @Param("transactionType") String transactionType,
                                           @Param("productTypes") List<String> productTypes);

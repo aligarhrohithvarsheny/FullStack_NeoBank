@@ -132,6 +132,8 @@ export class SalaryDashboard implements OnInit, OnDestroy {
   allPaymentLinks: any[] = [];
   isLoadingLinks = false;
   private linkPollInterval: any = null;
+  private debitCardPollInterval: any = null;
+  private creditCardPollInterval: any = null;
   showLinkPayModal = false;
   selectedLink: any = null;
   linkPayPin = '';
@@ -251,6 +253,8 @@ export class SalaryDashboard implements OnInit, OnDestroy {
   ngOnDestroy() {
     if (this.currentSessionTimer) clearInterval(this.currentSessionTimer);
     if (this.linkPollInterval) clearInterval(this.linkPollInterval);
+    if (this.debitCardPollInterval) clearInterval(this.debitCardPollInterval);
+    if (this.creditCardPollInterval) clearInterval(this.creditCardPollInterval);
   }
 
   startSessionTimer() {
@@ -320,6 +324,14 @@ export class SalaryDashboard implements OnInit, OnDestroy {
       this.router.navigate(['/website/positive-pay']);
       return;
     }
+    if (section !== 'debit-card' && this.debitCardPollInterval) {
+      clearInterval(this.debitCardPollInterval);
+      this.debitCardPollInterval = null;
+    }
+    if (section !== 'credit-card' && this.creditCardPollInterval) {
+      clearInterval(this.creditCardPollInterval);
+      this.creditCardPollInterval = null;
+    }
     this.activeSection = section;
     if (section === 'salary-transactions') this.loadSalaryTransactions();
     else if (section === 'transactions') this.loadNormalTransactions();
@@ -333,11 +345,21 @@ export class SalaryDashboard implements OnInit, OnDestroy {
     else if (section === 'loan-eligibility') { this.loadLoanEligibility(); }
     else if (section === 'auto-savings') { this.loadAutoSavingsInfo(); }
     else if (section === 'salary-advance') { this.loadAdvanceInfo(); this.loadAdvanceHistory(); }
-    else if (section === 'debit-card') { this.loadDebitCardInfo(); }
+    else if (section === 'debit-card') {
+      this.loadDebitCardInfo();
+      if (!this.debitCardPollInterval) {
+        this.debitCardPollInterval = setInterval(() => this.loadDebitCardInfo(), 5000);
+      }
+    }
     else if (section === 'fraud-detection') { this.loadFraudSummary(); }
     else if (section === 'gold-loan') { this.loadCurrentGoldRate(); this.loadMyGoldLoans(); }
     else if (section === 'employee-profile') { this.initProfileForm(); }
-    else if (section === 'credit-card') { this.loadMyCreditCards(); }
+    else if (section === 'credit-card') {
+      this.loadMyCreditCards();
+      if (!this.creditCardPollInterval) {
+        this.creditCardPollInterval = setInterval(() => this.loadMyCreditCards(), 5000);
+      }
+    }
   }
 
   onAtmWithdrawalCompleted(): void {
@@ -1516,6 +1538,10 @@ export class SalaryDashboard implements OnInit, OnDestroy {
   }
 
   toggleBlockCard() {
+    if ((this.debitCardInfo?.status || '').toUpperCase() === 'DEACTIVATED') {
+      this.alertService.userError('Card Deactivated', 'A deactivated card cannot be unblocked. Replace the card instead.');
+      return;
+    }
     this.updateCardSetting('status', this.isCardActive() ? 'Blocked' : 'Active');
   }
 

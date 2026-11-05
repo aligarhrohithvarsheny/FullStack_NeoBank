@@ -299,7 +299,7 @@ public class AllocationAccountLoginController {
         }
 
         AllocationAccount account = linkedAccountResult.get();
-        Page<AllocationUtilization> transactionPage = utilizationRepository.findByAllocationIdOrderByTransactionDateDesc(
+        Page<AllocationUtilization> transactionPage = utilizationRepository.findSuccessfulByAllocationIdOrderByTransactionDateDesc(
                 allocationRecordId,
                 PageRequest.of(Math.max(0, page), Math.max(1, Math.min(size, 100)),
                         Sort.by(Sort.Direction.DESC, "transactionDate")));
@@ -507,7 +507,7 @@ public class AllocationAccountLoginController {
         summary.put("creditCount", utilizationRepository.getCreditCount(allocationId));
         summary.put("debitCount", utilizationRepository.getDebitCount(allocationId));
         summary.put("fundsAdded", safeDouble(account.getTotalCredited() == null ? null : account.getTotalCredited().doubleValue()));
-        summary.put("transfersCount", utilizationRepository.countByAllocationId(allocationId));
+        summary.put("transfersCount", utilizationRepository.countSuccessfulByAllocationId(allocationId));
         summary.put("loansOpened", countByProductTypes(allocationId, "DEBIT", loanTypes));
         summary.put("loansClosedOrCredited", countByProductTypes(allocationId, "CREDIT", loanTypes));
         summary.put("loanDebits", loanDebits);
@@ -528,7 +528,7 @@ public class AllocationAccountLoginController {
         summary.put("paymentGatewayCharges", zeroIfNull(account.getPaymentGatewayCharges()));
         summary.put("totalCharges", zeroIfNull(account.getTotalChargesCollected()));
         summary.put("netProfitLoss", safeDouble(allocationProfitabilityData(allocationId).get("netProfitLoss")));
-        summary.put("transactionCount", utilizationRepository.countByAllocationId(allocationId));
+        summary.put("transactionCount", utilizationRepository.countSuccessfulByAllocationId(allocationId));
         Long creditedChargeCount = chargeTransactionRepository.countByCreditStatus(allocationId, "CREDITED");
         Long pendingChargeCount = chargeTransactionRepository.countByCreditStatus(allocationId, "PENDING_CREDIT");
         summary.put("chargeCount", (creditedChargeCount == null ? 0 : creditedChargeCount)
@@ -576,6 +576,11 @@ public class AllocationAccountLoginController {
         Set<String> accounts = new HashSet<>();
         if (utilizationRepository == null) return accounts;
         for (AllocationUtilization entry : utilizationRepository.findByAllocationIdOrderByTransactionDateDesc(allocationId)) {
+            if (!"SUCCESS".equalsIgnoreCase(entry.getStatus())) continue;
+            String sourceStatus = entry.getSourceStatus();
+            if (sourceStatus != null && !sourceStatus.isBlank()
+                    && !"SUCCESS".equalsIgnoreCase(sourceStatus)
+                    && !"COMPLETED".equalsIgnoreCase(sourceStatus)) continue;
             if (entry.getUserAccountNumber() != null && !entry.getUserAccountNumber().isBlank()) {
                 accounts.add(entry.getUserAccountNumber().trim());
             }
@@ -737,6 +742,11 @@ public class AllocationAccountLoginController {
     private List<Map<String, Object>> allocationAccountDepositData(Long allocationId) {
         Map<String, Map<String, Object>> accounts = new LinkedHashMap<>();
         for (AllocationUtilization entry : utilizationRepository.findByAllocationIdOrderByTransactionDateDesc(allocationId)) {
+            if (!"SUCCESS".equalsIgnoreCase(entry.getStatus())) continue;
+            String sourceStatus = entry.getSourceStatus();
+            if (sourceStatus != null && !sourceStatus.isBlank()
+                    && !"SUCCESS".equalsIgnoreCase(sourceStatus)
+                    && !"COMPLETED".equalsIgnoreCase(sourceStatus)) continue;
             String account = entry.getUserAccountNumber() == null || entry.getUserAccountNumber().isBlank()
                     ? "Account not recorded" : entry.getUserAccountNumber().trim();
             Map<String, Object> row = accounts.computeIfAbsent(account, key -> {
