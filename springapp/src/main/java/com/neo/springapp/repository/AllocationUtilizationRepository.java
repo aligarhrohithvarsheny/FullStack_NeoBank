@@ -24,6 +24,9 @@ public interface AllocationUtilizationRepository extends JpaRepository<Allocatio
     @Query("SELECT COUNT(au) FROM AllocationUtilization au WHERE au.allocationId = :allocationId AND UPPER(au.status) = 'SUCCESS'")
     long countSuccessfulByAllocationId(@Param("allocationId") Long allocationId);
 
+    @Query("SELECT COUNT(au) FROM AllocationUtilization au WHERE au.allocationId = :allocationId AND UPPER(au.status) = 'SUCCESS'")
+    long countByAllocationId(@Param("allocationId") Long allocationId);
+
     @Query("SELECT au FROM AllocationUtilization au WHERE au.allocationId = :allocationId AND UPPER(au.status) = 'SUCCESS' ORDER BY au.transactionDate DESC")
     Page<AllocationUtilization> findSuccessfulByAllocationIdOrderByTransactionDateDesc(
             @Param("allocationId") Long allocationId, Pageable pageable);
