@@ -39,6 +39,27 @@
       </div>
     </header>
 
+    <div class="allocation-universal-search">
+      <div class="allocation-universal-search-controls">
+        <label>
+          <i class="fas fa-search"></i>
+          <input type="search" [(ngModel)]="universalSearch" name="universalSearch" autocomplete="off"
+            placeholder="Search account, FD, RD, loan, ECS mandate, transaction ID or amount">
+        </label>
+        <select [(ngModel)]="universalSearchCategory" name="universalSearchCategory" aria-label="Search category">
+          <option *ngFor="let category of universalSearchCategories" [value]="category.value">{{ category.label }}</option>
+        </select>
+        <button *ngIf="universalSearch" type="button" (click)="universalSearch = ''">Clear</button>
+      </div>
+      <div class="allocation-universal-results" *ngIf="universalSearch.trim()">
+        <button type="button" *ngFor="let result of universalSearchResults" (click)="openUniversalSearchResult(result)">
+          <span><strong>{{ result.title }}</strong><small>{{ result.category }} · {{ result.detail }}</small></span>
+          <b>{{ formatCurrency(result.amount || 0) }}</b>
+        </button>
+        <div class="allocation-universal-empty" *ngIf="universalSearchResults.length === 0">No matching records found.</div>
+      </div>
+    </div>
+
     <div *ngIf="errorMessage" class="allocation-portal-alert">{{ errorMessage }}</div>
     <div *ngIf="loading && !linkedAccount" class="allocation-portal-loading"><i class="fas fa-spinner fa-spin"></i> Loading account data…</div>
 
@@ -60,7 +81,7 @@
         </div>
 
         <div class="allocation-portal-card">
-          <div class="allocation-portal-card-heading"><div><h2>Account mapping</h2><p>Customer deposits are credited only when their debit account exactly matches this linked account.</p></div></div>
+          <div class="allocation-portal-card-heading"><div><h2>Account mapping</h2><p>Only successfully posted customer-account debits become FD / RD allocation credits. Pending applications and unposted installments are not included.</p></div></div>
           <div class="allocation-portal-facts">
             <div><span>Allocation reference</span><strong>{{ account.allocationId || '—' }}</strong></div>
             <div><span>Linked bank account</span><strong>{{ account.accountNumber || '—' }}</strong></div>

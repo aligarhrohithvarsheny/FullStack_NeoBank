@@ -50,6 +50,8 @@ export class ManagerAccountDashboardComponent implements OnInit, OnDestroy {
   loanTypeFilter = 'ALL';
   mandateSearch = '';
   accountDepositSearch = '';
+  universalSearch = '';
+  universalSearchCategory = 'ALL';
   readonly chargeCategories = [
     { value: 'CIBIL', label: 'CIBIL' },
     { value: 'PROCESSING', label: 'Processing fee' },
@@ -264,6 +266,124 @@ export class ManagerAccountDashboardComponent implements OnInit, OnDestroy {
     const search = this.accountDepositSearch.trim().toLowerCase();
     return this.allocationAccountDeposits.filter(account =>
       !search || `${account.accountNumber || ''} ${account.customerName || ''}`.toLowerCase().includes(search));
+  }
+
+  get universalSearchCategories(): { value: string; label: string }[] {
+    return [
+      { value: 'ALL', label: 'All categories' },
+      { value: 'TRANSACTIONS', label: 'Transactions' },
+      { value: 'ACCOUNTS', label: 'Accounts' },
+      { value: 'FD', label: 'Fixed deposits' },
+      { value: 'RD', label: 'Recurring deposits' },
+      { value: 'LOANS', label: 'Loans & EMIs' },
+      { value: 'ECS', label: 'ECS mandates' },
+      { value: 'CHARGES', label: 'Charges' },
+      { value: 'PORTFOLIO', label: 'Customer portfolio' }
+    ];
+  }
+
+  get universalSearchResults(): any[] {
+    const search = this.universalSearch.trim().toLowerCase();
+    if (!search) return [];
+
+    const category = this.universalSearchCategory;
+    const matchesCategory = (itemCategory: string) => category === 'ALL' || category === itemCategory;
+    const searchable = (value: any) => String(value ?? '').toLowerCase();
+    const matches = (record: any) => searchable(JSON.stringify(record)).includes(search);
+    const results: any[] = [];
+
+    if (matchesCategory('TRANSACTIONS')) {
+      this.accountTransactions.filter(matches).forEach(record => results.push({
+        category: 'TRANSACTIONS',
+        title: record.linkedTransactionId || record.transactionId || record.referenceNumber || 'Allocation transaction',
+        detail: `${record.productType || 'Transaction'} · Account ${record.userAccountNumber || '—'} · ${record.status || '—'} / ${record.sourceStatus || '—'}`,
+        amount: Number(record.amount || 0),
+        section: 'transactions'
+      }));
+    }
+    if (matchesCategory('ACCOUNTS')) {
+      this.allocationAccountDeposits.filter(matches).forEach(record => results.push({
+        category: 'ACCOUNTS',
+        title: record.accountNumber || 'Account',
+        detail: `${record.customerName || 'Customer'} · ${record.transactionCount || 0} transactions`,
+        amount: Number(record.depositTotal || record.availableBalance || 0),
+        section: 'accounts'
+      }));
+    }
+    if (matchesCategory('FD')) {
+      (this.allocationPortfolio.fixedDeposits || []).filter(matches).forEach((record: any) => results.push({
+        category: 'FD',
+        title: record.fdAccountNumber || record.accountNumber || 'FD',
+        detail: `${record.accountNumber || '—'} · ${record.customerName || '—'} · ${record.status || '—'}`,
+        amount: Number(record.principalAmount || record.maturityAmount || 0),
+        section: 'portfolio'
+      }));
+    }
+    if (matchesCategory('RD')) {
+      (this.allocationPortfolio.recurringDeposits || []).filter(matches).forEach((record: any) => results.push({
+        category: 'RD',
+        title: record.rdAccountNumber || record.accountNumber || 'RD',
+        detail: `${record.accountNumber || '—'} · ${record.customerName || '—'} · ${record.status || '—'}`,
+        amount: Number(record.paidPrincipal || record.monthlyInstallment || 0),
+        section: 'portfolio'
+      }));
+    }
+    if (matchesCategory('LOANS')) {
+      this.allocationLoans.filter(matches).forEach(record => results.push({
+        category: 'LOANS',
+        title: record.loanAccountNumber || record.loanId || 'Loan',
+        detail: `${record.loanType || record.type || 'Loan'} · ${record.customerName || '—'} · Account ${record.accountNumber || '—'}`,
+        amount: Number(record.sanctionedAmount || record.amount || 0),
+        section: 'loans'
+      }));
+      this.allocationEmiPayments.filter(matches).forEach(record => results.push({
+        category: 'LOANS',
+        title: `${record.loanAccountNumber || 'Loan'} · EMI ${record.emiNumber || ''}`,
+        detail: `${record.transactionId || 'No transaction reference'} · ${record.status || '—'}`,
+        amount: Number(record.totalAmount || 0),
+        section: 'loans'
+      }));
+    }
+    if (matchesCategory('ECS')) {
+      this.allocationEcsMandates.filter(matches).forEach(record => results.push({
+        category: 'ECS',
+        title: record.mandateId || record.loanAccountNumber || 'ECS mandate',
+        detail: `${record.loanAccountNumber || '—'} · Account ${record.savingsAccountNumber || '—'} · ${record.status || '—'}`,
+        amount: Number(record.emiAmount || 0),
+        section: 'ecs'
+      }));
+    }
+    if (matchesCategory('CHARGES')) {
+      this.dashboardCharges.filter(matches).forEach(record => results.push({
+        category: 'CHARGES',
+        title: record.transactionId || record.chargeTransactionId || 'Charge',
+        detail: `${record.category || record.chargeType || 'Charge'} · Account ${record.accountNumber || record.userAccountNumber || '—'}`,
+        amount: Number(record.amount || record.totalAmount || 0),
+        section: 'charges'
+      }));
+    }
+    if (matchesCategory('PORTFOLIO')) {
+      (this.allocationPortfolio.accounts || []).filter(matches).forEach((record: any) => results.push({
+        category: 'PORTFOLIO',
+        title: record.accountNumber || 'Customer account',
+        detail: `${record.accountType || 'Account'} · ${record.holderName || record.ownerName || '—'} · ${record.status || '—'}`,
+        amount: Number(record.balance || 0),
+        section: 'portfolio'
+      }));
+      (this.allocationPortfolio.creditCards || []).filter(matches).forEach((record: any) => results.push({
+        category: 'PORTFOLIO',
+        title: record.cardNumber || record.accountNumber || 'Credit card',
+        detail: `${record.accountNumber || '—'} · ${record.status || '—'}`,
+        amount: Number(record.currentBalance || 0),
+        section: 'portfolio'
+      }));
+    }
+
+    return results.slice(0, 30);
+  }
+
+  openUniversalSearchResult(result: any): void {
+    if (result?.section) this.navigateDashboardSection(result.section);
   }
 
   get filteredTransactions(): any[] {
