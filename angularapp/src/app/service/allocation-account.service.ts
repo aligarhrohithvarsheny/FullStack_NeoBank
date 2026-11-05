@@ -41,6 +41,10 @@ export class AllocationAccountService {
     return this.http.put(`${this.apiUrl}/hod/account/${allocationId}`, payload);
   }
 
+  postFaAccountMovement(payload: any): Observable<any> {
+    return this.http.post(`${this.apiUrl}/admin/fa-account/movement`, payload);
+  }
+
   getHodStaff(): Observable<any[]> {
     return this.http.get<any[]>(`${environment.apiBaseUrl}/api/admins/staff`);
   }

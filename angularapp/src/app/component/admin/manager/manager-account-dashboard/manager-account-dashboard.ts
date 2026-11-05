@@ -40,6 +40,15 @@ export class ManagerAccountDashboardComponent implements OnInit, OnDestroy {
   chargeTotalElements = 0;
   chargeAccountFilter = '';
   chargeCategoryFilter = 'ALL';
+  allocationLoans: any[] = [];
+  allocationEmiPayments: any[] = [];
+  allocationEcsMandates: any[] = [];
+  allocationAccountDeposits: any[] = [];
+  allocationProfitability: any = {};
+  loanSearch = '';
+  loanTypeFilter = 'ALL';
+  mandateSearch = '';
+  accountDepositSearch = '';
   readonly chargeCategories = [
     { value: 'CIBIL', label: 'CIBIL' },
     { value: 'PROCESSING', label: 'Processing fee' },
@@ -107,7 +116,7 @@ export class ManagerAccountDashboardComponent implements OnInit, OnDestroy {
         if (typeof document === 'undefined' || document.visibilityState === 'visible') {
           this.loadAllocationDashboard(true);
         }
-      }, 15000);
+      }, 5000);
     }
   }
 
@@ -196,7 +205,7 @@ export class ManagerAccountDashboardComponent implements OnInit, OnDestroy {
     }
   }
 
-  navigateDashboardSection(section: 'overview' | 'account' | 'transactions' | 'deposits' | 'fundUse' | 'charges' | 'requests'): void {
+  navigateDashboardSection(section: 'overview' | 'account' | 'transactions' | 'deposits' | 'fundUse' | 'charges' | 'loans' | 'accounts' | 'ecs' | 'profitability' | 'requests'): void {
     this.activeSection = section;
     this.errorMessage = '';
     this.requestError = '';
@@ -219,6 +228,41 @@ export class ManagerAccountDashboardComponent implements OnInit, OnDestroy {
     return [...new Set(this.accountTransactions
       .map(transaction => transaction.userAccountNumber)
       .filter((accountNumber): accountNumber is string => !!accountNumber))];
+  }
+
+  get loanTypes(): string[] {
+    return [...new Set(this.allocationLoans.map(loan => String(loan.loanType || loan.type || 'OTHER')))].sort();
+  }
+
+  get filteredAllocationLoans(): any[] {
+    const search = this.loanSearch.trim().toLowerCase();
+    return this.allocationLoans.filter(loan => {
+      const type = String(loan.loanType || loan.type || '').toUpperCase();
+      if (this.loanTypeFilter !== 'ALL' && type !== this.loanTypeFilter.toUpperCase()) return false;
+      if (!search) return true;
+      return `${loan.loanAccountNumber || ''} ${loan.accountNumber || ''} ${loan.customerName || ''} ${loan.loanType || ''}`
+        .toLowerCase().includes(search);
+    });
+  }
+
+  get filteredAllocationEmiPayments(): any[] {
+    const search = this.loanSearch.trim().toLowerCase();
+    return this.allocationEmiPayments.filter(emi =>
+      !search || `${emi.loanAccountNumber || ''} ${emi.accountNumber || ''} ${emi.transactionId || ''}`
+        .toLowerCase().includes(search));
+  }
+
+  get filteredAllocationEcsMandates(): any[] {
+    const search = this.mandateSearch.trim().toLowerCase();
+    return this.allocationEcsMandates.filter(mandate =>
+      !search || `${mandate.mandateId || ''} ${mandate.loanAccountNumber || ''} ${mandate.savingsAccountNumber || ''} ${mandate.customerName || ''}`
+        .toLowerCase().includes(search));
+  }
+
+  get filteredAllocationAccountDeposits(): any[] {
+    const search = this.accountDepositSearch.trim().toLowerCase();
+    return this.allocationAccountDeposits.filter(account =>
+      !search || `${account.accountNumber || ''} ${account.customerName || ''}`.toLowerCase().includes(search));
   }
 
   get filteredTransactions(): any[] {
@@ -432,6 +476,11 @@ export class ManagerAccountDashboardComponent implements OnInit, OnDestroy {
         this.dashboardSummary = response.summary || {};
         this.productBreakdown = response.productBreakdown || [];
         this.dashboardCharges = response.charges || [];
+        this.allocationLoans = response.loans || [];
+        this.allocationEmiPayments = response.emiPayments || [];
+        this.allocationEcsMandates = response.ecsMandates || [];
+        this.allocationAccountDeposits = response.accountDeposits || [];
+        this.allocationProfitability = response.profitability || {};
         this.chargePage = response.chargePage || 0;
         this.chargeTotalPages = response.chargeTotalPages || 0;
         this.chargeTotalElements = response.chargeTotalElements || 0;

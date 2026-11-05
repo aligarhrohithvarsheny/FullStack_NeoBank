@@ -64,7 +64,7 @@
 .allocation-portal-pill.success { color: #126044; background: #ddf5e9; }
 .allocation-portal-filters { display: flex; align-items: end; gap: 12px; margin: 0 0 14px; }
 .allocation-portal-filters label,.allocation-portal-request-form label { display: grid; gap: 5px; color: #54676a; font-size: 11px; font-weight: 600; }
-.allocation-portal-filters select,.allocation-portal-request-form input,.allocation-portal-request-form select,.allocation-portal-request-form textarea { min-width: 190px; padding: 8px 9px; border: 1px solid #d5e0de; border-radius: 4px; color: #29484a; background: #fff; font: inherit; }
+.allocation-portal-filters select,.allocation-portal-filters input,.allocation-portal-request-form input,.allocation-portal-request-form select,.allocation-portal-request-form textarea { min-width: 190px; padding: 8px 9px; border: 1px solid #d5e0de; border-radius: 4px; color: #29484a; background: #fff; font: inherit; }
 .allocation-portal-filters > span { margin-left: auto; color: #647579; font-size: 11px; }
 .allocation-portal-pagination { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
 .allocation-portal-detail-button { padding: 5px 8px; border: 1px solid #c9ddd7; border-radius: 4px; color: #216452; background: #fff; font-size: 10px; white-space: nowrap; cursor: pointer; }

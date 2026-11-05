@@ -2,9 +2,15 @@ package com.neo.springapp.controller;
 
 import com.neo.springapp.entity.AllocationAccount;
 import com.neo.springapp.service.AllocationAccountLinkingService;
+import com.neo.springapp.service.AllocationUtilizationService;
+import com.neo.springapp.repository.AllocationAccountRepository;
+import com.neo.springapp.repository.FundsAllocationRepository;
+import com.neo.springapp.model.FundsAllocation;
+import com.neo.springapp.service.UserSessionTokenService.SessionPrincipal;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -24,6 +30,15 @@ public class AllocationAccountLinkingController {
     
     @Autowired
     private AllocationAccountLinkingService accountLinkingService;
+
+    @Autowired
+    private AllocationUtilizationService allocationUtilizationService;
+
+    @Autowired
+    private AllocationAccountRepository allocationAccountRepository;
+
+    @Autowired
+    private FundsAllocationRepository fundsAllocationRepository;
 
     @GetMapping("/verify/ifsc/{ifscCode}")
     public ResponseEntity<?> verifyInternalIfsc(@PathVariable String ifscCode) {
@@ -149,6 +164,80 @@ public class AllocationAccountLinkingController {
     public ResponseEntity<?> getHodAccountDetails(@PathVariable Long allocationId) {
         try {
             return ResponseEntity.ok(Map.of("success", true, "account", accountLinkingService.getAccountDetails(allocationId)));
+        } catch (Exception exception) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", exception.getMessage()));
+        }
+    }
+
+    /**
+     * Admin/HOD: post an immediate deposit or withdrawal for an allocation using its
+     * FA account number or linked NeoBank account number. Both balances are updated
+     * by the shared utilization ledger.
+     */
+    @PostMapping("/admin/fa-account/movement")
+    public ResponseEntity<?> postFaAccountMovement(@RequestBody Map<String, Object> request) {
+        try {
+            String faAccountNumber = requiredText(request, "faAccountNumber").trim().toUpperCase();
+            String movementType = requiredText(request, "movementType").trim().toUpperCase();
+            if (!"DEPOSIT".equals(movementType) && !"WITHDRAWAL".equals(movementType)) {
+                throw new IllegalArgumentException("movementType must be DEPOSIT or WITHDRAWAL.");
+            }
+            Double amount = Double.parseDouble(requiredText(request, "amount"));
+            if (amount <= 0 || !Double.isFinite(amount)) {
+                throw new IllegalArgumentException("Amount must be greater than zero.");
+            }
+
+            FundsAllocation allocation = null;
+            var linkedAccount = allocationAccountRepository.findByAccountNumber(faAccountNumber).orElse(null);
+            if (linkedAccount != null) {
+                allocation = fundsAllocationRepository.findById(linkedAccount.getAllocationId()).orElse(null);
+            }
+            if (allocation == null) {
+                allocation = fundsAllocationRepository.findByAllocationId(faAccountNumber).orElse(null);
+            }
+            if (allocation == null) {
+                try {
+                    allocation = fundsAllocationRepository.findById(Long.parseLong(faAccountNumber)).orElse(null);
+                } catch (NumberFormatException ignored) {
+                    // FA account lookup is handled by allocation code or linked account number.
+                }
+            }
+            if (allocation == null) {
+                throw new IllegalArgumentException("No allocation matches FA account number " + faAccountNumber + ".");
+            }
+
+            Long adminId = 0L;
+            String adminName = "ADMIN";
+            if (request.get("adminId") != null) {
+                try { adminId = Long.parseLong(request.get("adminId").toString()); } catch (NumberFormatException ignored) {}
+            }
+            if (request.get("adminName") != null) {
+                adminName = request.get("adminName").toString().trim();
+            }
+            String reference = java.util.UUID.randomUUID().toString();
+            String description = request.getOrDefault("description",
+                    "WITHDRAWAL".equals(movementType) ? "Admin allocation withdrawal" : "Admin FA account deposit").toString();
+
+            Map<String, Object> result;
+            if ("DEPOSIT".equals(movementType)) {
+                result = allocationUtilizationService.creditAllocationFunds(
+                        allocation.getId(), amount, "ADMIN_DEPOSIT", faAccountNumber, adminName,
+                        "FA-DEP-" + reference, description, adminId);
+            } else {
+                result = allocationUtilizationService.debitAllocationFunds(
+                        allocation.getId(), amount, "ADMIN_WITHDRAWAL", faAccountNumber, adminName,
+                        "FA-WD-" + reference, description, adminId);
+            }
+            if (!Boolean.TRUE.equals(result.get("success"))) {
+                return ResponseEntity.badRequest().body(result);
+            }
+            result.put("allocationId", allocation.getAllocationId());
+            result.put("faAccountNumber", faAccountNumber);
+            result.put("movementType", movementType);
+            result.put("amount", amount);
+            return ResponseEntity.ok(result);
+        } catch (IllegalArgumentException exception) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", exception.getMessage()));
         } catch (Exception exception) {
             return ResponseEntity.badRequest().body(Map.of("success", false, "message", exception.getMessage()));
         }

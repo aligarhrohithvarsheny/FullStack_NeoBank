@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { HttpClientModule } from '@angular/common/http';
@@ -11,7 +11,7 @@ import { AllocationAccountService } from '../../../service/allocation-account.se
   templateUrl: './account-linking.html',
   styleUrls: ['./account-linking.css']
 })
-export class AccountLinkingComponent implements OnInit {
+export class AccountLinkingComponent implements OnInit, OnDestroy {
   accountForm!: FormGroup;
   chequeForm!: FormGroup;
   allocationForm!: FormGroup;
@@ -54,6 +54,11 @@ export class AccountLinkingComponent implements OnInit {
   allocationOperationRequests: any[] = [];
   operationRequestsLoading = false;
   reviewingOperationRequestId: number | null = null;
+  private liveRefreshTimer: any = null;
+  faAccountNumber = '';
+  faMovementType: 'DEPOSIT' | 'WITHDRAWAL' = 'DEPOSIT';
+  faMovementAmount: number | null = null;
+  faMovementDescription = '';
   readonly bankOptions = [
     { name: 'NeoBank', ifscCode: 'NEOB0000001' },
     { name: 'ExyVault', ifscCode: 'EZYV000123' }
@@ -128,6 +133,54 @@ export class AccountLinkingComponent implements OnInit {
       this.selectedCity = hodCity;
       this.loadAccountsByLocation();
     }
+    this.liveRefreshTimer = window.setInterval(() => {
+      if (this.selectedCity && !this.loading) this.loadAccountsByLocation();
+    }, 5000);
+  }
+
+  ngOnDestroy(): void {
+    if (this.liveRefreshTimer) window.clearInterval(this.liveRefreshTimer);
+  }
+
+  selectFaAccount(account: any): void {
+    const allocation = this.getAllocationForAccount(account);
+    this.faAccountNumber = allocation?.allocationId || account.accountNumber || '';
+  }
+
+  postFaMovement(): void {
+    const accountNumber = String(this.faAccountNumber || '').trim().toUpperCase();
+    if (!accountNumber || !this.faMovementAmount || this.faMovementAmount <= 0) {
+      this.errorMessage = 'Enter a valid FA account number and amount.';
+      return;
+    }
+    const hod = this.getHodSession();
+    this.loading = true;
+    this.errorMessage = '';
+    this.successMessage = '';
+    this.accountService.postFaAccountMovement({
+      faAccountNumber: accountNumber,
+      movementType: this.faMovementType,
+      amount: this.faMovementAmount,
+      description: this.faMovementDescription.trim() || undefined,
+      adminId: hod?.id || 0,
+      adminName: hod?.name || 'ADMIN'
+    }).subscribe({
+      next: response => {
+        this.loading = false;
+        if (!response?.success) {
+          this.errorMessage = response?.message || 'FA account movement failed.';
+          return;
+        }
+        this.successMessage = `${this.faMovementType === 'DEPOSIT' ? 'Deposit' : 'Withdrawal'} posted in real time. Allocation and linked-account balances updated.`;
+        this.faMovementAmount = null;
+        this.faMovementDescription = '';
+        if (this.selectedCity) this.loadAccountsByLocation();
+      },
+      error: error => {
+        this.loading = false;
+        this.errorMessage = error.error?.message || 'FA account movement failed.';
+      }
+    });
   }
 
   get branchOptions(): string[] {
@@ -702,6 +755,30 @@ export class AccountLinkingComponent implements OnInit {
   /**
    * Verify account number with bank
    */
+  verifyEditedAccountNumber(): void {
+    const accountNumber = String(this.editAccountForm.get('accountNumber')?.value || '').trim().toUpperCase();
+    const ifscCode = String(this.editAccountForm.get('ifscCode')?.value || '').trim().toUpperCase();
+    if (!accountNumber || !ifscCode) return;
+    this.accountService.verifyAccountNumber(accountNumber, ifscCode).subscribe({
+      next: (response: any) => {
+        if (!response?.success) return;
+        this.editAccountForm.patchValue({
+          accountNumber: response.accountNumber,
+          ifscCode: response.ifscCode,
+          bankName: response.bankName,
+          accountHolderName: response.accountHolderName,
+          accountType: response.accountType,
+          city: response.city || this.editAccountForm.get('city')?.value,
+          state: response.state || this.editAccountForm.get('state')?.value
+        });
+        this.successMessage = `Linked account holder verified as ${response.accountHolderName}.`;
+      },
+      error: error => {
+        this.errorMessage = error.error?.message || 'Linked account verification failed.';
+      }
+    });
+  }
+
   verifyAccountNumber(): void {
     const accountNumber = String(this.accountForm.get('accountNumber')?.value || '').trim().toUpperCase();
     const ifscCode = String(this.accountForm.get('ifscCode')?.value || '').trim().toUpperCase();

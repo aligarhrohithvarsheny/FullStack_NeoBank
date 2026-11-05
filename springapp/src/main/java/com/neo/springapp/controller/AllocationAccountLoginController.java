@@ -12,9 +12,16 @@ import com.neo.springapp.repository.AllocationUtilizationRepository;
 import com.neo.springapp.repository.AllocationAccountRepository;
 import com.neo.springapp.repository.ChargeTransactionRepository;
 import com.neo.springapp.repository.FundsAllocationRepository;
+import com.neo.springapp.repository.EmiPaymentRepository;
+import com.neo.springapp.repository.EcsMandateRepository;
+import com.neo.springapp.repository.EcsMandateEventRepository;
+import com.neo.springapp.repository.LoanRepository;
+import com.neo.springapp.repository.GoldLoanRepository;
+import com.neo.springapp.repository.HomeLoanRepository;
 import com.neo.springapp.service.PasswordService;
 import com.neo.springapp.service.UserSessionTokenService;
 import com.neo.springapp.service.UserSessionTokenService.SessionPrincipal;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.data.domain.Page;
@@ -38,6 +45,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.HashSet;
 
 @RestController
 @RequestMapping("/api")
@@ -54,6 +63,13 @@ public class AllocationAccountLoginController {
     private final PasswordService passwordService;
     private final UserSessionTokenService tokenService;
     private final SecureRandom secureRandom = new SecureRandom();
+
+    @Autowired private EmiPaymentRepository emiPaymentRepository;
+    @Autowired private EcsMandateRepository ecsMandateRepository;
+    @Autowired private EcsMandateEventRepository ecsMandateEventRepository;
+    @Autowired private LoanRepository loanRepository;
+    @Autowired private GoldLoanRepository goldLoanRepository;
+    @Autowired private HomeLoanRepository homeLoanRepository;
 
     public AllocationAccountLoginController(
             FundsAllocationRepository allocationRepository,
@@ -283,6 +299,11 @@ public class AllocationAccountLoginController {
         response.put("chargePage", chargeHistoryPage.getNumber());
         response.put("chargeTotalPages", chargeHistoryPage.getTotalPages());
         response.put("chargeTotalElements", chargeHistoryPage.getTotalElements());
+        response.put("loans", allocationLoansDashboardData(allocationRecordId));
+        response.put("emiPayments", allocationEmiDashboardData(allocationRecordId));
+        response.put("ecsMandates", allocationEcsDashboardData(allocationRecordId));
+        response.put("accountDeposits", allocationAccountDepositData(allocationRecordId));
+        response.put("profitability", allocationProfitabilityData(allocationRecordId));
         response.put("lastUpdated", LocalDateTime.now());
         return ResponseEntity.ok(response);
     }
@@ -483,6 +504,7 @@ public class AllocationAccountLoginController {
         summary.put("upiCharges", zeroIfNull(account.getUpiCharges()));
         summary.put("paymentGatewayCharges", zeroIfNull(account.getPaymentGatewayCharges()));
         summary.put("totalCharges", zeroIfNull(account.getTotalChargesCollected()));
+        summary.put("netProfitLoss", safeDouble(allocationProfitabilityData(allocationId).get("netProfitLoss")));
         summary.put("transactionCount", utilizationRepository.countByAllocationId(allocationId));
         Long creditedChargeCount = chargeTransactionRepository.countByCreditStatus(allocationId, "CREDITED");
         Long pendingChargeCount = chargeTransactionRepository.countByCreditStatus(allocationId, "PENDING_CREDIT");
@@ -525,6 +547,228 @@ public class AllocationAccountLoginController {
             }
         }
         return new ArrayList<>(products.values());
+    }
+
+    private Set<String> allocationCustomerAccounts(Long allocationId) {
+        Set<String> accounts = new HashSet<>();
+        if (utilizationRepository == null) return accounts;
+        for (AllocationUtilization entry : utilizationRepository.findByAllocationIdOrderByTransactionDateDesc(allocationId)) {
+            if (entry.getUserAccountNumber() != null && !entry.getUserAccountNumber().isBlank()) {
+                accounts.add(entry.getUserAccountNumber().trim());
+            }
+        }
+        return accounts;
+    }
+
+    private List<Map<String, Object>> allocationLoansDashboardData(Long allocationId) {
+        Set<String> customerAccounts = allocationCustomerAccounts(allocationId);
+        List<Map<String, Object>> loans = new ArrayList<>();
+        if (loanRepository != null) {
+            for (com.neo.springapp.model.Loan loan : loanRepository.findAll()) {
+                if (customerAccounts.contains(loan.getAccountNumber()) || customerAccounts.contains(loan.getChildAccountNumber())) {
+                    Map<String, Object> row = new LinkedHashMap<>();
+                    row.put("source", "LOAN");
+                    row.put("loanId", loan.getId());
+                    row.put("loanType", loan.getType());
+                    row.put("loanAccountNumber", loan.getLoanAccountNumber());
+                    row.put("accountNumber", loan.getAccountNumber());
+                    row.put("customerName", loan.getUserName());
+                    row.put("sanctionedAmount", safeDouble(loan.getAmount()));
+                    row.put("principalPaid", safeDouble(loan.getPrincipalPaid()));
+                    row.put("interestPaid", safeDouble(loan.getInterestPaid()));
+                    row.put("remainingPrincipal", safeDouble(loan.getRemainingPrincipal()));
+                    row.put("remainingInterest", safeDouble(loan.getRemainingInterest()));
+                    row.put("status", loan.getStatus());
+                    row.put("applicationDate", loan.getApplicationDate());
+                    row.put("approvalDate", loan.getApprovalDate());
+                    row.put("interestRate", loan.getInterestRate());
+                    row.put("tenure", loan.getTenure());
+                    loans.add(row);
+                }
+            }
+        }
+        if (goldLoanRepository != null) {
+            for (com.neo.springapp.model.GoldLoan loan : goldLoanRepository.findAll()) {
+                if (customerAccounts.contains(loan.getAccountNumber())) {
+                    Map<String, Object> row = new LinkedHashMap<>();
+                    row.put("source", "GOLD_LOAN");
+                    row.put("loanId", loan.getId());
+                    row.put("loanType", "GOLD");
+                    row.put("loanAccountNumber", loan.getLoanAccountNumber());
+                    row.put("accountNumber", loan.getAccountNumber());
+                    row.put("customerName", loan.getUserName());
+                    row.put("sanctionedAmount", safeDouble(loan.getLoanAmount()));
+                    row.put("principalPaid", safeDouble(loan.getPrincipalPaid()));
+                    row.put("interestPaid", safeDouble(loan.getInterestPaid()));
+                    row.put("remainingPrincipal", safeDouble(loan.getRemainingPrincipal()));
+                    row.put("remainingInterest", safeDouble(loan.getRemainingInterest()));
+                    row.put("currentEmi", safeDouble(loan.getCurrentEmi()));
+                    row.put("status", loan.getStatus());
+                    row.put("applicationDate", loan.getApplicationDate());
+                    row.put("approvalDate", loan.getApprovalDate());
+                    row.put("interestRate", loan.getInterestRate());
+                    row.put("tenure", loan.getTenure());
+                    loans.add(row);
+                }
+            }
+        }
+        if (homeLoanRepository != null) {
+            for (com.neo.springapp.model.HomeLoan loan : homeLoanRepository.findAll()) {
+                if (customerAccounts.contains(loan.getAccountNumber())) {
+                    Map<String, Object> row = new LinkedHashMap<>();
+                    row.put("source", "HOME_CATEGORY_LOAN");
+                    row.put("loanId", loan.getId());
+                    row.put("loanType", loan.getLoanType());
+                    row.put("loanAccountNumber", loan.getLoanAccountNumber());
+                    row.put("accountNumber", loan.getAccountNumber());
+                    row.put("customerName", loan.getUserName());
+                    row.put("sanctionedAmount", safeDouble(loan.getAmount()));
+                    row.put("principalPaid", safeDouble(loan.getPrincipalPaid()));
+                    row.put("interestPaid", safeDouble(loan.getInterestPaid()));
+                    row.put("remainingPrincipal", safeDouble(loan.getRemainingPrincipal()));
+                    row.put("remainingInterest", 0.0);
+                    row.put("status", loan.getStatus());
+                    row.put("applicationDate", loan.getApplicationDate());
+                    row.put("approvalDate", loan.getApprovalDate());
+                    row.put("interestRate", loan.getInterestRate());
+                    row.put("tenure", loan.getTenure());
+                    row.put("purpose", loan.getPurpose());
+                    loans.add(row);
+                }
+            }
+        }
+        return loans;
+    }
+
+    private List<Map<String, Object>> allocationEmiDashboardData(Long allocationId) {
+        List<Map<String, Object>> result = new ArrayList<>();
+        if (emiPaymentRepository == null) return result;
+        Set<String> customerAccounts = allocationCustomerAccounts(allocationId);
+        for (com.neo.springapp.model.EmiPayment emi : emiPaymentRepository.findAll()) {
+            if (!customerAccounts.contains(emi.getAccountNumber()) && !customerAccounts.contains(emi.getLoanAccountNumber())) continue;
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("emiId", emi.getId());
+            row.put("loanId", emi.getLoanId());
+            row.put("loanAccountNumber", emi.getLoanAccountNumber());
+            row.put("accountNumber", emi.getAccountNumber());
+            row.put("emiNumber", emi.getEmiNumber());
+            row.put("dueDate", emi.getDueDate());
+            row.put("paymentDate", emi.getPaymentDate());
+            row.put("principalAmount", safeDouble(emi.getPrincipalAmount()));
+            row.put("interestAmount", safeDouble(emi.getInterestAmount()));
+            row.put("totalAmount", safeDouble(emi.getTotalAmount()));
+            row.put("remainingPrincipal", safeDouble(emi.getRemainingPrincipal()));
+            row.put("status", emi.getStatus());
+            row.put("transactionId", emi.getTransactionId());
+            row.put("balanceBeforePayment", safeDouble(emi.getBalanceBeforePayment()));
+            row.put("balanceAfterPayment", safeDouble(emi.getBalanceAfterPayment()));
+            result.add(row);
+        }
+        return result;
+    }
+
+    private List<Map<String, Object>> allocationEcsDashboardData(Long allocationId) {
+        List<Map<String, Object>> result = new ArrayList<>();
+        if (ecsMandateRepository == null) return result;
+        Set<String> customerAccounts = allocationCustomerAccounts(allocationId);
+        for (com.neo.springapp.model.EcsMandate mandate : ecsMandateRepository.findAllByOrderByCreatedAtDesc()) {
+            if (!customerAccounts.contains(mandate.getSavingsAccountNumber())
+                    && !customerAccounts.contains(mandate.getLoanAccountNumber())) continue;
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("mandateId", mandate.getMandateId());
+            row.put("loanAccountNumber", mandate.getLoanAccountNumber());
+            row.put("loanType", mandate.getLoanType());
+            row.put("savingsAccountNumber", mandate.getSavingsAccountNumber());
+            row.put("customerName", mandate.getCustomerName());
+            row.put("debitDay", mandate.getDebitDay());
+            row.put("amountLimit", safeDouble(mandate.getAmountLimit()));
+            row.put("emiAmount", safeDouble(mandate.getEmiAmount()));
+            row.put("status", mandate.getStatus());
+            row.put("lastAttemptDate", mandate.getLastAttemptDate());
+            row.put("lastDebitAt", mandate.getLastDebitAt());
+            row.put("lastDebitStatus", mandate.getLastDebitStatus());
+            row.put("lastDebitMessage", mandate.getLastDebitMessage());
+            row.put("successfulDebits", mandate.getSuccessfulDebits());
+            row.put("failedDebits", mandate.getFailedDebits());
+            row.put("linked", mandate.getCustomerConsentAt() != null || mandate.getStatus() != null);
+            row.put("autoDebit", "ACTIVE".equalsIgnoreCase(mandate.getStatus()));
+            if (ecsMandateEventRepository != null && mandate.getId() != null) {
+                row.put("events", ecsMandateEventRepository.findByMandateDbIdOrderByCreatedAtDesc(mandate.getId())
+                        .stream().map(event -> {
+                            Map<String, Object> eventData = new LinkedHashMap<>();
+                            eventData.put("eventType", event.getEventType());
+                            eventData.put("emiNumber", event.getEmiNumber());
+                            eventData.put("amount", safeDouble(event.getAmount()));
+                            eventData.put("message", event.getMessage());
+                            eventData.put("createdAt", event.getCreatedAt());
+                            return eventData;
+                        }).toList());
+            } else {
+                row.put("events", List.of());
+            }
+            result.add(row);
+        }
+        return result;
+    }
+
+    private List<Map<String, Object>> allocationAccountDepositData(Long allocationId) {
+        Map<String, Map<String, Object>> accounts = new LinkedHashMap<>();
+        for (AllocationUtilization entry : utilizationRepository.findByAllocationIdOrderByTransactionDateDesc(allocationId)) {
+            String account = entry.getUserAccountNumber() == null || entry.getUserAccountNumber().isBlank()
+                    ? "Account not recorded" : entry.getUserAccountNumber().trim();
+            Map<String, Object> row = accounts.computeIfAbsent(account, key -> {
+                Map<String, Object> data = new LinkedHashMap<>();
+                data.put("accountNumber", key);
+                data.put("customerName", "");
+                data.put("depositTotal", 0.0);
+                data.put("withdrawalTotal", 0.0);
+                data.put("allocatedDebitTotal", 0.0);
+                data.put("allocationCreditTotal", 0.0);
+                data.put("transactionCount", 0L);
+                data.put("lastTransactionDate", null);
+                return data;
+            });
+            if (entry.getUserName() != null && entry.getUserName().length() > 0) row.put("customerName", entry.getUserName());
+            double amount = safeDouble(entry.getAmount());
+            String product = String.valueOf(entry.getProductType()).toUpperCase();
+            if ("DEBIT".equalsIgnoreCase(entry.getTransactionType())) {
+                if (product.contains("FD") || product.contains("RD") || product.contains("DEPOSIT")) {
+                    row.put("depositTotal", safeDouble(row.get("depositTotal")) + amount);
+                } else {
+                    row.put("allocatedDebitTotal", safeDouble(row.get("allocatedDebitTotal")) + amount);
+                }
+            } else if ("CREDIT".equalsIgnoreCase(entry.getTransactionType())) {
+                row.put("allocationCreditTotal", safeDouble(row.get("allocationCreditTotal")) + amount);
+            }
+            row.put("transactionCount", safeLong(row.get("transactionCount")) + 1L);
+            if (entry.getTransactionDate() != null && row.get("lastTransactionDate") == null) row.put("lastTransactionDate", entry.getTransactionDate());
+        }
+        return new ArrayList<>(accounts.values());
+    }
+
+    private Map<String, Object> allocationProfitabilityData(Long allocationId) {
+        Map<String, Object> profit = new LinkedHashMap<>();
+        double interestCollected = safeDouble(chargeTransactionRepository.sumSuccessfulInterestCharges(allocationId));
+        double feesCollected = safeDouble(chargeTransactionRepository.sumCreditedCharges(allocationId));
+        double principalDistributed = safeDouble(utilizationRepository.sumByAllocationAndProductTypes(
+                allocationId, "DEBIT", List.of("LOAN", "LOANS", "PERSONAL_LOAN", "GOLD_LOAN", "HOME_LOAN",
+                        "CAR_LOAN", "AUTO_LOAN", "CROP_LOAN", "EDUCATION_LOAN", "CREDIT_CARD_LOAN")));
+        double principalRecovered = safeDouble(utilizationRepository.sumByAllocationAndProductTypes(
+                allocationId, "CREDIT", List.of("LOAN", "LOANS", "PERSONAL_LOAN", "GOLD_LOAN", "HOME_LOAN",
+                        "CAR_LOAN", "AUTO_LOAN", "CROP_LOAN", "EDUCATION_LOAN", "CREDIT_CARD_LOAN")));
+        double net = interestCollected + feesCollected + principalRecovered - principalDistributed;
+        profit.put("principalDistributed", principalDistributed);
+        profit.put("principalRecovered", principalRecovered);
+        profit.put("interestCollected", interestCollected);
+        profit.put("feesCollected", feesCollected);
+        profit.put("lossesAndBounces", 0.0);
+        profit.put("netProfitLoss", net);
+        profit.put("result", net >= 0 ? "PROFIT" : "LOSS");
+        return profit;
+    }
+
+    private long safeLong(Object value) {
+        return value instanceof Number number ? number.longValue() : 0L;
     }
 
     private Map<String, Object> transactionDashboardData(AllocationUtilization transaction) {
@@ -650,7 +894,11 @@ public class AllocationAccountLoginController {
         return value == null ? "" : value.trim().toUpperCase(java.util.Locale.ROOT);
     }
 
-    private double safeDouble(Double value) { return value == null ? 0 : value; }
+    private double safeDouble(Object value) {
+        if (value instanceof Number number) return number.doubleValue();
+        if (value == null) return 0.0;
+        try { return Double.parseDouble(value.toString()); } catch (Exception ignored) { return 0.0; }
+    }
     private BigDecimal zeroIfNull(BigDecimal value) { return value == null ? BigDecimal.ZERO : value; }
 
     private boolean isAllocationActive(FundsAllocation allocation) {

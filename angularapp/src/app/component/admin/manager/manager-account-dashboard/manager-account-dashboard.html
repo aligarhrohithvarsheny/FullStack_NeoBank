@@ -10,6 +10,10 @@
       <button type="button" [class.active]="activeSection === 'transactions'" (click)="navigateDashboardSection('transactions')"><i class="fas fa-exchange-alt"></i>Transactions</button>
       <button type="button" [class.active]="activeSection === 'deposits'" (click)="navigateDashboardSection('deposits')"><i class="fas fa-piggy-bank"></i>FD / RD deposits</button>
       <button type="button" [class.active]="activeSection === 'fundUse'" (click)="navigateDashboardSection('fundUse')"><i class="fas fa-hand-holding-usd"></i>Loans & fund use</button>
+      <button type="button" [class.active]="activeSection === 'loans'" (click)="navigateDashboardSection('loans')"><i class="fas fa-file-invoice-dollar"></i>Loan details & EMIs</button>
+      <button type="button" [class.active]="activeSection === 'ecs'" (click)="navigateDashboardSection('ecs')"><i class="fas fa-calendar-check"></i>ECS mandates</button>
+      <button type="button" [class.active]="activeSection === 'accounts'" (click)="navigateDashboardSection('accounts')"><i class="fas fa-user-check"></i>Account deposits</button>
+      <button type="button" [class.active]="activeSection === 'profitability'" (click)="navigateDashboardSection('profitability')"><i class="fas fa-chart-line"></i>Profit / loss</button>
       <button type="button" [class.active]="activeSection === 'charges'" (click)="navigateDashboardSection('charges')"><i class="fas fa-receipt"></i>Charges</button>
       <button type="button" [class.active]="activeSection === 'requests'" (click)="navigateDashboardSection('requests')"><i class="fas fa-paper-plane"></i>Operation requests</button>
     </nav>
@@ -23,7 +27,7 @@
     <header class="allocation-portal-header">
       <div>
         <span class="allocation-portal-eyebrow">ALLOCATION ACCOUNT</span>
-        <h1>{{ activeSection === 'deposits' ? 'FD / RD deposits' : activeSection === 'fundUse' ? 'Loans & fund use' : activeSection === 'account' ? 'Account details' : activeSection === 'transactions' ? 'Transactions' : activeSection === 'charges' ? 'Charges' : activeSection === 'requests' ? 'Operation requests' : 'Overview' }}</h1>
+        <h1>{{ activeSection === 'deposits' ? 'FD / RD deposits' : activeSection === 'fundUse' ? 'Loans & fund use' : activeSection === 'loans' ? 'Loan details & EMI schedule' : activeSection === 'ecs' ? 'ECS mandates' : activeSection === 'accounts' ? 'Customer account deposits' : activeSection === 'profitability' ? 'Profit / loss' : activeSection === 'account' ? 'Account details' : activeSection === 'transactions' ? 'Transactions' : activeSection === 'charges' ? 'Charges' : activeSection === 'requests' ? 'Operation requests' : 'Overview' }}</h1>
       </div>
       <div class="allocation-portal-actions">
         <span class="allocation-portal-live"><i class="fas fa-circle"></i> Live data</span>
@@ -253,6 +257,76 @@
             <div class="details-wide"><span>Collection details</span><strong>{{ charge.collectionDetails || 'No collection detail recorded' }}</strong></div>
             <div class="details-wide" *ngIf="charge.reconciliationNotes"><span>Reconciliation notes</span><strong>{{ charge.reconciliationNotes }}</strong></div>
             <div class="details-wide" *ngIf="charge.failureReason"><span>Failure reason</span><strong>{{ charge.failureReason }}</strong></div>
+          </div>
+        </div>
+      </section>
+
+      <section *ngIf="activeSection === 'loans'" class="allocation-portal-section">
+        <div class="allocation-portal-card">
+          <div class="allocation-portal-card-heading"><div><h2>All linked loans</h2><p>Separate principal, interest, outstanding and payment data for each loan account.</p></div></div>
+          <div class="allocation-portal-filters">
+            <label>Search loan<input [(ngModel)]="loanSearch" name="loanSearch" placeholder="Loan number, account, customer"></label>
+            <label>Loan type<select [(ngModel)]="loanTypeFilter"><option value="ALL">All loan types</option><option *ngFor="let type of loanTypes" [value]="type">{{ type }}</option></select></label>
+          </div>
+          <div class="allocation-portal-table-wrap">
+            <table class="allocation-portal-table"><thead><tr><th>Loan / type</th><th>Customer / account</th><th>Sanctioned</th><th>Principal paid</th><th>Interest paid</th><th>Remaining principal</th><th>EMI / rate / tenure</th><th>Status</th></tr></thead><tbody>
+              <tr *ngFor="let loan of filteredAllocationLoans"><td>{{ loan.loanAccountNumber || loan.loanId }}<small>{{ loan.loanType || loan.source }}</small></td><td>{{ loan.customerName || '—' }}<small>{{ loan.accountNumber || 'Account not recorded' }}</small></td><td>{{ formatCurrency(loan.sanctionedAmount || 0) }}</td><td>{{ formatCurrency(loan.principalPaid || 0) }}</td><td>{{ formatCurrency(loan.interestPaid || 0) }}</td><td>{{ formatCurrency(loan.remainingPrincipal || 0) }}</td><td>{{ formatCurrency(loan.currentEmi || 0) }}<small>{{ loan.interestRate || 0 }}% · {{ loan.tenure || 0 }} months</small></td><td><span class="allocation-portal-pill">{{ loan.status || '—' }}</span></td></tr>
+              <tr *ngIf="filteredAllocationLoans.length === 0"><td colspan="8" class="allocation-portal-empty">No loan records match the linked customer accounts.</td></tr>
+            </tbody></table>
+          </div>
+        </div>
+        <div class="allocation-portal-card">
+          <div class="allocation-portal-card-heading"><div><h2>EMI payment details</h2><p>Each EMI separates principal and interest and records paid, overdue, failed or pending status.</p></div></div>
+          <div class="allocation-portal-table-wrap">
+            <table class="allocation-portal-table"><thead><tr><th>Due / paid</th><th>Loan / account</th><th>EMI</th><th>Principal</th><th>Interest</th><th>Total paid</th><th>Remaining principal</th><th>Status / reference</th></tr></thead><tbody>
+              <tr *ngFor="let emi of filteredAllocationEmiPayments"><td>{{ emi.dueDate | date:'dd/MM/yyyy' }}<small>{{ emi.paymentDate ? (emi.paymentDate | date:'dd/MM/yyyy HH:mm') : 'Not paid' }}</small></td><td>{{ emi.loanAccountNumber || '—' }}<small>{{ emi.accountNumber || '—' }}</small></td><td>#{{ emi.emiNumber || '—' }}</td><td>{{ formatCurrency(emi.principalAmount || 0) }}</td><td>{{ formatCurrency(emi.interestAmount || 0) }}</td><td>{{ formatCurrency(emi.totalAmount || 0) }}</td><td>{{ formatCurrency(emi.remainingPrincipal || 0) }}</td><td><span class="allocation-portal-pill">{{ emi.status || '—' }}</span><small>{{ emi.transactionId || 'No transaction reference' }}</small></td></tr>
+              <tr *ngIf="filteredAllocationEmiPayments.length === 0"><td colspan="8" class="allocation-portal-empty">No EMI records are linked to this allocation.</td></tr>
+            </tbody></table>
+          </div>
+        </div>
+      </section>
+
+      <section *ngIf="activeSection === 'ecs'" class="allocation-portal-section">
+        <div class="allocation-portal-card">
+          <div class="allocation-portal-card-heading"><div><h2>ECS mandate & auto-debit details</h2><p>Linked, active, paused and cancelled mandates with successful/failed debit history.</p></div></div>
+          <div class="allocation-portal-filters"><label>Search mandate<input [(ngModel)]="mandateSearch" name="mandateSearch" placeholder="Mandate, loan, savings account, customer"></label></div>
+          <div class="allocation-portal-table-wrap">
+            <table class="allocation-portal-table"><thead><tr><th>Mandate / loan</th><th>Customer / savings account</th><th>Debit day / EMI</th><th>Last attempt</th><th>Successful / failed</th><th>Linked / auto-debit</th><th>Status</th></tr></thead><tbody>
+              <tr *ngFor="let mandate of filteredAllocationEcsMandates"><td>{{ mandate.mandateId || '—' }}<small>{{ mandate.loanAccountNumber || '—' }}</small></td><td>{{ mandate.customerName || '—' }}<small>{{ mandate.savingsAccountNumber || '—' }}</small></td><td>Day {{ mandate.debitDay || '—' }}<small>{{ formatCurrency(mandate.emiAmount || 0) }} EMI</small></td><td>{{ mandate.lastDebitAt ? (mandate.lastDebitAt | date:'dd/MM/yyyy HH:mm') : 'No attempt' }}<small>{{ mandate.lastDebitStatus || '—' }}</small></td><td>{{ mandate.successfulDebits || 0 }} / {{ mandate.failedDebits || 0 }}</td><td>{{ mandate.linked ? 'Linked' : 'Not linked' }}<small>{{ mandate.autoDebit ? 'Auto-debit active' : 'Auto-debit inactive' }}</small></td><td><span class="allocation-portal-pill">{{ mandate.status || '—' }}</span></td></tr>
+              <tr *ngIf="filteredAllocationEcsMandates.length === 0"><td colspan="7" class="allocation-portal-empty">No ECS mandates are linked to this allocation.</td></tr>
+            </tbody></table>
+          </div>
+        </div>
+      </section>
+
+      <section *ngIf="activeSection === 'accounts'" class="allocation-portal-section">
+        <div class="allocation-portal-card">
+          <div class="allocation-portal-card-heading"><div><h2>Deposits by customer account</h2><p>Posted account-level allocation movement with available allocation balance shown separately.</p></div></div>
+          <div class="allocation-portal-filters"><label>Search account<input [(ngModel)]="accountDepositSearch" name="accountDepositSearch" placeholder="Account number or customer"></label></div>
+          <div class="allocation-portal-table-wrap">
+            <table class="allocation-portal-table"><thead><tr><th>Customer / account</th><th>Posted deposits</th><th>Allocated debits</th><th>Allocation credits</th><th>Transaction count</th><th>Last transaction</th></tr></thead><tbody>
+              <tr *ngFor="let account of filteredAllocationAccountDeposits"><td>{{ account.customerName || '—' }}<small>{{ account.accountNumber }}</small></td><td>{{ formatCurrency(account.depositTotal || 0) }}</td><td>{{ formatCurrency(account.allocatedDebitTotal || 0) }}</td><td>{{ formatCurrency(account.allocationCreditTotal || 0) }}</td><td>{{ account.transactionCount || 0 }}</td><td>{{ account.lastTransactionDate ? (account.lastTransactionDate | date:'short') : '—' }}</td></tr>
+              <tr *ngIf="filteredAllocationAccountDeposits.length === 0"><td colspan="6" class="allocation-portal-empty">No customer-account records match this search.</td></tr>
+            </tbody></table>
+          </div>
+        </div>
+      </section>
+
+      <section *ngIf="activeSection === 'profitability'" class="allocation-portal-section">
+        <div class="allocation-portal-metrics">
+          <article><span>Principal distributed</span><strong>{{ formatCurrency(allocationProfitability.principalDistributed || 0) }}</strong><small>Funded loan principal</small></article>
+          <article><span>Principal recovered</span><strong>{{ formatCurrency(allocationProfitability.principalRecovered || 0) }}</strong><small>Posted principal credits</small></article>
+          <article><span>Interest + fees collected</span><strong>{{ formatCurrency((allocationProfitability.interestCollected || 0) + (allocationProfitability.feesCollected || 0)) }}</strong><small>Interest and successful credited charges</small></article>
+        </div>
+        <div class="allocation-portal-card">
+          <div class="allocation-portal-card-heading"><div><h2>Allocation net profit / loss</h2><p>Calculated from posted principal movements, successful charge credits and interest collections.</p></div></div>
+          <div class="allocation-portal-facts">
+            <div><span>Net result</span><strong>{{ allocationProfitability.result || 'PROFIT' }}</strong></div>
+            <div><span>Net amount</span><strong>{{ formatCurrency(allocationProfitability.netProfitLoss || 0) }}</strong></div>
+            <div><span>Available allocation balance</span><strong>{{ formatCurrency(linkedAccount?.currentBalance || 0) }}</strong></div>
+            <div><span>Interest collected</span><strong>{{ formatCurrency(allocationProfitability.interestCollected || 0) }}</strong></div>
+            <div><span>Fees collected</span><strong>{{ formatCurrency(allocationProfitability.feesCollected || 0) }}</strong></div>
+            <div><span>Losses / bounces</span><strong>{{ formatCurrency(allocationProfitability.lossesAndBounces || 0) }}</strong></div>
           </div>
         </div>
       </section>

@@ -45,6 +45,41 @@
           <small class="text-muted d-block mt-2" *ngIf="cityOptions.length === 0">No HOD cities are configured yet. Add a city in the HOD dashboard first.</small>
         </div>
       </div>
+      <div class="col-md-6">
+        <div class="card">
+          <div class="card-body">
+            <h5 class="card-title">FA account deposit / withdrawal</h5>
+            <div class="row">
+              <div class="col-md-7 mb-2">
+                <label for="fa-account-number">FA or allocation account number</label>
+                <input id="fa-account-number" class="form-control" [(ngModel)]="faAccountNumber"
+                  placeholder="Linked account or allocation number" autocomplete="off">
+              </div>
+              <div class="col-md-5 mb-2">
+                <label for="fa-movement-type">Movement</label>
+                <select id="fa-movement-type" class="form-select" [(ngModel)]="faMovementType">
+                  <option value="DEPOSIT">Deposit</option>
+                  <option value="WITHDRAWAL">Withdrawal</option>
+                </select>
+              </div>
+              <div class="col-md-5 mb-2">
+                <label for="fa-movement-amount">Amount (₹)</label>
+                <input id="fa-movement-amount" type="number" min="1" class="form-control"
+                  [(ngModel)]="faMovementAmount" placeholder="0.00">
+              </div>
+              <div class="col-md-7 mb-2">
+                <label for="fa-movement-description">Description</label>
+                <input id="fa-movement-description" class="form-control"
+                  [(ngModel)]="faMovementDescription" placeholder="Admin reference or reason">
+              </div>
+            </div>
+            <button type="button" class="btn btn-success w-100" (click)="postFaMovement()" [disabled]="loading || !faAccountNumber || !faMovementAmount">
+              <i class="fas" [ngClass]="loading ? 'fa-spinner fa-spin' : (faMovementType === 'DEPOSIT' ? 'fa-plus-circle' : 'fa-minus-circle')"></i>
+              Post {{ faMovementType === 'DEPOSIT' ? 'deposit' : 'withdrawal' }}
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -122,6 +157,9 @@
                 </td>
                 <td>
                   <div class="account-action-buttons">
+                    <button type="button" class="btn btn-sm btn-outline-success" (click)="selectFaAccount(account)">
+                      <i class="fas fa-wallet"></i> Use for FA movement
+                    </button>
                     <button type="button" class="btn btn-sm btn-outline-primary" (click)="editLinkedAccount(account)" [disabled]="loading">
                       <i class="fas fa-pen"></i> Edit details
                     </button>
@@ -325,7 +363,7 @@
         </div>
         <form [formGroup]="editAccountForm" (ngSubmit)="saveLinkedAccount()">
           <div class="row">
-            <div class="col-md-4 mb-3"><label class="form-label">Account number *</label><input class="form-control" formControlName="accountNumber"></div>
+            <div class="col-md-4 mb-3"><label class="form-label">Account number *</label><input class="form-control" formControlName="accountNumber" (blur)="verifyEditedAccountNumber()"></div>
             <div class="col-md-4 mb-3"><label class="form-label">IFSC *</label><input class="form-control" formControlName="ifscCode"></div>
             <div class="col-md-4 mb-3"><label class="form-label">Account holder *</label><input class="form-control" formControlName="accountHolderName"></div>
             <div class="col-md-3 mb-3"><label class="form-label">Bank *</label>
