@@ -143,6 +143,31 @@ export class AllocationAccountService {
     });
   }
 
+  getAccountMappings(allocationId: number, token: string): Observable<any> {
+    return this.http.get(`${this.apiUrl}/hod/allocations/${allocationId}/account-mappings`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+  }
+
+  addAccountMapping(allocationId: number, payload: any, token: string): Observable<any> {
+    return this.http.post(`${this.apiUrl}/hod/allocations/${allocationId}/account-mappings`, payload, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+  }
+
+  editAccountMapping(allocationId: number, accountNumber: string, payload: any, token: string): Observable<any> {
+    return this.http.put(`${this.apiUrl}/hod/allocations/${allocationId}/account-mappings/${encodeURIComponent(accountNumber)}`, payload, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+  }
+
+  deleteAccountMapping(allocationId: number, accountNumber: string, payload: any, token: string): Observable<any> {
+    return this.http.request('DELETE', `${this.apiUrl}/hod/allocations/${allocationId}/account-mappings/${encodeURIComponent(accountNumber)}`, {
+      body: payload,
+      headers: { Authorization: `Bearer ${token}` }
+    });
+  }
+
   // ==================== ACCOUNT VERIFICATION (ADMIN) ====================
 
   /**

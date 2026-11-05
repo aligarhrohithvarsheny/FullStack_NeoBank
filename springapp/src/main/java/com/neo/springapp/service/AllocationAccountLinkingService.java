@@ -1,6 +1,8 @@
 package com.neo.springapp.service;
 
 import com.neo.springapp.entity.AllocationAccount;
+import com.neo.springapp.entity.AllocationAccountMapping;
+import com.neo.springapp.entity.AllocationAccountMappingHistory;
 import com.neo.springapp.model.Admin;
 import com.neo.springapp.model.BranchAccount;
 import com.neo.springapp.model.CurrentAccount;
@@ -11,6 +13,11 @@ import com.neo.springapp.repository.AdminRepository;
 import com.neo.springapp.repository.CurrentAccountRepository;
 import com.neo.springapp.repository.BranchAccountRepository;
 import com.neo.springapp.repository.FundsAllocationRepository;
+import com.neo.springapp.repository.AllocationAccountMappingRepository;
+import com.neo.springapp.repository.AllocationAccountMappingHistoryRepository;
+import com.neo.springapp.repository.FixedDepositRepository;
+import com.neo.springapp.repository.RecurringDepositRepository;
+import com.neo.springapp.repository.SalaryAccountRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -53,6 +60,21 @@ public class AllocationAccountLinkingService {
 
     @Autowired
     private BranchAccountRepository branchAccountRepository;
+
+    @Autowired
+    private AllocationAccountMappingRepository accountMappingRepository;
+
+    @Autowired
+    private AllocationAccountMappingHistoryRepository accountMappingHistoryRepository;
+
+    @Autowired
+    private FixedDepositRepository fixedDepositRepository;
+
+    @Autowired
+    private RecurringDepositRepository recurringDepositRepository;
+
+    @Autowired
+    private SalaryAccountRepository salaryAccountRepository;
 
     public Map<String, Object> verifyIfscCode(String ifscCode) {
         String normalizedIfsc = normalize(ifscCode);
@@ -494,6 +516,143 @@ public class AllocationAccountLinkingService {
         
          return "VERIFIED".equals(allocation.getAccountStatus()) &&
              "ACTIVE".equals(allocation.getStatus());
+    }
+
+    public Map<String, Object> getAllocationAccountMappings(Long allocationId) {
+        Map<String, Object> response = new HashMap<>();
+        response.put("mappings", accountMappingRepository.findByAllocationIdOrderByUpdatedAtDesc(allocationId));
+        response.put("history", accountMappingHistoryRepository.findByAllocationIdOrderByPerformedAtDesc(allocationId));
+        return response;
+    }
+
+    public AllocationAccountMapping mapAccountToAllocation(Long allocationId, String accountNumber, String accountType,
+                                                           Long adminId, String adminName, String notes) {
+        if (allocationId == null || allocationId <= 0) throw new IllegalArgumentException("Allocation ID is required.");
+        String normalized = normalize(accountNumber);
+        if (normalized.isBlank()) throw new IllegalArgumentException("Account number is required.");
+
+        Optional<AllocationAccountMapping> existing = accountMappingRepository.findFirstByAllocationIdAndAccountNumberAndMappingStatus(allocationId, normalized, "ACTIVE");
+        if (existing.isPresent()) {
+            AllocationAccountMapping mapping = existing.get();
+            mapping.setAccountType(normalize(accountType).isBlank() ? mapping.getAccountType() : normalize(accountType).toUpperCase());
+            mapping.setNotes(notes == null ? "" : notes.trim());
+            mapping.setMappedByAdminId(adminId == null ? 0L : adminId);
+            mapping.setMappedByAdminName(adminName == null || adminName.isBlank() ? "HOD Admin" : adminName.trim());
+            mapping.setUpdatedAt(LocalDateTime.now());
+            fillMappingDetails(mapping);
+            AllocationAccountMapping saved = accountMappingRepository.save(mapping);
+            addMappingHistory(allocationId, "EDITED", normalized, null, saved.getAccountType(), adminId, adminName,
+                "Mapping details edited and account details refreshed.");
+            return saved;
+        }
+
+        AllocationAccountMapping mapping = new AllocationAccountMapping();
+        mapping.setAllocationId(allocationId);
+        mapping.setAccountNumber(normalized);
+        mapping.setAccountType(normalize(accountType).isBlank() ? "AUTO" : normalize(accountType).toUpperCase());
+        mapping.setNotes(notes == null ? "" : notes.trim());
+        mapping.setMappingStatus("ACTIVE");
+        mapping.setMappedByAdminId(adminId == null ? 0L : adminId);
+        mapping.setMappedByAdminName(adminName == null || adminName.isBlank() ? "HOD Admin" : adminName.trim());
+        mapping.setMappedAt(LocalDateTime.now());
+        mapping.setUpdatedAt(LocalDateTime.now());
+        fillMappingDetails(mapping);
+        AllocationAccountMapping saved = accountMappingRepository.save(mapping);
+        addMappingHistory(allocationId, "ADDED", normalized, null, saved.getAccountType(), adminId, adminName,
+            "Account mapped to this allocation branch.");
+        return saved;
+    }
+
+    public AllocationAccountMapping replaceAccountMapping(Long allocationId, String accountNumber, String replacementAccountNumber,
+                                                          String accountType, Long adminId, String adminName, String notes) {
+        AllocationAccountMapping oldMapping = accountMappingRepository.findFirstByAllocationIdAndAccountNumberAndMappingStatus(
+                allocationId, normalize(accountNumber), "ACTIVE")
+            .orElseThrow(() -> new IllegalArgumentException("Active mapping not found for this account."));
+        String replacement = normalize(replacementAccountNumber);
+        if (replacement.isBlank()) throw new IllegalArgumentException("Replacement account number is required.");
+
+        oldMapping.setMappingStatus("REPLACED");
+        oldMapping.setReplacedByAccountNumber(replacement);
+        oldMapping.setUpdatedAt(LocalDateTime.now());
+        accountMappingRepository.save(oldMapping);
+        addMappingHistory(allocationId, "REPLACED", normalize(accountNumber), replacement, oldMapping.getAccountType(),
+            adminId, adminName, "Account mapping replaced with " + replacement + ".");
+
+        return mapAccountToAllocation(allocationId, replacement, accountType, adminId, adminName, notes);
+    }
+
+    public AllocationAccountMapping deleteAccountMapping(Long allocationId, String accountNumber, Long adminId,
+                                                         String adminName, String notes) {
+        AllocationAccountMapping mapping = accountMappingRepository.findFirstByAllocationIdAndAccountNumberAndMappingStatus(
+                allocationId, normalize(accountNumber), "ACTIVE")
+            .orElseThrow(() -> new IllegalArgumentException("Active mapping not found for this account."));
+        mapping.setMappingStatus("DELETED");
+        mapping.setNotes(notes == null ? mapping.getNotes() : notes.trim());
+        mapping.setUpdatedAt(LocalDateTime.now());
+        AllocationAccountMapping saved = accountMappingRepository.save(mapping);
+        addMappingHistory(allocationId, "DELETED", normalize(accountNumber), null, mapping.getAccountType(),
+            adminId, adminName, "Account mapping removed from this allocation.");
+        return saved;
+    }
+
+    private void fillMappingDetails(AllocationAccountMapping mapping) {
+        String number = mapping.getAccountNumber();
+        com.neo.springapp.model.Account savings = savingsAccountRepository.findByAccountNumber(number);
+        com.neo.springapp.model.SalaryAccount salary = salaryAccountRepository.findByAccountNumber(number);
+        Optional<com.neo.springapp.model.CurrentAccount> business = currentAccountRepository.findByAccountNumber(number);
+        Optional<com.neo.springapp.model.FixedDeposit> fd = fixedDepositRepository.findByFdAccountNumber(number);
+        Optional<com.neo.springapp.model.RecurringDeposit> rd = recurringDepositRepository.findByRdAccountNumber(number);
+
+        if (fd.isPresent()) {
+            com.neo.springapp.model.FixedDeposit record = fd.get();
+            mapping.setResolvedAccountNumber(record.getAccountNumber());
+            mapping.setAccountType("FD");
+            mapping.setHolderName(record.getUserName());
+            return;
+        }
+        if (rd.isPresent()) {
+            com.neo.springapp.model.RecurringDeposit record = rd.get();
+            mapping.setResolvedAccountNumber(record.getAccountNumber());
+            mapping.setAccountType("RD");
+            mapping.setHolderName(record.getCustomerName());
+            return;
+        }
+        if (salary != null) {
+            mapping.setResolvedAccountNumber(salary.getAccountNumber());
+            mapping.setAccountType("SALARY");
+            mapping.setHolderName(salary.getEmployeeName());
+            mapping.setBranchName(salary.getBranchName());
+            return;
+        }
+        if (business.isPresent()) {
+            com.neo.springapp.model.CurrentAccount record = business.get();
+            mapping.setResolvedAccountNumber(record.getAccountNumber());
+            mapping.setAccountType("BUSINESS CURRENT");
+            mapping.setHolderName(record.getBusinessName());
+            mapping.setBranchName(record.getBranchName());
+            return;
+        }
+        if (savings != null) {
+            mapping.setResolvedAccountNumber(savings.getAccountNumber());
+            mapping.setAccountType("SAVINGS");
+            mapping.setHolderName(savings.getName());
+            mapping.setBranchName(savings.getBranchCity());
+        }
+    }
+
+    private void addMappingHistory(Long allocationId, String action, String accountNumber, String replacement, String accountType,
+                                   Long adminId, String adminName, String summary) {
+        AllocationAccountMappingHistory history = new AllocationAccountMappingHistory();
+        history.setAllocationId(allocationId);
+        history.setAction(action);
+        history.setAccountNumber(accountNumber);
+        history.setReplacementAccountNumber(replacement);
+        history.setAccountType(accountType);
+        history.setSummary(summary);
+        history.setPerformedByAdminId(adminId == null ? 0L : adminId);
+        history.setPerformedByAdminName(adminName == null || adminName.isBlank() ? "HOD Admin" : adminName.trim());
+        history.setPerformedAt(LocalDateTime.now());
+        accountMappingHistoryRepository.save(history);
     }
     
     /**

@@ -28,6 +28,7 @@ import com.neo.springapp.repository.SoundboxDeviceRepository;
 import com.neo.springapp.repository.SoundboxTransactionRepository;
 import com.neo.springapp.repository.PgMerchantRepository;
 import com.neo.springapp.repository.PgTransactionRepository;
+import com.neo.springapp.repository.AllocationAccountMappingRepository;
 import com.neo.springapp.service.PasswordService;
 import com.neo.springapp.service.UserSessionTokenService;
 import com.neo.springapp.service.UserSessionTokenService.SessionPrincipal;
@@ -90,6 +91,7 @@ public class AllocationAccountLoginController {
     @Autowired private SoundboxTransactionRepository soundboxTransactionRepository;
     @Autowired private PgMerchantRepository pgMerchantRepository;
     @Autowired private PgTransactionRepository pgTransactionRepository;
+    @Autowired private AllocationAccountMappingRepository accountMappingRepository;
 
     public AllocationAccountLoginController(
             FundsAllocationRepository allocationRepository,
@@ -769,6 +771,16 @@ public class AllocationAccountLoginController {
 
     private Map<String, Object> allocationPortfolioDashboardData(Long allocationId) {
         Set<String> accountNumbers = allocationCustomerAccounts(allocationId);
+        Set<String> mappedAccountNumbers = new HashSet<>();
+        for (com.neo.springapp.entity.AllocationAccountMapping mapping :
+                accountMappingRepository.findByAllocationIdAndMappingStatusOrderByUpdatedAtDesc(allocationId, "ACTIVE")) {
+            mappedAccountNumbers.add(mapping.getAccountNumber());
+            if (mapping.getResolvedAccountNumber() != null && !mapping.getResolvedAccountNumber().isBlank()) {
+                mappedAccountNumbers.add(mapping.getResolvedAccountNumber());
+            }
+        }
+        accountNumbers = new HashSet<>(accountNumbers);
+        accountNumbers.addAll(mappedAccountNumbers);
         Map<String, Map<String, Object>> customerAccounts = new LinkedHashMap<>();
         List<Map<String, Object>> fixedDeposits = new ArrayList<>();
         List<Map<String, Object>> recurringDeposits = new ArrayList<>();

@@ -55,6 +55,15 @@ export class AccountLinkingComponent implements OnInit, OnDestroy {
   operationRequestsLoading = false;
   reviewingOperationRequestId: number | null = null;
   private liveRefreshTimer: any = null;
+  selectedMappingAllocationId: number | null = null;
+  mappingAccountNumber = '';
+  mappingAccountType = 'AUTO';
+  mappingReplacementAccountNumber = '';
+  mappingNotes = '';
+  mappingRecords: any[] = [];
+  mappingHistory: any[] = [];
+  mappingLoading = false;
+  mappingSaving = false;
   faAccountNumber = '';
   faMovementType: 'DEPOSIT' | 'WITHDRAWAL' = 'DEPOSIT';
   faMovementAmount: number | null = null;
@@ -135,6 +144,7 @@ export class AccountLinkingComponent implements OnInit, OnDestroy {
     }
     this.liveRefreshTimer = window.setInterval(() => {
       if (this.selectedCity && !this.loading) this.loadAccountsByLocation();
+      if (this.selectedMappingAllocationId) this.loadAccountMappings();
     }, 5000);
   }
 
@@ -424,6 +434,114 @@ export class AccountLinkingComponent implements OnInit, OnDestroy {
     if (nextPage < 0 || nextPage >= this.historyTotalPages) return;
     this.historyPage = nextPage;
     this.loadAllocationHistoryPage();
+  }
+
+  openAccountMapping(account: any): void {
+    this.selectedMappingAllocationId = Number(account?.allocationId) || null;
+    this.mappingAccountNumber = '';
+    this.mappingAccountType = 'AUTO';
+    this.mappingReplacementAccountNumber = '';
+    this.mappingNotes = '';
+    if (this.selectedMappingAllocationId) this.loadAccountMappings();
+  }
+
+  loadAccountMappings(): void {
+    if (!this.selectedMappingAllocationId) return;
+    const token = sessionStorage.getItem('adminSessionToken') || '';
+    this.mappingLoading = true;
+    this.accountService.getAccountMappings(this.selectedMappingAllocationId, token).subscribe({
+      next: (response: any) => {
+        this.mappingRecords = response?.mappings || [];
+        this.mappingHistory = response?.history || [];
+        this.mappingLoading = false;
+      },
+      error: (error: any) => {
+        this.errorMessage = error.error?.message || 'Unable to load account mappings.';
+        this.mappingLoading = false;
+      }
+    });
+  }
+
+  addAccountMapping(): void {
+    if (!this.selectedMappingAllocationId || !this.mappingAccountNumber.trim()) {
+      this.errorMessage = 'Select an allocation and enter an account, FD, RD, salary or business account number.';
+      return;
+    }
+    const token = sessionStorage.getItem('adminSessionToken') || '';
+    const hodSession = this.getHodSession();
+    this.mappingSaving = true;
+    this.accountService.addAccountMapping(this.selectedMappingAllocationId, {
+      accountNumber: this.mappingAccountNumber.trim(),
+      accountType: this.mappingAccountType,
+      notes: this.mappingNotes,
+      adminId: Number(hodSession?.adminId || hodSession?.id || 0),
+      adminName: String(hodSession?.name || hodSession?.adminName || 'HOD Admin')
+    }, token).subscribe({
+      next: () => {
+        this.successMessage = 'Account mapped in real time.';
+        this.mappingAccountNumber = '';
+        this.mappingReplacementAccountNumber = '';
+        this.mappingNotes = '';
+        this.mappingSaving = false;
+        this.loadAccountMappings();
+      },
+      error: (error: any) => {
+        this.errorMessage = error.error?.message || 'Unable to map account.';
+        this.mappingSaving = false;
+      }
+    });
+  }
+
+  replaceAccountMapping(mapping: any): void {
+    if (!this.selectedMappingAllocationId || !this.mappingReplacementAccountNumber.trim()) {
+      this.errorMessage = 'Enter the replacement account number.';
+      return;
+    }
+    const token = sessionStorage.getItem('adminSessionToken') || '';
+    const hodSession = this.getHodSession();
+    this.mappingSaving = true;
+    this.accountService.editAccountMapping(this.selectedMappingAllocationId, mapping.accountNumber, {
+      replacementAccountNumber: this.mappingReplacementAccountNumber.trim(),
+      accountType: mapping.accountType,
+      notes: this.mappingNotes,
+      adminId: Number(hodSession?.adminId || hodSession?.id || 0),
+      adminName: String(hodSession?.name || hodSession?.adminName || 'HOD Admin')
+    }, token).subscribe({
+      next: () => {
+        this.successMessage = 'Mapping replaced successfully.';
+        this.mappingReplacementAccountNumber = '';
+        this.mappingNotes = '';
+        this.mappingSaving = false;
+        this.loadAccountMappings();
+      },
+      error: (error: any) => {
+        this.errorMessage = error.error?.message || 'Unable to replace mapping.';
+        this.mappingSaving = false;
+      }
+    });
+  }
+
+  deleteAccountMapping(mapping: any): void {
+    if (!this.selectedMappingAllocationId || !mapping?.accountNumber) return;
+    if (!window.confirm(`Remove mapping ${mapping.accountNumber} from this allocation?`)) return;
+    const token = sessionStorage.getItem('adminSessionToken') || '';
+    const hodSession = this.getHodSession();
+    this.mappingSaving = true;
+    this.accountService.deleteAccountMapping(this.selectedMappingAllocationId, mapping.accountNumber, {
+      notes: this.mappingNotes,
+      adminId: Number(hodSession?.adminId || hodSession?.id || 0),
+      adminName: String(hodSession?.name || hodSession?.adminName || 'HOD Admin')
+    }, token).subscribe({
+      next: () => {
+        this.successMessage = 'Mapping deleted and saved to history.';
+        this.mappingSaving = false;
+        this.loadAccountMappings();
+      },
+      error: (error: any) => {
+        this.errorMessage = error.error?.message || 'Unable to delete mapping.';
+        this.mappingSaving = false;
+      }
+    });
   }
 
   private loadAllocationHistoryPage(): void {

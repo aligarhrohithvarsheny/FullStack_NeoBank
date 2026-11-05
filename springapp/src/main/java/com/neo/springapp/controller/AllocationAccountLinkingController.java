@@ -61,6 +61,84 @@ public class AllocationAccountLinkingController {
     }
     
     // ==================== HOD DASHBOARD ENDPOINTS ====================
+
+    @GetMapping("/hod/allocations/{allocationId}/account-mappings")
+    public ResponseEntity<?> getAccountMappings(@PathVariable Long allocationId) {
+        try {
+            return ResponseEntity.ok(accountLinkingService.getAllocationAccountMappings(allocationId));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/hod/allocations/{allocationId}/account-mappings")
+    public ResponseEntity<?> addAccountMapping(@PathVariable Long allocationId, @RequestBody Map<String, Object> request) {
+        try {
+            Long adminId = request.get("adminId") == null ? 0L : Long.parseLong(request.get("adminId").toString());
+            String adminName = request.get("adminName") == null ? "HOD Admin" : request.get("adminName").toString();
+            String notes = request.get("notes") == null ? "" : request.get("notes").toString();
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "mapping", accountLinkingService.mapAccountToAllocation(
+                    allocationId,
+                    request.get("accountNumber").toString(),
+                    request.get("accountType") == null ? "" : request.get("accountType").toString(),
+                    adminId,
+                    adminName,
+                    notes
+                )
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", e.getMessage()));
+        }
+    }
+
+    @PutMapping("/hod/allocations/{allocationId}/account-mappings/{accountNumber}")
+    public ResponseEntity<?> editAccountMapping(@PathVariable Long allocationId, @PathVariable String accountNumber,
+                                                @RequestBody Map<String, Object> request) {
+        try {
+            Long adminId = request.get("adminId") == null ? 0L : Long.parseLong(request.get("adminId").toString());
+            String adminName = request.get("adminName") == null ? "HOD Admin" : request.get("adminName").toString();
+            String notes = request.get("notes") == null ? "" : request.get("notes").toString();
+            if (request.get("replacementAccountNumber") != null) {
+                return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "mapping", accountLinkingService.replaceAccountMapping(
+                        allocationId, accountNumber, request.get("replacementAccountNumber").toString(),
+                        request.get("accountType") == null ? "" : request.get("accountType").toString(),
+                        adminId, adminName, notes
+                    )
+                ));
+            }
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "mapping", accountLinkingService.mapAccountToAllocation(
+                    allocationId, accountNumber,
+                    request.get("accountType") == null ? "" : request.get("accountType").toString(),
+                    adminId, adminName, notes
+                )
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", e.getMessage()));
+        }
+    }
+
+    @DeleteMapping("/hod/allocations/{allocationId}/account-mappings/{accountNumber}")
+    public ResponseEntity<?> deleteAccountMapping(@PathVariable Long allocationId, @PathVariable String accountNumber,
+                                                  @RequestBody(required = false) Map<String, Object> request) {
+        try {
+            Map<String, Object> body = request == null ? Map.of() : request;
+            Long adminId = body.get("adminId") == null ? 0L : Long.parseLong(body.get("adminId").toString());
+            String adminName = body.get("adminName") == null ? "HOD Admin" : body.get("adminName").toString();
+            String notes = body.get("notes") == null ? "" : body.get("notes").toString();
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "mapping", accountLinkingService.deleteAccountMapping(allocationId, accountNumber, adminId, adminName, notes)
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", e.getMessage()));
+        }
+    }
     
     /**
      * HOD: Create and link account to allocation
