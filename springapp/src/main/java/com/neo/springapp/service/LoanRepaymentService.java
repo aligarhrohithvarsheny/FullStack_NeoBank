@@ -235,7 +235,12 @@ public class LoanRepaymentService {
             throw new IllegalArgumentException("Loan number and date of birth are required.");
         }
         String number = loanAccountNumber.trim();
-        Loan loan = loanRepository.findByLoanAccountNumber(number).orElse(null);
+        Loan loan = loanRepository.findByLoanAccountNumber(number).orElseGet(() ->
+                loanRepository.findAll().stream()
+                        .filter(item -> item.getLoanAccountNumber() != null
+                                && item.getLoanAccountNumber().trim().equalsIgnoreCase(number))
+                        .findFirst()
+                        .orElse(null));
         if (loan != null) {
             if (!"Approved".equalsIgnoreCase(loan.getStatus())) {
                 throw new IllegalArgumentException("Only approved loans can be paid.");
@@ -244,7 +249,12 @@ public class LoanRepaymentService {
                     loan.getType(), loan.getStatus(), loan, null, null, dob);
         }
 
-        GoldLoan goldLoan = goldLoanRepository.findByLoanAccountNumber(number).orElse(null);
+        GoldLoan goldLoan = goldLoanRepository.findByLoanAccountNumber(number).orElseGet(() ->
+                goldLoanRepository.findAll().stream()
+                        .filter(item -> item.getLoanAccountNumber() != null
+                                && item.getLoanAccountNumber().trim().equalsIgnoreCase(number))
+                        .findFirst()
+                        .orElse(null));
         if (goldLoan != null) {
             if (!"Approved".equalsIgnoreCase(goldLoan.getStatus())
                     || !Boolean.TRUE.equals(goldLoan.getTermsAccepted())) {
@@ -254,7 +264,12 @@ public class LoanRepaymentService {
                     "Gold Loan", goldLoan.getStatus(), null, goldLoan, null, dob);
         }
 
-        HomeLoan homeLoan = homeLoanRepository.findByLoanAccountNumber(number).orElse(null);
+        HomeLoan homeLoan = homeLoanRepository.findByLoanAccountNumber(number).orElseGet(() ->
+                homeLoanRepository.findAll().stream()
+                        .filter(item -> item.getLoanAccountNumber() != null
+                                && item.getLoanAccountNumber().trim().equalsIgnoreCase(number))
+                        .findFirst()
+                        .orElse(null));
         if (homeLoan != null) {
             if (!"Approved".equalsIgnoreCase(homeLoan.getStatus())) {
                 throw new IllegalArgumentException("Only approved home loans can be paid.");
@@ -537,6 +552,8 @@ public class LoanRepaymentService {
                 DateTimeFormatter.ISO_LOCAL_DATE,
                 DateTimeFormatter.ofPattern("dd-MM-yyyy"),
                 DateTimeFormatter.ofPattern("dd/MM/yyyy"),
+                DateTimeFormatter.ofPattern("yyyy/MM/dd"),
+                DateTimeFormatter.ofPattern("MM/dd/yyyy"),
                 DateTimeFormatter.BASIC_ISO_DATE)) {
             try {
                 return LocalDate.parse(value.trim(), formatter);

@@ -62,6 +62,7 @@ export class LoanRepayment {
       this.error = 'Enter the loan account number and date of birth.';
       return;
     }
+    this.loanAccountNumber = number;
 
     this.isLookingUp = true;
     this.error = '';
