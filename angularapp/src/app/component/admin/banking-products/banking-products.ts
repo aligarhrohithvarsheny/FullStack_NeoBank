@@ -146,10 +146,15 @@ export class BankingProducts implements OnInit {
   saveImmediately(): void {
     this.error = '';
     this.success = '';
+    if (!this.form.productCode.trim() || !this.form.productName.trim()) {
+      this.error = 'Select a bank charge or interest item before saving.';
+      return;
+    }
     this.saving = true;
     this.http.post<BankingProduct>(`${environment.apiBaseUrl}/api/admin/banking-products/save`, {
       ...this.form,
       accountType: this.form.accountType || 'GENERAL',
+      eligibility: this.form.eligibility?.trim() || 'Global bank-wide update applicable to all relevant account types.',
       requestedBy: this.adminName
     }, { headers: this.adminAuthHeaders() }).subscribe({
       next: () => {
@@ -228,7 +233,7 @@ export class BankingProducts implements OnInit {
       dailyTransactionLimit: 0,
       monthlyTransactionLimit: 0,
       serviceCharge: 0,
-      eligibility: '',
+      eligibility: 'Global bank-wide update applicable to all relevant account types.',
       enabledFeatures: this.savingsFeatures.map(feature => feature.id),
       effectiveFrom: new Date().toISOString().slice(0, 10)
     };

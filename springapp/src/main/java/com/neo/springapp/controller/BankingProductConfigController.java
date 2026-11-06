@@ -49,7 +49,7 @@ public class BankingProductConfigController {
     @PostMapping("/save")
     @Transactional
     public ResponseEntity<BankingProductConfig> saveImmediately(@RequestBody BankingProductConfigRequest request) {
-        validate(request);
+        validateImmediateSave(request);
         BankingProductConfig product = new BankingProductConfig();
         product.setProductCode(request.productCode().trim().toUpperCase(Locale.ROOT));
         product.setProductName(request.productName().trim());
@@ -59,7 +59,9 @@ public class BankingProductConfigController {
         product.setDailyTransactionLimit(request.dailyTransactionLimit());
         product.setMonthlyTransactionLimit(request.monthlyTransactionLimit());
         product.setServiceCharge(request.serviceCharge());
-        product.setEligibility(request.eligibility().trim());
+        product.setEligibility(request.eligibility() == null || request.eligibility().isBlank()
+                ? "Global bank-wide update applicable to all relevant account types."
+                : request.eligibility().trim());
         product.setEnabledFeatures("SAVINGS".equalsIgnoreCase(request.accountType().trim())
                 ? SavingsFeature.IDS : List.of());
         product.setEffectiveFrom(request.effectiveFrom());
@@ -184,6 +186,27 @@ public class BankingProductConfigController {
                 || !validAmount(request.monthlyTransactionLimit()) || !validAmount(request.serviceCharge())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "Rates, balances, limits, and charges must be finite non-negative numbers.");
+        }
+    }
+
+    private void validateImmediateSave(BankingProductConfigRequest request) {
+        if (request == null
+                || blank(request.productCode()) || blank(request.productName())
+                || blank(request.accountType()) || request.effectiveFrom() == null
+                || blank(request.requestedBy())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Product code, name, account type, effective date, and requesting admin are required.");
+        }
+        String accountType = request.accountType().trim().toUpperCase(Locale.ROOT);
+        if (!ADMIN_PRODUCT_CATEGORIES.contains(accountType)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Unsupported charge or product category.");
+        }
+        if (!validAmount(request.interestRate()) || !validAmount(request.minimumBalance())
+                || !validAmount(request.dailyTransactionLimit())
+                || !validAmount(request.monthlyTransactionLimit()) || !validAmount(request.serviceCharge())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Rates and charges must be finite non-negative numbers.");
         }
     }
 
