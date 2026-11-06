@@ -237,8 +237,7 @@ public class LoanRepaymentService {
         String number = loanAccountNumber.trim();
         Loan loan = loanRepository.findByLoanAccountNumber(number).orElseGet(() ->
                 loanRepository.findAll().stream()
-                        .filter(item -> item.getLoanAccountNumber() != null
-                                && item.getLoanAccountNumber().trim().equalsIgnoreCase(number))
+                        .filter(item -> matchesAccountReference(item.getLoanAccountNumber(), number))
                         .findFirst()
                         .orElse(null));
         if (loan != null) {
@@ -251,8 +250,7 @@ public class LoanRepaymentService {
 
         GoldLoan goldLoan = goldLoanRepository.findByLoanAccountNumber(number).orElseGet(() ->
                 goldLoanRepository.findAll().stream()
-                        .filter(item -> item.getLoanAccountNumber() != null
-                                && item.getLoanAccountNumber().trim().equalsIgnoreCase(number))
+                        .filter(item -> matchesAccountReference(item.getLoanAccountNumber(), number))
                         .findFirst()
                         .orElse(null));
         if (goldLoan != null) {
@@ -266,18 +264,34 @@ public class LoanRepaymentService {
 
         HomeLoan homeLoan = homeLoanRepository.findByLoanAccountNumber(number).orElseGet(() ->
                 homeLoanRepository.findAll().stream()
-                        .filter(item -> item.getLoanAccountNumber() != null
-                                && item.getLoanAccountNumber().trim().equalsIgnoreCase(number))
+                        .filter(item -> matchesAccountReference(item.getLoanAccountNumber(), number))
                         .findFirst()
                         .orElse(null));
+        if (homeLoan == null) {
+            homeLoan = homeLoanRepository.findByApplicationId(number).orElseGet(() ->
+                    homeLoanRepository.findAll().stream()
+                            .filter(item -> matchesAccountReference(item.getApplicationId(), number))
+                            .findFirst()
+                            .orElse(null));
+        }
         if (homeLoan != null) {
             if (!"Approved".equalsIgnoreCase(homeLoan.getStatus())) {
                 throw new IllegalArgumentException("Only approved home loans can be paid.");
             }
-            return verifiedDetails("HOME", number, homeLoan.getAccountNumber(), homeLoan.getUserName(),
-                    "Home Loan", homeLoan.getStatus(), null, null, homeLoan, dob);
+            String homeLoanLabel = switch (homeLoan.getLoanType() == null ? "" : homeLoan.getLoanType().toUpperCase(Locale.ROOT)) {
+                case "CAR" -> "Car Loan";
+                case "FARMER" -> "Farmer Loan";
+                case "CROP" -> "Crop Loan";
+                default -> "Home Loan";
+            };
+            String canonicalLoanNumber = homeLoan.getLoanAccountNumber();
+            String responseLoanNumber = canonicalLoanNumber == null || canonicalLoanNumber.isBlank()
+                    ? homeLoan.getApplicationId()
+                    : canonicalLoanNumber;
+            return verifiedDetails("HOME", responseLoanNumber, homeLoan.getAccountNumber(), homeLoan.getUserName(),
+                    homeLoanLabel, homeLoan.getStatus(), null, null, homeLoan, dob);
         }
-        throw new IllegalArgumentException("Loan details could not be verified.");
+        throw new IllegalArgumentException("Loan account number was not found. Check the complete number shown in the loan account.");
     }
 
     private LoanDetails verifiedDetails(
@@ -291,11 +305,17 @@ public class LoanRepaymentService {
             GoldLoan goldLoan,
             HomeLoan homeLoan,
             String suppliedDob) {
-        Account account = accountRepository.findByAccountNumber(accountNumber);
+        Account account = findSavingsAccount(accountNumber);
         String storedDob = account == null ? null : account.getDob();
         String customerName = account == null ? loanCustomerName : account.getName();
         if (storedDob == null) {
             SalaryAccount salary = salaryAccountRepository.findByAccountNumber(accountNumber);
+            if (salary == null) {
+                salary = salaryAccountRepository.findAll().stream()
+                        .filter(item -> matchesAccountReference(item.getAccountNumber(), accountNumber))
+                        .findFirst()
+                        .orElse(null);
+            }
             if (salary != null) {
                 storedDob = salary.getDob();
                 customerName = salary.getEmployeeName();
@@ -303,13 +323,20 @@ public class LoanRepaymentService {
         }
         if (storedDob == null) {
             Optional<CurrentAccount> current = currentAccountRepository.findByAccountNumber(accountNumber);
+            if (current.isEmpty()) {
+                current = currentAccountRepository.findAll().stream()
+                        .filter(item -> matchesAccountReference(item.getAccountNumber(), accountNumber))
+                        .findFirst();
+            }
             if (current.isPresent()) {
                 storedDob = current.get().getOwnerDob();
                 customerName = current.get().getOwnerName();
             }
         }
         if (!sameDate(suppliedDob, storedDob)) {
-            throw new IllegalArgumentException("Loan details could not be verified.");
+            throw new IllegalArgumentException(
+                    "Date of birth does not match the linked account. Use the DOB registered for account "
+                            + maskAccountNumber(accountNumber) + ".");
         }
 
         LoanDetails details = new LoanDetails(kind, loanAccountNumber, accountNumber,
@@ -537,6 +564,26 @@ public class LoanRepaymentService {
 
     private static double round(double value) {
         return Math.round(value * 100.0) / 100.0;
+    }
+
+    private Account findSavingsAccount(String accountNumber) {
+        Account account = accountRepository.findByAccountNumber(accountNumber);
+        if (account != null) {
+            return account;
+        }
+        return accountRepository.findAll().stream()
+                .filter(item -> matchesAccountReference(item.getAccountNumber(), accountNumber))
+                .findFirst()
+                .orElse(null);
+    }
+
+    private static boolean matchesAccountReference(String stored, String supplied) {
+        if (stored == null || supplied == null) {
+            return false;
+        }
+        String storedKey = stored.replaceAll("[^A-Za-z0-9]", "").toUpperCase(Locale.ROOT);
+        String suppliedKey = supplied.replaceAll("[^A-Za-z0-9]", "").toUpperCase(Locale.ROOT);
+        return !storedKey.isEmpty() && storedKey.equals(suppliedKey);
     }
 
     private static boolean sameDate(String supplied, String stored) {

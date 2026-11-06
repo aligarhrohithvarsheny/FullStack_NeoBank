@@ -135,7 +135,7 @@ class LoanRepaymentServiceTest {
     void incorrectDateOfBirthDoesNotAttemptPayment() throws Exception {
         assertThatThrownBy(() -> service.pay("LN-12345678", "1990-01-03", "EMI", 1, null, null))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("Loan details could not be verified.");
+                .hasMessageContaining("Date of birth does not match");
 
         verify(emiService, never()).payEmi(any(), any());
         verify(pdfService, never()).generateLoanPaymentReceipt(

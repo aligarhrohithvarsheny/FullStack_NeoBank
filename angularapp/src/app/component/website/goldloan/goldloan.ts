@@ -547,6 +547,13 @@ export class Goldloan implements OnInit, OnDestroy {
         timeout(20000),
         finalize(() => this.downloadingReceiptLoanIds.delete(loan.id!)),
         catchError(err => {
+          if (err.status === 404 && loan.loanAccountNumber) {
+            const fallbackUrl = `${environment.apiBaseUrl}/api/gold-loans/receipt/by-account/${encodeURIComponent(loan.loanAccountNumber)}${params}`;
+            return this.http.get(fallbackUrl, { responseType: 'blob' }).pipe(
+              timeout(20000),
+              catchError(() => of(null))
+            );
+          }
           let message = err.error?.message || 'Failed to download receipt.';
           if (err.status === 403) {
             message = 'You are not authorized to download this receipt.';

@@ -614,6 +614,17 @@ public class GoldLoanController {
     }
 
     // Download receipt for approved gold loan
+    @GetMapping("/receipt/by-account/{loanAccountNumber}")
+    public ResponseEntity<?> downloadApprovedReceiptByAccount(
+            @PathVariable String loanAccountNumber,
+            @RequestParam(required = false) String accountNumber) {
+        GoldLoan loan = goldLoanService.getGoldLoanByLoanAccountNumber(loanAccountNumber);
+        if (loan == null) {
+            return ResponseEntity.notFound().build();
+        }
+        return downloadApprovedReceipt(loan.getId(), accountNumber);
+    }
+
     @GetMapping("/{id}/receipt")
     public ResponseEntity<?> downloadApprovedReceipt(
             @PathVariable Long id,

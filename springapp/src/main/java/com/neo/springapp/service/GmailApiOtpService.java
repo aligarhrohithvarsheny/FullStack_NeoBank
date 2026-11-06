@@ -280,6 +280,12 @@ public class GmailApiOtpService {
 
     private GmailApiException mapGmailSendError(HttpClientErrorException e) {
         String body = e.getResponseBodyAsString();
+        if (e.getStatusCode().value() == 404) {
+            return new GmailApiException(
+                    "gmail_send_endpoint_not_found",
+                    "Gmail API send endpoint returned 404. Re-authorize with gmail.send scope and verify Gmail API is enabled. Body: " + body,
+                    e);
+        }
         if (e.getStatusCode().value() == 403) {
             return new GmailApiException(
                     "forbidden",
