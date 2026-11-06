@@ -3,7 +3,7 @@
     <div>
       <p class="eyebrow">ADMINISTRATION · CHARGES & INTEREST MASTER</p>
       <h1>Bank charges and interest rates</h1>
-      <p class="subtitle">Update CIBIL, processing, card, bounce, account and loan rates immediately; every save is retained in history.</p>
+      <p class="subtitle">Update global CIBIL, processing, card, bounce, account and loan rates immediately for all applicable account types; every save is retained in history.</p>
     </div>
     <button type="button" class="secondary-button" (click)="loadProducts()" [disabled]="loading">Refresh</button>
   </header>
@@ -36,7 +36,7 @@
   <section class="product-card proposal-card">
     <div class="section-header">
       <div><p class="eyebrow">DAILY RATE UPDATE</p><h2>Save a charge or interest rate</h2></div>
-      <span>Admin-only · Applies immediately</span>
+      <span>Admin-only · Global update</span>
     </div>
     <div class="charge-preset-grid">
       <button type="button" *ngFor="let item of chargeMasterItems" (click)="selectChargeItem(item)" [class.selected]="form.productCode === item.productCode">

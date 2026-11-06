@@ -834,6 +834,16 @@
   </div>
   <!-- End Home Feature View -->
 
+  <div class="section-content" *ngIf="activeSection === 'banking-products'" style="padding: 24px;">
+    <button type="button" class="close-btn" (click)="setActiveSection('home')" style="float:right;background:none;border:none;font-size:20px;cursor:pointer;color:#888;">
+      <i class="fa fa-times"></i>
+    </button>
+    <p style="margin-bottom:16px;padding:12px;border:1px solid #bfdbfe;border-radius:8px;background:#eff6ff;color:#1e3a5f;">
+      <strong>Global bank settings:</strong> Saved values apply immediately to all savings, salary, current, credit card, home loan and personal loan accounts. No individual account linkage is required.
+    </p>
+    <app-banking-products></app-banking-products>
+  </div>
+
   <section class="section-content" *ngIf="activeSection === 'bank-account-link'" style="padding: 24px;">
     <div class="section-header">
       <div>

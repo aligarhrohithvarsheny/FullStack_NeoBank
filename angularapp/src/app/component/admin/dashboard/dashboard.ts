@@ -11,6 +11,7 @@ import { FaceAuthService } from '../../../service/face-auth.service';
 import { PaymentGatewayService } from '../../../service/payment-gateway.service';
 import { FasttagAdmin } from '../fasttag/fasttag-admin';
 import { BankFormsAdminComponent } from '../bank-forms-admin/bank-forms-admin';
+import { BankingProducts } from '../banking-products/banking-products';
 import { environment } from '../../../../environment/environment';
 import { FundTransferReceiptData, printFundTransferReceipt } from '../../../service/fund-transfer-receipt';
 import { forkJoin, of } from 'rxjs';
@@ -47,7 +48,7 @@ interface TransactionDetails {
   templateUrl: './dashboard.html',
   styleUrls: ['./dashboard.css'],
   encapsulation: ViewEncapsulation.None,
-  imports: [FormsModule, CommonModule, FasttagAdmin, BankFormsAdminComponent],
+  imports: [FormsModule, CommonModule, FasttagAdmin, BankFormsAdminComponent, BankingProducts],
   standalone: true
 })
 export class Dashboard implements OnInit, OnDestroy {
@@ -191,7 +192,7 @@ export class Dashboard implements OnInit, OnDestroy {
     { section: 'system-monitoring', icon: 'fa-heartbeat', label: 'System Monitoring & Incidents', description: 'Monitor API errors, slow database operations, scheduled jobs, service health and delivery failures', gradient: 'linear-gradient(135deg, #0f766e, #14b8a6)', route: 'system-monitoring' },
     { section: 'kill-switches', icon: 'fa-shield-alt', label: 'Emergency Kill-Switches', description: 'Pause outbound rails, isolate customer accounts, freeze cards, and review the action audit', gradient: 'linear-gradient(135deg, #991b1b, #f97316)', route: 'kill-switches' },
     { section: 'customer-360', icon: 'fa-user-circle', label: 'Customer 360°', description: 'Review a customer’s accounts, activity, KYC, complaints, loans and relationships', gradient: 'linear-gradient(135deg, #4f46e5, #a78bfa)', featureKey: 'customer-360', route: 'customer-360' },
-    { section: 'banking-products', icon: 'fa-sliders-h', label: 'Banking Product Configuration', description: 'Propose effective-dated savings and current account product changes for approval', gradient: 'linear-gradient(135deg, #c2410c, #fb923c)', route: 'banking-products' },
+    { section: 'banking-products', icon: 'fa-sliders-h', label: 'Bank Charges & Interest Rates', description: 'Immediately update global CIBIL, processing, card, bounce, savings, salary, home loan and personal loan rates', gradient: 'linear-gradient(135deg, #c2410c, #fb923c)' },
     { section: 'profile', icon: 'fa-user-shield', label: 'Admin Profile', description: 'View and manage admin profile', gradient: 'linear-gradient(135deg, #667eea, #764ba2)' },
     { section: 'users', icon: 'fa-users', label: 'Manage Users', description: 'View, edit and manage all user accounts', gradient: 'linear-gradient(135deg, #f093fb, #f5576c)', featureKey: 'manage-users', route: 'users' },
     { section: 'user-control', icon: 'fa-user-cog', label: 'Full User Control', description: 'Block, unblock and control user access', gradient: 'linear-gradient(135deg, #4facfe, #00f2fe)', featureKey: 'user-control', route: 'user-control' },

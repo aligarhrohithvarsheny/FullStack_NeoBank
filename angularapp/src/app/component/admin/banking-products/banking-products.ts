@@ -162,14 +162,14 @@ export class BankingProducts implements OnInit {
         this.error = error?.error?.message || 'Unable to save the charge or interest update.';
         this.saving = false;
       }
-
-      private adminAuthHeaders(): HttpHeaders {
-        const token = typeof sessionStorage !== 'undefined'
-          ? sessionStorage.getItem('adminSessionToken') || ''
-          : '';
-        return token ? new HttpHeaders({ Authorization: `Bearer ${token}` }) : new HttpHeaders();
-      }
     });
+  }
+
+  private adminAuthHeaders(): HttpHeaders {
+    const token = typeof sessionStorage !== 'undefined'
+      ? sessionStorage.getItem('adminSessionToken') || ''
+      : '';
+    return token ? new HttpHeaders({ Authorization: `Bearer ${token}` }) : new HttpHeaders();
   }
 
   selectChargeItem(item: { productCode: string; productName: string; accountType: string; interestRate: boolean }): void {
