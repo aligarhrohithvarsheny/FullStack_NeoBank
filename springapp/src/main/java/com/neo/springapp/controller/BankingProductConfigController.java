@@ -18,12 +18,17 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/admin/banking-products")
 public class BankingProductConfigController {
+
+    private static final Set<String> ADMIN_PRODUCT_CATEGORIES = Set.of(
+            "CIBIL", "PROCESSING", "CREDIT_CARD", "BOUNCE", "SAVINGS",
+            "SALARY", "HOME_LOAN", "PERSONAL_LOAN", "CURRENT");
 
     private final BankingProductConfigRepository repository;
 
@@ -39,6 +44,33 @@ public class BankingProductConfigController {
     @GetMapping("/pending")
     public List<BankingProductConfig> getPendingApprovals() {
         return repository.findByStatusOrderByCreatedAtDesc("PENDING_APPROVAL");
+    }
+
+    @PostMapping("/save")
+    @Transactional
+    public ResponseEntity<BankingProductConfig> saveImmediately(@RequestBody BankingProductConfigRequest request) {
+        validate(request);
+        BankingProductConfig product = new BankingProductConfig();
+        product.setProductCode(request.productCode().trim().toUpperCase(Locale.ROOT));
+        product.setProductName(request.productName().trim());
+        product.setAccountType(request.accountType().trim().toUpperCase(Locale.ROOT));
+        product.setInterestRate(request.interestRate());
+        product.setMinimumBalance(request.minimumBalance());
+        product.setDailyTransactionLimit(request.dailyTransactionLimit());
+        product.setMonthlyTransactionLimit(request.monthlyTransactionLimit());
+        product.setServiceCharge(request.serviceCharge());
+        product.setEligibility(request.eligibility().trim());
+        product.setEnabledFeatures("SAVINGS".equalsIgnoreCase(request.accountType().trim())
+                ? SavingsFeature.IDS : List.of());
+        product.setEffectiveFrom(request.effectiveFrom());
+        product.setRequestedBy(request.requestedBy().trim());
+        product.setStatus("APPROVED");
+        product.setApprovedBy(request.requestedBy().trim());
+        product.setApprovedAt(LocalDateTime.now());
+        product.setRejectionReason(null);
+
+        BankingProductConfig saved = repository.save(product);
+        return ResponseEntity.status(saved.getId() == null ? HttpStatus.CREATED : HttpStatus.OK).body(saved);
     }
 
     @GetMapping("/active")
@@ -143,9 +175,9 @@ public class BankingProductConfigController {
                     "Product code, name, account type, eligibility, effective date, and requesting admin are required.");
         }
         String accountType = request.accountType().trim().toUpperCase(Locale.ROOT);
-        if (!"SAVINGS".equals(accountType) && !"CURRENT".equals(accountType)) {
+        if (!ADMIN_PRODUCT_CATEGORIES.contains(accountType)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "Account type must be SAVINGS or CURRENT.");
+                    "Unsupported charge or product category.");
         }
         if (!validAmount(request.interestRate()) || !validAmount(request.minimumBalance())
                 || !validAmount(request.dailyTransactionLimit())

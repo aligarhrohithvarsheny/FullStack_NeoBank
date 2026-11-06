@@ -47,6 +47,10 @@ public class SpringSecurityConfig {
 
                 // Emergency account controls require a backend-verified admin login.
                 .requestMatchers("/api/admin/kill-switches/**").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.POST, "/api/admin/banking-products").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.POST, "/api/admin/banking-products/save").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.PUT, "/api/admin/banking-products/*/approve").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.PUT, "/api/admin/banking-products/*/reject").hasRole("ADMIN")
                 .requestMatchers("/api/accounts/*/features").hasRole("USER")
                 
                 // Explicitly allow GET and POST methods for all API endpoints

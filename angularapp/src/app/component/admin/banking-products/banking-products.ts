@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { forkJoin } from 'rxjs';
 import { environment } from '../../../../environment/environment';
 
@@ -33,6 +33,19 @@ interface BankingProduct {
   styleUrl: './banking-products.css'
 })
 export class BankingProducts implements OnInit {
+  readonly chargeMasterItems = [
+    { productCode: 'CIBIL_REPORT', productName: 'CIBIL report charge', accountType: 'CIBIL', interestRate: false },
+    { productCode: 'LOAN_PROCESSING', productName: 'Loan processing charge', accountType: 'PROCESSING', interestRate: false },
+    { productCode: 'CREDIT_CARD_ANNUAL', productName: 'Credit card annual charge', accountType: 'CREDIT_CARD', interestRate: false },
+    { productCode: 'CREDIT_CARD_LATE', productName: 'Credit card late payment charge', accountType: 'CREDIT_CARD', interestRate: false },
+    { productCode: 'CHEQUE_BOUNCE', productName: 'Cheque bounce charge', accountType: 'BOUNCE', interestRate: false },
+    { productCode: 'SAVINGS_INTEREST', productName: 'Savings account interest', accountType: 'SAVINGS', interestRate: true },
+    { productCode: 'SALARY_INTEREST', productName: 'Salary account interest', accountType: 'SALARY', interestRate: true },
+    { productCode: 'HOME_LOAN_INTEREST', productName: 'Home loan interest', accountType: 'HOME_LOAN', interestRate: true },
+    { productCode: 'PERSONAL_LOAN_INTEREST', productName: 'Personal loan interest', accountType: 'PERSONAL_LOAN', interestRate: true },
+    { productCode: 'HOME_LOAN_PROCESSING', productName: 'Home loan processing charge', accountType: 'HOME_LOAN', interestRate: false },
+    { productCode: 'PERSONAL_LOAN_PROCESSING', productName: 'Personal loan processing charge', accountType: 'PERSONAL_LOAN', interestRate: false }
+  ];
   readonly savingsFeatures = [
     { id: 'accounts', label: 'Account overview' },
     { id: 'ai-assistant', label: 'AI assistant' },
@@ -116,7 +129,7 @@ export class BankingProducts implements OnInit {
     this.http.post<BankingProduct>(`${environment.apiBaseUrl}/api/admin/banking-products`, {
       ...this.form,
       requestedBy: this.adminName
-    }).subscribe({
+    }, { headers: this.adminAuthHeaders() }).subscribe({
       next: () => {
         this.success = 'Product version submitted for approval. It will not take effect until approved and its effective date.';
         this.form = this.createEmptyForm();
@@ -130,6 +143,42 @@ export class BankingProducts implements OnInit {
     });
   }
 
+  saveImmediately(): void {
+    this.error = '';
+    this.success = '';
+    this.saving = true;
+    this.http.post<BankingProduct>(`${environment.apiBaseUrl}/api/admin/banking-products/save`, {
+      ...this.form,
+      accountType: this.form.accountType || 'GENERAL',
+      requestedBy: this.adminName
+    }, { headers: this.adminAuthHeaders() }).subscribe({
+      next: () => {
+        this.success = `${this.form.productName || this.form.productCode} saved immediately and added to history, effective ${this.form.effectiveFrom}.`;
+        this.form = this.createEmptyForm();
+        this.saving = false;
+        this.loadProducts();
+      },
+      error: error => {
+        this.error = error?.error?.message || 'Unable to save the charge or interest update.';
+        this.saving = false;
+      }
+
+      private adminAuthHeaders(): HttpHeaders {
+        const token = typeof sessionStorage !== 'undefined'
+          ? sessionStorage.getItem('adminSessionToken') || ''
+          : '';
+        return token ? new HttpHeaders({ Authorization: `Bearer ${token}` }) : new HttpHeaders();
+      }
+    });
+  }
+
+  selectChargeItem(item: { productCode: string; productName: string; accountType: string; interestRate: boolean }): void {
+    this.form.productCode = item.productCode;
+    this.form.productName = item.productName;
+    this.form.accountType = item.accountType as any;
+    this.form.effectiveFrom = new Date().toISOString().slice(0, 10);
+  }
+
   approve(product: BankingProduct): void {
     if (!window.confirm(`Approve ${product.productName} (${product.productCode}) effective ${product.effectiveFrom}?`)) return;
     this.error = '';
@@ -137,7 +186,7 @@ export class BankingProducts implements OnInit {
     this.http.put<BankingProduct>(
       `${environment.apiBaseUrl}/api/admin/banking-products/${product.id}/approve`,
       {},
-      { params: { approvedBy: this.adminName } }
+      { params: { approvedBy: this.adminName }, headers: this.adminAuthHeaders() }
     ).subscribe({
       next: () => {
         this.success = `${product.productName} version approved. It becomes effective on ${product.effectiveFrom}.`;
@@ -157,7 +206,8 @@ export class BankingProducts implements OnInit {
     this.success = '';
     this.http.put<BankingProduct>(
       `${environment.apiBaseUrl}/api/admin/banking-products/${product.id}/reject`,
-      { rejectedBy: this.adminName, reason }
+      { rejectedBy: this.adminName, reason },
+      { headers: this.adminAuthHeaders() }
     ).subscribe({
       next: () => {
         this.success = `${product.productName} version rejected.`;

@@ -1,9 +1,9 @@
 <main class="products-page">
   <header class="page-header">
     <div>
-      <p class="eyebrow">ADMINISTRATION · PRODUCT GOVERNANCE</p>
-      <h1>Banking product configuration</h1>
-      <p class="subtitle">Propose versioned savings and current account terms, then review effective-dated changes.</p>
+      <p class="eyebrow">ADMINISTRATION · CHARGES & INTEREST MASTER</p>
+      <h1>Bank charges and interest rates</h1>
+      <p class="subtitle">Update CIBIL, processing, card, bounce, account and loan rates immediately; every save is retained in history.</p>
     </div>
     <button type="button" class="secondary-button" (click)="loadProducts()" [disabled]="loading">Refresh</button>
   </header>
@@ -35,24 +35,40 @@
 
   <section class="product-card proposal-card">
     <div class="section-header">
-      <div><p class="eyebrow">CHANGE REQUEST</p><h2>Propose a product version</h2></div>
-      <span>Changes require approval</span>
+      <div><p class="eyebrow">DAILY RATE UPDATE</p><h2>Save a charge or interest rate</h2></div>
+      <span>Admin-only · Applies immediately</span>
     </div>
-    <form class="product-form" (ngSubmit)="proposeChange()">
+    <div class="charge-preset-grid">
+      <button type="button" *ngFor="let item of chargeMasterItems" (click)="selectChargeItem(item)" [class.selected]="form.productCode === item.productCode">
+        <span>{{ item.productName }}</span>
+        <small>{{ item.interestRate ? 'Interest rate' : 'Charge / fee' }}</small>
+      </button>
+    </div>
+    <form class="product-form" (ngSubmit)="saveImmediately()">
       <label>Product code<input name="productCode" [(ngModel)]="form.productCode" required maxlength="40" placeholder="SAVINGS-PLUS"></label>
       <label>Product name<input name="productName" [(ngModel)]="form.productName" required maxlength="120" placeholder="Savings Plus"></label>
-      <label>Account type<select name="accountType" [(ngModel)]="form.accountType"><option value="SAVINGS">Savings</option><option value="CURRENT">Current</option></select></label>
+      <label>Product category<select name="accountType" [(ngModel)]="form.accountType">
+        <option value="CIBIL">CIBIL</option>
+        <option value="PROCESSING">Processing charge</option>
+        <option value="CREDIT_CARD">Credit card</option>
+        <option value="BOUNCE">Bounce charge</option>
+        <option value="SAVINGS">Savings account</option>
+        <option value="SALARY">Salary account</option>
+        <option value="HOME_LOAN">Home loan</option>
+        <option value="PERSONAL_LOAN">Personal loan</option>
+        <option value="CURRENT">Current</option>
+      </select></label>
       <label>Interest rate (% p.a.)<input name="interestRate" type="number" [(ngModel)]="form.interestRate" required min="0" step="0.01"></label>
-      <label>Minimum balance (₹)<input name="minimumBalance" type="number" [(ngModel)]="form.minimumBalance" required min="0" step="0.01"></label>
-      <label>Daily transaction limit (₹)<input name="dailyTransactionLimit" type="number" [(ngModel)]="form.dailyTransactionLimit" required min="0" step="0.01"></label>
-      <label>Monthly transaction limit (₹)<input name="monthlyTransactionLimit" type="number" [(ngModel)]="form.monthlyTransactionLimit" required min="0" step="0.01"></label>
-      <label>Service charge (₹)<input name="serviceCharge" type="number" [(ngModel)]="form.serviceCharge" required min="0" step="0.01"></label>
+      <label>Fixed charge / fee (₹)<input name="serviceCharge" type="number" [(ngModel)]="form.serviceCharge" required min="0" step="0.01"></label>
+      <label>Percentage charge (%)<input name="dailyTransactionLimit" type="number" [(ngModel)]="form.dailyTransactionLimit" required min="0" step="0.01"></label>
+      <label>Minimum balance / amount (₹)<input name="minimumBalance" type="number" [(ngModel)]="form.minimumBalance" required min="0" step="0.01"></label>
+      <label>Maximum limit / amount (₹)<input name="monthlyTransactionLimit" type="number" [(ngModel)]="form.monthlyTransactionLimit" required min="0" step="0.01"></label>
       <label>Effective from<input name="effectiveFrom" type="date" [(ngModel)]="form.effectiveFrom" required></label>
-      <label class="eligibility-field">Eligibility criteria<textarea name="eligibility" [(ngModel)]="form.eligibility" rows="3" maxlength="2000" required placeholder="Describe who can open this account and any eligibility rules"></textarea></label>
+      <label class="eligibility-field">Terms / applicability<textarea name="eligibility" [(ngModel)]="form.eligibility" rows="3" maxlength="2000" required placeholder="Describe item eligibility, calculation method, tax applicability or account rules"></textarea></label>
       <p class="feature-entitlements" *ngIf="form.accountType === 'SAVINGS'">
         All customer features are enabled for every Savings account and cannot be disabled through product settings.
       </p>
-      <div class="form-footer"><span>Submitted by {{ adminName }} · Proposal will remain pending until reviewed.</span><button type="submit" class="primary-button" [disabled]="saving">{{ saving ? 'Submitting…' : 'Submit for approval' }}</button></div>
+      <div class="form-footer"><span>Saved by {{ adminName }} · Update becomes effective on the selected date and is stored in history immediately.</span><button type="submit" class="primary-button" [disabled]="saving">{{ saving ? 'Saving…' : 'Save and apply' }}</button></div>
     </form>
   </section>
 
