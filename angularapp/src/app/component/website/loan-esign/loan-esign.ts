@@ -135,7 +135,7 @@ export class LoanEsign implements OnInit, OnDestroy {
     if (!isPlatformBrowser(this.platformId) || !this.pdfObjectUrl) return;
     const anchor = document.createElement('a');
     anchor.href = this.pdfObjectUrl;
-    anchor.download = 'neobank-loan-agreement-demo.pdf';
+    anchor.download = 'neobank-loan-agreement.pdf';
     anchor.click();
   }
 }

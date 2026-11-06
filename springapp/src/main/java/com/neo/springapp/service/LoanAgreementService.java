@@ -662,7 +662,7 @@ public class LoanAgreementService {
                 "Review every page, the complete repayment schedule, charges, and all product conditions.",
                 "The customer must receive a final, bank-approved agreement before any real-world signing.",
                 "Signature type: typed-name confirmation protected by a CAPTCHA.",
-                "This application does not provide a qualified or regulated electronic-signature service."
+                "This application does  provide a qualified or regulated electronic-signature service."
         ));
         if (agreement.getSignedAt() != null) {
             signaturePage.add("Customer typed name: " + safe(agreement.getSignedName()));

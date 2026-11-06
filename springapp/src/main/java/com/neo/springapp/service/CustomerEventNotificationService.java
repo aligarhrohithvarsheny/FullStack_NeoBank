@@ -7,6 +7,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
+import org.springframework.scheduling.annotation.Async;
 
 import java.io.IOException;
 import java.text.Normalizer;
@@ -71,6 +72,7 @@ public class CustomerEventNotificationService {
     }
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
+    @Async("customerNotificationExecutor")
     public void deliver(NotificationRequest request) {
         try {
             byte[] pdf = pdfService.generateCustomerEventSummary(
@@ -84,12 +86,20 @@ public class CustomerEventNotificationService {
                     + "A PDF summary is attached. If you did not request this activity, please contact NeoBank using the official support channels.";
             String fileName = filePart(request.event()) + "_"
                     + filePart(request.reference()) + ".pdf";
-            if (!emailService.sendEmailWithPdfAttachment(
-                    request.email(), subject, body, fileName, pdf)) {
-                logger.error("Customer event notification delivery failed for event {} and reference {}",
-                        request.event(), request.reference());
+            boolean sent = false;
+            for (int attempt = 1; attempt <= 3 && !sent; attempt++) {
+                sent = emailService.sendEmailWithPdfAttachment(
+                        request.email(), subject, body, fileName, pdf);
+                if (!sent && attempt < 3) {
+                    Thread.sleep(500L * attempt);
+                }
             }
-        } catch (IOException | RuntimeException e) {
+            if (!sent) {
+                logger.error("Customer event notification delivery failed after 3 attempts for event {} and reference {}",
+                        request.event(), request.reference());
+                recordFailure("Registered-email PDF notification delivery failed after 3 attempts");
+            }
+        } catch (IOException | RuntimeException | InterruptedException e) {
             recordFailure("Customer event notification could not be generated for event "
                     + request.event() + " and reference " + request.reference(), e);
         }

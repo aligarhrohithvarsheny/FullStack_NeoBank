@@ -17,6 +17,7 @@ import com.neo.springapp.repository.LoanRepository;
 import com.neo.springapp.repository.SalaryAccountRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import java.io.IOException;
 import java.time.LocalDate;
@@ -44,8 +45,12 @@ public class LoanRepaymentService {
     private final CurrentAccountRepository currentAccountRepository;
     private final EmiService emiService;
     private final HomeLoanService homeLoanService;
+    private final GoldLoanService goldLoanService;
     private final AccountService accountService;
+    private final TransactionService transactionService;
     private final PdfService pdfService;
+    @Autowired(required = false)
+    private CustomerEventNotificationService notificationService;
 
     public LoanRepaymentService(
             LoanRepository loanRepository,
@@ -59,6 +64,26 @@ public class LoanRepaymentService {
             HomeLoanService homeLoanService,
             AccountService accountService,
             PdfService pdfService) {
+        this(loanRepository, goldLoanRepository, homeLoanRepository, emiPaymentRepository,
+            accountRepository, salaryAccountRepository, currentAccountRepository, emiService,
+            homeLoanService, null, accountService, null, pdfService);
+    }
+
+    @Autowired
+    public LoanRepaymentService(
+            LoanRepository loanRepository,
+            GoldLoanRepository goldLoanRepository,
+            HomeLoanRepository homeLoanRepository,
+            EmiPaymentRepository emiPaymentRepository,
+            AccountRepository accountRepository,
+            SalaryAccountRepository salaryAccountRepository,
+            CurrentAccountRepository currentAccountRepository,
+            EmiService emiService,
+            HomeLoanService homeLoanService,
+            GoldLoanService goldLoanService,
+            AccountService accountService,
+            TransactionService transactionService,
+            PdfService pdfService) {
         this.loanRepository = loanRepository;
         this.goldLoanRepository = goldLoanRepository;
         this.homeLoanRepository = homeLoanRepository;
@@ -68,7 +93,9 @@ public class LoanRepaymentService {
         this.currentAccountRepository = currentAccountRepository;
         this.emiService = emiService;
         this.homeLoanService = homeLoanService;
+        this.goldLoanService = goldLoanService;
         this.accountService = accountService;
+        this.transactionService = transactionService;
         this.pdfService = pdfService;
     }
 
@@ -123,6 +150,31 @@ public class LoanRepaymentService {
             transaction = result.transaction();
             paidAmount = transaction.getAmount();
             remaining = value(result.loan().getRemainingPrincipal());
+        } else if ("PREPAYMENT".equals(mode) && "GOLD".equals(details.kind)) {
+            validatePrepayment(details.outstandingPrincipal, amount);
+            double charges = round(amount * 0.01);
+            double gst = round(charges * 0.18);
+            double totalDebit = round(amount + charges + gst);
+            transaction = debitPrepaymentAccount(details.accountNumber, totalDebit,
+                        "Gold Loan Prepayment", "Prepayment - " + details.loanAccountNumber
+                                + " (principal " + amount + ", charge " + charges + ", GST " + gst + ")");
+            if (goldLoanService == null) {
+                throw new IllegalStateException("Gold loan repayment service is unavailable.");
+            }
+            Map<String, Double> balances = goldLoanService.processQuickAction(
+                        details.loanAccountNumber, "DEPOSIT", amount, "Customer");
+            remaining = balances.get("balanceAfter");
+            paidAmount = totalDebit;
+        } else if ("PREPAYMENT".equals(mode) && "STANDARD".equals(details.kind)) {
+            validatePrepayment(details.outstandingPrincipal, amount);
+            double charges = round(amount * 0.01);
+            double gst = round(charges * 0.18);
+            double totalDebit = round(amount + charges + gst);
+            transaction = debitPrepaymentAccount(details.accountNumber, totalDebit,
+                        details.loanType + " Prepayment", "Prepayment - " + details.loanAccountNumber
+                                + " (principal " + amount + ", charge " + charges + ", GST " + gst + ")");
+            remaining = applyStandardPrepayment(details.loan, amount, normalizeAdjustment(adjustment));
+            paidAmount = totalDebit;
         } else {
             throw new IllegalArgumentException("This loan does not support the selected payment option.");
         }
@@ -163,6 +215,18 @@ public class LoanRepaymentService {
         transactionSummary.put("status", transaction.getStatus());
         response.put("transaction", transactionSummary);
         response.put("receiptPdfBase64", Base64.getEncoder().encodeToString(receipt));
+        if (notificationService != null) {
+            Map<String, String> notificationDetails = new LinkedHashMap<>();
+            notificationDetails.put("Loan account", maskAccountNumber(details.loanAccountNumber));
+            notificationDetails.put("Loan type", details.loanType);
+            notificationDetails.put("Payment mode", mode);
+            notificationDetails.put("Amount paid", String.format(Locale.ROOT, "%.2f", paidAmount));
+            notificationDetails.put("Remaining principal", String.format(Locale.ROOT, "%.2f", remaining));
+            notificationDetails.put("Linked account balance", String.format(Locale.ROOT, "%.2f", balanceAfter));
+            notificationDetails.put("Transaction ID", String.valueOf(transaction.getTransactionId()));
+            notificationService.notifyForAccount(details.accountNumber, "Loan " + mode.toLowerCase(Locale.ROOT),
+                    "Completed", String.valueOf(transaction.getTransactionId()), notificationDetails);
+        }
         return response;
     }
 
@@ -249,6 +313,27 @@ public class LoanRepaymentService {
             }
             details.prepaymentSupported = true;
             details.prepaymentChargePercent = 1.0;
+        } else if (goldLoan != null) {
+            List<EmiPayment> pending = emiPaymentRepository.findByLoanAccountNumberOrderByEmiNumberAsc(loanAccountNumber)
+                    .stream()
+                    .filter(emi -> "Pending".equalsIgnoreCase(emi.getStatus()))
+                    .sorted(Comparator.comparing(EmiPayment::getEmiNumber))
+                    .limit(1)
+                    .toList();
+            for (EmiPayment emi : pending) {
+                Map<String, Object> entry = new LinkedHashMap<>();
+                entry.put("emiNumber", emi.getEmiNumber());
+                entry.put("dueDate", emi.getDueDate());
+                entry.put("amount", emi.getTotalAmount());
+                emis.add(entry);
+            }
+            outstanding = value(goldLoan.getRemainingPrincipal() == null
+                    ? goldLoan.getLoanAmount() : goldLoan.getRemainingPrincipal());
+            if (outstanding <= 0 && !pending.isEmpty()) {
+                outstanding = pending.stream().mapToDouble(emi -> value(emi.getPrincipalAmount())).sum();
+            }
+            details.prepaymentSupported = true;
+            details.prepaymentChargePercent = 1.0;
         } else {
             List<EmiPayment> pending = emiPaymentRepository.findByLoanAccountNumberOrderByEmiNumberAsc(loanAccountNumber)
                     .stream()
@@ -269,6 +354,10 @@ public class LoanRepaymentService {
             } else {
                 outstanding = value(goldLoan.getRemainingPrincipal() == null
                         ? goldLoan.getLoanAmount() : goldLoan.getRemainingPrincipal());
+            }
+            if (loan != null) {
+                details.prepaymentSupported = true;
+                details.prepaymentChargePercent = 1.0;
             }
         }
         details.emis = emis;
@@ -295,6 +384,144 @@ public class LoanRepaymentService {
 
     private static String normalizeAdjustment(String adjustment) {
         return "REDUCE_EMI".equalsIgnoreCase(adjustment) ? "REDUCE_EMI" : "REDUCE_TENURE";
+    }
+
+    private void validatePrepayment(double outstanding, Double amount) {
+        if (amount == null || !Double.isFinite(amount) || amount <= 0
+                || amount >= outstanding) {
+            throw new IllegalArgumentException(
+                    "Enter a valid prepayment amount below the outstanding principal.");
+        }
+    }
+
+    private Transaction debitPrepaymentAccount(String accountNumber, double totalDebit,
+            String merchant, String description) {
+        Double balance = accountService.getBalanceByAccountNumber(accountNumber);
+        boolean salaryAccount = false;
+        boolean currentAccount = false;
+        SalaryAccount salary = null;
+        CurrentAccount current = null;
+
+        if (balance == null) {
+            salary = salaryAccountRepository.findByAccountNumber(accountNumber);
+            if (salary != null && salary.getBalance() != null) {
+                balance = salary.getBalance();
+                salaryAccount = true;
+            }
+        }
+        if (balance == null) {
+            current = currentAccountRepository.findByAccountNumber(accountNumber).orElse(null);
+            if (current != null && current.getBalance() != null) {
+                balance = current.getBalance();
+                currentAccount = true;
+            }
+        }
+        if (balance == null || balance < totalDebit) {
+            throw new IllegalArgumentException("Insufficient balance. Required: Rs. " + round(totalDebit)
+                    + ", Available: Rs. " + round(balance == null ? 0.0 : balance));
+        }
+
+        double newBalance;
+        if (salaryAccount && salary != null) {
+            newBalance = round(salary.getBalance() - totalDebit);
+            salary.setBalance(newBalance);
+            salary.setUpdatedAt(LocalDateTime.now());
+            salaryAccountRepository.save(salary);
+        } else if (currentAccount && current != null) {
+            newBalance = round(current.getBalance() - totalDebit);
+            current.setBalance(newBalance);
+            currentAccountRepository.save(current);
+        } else {
+            Double debited = accountService.debitBalance(accountNumber, totalDebit);
+            if (debited == null) throw new IllegalStateException("Failed to debit the linked account.");
+            newBalance = debited;
+        }
+
+        Transaction transaction = new Transaction();
+        transaction.setAccountNumber(accountNumber);
+        transaction.setMerchant(merchant);
+        transaction.setAmount(totalDebit);
+        transaction.setType("Debit");
+        transaction.setDescription(description);
+        transaction.setDate(LocalDateTime.now());
+        transaction.setStatus("Completed");
+        transaction.setBalance(newBalance);
+        if (transactionService == null) {
+            transaction.setTransactionId("LOAN-" + System.currentTimeMillis());
+            return transaction;
+        }
+        return transactionService.saveTransaction(transaction);
+    }
+
+    private double applyStandardPrepayment(Loan loan, double amount, String adjustment) {
+        double oldOutstanding = value(loan.getRemainingPrincipal() == null ? loan.getAmount() : loan.getRemainingPrincipal());
+        double newOutstanding = round(Math.max(0.0, oldOutstanding - amount));
+        loan.setRemainingPrincipal(newOutstanding);
+        loan.setPrincipalPaid(round(value(loan.getPrincipalPaid()) + amount));
+
+        List<EmiPayment> pending = emiPaymentRepository.findByLoanAccountNumberOrderByEmiNumberAsc(loan.getLoanAccountNumber())
+                .stream()
+                .filter(emi -> "Pending".equalsIgnoreCase(emi.getStatus()))
+                .sorted(Comparator.comparing(EmiPayment::getEmiNumber))
+                .toList();
+        if (!pending.isEmpty()) {
+            double monthlyRate = value(loan.getInterestRate()) / 1200.0;
+            List<EmiPayment> remainingSchedule = new ArrayList<>(pending);
+            if ("REDUCE_TENURE".equalsIgnoreCase(adjustment)) {
+                double currentEmi = value(pending.get(0).getTotalAmount());
+                int reducedTenure = newRemainingTenure(newOutstanding, monthlyRate, currentEmi, pending.size());
+                if (reducedTenure < remainingSchedule.size()) {
+                    for (int i = reducedTenure; i < remainingSchedule.size(); i++) {
+                        remainingSchedule.get(i).setStatus("Cancelled");
+                    }
+                    remainingSchedule = new ArrayList<>(remainingSchedule.subList(0, reducedTenure));
+                }
+            } else {
+                double recalculatedEmi = amortizedEmi(newOutstanding, monthlyRate, remainingSchedule.size());
+                for (EmiPayment emi : remainingSchedule) {
+                    emi.setTotalAmount(round(recalculatedEmi));
+                }
+            }
+
+            double balance = newOutstanding;
+            double remainingInterest = 0.0;
+            for (int i = 0; i < remainingSchedule.size(); i++) {
+                EmiPayment emi = remainingSchedule.get(i);
+                double interest = round(balance * monthlyRate);
+                double emiAmount = value(emi.getTotalAmount());
+                double principalPart = i == remainingSchedule.size() - 1
+                        ? balance : round(Math.max(0.0, Math.min(balance, emiAmount - interest)));
+                if (i == remainingSchedule.size() - 1) emiAmount = round(principalPart + interest);
+                emi.setPrincipalAmount(round(principalPart));
+                emi.setInterestAmount(interest);
+                emi.setTotalAmount(round(emiAmount));
+                balance = round(Math.max(0.0, balance - principalPart));
+                emi.setRemainingPrincipal(balance);
+                remainingInterest = round(remainingInterest + interest);
+            }
+            emiPaymentRepository.saveAll(pending);
+        }
+        loanRepository.save(loan);
+        return newOutstanding;
+    }
+
+    private static int newRemainingTenure(double principal, double monthlyRate, double currentEmi, int currentCount) {
+        if (principal <= 0) return 0;
+        if (monthlyRate <= 0) return Math.max(1, (int) Math.ceil(principal / Math.max(1.0, currentEmi)));
+        if (currentEmi <= principal * monthlyRate) return currentCount;
+        double months = Math.log(currentEmi / (currentEmi - principal * monthlyRate))
+                / Math.log(1 + monthlyRate);
+        return Math.max(1, (int) Math.ceil(months));
+    }
+
+    private static double amortizedEmi(double principal, double monthlyRate, int months) {
+        if (principal <= 0 || months <= 0) return 0.0;
+        if (monthlyRate <= 0) return round(principal / months);
+        return round(principal * monthlyRate / (1 - Math.pow(1 + monthlyRate, -months)));
+    }
+
+    private static double round(double value) {
+        return Math.round(value * 100.0) / 100.0;
     }
 
     private static boolean sameDate(String supplied, String stored) {

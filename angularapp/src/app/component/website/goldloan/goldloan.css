@@ -396,6 +396,116 @@
   gap: 20px;
 }
 
+.gold-loan-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.gold-loan-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.gold-loan-tabs button {
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px solid #dbe3ef;
+  border-radius: 8px;
+  background: #fff;
+  color: #40566b;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.gold-loan-tabs button.active {
+  border-color: #1e40af;
+  background: #1e40af;
+  color: #fff;
+}
+
+.gold-loan-tabs button span {
+  display: inline-grid;
+  min-width: 20px;
+  height: 20px;
+  margin-left: 4px;
+  place-items: center;
+  border-radius: 999px;
+  background: rgba(30, 64, 175, 0.09);
+  font-size: 12px;
+}
+
+.gold-loan-tabs button.active span {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.gold-loan-search {
+  width: min(320px, 100%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid #cbd7e3;
+  border-radius: 9px;
+  background: #fff;
+}
+
+.gold-loan-search input {
+  width: 100%;
+  border: 0;
+  outline: 0;
+  color: #18324b;
+  font: inherit;
+}
+
+.gold-loan-no-results {
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+}
+
+.gold-loan-clear-btn,
+.gold-action-btn {
+  min-height: 42px;
+  padding: 10px 14px;
+  border: 0;
+  border-radius: 8px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.gold-loan-clear-btn {
+  margin-top: 10px;
+  background: #eaf3ff;
+  color: #1e40af;
+}
+
+.gold-action-btn {
+  border: 1px solid #1e40af;
+  background: #fff;
+  color: #1e40af;
+}
+
+.gold-action-btn:hover:not(:disabled) {
+  background: #1e40af;
+  color: #fff;
+}
+
+.approved-receipt-btn {
+  background: #1e40af;
+  color: #fff;
+}
+
+.terms-action {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+}
+
 .loan-card {
   background: #f9fafb;
   padding: 20px;
@@ -438,6 +548,11 @@
 .status-badge.status-rejected {
   background: #fee2e2;
   color: #991b1b;
+}
+
+.status-badge.status-foreclosed {
+  background: #ede9fe;
+  color: #5b21b6;
 }
 
 .loan-details {
@@ -676,6 +791,24 @@
 @media (max-width: 768px) {
   .gold-loan-container {
     padding: 15px;
+  }
+
+  .gold-loan-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .gold-loan-tabs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .gold-loan-search {
+    width: 100%;
+  }
+
+  .gold-action-btn {
+    width: 100%;
   }
 
   .form-grid {

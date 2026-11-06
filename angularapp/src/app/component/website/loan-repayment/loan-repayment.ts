@@ -108,6 +108,19 @@ export class LoanRepayment {
     return (this.prepaymentAmount ?? 0) + this.prepaymentCharges;
   }
 
+  get estimatedPrepaymentBalance(): number | null {
+    if (!this.details || !this.prepaymentAmount || this.prepaymentAmount <= 0) return null;
+    return Math.max(0, this.details.outstandingPrincipal - this.prepaymentAmount);
+  }
+
+  get estimatedPostPrepaymentEmi(): number | null {
+    if (!this.details || !this.prepaymentAmount || this.prepaymentAmount <= 0) return null;
+    if (!this.details.emis.length) return null;
+    if (this.adjustment !== 'REDUCE_EMI') return null;
+    const months = Math.max(1, this.details.emis.length);
+    return Math.max(0, this.details.outstandingPrincipal - this.prepaymentAmount) / months;
+  }
+
   reviewPayment() {
     this.error = '';
     if (!this.details) return;

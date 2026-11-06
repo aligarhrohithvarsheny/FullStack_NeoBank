@@ -10,7 +10,7 @@
 
   <!-- CIBIL Information Card -->
   <div class="cibil-info-card" *ngIf="cibilInfo.cibilScore > 0 || cibilInfo.loading || cibilInfo.error">
-    <h3>📊 Credit Information</h3>
+    <h3> Credit Information</h3>
     <div *ngIf="cibilInfo.loading" class="loading-cibil">
       <p>Checking CIBIL score...</p>
     </div>
@@ -188,7 +188,7 @@
 
       <!-- Education Details - 10th -->
       <div class="form-section">
-        <h4>📚 10th Standard Details</h4>
+        <h4> 10th Standard Details</h4>
         <div class="form-row">
           <div class="input-group">
             <label class="input-label">School Name <span class="required">*</span></label>
@@ -221,7 +221,7 @@
 
       <!-- Education Details - 12th -->
       <div class="form-section">
-        <h4>📚 12th Standard Details</h4>
+        <h4> 12th Standard Details</h4>
         <div class="form-row">
           <div class="input-group">
             <label class="input-label">School/College Name <span class="required">*</span></label>
@@ -292,7 +292,7 @@
 
       <!-- College/University Selection -->
       <div class="form-section">
-        <h4>🏫 College/University for Loan</h4>
+        <h4> College/University for Loan</h4>
         <div class="form-row">
           <div class="input-group">
             <label class="input-label">College Type <span class="required">*</span></label>
@@ -390,7 +390,7 @@
 
       <!-- College Account Details -->
       <div class="form-section">
-        <h4>🏦 College Account Details</h4>
+        <h4> College Account Details</h4>
         <div class="form-row">
           <div class="input-group">
             <label class="input-label">Account Number <span class="required">*</span></label>
@@ -420,7 +420,7 @@
 
       <!-- Document Upload -->
       <div class="form-section">
-        <h4>📄 Documents</h4>
+        <h4>Documents</h4>
         <div class="input-group">
           <label class="input-label">College Application/Admission Letter</label>
           <input type="file" class="input-field" (change)="onCollegeApplicationFileSelected($event)" 
@@ -478,13 +478,13 @@
 
     <!-- Personal Loan Application Form Section -->
     <div *ngIf="loanForm.type === 'Personal Loan'" class="personal-loan-form-section">
-      <h3 class="section-title">📄 Personal Loan Application Form</h3>
+      <h3 class="section-title"> Personal Loan Application Form</h3>
       
       <div class="form-section">
         <div class="input-group">
           <label class="input-label">Download Application Form</label>
           <button type="button" class="download-form-btn" (click)="downloadPersonalLoanForm()">
-            📥 Download Application Form
+             Download Application Form
           </button>
           <small class="input-hint">Download the Personal Loan application form, fill it, and upload it below.</small>
         </div>
@@ -500,7 +500,7 @@
           />
           <small class="input-hint">Upload the filled Personal Loan application form (PDF, JPG, PNG - Max 5MB)</small>
           <div *ngIf="personalLoanFormFile" class="file-info">
-            <span class="file-name">📄 {{ personalLoanFormFile.name }}</span>
+            <span class="file-name"> {{ personalLoanFormFile.name }}</span>
             <button type="button" class="remove-file-btn" (click)="removePersonalLoanForm()" *ngIf="!personalLoanFormUploaded">✕</button>
           </div>
           <div *ngIf="personalLoanFormUploaded" class="success-message">
@@ -615,7 +615,7 @@
   <div class="foreclosure-quick-access" *ngIf="hasApprovedLoans()">
     <div class="foreclosure-banner">
       <div class="foreclosure-banner-content">
-        <h3>🏦 Loan Foreclosure Available</h3>
+        <h3> Loan Foreclosure Available</h3>
         <p>You have approved loans that can be foreclosed. Contact admin or check below for foreclosure details.</p>
       </div>
     </div>
@@ -679,28 +679,28 @@
               class="download-foreclosure-btn" 
               (click)="downloadForeclosurePDF(loan)" 
               title="Download Foreclosure Statement PDF">
-               📄 Foreclosure PDF
+               Foreclosure PDF
             </button>
             <button 
               *ngIf="loan.status === 'Approved' || loan.status === 'Paid' || loan.status === 'Foreclosed'" 
               class="download-foreclosure-btn" 
               (click)="downloadLoanDoc('receipt', loan)" 
               title="Download Loan Receipt">
-               🧾 Receipt
+                Receipt
             </button>
             <button 
               *ngIf="isClosed(loan)" 
               class="download-foreclosure-btn" 
               (click)="downloadLoanDoc('noc', loan)" 
               title="Download NOC">
-               📜 NOC
+                NOC
             </button>
             <button 
               *ngIf="loan.status === 'Approved' || loan.status === 'Paid'" 
               class="view-emi-btn" 
               (click)="showEmiDetails(loan)" 
               title="View EMI Details">
-               💳 View EMIs
+                View EMIs
             </button>
           </td>
         </tr>
@@ -710,7 +710,7 @@
     
     <!-- Foreclosure Information Section -->
     <div class="foreclosure-section" *ngIf="hasForeclosedLoans()">
-      <h3>🏦 Foreclosed Loans</h3>
+      <h3> Foreclosed Loans</h3>
       <div class="foreclosure-cards">
         <div class="foreclosure-card" *ngFor="let loan of loans" [hidden]="loan.status !== 'Foreclosed'">
           <div class="foreclosure-header">
@@ -753,7 +753,7 @@
           </div>
           <div class="foreclosure-actions">
             <button class="download-foreclosure-pdf-btn" (click)="downloadForeclosurePDF(loan)">
-              📄 Download Foreclosure Statement
+               Download Foreclosure Statement
             </button>
           </div>
         </div>
@@ -802,7 +802,7 @@
       <!-- Next Due EMI Alert -->
       <div class="next-emi-alert" *ngIf="getNextDueEmi(selectedLoanForEmi.id)">
         <div class="alert-content">
-          <h4>⚠️ Next EMI Due</h4>
+          <h4>Next EMI Due</h4>
           <p><strong>Due Date:</strong> {{ getNextDueEmi(selectedLoanForEmi.id)!.dueDate | date:'dd-MM-yyyy' }}</p>
           <p><strong>Amount:</strong> ₹{{ getNextDueEmi(selectedLoanForEmi.id)!.totalAmount | number:'1.2-2' }}</p>
           <button class="pay-now-btn" (click)="payEmi(getNextDueEmi(selectedLoanForEmi.id)!)" [disabled]="payingEmi">
@@ -930,13 +930,13 @@
                       class="pay-emi-btn-card" 
                       (click)="payEmi(emi)" 
                       [disabled]="payingEmi">
-                <span class="btn-icon">💳</span>
+                <span class="btn-icon"></span>
                 <span class="btn-text">{{ payingEmi ? 'Processing...' : 'Pay Now' }}</span>
               </button>
               <button *ngIf="emi.status === 'Paid'" 
                       class="download-receipt-btn-card" 
                       (click)="downloadEmiReceipt(emi)">
-                <span class="btn-icon">📄</span>
+                <span class="btn-icon"></span>
                 <span class="btn-text">Download Receipt</span>
               </button>
             </div>
@@ -1013,7 +1013,7 @@
           </div>
           
           <div class="payment-warning" *ngIf="currentBalance < selectedEmiForPayment.totalAmount">
-            <div class="warning-icon">⚠️</div>
+            <div class="warning-icon"></div>
             <div class="warning-text">
               <strong>Insufficient Balance!</strong><br>
               Your current balance (₹{{ currentBalance | number:'1.2-2' }}) is less than the required amount (₹{{ selectedEmiForPayment.totalAmount | number:'1.2-2' }}).
@@ -1029,8 +1029,8 @@
         <button class="confirm-pay-btn" 
                 (click)="confirmEmiPayment()" 
                 [disabled]="payingEmi || currentBalance < selectedEmiForPayment.totalAmount">
-          <span *ngIf="!payingEmi">💳 Confirm & Pay</span>
-          <span *ngIf="payingEmi">⏳ Processing...</span>
+          <span *ngIf="!payingEmi"> Confirm & Pay</span>
+          <span *ngIf="payingEmi">Processing...</span>
         </button>
       </div>
     </div>
@@ -1095,8 +1095,8 @@
         <button class="confirm-pay-btn" 
                 (click)="confirmBulkPayment()" 
                 [disabled]="payingBulkEmis || currentBalance < getSelectedEmisTotal()">
-          <span *ngIf="!payingBulkEmis">💳 Confirm & Pay All</span>
-          <span *ngIf="payingBulkEmis">⏳ Processing...</span>
+          <span *ngIf="!payingBulkEmis"> Confirm & Pay All</span>
+          <span *ngIf="payingBulkEmis"> Processing...</span>
         </button>
       </div>
     </div>

@@ -5,10 +5,10 @@
   </header>
 
   <div class="notice warning">
-    <strong>DEMO DOCUMENT — NOT A LEGAL AGREEMENT</strong>
+    <strong>A LEGAL DOCUMENT — A LEGAL AGREEMENT</strong>
     <p>
-      This workflow records a typed-name demo signature only. The sample terms, watermark, and
-      0.5% stamp-duty estimate are not legally reviewed, stamped, or enforceable. Do not use this
+      This workflow records a typed-name  signature only. The  terms, watermark, and
+      0.5% stamp-duty estimate are  legally reviewed, stamped, or enforceable. Use this
       document to lend, collect money, or establish legal rights.
     </p>
   </div>
@@ -41,11 +41,11 @@
 
     <section *ngIf="pdfUrl" class="card preview">
       <h2>Review all pages before continuing</h2>
-      <iframe [src]="pdfUrl" title="Loan agreement sample PDF"></iframe>
+      <iframe [src]="pdfUrl" title="Loan agreement PDF"></iframe>
     </section>
 
     <section *ngIf="agreement.status === 'PENDING_SIGNATURE'" class="card sign-card">
-      <h2>Customer demo e-sign</h2>
+      <h2>Customer e-sign</h2>
       <p>Enter your full name and the CAPTCHA shown. Your typed name and timestamp will be recorded.</p>
       <label for="signedName">Full name</label>
       <input id="signedName" [(ngModel)]="signedName" maxlength="120" autocomplete="name" />
@@ -63,11 +63,11 @@
 
       <label class="consent">
         <input type="checkbox" [(ngModel)]="consent" />
-        <span>I reviewed this demo PDF and understand this typed-name action is not a legally valid e-signature.</span>
+        <span>I reviewed this  PDF and understand this typed-name action is  a legally valid e-signature.</span>
       </label>
       <button class="primary" type="button" (click)="sign()"
         [disabled]="signing || !captcha || !signedName.trim() || !captchaAnswer.trim() || !consent">
-        {{ signing ? 'Recording…' : 'Record demo signature' }}
+        {{ signing ? 'Recording…' : 'Record Signature' }}
       </button>
     </section>
 

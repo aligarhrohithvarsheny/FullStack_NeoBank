@@ -3,7 +3,7 @@
     <div>
       <span class="repayment-eyebrow">Secure loan payment</span>
       <h2 id="loan-repayment-title">Pay a loan</h2>
-      <p>Verify your loan with the loan account number and date of birth.</p>
+      <p>Pay EMI or prepay personal, car, gold, home, education, business, and other approved loans.</p>
     </div>
     <span class="repayment-lock" aria-hidden="true">🔒</span>
   </div>
@@ -49,6 +49,19 @@
       <div><span>Linked account</span><strong>{{ loan.linkedAccountNumber }}</strong></div>
       <div><span>Status</span><strong>{{ loan.status }}</strong></div>
       <div><span>Outstanding principal</span><strong>{{ loan.outstandingPrincipal | currency:'INR':'symbol':'1.2-2' }}</strong></div>
+    </div>
+
+    <div class="live-loan-summary" *ngIf="loan.emis.length || paymentMode === 'PREPAYMENT'">
+      <div *ngIf="loan.emis.length">
+        <span>Next scheduled EMI</span>
+        <strong>{{ loan.emis[0].amount | currency:'INR':'symbol':'1.2-2' }}</strong>
+        <small *ngIf="loan.emis[0].dueDate">Due {{ loan.emis[0].dueDate | date:'mediumDate' }}</small>
+      </div>
+      <div *ngIf="paymentMode === 'PREPAYMENT' && estimatedPrepaymentBalance !== null">
+        <span>Estimated balance after prepayment</span>
+        <strong>{{ estimatedPrepaymentBalance | currency:'INR':'symbol':'1.2-2' }}</strong>
+        <small>{{ adjustment === 'REDUCE_TENURE' ? 'Tenure can be reduced' : 'EMI can be recalculated' }}</small>
+      </div>
     </div>
 
     <fieldset class="payment-options">

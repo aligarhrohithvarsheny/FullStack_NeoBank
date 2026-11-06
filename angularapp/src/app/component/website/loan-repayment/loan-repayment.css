@@ -162,6 +162,41 @@
   font-size: 0.9rem;
 }
 
+.live-loan-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.live-loan-summary > div {
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid #b8daf1;
+  background: #f2f9ff;
+}
+
+.live-loan-summary span,
+.live-loan-summary strong,
+.live-loan-summary small {
+  display: block;
+}
+
+.live-loan-summary span {
+  color: #60748a;
+  font-size: 0.76rem;
+}
+
+.live-loan-summary strong {
+  margin: 4px 0;
+  color: #0876c9;
+  font-size: 1rem;
+}
+
+.live-loan-summary small {
+  color: #60748a;
+}
+
 .payment-options {
   display: flex;
   flex-wrap: wrap;
@@ -244,6 +279,10 @@
 
   .verified-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .live-loan-summary {
+    grid-template-columns: 1fr;
   }
 }
 

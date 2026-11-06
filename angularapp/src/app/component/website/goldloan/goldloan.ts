@@ -88,6 +88,8 @@ export class Goldloan implements OnInit, OnDestroy {
   // Gold loans list
   goldLoans: GoldLoan[] = [];
   loadingLoans: boolean = false;
+  goldLoanSearch: string = '';
+  goldLoanTab: 'APPROVED' | 'FORECLOSED' | 'REJECTED' | 'ALL' = 'ALL';
   
   // Terms acceptance for approved loans
   selectedLoanForTerms: GoldLoan | null = null;
@@ -468,6 +470,10 @@ export class Goldloan implements OnInit, OnDestroy {
         return 'status-pending';
       case 'Rejected':
         return 'status-rejected';
+      case 'Foreclosed':
+      case 'Closed':
+      case 'Paid':
+        return 'status-foreclosed';
       default:
         return '';
     }
@@ -485,6 +491,37 @@ export class Goldloan implements OnInit, OnDestroy {
 
   isApproved(loan: GoldLoan): boolean {
     return (loan?.status || '').toLowerCase() === 'approved';
+  }
+
+  setGoldLoanTab(tab: 'APPROVED' | 'FORECLOSED' | 'REJECTED' | 'ALL') {
+    this.goldLoanTab = tab;
+  }
+
+  get filteredGoldLoans(): GoldLoan[] {
+    const query = this.goldLoanSearch.trim().toLowerCase();
+    return this.goldLoans.filter(loan => {
+      const status = (loan.status || '').toLowerCase();
+      let tabMatches = true;
+      if (this.goldLoanTab === 'APPROVED') tabMatches = status === 'approved' && !this.isClosed(loan);
+      if (this.goldLoanTab === 'FORECLOSED') tabMatches = this.isClosed(loan);
+      if (this.goldLoanTab === 'REJECTED') tabMatches = status === 'rejected';
+      if (!tabMatches) return false;
+      if (!query) return true;
+      return [
+        loan.loanAccountNumber,
+        loan.status,
+        loan.userName,
+        loan.loanAmount?.toString(),
+        loan.applicationDate
+      ].some(value => String(value || '').toLowerCase().includes(query));
+    });
+  }
+
+  getGoldLoanTabCount(tab: 'APPROVED' | 'FORECLOSED' | 'REJECTED' | 'ALL'): number {
+    if (tab === 'ALL') return this.goldLoans.length;
+    if (tab === 'APPROVED') return this.goldLoans.filter(loan => this.isApproved(loan) && !this.isClosed(loan)).length;
+    if (tab === 'FORECLOSED') return this.goldLoans.filter(loan => this.isClosed(loan)).length;
+    return this.goldLoans.filter(loan => (loan.status || '').toLowerCase() === 'rejected').length;
   }
 
   isDownloadingReceipt(loanId: number | undefined): boolean {

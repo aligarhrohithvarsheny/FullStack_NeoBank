@@ -257,8 +257,33 @@
     <div *ngIf="!loadingLoans && goldLoans.length === 0" class="no-loans">
       <p>You don't have any gold loan applications yet.</p>
     </div>
-    <div *ngIf="!loadingLoans && goldLoans.length > 0" class="loans-list">
-      <div *ngFor="let loan of goldLoans" class="loan-card">
+    <div *ngIf="!loadingLoans && goldLoans.length > 0" class="gold-loan-toolbar">
+      <div class="gold-loan-tabs" role="tablist" aria-label="Gold loan status">
+        <button type="button" [class.active]="goldLoanTab === 'APPROVED'" (click)="setGoldLoanTab('APPROVED')">
+          Approved <span>{{ getGoldLoanTabCount('APPROVED') }}</span>
+        </button>
+        <button type="button" [class.active]="goldLoanTab === 'FORECLOSED'" (click)="setGoldLoanTab('FORECLOSED')">
+          Foreclosed <span>{{ getGoldLoanTabCount('FORECLOSED') }}</span>
+        </button>
+        <button type="button" [class.active]="goldLoanTab === 'REJECTED'" (click)="setGoldLoanTab('REJECTED')">
+          Rejected <span>{{ getGoldLoanTabCount('REJECTED') }}</span>
+        </button>
+        <button type="button" [class.active]="goldLoanTab === 'ALL'" (click)="setGoldLoanTab('ALL')">
+          All Loans <span>{{ getGoldLoanTabCount('ALL') }}</span>
+        </button>
+      </div>
+      <label class="gold-loan-search">
+        <span aria-hidden="true">⌕</span>
+        <input type="search" [(ngModel)]="goldLoanSearch" name="goldLoanSearch"
+          placeholder="Search loan number, status or amount">
+      </label>
+    </div>
+    <div *ngIf="!loadingLoans && filteredGoldLoans.length === 0" class="no-loans gold-loan-no-results">
+      <p>No gold loans match this status and search.</p>
+      <button type="button" class="gold-loan-clear-btn" (click)="goldLoanSearch = ''; setGoldLoanTab('ALL')">Clear search and filters</button>
+    </div>
+    <div *ngIf="!loadingLoans && filteredGoldLoans.length > 0" class="loans-list">
+      <div *ngFor="let loan of filteredGoldLoans" class="loan-card">
         <div class="loan-header">
           <h4>Loan #{{ loan.loanAccountNumber || 'N/A' }}</h4>
           <span class="status-badge" [ngClass]="getStatusClass(loan.status)">
@@ -349,8 +374,8 @@
         </section>
 
         <div class="terms-action" *ngIf="loan.status !== 'Pending' && loan.status !== 'Rejected'">
-          <button type="button" class="accept-terms-btn" (click)="downloadLoanDoc('receipt', loan)">🧾 Gold Loan Receipt</button>
-          <button type="button" class="accept-terms-btn" *ngIf="isClosed(loan)" (click)="downloadLoanDoc('noc', loan)">📜 Download NOC</button>
+          <button type="button" class="gold-action-btn receipt-btn" (click)="downloadLoanDoc('receipt', loan)">🧾 Download Gold Loan Receipt</button>
+          <button type="button" class="gold-action-btn noc-btn" *ngIf="isClosed(loan)" (click)="downloadLoanDoc('noc', loan)">📜 Download NOC</button>
         </div>
 
         <!-- Gold Details (if approved) -->
@@ -404,7 +429,7 @@
             </p>
             <button
               type="button"
-              class="accept-terms-btn"
+              class="gold-action-btn approved-receipt-btn"
               (click)="showTermsAndAccept(loan)"
             >
               📋 View & Accept Terms
