@@ -45,6 +45,10 @@ public class TransactionService {
         return transactionRepository.findAll(pageable);
     }
 
+    public List<Transaction> getLoanRepaymentTransactions() {
+        return transactionRepository.findLoanRepaymentTransactions();
+    }
+
     // Get transactions by account number with pagination
     public Page<Transaction> getTransactionsByAccountNumber(String accountNumber, int page, int size) {
         Pageable pageable = PageRequest.of(page, size);

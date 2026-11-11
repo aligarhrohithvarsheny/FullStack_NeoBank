@@ -3,18 +3,22 @@ package com.neo.springapp.service;
 import com.neo.springapp.model.BusinessChequeBankRange;
 import com.neo.springapp.model.BusinessChequeLeaf;
 import com.neo.springapp.model.ChequeBankRange;
+import com.neo.springapp.model.ChequeBookClosureHistory;
 import com.neo.springapp.model.ChequeLeaf;
+import com.neo.springapp.model.CibilReport;
 import com.neo.springapp.model.SavingsChequeBankRange;
 import com.neo.springapp.model.SavingsChequeLeaf;
 import com.neo.springapp.repository.AccountRepository;
 import com.neo.springapp.repository.BusinessChequeBankRangeRepository;
 import com.neo.springapp.repository.BusinessChequeLeafRepository;
+import com.neo.springapp.repository.ChequeBookClosureHistoryRepository;
 import com.neo.springapp.repository.ChequeBankRangeRepository;
 import com.neo.springapp.repository.ChequeLeafRepository;
 import com.neo.springapp.repository.CurrentAccountRepository;
 import com.neo.springapp.repository.SalaryAccountRepository;
 import com.neo.springapp.repository.SavingsChequeBankRangeRepository;
 import com.neo.springapp.repository.SavingsChequeLeafRepository;
+import com.neo.springapp.repository.CibilReportRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,6 +34,7 @@ public class ChequeBookIssuanceService {
 
     private static final int BOOK_SIZE = 30;
     private static final double BOOK_CHARGE = 199.0;
+    private static final int MINIMUM_CIBIL_SCORE = 300;
 
     @Autowired private AccountRepository accountRepository;
     @Autowired private SalaryAccountRepository salaryAccountRepository;
@@ -40,6 +45,8 @@ public class ChequeBookIssuanceService {
     @Autowired private ChequeBankRangeRepository chequeBankRangeRepository;
     @Autowired private BusinessChequeBankRangeRepository businessChequeBankRangeRepository;
     @Autowired private SavingsChequeBankRangeRepository savingsChequeBankRangeRepository;
+    @Autowired private ChequeBookClosureHistoryRepository closureHistoryRepository;
+    @Autowired private CibilReportRepository cibilReportRepository;
     @Autowired private AccountService accountService;
     @Autowired private TransactionService transactionService;
 
@@ -99,7 +106,7 @@ public class ChequeBookIssuanceService {
         String serialFrom = String.format("%06d", firstSerial);
         String serialTo = String.format("%06d", lastSerial);
         String bookNumber = "CB-" + System.currentTimeMillis() + "-" + accountId;
-        saveBook(type, accountId, bookNumber, serialFrom, serialTo, firstSerial);
+        saveBook(type, accountId, bookNumber, serialFrom, serialTo, firstSerial, BOOK_SIZE);
 
         transactionService.createTransferTransaction(
                 accountNumber, "Cheque book issuance fee (" + bookNumber + ")", BOOK_CHARGE, "Debit", balanceAfterCharge);
@@ -116,6 +123,117 @@ public class ChequeBookIssuanceService {
         response.put("balanceAfterCharge", balanceAfterCharge);
         return response;
     }
+
+    @Transactional(readOnly = true)
+    public Map<String, Object> getAdminIssueEligibility(String accountNumber) {
+        AccountDetails account = resolveAccount(accountNumber);
+        Integer score = findStoredCibilScore(account.accountNumber());
+        Map<String, Object> response = new HashMap<>();
+        response.put("accountNumber", account.accountNumber());
+        response.put("accountType", account.type());
+        response.put("storedCibilScore", score);
+        response.put("minimumCibilScore", MINIMUM_CIBIL_SCORE);
+        response.put("eligible", score != null && score >= MINIMUM_CIBIL_SCORE);
+        return response;
+    }
+
+    @Transactional
+    public Map<String, Object> issueBookForAdmin(String accountNumber, int leafCount, double charge, String issuedBy) {
+        if (leafCount < 1 || leafCount > 1000) {
+            throw new IllegalArgumentException("Cheque leaf count must be between 1 and 1000.");
+        }
+        if (!Double.isFinite(charge) || charge <= 0) {
+            throw new IllegalArgumentException("Cheque book cost must be greater than zero.");
+        }
+        if (accountNumber == null || accountNumber.isBlank()) {
+            throw new IllegalArgumentException("Account number is required.");
+        }
+
+        AccountDetails account = resolveAccount(accountNumber);
+        Integer cibilScore = findStoredCibilScore(account.accountNumber());
+        if (cibilScore == null) {
+            throw new IllegalStateException("No stored CIBIL score is linked to this account.");
+        }
+        if (cibilScore < MINIMUM_CIBIL_SCORE) {
+            throw new IllegalStateException(
+                    "Cheque book issuance requires a CIBIL score of at least " + MINIMUM_CIBIL_SCORE
+                            + ". Stored score: " + cibilScore + ".");
+        }
+        if (hasAvailableLeaf(account.type(), account.id())) {
+            throw new IllegalStateException("Use or close the currently active cheque leaves before issuing another book.");
+        }
+
+        Double balanceAfterCharge = accountService.debitBalance(account.accountNumber(), charge, account.type());
+        if (balanceAfterCharge == null) {
+            throw new IllegalStateException("Insufficient balance to pay the cheque book cost.");
+        }
+
+        long firstSerial = findGlobalMaximumSerial() + 1;
+        long lastSerial = firstSerial + leafCount - 1;
+        String serialFrom = String.format("%06d", firstSerial);
+        String serialTo = String.format("%06d", lastSerial);
+        String bookNumber = "CB-" + System.currentTimeMillis() + "-" + account.id();
+        saveBook(account.type(), account.id(), bookNumber, serialFrom, serialTo, firstSerial, leafCount);
+        transactionService.createTransferTransaction(
+                account.accountNumber(), "Admin cheque book issuance fee (" + bookNumber + ")",
+                charge, "Debit", balanceAfterCharge);
+
+        List<String> chequeNumbers = new ArrayList<>(leafCount);
+        for (long serial = firstSerial; serial <= lastSerial; serial++) {
+            chequeNumbers.add(String.format("%06d", serial));
+        }
+        ChequeBookClosureHistory history = new ChequeBookClosureHistory(
+                account.accountNumber(), account.type(), bookNumber, account.type(), serialFrom, serialTo,
+                issuedBy == null || issuedBy.isBlank() ? "Admin" : issuedBy,
+                "Admin issued cheque book", leafCount);
+        history.setStatus("ISSUED");
+        history.setChargeAmount(charge);
+        history.setCibilScore(cibilScore);
+        history.setClosedChequeNumbers(String.join(",", chequeNumbers));
+        closureHistoryRepository.save(history);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", true);
+        response.put("message", leafCount + " active cheque numbers issued successfully.");
+        response.put("accountNumber", account.accountNumber());
+        response.put("accountType", account.type());
+        response.put("chequeBookNumber", bookNumber);
+        response.put("serialFrom", serialFrom);
+        response.put("serialTo", serialTo);
+        response.put("leafCount", leafCount);
+        response.put("charge", charge);
+        response.put("balanceAfterCharge", balanceAfterCharge);
+        response.put("cibilScore", cibilScore);
+        return response;
+    }
+
+    private AccountDetails resolveAccount(String accountNumber) {
+        if (accountNumber == null || accountNumber.isBlank()) {
+            throw new IllegalArgumentException("Account number is required.");
+        }
+        String normalized = accountNumber.trim();
+        var savings = accountRepository.findByAccountNumber(normalized);
+        if (savings != null) return new AccountDetails("SAVINGS", savings.getId(), savings.getAccountNumber());
+
+        var salary = salaryAccountRepository.findByAccountNumber(normalized);
+        if (salary != null) return new AccountDetails("SALARY", salary.getId(), salary.getAccountNumber());
+
+        var current = currentAccountRepository.findByAccountNumber(normalized);
+        if (current.isPresent()) {
+            return new AccountDetails("CURRENT", current.get().getId(), current.get().getAccountNumber());
+        }
+        throw new IllegalArgumentException("No eligible savings, salary or current account was found.");
+    }
+
+    private Integer findStoredCibilScore(String accountNumber) {
+        return cibilReportRepository.findByLinkedAccountNumber(accountNumber).stream()
+                .map(CibilReport::getCibilScore)
+                .filter(score -> score != null)
+                .findFirst()
+                .orElse(null);
+    }
+
+    private record AccountDetails(String type, Long id, String accountNumber) {}
 
     private boolean hasAvailableLeaf(String type, Long accountId) {
         return switch (type) {
@@ -146,40 +264,40 @@ public class ChequeBookIssuanceService {
     }
 
     private void saveBook(String type, Long accountId, String bookNumber,
-                          String serialFrom, String serialTo, long firstSerial) {
+                          String serialFrom, String serialTo, long firstSerial, int leafCount) {
         if ("SALARY".equals(type)) {
-            chequeLeafRepository.saveAll(createSalaryLeaves(accountId, firstSerial));
+            chequeLeafRepository.saveAll(createSalaryLeaves(accountId, firstSerial, leafCount));
             chequeBankRangeRepository.save(new ChequeBankRange(accountId, bookNumber, serialFrom, serialTo));
         } else if ("CURRENT".equals(type)) {
-            businessChequeLeafRepository.saveAll(createBusinessLeaves(accountId, firstSerial));
+            businessChequeLeafRepository.saveAll(createBusinessLeaves(accountId, firstSerial, leafCount));
             businessChequeBankRangeRepository.save(
                     new BusinessChequeBankRange(accountId, bookNumber, serialFrom, serialTo));
         } else {
-            savingsChequeLeafRepository.saveAll(createSavingsLeaves(accountId, firstSerial));
+            savingsChequeLeafRepository.saveAll(createSavingsLeaves(accountId, firstSerial, leafCount));
             savingsChequeBankRangeRepository.save(new SavingsChequeBankRange(accountId, bookNumber, serialFrom, serialTo));
         }
     }
 
-    private List<ChequeLeaf> createSalaryLeaves(Long accountId, long firstSerial) {
+    private List<ChequeLeaf> createSalaryLeaves(Long accountId, long firstSerial, int leafCount) {
         Long userId = accountId;
-        List<ChequeLeaf> leaves = new ArrayList<>(BOOK_SIZE);
-        for (int i = 0; i < BOOK_SIZE; i++) {
+        List<ChequeLeaf> leaves = new ArrayList<>(leafCount);
+        for (int i = 0; i < leafCount; i++) {
             leaves.add(new ChequeLeaf(accountId, userId, String.format("%06d", firstSerial + i)));
         }
         return leaves;
     }
 
-    private List<BusinessChequeLeaf> createBusinessLeaves(Long accountId, long firstSerial) {
-        List<BusinessChequeLeaf> leaves = new ArrayList<>(BOOK_SIZE);
-        for (int i = 0; i < BOOK_SIZE; i++) {
+    private List<BusinessChequeLeaf> createBusinessLeaves(Long accountId, long firstSerial, int leafCount) {
+        List<BusinessChequeLeaf> leaves = new ArrayList<>(leafCount);
+        for (int i = 0; i < leafCount; i++) {
             leaves.add(new BusinessChequeLeaf(accountId, accountId, String.format("%06d", firstSerial + i)));
         }
         return leaves;
     }
 
-    private List<SavingsChequeLeaf> createSavingsLeaves(Long accountId, long firstSerial) {
-        List<SavingsChequeLeaf> leaves = new ArrayList<>(BOOK_SIZE);
-        for (int i = 0; i < BOOK_SIZE; i++) {
+    private List<SavingsChequeLeaf> createSavingsLeaves(Long accountId, long firstSerial, int leafCount) {
+        List<SavingsChequeLeaf> leaves = new ArrayList<>(leafCount);
+        for (int i = 0; i < leafCount; i++) {
             leaves.add(new SavingsChequeLeaf(accountId, accountId, String.format("%06d", firstSerial + i)));
         }
         return leaves;

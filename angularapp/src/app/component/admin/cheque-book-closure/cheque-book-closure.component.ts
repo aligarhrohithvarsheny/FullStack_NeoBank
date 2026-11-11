@@ -21,6 +21,13 @@ export class ChequeBookClosureComponent {
   isLoadingClosureBooks = false;
   isClosingBooks = false;
   isLookingUpCheque = false;
+  showIssueBookForm = false;
+  isLoadingIssueEligibility = false;
+  isIssuingBook = false;
+  storedCibilScore: number | null = null;
+  isCibilEligible = false;
+  newBookLeafCount = 30;
+  newBookCost = 199;
   private readonly adminName: string;
 
   get hasActiveBooks(): boolean {
@@ -53,6 +60,9 @@ export class ChequeBookClosureComponent {
       return;
     }
 
+    this.showIssueBookForm = false;
+    this.storedCibilScore = null;
+    this.isCibilEligible = false;
     this.isLoadingClosureBooks = true;
     this.chequeService.getChequeBooksByAccountNumber(accountNumber).subscribe({
       next: books => {
@@ -67,6 +77,77 @@ export class ChequeBookClosureComponent {
         this.alertService.error(
           'Unable to load cheque books',
           err?.error?.error || 'Please check the account number and try again.'
+        );
+      }
+    });
+  }
+
+  openIssueBookForm(): void {
+    const accountNumber = this.closureAccountNumber.trim();
+    if (!accountNumber) {
+      this.alertService.error('Missing Info', 'Find an account before issuing a cheque book');
+      return;
+    }
+
+    this.showIssueBookForm = true;
+    this.isLoadingIssueEligibility = true;
+    this.storedCibilScore = null;
+    this.isCibilEligible = false;
+    this.chequeService.getAdminChequeBookIssueEligibility(accountNumber).subscribe({
+      next: eligibility => {
+        this.storedCibilScore = eligibility?.storedCibilScore ?? null;
+        this.isCibilEligible = eligibility?.eligible === true;
+        this.isLoadingIssueEligibility = false;
+      },
+      error: err => {
+        this.isLoadingIssueEligibility = false;
+        this.alertService.error(
+          'Eligibility unavailable',
+          err?.error?.error || 'Unable to retrieve the stored CIBIL score for this account.'
+        );
+      }
+    });
+  }
+
+  issueNewChequeBook(): void {
+    const accountNumber = this.closureAccountNumber.trim();
+    if (!accountNumber || !this.isCibilEligible) {
+      this.alertService.error('Not Eligible', 'The account must have a stored CIBIL score of at least 300.');
+      return;
+    }
+    if (!Number.isInteger(this.newBookLeafCount) || this.newBookLeafCount < 1 || this.newBookLeafCount > 1000) {
+      this.alertService.error('Invalid leaf count', 'Enter between 1 and 1000 cheque leaves.');
+      return;
+    }
+    if (!Number.isFinite(this.newBookCost) || this.newBookCost <= 0) {
+      this.alertService.error('Invalid cost', 'Enter a cheque book cost greater than zero.');
+      return;
+    }
+    if (!confirm(
+      `Issue ${this.newBookLeafCount} active cheque numbers to ${accountNumber}?\n` +
+      `₹${this.newBookCost.toFixed(2)} will be debited. Stored CIBIL score: ${this.storedCibilScore}.`
+    )) {
+      return;
+    }
+
+    this.isIssuingBook = true;
+    this.chequeService.issueChequeBookForAdmin(
+      accountNumber,
+      this.newBookLeafCount,
+      this.newBookCost,
+      this.adminName
+    ).subscribe({
+      next: response => {
+        this.isIssuingBook = false;
+        this.showIssueBookForm = false;
+        this.alertService.success('Cheque Book Issued', response?.message || 'Cheque numbers are now active.');
+        this.fetchChequeBooksForClosure();
+      },
+      error: err => {
+        this.isIssuingBook = false;
+        this.alertService.error(
+          'Issuance Failed',
+          err?.error?.error || 'Unable to issue a cheque book for this account.'
         );
       }
     });

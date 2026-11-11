@@ -54,6 +54,11 @@ public class TransactionController {
         return transactionService.getAllTransactions(page, size, sortBy, sortDir);
     }
 
+    @GetMapping("/loan-repayments")
+    public List<Transaction> getLoanRepayments() {
+        return transactionService.getLoanRepaymentTransactions();
+    }
+
     // Get transactions by account number with pagination
     @GetMapping("/account/{accountNumber}")
     public Page<Transaction> getTransactionsByAccount(

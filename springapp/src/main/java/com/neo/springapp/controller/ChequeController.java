@@ -352,6 +352,37 @@ public class ChequeController {
         }
     }
 
+    @GetMapping("/admin/issue-eligibility")
+    public ResponseEntity<Map<String, Object>> getChequeBookIssueEligibility(
+            @RequestParam String accountNumber) {
+        try {
+            return ResponseEntity.ok(chequeBookIssuanceService.getAdminIssueEligibility(accountNumber));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("error", "Unable to check cheque book eligibility"));
+        }
+    }
+
+    @PostMapping("/admin/issue-book")
+    public ResponseEntity<Map<String, Object>> issueChequeBookForAdmin(
+            @RequestBody Map<String, Object> request) {
+        try {
+            String accountNumber = request.get("accountNumber") == null
+                    ? null : request.get("accountNumber").toString();
+            int leafCount = Integer.parseInt(String.valueOf(request.getOrDefault("leafCount", "0")));
+            double charge = Double.parseDouble(String.valueOf(request.getOrDefault("charge", "0")));
+            String issuedBy = request.get("issuedBy") == null
+                    ? "Admin" : request.get("issuedBy").toString();
+            return ResponseEntity.ok(chequeBookIssuanceService.issueBookForAdmin(
+                    accountNumber, leafCount, charge, issuedBy));
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("error", "Unable to issue cheque book"));
+        }
+    }
+
     @PostMapping("/admin/close-books")
     public ResponseEntity<Map<String, Object>> closeChequeBooks(@RequestBody Map<String, Object> request) {
         try {

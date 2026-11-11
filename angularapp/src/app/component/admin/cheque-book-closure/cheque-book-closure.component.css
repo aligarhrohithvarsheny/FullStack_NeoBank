@@ -12,7 +12,7 @@
 .closure-header h1 { margin: 3px 0 6px; font-size: 26px; }
 .closure-header p { margin: 0; color: #d7eff2; font-size: 13px; }
 .closure-header .eyebrow { font-size: 10px; font-weight: 800; letter-spacing: 1.1px; }
-.back-button, .search-button, .close-button { min-height: 40px; padding: 9px 15px; border: 0; border-radius: 8px; font: inherit; font-size: 12px; font-weight: 750; cursor: pointer; }
+.back-button, .search-button, .close-button, .issue-button, .cancel-button { min-height: 40px; padding: 9px 15px; border: 0; border-radius: 8px; font: inherit; font-size: 12px; font-weight: 750; cursor: pointer; }
 .back-button { color: #0f4660; background: #fff; white-space: nowrap; }
 .closure-card { min-width: 0; padding: 20px; background: #fff; border: 1px solid #e4eaf1; border-radius: 13px; box-shadow: 0 4px 16px rgba(20, 45, 70, .05); }
 .section-title { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 16px; }
@@ -22,12 +22,23 @@
 .form-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 14px; }
 .field { display: grid; gap: 7px; color: #34445a; font-size: 11px; font-weight: 750; }
 .input-action { display: flex; gap: 8px; }
+.account-actions, .issue-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 9px; }
 .field input { width: 100%; min-width: 0; height: 42px; padding: 0 12px; color: #172033; background: #fff; border: 1px solid #cbd5e1; border-radius: 8px; font: inherit; font-size: 13px; }
 .field input:focus { outline: 2px solid #b6e2eb; border-color: #07869b; }
 .search-button { color: #fff; background: #087e8b; white-space: nowrap; }
+.issue-button { color: #fff; background: #176b45; white-space: nowrap; }
+.cancel-button { color: #34445a; background: #e8edf2; white-space: nowrap; }
 .close-button { color: #fff; background: #c62828; white-space: nowrap; }
-.search-button:disabled, .close-button:disabled { opacity: .58; cursor: not-allowed; }
+.search-button:disabled, .close-button:disabled, .issue-button:disabled { opacity: .58; cursor: not-allowed; }
 .help-text { margin: 10px 0 0; color: #768397; font-size: 11px; }
+.issue-book-panel { margin-top: 18px; padding: 18px; background: #f7fafc; border: 1px solid #dfe8ef; border-radius: 10px; }
+.issue-fields { display: grid; grid-template-columns: repeat(2, minmax(140px, 1fr)) minmax(180px, 1fr); align-items: end; gap: 12px; }
+.cibil-score { display: grid; gap: 3px; min-height: 42px; padding: 8px 12px; background: #fff; border: 1px solid #d8e1e9; border-radius: 8px; }
+.cibil-score span, .cibil-score small { color: #6b7789; font-size: 10px; }
+.cibil-score strong { font-size: 14px; }
+.cibil-score.eligible strong { color: #067647; }
+.cibil-score.ineligible strong { color: #b42318; }
+.issue-actions { margin-top: 14px; }
 .table-wrap { width: 100%; overflow-x: auto; border: 1px solid #e5eaf0; border-radius: 9px; }
 table { width: 100%; min-width: 920px; border-collapse: collapse; table-layout: auto; }
 th, td { padding: 13px 15px; border-bottom: 1px solid #e8edf2; text-align: left; vertical-align: middle; font-size: 12px; line-height: 1.45; white-space: normal; overflow-wrap: anywhere; }
@@ -36,6 +47,7 @@ tbody tr:last-child td { border-bottom: 0; }
 tbody tr:hover { background: #f8fbfd; }
 .status-chip { display: inline-block; padding: 4px 9px; color: #067647; background: #e8f7ef; border-radius: 20px; font-size: 10px; font-weight: 800; }
 .status-chip.closed { color: #b42318; background: #feeceb; }
+.status-chip.issued { color: #175cd3; background: #eff8ff; }
 .loading-state, .empty-state { margin: 0; padding: 18px; color: #78869a; text-align: center; font-size: 12px; }
 .lookup-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 10px; max-width: 760px; }
 .lookup-result { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin: 16px 0 0; }
@@ -53,7 +65,7 @@ tbody tr:hover { background: #f8fbfd; }
 @media (max-width: 700px) {
   :host { padding: 14px; }
   .closure-header { align-items: flex-start; flex-direction: column; padding: 20px; }
-  .form-row, .lookup-row { grid-template-columns: 1fr; }
+  .form-row, .lookup-row, .issue-fields { grid-template-columns: 1fr; }
   .close-button, .lookup-row > .search-button { justify-self: start; }
   .closure-card { padding: 15px; }
   .input-action { align-items: stretch; flex-direction: column; }

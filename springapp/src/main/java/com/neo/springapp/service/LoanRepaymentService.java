@@ -118,12 +118,22 @@ public class LoanRepaymentService {
         Transaction transaction;
         double paidAmount;
         double remaining;
+        double principalAdjusted = 0.0;
+        double interestPaid = 0.0;
+        double chargesPaid = 0.0;
+        double gstPaid = 0.0;
+        Integer completedEmiNumber = null;
+        String adjustmentType = null;
 
         if ("EMI".equals(mode)) {
             if ("HOME".equals(details.kind)) {
                 if (emiNumber != null && emiNumber != details.homeLoan.getPaidEmis() + 1) {
                     throw new IllegalArgumentException("Only the next scheduled EMI can be paid.");
                 }
+                Map<String, Object> due = homeLoanService.emiDue(details.homeLoan.getId());
+                completedEmiNumber = ((Number) due.get("emiNumber")).intValue();
+                principalAdjusted = ((Number) due.get("principalAmount")).doubleValue();
+                interestPaid = ((Number) due.get("interestAmount")).doubleValue();
                 HomeLoanService.RepaymentResult result = homeLoanService.payEmiFromAccountWithResult(
                         details.homeLoan.getId(), details.accountNumber, "Customer");
                 transaction = result.transaction();
@@ -131,6 +141,9 @@ public class LoanRepaymentService {
                 remaining = value(result.loan().getRemainingPrincipal());
             } else {
                 EmiPayment emi = nextPendingEmi(details, emiNumber);
+                completedEmiNumber = emi.getEmiNumber();
+                principalAdjusted = value(emi.getPrincipalAmount());
+                interestPaid = value(emi.getInterestAmount());
                 Map<String, Object> result = emiService.payEmi(emi.getId(), details.accountNumber);
                 if (!Boolean.TRUE.equals(result.get("success"))) {
                     throw new IllegalStateException(String.valueOf(result.get("message")));
@@ -145,8 +158,12 @@ public class LoanRepaymentService {
                 throw new IllegalArgumentException(
                         "Enter a valid prepayment amount below the outstanding principal.");
             }
+            principalAdjusted = amount;
+            chargesPaid = round(amount * 0.01);
+            gstPaid = round(chargesPaid * 0.18);
+            adjustmentType = normalizeAdjustment(adjustment);
             HomeLoanService.RepaymentResult result = homeLoanService.prepayFromAccountWithResult(
-                    details.homeLoan.getId(), details.accountNumber, amount, normalizeAdjustment(adjustment), "Customer");
+                    details.homeLoan.getId(), details.accountNumber, amount, adjustmentType, "Customer");
             transaction = result.transaction();
             paidAmount = transaction.getAmount();
             remaining = value(result.loan().getRemainingPrincipal());
@@ -155,6 +172,10 @@ public class LoanRepaymentService {
             double charges = round(amount * 0.01);
             double gst = round(charges * 0.18);
             double totalDebit = round(amount + charges + gst);
+            principalAdjusted = amount;
+            chargesPaid = charges;
+            gstPaid = gst;
+            adjustmentType = normalizeAdjustment(adjustment);
             transaction = debitPrepaymentAccount(details.accountNumber, totalDebit,
                         "Gold Loan Prepayment", "Prepayment - " + details.loanAccountNumber
                                 + " (principal " + amount + ", charge " + charges + ", GST " + gst + ")");
@@ -170,6 +191,10 @@ public class LoanRepaymentService {
             double charges = round(amount * 0.01);
             double gst = round(charges * 0.18);
             double totalDebit = round(amount + charges + gst);
+            principalAdjusted = amount;
+            chargesPaid = charges;
+            gstPaid = gst;
+            adjustmentType = normalizeAdjustment(adjustment);
             transaction = debitPrepaymentAccount(details.accountNumber, totalDebit,
                         details.loanType + " Prepayment", "Prepayment - " + details.loanAccountNumber
                                 + " (principal " + amount + ", charge " + charges + ", GST " + gst + ")");
@@ -182,6 +207,19 @@ public class LoanRepaymentService {
         if (transaction == null) {
             throw new IllegalStateException("Payment was processed without a transaction record.");
         }
+
+        transaction.setCategory("LOAN_REPAYMENT");
+        transaction.setLoanAccountNumber(details.loanAccountNumber);
+        transaction.setLoanType(details.loanType);
+        transaction.setPaymentMode(mode);
+        transaction.setEmiNumber(completedEmiNumber);
+        transaction.setPrincipalAdjusted(round(principalAdjusted));
+        transaction.setInterestPaid(round(interestPaid));
+        transaction.setChargesPaid(round(chargesPaid));
+        transaction.setGstPaid(round(gstPaid));
+        transaction.setLoanOutstandingAfter(round(remaining));
+        transaction.setAdjustmentType(adjustmentType);
+        transaction.setSourceAccountNumber(details.accountNumber);
 
         Double balanceAfter = accountService.getBalanceByAccountNumber(details.accountNumber);
         if (balanceAfter == null) {

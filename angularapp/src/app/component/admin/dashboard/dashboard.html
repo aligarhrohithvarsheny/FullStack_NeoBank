@@ -4529,6 +4529,90 @@
         <span class="stat-value">{{ getBillPaymentsCountByType('WiFi Bill') }}</span>
       </div>
     </div>
+
+    <div class="section-header loan-repayments-header">
+      <h2><i class="fa fa-hand-holding-usd"></i> Loan Payments &amp; EMI</h2>
+      <input type="text" [(ngModel)]="loanRepaymentsSearchQuery"
+        placeholder="Search customer, account, loan, type, or transaction..." />
+    </div>
+
+    <div *ngIf="isLoadingLoanRepayments" class="loading-state">Loading loan payments...</div>
+    <div *ngIf="!isLoadingLoanRepayments && getFilteredLoanRepayments().length === 0" class="no-data">
+      No loan EMI or repayment transactions found
+    </div>
+
+    <div class="bill-payments-table loan-repayments-table"
+      *ngIf="!isLoadingLoanRepayments && getFilteredLoanRepayments().length > 0">
+      <table>
+        <thead>
+          <tr>
+            <th>Payment Date</th>
+            <th>Customer</th>
+            <th>Paid From Account</th>
+            <th>Loan Account</th>
+            <th>Loan Type</th>
+            <th>Payment</th>
+            <th>EMI No.</th>
+            <th>Principal Adjusted</th>
+            <th>Interest Paid</th>
+            <th>Charges</th>
+            <th>GST</th>
+            <th>Total Paid</th>
+            <th>Loan Outstanding</th>
+            <th>Adjustment</th>
+            <th>Transaction ID</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let payment of getFilteredLoanRepayments()">
+            <td>{{ payment.date | date:'dd/MM/yyyy HH:mm' }}</td>
+            <td>{{ payment.userName || 'N/A' }}</td>
+            <td>
+              <a href="" (click)="$event.preventDefault(); searchAdminReference(payment.sourceAccountNumber || payment.accountNumber)">
+                {{ payment.sourceAccountNumber || payment.accountNumber || 'N/A' }}
+              </a>
+            </td>
+            <td>
+              <a href="" (click)="$event.preventDefault(); searchAdminReference(payment.loanAccountNumber)">
+                {{ payment.loanAccountNumber || 'N/A' }}
+              </a>
+            </td>
+            <td>{{ payment.loanType || 'Loan' }}</td>
+            <td>{{ payment.paymentMode || 'Repayment' }}</td>
+            <td>{{ payment.emiNumber ? ('#' + payment.emiNumber) : '—' }}</td>
+            <td class="amount">₹{{ payment.principalAdjusted | number:'1.2-2' }}</td>
+            <td class="amount">₹{{ payment.interestPaid | number:'1.2-2' }}</td>
+            <td class="amount">₹{{ payment.chargesPaid | number:'1.2-2' }}</td>
+            <td class="amount">₹{{ payment.gstPaid | number:'1.2-2' }}</td>
+            <td class="amount">₹{{ payment.amount | number:'1.2-2' }}</td>
+            <td class="amount">₹{{ payment.loanOutstandingAfter | number:'1.2-2' }}</td>
+            <td>{{ payment.adjustmentType || '—' }}</td>
+            <td>{{ payment.transactionId || 'N/A' }}</td>
+            <td>
+              <span class="status-badge" [ngClass]="payment.status?.toLowerCase()">
+                {{ payment.status || 'Completed' }}
+              </span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="summary-stats" *ngIf="!isLoadingLoanRepayments && getFilteredLoanRepayments().length > 0">
+      <div class="stat-item">
+        <span class="stat-label">Loan Payments / EMIs:</span>
+        <span class="stat-value">{{ getFilteredLoanRepayments().length }}</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">Total Paid:</span>
+        <span class="stat-value amount">₹{{ getLoanRepaymentsTotal('amount') | number:'1.2-2' }}</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">Principal Adjusted:</span>
+        <span class="stat-value amount">₹{{ getLoanRepaymentsTotal('principalAdjusted') | number:'1.2-2' }}</span>
+      </div>
+    </div>
   </div>
   <!-- Support Tickets Management Section -->
   <div class="support-tickets-admin-section section-content" *ngIf="activeSection === 'support-tickets'">

@@ -124,6 +124,14 @@ class LoanRepaymentServiceTest {
         Map<?, ?> transactionSummary = (Map<?, ?>) result.get("transaction");
         assertThat(transactionSummary.get("transactionId")).isEqualTo("TXN-123");
         assertThat(transactionSummary.containsKey("accountNumber")).isFalse();
+        assertThat(transaction.getCategory()).isEqualTo("LOAN_REPAYMENT");
+        assertThat(transaction.getSourceAccountNumber()).isEqualTo("ACC-12345678");
+        assertThat(transaction.getLoanAccountNumber()).isEqualTo("LN-12345678");
+        assertThat(transaction.getLoanType()).isEqualTo("Personal Loan");
+        assertThat(transaction.getPaymentMode()).isEqualTo("EMI");
+        assertThat(transaction.getEmiNumber()).isEqualTo(1);
+        assertThat(transaction.getPrincipalAdjusted()).isEqualTo(80.0);
+        assertThat(transaction.getLoanOutstandingAfter()).isEqualTo(920.0);
         verify(emiService).payEmi(9L, "ACC-12345678");
         verify(pdfService).generateLoanPaymentReceipt(
                 eq("A*** C*******"), eq("*******5678"), eq("Personal Loan"), eq("EMI"),

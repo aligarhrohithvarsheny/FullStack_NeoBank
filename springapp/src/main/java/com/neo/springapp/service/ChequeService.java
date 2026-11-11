@@ -558,6 +558,8 @@ public class ChequeService {
             item.put("closedBy", entry.getClosedBy());
             item.put("reason", entry.getReason());
             item.put("closedCount", entry.getClosedCount());
+            item.put("chargeAmount", entry.getChargeAmount());
+            item.put("cibilScore", entry.getCibilScore());
             item.put("status", entry.getStatus());
             item.put("closedAt", entry.getClosedAt());
             List<String> numbers = closureNumbers(entry);

@@ -195,6 +195,25 @@ export class ChequeService {
     return this.http.get<any[]>(`${this.apiBaseUrl}/account/${encodeURIComponent(accountNumber)}/books`);
   }
 
+  getAdminChequeBookIssueEligibility(accountNumber: string): Observable<any> {
+    const params = new HttpParams().set('accountNumber', accountNumber.trim());
+    return this.http.get<any>(`${this.apiBaseUrl}/admin/issue-eligibility`, { params });
+  }
+
+  issueChequeBookForAdmin(
+    accountNumber: string,
+    leafCount: number,
+    charge: number,
+    issuedBy: string
+  ): Observable<any> {
+    return this.http.post<any>(`${this.apiBaseUrl}/admin/issue-book`, {
+      accountNumber,
+      leafCount,
+      charge,
+      issuedBy
+    });
+  }
+
   lookupChequeByNumber(chequeNumber: string): Observable<any> {
     const params = new HttpParams().set('chequeNumber', chequeNumber.trim());
     return this.http.get<any>(`${this.apiBaseUrl}/admin/lookup`, { params });

@@ -4706,6 +4706,34 @@ app-admin-dashboard .dashboard-container {
   }
 }
 
+.loan-repayments-header {
+  margin-top: 32px;
+  gap: 16px;
+}
+
+.loan-repayments-header input {
+  max-width: 460px;
+}
+
+.loan-repayments-table {
+  overflow-x: auto;
+}
+
+.loan-repayments-table table {
+  min-width: 1500px;
+}
+
+.loan-repayments-table a {
+  color: #2563eb;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.loan-repayments-table a:hover {
+  color: #1d4ed8;
+}
+
 .modal-content {
   background: white !important;
   border-radius: 16px !important;

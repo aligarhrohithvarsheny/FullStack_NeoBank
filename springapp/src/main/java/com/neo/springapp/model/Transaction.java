@@ -43,6 +43,25 @@ public class Transaction {
     @Column(length = 120)
     private String chargeType;
 
+    @Column(length = 80)
+    private String loanAccountNumber;
+
+    @Column(length = 80)
+    private String loanType;
+
+    @Column(length = 30)
+    private String paymentMode;
+
+    private Integer emiNumber;
+    private Double principalAdjusted;
+    private Double interestPaid;
+    private Double chargesPaid;
+    private Double gstPaid;
+    private Double loanOutstandingAfter;
+
+    @Column(length = 40)
+    private String adjustmentType;
+
     @Column(name = "branch_city", length = 120)
     private String branchCity;
 

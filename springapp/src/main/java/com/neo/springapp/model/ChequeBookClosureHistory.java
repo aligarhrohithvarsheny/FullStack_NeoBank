@@ -42,6 +42,12 @@ public class ChequeBookClosureHistory {
     @Column(name = "closed_count")
     private Integer closedCount;
 
+    @Column(name = "charge_amount")
+    private Double chargeAmount;
+
+    @Column(name = "cibil_score")
+    private Integer cibilScore;
+
     @Column(name = "closed_cheque_numbers", columnDefinition = "TEXT")
     private String closedChequeNumbers;
 
@@ -99,6 +105,12 @@ public class ChequeBookClosureHistory {
 
     public Integer getClosedCount() { return closedCount; }
     public void setClosedCount(Integer closedCount) { this.closedCount = closedCount; }
+
+    public Double getChargeAmount() { return chargeAmount; }
+    public void setChargeAmount(Double chargeAmount) { this.chargeAmount = chargeAmount; }
+
+    public Integer getCibilScore() { return cibilScore; }
+    public void setCibilScore(Integer cibilScore) { this.cibilScore = cibilScore; }
 
     public String getClosedChequeNumbers() { return closedChequeNumbers; }
     public void setClosedChequeNumbers(String closedChequeNumbers) { this.closedChequeNumbers = closedChequeNumbers; }

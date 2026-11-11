@@ -688,6 +688,9 @@ export class Dashboard implements OnInit, OnDestroy {
   billPaymentsSearchQuery: string = '';
   billPaymentsTypeFilter: string = 'ALL'; // ALL, Mobile Bill, WiFi Bill
   billPaymentsStatusFilter: string = 'ALL'; // ALL, Completed, Failed, Pending
+  loanRepayments: any[] = [];
+  isLoadingLoanRepayments: boolean = false;
+  loanRepaymentsSearchQuery: string = '';
   creditCards: any[] = [];
   isLoadingCreditCards: boolean = false;
   selectedCreditCard: any = null;
@@ -7016,6 +7019,7 @@ export class Dashboard implements OnInit, OnDestroy {
   loadBillPayments() {
     if (!isPlatformBrowser(this.platformId)) return;
 
+    this.loadLoanRepayments();
     this.isLoadingBillPayments = true;
     this.http.get(`${environment.apiBaseUrl}/api/bill-payments/all`).subscribe({
       next: (payments: any) => {
@@ -7029,6 +7033,50 @@ export class Dashboard implements OnInit, OnDestroy {
         this.alertService.error('Error', 'Failed to load bill payments');
       }
     });
+  }
+
+  loadLoanRepayments() {
+    if (!isPlatformBrowser(this.platformId)) return;
+
+    this.isLoadingLoanRepayments = true;
+    this.http.get<any[]>(`${environment.apiBaseUrl}/api/transactions/loan-repayments`).subscribe({
+      next: (payments: any[]) => {
+        this.loanRepayments = Array.isArray(payments) ? payments : [];
+        this.isLoadingLoanRepayments = false;
+      },
+      error: (err: any) => {
+        console.error('Error loading loan repayments:', err);
+        this.loanRepayments = [];
+        this.isLoadingLoanRepayments = false;
+        this.alertService.error('Error', 'Failed to load loan repayments');
+      }
+    });
+  }
+
+  getFilteredLoanRepayments(): any[] {
+    const query = this.loanRepaymentsSearchQuery.trim().toLowerCase();
+    return [...this.loanRepayments]
+      .filter(payment => !query || [
+        payment.userName,
+        payment.accountNumber,
+        payment.sourceAccountNumber,
+        payment.loanAccountNumber,
+        payment.loanType,
+        payment.paymentMode,
+        payment.transactionId
+      ].some(value => String(value || '').toLowerCase().includes(query)))
+      .sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
+  }
+
+  getLoanRepaymentsTotal(field: 'amount' | 'principalAdjusted'): number {
+    return this.getFilteredLoanRepayments()
+      .reduce((sum: number, payment: any) => sum + (Number(payment[field]) || 0), 0);
+  }
+
+  searchAdminReference(reference: string) {
+    if (!reference?.trim()) return;
+    this.universalSearchQuery = reference.trim();
+    this.performUniversalSearch();
   }
 
   getFilteredBillPayments(): any[] {

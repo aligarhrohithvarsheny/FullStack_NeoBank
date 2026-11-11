@@ -49,6 +49,15 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
     Optional<Transaction> findByTransactionId(String transactionId);
     boolean existsByTransactionId(String transactionId);
 
+    @Query("SELECT t FROM Transaction t WHERE t.category = 'LOAN_REPAYMENT' " +
+           "OR LOWER(COALESCE(t.description, '')) LIKE '%loan%emi%' " +
+           "OR LOWER(COALESCE(t.description, '')) LIKE '%emi%loan%' " +
+           "OR LOWER(COALESCE(t.description, '')) LIKE '%loan%prepayment%' " +
+           "OR LOWER(COALESCE(t.merchant, '')) LIKE '%loan%emi%' " +
+           "OR LOWER(COALESCE(t.merchant, '')) LIKE '%loan%prepayment%' " +
+           "ORDER BY t.date DESC")
+    List<Transaction> findLoanRepaymentTransactions();
+
     List<Transaction> findByTransactionIdContainingIgnoreCase(String transactionId);
 
     Optional<Transaction> findByGlobalTransactionSequence(Long globalTransactionSequence);
