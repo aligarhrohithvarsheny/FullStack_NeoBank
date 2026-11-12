@@ -118,6 +118,59 @@ export class Card implements OnInit, OnDestroy {
     this.loadUserCard();
   }
 
+  private isDebitCardRecord(card: any): boolean {
+    const type = String(card?.cardType || '').toLowerCase();
+    return type.includes('debit') && !type.includes('credit');
+  }
+
+  private selectDebitCard(cards: any[]): any | null {
+    const debitCards = (Array.isArray(cards) ? cards : []).filter(card => this.isDebitCardRecord(card));
+    if (this.card) {
+      const currentCard = debitCards.find(card => String(card.id) === this.card?.id);
+      if (currentCard) return currentCard;
+    }
+    return debitCards.find(card =>
+      String(card.status || '').toLowerCase() === 'active' &&
+      !card.blocked && !card.deactivated
+    ) || debitCards[0] || null;
+  }
+
+  private mapBackendCard(card: any): CardDetails {
+    return {
+      id: String(card.id),
+      userId: card.accountNumber,
+      userName: card.userName,
+      userAccountNumber: card.accountNumber,
+      cardNumber: card.cardNumber,
+      cardType: card.cardType,
+      cvv: card.cvv,
+      expiry: card.expiryDate,
+      status: card.status,
+      pinSet: card.pinSet,
+      createdAt: card.createdAt || new Date().toISOString(),
+      lastUpdated: card.lastUpdated || new Date().toISOString()
+    };
+  }
+
+  private withSelectedDebitCard(action: (card: any) => void): void {
+    if (!this.userProfile) return;
+    const accountNumber = encodeURIComponent(this.userProfile.accountNumber);
+    this.http.get<any[]>(`${environment.apiBaseUrl}/api/cards/account/${accountNumber}`).subscribe({
+      next: (cards) => {
+        const selectedDebitCard = this.selectDebitCard(cards);
+        if (!selectedDebitCard) {
+          this.alertService.cardError('Debit Card Not Found', 'No debit card is linked to this account.');
+          return;
+        }
+        action(selectedDebitCard);
+      },
+      error: (err: any) => {
+        console.error('Error retrieving debit card:', err);
+        this.alertService.operationError('Debit card information retrieval', err.message || 'Unknown error');
+      }
+    });
+  }
+
   loadUserProfile() {
     if (!isPlatformBrowser(this.platformId)) return;
     
@@ -238,30 +291,17 @@ export class Card implements OnInit, OnDestroy {
     
     // Load card from MySQL database
     console.log('Loading card for account:', this.userProfile.accountNumber);
-    this.http.get(`${environment.apiBaseUrl}/api/cards/account/${this.userProfile.accountNumber}`).subscribe({
-      next: (cards: any) => {
+    const accountNumber = encodeURIComponent(this.userProfile.accountNumber);
+    this.http.get<any[]>(`${environment.apiBaseUrl}/api/cards/account/${accountNumber}`).subscribe({
+      next: (cards) => {
         console.log('Cards loaded from MySQL:', cards);
         console.log('Number of cards found:', cards?.length || 0);
-        if (cards && cards.length > 0) {
-          const backendCard = cards[0]; // Get the first card
-          this.card = {
-            id: backendCard.id.toString(),
-            userId: backendCard.accountNumber,
-            userName: backendCard.userName,
-            userAccountNumber: backendCard.accountNumber,
-            cardNumber: backendCard.cardNumber,
-            cardType: backendCard.cardType,
-            cvv: backendCard.cvv,
-            expiry: backendCard.expiryDate,
-            status: backendCard.status,
-            pinSet: backendCard.pinSet,
-            createdAt: backendCard.createdAt || new Date().toISOString(),
-            lastUpdated: backendCard.lastUpdated || new Date().toISOString()
-          };
-          
-          // Card loaded successfully from MySQL
+        const debitCard = this.selectDebitCard(cards);
+        if (debitCard) {
+          this.card = this.mapBackendCard(debitCard);
+        } else if (cards?.length) {
+          this.card = null;
         } else {
-          // No card found in database, create default card
           this.createDefaultCard();
         }
       },
@@ -279,28 +319,16 @@ export class Card implements OnInit, OnDestroy {
     
     // First check if card already exists in database
     console.log('Checking if card already exists for account:', this.userProfile.accountNumber);
-    this.http.get(`${environment.apiBaseUrl}/api/cards/account/${this.userProfile.accountNumber}`).subscribe({
-      next: (existingCards: any) => {
-        if (existingCards && existingCards.length > 0) {
-          console.log('Card already exists, using existing card');
-          const existingCard = existingCards[0];
-          this.card = {
-            id: existingCard.id.toString(),
-            userId: existingCard.accountNumber,
-            userName: existingCard.userName,
-            userAccountNumber: existingCard.accountNumber,
-            cardNumber: existingCard.cardNumber,
-            cardType: existingCard.cardType,
-            cvv: existingCard.cvv,
-            expiry: existingCard.expiryDate,
-            status: existingCard.status,
-            pinSet: existingCard.pinSet,
-            createdAt: existingCard.createdAt || new Date().toISOString(),
-            lastUpdated: existingCard.lastUpdated || new Date().toISOString()
-          };
+    const accountNumber = encodeURIComponent(this.userProfile.accountNumber);
+    this.http.get<any[]>(`${environment.apiBaseUrl}/api/cards/account/${accountNumber}`).subscribe({
+      next: (existingCards) => {
+        const debitCard = this.selectDebitCard(existingCards);
+        if (debitCard) {
+          this.card = this.mapBackendCard(debitCard);
           this.saveCard();
+        } else if (existingCards?.length) {
+          this.card = null;
         } else {
-          // No card exists, create new one
           this.createNewCard();
         }
       },
@@ -450,38 +478,21 @@ export class Card implements OnInit, OnDestroy {
       return;
     }
     
-    // First get the card from backend to get the correct Long ID
-    this.http.get(`${environment.apiBaseUrl}/api/cards/account/${this.userProfile.accountNumber}`).subscribe({
-      next: (cards: any) => {
-        if (cards && cards.length > 0) {
-          const backendCard = cards[0]; // Get the first card
-          // Update card PIN in MySQL database using correct endpoint
-          this.http.put(`${environment.apiBaseUrl}/api/cards/${backendCard.id}/pin?pin=${this.newPin}`, {}).subscribe({
-            next: (response: any) => {
-              console.log('Card PIN updated in MySQL:', response);
-              this.card!.pinSet = true;
-              this.card!.lastUpdated = new Date().toISOString();
-              this.saveCard(); // Also save to localStorage as backup
-              
-              this.alertService.cardSuccess('PIN Set', 'PIN has been set successfully!');
-              this.newPin = '';
-              this.showPinForm = false;
-            },
-            error: (err: any) => {
-              console.error('Error updating card PIN:', err);
-              this.alertService.cardError('PIN Setting Failed', 'Failed to set PIN. Please try again.');
-            }
-          });
-        } else {
-          console.log('No card found in database. Please contact admin.');
+    this.withSelectedDebitCard((backendCard) => {
+      this.http.put(`${environment.apiBaseUrl}/api/cards/${backendCard.id}/pin?pin=${this.newPin}`, {}).subscribe({
+        next: () => {
+          this.card!.pinSet = true;
+          this.card!.lastUpdated = new Date().toISOString();
+          this.saveCard();
+          this.alertService.cardSuccess('PIN Set', 'PIN has been set successfully!');
+          this.newPin = '';
+          this.showPinForm = false;
+        },
+        error: (err: any) => {
+          console.error('Error updating debit card PIN:', err);
+          this.alertService.cardError('PIN Setting Failed', 'Failed to set PIN. Please try again.');
         }
-      },
-      error: (err: any) => {
-        console.error('Error getting card from backend:', err);
-        console.error('Full error details:', err);
-        console.error('Account number being searched:', this.userProfile?.accountNumber);
-        this.alertService.operationError('Card information retrieval', err.message || 'Unknown error');
-      }
+      });
     });
   }
 
@@ -502,39 +513,22 @@ export class Card implements OnInit, OnDestroy {
       'Reset PIN',
       'Are you sure you want to reset your PIN? This will disable your current PIN and set a new one.',
       () => {
-      // First get the card from backend to get the correct Long ID
-      this.http.get(`${environment.apiBaseUrl}/api/cards/account/${this.userProfile!.accountNumber}`).subscribe({
-        next: (cards: any) => {
-          if (cards && cards.length > 0) {
-            const backendCard = cards[0]; // Get the first card
-            // Reset card PIN in MySQL database using correct endpoint
-            this.http.put(`${environment.apiBaseUrl}/api/cards/${backendCard.id}/reset-pin?pin=${this.newPin}`, {}).subscribe({
-              next: (response: any) => {
-                console.log('Card PIN reset in MySQL:', response);
-                this.card!.pinSet = true;
-                this.card!.lastUpdated = new Date().toISOString();
-                this.saveCard(); // Also save to localStorage as backup
-                
-                this.alertService.cardSuccess('PIN Reset', 'PIN has been reset successfully! Your new PIN is ready to use.');
-                this.newPin = '';
-                this.showForgotPinForm = false;
-              },
-              error: (err: any) => {
-                console.error('Error resetting card PIN:', err);
-                this.alertService.cardError('PIN Reset Failed', 'Failed to reset PIN. Please try again.');
-              }
-            });
-          } else {
-            console.log('No card found in database. Please contact admin.');
-          }
-        },
-        error: (err: any) => {
-          console.error('Error getting card from backend:', err);
-          console.error('Full error details:', err);
-          console.error('Account number being searched:', this.userProfile?.accountNumber);
-          this.alertService.operationError('Card information retrieval', err.message || 'Unknown error');
-        }
-      });
+        this.withSelectedDebitCard((backendCard) => {
+          this.http.put(`${environment.apiBaseUrl}/api/cards/${backendCard.id}/reset-pin?pin=${this.newPin}`, {}).subscribe({
+            next: () => {
+              this.card!.pinSet = true;
+              this.card!.lastUpdated = new Date().toISOString();
+              this.saveCard();
+              this.alertService.cardSuccess('PIN Reset', 'PIN has been reset successfully! Your new PIN is ready to use.');
+              this.newPin = '';
+              this.showForgotPinForm = false;
+            },
+            error: (err: any) => {
+              console.error('Error resetting debit card PIN:', err);
+              this.alertService.cardError('PIN Reset Failed', 'Failed to reset PIN. Please try again.');
+            }
+          });
+        });
       }
     );
   }
@@ -546,43 +540,27 @@ export class Card implements OnInit, OnDestroy {
       'Block Card',
       'Are you sure you want to block this card? This action can be reversed by admin.',
       () => {
-      // First get the card from backend to get the correct Long ID
-      this.http.get(`${environment.apiBaseUrl}/api/cards/account/${this.userProfile!.accountNumber}`).subscribe({
-        next: (cards: any) => {
-          if (cards && cards.length > 0) {
-            const backendCard = cards[0]; // Get the first card
-            this.http.put(`${environment.apiBaseUrl}/api/cards/${backendCard.id}/block`, {}).subscribe({
-              next: (response: any) => {
-                console.log('Card blocked in MySQL:', response);
-                this.card!.status = 'Blocked';
-                this.card!.lastUpdated = new Date().toISOString();
-                this.saveCard(); // Also save to localStorage as backup
-                this.alertService.cardSuccess('Card Blocked', 'Your card has been blocked for security reasons.');
-              },
-              error: (err: any) => {
-                console.error('Error blocking card:', err);
-                this.alertService.cardError('Card Blocking Failed', 'Failed to block card. Please try again.');
-              }
-            });
-          } else {
-            console.log('No card found in database. Please contact admin.');
-          }
-        },
-        error: (err: any) => {
-          console.error('Error getting card from backend:', err);
-          this.alertService.operationError('Card information retrieval');
-        }
-      });
+        this.withSelectedDebitCard((backendCard) => {
+          this.http.put(`${environment.apiBaseUrl}/api/cards/${backendCard.id}/block`, {}).subscribe({
+            next: () => {
+              this.card!.status = 'Blocked';
+              this.card!.lastUpdated = new Date().toISOString();
+              this.saveCard();
+              this.alertService.cardSuccess('Card Blocked', 'Your card has been blocked for security reasons.');
+            },
+            error: (err: any) => {
+              console.error('Error blocking debit card:', err);
+              this.alertService.cardError('Card Blocking Failed', 'Failed to block card. Please try again.');
+            }
+          });
+        });
       }
     );
   }
 
   unblockCard() {
     if (!this.card || !this.userProfile) return;
-    this.http.get(`${environment.apiBaseUrl}/api/cards/account/${this.userProfile.accountNumber}`).subscribe({
-      next: (cards: any) => {
-        if (!cards?.length) return;
-        const backendCard = cards[0];
+    this.withSelectedDebitCard((backendCard) => {
         this.http.put(`${environment.apiBaseUrl}/api/cards/${backendCard.id}/unblock`, {}).subscribe({
           next: () => {
             this.card!.status = 'Active';
@@ -592,7 +570,6 @@ export class Card implements OnInit, OnDestroy {
           },
           error: () => this.alertService.cardError('Card Unblocking Failed', 'Failed to unblock card. Please try again.')
         });
-      }
     });
   }
 
@@ -603,33 +580,20 @@ export class Card implements OnInit, OnDestroy {
       'Deactivate Card',
       'Are you sure you want to deactivate this card? This action cannot be undone.',
       () => {
-      // First get the card from backend to get the correct Long ID
-      this.http.get(`${environment.apiBaseUrl}/api/cards/account/${this.userProfile!.accountNumber}`).subscribe({
-        next: (cards: any) => {
-          if (cards && cards.length > 0) {
-            const backendCard = cards[0]; // Get the first card
-            this.http.put(`${environment.apiBaseUrl}/api/cards/${backendCard.id}/deactivate`, {}).subscribe({
-              next: (response: any) => {
-                console.log('Card deactivated in MySQL:', response);
-                this.card!.status = 'Deactivated';
-                this.card!.lastUpdated = new Date().toISOString();
-                this.saveCard(); // Also save to localStorage as backup
-                this.alertService.cardSuccess('Card Deactivated', 'Your card has been deactivated.');
-              },
-              error: (err: any) => {
-                console.error('Error deactivating card:', err);
-                this.alertService.cardError('Card Deactivation Failed', 'Failed to deactivate card. Please try again.');
-              }
-            });
-          } else {
-            console.log('No card found in database. Please contact admin.');
-          }
-        },
-        error: (err: any) => {
-          console.error('Error getting card from backend:', err);
-          this.alertService.operationError('Card information retrieval');
-        }
-      });
+        this.withSelectedDebitCard((backendCard) => {
+          this.http.put(`${environment.apiBaseUrl}/api/cards/${backendCard.id}/deactivate`, {}).subscribe({
+            next: () => {
+              this.card!.status = 'Deactivated';
+              this.card!.lastUpdated = new Date().toISOString();
+              this.saveCard();
+              this.alertService.cardSuccess('Card Deactivated', 'Your card has been deactivated.');
+            },
+            error: (err: any) => {
+              console.error('Error deactivating debit card:', err);
+              this.alertService.cardError('Card Deactivation Failed', 'Failed to deactivate card. Please try again.');
+            }
+          });
+        });
       }
     );
   }

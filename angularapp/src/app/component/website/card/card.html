@@ -87,8 +87,10 @@
     </div>
   </div>
 
+  <p *ngIf="!card" class="no-debit-card">No debit card is currently linked to this account.</p>
+
   <!-- Card Actions -->
-  <div class="card-actions">
+  <div *ngIf="card" class="card-actions">
     <h4 class="actions-title">Card Management Actions</h4>
     <div class="actions-grid">
       <div class="action-group">
