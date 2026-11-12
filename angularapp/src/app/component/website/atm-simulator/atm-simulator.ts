@@ -3,8 +3,9 @@ import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../../environment/environment';
+import { AtmUpiWithdrawalService } from '../../../service/atm-upi-withdrawal.service';
 
-type AtmStep = 'idle' | 'select-atm' | 'inserting-card' | 'reading-card' | 'pin-entry' | 'menu' | 'withdraw' | 'custom-amount' | 'processing' | 'dispensing' | 'collect-cash' | 'receipt' | 'ejecting-card' | 'thank-you' | 'balance' | 'mini-statement' | 'error' | 'no-card';
+type AtmStep = 'idle' | 'select-atm' | 'inserting-card' | 'reading-card' | 'pin-entry' | 'menu' | 'withdraw' | 'custom-amount' | 'upi-qr' | 'processing' | 'dispensing' | 'collect-cash' | 'receipt' | 'ejecting-card' | 'thank-you' | 'balance' | 'mini-statement' | 'error' | 'no-card';
 
 interface MiniStatementEntry {
   date: string;
@@ -75,12 +76,22 @@ export class AtmSimulatorComponent implements OnInit, OnDestroy {
   cardLoading: boolean = false;
   cardLoadError: string = '';
   private salaryAccountId: number | null = null;
-  private isSalaryAccount: boolean = false;
+  isSalaryAccount = false;
+  isUpiMode = false;
+  isCreatingUpiRequest = false;
+  upiWithdrawalQr = '';
+  upiWithdrawalToken = '';
+  upiWithdrawalExpiresAt = '';
+  upiWithdrawalStatusMessage = '';
+  lastUpiTransactionRef = '';
+  private upiWithdrawalPoll: any = null;
+  private upiWithdrawalCompleted = false;
 
   quickAmounts = [500, 1000, 2000, 5000, 10000];
 
   constructor(
     private http: HttpClient,
+    private atmUpiWithdrawalService: AtmUpiWithdrawalService,
     @Inject(PLATFORM_ID) platformId: Object
   ) {
     this.isBrowser = isPlatformBrowser(platformId);
@@ -122,6 +133,7 @@ export class AtmSimulatorComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     if (this.stepTimeout) clearTimeout(this.stepTimeout);
+    this.stopUpiWithdrawalPolling();
   }
 
   @HostListener('document:keydown', ['$event'])
@@ -282,7 +294,11 @@ export class AtmSimulatorComponent implements OnInit, OnDestroy {
     this.http.get<any>(`${environment.apiBaseUrl}/api/admin/atm/status/${this.selectedAtmId}`).subscribe({
       next: (res) => {
         if (res.available) {
-          this.insertCard();
+          if (this.isUpiMode) {
+            this.currentStep = 'withdraw';
+          } else {
+            this.insertCard();
+          }
         } else {
           this.currentStep = 'error';
           this.errorMessage = res.message || 'This ATM is currently unavailable.';
@@ -301,6 +317,13 @@ export class AtmSimulatorComponent implements OnInit, OnDestroy {
       return;
     }
     // Load available ATMs and show selection
+    this.loadAvailableAtms();
+    this.currentStep = 'select-atm';
+    this.errorMessage = '';
+  }
+
+  startUpiAtmSession(): void {
+    this.isUpiMode = true;
     this.loadAvailableAtms();
     this.currentStep = 'select-atm';
     this.errorMessage = '';
@@ -395,6 +418,10 @@ export class AtmSimulatorComponent implements OnInit, OnDestroy {
       return;
     }
     if (key === 'cancel') {
+      if (this.currentStep === 'upi-qr') {
+        this.resetATM();
+        return;
+      }
       this.ejectCard();
       return;
     }
@@ -543,8 +570,89 @@ export class AtmSimulatorComponent implements OnInit, OnDestroy {
     }
     this.errorMessage = '';
     this.selectedAmount = amount;
+    if (this.isUpiMode) {
+      this.createUpiWithdrawalRequest();
+      return;
+    }
     this.currentStep = 'processing';
     this.processWithdrawal();
+  }
+
+  private async createUpiWithdrawalRequest(): Promise<void> {
+    if (!this.selectedAtmId || !this.accountNumber) {
+      this.currentStep = 'error';
+      this.errorMessage = 'Select an ATM and sign in to your account before withdrawing.';
+      return;
+    }
+    this.isCreatingUpiRequest = true;
+    this.atmUpiWithdrawalService.createRequest({
+      atmId: this.selectedAtmId,
+      accountNumber: this.accountNumber,
+      accountType: this.accountType,
+      amount: this.selectedAmount
+    }).subscribe({
+      next: async (request) => {
+        this.isCreatingUpiRequest = false;
+        if (!request.success || !request.qrPayload || !request.requestToken) {
+          this.errorMessage = request.message || 'Could not create a UPI withdrawal request.';
+          return;
+        }
+        try {
+          const qrCode = await import('qrcode');
+          this.upiWithdrawalQr = await qrCode.toDataURL(request.qrPayload, {
+            width: 220,
+            margin: 1,
+            errorCorrectionLevel: 'M'
+          });
+          this.upiWithdrawalToken = request.requestToken;
+          this.upiWithdrawalExpiresAt = request.expiresAt;
+          this.upiWithdrawalStatusMessage = 'Waiting for UPI approval...';
+          this.upiWithdrawalCompleted = false;
+          this.currentStep = 'upi-qr';
+          this.startUpiWithdrawalPolling();
+        } catch (error) {
+          console.error('ATM - Failed to render UPI withdrawal QR:', error);
+          this.atmUpiWithdrawalService.cancelRequest(request.requestToken, this.accountNumber).subscribe();
+          this.errorMessage = 'Could not display the QR code. Please try again.';
+        }
+      },
+      error: (err) => {
+        this.isCreatingUpiRequest = false;
+        this.errorMessage = err?.error?.message || 'Could not create a UPI withdrawal request.';
+      }
+    });
+  }
+
+  private startUpiWithdrawalPolling(): void {
+    this.stopUpiWithdrawalPolling();
+    this.upiWithdrawalPoll = setInterval(() => {
+      if (!this.upiWithdrawalToken || this.currentStep !== 'upi-qr') return;
+      this.atmUpiWithdrawalService.getRequest(this.upiWithdrawalToken, this.accountNumber).subscribe({
+        next: (status) => {
+          if (status.status === 'SUCCESS' && !this.upiWithdrawalCompleted) {
+            this.upiWithdrawalCompleted = true;
+            this.stopUpiWithdrawalPolling();
+            this.currentBalance = Number(status.balanceAfter ?? this.currentBalance);
+            this.lastTransactionRef = status.transactionRef || '';
+            this.lastUpiTransactionRef = status.upiTransactionRef || '';
+            this.withdrawalCompleted.emit();
+            this.startDispensing();
+          } else if (['FAILED', 'EXPIRED', 'CANCELLED'].includes(status.status)) {
+            this.stopUpiWithdrawalPolling();
+            this.errorMessage = status.message || `UPI withdrawal ${status.status.toLowerCase()}.`;
+            this.currentStep = 'error';
+          }
+        },
+        error: (err) => console.warn('ATM - Could not check UPI withdrawal status:', err)
+      });
+    }, 2000);
+  }
+
+  private stopUpiWithdrawalPolling(): void {
+    if (this.upiWithdrawalPoll) {
+      clearInterval(this.upiWithdrawalPoll);
+      this.upiWithdrawalPoll = null;
+    }
   }
 
   enterCustomAmount(): void {
@@ -626,19 +734,30 @@ export class AtmSimulatorComponent implements OnInit, OnDestroy {
       accountNumber: this.accountNumber ? '****' + this.accountNumber.slice(-4) : '****1234',
       amount: this.selectedAmount,
       balance: this.currentBalance,
-      txnId: this.lastTransactionRef || 'ATM' + Date.now().toString().slice(-8)
+      txnId: this.lastTransactionRef || 'ATM' + Date.now().toString().slice(-8),
+      paymentMethod: this.isUpiMode ? 'UPI QR' : 'Debit card',
+      upiTransactionRef: this.lastUpiTransactionRef
     };
   }
 
   printReceipt(): void {
     this.showReceipt = true;
     this.stepTimeout = setTimeout(() => {
-      this.ejectCard();
+      this.finishTransaction();
     }, 3000);
   }
 
   skipReceipt(): void {
-    this.ejectCard();
+    this.finishTransaction();
+  }
+
+  private finishTransaction(): void {
+    if (this.isUpiMode) {
+      this.currentStep = 'thank-you';
+      this.stepTimeout = setTimeout(() => this.resetATM(), 4000);
+    } else {
+      this.ejectCard();
+    }
   }
 
   ejectCard(): void {
@@ -658,6 +777,12 @@ export class AtmSimulatorComponent implements OnInit, OnDestroy {
   }
 
   resetATM(): void {
+    this.stopUpiWithdrawalPolling();
+    if (this.upiWithdrawalToken && !this.upiWithdrawalCompleted && this.accountNumber) {
+      this.atmUpiWithdrawalService.cancelRequest(this.upiWithdrawalToken, this.accountNumber).subscribe({
+        error: (err) => console.warn('ATM - Could not cancel pending UPI withdrawal:', err)
+      });
+    }
     this.currentStep = 'idle';
     this.pin = '';
     this.pinMask = '';
@@ -673,6 +798,14 @@ export class AtmSimulatorComponent implements OnInit, OnDestroy {
     this.selectedAtmId = '';
     this.selectedAtmInfo = null;
     this.availableAtms = [];
+    this.isUpiMode = false;
+    this.isCreatingUpiRequest = false;
+    this.upiWithdrawalQr = '';
+    this.upiWithdrawalToken = '';
+    this.upiWithdrawalExpiresAt = '';
+    this.upiWithdrawalStatusMessage = '';
+    this.lastUpiTransactionRef = '';
+    this.upiWithdrawalCompleted = false;
     this.fetchBalance();
     this.loadDebitCard();
   }

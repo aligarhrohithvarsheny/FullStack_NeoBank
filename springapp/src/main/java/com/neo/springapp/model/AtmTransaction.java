@@ -59,6 +59,12 @@ public class AtmTransaction {
     @Column(name = "receipt_number")
     private String receiptNumber;
 
+    @Column(name = "payment_method", length = 30)
+    private String paymentMethod = "CARD";
+
+    @Column(name = "upi_transaction_ref", length = 50)
+    private String upiTransactionRef;
+
     @Column(name = "receipt_generated")
     private Boolean receiptGenerated = true;
 
@@ -133,6 +139,12 @@ public class AtmTransaction {
 
     public String getReceiptNumber() { return receiptNumber; }
     public void setReceiptNumber(String receiptNumber) { this.receiptNumber = receiptNumber; }
+
+    public String getPaymentMethod() { return paymentMethod; }
+    public void setPaymentMethod(String paymentMethod) { this.paymentMethod = paymentMethod; }
+
+    public String getUpiTransactionRef() { return upiTransactionRef; }
+    public void setUpiTransactionRef(String upiTransactionRef) { this.upiTransactionRef = upiTransactionRef; }
 
     public Boolean getReceiptGenerated() { return receiptGenerated; }
     public void setReceiptGenerated(Boolean receiptGenerated) { this.receiptGenerated = receiptGenerated; }

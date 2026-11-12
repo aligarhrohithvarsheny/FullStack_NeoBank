@@ -31,6 +31,7 @@ import { BankMessagesComponent } from '../bank-messages/bank-messages';
 import { VirtualCardComponent } from '../virtual-card/virtual-card';
 import { BeneficiaryManagementComponent } from '../beneficiary-management/beneficiary-management';
 import { AtmSimulatorComponent } from '../atm-simulator/atm-simulator';
+import { AtmUpiWithdrawalService } from '../../../service/atm-upi-withdrawal.service';
 import { FasttagUser } from '../fasttag/fasttag-user';
 import { FamilyBankingComponent } from '../family-banking/family-banking';
 import { DepositSlipComponent } from '../deposit-slip/deposit-slip.component';
@@ -125,6 +126,13 @@ export class Userdashboard implements OnInit, OnDestroy, AfterViewInit {
   isGeneratingQr: boolean = false;
   html5QrCode: any = null;
   isScanning: boolean = false;
+  showAtmUpiApproval = false;
+  atmUpiRequestToken = '';
+  atmUpiAmount = 0;
+  atmUpiAtmId = '';
+  atmUpiPin = '';
+  atmUpiApprovalError = '';
+  isApprovingAtmUpi = false;
   
   // ML Loan Prediction properties
   mlPredictionForm = {
@@ -652,7 +660,8 @@ export class Userdashboard implements OnInit, OnDestroy, AfterViewInit {
     private http: HttpClient,
     private alertService: AlertService,
     private fasttagService: FasttagService,
-    private currentAccountService: CurrentAccountService
+    private currentAccountService: CurrentAccountService,
+    private atmUpiWithdrawalService: AtmUpiWithdrawalService
   ) {
     const nav = this.router.getCurrentNavigation();
     if (nav?.extras?.state && nav.extras.state['username']) {
@@ -1469,53 +1478,100 @@ export class Userdashboard implements OnInit, OnDestroy, AfterViewInit {
       // Continue with the existing UPI QR parser below.
     }
     
-    // Check if it's a UPI payment QR code
-    if (decodedText.startsWith('upi://pay')) {
-      try {
-        // Parse UPI URL - handle both URL and string parsing
-        let upiId: string | null = null;
-        let name: string | null = null;
-        let amount: string | null = null;
-        
-        try {
-          // Try using URL constructor (works for full URLs)
-          const url = new URL(decodedText);
-          upiId = url.searchParams.get('pa');
-          name = url.searchParams.get('pn');
-          amount = url.searchParams.get('am');
-        } catch (e) {
-          // Fallback: manual parsing for upi:// protocol
-          const params = decodedText.split('?')[1];
-          if (params) {
-            const paramPairs = params.split('&');
-            paramPairs.forEach(pair => {
-              const [key, value] = pair.split('=');
-              if (key === 'pa') upiId = decodeURIComponent(value);
-              if (key === 'pn') name = decodeURIComponent(value);
-              if (key === 'am') amount = value;
-            });
-          }
-        }
-        
-        // Stop scanner
-        this.stopQrScanner();
-        
-        // Navigate to transfer funds with pre-filled data
-        this.router.navigate(['/website/transferfunds'], {
-          state: {
-            scannedUpiId: upiId,
-            scannedName: name,
-            scannedAmount: amount ? parseFloat(amount) : null
-          }
-        });
-      } catch (error) {
-        console.error('Error parsing QR code:', error);
-        this.alertService.transferError('Error parsing QR code. Please try again.');
-        this.stopQrScanner();
-      }
-    } else {
+    if (!decodedText.startsWith('upi://pay')) {
       this.alertService.transferError('Invalid QR code. Please scan a UPI payment QR code.');
+      return;
     }
+
+    try {
+      const parsedQr = new URL(decodedText);
+      const recipientUpi = parsedQr.searchParams.get('pa')?.toLowerCase();
+      const note = parsedQr.searchParams.get('tn') || '';
+      if (recipientUpi === 'atmwithdrawal@neobank' && note.startsWith('ATMREQ:')) {
+        this.stopQrScanner();
+        this.prepareAtmUpiApproval(note.substring('ATMREQ:'.length));
+        return;
+      }
+
+      const upiId = parsedQr.searchParams.get('pa');
+      const name = parsedQr.searchParams.get('pn');
+      const amount = parsedQr.searchParams.get('am');
+      this.stopQrScanner();
+      this.router.navigate(['/website/transferfunds'], {
+        state: {
+          scannedUpiId: upiId,
+          scannedName: name,
+          scannedAmount: amount ? parseFloat(amount) : null
+        }
+      });
+    } catch (error) {
+      console.error('Error parsing QR code:', error);
+      this.alertService.transferError('Error parsing QR code. Please try again.');
+      this.stopQrScanner();
+    }
+  }
+
+  private prepareAtmUpiApproval(token: string): void {
+    if (!this.userAccountNumber || !token) {
+      this.alertService.transferError('Sign in to your savings account before approving this request.');
+      return;
+    }
+    this.atmUpiWithdrawalService.getRequest(token, this.userAccountNumber).subscribe({
+      next: (request) => {
+        if (request.status !== 'PENDING') {
+          this.alertService.transferError(request.message || `This ATM request is ${String(request.status).toLowerCase()}.`);
+          return;
+        }
+        this.atmUpiRequestToken = token;
+        this.atmUpiAmount = Number(request.amount);
+        this.atmUpiAtmId = request.atmId || '';
+        this.atmUpiPin = '';
+        this.atmUpiApprovalError = '';
+        this.showAtmUpiApproval = true;
+      },
+      error: (err) => this.alertService.transferError(
+        err?.error?.message || 'This ATM withdrawal request is invalid or has expired.'
+      )
+    });
+  }
+
+  confirmAtmUpiWithdrawal(): void {
+    if (!this.atmUpiRequestToken || !this.userAccountNumber || !/^[0-9]{6}$/.test(this.atmUpiPin)) {
+      this.atmUpiApprovalError = 'Enter your 6-digit UPI PIN to authorize the withdrawal.';
+      return;
+    }
+    this.isApprovingAtmUpi = true;
+    this.atmUpiApprovalError = '';
+    this.atmUpiWithdrawalService.confirmRequest(
+      this.atmUpiRequestToken, this.userAccountNumber, this.atmUpiPin
+    ).subscribe({
+      next: (result) => {
+        this.isApprovingAtmUpi = false;
+        if (!result.success) {
+          this.atmUpiApprovalError = result.message || 'UPI authorization failed.';
+          return;
+        }
+        const amount = this.atmUpiAmount;
+        this.closeAtmUpiApproval();
+        this.loadCurrentBalanceFromMySQL();
+        this.loadRecentTransactions();
+        this.loadUpiTransactions();
+        this.alertService.userSuccess('ATM withdrawal approved', `₹${amount.toLocaleString('en-IN')} is ready to collect.`);
+      },
+      error: (err) => {
+        this.isApprovingAtmUpi = false;
+        this.atmUpiApprovalError = err?.error?.message || 'UPI authorization failed. Please try again.';
+      }
+    });
+  }
+
+  closeAtmUpiApproval(): void {
+    this.showAtmUpiApproval = false;
+    this.atmUpiRequestToken = '';
+    this.atmUpiAmount = 0;
+    this.atmUpiAtmId = '';
+    this.atmUpiPin = '';
+    this.atmUpiApprovalError = '';
   }
 
   // Credit Card Methods

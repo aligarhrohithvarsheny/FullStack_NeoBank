@@ -1066,7 +1066,9 @@
                   </div>
                   <div>
                     <h4 class="sdash-qr-result-title">QR Code Scanned ✓</h4>
-                    <p class="sdash-qr-result-sub">Review and confirm payment details</p>
+                    <p class="sdash-qr-result-sub">
+                      {{ isAtmUpiWithdrawalQr ? 'Confirm this fixed-amount cash withdrawal' : 'Review and confirm payment details' }}
+                    </p>
                   </div>
                 </div>
 
@@ -1085,14 +1087,16 @@
                 </div>
 
                 <div class="sdash-qr-pay-form">
+                  <div *ngIf="qrScanError" class="sdash-qr-error">{{ qrScanError }}</div>
                   <div class="sdash-form-group">
                     <label>Amount (&#8377;) <span class="required">*</span></label>
-                    <input type="number" [(ngModel)]="qrScannedAmount" placeholder="Enter amount" class="sdash-qr-amount-input" min="1">
+                    <input type="number" [(ngModel)]="qrScannedAmount" placeholder="Enter amount" class="sdash-qr-amount-input" min="1"
+                           [readonly]="isAtmUpiWithdrawalQr">
                     <span *ngIf="qrScannedAmount" class="sdash-qr-amount-hint">₹{{ qrScannedAmount | number:'1.2-2' }}</span>
                   </div>
                   <div class="sdash-form-group">
                     <label>Remark</label>
-                    <input type="text" [(ngModel)]="qrScannedRemark" placeholder="Optional remark">
+                    <input type="text" [(ngModel)]="qrScannedRemark" placeholder="Optional remark" [readonly]="isAtmUpiWithdrawalQr">
                   </div>
                   <div class="sdash-form-group">
                     <label>Transaction PIN <span class="required">*</span></label>
@@ -1105,7 +1109,7 @@
                           [disabled]="isQrPayProcessing || !qrScannedUpiId || !qrScannedAmount || !qrPayPin">
                     <span *ngIf="!isQrPayProcessing">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px;vertical-align:middle;margin-right:5px;"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-                      Pay ₹{{ qrScannedAmount | number:'1.0-0' }}
+                      {{ isAtmUpiWithdrawalQr ? 'Authorize & withdraw' : 'Pay' }} ₹{{ qrScannedAmount | number:'1.0-0' }}
                     </span>
                     <span *ngIf="isQrPayProcessing" class="sdash-btn-loading">
                       <div class="sdash-spinner-small"></div> Processing...
@@ -1123,9 +1127,11 @@
                 <div class="sdash-qr-success-circle">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
                 </div>
-                <h3 class="sdash-qr-success-title">Payment Successful!</h3>
+                <h3 class="sdash-qr-success-title">{{ isAtmUpiWithdrawalQr ? 'ATM withdrawal approved!' : 'Payment Successful!' }}</h3>
                 <div class="sdash-qr-success-amount">₹{{ qrPaySuccessResult.amount | number:'1.2-2' }}</div>
-                <p class="sdash-qr-success-to">Paid to <strong>{{ qrPaySuccessResult.recipientName }}</strong></p>
+                <p class="sdash-qr-success-to">
+                  {{ isAtmUpiWithdrawalQr ? 'Collect your cash from ATM ' + atmUpiAtmId : 'Paid to ' + qrPaySuccessResult.recipientName }}
+                </p>
                 <p class="sdash-qr-success-upi">{{ qrPaySuccessResult.recipient }}</p>
                 <p class="sdash-qr-success-txn">Txn ID: <strong>{{ qrPaySuccessResult.txnId }}</strong></p>
                 <p *ngIf="qrPaySuccessResult.newBalance != null" class="sdash-qr-success-balance">

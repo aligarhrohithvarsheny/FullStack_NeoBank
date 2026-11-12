@@ -85,6 +85,28 @@
     </div>
   </div>
 
+  <div class="ud-qr-scanner-modal" *ngIf="showAtmUpiApproval">
+    <div class="ud-qr-scanner-panel" role="dialog" aria-modal="true" aria-labelledby="atm-upi-title">
+      <div class="ud-qr-scanner-header">
+        <h3 id="atm-upi-title">Approve ATM withdrawal</h3>
+        <button type="button" (click)="closeAtmUpiApproval()" title="Close approval">&times;</button>
+      </div>
+      <p>NeoBank ATM {{ atmUpiAtmId }} &middot; fixed amount</p>
+      <p style="font-size:28px;font-weight:700;">₹{{ atmUpiAmount | number:'1.2-2' }}</p>
+      <label for="atm-upi-pin">Enter your 6-digit UPI PIN</label>
+      <input id="atm-upi-pin" type="password" inputmode="numeric" autocomplete="off"
+             maxlength="6" [(ngModel)]="atmUpiPin" class="ud-input" placeholder="••••••">
+      <div *ngIf="atmUpiApprovalError" class="upi-error-msg">{{ atmUpiApprovalError }}</div>
+      <div style="display:flex;gap:10px;margin-top:16px;">
+        <button type="button" class="ud-btn-link" (click)="closeAtmUpiApproval()">Cancel</button>
+        <button type="button" class="ud-btn-primary" (click)="confirmAtmUpiWithdrawal()"
+                [disabled]="isApprovingAtmUpi || atmUpiPin.length !== 6">
+          {{ isApprovingAtmUpi ? 'Authorizing...' : 'Authorize & withdraw' }}
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- ═══ SERVICES ICON STRIP (Canara Bank Style) ═══ -->
   <div class="cb-icon-strip" [class.open]="isSidebarOpen">
     <div class="cb-icon-strip-inner">

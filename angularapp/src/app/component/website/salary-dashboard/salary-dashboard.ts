@@ -12,6 +12,7 @@ import { DrawChequeComponent } from './draw-cheque/draw-cheque.component';
 import { environment } from '../../../../environment/environment';
 import { CreditCardBillPay } from '../credit-card-bill-pay/credit-card-bill-pay';
 import { AtmSimulatorComponent } from '../atm-simulator/atm-simulator';
+import { AtmUpiWithdrawalService } from '../../../service/atm-upi-withdrawal.service';
 
 @Component({
   selector: 'app-salary-dashboard',
@@ -126,12 +127,16 @@ export class SalaryDashboard implements OnInit, OnDestroy {
   isQrPayProcessing = false;
   showQrPaySuccess = false;
   qrPaySuccessResult: any = null;
+  isAtmUpiWithdrawalQr = false;
+  atmUpiWithdrawalToken = '';
+  atmUpiAtmId = '';
 
   // ─── Payment Links (incoming requests from merchants) ──────
   pendingPaymentLinks: any[] = [];
   allPaymentLinks: any[] = [];
   isLoadingLinks = false;
   private linkPollInterval: any = null;
+  private upiTransactionPollInterval: any = null;
   private debitCardPollInterval: any = null;
   private creditCardPollInterval: any = null;
   showLinkPayModal = false;
@@ -234,6 +239,7 @@ export class SalaryDashboard implements OnInit, OnDestroy {
     private alertService: AlertService,
     private pgService: PaymentGatewayService,
     private http: HttpClient,
+    private atmUpiWithdrawalService: AtmUpiWithdrawalService,
     @Inject(PLATFORM_ID) private platformId: Object
   ) {}
 
@@ -255,6 +261,7 @@ export class SalaryDashboard implements OnInit, OnDestroy {
     if (this.linkPollInterval) clearInterval(this.linkPollInterval);
     if (this.debitCardPollInterval) clearInterval(this.debitCardPollInterval);
     if (this.creditCardPollInterval) clearInterval(this.creditCardPollInterval);
+    if (this.upiTransactionPollInterval) clearInterval(this.upiTransactionPollInterval);
   }
 
   startSessionTimer() {
@@ -332,6 +339,10 @@ export class SalaryDashboard implements OnInit, OnDestroy {
       clearInterval(this.creditCardPollInterval);
       this.creditCardPollInterval = null;
     }
+    if (section !== 'upi' && this.upiTransactionPollInterval) {
+      clearInterval(this.upiTransactionPollInterval);
+      this.upiTransactionPollInterval = null;
+    }
     this.activeSection = section;
     if (section === 'salary-transactions') this.loadSalaryTransactions();
     else if (section === 'transactions') this.loadNormalTransactions();
@@ -341,7 +352,13 @@ export class SalaryDashboard implements OnInit, OnDestroy {
     else if (section === 'salary-slip') this.loadSalaryTransactions();
     else if (section === 'login-activity') this.loadLoginActivity();
     else if (section === 'overview') { this.loadAccount(); }
-    else if (section === 'upi') { this.loadUpiTransactions(); this.loadSalaryPaymentLinks(); }
+    else if (section === 'upi') {
+      this.loadUpiTransactions();
+      this.loadSalaryPaymentLinks();
+      if (!this.upiTransactionPollInterval) {
+        this.upiTransactionPollInterval = setInterval(() => this.loadUpiTransactions(), 5000);
+      }
+    }
     else if (section === 'loan-eligibility') { this.loadLoanEligibility(); }
     else if (section === 'auto-savings') { this.loadAutoSavingsInfo(); }
     else if (section === 'salary-advance') { this.loadAdvanceInfo(); this.loadAdvanceHistory(); }
@@ -1168,11 +1185,42 @@ export class SalaryDashboard implements OnInit, OnDestroy {
         return;
       }
 
+      if (paLower === 'atmwithdrawal@neobank') {
+        const tokenPrefix = 'ATMREQ:';
+        const token = tn.startsWith(tokenPrefix) ? tn.substring(tokenPrefix.length) : '';
+        if (!token || !this.account?.accountNumber) {
+          this.qrScanError = 'This ATM QR request is invalid or your salary account is not loaded.';
+          return;
+        }
+        this.atmUpiWithdrawalService.getRequest(token, this.account.accountNumber).subscribe({
+          next: (request) => {
+            if (request.status !== 'PENDING') {
+              this.qrScanError = request.message || `This ATM request is ${String(request.status).toLowerCase()}.`;
+              return;
+            }
+            this.atmUpiWithdrawalToken = token;
+            this.atmUpiAtmId = request.atmId || '';
+            this.qrScannedUpiId = pa;
+            this.qrScannedName = 'NeoBank ATM';
+            this.qrScannedAmount = Number(request.amount);
+            this.qrScannedRemark = `ATM cash withdrawal at ${this.atmUpiAtmId}`;
+            this.qrPayPin = '';
+            this.isAtmUpiWithdrawalQr = true;
+            this.showQrScanResult = true;
+          },
+          error: (err) => {
+            this.qrScanError = err?.error?.message || 'This ATM request is invalid or has expired.';
+          }
+        });
+        return;
+      }
+
       this.qrScannedUpiId = pa;
       this.qrScannedName = pn ? decodeURIComponent(pn) : pa.split('@')[0];
       this.qrScannedAmount = am ? parseFloat(am) : null;
       this.qrScannedRemark = tn ? decodeURIComponent(tn) : '';
       this.qrPayPin = '';
+      this.isAtmUpiWithdrawalQr = false;
       this.showQrScanResult = true;
     } catch {
       this.qrScanError = 'Failed to parse QR code. Please try again.';
@@ -1180,6 +1228,42 @@ export class SalaryDashboard implements OnInit, OnDestroy {
   }
 
   payViaScannedQr() {
+    if (this.isAtmUpiWithdrawalQr) {
+      if (!this.account?.accountNumber || !this.atmUpiWithdrawalToken || !this.qrPayPin) {
+        this.alertService.userError('Validation', 'A valid ATM request and UPI PIN are required.');
+        return;
+      }
+      this.isQrPayProcessing = true;
+      this.atmUpiWithdrawalService.confirmRequest(
+        this.atmUpiWithdrawalToken, this.account.accountNumber, this.qrPayPin
+      ).subscribe({
+        next: (res) => {
+          this.isQrPayProcessing = false;
+          if (!res.success) {
+            this.qrScanError = res.message || 'UPI authorization failed.';
+            return;
+          }
+          this.qrPaySuccessResult = {
+            txnId: res.transactionRef || res.upiTransactionRef,
+            amount: this.qrScannedAmount,
+            recipient: this.qrScannedUpiId,
+            recipientName: 'NeoBank ATM',
+            newBalance: res.balanceAfter,
+            remark: this.qrScannedRemark
+          };
+          this.showQrPaySuccess = true;
+          this.qrPayPin = '';
+          this.loadUpiTransactions();
+          this.loadAccount();
+        },
+        error: (err) => {
+          this.isQrPayProcessing = false;
+          this.qrScanError = err?.error?.message || 'UPI authorization failed. Please try again.';
+        }
+      });
+      return;
+    }
+
     if (!this.account?.id || !this.qrScannedUpiId || !this.qrScannedAmount || !this.qrPayPin) {
       this.alertService.userError('Validation', 'UPI ID, amount and PIN are required.');
       return;
@@ -1238,6 +1322,9 @@ export class SalaryDashboard implements OnInit, OnDestroy {
     this.showQrPaySuccess = false;
     this.qrPaySuccessResult = null;
     this.isQrScanning = false;
+    this.isAtmUpiWithdrawalQr = false;
+    this.atmUpiWithdrawalToken = '';
+    this.atmUpiAtmId = '';
   }
 
   // ─── Loan Eligibility ─────────────────────────────────────

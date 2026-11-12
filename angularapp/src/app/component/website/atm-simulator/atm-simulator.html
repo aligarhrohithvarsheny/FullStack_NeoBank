@@ -129,6 +129,9 @@
                     <span class="atm-insert-btn-glow"></span>
                     <span class="atm-insert-btn-shine"></span>
                   </button>
+                  <button class="atm-back-btn" type="button" (click)="startUpiAtmSession()">
+                    Withdraw with NeoBank UPI
+                  </button>
                   <p *ngIf="debitCard && !isPinSet" class="atm-pin-warning">⚠️ ATM PIN not set. Set it from Card Management.</p>
                   <p *ngIf="!debitCard && !cardLoading && cardLoadError" class="atm-pin-warning">{{ cardLoadError }}</p>
                 </div>
@@ -327,7 +330,8 @@
 
                 <!-- ═══ WITHDRAW SCREEN ═══ -->
                 <div *ngIf="currentStep === 'withdraw'" class="atm-screen-withdraw">
-                  <h3 class="atm-screen-title">Select Withdrawal Amount</h3>
+                  <h3 class="atm-screen-title">{{ isUpiMode ? 'UPI Cardless Withdrawal' : 'Select Withdrawal Amount' }}</h3>
+                  <p *ngIf="isUpiMode" class="atm-screen-subtitle">Choose an amount. Scan the QR with NeoBank UPI to authorize.</p>
                   <div class="atm-amount-grid">
                     <button *ngFor="let amt of quickAmounts" class="atm-amount-btn" (click)="selectAmount(amt)">
                       <span class="atm-amt-currency">₹</span>
@@ -340,6 +344,18 @@
                   </div>
                   <p *ngIf="errorMessage" class="atm-error-msg">{{ errorMessage }}</p>
                   <button class="atm-back-btn" (click)="goBackToMenu()">← Back to Menu</button>
+                </div>
+
+                <!-- ═══ UPI CARDLESS WITHDRAWAL QR ═══ -->
+                <div *ngIf="currentStep === 'upi-qr'" class="atm-screen-withdraw" style="text-align:center;">
+                  <h3 class="atm-screen-title">Approve with NeoBank UPI</h3>
+                  <p class="atm-amount-display">₹{{ selectedAmount | number }}</p>
+                  <img *ngIf="upiWithdrawalQr" [src]="upiWithdrawalQr" alt="UPI ATM withdrawal QR code"
+                       style="width:180px;height:180px;background:#fff;padding:8px;border-radius:12px;">
+                  <p class="atm-screen-subtitle">Scan in your NeoBank UPI dashboard and enter your {{ isSalaryAccount ? '4-digit transaction PIN' : '6-digit UPI PIN' }}.</p>
+                  <p class="atm-status-text atm-pulse-text">{{ upiWithdrawalStatusMessage }}</p>
+                  <p class="atm-screen-subtitle">Request expires {{ upiWithdrawalExpiresAt | date:'shortTime' }}</p>
+                  <button class="atm-back-btn" type="button" (click)="resetATM()">Cancel request</button>
                 </div>
 
                 <!-- ═══ CUSTOM AMOUNT ═══ -->
@@ -417,7 +433,9 @@
                       <p class="atm-receipt-line">A/C: {{ receiptData?.accountNumber }}</p>
                       <p class="atm-receipt-line">Amount: ₹{{ receiptData?.amount | number }}</p>
                       <p class="atm-receipt-line">Bal: ₹{{ receiptData?.balance | number:'1.2-2' }}</p>
+                      <p class="atm-receipt-line">Method: {{ receiptData?.paymentMethod }}</p>
                       <p class="atm-receipt-line">Txn: {{ receiptData?.txnId }}</p>
+                      <p *ngIf="receiptData?.upiTransactionRef" class="atm-receipt-line">UPI: {{ receiptData?.upiTransactionRef }}</p>
                       <div class="atm-receipt-divider"></div>
                       <p class="atm-receipt-footer">Thank you for banking with NeoBank</p>
                     </div>
@@ -562,7 +580,7 @@
               </div>
               <div class="atm-slot-led" [class.glow]="currentStep === 'idle' || currentStep === 'ejecting-card'"></div>
               <!-- Physical card sticking out -->
-              <div *ngIf="currentStep === 'inserting-card' || currentStep === 'reading-card' || currentStep === 'pin-entry' || currentStep === 'menu' || currentStep === 'withdraw' || currentStep === 'custom-amount' || currentStep === 'processing' || currentStep === 'dispensing' || currentStep === 'collect-cash' || currentStep === 'receipt'" class="atm-card-in-slot">
+              <div *ngIf="!isUpiMode && (currentStep === 'inserting-card' || currentStep === 'reading-card' || currentStep === 'pin-entry' || currentStep === 'menu' || currentStep === 'withdraw' || currentStep === 'custom-amount' || currentStep === 'processing' || currentStep === 'dispensing' || currentStep === 'collect-cash' || currentStep === 'receipt')" class="atm-card-in-slot">
                 <div class="atm-mini-card"></div>
               </div>
             </div>
