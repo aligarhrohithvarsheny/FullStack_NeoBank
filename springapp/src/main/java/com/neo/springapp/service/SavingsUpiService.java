@@ -407,6 +407,7 @@ public class SavingsUpiService {
         if (user == null) { res.put("found", false); return res; }
         res.put("found", true);
         res.put("upiId", user.getUpiId());
+        res.put("upiVerified", isVerifiedNeoBankUpiId(user.getUpiId()));
         res.put("upiEnabled", Boolean.TRUE.equals(user.getUpiEnabled()));
         res.put("pinSet", Boolean.TRUE.equals(user.getTransactionPinSet()));
         res.put("accountNumber", user.getAccountNumber());
@@ -415,6 +416,10 @@ public class SavingsUpiService {
             res.put("balance", user.getAccount().getBalance());
         }
         return res;
+    }
+
+    private boolean isVerifiedNeoBankUpiId(String upiId) {
+        return upiId != null && upiId.trim().toLowerCase(Locale.ROOT).endsWith("@neobank");
     }
 
     // ── Admin: all UPI accounts (savings only) ────────────────────────────────

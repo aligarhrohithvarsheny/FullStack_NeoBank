@@ -10,6 +10,10 @@ The ATM simulator supports a cardless withdrawal for savings and salary accounts
 
 Savings accounts use their six-digit UPI PIN. Salary accounts use their four-digit transaction PIN. A request is single-use, is bound to the account that created it, and locks after three incorrect PIN attempts.
 
+ATM UPI authorization requires an enabled NeoBank UPI ID ending in `@neobank` and a configured UPI PIN. The ATM admin's **Max Withdrawal/Txn** setting is the per-withdrawal ceiling for both card and NeoBank UPI withdrawals; the selected ATM's current setting is checked by the backend when a request is created and again when cash is dispensed. The Manage UPI panel refreshes the active ATM limits automatically.
+
+Only the NeoBank ATM QR destination and a valid `ATMREQ:` token enter the ATM approval flow. Other UPI QR codes continue through the existing UPI payment flow and cannot authorize ATM cash dispensing.
+
 ## API
 
 - `POST /api/atm/upi-withdrawals/requests` — create a request (`atmId`, `accountNumber`, `accountType`, `amount`).

@@ -294,6 +294,7 @@ export class AtmSimulatorComponent implements OnInit, OnDestroy {
     this.http.get<any>(`${environment.apiBaseUrl}/api/admin/atm/status/${this.selectedAtmId}`).subscribe({
       next: (res) => {
         if (res.available) {
+          this.selectedAtmInfo = { ...this.selectedAtmInfo, ...res };
           if (this.isUpiMode) {
             this.currentStep = 'withdraw';
           } else {
@@ -304,9 +305,13 @@ export class AtmSimulatorComponent implements OnInit, OnDestroy {
           this.errorMessage = res.message || 'This ATM is currently unavailable.';
         }
       },
-      error: () => {
-        // If status check fails, proceed anyway
-        this.insertCard();
+      error: (err) => {
+        if (this.isUpiMode) {
+          this.currentStep = 'error';
+          this.errorMessage = err?.error?.message || 'Unable to verify this ATM. Please try again.';
+        } else {
+          this.insertCard();
+        }
       }
     });
   }
@@ -564,8 +569,13 @@ export class AtmSimulatorComponent implements OnInit, OnDestroy {
       this.errorMessage = 'Insufficient balance';
       return;
     }
-    if (amount > 25000) {
-      this.errorMessage = 'Maximum withdrawal limit is ₹25,000';
+    const atmLimit = Number(this.selectedAtmInfo?.maxWithdrawalLimit);
+    if (!Number.isFinite(atmLimit) || atmLimit <= 0) {
+      this.errorMessage = "This ATM's admin-set withdrawal limit is unavailable. Please select another ATM.";
+      return;
+    }
+    if (amount > atmLimit) {
+      this.errorMessage = `This ATM's admin-set per-withdrawal limit is ₹${atmLimit.toLocaleString('en-IN')}.`;
       return;
     }
     this.errorMessage = '';

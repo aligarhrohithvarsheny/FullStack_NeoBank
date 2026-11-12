@@ -1157,6 +1157,7 @@
                 <span class="upi-badge" [class.active]="upiStatus.upiEnabled" [class.blocked]="!upiStatus.upiEnabled">
                   {{upiStatus.upiEnabled ? 'Active' : 'Blocked'}}
                 </span>
+                <span *ngIf="upiStatus.upiVerified" class="upi-badge upi-verified-badge">Verified for ATM</span>
               </div>
               <div class="upi-status-grid">
                 <div class="upi-stat-item">
@@ -1179,6 +1180,25 @@
                   {{upiStatus.upiEnabled ? '🔒 Block UPI' : '✅ Enable UPI'}}
                 </button>
               </div>
+            </div>
+
+            <div class="upi-atm-limit-card">
+              <h4>NeoBank ATM UPI withdrawal limit</h4>
+              <p>Only enabled, verified <strong>&#64;neobank</strong> UPI IDs with a PIN can approve NeoBank ATM QR requests. The maximum per withdrawal is set by an administrator for each ATM and checked when you request cash.</p>
+              <p *ngIf="upiStatus?.upiId && !upiStatus?.upiVerified" class="upi-error-msg">This UPI ID is not verified for NeoBank ATM withdrawals.</p>
+              <div *ngIf="isLoadingUpiAtmLimits" class="upi-atm-limit-message">Refreshing admin-set ATM limits...</div>
+              <div *ngIf="upiAtmLimitsError" class="upi-error-msg">{{upiAtmLimitsError}}</div>
+              <div *ngIf="!isLoadingUpiAtmLimits && !upiAtmLimitsError && upiAtmLimits.length === 0" class="upi-atm-limit-message">
+                No active NeoBank ATM limits are currently available.
+              </div>
+              <div *ngFor="let atm of upiAtmLimits" class="upi-atm-limit-row">
+                <div>
+                  <strong>{{atm.atmName}}</strong>
+                  <small>{{atm.atmId}}<span *ngIf="atm.location"> · {{atm.location}}</span></small>
+                </div>
+                <strong>₹{{atm.maxWithdrawalLimit | number:'1.0-0'}} / withdrawal</strong>
+              </div>
+              <small class="upi-atm-limit-note">Limits refresh automatically. The limit at the selected ATM applies.</small>
             </div>
           </div>
         </div>

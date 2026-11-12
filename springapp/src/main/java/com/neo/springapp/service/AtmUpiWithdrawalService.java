@@ -34,24 +34,26 @@ public class AtmUpiWithdrawalService {
     @Transactional
     public Map<String, Object> createRequest(String atmId, String accountNumber, String accountType, Double amount) {
         if (accountNumber == null || accountNumber.isBlank() || amount == null || amount <= 0
-                || amount % 100 != 0 || amount > 25_000) {
-            throw new IllegalArgumentException("Enter a withdrawal amount in multiples of ₹100, up to ₹25,000.");
+                || amount % 100 != 0) {
+            throw new IllegalArgumentException("Enter a positive withdrawal amount in multiples of ₹100.");
         }
 
         String normalizedType = normalizeAccountType(accountType);
         AccountIdentity account = loadAccount(accountNumber, normalizedType);
-        if (!Boolean.TRUE.equals(account.upiEnabled()) || !Boolean.TRUE.equals(account.pinSet())
-                || account.upiId() == null || account.upiId().isBlank()) {
-            throw new IllegalArgumentException("Enable UPI and set a UPI PIN before using cardless withdrawal.");
-        }
+        requireVerifiedNeoBankUpi(account);
 
         AtmMachine atm = atmMachineRepository.findByAtmId(atmId)
                 .orElseThrow(() -> new IllegalArgumentException("ATM not found."));
         if (!"ACTIVE".equals(atm.getStatus())) {
             throw new IllegalArgumentException("This ATM is currently " + atm.getStatus() + ".");
         }
-        if (amount > atm.getMaxWithdrawalLimit()) {
-            throw new IllegalArgumentException("Amount exceeds this ATM's per-transaction limit.");
+        Double atmLimit = atm.getMaxWithdrawalLimit();
+        if (atmLimit == null || atmLimit <= 0) {
+            throw new IllegalArgumentException("This ATM's withdrawal limit is not configured. Please contact the bank.");
+        }
+        if (amount > atmLimit) {
+            throw new IllegalArgumentException("Amount exceeds this ATM's admin-set per-withdrawal limit of ₹"
+                    + atmLimit + ".");
         }
         if (atm.getCashAvailable() == null || atm.getCashAvailable() < amount) {
             throw new IllegalArgumentException("This ATM does not have enough cash for that amount.");
@@ -87,6 +89,9 @@ public class AtmUpiWithdrawalService {
     public Map<String, Object> getRequest(String token, String accountNumber) {
         AtmUpiWithdrawalRequest request = findRequest(token, accountNumber);
         expireIfNeeded(request);
+        if ("PENDING".equals(request.getStatus())) {
+            requireVerifiedNeoBankUpi(loadAccount(request.getAccountNumber(), request.getAccountType()));
+        }
         return requestResponse(request);
     }
 
@@ -112,14 +117,14 @@ public class AtmUpiWithdrawalService {
         if (!"PENDING".equals(request.getStatus())) {
             return requestResponse(request);
         }
+        AccountIdentity account = loadAccount(request.getAccountNumber(), request.getAccountType());
+        requireVerifiedNeoBankUpi(account);
         int pinLength = "SALARY".equals(request.getAccountType()) ? 4 : 6;
         if (pin == null || !pin.matches("[0-9]{" + pinLength + "}")) {
             return failure("Enter your " + pinLength + "-digit UPI PIN.");
         }
 
-        AccountIdentity account = loadAccount(request.getAccountNumber(), request.getAccountType());
-        if (!Boolean.TRUE.equals(account.upiEnabled()) || !Boolean.TRUE.equals(account.pinSet())
-                || account.pinHash() == null || !pinEncoder.matches(pin, account.pinHash())) {
+        if (account.pinHash() == null || !pinEncoder.matches(pin, account.pinHash())) {
             int attempts = (request.getPinAttempts() == null ? 0 : request.getPinAttempts()) + 1;
             request.setPinAttempts(attempts);
             if (attempts >= MAX_PIN_ATTEMPTS) {
@@ -271,6 +276,16 @@ public class AtmUpiWithdrawalService {
                 ? user.getAccount().getName() : user.getUsername();
         return new AccountIdentity(null, user.getUpiId(), name, user.getEmail(), user.getTransactionPin(),
                 user.getTransactionPinSet(), user.getUpiEnabled());
+    }
+
+    private void requireVerifiedNeoBankUpi(AccountIdentity account) {
+        if (!Boolean.TRUE.equals(account.upiEnabled()) || !Boolean.TRUE.equals(account.pinSet())) {
+            throw new IllegalArgumentException("Enable NeoBank UPI and set a UPI PIN before using ATM withdrawal.");
+        }
+        if (account.upiId() == null
+                || !account.upiId().trim().toLowerCase(Locale.ROOT).endsWith("@neobank")) {
+            throw new IllegalArgumentException("A verified NeoBank UPI ID is required for ATM withdrawal.");
+        }
     }
 
     private record AccountIdentity(Long id, String upiId, String name, String email,

@@ -6716,8 +6716,9 @@
             <input type="number" [(ngModel)]="atmForm.maxCapacity" style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; box-sizing: border-box;">
           </div>
           <div>
-            <label style="display: block; font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 4px;">Max Withdrawal/Txn (₹)</label>
+            <label style="display: block; font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 4px;">Admin-set Max Withdrawal/Txn (₹)</label>
             <input type="number" [(ngModel)]="atmForm.maxWithdrawalLimit" style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; box-sizing: border-box;">
+            <small style="display: block; margin-top: 4px; color: #64748b;">Applies to card and NeoBank UPI withdrawals at this ATM.</small>
           </div>
           <div>
             <label style="display: block; font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 4px;">Daily Limit (₹)</label>

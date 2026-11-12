@@ -611,6 +611,9 @@ export class Userdashboard implements OnInit, OnDestroy, AfterViewInit {
 
   // ── UPI Pay (Savings) ──────────────────────────────────────
   upiStatus: any = null;
+  upiAtmLimits: any[] = [];
+  isLoadingUpiAtmLimits = false;
+  upiAtmLimitsError = '';
   isLoadingUpiStatus: boolean = false;
   upiTransactions: any[] = [];
   isLoadingUpiTxns: boolean = false;
@@ -1487,7 +1490,12 @@ export class Userdashboard implements OnInit, OnDestroy, AfterViewInit {
       const parsedQr = new URL(decodedText);
       const recipientUpi = parsedQr.searchParams.get('pa')?.toLowerCase();
       const note = parsedQr.searchParams.get('tn') || '';
-      if (recipientUpi === 'atmwithdrawal@neobank' && note.startsWith('ATMREQ:')) {
+      if (recipientUpi === 'atmwithdrawal@neobank' || note.startsWith('ATMREQ:')) {
+        if (recipientUpi !== 'atmwithdrawal@neobank' || !note.startsWith('ATMREQ:')) {
+          this.stopQrScanner();
+          this.alertService.transferError('Invalid NeoBank ATM QR code.');
+          return;
+        }
         this.stopQrScanner();
         this.prepareAtmUpiApproval(note.substring('ATMREQ:'.length));
         return;
@@ -1724,6 +1732,35 @@ export class Userdashboard implements OnInit, OnDestroy, AfterViewInit {
     });
   }
 
+  loadUpiAtmLimits(): void {
+    if (this.isLoadingUpiAtmLimits) return;
+    this.isLoadingUpiAtmLimits = true;
+    this.upiAtmLimitsError = '';
+    this.http.get<any>(`${environment.apiBaseUrl}/api/admin/atm/active-atms`).pipe(timeout(8000)).subscribe({
+      next: (response) => {
+        this.isLoadingUpiAtmLimits = false;
+        if (response?.success === false) {
+          this.upiAtmLimits = [];
+          this.upiAtmLimitsError = response.message || 'Could not load NeoBank ATM withdrawal limits.';
+          return;
+        }
+        this.upiAtmLimits = (Array.isArray(response?.atms) ? response.atms : [])
+          .filter((atm: any) => Number(atm.maxWithdrawalLimit) > 0)
+          .map((atm: any) => ({
+            atmId: atm.atmId,
+            atmName: atm.atmName || atm.atmId,
+            location: [atm.location, atm.city].filter(Boolean).join(', '),
+            maxWithdrawalLimit: Number(atm.maxWithdrawalLimit)
+          }));
+      },
+      error: (err: any) => {
+        this.isLoadingUpiAtmLimits = false;
+        this.upiAtmLimits = [];
+        this.upiAtmLimitsError = err?.error?.message || 'Could not load NeoBank ATM withdrawal limits.';
+      }
+    });
+  }
+
   loadUpiTransactions() {
     if (!this.userAccountNumber) return;
     this.isLoadingUpiTxns = true;
@@ -1945,7 +1982,11 @@ export class Userdashboard implements OnInit, OnDestroy, AfterViewInit {
   startUpiPolling() {
     this.stopUpiPolling();
     this.upiLastPollMs = Date.now() - 15000;
-    this.upiPollInterval = setInterval(() => this.pollUpiTransactions(), 5000);
+    this.loadUpiAtmLimits();
+    this.upiPollInterval = setInterval(() => {
+      this.pollUpiTransactions();
+      this.loadUpiAtmLimits();
+    }, 5000);
   }
 
   stopUpiPolling() {

@@ -57,6 +57,9 @@ public class AtmManagementService {
         if (atmMachineRepository.existsByAtmId(atm.getAtmId())) {
             throw new RuntimeException("ATM with ID " + atm.getAtmId() + " already exists");
         }
+        if (atm.getMaxWithdrawalLimit() == null || atm.getMaxWithdrawalLimit() <= 0) {
+            throw new IllegalArgumentException("The admin-set per-withdrawal limit must be greater than zero.");
+        }
         return atmMachineRepository.save(atm);
     }
 
@@ -64,6 +67,9 @@ public class AtmManagementService {
     public AtmMachine updateAtm(String atmId, AtmMachine updates) {
         AtmMachine atm = atmMachineRepository.findByAtmId(atmId)
                 .orElseThrow(() -> new RuntimeException("ATM not found: " + atmId));
+        if (updates.getMaxWithdrawalLimit() != null && updates.getMaxWithdrawalLimit() <= 0) {
+            throw new IllegalArgumentException("The admin-set per-withdrawal limit must be greater than zero.");
+        }
         if (updates.getAtmName() != null) atm.setAtmName(updates.getAtmName());
         if (updates.getLocation() != null) atm.setLocation(updates.getLocation());
         if (updates.getCity() != null) atm.setCity(updates.getCity());
