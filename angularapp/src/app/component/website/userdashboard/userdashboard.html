@@ -79,7 +79,7 @@
   <div class="ud-qr-scanner-modal" *ngIf="showQrScanner" (click)="stopQrScanner()">
     <div class="ud-qr-scanner-panel" (click)="$event.stopPropagation()">
       <div class="ud-qr-scanner-header"><h3><i class="fa fa-qrcode"></i> Scan QR Code</h3><button type="button" (click)="stopQrScanner()" title="Close scanner">&times;</button></div>
-      <p>Scan a NeoBank web login QR or UPI payment QR.</p>
+      <p>Scan a NeoBank web login QR, NeoBank UPI payment QR, or official NeoBank ATM withdrawal QR.</p>
       <div id="qr-reader"></div>
       <button type="button" class="ud-qr-cancel" (click)="stopQrScanner()">Close Scanner</button>
     </div>
@@ -1220,6 +1220,12 @@
                   {{isVerifyingUpiSend ? 'Verifying...' : 'Verify'}}
                 </button>
               </div>
+              <button type="button" class="ud-btn-outline ud-btn-sm" (click)="startQrScanner()" [disabled]="isScanning">
+                <i class="fa fa-qrcode"></i> Scan NeoBank QR
+              </button>
+              <small style="display:block;margin-top:8px;color:#64748b;">
+                Scanning supports NeoBank UPI payments and official NeoBank ATM withdrawal requests only.
+              </small>
               <div *ngIf="upiSendVerified" class="upi-verified-name">✅ {{upiSendVerifiedName}}</div>
               <div *ngIf="upiSendVerifyError" class="upi-error-msg">{{upiSendVerifyError}}</div>
             </div>

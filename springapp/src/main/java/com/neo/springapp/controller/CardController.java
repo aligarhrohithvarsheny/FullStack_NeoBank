@@ -1,10 +1,12 @@
 package com.neo.springapp.controller;
 
 import com.neo.springapp.model.Card;
+import com.neo.springapp.model.User;
 import com.neo.springapp.service.CardService;
 import com.neo.springapp.service.PasswordService;
 import org.springframework.data.domain.Page;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -18,6 +20,9 @@ public class CardController {
 
     private final CardService cardService;
     private final PasswordService passwordService;
+    @Autowired
+    private com.neo.springapp.repository.UserRepository userRepository;
+
     @Autowired
     private com.neo.springapp.service.EmergencyControlService emergencyControlService;
 
@@ -139,6 +144,51 @@ public class CardController {
     public ResponseEntity<Card> addOnCard(@PathVariable Long cardId) {
         Card card = cardService.addOnCard(cardId);
         return card == null ? ResponseEntity.badRequest().build() : ResponseEntity.ok(card);
+    }
+
+    @PostMapping("/generate/debit")
+    public ResponseEntity<?> generateDebitCard(
+            @org.springframework.security.core.annotation.AuthenticationPrincipal
+            com.neo.springapp.service.UserSessionTokenService.SessionPrincipal principal) {
+        if (principal == null || !"USER".equals(principal.scope())
+                || principal.accountNumber() == null || principal.accountNumber().isBlank()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("message", "Sign in with a customer account to generate a debit card."));
+        }
+
+        User user = userRepository.findByAccountNumber(principal.accountNumber()).orElse(null);
+        if (user == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("message", "Customer account was not found."));
+        }
+
+        try {
+            return ResponseEntity.status(HttpStatus.CREATED).body(cardService.generateDebitCardForUser(user));
+        } catch (IllegalStateException ex) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("message", ex.getMessage()));
+        }
+    }
+
+    @GetMapping("/{cardId}/user-action-history")
+    public ResponseEntity<?> getUserCardActionHistory(
+            @PathVariable Long cardId,
+            @org.springframework.security.core.annotation.AuthenticationPrincipal
+            com.neo.springapp.service.UserSessionTokenService.SessionPrincipal principal) {
+        if (principal == null || !"USER".equals(principal.scope())
+                || principal.accountNumber() == null || principal.accountNumber().isBlank()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("message", "Sign in with a customer account to view card history."));
+        }
+
+        Card card = cardService.getCardById(cardId);
+        if (card == null) return ResponseEntity.notFound().build();
+        if (card.getAccountNumber() == null
+                || !card.getAccountNumber().equalsIgnoreCase(principal.accountNumber())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("message", "This card does not belong to your account."));
+        }
+
+        return ResponseEntity.ok(cardService.getCardActionHistory(cardId));
     }
 
     @PostMapping("/{cardId}/merge")

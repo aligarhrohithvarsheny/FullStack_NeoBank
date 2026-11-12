@@ -7,18 +7,23 @@ import com.neo.springapp.repository.TransactionRepository;
 import com.neo.springapp.model.CardActionHistory;
 import com.neo.springapp.model.Transaction;
 import com.neo.springapp.model.Account;
+import com.neo.springapp.model.User;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Locale;
 
 @Service
 @SuppressWarnings("null")
 public class CardService {
+    private static final SecureRandom CARD_RANDOM = new SecureRandom();
 
     private final CardRepository cardRepository;
     private final AccountService accountService;
@@ -32,6 +37,70 @@ public class CardService {
         this.accountService = accountService;
         this.cardActionHistoryRepository = cardActionHistoryRepository;
         this.transactionRepository = transactionRepository;
+    }
+
+    @Transactional
+    public Card generateDebitCardForUser(User user) {
+        if (user == null || !"APPROVED".equalsIgnoreCase(user.getStatus())
+                || user.getAccount() == null || user.getAccountNumber() == null
+                || user.getAccountNumber().isBlank()) {
+            throw new IllegalStateException("An approved, active account is required to generate a debit card.");
+        }
+
+        Account account = user.getAccount();
+        if (!"ACTIVE".equalsIgnoreCase(account.getStatus())) {
+            throw new IllegalStateException("Your account is not active and cannot receive a debit card.");
+        }
+
+        boolean hasDebitCard = cardRepository.findByAccountNumber(user.getAccountNumber()).stream()
+                .anyMatch(card -> isDebitCard(card.getCardType()));
+        if (hasDebitCard) {
+            throw new IllegalStateException("A debit card is already linked to this account.");
+        }
+
+        String cardHolder = account.getName() == null || account.getName().isBlank()
+                ? user.getUsername() : account.getName();
+        Card card = new Card(generateDebitCardNumber(), "Visa Debit", cardHolder,
+                user.getAccountNumber(), user.getEmail());
+        LocalDateTime expiry = LocalDateTime.now().plusYears(3);
+        card.setExpiryDate(String.format(Locale.ROOT, "%02d/%02d",
+                expiry.getMonthValue(), expiry.getYear() % 100));
+        card.setExpiryDateTime(expiry);
+        card.setStatus("Active");
+        card.setPinSet(false);
+
+        Card savedCard = cardRepository.save(card);
+        recordAction(savedCard, "GENERATE", "NONE", savedCard.getMaskedCardNumber(), "USER");
+        return savedCard;
+    }
+
+    private boolean isDebitCard(String cardType) {
+        String type = cardType == null ? "" : cardType.toLowerCase(Locale.ROOT);
+        return type.contains("debit") && !type.contains("credit");
+    }
+
+    private String generateDebitCardNumber() {
+        for (int attempt = 0; attempt < 10; attempt++) {
+            StringBuilder firstFifteenDigits = new StringBuilder("4");
+            while (firstFifteenDigits.length() < 15) {
+                firstFifteenDigits.append(CARD_RANDOM.nextInt(10));
+            }
+
+            int sum = 0;
+            boolean doubleDigit = true;
+            for (int index = firstFifteenDigits.length() - 1; index >= 0; index--) {
+                int digit = firstFifteenDigits.charAt(index) - '0';
+                if (doubleDigit) {
+                    digit *= 2;
+                    if (digit > 9) digit -= 9;
+                }
+                sum += digit;
+                doubleDigit = !doubleDigit;
+            }
+            String cardNumber = firstFifteenDigits.append((10 - sum % 10) % 10).toString();
+            if (cardRepository.findByCardNumber(cardNumber) == null) return cardNumber;
+        }
+        throw new IllegalStateException("Could not generate a unique debit card number. Please try again.");
     }
 
     // Save new card

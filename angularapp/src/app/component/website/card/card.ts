@@ -2,7 +2,7 @@ import { Component, OnInit, OnDestroy, Inject, PLATFORM_ID, ViewEncapsulation, I
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { AlertService } from '../../../service/alert.service';
 import { environment } from '../../../../environment/environment';
 
@@ -35,6 +35,15 @@ interface UserProfile {
   aadhar?: string;
   occupation?: string;
   income?: number;
+}
+
+interface CardActionHistory {
+  id: number;
+  actionType: string;
+  oldValue?: string;
+  newValue?: string;
+  changedBy?: string;
+  createdAt: string;
 }
 
 @Component({
@@ -79,6 +88,14 @@ export class Card implements OnInit, OnDestroy {
   // CIBIL Report Lookup
   cibilReportData: any = null;
   isLoadingCibilReport: boolean = false;
+  isLoadingCard: boolean = false;
+  cardLoadError: string = '';
+  isGeneratingCard: boolean = false;
+  cardGenerationError: string = '';
+  cardGenerationSuccess: string = '';
+  cardHistory: CardActionHistory[] = [];
+  isLoadingCardHistory: boolean = false;
+  cardHistoryError: string = '';
   private cardPollInterval: any = null;
 
   constructor(private router: Router, @Inject(PLATFORM_ID) private platformId: Object, private http: HttpClient, private alertService: AlertService) {}
@@ -283,147 +300,91 @@ export class Card implements OnInit, OnDestroy {
 
   loadUserCard() {
     if (!isPlatformBrowser(this.platformId)) return;
-    
+
     if (!this.userProfile) {
-      this.createDefaultCard();
+      this.card = null;
+      this.cardHistory = [];
+      this.isLoadingCard = false;
       return;
     }
-    
-    // Load card from MySQL database
-    console.log('Loading card for account:', this.userProfile.accountNumber);
+
+    if (this.isLoadingCard) return;
+    this.isLoadingCard = true;
+    this.cardLoadError = '';
     const accountNumber = encodeURIComponent(this.userProfile.accountNumber);
     this.http.get<any[]>(`${environment.apiBaseUrl}/api/cards/account/${accountNumber}`).subscribe({
       next: (cards) => {
-        console.log('Cards loaded from MySQL:', cards);
-        console.log('Number of cards found:', cards?.length || 0);
+        this.isLoadingCard = false;
         const debitCard = this.selectDebitCard(cards);
         if (debitCard) {
+          const cardChanged = this.card?.id !== String(debitCard.id);
           this.card = this.mapBackendCard(debitCard);
-        } else if (cards?.length) {
-          this.card = null;
+          if (cardChanged) this.loadCardHistory();
         } else {
-          this.createDefaultCard();
+          this.card = null;
+          this.cardHistory = [];
         }
       },
       error: (err: any) => {
+        this.isLoadingCard = false;
+        this.card = null;
         console.error('Error loading card from database:', err);
-        console.error('Account number being searched:', this.userProfile?.accountNumber);
-        console.log(`No card found for account ${this.userProfile?.accountNumber}. Please contact admin to create a card.`);
-        this.createDefaultCard();
+        this.cardLoadError = 'Unable to load debit card information. Please retry.';
       }
     });
   }
 
-  createDefaultCard() {
-    if (!this.userProfile) return;
-    
-    // First check if card already exists in database
-    console.log('Checking if card already exists for account:', this.userProfile.accountNumber);
-    const accountNumber = encodeURIComponent(this.userProfile.accountNumber);
-    this.http.get<any[]>(`${environment.apiBaseUrl}/api/cards/account/${accountNumber}`).subscribe({
-      next: (existingCards) => {
-        const debitCard = this.selectDebitCard(existingCards);
-        if (debitCard) {
-          this.card = this.mapBackendCard(debitCard);
-          this.saveCard();
-        } else if (existingCards?.length) {
-          this.card = null;
-        } else {
-          this.createNewCard();
-        }
+  generateDebitCard() {
+    if (!this.userProfile || this.isGeneratingCard) return;
+
+    this.isGeneratingCard = true;
+    this.cardGenerationError = '';
+    this.cardGenerationSuccess = '';
+    this.http.post<any>(`${environment.apiBaseUrl}/api/cards/generate/debit`, {}, {
+      headers: this.getUserAuthHeaders()
+    }).subscribe({
+      next: (response) => {
+        this.isGeneratingCard = false;
+        this.card = this.mapBackendCard(response);
+        this.cardGenerationSuccess = 'Your debit card was generated and saved to card history.';
+        this.loadCardHistory();
       },
       error: (err: any) => {
-        console.error('Error checking existing cards:', err);
-        // If check fails, create new card
-        this.createNewCard();
+        this.isGeneratingCard = false;
+        console.error('Error generating debit card:', err);
+        this.cardGenerationError = err.error?.message || 'Unable to generate your debit card. Please try again.';
       }
     });
   }
 
-  createNewCard() {
-    if (!this.userProfile) return;
-    
-    const cardNumber = '4' + Math.floor(100000000000000 + Math.random() * 900000000000000).toString();
-    const cvv = Math.floor(100 + Math.random() * 900).toString();
-    const expiryMonth = String(Math.floor(1 + Math.random() * 12)).padStart(2, '0');
-    const expiryYear = String(new Date().getFullYear() + Math.floor(1 + Math.random() * 5));
-    
-    const newCard = {
-      cardNumber: cardNumber,
-      cardType: 'Visa Debit',
-      cvv: cvv,
-      userName: this.userProfile.name,
-      expiryDate: `${expiryMonth}/${expiryYear.slice(-2)}`,
-      pin: '',
-      blocked: false,
-      deactivated: false,
-      pinSet: false,
-      status: 'Active',
-      accountNumber: this.userProfile.accountNumber,
-      userEmail: this.userProfile.email
-    };
-    
-    // Create card in MySQL database
-    console.log('Creating new card in MySQL for account:', this.userProfile.accountNumber);
-          this.http.post(`${environment.apiBaseUrl}/api/cards`, newCard).subscribe({
-      next: (response: any) => {
-        console.log('Card created successfully in MySQL:', response);
-        
-        // Update local card with the response from database
-        if (this.userProfile) {
-          this.card = {
-            id: response.id.toString(),
-            userId: this.userProfile.accountNumber,
-            userName: this.userProfile.name,
-            userAccountNumber: this.userProfile.accountNumber,
-            cardNumber: response.cardNumber,
-            cardType: response.cardType,
-            cvv: response.cvv,
-            expiry: response.expiryDate,
-            status: response.status,
-            pinSet: response.pinSet,
-            createdAt: response.createdAt || new Date().toISOString(),
-            lastUpdated: response.lastUpdated || new Date().toISOString()
-          };
-        }
-        
-        // Also save to localStorage as backup
-        this.saveCard();
+  private getUserAuthHeaders(): HttpHeaders {
+    let token = sessionStorage.getItem('jwt') || '';
+    if (!token) {
+      const currentUser = sessionStorage.getItem('currentUser');
+      token = currentUser ? JSON.parse(currentUser).authToken || '' : '';
+    }
+    return token ? new HttpHeaders({ Authorization: `Bearer ${token}` }) : new HttpHeaders();
+  }
+
+  private loadCardHistory() {
+    if (!this.card) return;
+
+    this.isLoadingCardHistory = true;
+    this.cardHistoryError = '';
+    this.http.get<CardActionHistory[]>(
+      `${environment.apiBaseUrl}/api/cards/${encodeURIComponent(this.card.id)}/user-action-history`,
+      { headers: this.getUserAuthHeaders() }
+    ).subscribe({
+      next: (history) => {
+        this.cardHistory = Array.isArray(history) ? history : [];
+        this.isLoadingCardHistory = false;
       },
       error: (err: any) => {
-        console.error('Error creating card in MySQL:', err);
-        // Fallback to localStorage if database fails
-        this.createLocalCard();
+        this.isLoadingCardHistory = false;
+        this.cardHistoryError = 'Unable to load card history. Please refresh and try again.';
+        console.error('Error loading debit card history:', err);
       }
     });
-  }
-
-  createLocalCard() {
-    if (!this.userProfile) return;
-    
-    // Fallback method to create card in localStorage only
-    const cardId = 'CARD_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-    const cardNumber = '4' + Math.floor(100000000000000 + Math.random() * 900000000000000).toString();
-    const cvv = Math.floor(100 + Math.random() * 900).toString();
-    const expiryMonth = String(Math.floor(1 + Math.random() * 12)).padStart(2, '0');
-    const expiryYear = String(new Date().getFullYear() + Math.floor(1 + Math.random() * 5));
-    
-    this.card = {
-      id: cardId,
-      userId: this.userProfile.accountNumber,
-      userName: this.userProfile.name,
-      userAccountNumber: this.userProfile.accountNumber,
-      cardNumber: cardNumber,
-      cardType: 'Visa Debit',
-      cvv: cvv,
-      expiry: `${expiryMonth}/${expiryYear.slice(-2)}`,
-      status: 'Active',
-      pinSet: false,
-      createdAt: new Date().toISOString(),
-      lastUpdated: new Date().toISOString()
-    };
-    
-    this.saveCard();
   }
 
   saveCard() {
@@ -546,6 +507,7 @@ export class Card implements OnInit, OnDestroy {
               this.card!.status = 'Blocked';
               this.card!.lastUpdated = new Date().toISOString();
               this.saveCard();
+              this.loadCardHistory();
               this.alertService.cardSuccess('Card Blocked', 'Your card has been blocked for security reasons.');
             },
             error: (err: any) => {
@@ -566,6 +528,7 @@ export class Card implements OnInit, OnDestroy {
             this.card!.status = 'Active';
             this.card!.lastUpdated = new Date().toISOString();
             this.saveCard();
+            this.loadCardHistory();
             this.alertService.cardSuccess('Card Unblocked', 'Your debit card is active again.');
           },
           error: () => this.alertService.cardError('Card Unblocking Failed', 'Failed to unblock card. Please try again.')
@@ -586,6 +549,7 @@ export class Card implements OnInit, OnDestroy {
               this.card!.status = 'Deactivated';
               this.card!.lastUpdated = new Date().toISOString();
               this.saveCard();
+              this.loadCardHistory();
               this.alertService.cardSuccess('Card Deactivated', 'Your card has been deactivated.');
             },
             error: (err: any) => {

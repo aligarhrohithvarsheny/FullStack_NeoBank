@@ -2,12 +2,15 @@ package com.neo.springapp.model;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import java.security.SecureRandom;
 import java.time.LocalDateTime;
+import java.util.Locale;
 
 @Data
 @Entity
 @Table(name = "cards")
 public class Card {
+    private static final SecureRandom CVV_RANDOM = new SecureRandom();
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -55,7 +58,7 @@ public class Card {
 
     // Generate random CVV
     private String generateCVV() {
-        return String.format("%03d", (int)(Math.random() * 1000));
+        return String.format(Locale.ROOT, "%03d", CVV_RANDOM.nextInt(1000));
     }
 
     // Generate masked card number

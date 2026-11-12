@@ -87,7 +87,45 @@
     </div>
   </div>
 
-  <p *ngIf="!card" class="no-debit-card">No debit card is currently linked to this account.</p>
+  <p *ngIf="isLoadingCard" class="no-debit-card">Loading debit card information...</p>
+
+  <div *ngIf="!isLoadingCard && !card" class="no-debit-card">
+    <p *ngIf="!cardLoadError">No debit card is currently linked to this account.</p>
+    <p *ngIf="cardLoadError" class="card-error">{{ cardLoadError }}</p>
+    <button *ngIf="cardLoadError" (click)="refreshCardData()" class="apply-new-card-btn">
+      Retry
+    </button>
+    <button *ngIf="!cardLoadError" (click)="generateDebitCard()" class="apply-new-card-btn" [disabled]="isGeneratingCard">
+      {{ isGeneratingCard ? 'Generating...' : 'Generate Debit Card' }}
+    </button>
+    <p *ngIf="cardGenerationError" class="card-error">{{ cardGenerationError }}</p>
+    <p *ngIf="cardGenerationSuccess" class="card-success">{{ cardGenerationSuccess }}</p>
+  </div>
+
+  <section *ngIf="card" class="card-history">
+    <h4>Debit Card History</h4>
+    <p *ngIf="isLoadingCardHistory">Loading card history...</p>
+    <p *ngIf="cardHistoryError" class="card-error">{{ cardHistoryError }}</p>
+    <p *ngIf="!isLoadingCardHistory && !cardHistoryError && !cardHistory.length">
+      No card activity has been recorded yet.
+    </p>
+    <table *ngIf="!isLoadingCardHistory && cardHistory.length">
+      <thead>
+        <tr>
+          <th>Activity</th>
+          <th>Details</th>
+          <th>Date</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let entry of cardHistory">
+          <td>{{ entry.actionType | titlecase }}</td>
+          <td>{{ entry.newValue || entry.oldValue || '-' }}</td>
+          <td>{{ entry.createdAt | date:'medium' }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
 
   <!-- Card Actions -->
   <div *ngIf="card" class="card-actions">

@@ -1466,8 +1466,6 @@ export class Userdashboard implements OnInit, OnDestroy, AfterViewInit {
   }
 
   onQrCodeScanned(decodedText: string) {
-    console.log('QR Code scanned:', decodedText);
-
     // A web-login QR contains the token generated on the public login page.
     try {
       const loginUrl = new URL(decodedText, window.location.origin);
@@ -1480,43 +1478,66 @@ export class Userdashboard implements OnInit, OnDestroy, AfterViewInit {
     } catch {
       // Continue with the existing UPI QR parser below.
     }
-    
-    if (!decodedText.startsWith('upi://pay')) {
+
+    let parsedQr: URL;
+    try {
+      parsedQr = new URL(decodedText);
+    } catch {
+      this.stopQrScanner();
       this.alertService.transferError('Invalid QR code. Please scan a UPI payment QR code.');
       return;
     }
 
-    try {
-      const parsedQr = new URL(decodedText);
-      const recipientUpi = parsedQr.searchParams.get('pa')?.toLowerCase();
-      const note = parsedQr.searchParams.get('tn') || '';
-      if (recipientUpi === 'atmwithdrawal@neobank' || note.startsWith('ATMREQ:')) {
-        if (recipientUpi !== 'atmwithdrawal@neobank' || !note.startsWith('ATMREQ:')) {
-          this.stopQrScanner();
-          this.alertService.transferError('Invalid NeoBank ATM QR code.');
-          return;
-        }
+    if (parsedQr.protocol.toLowerCase() !== 'upi:' || parsedQr.hostname.toLowerCase() !== 'pay') {
+      this.stopQrScanner();
+      this.alertService.transferError('Invalid QR code. Please scan a UPI payment QR code.');
+      return;
+    }
+
+    const recipientUpi = (parsedQr.searchParams.get('pa') || '').trim().toLowerCase();
+    const note = parsedQr.searchParams.get('tn') || '';
+    const isAtmUpi = recipientUpi === 'atmwithdrawal@neobank';
+    const hasAtmRequest = note.startsWith('ATMREQ:');
+    if (isAtmUpi || hasAtmRequest) {
+      const requestToken = hasAtmRequest ? note.substring('ATMREQ:'.length) : '';
+      if (!isAtmUpi || !requestToken) {
         this.stopQrScanner();
-        this.prepareAtmUpiApproval(note.substring('ATMREQ:'.length));
+        this.alertService.transferError('Invalid NeoBank ATM QR code.');
         return;
       }
-
-      const upiId = parsedQr.searchParams.get('pa');
-      const name = parsedQr.searchParams.get('pn');
-      const amount = parsedQr.searchParams.get('am');
       this.stopQrScanner();
-      this.router.navigate(['/website/transferfunds'], {
-        state: {
-          scannedUpiId: upiId,
-          scannedName: name,
-          scannedAmount: amount ? parseFloat(amount) : null
-        }
-      });
-    } catch (error) {
-      console.error('Error parsing QR code:', error);
-      this.alertService.transferError('Error parsing QR code. Please try again.');
-      this.stopQrScanner();
+      this.prepareAtmUpiApproval(requestToken);
+      return;
     }
+
+    if (!/^[a-z0-9._-]+@neobank$/.test(recipientUpi)) {
+      this.stopQrScanner();
+      this.alertService.transferError('Only NeoBank UPI payment QR codes are supported.');
+      return;
+    }
+
+    const currency = (parsedQr.searchParams.get('cu') || 'INR').trim().toUpperCase();
+    const amountText = parsedQr.searchParams.get('am');
+    const amount = amountText === null ? 0 : Number(amountText);
+    if (currency !== 'INR' || (amountText !== null && (!Number.isFinite(amount) || amount <= 0))) {
+      this.stopQrScanner();
+      this.alertService.transferError('This NeoBank QR has an invalid currency or amount.');
+      return;
+    }
+
+    this.stopQrScanner();
+    this.selectFeature('upi-pay');
+    this.upiSendTab = 'send';
+    this.upiSendForm = {
+      receiverUpiId: recipientUpi,
+      amount,
+      remark: note,
+      transactionPin: ''
+    };
+    this.upiSendVerified = false;
+    this.upiSendVerifiedName = '';
+    this.upiSendVerifyError = '';
+    this.verifyUpiSendId();
   }
 
   private prepareAtmUpiApproval(token: string): void {

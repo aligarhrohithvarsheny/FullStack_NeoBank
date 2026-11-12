@@ -12,7 +12,9 @@ Savings accounts use their six-digit UPI PIN. Salary accounts use their four-dig
 
 ATM UPI authorization requires an enabled NeoBank UPI ID ending in `@neobank` and a configured UPI PIN. The ATM admin's **Max Withdrawal/Txn** setting is the per-withdrawal ceiling for both card and NeoBank UPI withdrawals; the selected ATM's current setting is checked by the backend when a request is created and again when cash is dispensed. The Manage UPI panel refreshes the active ATM limits automatically.
 
-Only the NeoBank ATM QR destination and a valid `ATMREQ:` token enter the ATM approval flow. Other UPI QR codes continue through the existing UPI payment flow and cannot authorize ATM cash dispensing.
+In the user dashboard's **UPI Pay** section, **Scan NeoBank QR** accepts payment QR codes addressed to an enabled NeoBank UPI ID ending in `@neobank`. The recipient is verified and the QR amount and note are prefilled before the user authorizes payment with their UPI PIN. External UPI providers are not supported.
+
+Only the exact NeoBank ATM QR destination with a valid `ATMREQ:` token enters the ATM approval flow; a normal payment QR cannot authorize cash dispensing. Scanned payments are stored in the existing UPI transaction ledger. User history refreshes automatically, and the admin UPI Management transaction list refreshes every five seconds while open.
 
 ## API
 

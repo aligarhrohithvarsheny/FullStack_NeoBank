@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../../environment/environment';
 import { AtmUpiWithdrawalService } from '../../../service/atm-upi-withdrawal.service';
+import QRCode from 'qrcode';
 
 type AtmStep = 'idle' | 'select-atm' | 'inserting-card' | 'reading-card' | 'pin-entry' | 'menu' | 'withdraw' | 'custom-amount' | 'upi-qr' | 'processing' | 'dispensing' | 'collect-cash' | 'receipt' | 'ejecting-card' | 'thank-you' | 'balance' | 'mini-statement' | 'error' | 'no-card';
 
@@ -608,8 +609,7 @@ export class AtmSimulatorComponent implements OnInit, OnDestroy {
           return;
         }
         try {
-          const qrCode = await import('qrcode');
-          this.upiWithdrawalQr = await qrCode.toDataURL(request.qrPayload, {
+          this.upiWithdrawalQr = await QRCode.toDataURL(request.qrPayload, {
             width: 220,
             margin: 1,
             errorCorrectionLevel: 'M'
@@ -622,7 +622,9 @@ export class AtmSimulatorComponent implements OnInit, OnDestroy {
           this.startUpiWithdrawalPolling();
         } catch (error) {
           console.error('ATM - Failed to render UPI withdrawal QR:', error);
-          this.atmUpiWithdrawalService.cancelRequest(request.requestToken, this.accountNumber).subscribe();
+          this.atmUpiWithdrawalService.cancelRequest(request.requestToken, this.accountNumber).subscribe({
+            error: cancelError => console.error('ATM - Failed to cancel QR rendering request:', cancelError)
+          });
           this.errorMessage = 'Could not display the QR code. Please try again.';
         }
       },

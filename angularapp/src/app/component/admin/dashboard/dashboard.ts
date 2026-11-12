@@ -733,6 +733,7 @@ export class Dashboard implements OnInit, OnDestroy {
   passbookDownloadHistory: any[] = [];
   private passbookRefreshInterval: any = null;
   private adminTransferPollingInterval: any = null;
+  private adminUpiPollingInterval: any = null;
 
   // Account Action Management
   showAccountActionModal: boolean = false;
@@ -1831,6 +1832,10 @@ export class Dashboard implements OnInit, OnDestroy {
       clearInterval(this.adminTransferPollingInterval);
       this.adminTransferPollingInterval = null;
     }
+    if (this.adminUpiPollingInterval) {
+      clearInterval(this.adminUpiPollingInterval);
+      this.adminUpiPollingInterval = null;
+    }
   }
 
   setActiveSection(section: string) {
@@ -1874,6 +1879,17 @@ export class Dashboard implements OnInit, OnDestroy {
     } else if (section !== 'transfers' && this.adminTransferPollingInterval) {
       clearInterval(this.adminTransferPollingInterval);
       this.adminTransferPollingInterval = null;
+    }
+
+    if (section === 'upi-management' && !this.adminUpiPollingInterval) {
+      this.adminUpiPollingInterval = setInterval(() => {
+        if (this.activeSection === 'upi-management' && !this.isLoadingAdminUpiTxns) {
+          this.loadAdminUpiTransactions();
+        }
+      }, 5000);
+    } else if (section !== 'upi-management' && this.adminUpiPollingInterval) {
+      clearInterval(this.adminUpiPollingInterval);
+      this.adminUpiPollingInterval = null;
     }
 
     if (section === 'branch-operations') {
@@ -1972,7 +1988,10 @@ export class Dashboard implements OnInit, OnDestroy {
     this.activeSection = section;
 
     // Handle toggle sections
-    if (section === 'tracking') {
+    if (section === 'bill-payments') {
+      this.showBillPaymentsSection = true;
+      this.loadBillPayments();
+    } else if (section === 'tracking') {
       this.showTrackingSection = true;
       this.loadAccountTrackings();
     } else if (section === 'aadhar-verification') {
@@ -7783,6 +7802,10 @@ export class Dashboard implements OnInit, OnDestroy {
     if (this.adminTransferPollingInterval) {
       clearInterval(this.adminTransferPollingInterval);
       this.adminTransferPollingInterval = null;
+    }
+    if (this.adminUpiPollingInterval) {
+      clearInterval(this.adminUpiPollingInterval);
+      this.adminUpiPollingInterval = null;
     }
     if (this.passbookRefreshInterval) {
       clearInterval(this.passbookRefreshInterval);

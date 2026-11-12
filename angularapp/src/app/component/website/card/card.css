@@ -477,6 +477,66 @@ section {
   transform: none;
 }
 
+.apply-new-card-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.no-debit-card {
+  margin: 20px 0;
+  padding: 22px;
+  background: #fff;
+  border-radius: 10px;
+  text-align: center;
+  color: #475569;
+}
+
+.no-debit-card .apply-new-card-btn {
+  width: auto;
+  min-width: 190px;
+  margin: 14px auto 0;
+}
+
+.card-error,
+.card-success {
+  margin-top: 12px;
+  font-size: 0.9rem;
+}
+
+.card-error {
+  color: #b91c1c;
+}
+
+.card-success {
+  color: #15803d;
+}
+
+.card-history {
+  margin: 20px 0;
+  padding: 22px;
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+}
+
+.card-history h4 {
+  color: #0077cc;
+  margin-bottom: 14px;
+}
+
+.card-history table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.card-history th,
+.card-history td {
+  padding: 10px;
+  border-bottom: 1px solid #e9ecef;
+  text-align: left;
+}
+
 /* Forms */
 .pin-form, .replace-form, .forgot-pin-form {
   background: #f8f9fa;
