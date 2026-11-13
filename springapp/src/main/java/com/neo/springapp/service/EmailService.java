@@ -1344,6 +1344,61 @@ public class EmailService {
         }
     }
 
+    public boolean sendCreditCardAgreementLinkEmail(String toEmail, String customerName,
+                                                    String shareUrl, String expiresAt) {
+        if (toEmail == null || toEmail.isBlank() || !toEmail.contains("@")
+                || shareUrl == null || shareUrl.isBlank()) {
+            logger.error("Credit card agreement link email not sent: recipient or share link is invalid");
+            recordCustomerNotificationFailure();
+            return false;
+        }
+
+        String recipient = toEmail.trim();
+        String body = "Dear " + (customerName == null || customerName.isBlank() ? "Customer" : customerName.trim())
+                + ",\n\nYour credit card approval terms are ready for review.\n\n"
+                + "Review the details and complete the requested demo e-signature using this secure link:\n"
+                + shareUrl + "\n\n"
+                + "This typed-name signature is a demo workflow, not a certified digital signature or a binding bank contract. "
+                + "The card will be issued only after the signature step is completed.\n\n"
+                + "Link expiry: " + (expiresAt == null ? "see the agreement page" : expiresAt) + "\n\n"
+                + "If you did not expect this message, please contact the bank using its official support channels.\n\n"
+                + "NeoBank";
+
+        if (gmailApiOtpService != null && gmailApiOtpService.isConfigured()) {
+            try {
+                gmailApiOtpService.sendPlainTextEmail(recipient,
+                        "NeoBank - Credit Card Terms Ready for Review", body);
+                return true;
+            } catch (GmailApiException e) {
+                logger.error("Credit card agreement email delivery via Gmail API failed [{}]", e.getOAuthError());
+            }
+        }
+
+        initializeMailSender();
+        JavaMailSender sender = javaMailSender != null
+                ? javaMailSender
+                : mailSender instanceof JavaMailSender resolvedSender ? resolvedSender : null;
+        if (sender == null || !isSmtpCredentialsConfigured()) {
+            logger.error("Credit card agreement link email not sent: Gmail API or SMTP is not configured");
+            recordCustomerNotificationFailure();
+            return false;
+        }
+
+        try {
+            SimpleMailMessage message = new SimpleMailMessage();
+            message.setTo(recipient);
+            message.setFrom(getFromEmail());
+            message.setSubject("NeoBank - Credit Card Terms Ready for Review");
+            message.setText(body);
+            sender.send(message);
+            return true;
+        } catch (Exception e) {
+            logger.error("Credit card agreement link email delivery failed", e);
+            recordCustomerNotificationFailure();
+            return false;
+        }
+    }
+
     private String buildFastagOtpEmailBody(String otp) {
         return "Dear Customer,\n\n" +
                "Your FASTag Login OTP is:\n\n" +

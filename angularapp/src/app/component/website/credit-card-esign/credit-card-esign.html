@@ -1,0 +1,75 @@
+<main class="card-esign-page">
+  <a routerLink="/website/landing" class="back-link">NeoBank home</a>
+  <header>
+    <span class="eyebrow">NEOBANK CREDIT</span>
+    <h1>Review and sign your credit card terms</h1>
+    <p>Check the application and approved limit carefully. Card issuance happens only after you sign.</p>
+  </header>
+
+  <p class="state-message" *ngIf="loading">Loading your credit card agreement...</p>
+  <p class="error-message" *ngIf="error">{{ error }}</p>
+  <section class="agreement-card" *ngIf="agreement && !signed">
+    <h2>Applicant and application details</h2>
+    <dl>
+      <dt>Application ID</dt><dd>{{ agreement.applicationId || 'Existing customer application' }}</dd>
+      <dt>Full name</dt><dd>{{ agreement.applicantName }}</dd>
+      <dt>Email</dt><dd>{{ agreement.applicantEmail }}</dd>
+      <dt>PAN</dt><dd>Ending {{ agreement.panLastFour }}</dd>
+      <dt>Mobile</dt><dd>Ending {{ agreement.mobileLastFour || '—' }}</dd>
+      <dt>Date of birth</dt><dd>{{ agreement.dateOfBirth || '—' }}</dd>
+      <dt>Address</dt><dd>{{ agreement.address || '—' }}</dd>
+      <dt>Employment</dt><dd>{{ agreement.employmentType || '—' }} — {{ agreement.employerName || '—' }}</dd>
+      <dt>Designation</dt><dd>{{ agreement.designation || '—' }}</dd>
+      <dt>Declared annual income</dt><dd>₹{{ agreement.annualIncome | number:'1.0-0' }}</dd>
+    </dl>
+
+    <h2>Credit card approval terms</h2>
+    <dl>
+      <dt>Simulated score estimate</dt><dd>{{ agreement.predictedCibil }}</dd>
+      <dt>Card tier</dt><dd>{{ agreement.cardType }}</dd>
+      <dt>Approved credit limit</dt><dd>₹{{ agreement.approvedLimit | number:'1.0-0' }}</dd>
+      <dt>Annual interest rate</dt><dd>{{ agreement.interestRate }}%</dd>
+      <dt>Annual fee</dt><dd>₹{{ agreement.annualFee | number:'1.0-0' }}</dd>
+      <dt>Link expires</dt><dd>{{ agreement.expiresAt | date:'medium' }}</dd>
+    </dl>
+    <p class="notice">{{ agreement.scoreNotice }}</p>
+    <p class="notice warning">{{ agreement.signatureNotice }}</p>
+
+    <form (ngSubmit)="sign()" #signForm="ngForm">
+      <label>
+        Type your full name as shown above
+        <input name="signedName" [(ngModel)]="signedName" required maxlength="120" autocomplete="name">
+      </label>
+      <div class="captcha-row" *ngIf="captcha">
+        <img [src]="'data:image/svg+xml;base64,' + captcha.image" alt="CAPTCHA challenge">
+        <button type="button" class="secondary-button" (click)="refreshCaptcha()">Refresh CAPTCHA</button>
+      </div>
+      <label>
+        CAPTCHA text
+        <input name="captchaAnswer" [(ngModel)]="captchaAnswer" required maxlength="6" autocomplete="off">
+      </label>
+      <label class="consent-row">
+        <input type="checkbox" name="consent" [(ngModel)]="consent" required>
+        <span>I reviewed these details, confirm they are accurate, and agree to the displayed demo credit card terms.</span>
+      </label>
+      <p class="error-message" *ngIf="error">{{ error }}</p>
+      <button type="submit" class="primary-button"
+        [disabled]="signForm.invalid || !captcha || signing">
+        {{ signing ? 'Recording signature...' : 'Sign and generate card' }}
+      </button>
+    </form>
+  </section>
+
+  <section class="signed-card" *ngIf="signed">
+    <h2>Signature recorded</h2>
+    <p>{{ notice }}</p>
+    <p *ngIf="agreement?.applicationId">
+      For a guest application, track the application with its ID, PAN, and mobile number to reveal the generated
+      card details after email verification.
+    </p>
+    <p *ngIf="!agreement?.applicationId">
+      Your issued credit card is now available in your NeoBank account.
+    </p>
+    <a routerLink="/website/landing" class="secondary-button">Return to NeoBank</a>
+  </section>
+</main>

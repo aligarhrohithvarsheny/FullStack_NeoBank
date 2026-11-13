@@ -95,6 +95,7 @@ export const routes: Routes = [
   // ------------------ ADMIN ------------------
   { path: 'admin/login', component: Login },
   { path: 'loan-esign/:token', loadComponent: () => import('./component/website/loan-esign/loan-esign').then(m => m.LoanEsign) },
+  { path: 'credit-card-esign/:token', loadComponent: () => import('./component/website/credit-card-esign/credit-card-esign').then(m => m.CreditCardEsign) },
   { path: 'hod/login', component: HodLogin },
   { path: 'hod/dashboard', component: HodDashboard, canActivate: [hodAuthGuard] },
   { path: 'hod/account-linking', loadComponent: () => import('./component/admin/account-linking/account-linking').then(m => m.AccountLinkingComponent), canActivate: [hodAuthGuard] },

@@ -3,6 +3,7 @@ package com.neo.springapp.model;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.ToString;
 import java.time.LocalDateTime;
 
 @Data
@@ -45,6 +46,49 @@ public class CreditCardRequest {
     private LocalDateTime documentsDeleteAfter;
     @Column(name = "documents_available", nullable = false)
     private boolean documentsAvailable;
+    @Column(name = "rejection_reason", length = 500)
+    private String rejectionReason;
+    @JsonIgnore
+    @ToString.Exclude
+    @Column(name = "card_agreement_token_hash", length = 64)
+    private String cardAgreementTokenHash;
+    @Column(name = "card_agreement_expires_at")
+    private LocalDateTime cardAgreementExpiresAt;
+    @Column(name = "card_agreement_signed_at")
+    private LocalDateTime cardAgreementSignedAt;
+    @Column(name = "card_agreement_signed_name", length = 120)
+    private String cardAgreementSignedName;
+    @Column(name = "card_agreement_signature_hash", length = 64)
+    private String cardAgreementSignatureHash;
+    @JsonIgnore
+    @Column(name = "agreement_captcha_challenge_id")
+    private String agreementCaptchaChallengeId;
+    @JsonIgnore
+    @Column(name = "agreement_captcha_answer_hash", length = 64)
+    private String agreementCaptchaAnswerHash;
+    @JsonIgnore
+    @Column(name = "agreement_captcha_expires_at")
+    private LocalDateTime agreementCaptchaExpiresAt;
+    @Column(name = "agreement_captcha_attempts")
+    private Integer agreementCaptchaAttempts = 0;
+    @JsonIgnore
+    @ToString.Exclude
+    @Column(name = "guest_card_number", unique = true, length = 16)
+    private String guestCardNumber;
+    @JsonIgnore
+    @ToString.Exclude
+    @Column(name = "guest_card_expiry", length = 5)
+    private String guestCardExpiry;
+    @JsonIgnore
+    @ToString.Exclude
+    @Column(name = "guest_card_cvv", length = 3)
+    private String guestCardCvv;
+    @Column(name = "card_details_otp_sent_at")
+    private LocalDateTime cardDetailsOtpSentAt;
+    @Column(name = "card_details_otp_attempts")
+    private Integer cardDetailsOtpAttempts = 0;
+    @Column(name = "card_details_otp_locked_until")
+    private LocalDateTime cardDetailsOtpLockedUntil;
     private Double approvedLimit;
     private Integer predictedCibil; // predicted by ML stub
     private Double suggestedLimit;

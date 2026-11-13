@@ -213,6 +213,23 @@
   margin: 0 0 8px;
 }
 
+.score-preview {
+  margin: 16px 0;
+  padding: 14px;
+  border: 1px solid #c9d9eb;
+  border-radius: 10px;
+  background: #f2f7ff;
+}
+
+.score-preview p {
+  margin: 8px 0;
+}
+
+.score-preview small,
+.score-notice {
+  color: #5b6677;
+}
+
 .tracking-panel form {
   display: grid;
   gap: 14px;
@@ -225,6 +242,40 @@
 
 .tracking-result p {
   margin: 7px 0;
+}
+
+.guest-card-access {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #dce5f1;
+}
+
+.guest-card-access form {
+  display: grid;
+  gap: 12px;
+}
+
+.card-otp-message {
+  color: #1b5831;
+}
+
+.revealed-guest-card {
+  padding: 16px;
+  border-radius: 12px;
+  background: #172a4a;
+  color: #fff;
+  overflow-wrap: anywhere;
+}
+
+.revealed-guest-card p {
+  letter-spacing: 0.04em;
+}
+
+.guest-card-disclaimer {
+  font-size: 0.85rem;
+  color: #5b6677;
 }
 
 @media (max-width: 760px) {

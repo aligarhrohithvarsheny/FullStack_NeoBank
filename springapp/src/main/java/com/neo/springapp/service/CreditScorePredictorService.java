@@ -213,6 +213,8 @@ public class CreditScorePredictorService {
         prediction.put("cardType", cardType);
         prediction.put("interestRate", getInterestRate(predictedCibil));
         prediction.put("annualFee", getAnnualFee(cardType));
+        prediction.put("scoreSource", "SIMULATED_PAN_INCOME_ESTIMATE");
+        prediction.put("scoreNotice", "Simulated estimate based on PAN pattern and declared income; not a bureau score.");
         
         return prediction;
     }

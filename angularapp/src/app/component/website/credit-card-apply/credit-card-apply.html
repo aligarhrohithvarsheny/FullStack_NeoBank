@@ -27,7 +27,8 @@
           <label>
             PAN
             <input name="pan" [(ngModel)]="application.pan" required pattern="[A-Za-z]{5}[0-9]{4}[A-Za-z]"
-              maxlength="10" autocapitalize="characters">
+              maxlength="10" autocapitalize="characters" (ngModelChange)="resetCreditScorePreview()"
+              (blur)="checkCreditScore()">
           </label>
           <label>
             Aadhaar (last four digits only)
@@ -41,7 +42,8 @@
           <label>
             Annual income (₹)
             <input type="number" name="annualIncome" [(ngModel)]="application.annualIncome" required
-              min="1" max="1000000000" step="1" inputmode="decimal">
+              min="1" max="1000000000" step="1" inputmode="decimal"
+              (ngModelChange)="resetCreditScorePreview()" (blur)="checkCreditScore()">
           </label>
           <label>
             Employment type
@@ -106,6 +108,18 @@
           <span>I consent to NeoBank processing these details and documents to assess and verify my credit card application.</span>
         </label>
         <p class="form-error" *ngIf="errorMessage">{{ errorMessage }}</p>
+        <section class="score-preview" *ngIf="scorePreview || isCheckingCreditScore || scorePreviewError">
+          <strong>Credit score pre-check</strong>
+          <p *ngIf="isCheckingCreditScore">Estimating your score...</p>
+          <ng-container *ngIf="scorePreview">
+            <p>Simulated score estimate: <strong>{{ scorePreview.predictedCibil }}</strong></p>
+            <p>{{ scorePreview.predictedCibil < 750
+              ? 'Applications below 750 are automatically rejected.'
+              : 'Applications at 750 or above are sent to admin review.' }}</p>
+            <small>{{ scorePreview.scoreNotice }}</small>
+          </ng-container>
+          <p class="form-error" *ngIf="scorePreviewError">{{ scorePreviewError }}</p>
+        </section>
         <button type="submit" class="primary-button submit-button"
           [disabled]="applicationForm.invalid || isSubmitting">
           {{ isSubmitting ? 'Submitting application...' : 'Submit application' }}
@@ -115,7 +129,15 @@
       <div class="application-success" *ngIf="submittedApplication">
         <h3>Application submitted</h3>
         <p>Your application ID is <strong>{{ submittedApplication.applicationId }}</strong>.</p>
-        <p>Save this ID. Track your application using this ID, your PAN, and mobile number.</p>
+        <p>Status: <strong>{{ submittedApplication.status }}</strong> · Simulated score: {{ submittedApplication.predictedCibil }}</p>
+        <p *ngIf="submittedApplication.rejectionReason">{{ submittedApplication.rejectionReason }}</p>
+        <p *ngIf="submittedApplication.status === 'Pending'">
+          Save this ID. If approved by an admin, you will receive an expiring e-sign link by email. A card is generated only after signing.
+        </p>
+        <p *ngIf="submittedApplication.status === 'Rejected'">
+          Track this application using the ID, PAN, and mobile number to see the decision reason.
+        </p>
+        <small>{{ submittedApplication.scoreNotice }}</small>
       </div>
     </section>
 
@@ -146,9 +168,54 @@
         <p><strong>Submitted:</strong> {{ trackedApplication.requestDate | date:'medium' }}</p>
         <p *ngIf="trackedApplication.processedDate"><strong>Decision date:</strong> {{ trackedApplication.processedDate | date:'medium' }}</p>
         <p *ngIf="trackedApplication.approvedLimit"><strong>Approved limit:</strong> ₹{{ trackedApplication.approvedLimit | number:'1.0-0' }}</p>
-        <p *ngIf="trackedApplication.status === 'Approved' && !trackedApplication.cardIssued">
-          Your application is approved. A card has not been issued because no NeoBank account is linked.
+        <p *ngIf="trackedApplication.predictedCibil !== null && trackedApplication.predictedCibil !== undefined">
+          <strong>Simulated score estimate:</strong> {{ trackedApplication.predictedCibil }}
         </p>
+        <p *ngIf="trackedApplication.scoreNotice" class="score-notice">{{ trackedApplication.scoreNotice }}</p>
+        <p *ngIf="trackedApplication.status === 'Rejected' && trackedApplication.rejectionReason" class="form-error">
+          {{ trackedApplication.rejectionReason }}
+        </p>
+        <p *ngIf="trackedApplication.status === 'Pending Signature'">
+          Admin approved your application. Check the email address on your application for the secure e-sign link.
+          The card will be generated after you review and sign the terms.
+        </p>
+        <p *ngIf="trackedApplication.status === 'Approved' && !trackedApplication.cardIssued">
+          Your application is approved. Card details are not available yet; contact NeoBank support for assistance.
+        </p>
+        <section class="guest-card-access" *ngIf="trackedApplication.cardDetailsAvailable">
+          <p>Your guest virtual card is ready. Verify your email to reveal the card details.</p>
+          <p *ngIf="trackedApplication.maskedCardNumber">
+            <strong>Card:</strong> {{ trackedApplication.maskedCardNumber }}
+          </p>
+          <button type="button" class="secondary-button" (click)="requestGuestCardDetailsOtp()"
+            [disabled]="isSendingCardOtp">
+            {{ isSendingCardOtp ? 'Sending code...' : 'Email me a verification code' }}
+          </button>
+          <p class="card-otp-message" *ngIf="cardOtpMessage">{{ cardOtpMessage }}</p>
+          <form *ngIf="cardDetailsOtpSent && !revealedGuestCard" (ngSubmit)="verifyGuestCardDetailsOtp()"
+            #cardOtpForm="ngForm">
+            <label>
+              Email verification code
+              <input name="cardOtp" [(ngModel)]="cardOtp" required inputmode="numeric"
+                pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code">
+            </label>
+            <button type="submit" class="secondary-button" [disabled]="cardOtpForm.invalid || isVerifyingCardOtp">
+              {{ isVerifyingCardOtp ? 'Verifying...' : 'Reveal card details' }}
+            </button>
+          </form>
+          <p class="form-error" *ngIf="cardDetailsError">{{ cardDetailsError }}</p>
+          <div class="revealed-guest-card" *ngIf="revealedGuestCard">
+            <strong>Guest virtual card</strong>
+            <p><strong>Card number:</strong> {{ revealedGuestCard.cardNumber }}</p>
+            <p><strong>Expiry:</strong> {{ revealedGuestCard.expiryDate }}</p>
+            <p><strong>CVV:</strong> {{ revealedGuestCard.cvv }}</p>
+            <p><strong>Approved limit:</strong> ₹{{ revealedGuestCard.approvedLimit | number:'1.0-0' }}</p>
+            <small>These details are shown temporarily. Do not share them with anyone.</small>
+          </div>
+          <p class="guest-card-disclaimer">
+            This guest virtual card is not linked to a NeoBank account and cannot be used for transactions in this demo.
+          </p>
+        </section>
       </div>
     </aside>
   </div>

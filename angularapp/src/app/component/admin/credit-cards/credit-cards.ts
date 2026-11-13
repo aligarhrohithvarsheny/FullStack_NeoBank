@@ -52,6 +52,7 @@ export class CreditCards implements OnInit, OnDestroy {
   selectedApplication: any = null;
   applicationEdit: any = null;
   applicationApprovedLimit: number | null = null;
+  agreementShareUrl = '';
   isSavingApplication = false;
   applicationDocumentPreview = '';
   applicationDocumentPreviewType = '';
@@ -167,6 +168,7 @@ export class CreditCards implements OnInit, OnDestroy {
 
   reviewApplication(application: any) {
     this.clearApplicationDocumentPreview();
+    this.agreementShareUrl = '';
     this.selectedApplication = application;
     this.applicationApprovedLimit = application.approvedLimit ?? null;
     this.applicationEdit = {
@@ -239,11 +241,10 @@ export class CreditCards implements OnInit, OnDestroy {
       this.authOptions()
     ).subscribe({
       next: updated => {
-        this.selectedApplication = updated;
+        this.selectedApplication = updated.application;
+        this.agreementShareUrl = updated.shareUrl;
         this.isSavingApplication = false;
-        this.alertService.success('Application approved', updated.accountNumber
-          ? 'The approved credit card has been issued.'
-          : 'The application and credit limit were approved. No card was issued because the applicant has no NeoBank account.');
+        this.alertService.success('Approval terms sent', 'The applicant was emailed a secure e-sign link. A card will be issued after signature.');
         this.loadGuestApplications();
       },
       error: error => {
@@ -254,6 +255,41 @@ export class CreditCards implements OnInit, OnDestroy {
         );
       }
     });
+  }
+
+  renewCreditCardAgreementLink() {
+    if (!this.selectedApplication?.id) return;
+    this.isSavingApplication = true;
+    this.http.post<{ shareUrl: string; expiresAt: string }>(
+      `${environment.apiBaseUrl}/api/credit-card-requests/admin/${this.selectedApplication.id}/agreement-link`,
+      {},
+      this.authOptions()
+    ).subscribe({
+      next: result => {
+        this.agreementShareUrl = result.shareUrl;
+        this.isSavingApplication = false;
+        this.alertService.success('E-sign link sent', 'A new secure link was emailed and the previous link was invalidated.');
+      },
+      error: error => {
+        this.isSavingApplication = false;
+        this.alertService.operationError('Send e-sign link', error.error?.message || 'Unable to send the link');
+      }
+    });
+  }
+
+  copyAgreementLink() {
+    if (!this.agreementShareUrl) return;
+    if (!navigator.clipboard) {
+      this.alertService.operationError('Copy e-sign link', 'Clipboard access is unavailable in this browser.');
+      return;
+    }
+    navigator.clipboard.writeText(this.agreementShareUrl).then(
+      () => this.alertService.success('E-sign link copied', 'Share the link only with the applicant.'),
+      error => {
+        console.error('Could not copy credit card e-sign link:', error);
+        this.alertService.operationError('Copy e-sign link', 'The link could not be copied.');
+      }
+    );
   }
 
   rejectGuestApplication() {
@@ -285,6 +321,7 @@ export class CreditCards implements OnInit, OnDestroy {
     this.selectedApplication = null;
     this.applicationEdit = null;
     this.applicationApprovedLimit = null;
+    this.agreementShareUrl = '';
   }
 
   private clearApplicationDocumentPreview() {

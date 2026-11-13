@@ -113,6 +113,46 @@ class CreditCardRequestControllerTest {
     }
 
     @Test
+    void guestTrackingShowsOnlyMaskedCardInformationBeforeOtpVerification() {
+        CreditCardRequest request = new CreditCardRequest();
+        request.setApplicationId("CC2026ABCDEF1234");
+        request.setStatus("Approved");
+        request.setGuestCardNumber("4111111111111111");
+        request.setGuestCardExpiry("12/29");
+        request.setGuestCardCvv("123");
+        when(service.trackGuestApplication("CC2026ABCDEF1234", "ABCDE1234F", "9876543210"))
+                .thenReturn(request);
+
+        var response = controller.trackGuest(new CreditCardRequestController.TrackingRequest(
+                "CC2026ABCDEF1234", "ABCDE1234F", "9876543210"));
+
+        assertEquals(200, response.getStatusCode().value());
+        var status = (java.util.Map<?, ?>) response.getBody();
+        assertEquals(true, status.get("cardDetailsAvailable"));
+        assertEquals("**** **** **** 1111", status.get("maskedCardNumber"));
+        assertFalse(status.containsValue("4111111111111111"));
+        assertFalse(status.containsValue("12/29"));
+        assertFalse(status.containsValue("123"));
+    }
+
+    @Test
+    void fullGuestCardDetailsResponseIsNotCacheable() {
+        when(service.verifyGuestCardDetailsOtp("CC2026ABCDEF1234", "ABCDE1234F", "9876543210", "123456"))
+                .thenReturn(java.util.Map.of(
+                        "cardNumber", "4111111111111111",
+                        "expiryDate", "12/29",
+                        "cvv", "123",
+                        "approvedLimit", 42000d));
+
+        var response = controller.verifyGuestCardDetailsOtp(
+                new CreditCardRequestController.CardDetailsOtpRequest(
+                        "CC2026ABCDEF1234", "ABCDE1234F", "9876543210", "123456"));
+
+        assertEquals(200, response.getStatusCode().value());
+        assertEquals("no-store, no-cache, must-revalidate", response.getHeaders().getCacheControl());
+    }
+
+    @Test
     void nonStaffCannotViewApplicationDocuments() {
         var response = controller.getApplicationDocument(
                 17L, "pan", authenticated(new SessionPrincipal(5L, "ACC123", "USER")));

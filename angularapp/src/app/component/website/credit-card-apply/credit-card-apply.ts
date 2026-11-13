@@ -9,6 +9,9 @@ interface GuestApplicationResult {
   applicationId: string;
   status: string;
   requestDate: string;
+  predictedCibil: number;
+  rejectionReason?: string;
+  scoreNotice: string;
 }
 
 interface GuestApplicationStatus {
@@ -17,7 +20,27 @@ interface GuestApplicationStatus {
   requestDate: string;
   processedDate?: string | null;
   approvedLimit?: number | null;
+  predictedCibil?: number | null;
+  rejectionReason?: string | null;
+  scoreNotice?: string;
   cardIssued: boolean;
+  cardDetailsAvailable: boolean;
+  maskedCardNumber?: string;
+}
+
+interface CreditScorePreview {
+  predictedCibil: number;
+  eligibility: string;
+  suggestedLimit: number;
+  cardType: string;
+  scoreNotice: string;
+}
+
+interface GuestCardDetails {
+  cardNumber: string;
+  expiryDate: string;
+  cvv: string;
+  approvedLimit: number;
 }
 
 @Component({
@@ -55,11 +78,23 @@ export class CreditCardApply implements OnDestroy {
   isCameraOpen = false;
   isSubmitting = false;
   isTracking = false;
+  isSendingCardOtp = false;
+  isVerifyingCardOtp = false;
+  isCheckingCreditScore = false;
+  cardDetailsOtpSent = false;
+  cardOtp = '';
   errorMessage = '';
   trackingError = '';
+  cardDetailsError = '';
+  cardOtpMessage = '';
+  scorePreviewError = '';
   submittedApplication: GuestApplicationResult | null = null;
   trackedApplication: GuestApplicationStatus | null = null;
+  revealedGuestCard: GuestCardDetails | null = null;
+  scorePreview: CreditScorePreview | null = null;
+  private lastScorePreviewKey = '';
   private cameraStream: MediaStream | null = null;
+  private cardDetailsTimeout: ReturnType<typeof setTimeout> | null = null;
   private readonly isBrowser: boolean;
 
   constructor(
@@ -71,6 +106,7 @@ export class CreditCardApply implements OnDestroy {
 
   ngOnDestroy(): void {
     this.stopCamera();
+    this.clearCardDetailsTimeout();
   }
 
   searchCompanies(): void {
@@ -174,6 +210,38 @@ export class CreditCardApply implements OnDestroy {
       return;
     }
 
+    checkCreditScore(): void {
+      const pan = this.application.pan.trim().toUpperCase();
+      const income = this.application.annualIncome;
+      if (!/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(pan) || income === null || income <= 0) {
+        return;
+      }
+      const key = `${pan}|${income}`;
+      if (key === this.lastScorePreviewKey || this.isCheckingCreditScore) {
+        return;
+      }
+      this.isCheckingCreditScore = true;
+      this.scorePreviewError = '';
+      const params = new HttpParams().set('pan', pan).set('income', String(income));
+      this.http.post<CreditScorePreview>(`${this.apiUrl}/preview`, null, { params }).subscribe({
+        next: preview => {
+          this.scorePreview = preview;
+          this.lastScorePreviewKey = key;
+          this.isCheckingCreditScore = false;
+        },
+        error: error => {
+          this.scorePreviewError = error.error?.message || 'The simulated score estimate is unavailable.';
+          this.isCheckingCreditScore = false;
+        }
+      });
+    }
+
+    resetCreditScorePreview(): void {
+      this.scorePreview = null;
+      this.scorePreviewError = '';
+      this.lastScorePreviewKey = '';
+    }
+
     const body = new FormData();
     Object.entries(this.application).forEach(([key, value]) => {
       body.append(key, value === null ? '' : String(value));
@@ -200,6 +268,11 @@ export class CreditCardApply implements OnDestroy {
 
   trackApplication(): void {
     this.trackingError = '';
+    this.cardDetailsError = '';
+    this.cardOtpMessage = '';
+    this.cardDetailsOtpSent = false;
+    this.cardOtp = '';
+    this.clearRevealedCard();
     this.trackedApplication = null;
     this.isTracking = true;
     this.http.post<GuestApplicationStatus>(`${this.apiUrl}/track`, {
@@ -217,6 +290,68 @@ export class CreditCardApply implements OnDestroy {
         this.isTracking = false;
       }
     });
+  }
+
+  requestGuestCardDetailsOtp(): void {
+    this.cardDetailsError = '';
+    this.cardOtpMessage = '';
+    this.isSendingCardOtp = true;
+    this.http.post<{ message: string }>(`${this.apiUrl}/guest/card-details/request-otp`, this.trackingPayload())
+      .subscribe({
+        next: result => {
+          this.cardDetailsOtpSent = true;
+          this.cardOtpMessage = result.message;
+          this.isSendingCardOtp = false;
+        },
+        error: error => {
+          this.cardDetailsError = error.error?.message || 'The verification code could not be sent.';
+          this.isSendingCardOtp = false;
+        }
+      });
+  }
+
+  verifyGuestCardDetailsOtp(): void {
+    this.cardDetailsError = '';
+    this.isVerifyingCardOtp = true;
+    this.http.post<GuestCardDetails>(`${this.apiUrl}/guest/card-details/verify-otp`, {
+      ...this.trackingPayload(),
+      otp: this.cardOtp.trim()
+    }).subscribe({
+      next: details => {
+        this.revealedGuestCard = {
+          ...details,
+          cardNumber: details.cardNumber.replace(/(\d{4})(?=\d)/g, '$1 ')
+        };
+        this.cardOtp = '';
+        this.isVerifyingCardOtp = false;
+        this.clearCardDetailsTimeout();
+        this.cardDetailsTimeout = setTimeout(() => this.clearRevealedCard(), 60_000);
+      },
+      error: error => {
+        this.cardDetailsError = error.error?.message || 'The verification code could not be verified.';
+        this.isVerifyingCardOtp = false;
+      }
+    });
+  }
+
+  private trackingPayload(): { applicationId: string; pan: string; mobileNumber: string } {
+    return {
+      applicationId: this.tracking.applicationId.trim().toUpperCase(),
+      pan: this.tracking.pan.trim().toUpperCase(),
+      mobileNumber: this.tracking.mobileNumber.trim()
+    };
+  }
+
+  private clearRevealedCard(): void {
+    this.revealedGuestCard = null;
+    this.clearCardDetailsTimeout();
+  }
+
+  private clearCardDetailsTimeout(): void {
+    if (this.cardDetailsTimeout !== null) {
+      clearTimeout(this.cardDetailsTimeout);
+      this.cardDetailsTimeout = null;
+    }
   }
 
   private stopCamera(): void {

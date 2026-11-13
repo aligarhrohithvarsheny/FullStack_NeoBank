@@ -88,7 +88,10 @@ public class CreditCardRequestController {
             return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
                     "applicationId", saved.getApplicationId(),
                     "status", saved.getStatus(),
-                    "requestDate", saved.getRequestDate()));
+                    "requestDate", saved.getRequestDate(),
+                    "predictedCibil", saved.getPredictedCibil(),
+                    "rejectionReason", saved.getRejectionReason() == null ? "" : saved.getRejectionReason(),
+                    "scoreNotice", "Simulated estimate based on PAN pattern and declared income; not a bureau score."));
         } catch (IllegalArgumentException ex) {
             return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));
         } catch (IllegalStateException ex) {
@@ -108,9 +111,91 @@ public class CreditCardRequestController {
         status.put("requestDate", request.getRequestDate());
         status.put("processedDate", request.getProcessedDate());
         status.put("approvedLimit", request.getApprovedLimit());
-        status.put("cardIssued", request.getAccountNumber() != null
-                && "Approved".equalsIgnoreCase(request.getStatus()));
+        status.put("predictedCibil", request.getPredictedCibil());
+        status.put("rejectionReason", request.getRejectionReason());
+        status.put("scoreNotice", "Simulated estimate based on PAN pattern and declared income; not a bureau score.");
+        boolean approved = "Approved".equalsIgnoreCase(request.getStatus());
+        status.put("cardIssued", approved && (request.getAccountNumber() != null
+                || request.getGuestCardNumber() != null));
+        status.put("cardDetailsAvailable", approved && request.getGuestCardNumber() != null);
+        if (request.getGuestCardNumber() != null) {
+            status.put("maskedCardNumber", "**** **** **** " + request.getGuestCardNumber().substring(12));
+        }
         return ResponseEntity.ok(status);
+    }
+
+    @GetMapping("/agreement/{token}")
+    public ResponseEntity<?> creditCardAgreementDetails(@PathVariable String token) {
+        try {
+            return ResponseEntity.ok(service.creditCardAgreementDetails(token));
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));
+        }
+    }
+
+    @GetMapping("/agreement/{token}/captcha")
+    public ResponseEntity<?> creditCardAgreementCaptcha(@PathVariable String token) {
+        try {
+            return ResponseEntity.ok(service.createCreditCardAgreementCaptcha(token));
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));
+        }
+    }
+
+    @PostMapping("/agreement/{token}/sign")
+    public ResponseEntity<?> signCreditCardAgreement(
+            @PathVariable String token, @RequestBody AgreementSignRequest body,
+            jakarta.servlet.http.HttpServletRequest httpRequest) {
+        if (body == null) return ResponseEntity.badRequest().build();
+        try {
+            CreditCardRequestService.AgreementSignResult result = service.signCreditCardAgreement(
+                    token, body.challengeId(), body.captchaAnswer(), body.signedName(), body.consent(),
+                    httpRequest.getRemoteAddr());
+            if (!result.signed()) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "message", "CAPTCHA is incorrect or expired. Refresh the CAPTCHA and try again."));
+            }
+            return ResponseEntity.ok(Map.of(
+                    "status", "Approved",
+                    "cardIssued", true,
+                    "cardDetailsAvailable", result.guestCard(),
+                    "message", "Your demo signature was recorded and the approved card was generated."));
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));
+        }
+    }
+
+    @PostMapping("/guest/card-details/request-otp")
+    public ResponseEntity<?> requestGuestCardDetailsOtp(@RequestBody TrackingRequest body) {
+        if (body == null) return ResponseEntity.badRequest().build();
+        try {
+            String maskedEmail = service.requestGuestCardDetailsOtp(
+                    body.applicationId(), body.pan(), body.mobileNumber());
+            return ResponseEntity.ok(Map.of(
+                    "message", "A verification code was sent to " + maskedEmail + ".",
+                    "expiresInSeconds", 120));
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));
+        } catch (IllegalStateException ex) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("message", ex.getMessage()));
+        }
+    }
+
+    @PostMapping("/guest/card-details/verify-otp")
+    public ResponseEntity<?> verifyGuestCardDetailsOtp(@RequestBody CardDetailsOtpRequest body) {
+        if (body == null) return ResponseEntity.badRequest().build();
+        try {
+            Map<String, Object> details = service.verifyGuestCardDetailsOtp(
+                    body.applicationId(), body.pan(), body.mobileNumber(), body.otp());
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CACHE_CONTROL, "no-store, no-cache, must-revalidate")
+                    .header(HttpHeaders.PRAGMA, "no-cache")
+                    .body(details);
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));
+        } catch (IllegalStateException ex) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("message", ex.getMessage()));
+        }
     }
 
     @GetMapping("/companies")
@@ -200,12 +285,34 @@ public class CreditCardRequestController {
             return ResponseEntity.badRequest().body(Map.of("message", "An approved credit limit is required."));
         }
         try {
-            CreditCardRequest approved = service.approveRequest(id, String.valueOf(principal.userId()), body.approvedLimit());
-            return approved != null ? ResponseEntity.ok(approved) : ResponseEntity.notFound().build();
+            CreditCardRequestService.ApprovalResult result =
+                    service.approveRequest(id, String.valueOf(principal.userId()), body.approvedLimit());
+            if (result == null) return ResponseEntity.notFound().build();
+            if ("Rejected".equalsIgnoreCase(result.application().getStatus())) {
+                return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
+                        "message", result.application().getRejectionReason(),
+                        "application", result.application()));
+            }
+            return ResponseEntity.ok(Map.of(
+                    "application", result.application(),
+                    "shareUrl", result.shareUrl(),
+                    "expiresAt", result.expiresAt()));
         } catch (IllegalArgumentException | IllegalStateException ex) {
             return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));
         } catch (RuntimeException ex) {
             return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("message", ex.getMessage()));
+        }
+    }
+
+    @PostMapping("/admin/{id}/agreement-link")
+    public ResponseEntity<?> renewCreditCardAgreementLink(
+            @PathVariable Long id, Authentication authentication) {
+        if (!isStaff(authentication)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        try {
+            CreditCardRequestService.AgreementLinkResult result = service.renewCreditCardAgreementLink(id);
+            return ResponseEntity.ok(Map.of("shareUrl", result.shareUrl(), "expiresAt", result.expiresAt()));
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));
         }
     }
 
@@ -231,13 +338,14 @@ public class CreditCardRequestController {
 
     @PostMapping("/preview")
     public ResponseEntity<?> preview(@RequestParam String pan, @RequestParam(required = false) Double income) {
-        try {
-            // Get comprehensive credit card prediction
-            java.util.Map<String, Object> prediction = service.getCreditCardPrediction(pan, income != null ? income : 0.0);
-            return ResponseEntity.ok(prediction);
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().build();
+        if (pan == null || !pan.trim().matches("(?i)[A-Z]{5}[0-9]{4}[A-Z]")) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Enter a valid 10-character PAN."));
         }
+        if (income == null || !Double.isFinite(income) || income <= 0 || income > 1_000_000_000d) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Enter a valid annual income."));
+        }
+        return ResponseEntity.ok(service.getCreditCardPrediction(
+                pan.trim().toUpperCase(java.util.Locale.ROOT), income));
     }
 
     private SessionPrincipal userPrincipal(Authentication authentication) {
@@ -279,6 +387,8 @@ public class CreditCardRequestController {
     public record AdminApplicationSubmission(String accountNumber, String pan, Double annualIncome) {}
     public record ApprovalRequest(Double approvedLimit) {}
     public record TrackingRequest(String applicationId, String pan, String mobileNumber) {}
+    public record AgreementSignRequest(String challengeId, String captchaAnswer, String signedName, boolean consent) {}
+    public record CardDetailsOtpRequest(String applicationId, String pan, String mobileNumber, String otp) {}
     public record GuestApplicationUpdate(String userName, String userEmail, String pan, Double annualIncome,
                                          String mobileNumber, String dateOfBirth, String aadhaarLastFour,
                                          String address, String employmentType, String employerName,

@@ -8,21 +8,29 @@ import com.neo.springapp.repository.CardRepository;
 import com.neo.springapp.repository.CreditCardRepository;
 import com.neo.springapp.repository.CreditCardRequestRepository;
 import com.neo.springapp.repository.SalaryAccountRepository;
+import com.neo.springapp.repository.VirtualCardRepository;
 import com.neo.springapp.service.CreditCardApplicationDocumentService;
+import com.neo.springapp.service.EmailService;
 import org.springframework.mock.web.MockMultipartFile;
 import org.junit.jupiter.api.Test;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 class CreditCardRequestServiceTest {
 
     @Test
-    void storesApplicationDataWithoutAssigningOrPredictingALimit() {
+    void storesApplicationDataWithSimulatedCreditScore() {
         CreditCardRequestRepository requestRepository = mock(CreditCardRequestRepository.class);
         CreditCardRepository creditCardRepository = mock(CreditCardRepository.class);
         CreditCardRequestService service = createService(requestRepository, creditCardRepository);
@@ -37,8 +45,28 @@ class CreditCardRequestServiceTest {
         assertEquals("ABCDE1234F", saved.getPan());
         assertEquals(84000d, saved.getAnnualIncome());
         assertNull(saved.getApprovedLimit());
-        assertNull(saved.getSuggestedLimit());
-        assertNull(saved.getPanBasedLimit());
+        assertEquals(783, saved.getPredictedCibil());
+        assertNotNull(saved.getSuggestedLimit());
+        assertNotNull(saved.getPanBasedLimit());
+    }
+
+    @Test
+    void rejectsScoresBelowSevenHundredFiftyWithAnAdminVisibleReason() {
+        CreditCardRequestRepository requestRepository = mock(CreditCardRequestRepository.class);
+        when(requestRepository.findByAccountNumberOrderByRequestDateDesc("ACC123")).thenReturn(List.of());
+        when(requestRepository.save(any(CreditCardRequest.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        CreditCardRequest request = application("ABCDE0000F");
+        request.setAnnualIncome(84000d);
+
+        CreditCardRequest saved = createService(requestRepository, mock(CreditCardRepository.class))
+                .saveRequest(request, 84000d);
+
+        assertEquals(749, saved.getPredictedCibil());
+        assertEquals("Rejected", saved.getStatus());
+        assertTrue(saved.getRejectionReason().contains("minimum score"));
+        assertTrue(saved.getRejectionReason().contains("No credit-bureau lookup"));
+        assertNotNull(saved.getDocumentsDeleteAfter());
     }
 
     @Test
@@ -70,14 +98,13 @@ class CreditCardRequestServiceTest {
         when(creditCardRepository.findByAccountNumber("ACC123")).thenReturn(List.of());
         when(creditCardRepository.save(any(CreditCard.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
-        CreditCardRequest approved = service.approveRequest(17L, "admin-9", 42000d);
+        CreditCardRequestService.ApprovalResult result = service.approveRequest(17L, "admin-9", 42000d);
 
-        assertEquals("Approved", approved.getStatus());
-        assertEquals(42000d, approved.getApprovedLimit());
-        var cardCaptor = org.mockito.ArgumentCaptor.forClass(CreditCard.class);
-        verify(creditCardRepository).save(cardCaptor.capture());
-        assertEquals(42000d, cardCaptor.getValue().getApprovedLimit());
-        assertEquals(42000d, cardCaptor.getValue().getAvailableLimit());
+        assertEquals("Pending Signature", result.application().getStatus());
+        assertEquals(42000d, result.application().getApprovedLimit());
+        assertTrue(result.shareUrl().startsWith("https://bank.example/credit-card-esign/"));
+        assertNotNull(result.expiresAt());
+        verify(creditCardRepository, never()).save(any(CreditCard.class));
     }
 
     @Test
@@ -112,42 +139,214 @@ class CreditCardRequestServiceTest {
     }
 
     @Test
-    void guestApprovalRecordsTheLimitWithoutCreatingAnAccountOrCard() {
+    void cardIsGeneratedAtTheRequestedLimitOnlyAfterGuestSignsTheAgreement() {
         CreditCardRequestRepository requestRepository = mock(CreditCardRequestRepository.class);
         CreditCardRepository creditCardRepository = mock(CreditCardRepository.class);
         CreditCardRequestService service = createService(requestRepository, creditCardRepository);
         CreditCardRequest request = new CreditCardRequest();
         request.setId(22L);
         request.setApplicationId("CC2026ABCDEF1234");
+        request.setUserName("Guest applicant");
+        request.setUserEmail("guest@example.com");
+        request.setPan("ABCDE1234F");
+        request.setPredictedCibil(800);
         request.setStatus("Pending");
         when(requestRepository.findById(22L)).thenReturn(Optional.of(request));
+        when(requestRepository.findByCardAgreementTokenHash(anyString())).thenAnswer(invocation ->
+                request.getCardAgreementTokenHash().equals(invocation.getArgument(0)) ? request : null);
         when(requestRepository.save(any(CreditCardRequest.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
-        CreditCardRequest approved = service.approveRequest(22L, "admin-9", 42000d);
+        CreditCardRequestService.ApprovalResult approval = service.approveRequest(22L, "admin-9", 42000d);
 
-        assertEquals("Approved", approved.getStatus());
-        assertEquals(42000d, approved.getApprovedLimit());
-        assertNull(approved.getAccountNumber());
-        assertNotNull(approved.getDocumentsDeleteAfter());
-        verifyNoInteractions(creditCardRepository);
+        assertEquals("Pending Signature", approval.application().getStatus());
+        assertEquals(42000d, approval.application().getApprovedLimit());
+        assertNull(approval.application().getGuestCardNumber());
+        String token = approval.shareUrl().substring(approval.shareUrl().lastIndexOf('/') + 1);
+        request.setAgreementCaptchaChallengeId("captcha-1");
+        request.setAgreementCaptchaAnswerHash(hash("ABC234"));
+        request.setAgreementCaptchaExpiresAt(LocalDateTime.now().plusMinutes(5));
+
+        CreditCardRequestService.AgreementSignResult signature = service.signCreditCardAgreement(
+                token, "captcha-1", "abc234", "Guest applicant", true, "127.0.0.1");
+
+        assertTrue(signature.signed());
+        assertTrue(signature.guestCard());
+        assertEquals("Approved", request.getStatus());
+        assertEquals(42000d, request.getApprovedLimit());
+        assertTrue(request.getGuestCardNumber().matches("4[0-9]{15}"));
+        assertTrue(hasValidLuhnChecksum(request.getGuestCardNumber()));
+        assertTrue(request.getGuestCardExpiry().matches("(0[1-9]|1[0-2])/\\d{2}"));
+        assertTrue(request.getGuestCardCvv().matches("[0-9]{3}"));
+        assertNotNull(request.getCardAgreementSignatureHash());
+        assertNull(request.getCardAgreementTokenHash());
+        assertNotNull(request.getDocumentsDeleteAfter());
+        verify(creditCardRepository, never()).save(any(CreditCard.class));
+    }
+
+    @Test
+    void approvedGuestCardDetailsAreReturnedOnlyAfterEmailOtpVerification() {
+        CreditCardRequestRepository requestRepository = mock(CreditCardRequestRepository.class);
+        OtpService otpService = mock(OtpService.class);
+        CreditCardRequest request = approvedGuestRequest();
+        request.setCardDetailsOtpSentAt(LocalDateTime.now());
+        when(requestRepository.findByApplicationId(request.getApplicationId())).thenReturn(request);
+        when(requestRepository.save(any(CreditCardRequest.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(otpService.verifyOtpByKey("CREDIT_CARD_GUEST:" + request.getApplicationId(), "123456"))
+                .thenReturn(true);
+        CreditCardRequestService service = createService(
+                requestRepository, mock(CreditCardRepository.class), mock(CreditCardApplicationDocumentService.class), otpService);
+
+        Map<String, Object> details = service.verifyGuestCardDetailsOtp(
+                request.getApplicationId(), "ABCDE1234F", "9876543210", "123456");
+
+        assertEquals(request.getGuestCardNumber(), details.get("cardNumber"));
+        assertEquals(request.getGuestCardExpiry(), details.get("expiryDate"));
+        assertEquals(request.getGuestCardCvv(), details.get("cvv"));
+        assertEquals(42000d, details.get("approvedLimit"));
+        assertNull(request.getCardDetailsOtpSentAt());
+        verify(otpService).verifyOtpByKey("CREDIT_CARD_GUEST:" + request.getApplicationId(), "123456");
+    }
+
+    @Test
+    void guestCardOtpIsSentToTheApplicationEmailWithoutReturningTheCode() {
+        CreditCardRequestRepository requestRepository = mock(CreditCardRequestRepository.class);
+        OtpService otpService = mock(OtpService.class);
+        CreditCardRequest request = approvedGuestRequest();
+        when(requestRepository.findByApplicationId(request.getApplicationId())).thenReturn(request);
+        when(requestRepository.save(any(CreditCardRequest.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(otpService.sendOtpForKey(
+                "guest@example.com", "CREDIT_CARD_GUEST:" + request.getApplicationId(),
+                "NeoBank credit card details verification")).thenReturn("123456");
+        CreditCardRequestService service = createService(
+                requestRepository, mock(CreditCardRepository.class), mock(CreditCardApplicationDocumentService.class), otpService);
+
+        String maskedEmail = service.requestGuestCardDetailsOtp(
+                request.getApplicationId(), "ABCDE1234F", "9876543210");
+
+        assertEquals("g***@example.com", maskedEmail);
+        assertFalse(maskedEmail.contains("123456"));
+        assertNotNull(request.getCardDetailsOtpSentAt());
+        verify(otpService).sendOtpForKey(
+                "guest@example.com", "CREDIT_CARD_GUEST:" + request.getApplicationId(),
+                "NeoBank credit card details verification");
+    }
+
+    @Test
+    void failedGuestCardOtpIncrementsAttemptsAndDoesNotReturnCardDetails() {
+        CreditCardRequestRepository requestRepository = mock(CreditCardRequestRepository.class);
+        OtpService otpService = mock(OtpService.class);
+        CreditCardRequest request = approvedGuestRequest();
+        request.setCardDetailsOtpSentAt(LocalDateTime.now());
+        when(requestRepository.findByApplicationId(request.getApplicationId())).thenReturn(request);
+        when(requestRepository.save(any(CreditCardRequest.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(otpService.verifyOtpByKey(anyString(), eq("000000"))).thenReturn(false);
+        CreditCardRequestService service = createService(
+                requestRepository, mock(CreditCardRepository.class), mock(CreditCardApplicationDocumentService.class), otpService);
+
+        assertThrows(IllegalArgumentException.class, () -> service.verifyGuestCardDetailsOtp(
+                request.getApplicationId(), "ABCDE1234F", "9876543210", "000000"));
+
+        assertEquals(1, request.getCardDetailsOtpAttempts());
+        verify(requestRepository).save(request);
+    }
+
+    @Test
+    void cardDetailsOtpLocksAfterFiveFailedAttempts() {
+        CreditCardRequestRepository requestRepository = mock(CreditCardRequestRepository.class);
+        OtpService otpService = mock(OtpService.class);
+        CreditCardRequest request = approvedGuestRequest();
+        request.setCardDetailsOtpSentAt(LocalDateTime.now());
+        request.setCardDetailsOtpAttempts(4);
+        when(requestRepository.findByApplicationId(request.getApplicationId())).thenReturn(request);
+        when(requestRepository.save(any(CreditCardRequest.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(otpService.verifyOtpByKey(anyString(), eq("000000"))).thenReturn(false);
+        CreditCardRequestService service = createService(
+                requestRepository, mock(CreditCardRepository.class), mock(CreditCardApplicationDocumentService.class), otpService);
+
+        assertThrows(IllegalArgumentException.class, () -> service.verifyGuestCardDetailsOtp(
+                request.getApplicationId(), "ABCDE1234F", "9876543210", "000000"));
+
+        assertEquals(5, request.getCardDetailsOtpAttempts());
+        assertTrue(request.getCardDetailsOtpLockedUntil().isAfter(LocalDateTime.now()));
     }
 
     private CreditCardRequestService createService(CreditCardRequestRepository requestRepository,
                                                    CreditCardRepository creditCardRepository) {
-        return createService(requestRepository, creditCardRepository, mock(CreditCardApplicationDocumentService.class));
+        return createService(requestRepository, creditCardRepository,
+                mock(CreditCardApplicationDocumentService.class), mock(OtpService.class));
     }
 
     private CreditCardRequestService createService(CreditCardRequestRepository requestRepository,
                                                    CreditCardRepository creditCardRepository,
                                                    CreditCardApplicationDocumentService documentService) {
+        return createService(requestRepository, creditCardRepository, documentService, mock(OtpService.class));
+    }
+
+    private CreditCardRequestService createService(CreditCardRequestRepository requestRepository,
+                                                   CreditCardRepository creditCardRepository,
+                                                   CreditCardApplicationDocumentService documentService,
+                                                   OtpService otpService) {
         Account account = new Account();
         account.setStatus("ACTIVE");
         AccountService accountService = mock(AccountService.class);
         when(accountService.getAccountByNumber("ACC123")).thenReturn(account);
-        return new CreditCardRequestService(requestRepository, mock(CreditScorePredictorService.class),
-                mock(CardRepository.class), creditCardRepository, accountService,
-                mock(SalaryAccountRepository.class), documentService);
+        EmailService emailService = mock(EmailService.class);
+        when(emailService.sendCreditCardAgreementLinkEmail(anyString(), anyString(), anyString(), anyString()))
+                .thenReturn(true);
+        return new CreditCardRequestService(requestRepository, new CreditScorePredictorService(),
+                mock(CardRepository.class), creditCardRepository, mock(VirtualCardRepository.class), accountService,
+                mock(SalaryAccountRepository.class), documentService, otpService, emailService, "https://bank.example");
+    }
+
+    private CreditCardRequest approvedGuestRequest() {
+        CreditCardRequest request = new CreditCardRequest();
+        request.setApplicationId("CC2026ABCDEF1234");
+        request.setUserEmail("guest@example.com");
+        request.setStatus("Approved");
+        request.setApprovedLimit(42000d);
+        request.setGuestCardNumber("4111111111111111");
+        request.setGuestCardExpiry("12/29");
+        request.setGuestCardCvv("123");
+        request.setTrackingCredentialHash(trackingCredentialHash(
+                request.getApplicationId(), "ABCDE1234F", "9876543210"));
+        return request;
+    }
+
+    private String trackingCredentialHash(String applicationId, String pan, String mobileNumber) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            return java.util.HexFormat.of().formatHex(digest.digest(
+                    (applicationId + "|" + pan + "|" + mobileNumber).getBytes(StandardCharsets.UTF_8)));
+        } catch (Exception exception) {
+            throw new AssertionError(exception);
+        }
+    }
+
+    private String hash(String value) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            return java.util.HexFormat.of().formatHex(digest.digest(value.getBytes(StandardCharsets.UTF_8)));
+        } catch (Exception exception) {
+            throw new AssertionError(exception);
+        }
+    }
+
+    private boolean hasValidLuhnChecksum(String cardNumber) {
+        int sum = 0;
+        for (int index = 0; index < cardNumber.length(); index++) {
+            int digit = cardNumber.charAt(index) - '0';
+            if ((cardNumber.length() - 1 - index) % 2 == 1) {
+                digit *= 2;
+                if (digit > 9) digit -= 9;
+            }
+            sum += digit;
+        }
+        return sum % 10 == 0;
     }
 
     private CreditCardRequest application(String pan) {

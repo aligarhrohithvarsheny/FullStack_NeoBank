@@ -1,0 +1,169 @@
+.card-esign-page {
+  width: min(900px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 32px 0 64px;
+  color: #1d2b3f;
+}
+
+.back-link {
+  color: #275b9a;
+  text-decoration: none;
+}
+
+header {
+  margin: 28px 0;
+}
+
+.eyebrow {
+  color: #3974b8;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+h1 {
+  margin: 8px 0;
+  font-size: clamp(1.8rem, 5vw, 2.6rem);
+}
+
+.agreement-card,
+.signed-card {
+  padding: 24px;
+  border: 1px solid #dce5ef;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 12px 32px rgba(27, 47, 74, 0.08);
+}
+
+.agreement-card h2 {
+  margin: 0 0 14px;
+}
+
+.agreement-card h2:not(:first-child) {
+  margin-top: 28px;
+}
+
+dl {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) 2fr;
+  gap: 10px 18px;
+  margin: 0;
+}
+
+dt {
+  color: #657187;
+}
+
+dd {
+  margin: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.notice {
+  padding: 12px;
+  border-radius: 8px;
+  background: #eff6ff;
+}
+
+.warning {
+  background: #fff7e6;
+}
+
+form {
+  display: grid;
+  gap: 16px;
+  margin-top: 24px;
+}
+
+form > label:not(.consent-row) {
+  display: grid;
+  gap: 6px;
+  font-weight: 600;
+}
+
+input:not([type="checkbox"]) {
+  width: 100%;
+  padding: 11px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font: inherit;
+}
+
+.captcha-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.captcha-row img {
+  width: 205px;
+  height: 58px;
+  border: 1px solid #dce5ef;
+  border-radius: 8px;
+}
+
+.consent-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.primary-button,
+.secondary-button {
+  display: inline-flex;
+  justify-content: center;
+  width: fit-content;
+  padding: 11px 16px;
+  border: 0;
+  border-radius: 8px;
+  text-decoration: none;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.primary-button {
+  background: #1763ad;
+  color: #fff;
+}
+
+.secondary-button {
+  background: #eaf1f8;
+  color: #244b74;
+}
+
+.primary-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.error-message {
+  color: #a52020;
+}
+
+.state-message {
+  color: #53647a;
+}
+
+.signed-card {
+  border-color: #b8dfc7;
+  background: #f0faf3;
+}
+
+@media (max-width: 620px) {
+  .agreement-card,
+  .signed-card {
+    padding: 18px;
+  }
+
+  dl {
+    grid-template-columns: 1fr;
+    gap: 5px;
+  }
+
+  dd {
+    margin-bottom: 8px;
+  }
+}

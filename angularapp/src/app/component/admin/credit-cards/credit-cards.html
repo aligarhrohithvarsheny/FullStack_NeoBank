@@ -57,6 +57,7 @@
         <div class="application-queue-actions">
           <select [(ngModel)]="applicationStatusFilter" (change)="loadGuestApplications()" aria-label="Application status">
             <option value="Pending">Pending</option>
+            <option value="Pending Signature">Pending Signature</option>
             <option value="Approved">Approved</option>
             <option value="Rejected">Rejected</option>
           </select>
@@ -72,7 +73,7 @@
           <thead>
             <tr>
               <th>Application ID</th><th>Applicant</th><th>PAN</th><th>Mobile</th>
-              <th>Employment</th><th>Annual income</th><th>Submitted</th><th>Review</th>
+              <th>Employment</th><th>Annual income</th><th>Simulated score</th><th>Decision</th><th>Submitted</th><th>Review</th>
             </tr>
           </thead>
           <tbody>
@@ -83,6 +84,8 @@
               <td>{{ application.mobileNumber || '—' }}</td>
               <td>{{ application.employmentType || 'Existing customer' }}</td>
               <td>₹{{ application.annualIncome | number:'1.0-0' }}</td>
+              <td>{{ application.predictedCibil ?? '—' }}</td>
+              <td>{{ application.rejectionReason || application.status }}</td>
               <td>{{ application.requestDate | date:'short' }}</td>
               <td><button type="button" class="btn-secondary" (click)="reviewApplication(application)">Review details</button></td>
             </tr>
@@ -842,17 +845,37 @@
             </label>
             <span>Status: <strong>{{ selectedApplication.status }}</strong></span>
           </div>
+          <div class="application-score-summary">
+            <strong>Simulated credit-score estimate: {{ selectedApplication.predictedCibil ?? 'Unavailable' }}</strong>
+            <p>{{ selectedApplication.rejectionReason || 'Estimate generated from PAN pattern and declared income; this is not a bureau score.' }}</p>
+            <p *ngIf="selectedApplication.predictedCibil < 750" class="score-rejection">
+              Applications below 750 are automatically rejected and cannot be approved.
+            </p>
+          </div>
+          <p *ngIf="selectedApplication.status === 'Pending Signature'" class="no-data">
+            Admin approval is complete. Card issuance is waiting for the applicant's e-signature.
+          </p>
+          <div class="agreement-share-panel" *ngIf="agreementShareUrl">
+            <label>Secure e-sign link
+              <input [value]="agreementShareUrl" readonly>
+            </label>
+            <button type="button" class="btn-secondary" (click)="copyAgreementLink()">Copy link</button>
+          </div>
           <p *ngIf="selectedApplication.status === 'Approved' && !selectedApplication.accountNumber" class="no-data">
-            Approved as a guest application. No NeoBank account or card was created.
+            Approved as a guest application after signing. The card details are available to the applicant after email verification.
           </p>
           <div class="modal-actions application-review-actions">
             <button *ngIf="selectedApplication.applicationId && selectedApplication.status === 'Pending'"
               type="button" class="btn-secondary" (click)="saveApplicationChanges()" [disabled]="isSavingApplication">
               Save edited details
             </button>
-            <button *ngIf="selectedApplication.status === 'Pending'" type="button" class="btn-success"
+            <button *ngIf="selectedApplication.status === 'Pending' && selectedApplication.predictedCibil >= 750" type="button" class="btn-success"
               (click)="approveGuestApplication()" [disabled]="isSavingApplication">
-              {{ isSavingApplication ? 'Saving...' : 'Approve and set limit' }}
+              {{ isSavingApplication ? 'Saving...' : 'Approve limit and email e-sign link' }}
+            </button>
+            <button *ngIf="selectedApplication.status === 'Pending Signature'" type="button" class="btn-secondary"
+              (click)="renewCreditCardAgreementLink()" [disabled]="isSavingApplication">
+              {{ isSavingApplication ? 'Sending...' : 'Email a new e-sign link' }}
             </button>
             <button *ngIf="selectedApplication.status === 'Pending'" type="button" class="btn-danger"
               (click)="rejectGuestApplication()" [disabled]="isSavingApplication">Reject application</button>
