@@ -93,7 +93,7 @@
               {{ selfie ? 'Retake live photo' : 'Open camera' }}
             </button>
             <button *ngIf="isCameraOpen" type="button" class="primary-button"
-              (click)="captureSelfie(selfieVideo, selfieCanvas)">Capture photo</button>
+              (click)="captureSelfie()">Capture photo</button>
           </div>
           <video #selfieVideo id="credit-card-selfie-video" *ngIf="isCameraOpen" autoplay playsinline></video>
           <img *ngIf="selfiePreview" [src]="selfiePreview" alt="Captured live selfie preview">

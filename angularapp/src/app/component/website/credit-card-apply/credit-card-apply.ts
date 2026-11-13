@@ -1,6 +1,6 @@
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { Component, Inject, OnDestroy, PLATFORM_ID } from '@angular/core';
+import { Component, ElementRef, Inject, OnDestroy, PLATFORM_ID, ViewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { environment } from '../../../../environment/environment';
@@ -28,6 +28,8 @@ interface GuestApplicationStatus {
   styleUrls: ['./credit-card-apply.css']
 })
 export class CreditCardApply implements OnDestroy {
+  @ViewChild('selfieVideo') private selfieVideo?: ElementRef<HTMLVideoElement>;
+  @ViewChild('selfieCanvas') private selfieCanvas?: ElementRef<HTMLCanvasElement>;
   readonly apiUrl = `${environment.apiBaseUrl}/api/credit-card-requests`;
   readonly maxDate = new Date().toISOString().slice(0, 10);
   application = {
@@ -114,10 +116,13 @@ export class CreditCardApply implements OnDestroy {
       });
       this.isCameraOpen = true;
       setTimeout(() => {
-        const video = document.querySelector<HTMLVideoElement>('#credit-card-selfie-video');
+        const video = this.selfieVideo?.nativeElement;
         if (video) {
           video.srcObject = this.cameraStream;
-          void video.play();
+          void video.play().catch(error => {
+            console.error('Could not play live selfie preview:', error);
+            this.errorMessage = 'The camera preview could not start.';
+          });
         }
       });
     } catch (error) {
@@ -126,7 +131,13 @@ export class CreditCardApply implements OnDestroy {
     }
   }
 
-  captureSelfie(video: HTMLVideoElement, canvas: HTMLCanvasElement): void {
+  captureSelfie(): void {
+    const video = this.selfieVideo?.nativeElement;
+    const canvas = this.selfieCanvas?.nativeElement;
+    if (!video || !canvas) {
+      this.errorMessage = 'The camera preview is not ready.';
+      return;
+    }
     if (!video.videoWidth || !video.videoHeight) {
       this.errorMessage = 'Wait for the camera preview to load, then capture your photo.';
       return;

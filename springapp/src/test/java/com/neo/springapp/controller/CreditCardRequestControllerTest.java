@@ -14,7 +14,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import java.util.List;
 import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
@@ -87,6 +87,35 @@ class CreditCardRequestControllerTest {
         var response = controller.approve(12L,
                 new CreditCardRequestController.ApprovalRequest(50000d),
                 authenticated(new SessionPrincipal(5L, "ACC123", "USER")));
+
+        assertEquals(403, response.getStatusCode().value());
+        verifyNoInteractions(service);
+    }
+
+    @Test
+    void guestTrackingRequiresTheApplicationIdPanAndMobileNumber() {
+        CreditCardRequest request = new CreditCardRequest();
+        request.setApplicationId("CC2026ABCDEF1234");
+        request.setStatus("Pending");
+        request.setPan("ABCDE1234F");
+        request.setMobileNumber("9876543210");
+        when(service.trackGuestApplication("CC2026ABCDEF1234", "ABCDE1234F", "9876543210"))
+                .thenReturn(request);
+
+        var response = controller.trackGuest(new CreditCardRequestController.TrackingRequest(
+                "CC2026ABCDEF1234", "ABCDE1234F", "9876543210"));
+
+        assertEquals(200, response.getStatusCode().value());
+        var status = (java.util.Map<?, ?>) response.getBody();
+        assertEquals("Pending", status.get("status"));
+        assertFalse(status.containsKey("pan"));
+        assertFalse(status.containsKey("mobileNumber"));
+    }
+
+    @Test
+    void nonStaffCannotViewApplicationDocuments() {
+        var response = controller.getApplicationDocument(
+                17L, "pan", authenticated(new SessionPrincipal(5L, "ACC123", "USER")));
 
         assertEquals(403, response.getStatusCode().value());
         verifyNoInteractions(service);

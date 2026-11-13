@@ -61,21 +61,21 @@ public class CreditCardRequestController {
 
     @PostMapping(value = "/guest", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<?> createGuest(
-            @RequestParam String userName,
-            @RequestParam String userEmail,
-            @RequestParam String mobileNumber,
-            @RequestParam String pan,
-            @RequestParam String aadhaarLastFour,
-            @RequestParam String dateOfBirth,
-            @RequestParam Double annualIncome,
-            @RequestParam String employmentType,
-            @RequestParam String employerName,
-            @RequestParam String designation,
-            @RequestParam String address,
-            @RequestParam(defaultValue = "false") boolean consent,
-            @RequestParam MultipartFile panDocument,
-            @RequestParam MultipartFile aadhaarDocument,
-            @RequestParam MultipartFile selfie) {
+            @RequestParam("userName") String userName,
+            @RequestParam("userEmail") String userEmail,
+            @RequestParam("mobileNumber") String mobileNumber,
+            @RequestParam("pan") String pan,
+            @RequestParam("aadhaarLastFour") String aadhaarLastFour,
+            @RequestParam("dateOfBirth") String dateOfBirth,
+            @RequestParam("annualIncome") Double annualIncome,
+            @RequestParam("employmentType") String employmentType,
+            @RequestParam("employerName") String employerName,
+            @RequestParam("designation") String designation,
+            @RequestParam("address") String address,
+            @RequestParam(value = "consent", defaultValue = "false") boolean consent,
+            @RequestParam("panDocument") MultipartFile panDocument,
+            @RequestParam("aadhaarDocument") MultipartFile aadhaarDocument,
+            @RequestParam("selfie") MultipartFile selfie) {
         CreditCardRequest request = new CreditCardRequest();
         request.setUserName(userName);
         request.setUserEmail(userEmail);
@@ -116,8 +116,10 @@ public class CreditCardRequestController {
     @GetMapping("/companies")
     public ResponseEntity<List<String>> companySuggestions(
             @RequestParam(defaultValue = "") String query) {
-        if (query.length() < 2) return ResponseEntity.ok(List.of());
-        return ResponseEntity.ok(salaryAccountRepository.findCompanyNameSuggestions(query.trim()).stream()
+        String normalizedQuery = query.trim();
+        if (normalizedQuery.length() < 2) return ResponseEntity.ok(List.of());
+        if (normalizedQuery.length() > 100) return ResponseEntity.badRequest().build();
+        return ResponseEntity.ok(salaryAccountRepository.findCompanyNameSuggestions(normalizedQuery).stream()
                 .limit(30).toList());
     }
 

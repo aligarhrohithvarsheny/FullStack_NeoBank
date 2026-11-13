@@ -93,6 +93,7 @@ public class CreditCardApplicationDocumentService {
     }
 
     private Path applicationDirectory(String applicationId) {
+        if (!isValidApplicationId(applicationId)) throw new IllegalArgumentException("Invalid application ID.");
         Path root = Paths.get(uploadDirectory).toAbsolutePath().normalize();
         Path directory = root.resolve(applicationId).normalize();
         if (!directory.startsWith(root)) throw new IllegalArgumentException("Invalid application ID.");

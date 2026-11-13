@@ -89,6 +89,8 @@ class CreditCardRequestServiceTest {
         when(requestRepository.save(any(CreditCardRequest.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
         CreditCardRequest request = new CreditCardRequest();
+        when(requestRepository.findByApplicationId(anyString())).thenAnswer(invocation ->
+                request.getApplicationId().equals(invocation.getArgument(0)) ? request : null);
         request.setUserName("Guest applicant");
         request.setUserEmail("guest@example.com");
         request.setPan("abcde1234f");
@@ -116,7 +118,7 @@ class CreditCardRequestServiceTest {
         CreditCardRequestService service = createService(requestRepository, creditCardRepository);
         CreditCardRequest request = new CreditCardRequest();
         request.setId(22L);
-        request.setApplicationId("CC2026ABCDEF123456");
+        request.setApplicationId("CC2026ABCDEF1234");
         request.setStatus("Pending");
         when(requestRepository.findById(22L)).thenReturn(Optional.of(request));
         when(requestRepository.save(any(CreditCardRequest.class)))
