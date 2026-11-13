@@ -48,6 +48,49 @@
       </div>
     </div>
 
+    <section class="guest-application-queue">
+      <div class="application-queue-heading">
+        <div>
+          <h3>Credit card applications</h3>
+          <p>Review applicant details and private identity images. Documents are removed 90 days after a decision.</p>
+        </div>
+        <div class="application-queue-actions">
+          <select [(ngModel)]="applicationStatusFilter" (change)="loadGuestApplications()" aria-label="Application status">
+            <option value="Pending">Pending</option>
+            <option value="Approved">Approved</option>
+            <option value="Rejected">Rejected</option>
+          </select>
+          <button type="button" class="btn-secondary" (click)="loadGuestApplications()" [disabled]="isLoadingApplications">
+            {{ isLoadingApplications ? 'Loading...' : 'Refresh applications' }}
+          </button>
+        </div>
+      </div>
+      <p *ngIf="isLoadingApplications" class="no-data">Loading applications...</p>
+      <p *ngIf="!isLoadingApplications && guestApplications.length === 0" class="no-data">No {{ applicationStatusFilter.toLowerCase() }} applications.</p>
+      <div class="application-table-wrap" *ngIf="!isLoadingApplications && guestApplications.length">
+        <table class="application-table">
+          <thead>
+            <tr>
+              <th>Application ID</th><th>Applicant</th><th>PAN</th><th>Mobile</th>
+              <th>Employment</th><th>Annual income</th><th>Submitted</th><th>Review</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let application of guestApplications">
+              <td>{{ application.applicationId || ('#' + application.id) }}</td>
+              <td>{{ application.userName }}</td>
+              <td>{{ application.pan }}</td>
+              <td>{{ application.mobileNumber || '—' }}</td>
+              <td>{{ application.employmentType || 'Existing customer' }}</td>
+              <td>₹{{ application.annualIncome | number:'1.0-0' }}</td>
+              <td>{{ application.requestDate | date:'short' }}</td>
+              <td><button type="button" class="btn-secondary" (click)="reviewApplication(application)">Review details</button></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
     <div class="filters-bar">
       <select [(ngModel)]="creditCardStatusFilter" (change)="filterCreditCards()">
         <option value="ALL">All Status</option>
@@ -744,6 +787,75 @@
               <i class="fa fa-check"></i> {{ isTransferring ? 'Processing...' : 'Confirm Transfer' }}
             </button>
             <button class="btn-secondary" (click)="showTransferModal = false" [disabled]="isTransferring">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-overlay" *ngIf="selectedApplication" (click)="closeApplicationReview()">
+      <div class="modal-content application-review-modal" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <div>
+            <h3>Application review</h3>
+            <p>{{ selectedApplication.applicationId || ('Existing customer application #' + selectedApplication.id) }}</p>
+          </div>
+          <button class="close-btn" type="button" (click)="closeApplicationReview()">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="application-review-grid" *ngIf="applicationEdit">
+            <label>Full name<input [(ngModel)]="applicationEdit.userName" [readonly]="!selectedApplication.applicationId"></label>
+            <label>Email<input type="email" [(ngModel)]="applicationEdit.userEmail" [readonly]="!selectedApplication.applicationId"></label>
+            <label>Mobile<input [(ngModel)]="applicationEdit.mobileNumber" [readonly]="!selectedApplication.applicationId"></label>
+            <label>PAN<input [(ngModel)]="applicationEdit.pan" maxlength="10" [readonly]="!selectedApplication.applicationId"></label>
+            <label>Aadhaar last four<input [(ngModel)]="applicationEdit.aadhaarLastFour" maxlength="4" [readonly]="!selectedApplication.applicationId"></label>
+            <label>Date of birth<input type="date" [(ngModel)]="applicationEdit.dateOfBirth" [readonly]="!selectedApplication.applicationId"></label>
+            <label>Annual income (₹)<input type="number" [(ngModel)]="applicationEdit.annualIncome" [readonly]="!selectedApplication.applicationId"></label>
+            <label>Employment type
+              <select [(ngModel)]="applicationEdit.employmentType" [disabled]="!selectedApplication.applicationId">
+                <option value="SALARIED">Salaried employee</option>
+                <option value="SELF_EMPLOYED">Self-employed</option>
+              </select>
+            </label>
+            <label>Company / business<input [(ngModel)]="applicationEdit.employerName" [readonly]="!selectedApplication.applicationId"></label>
+            <label>Designation / occupation<input [(ngModel)]="applicationEdit.designation" [readonly]="!selectedApplication.applicationId"></label>
+            <label class="application-address-field">Address<textarea [(ngModel)]="applicationEdit.address" rows="3" [readonly]="!selectedApplication.applicationId"></textarea></label>
+          </div>
+
+          <div class="application-document-actions" *ngIf="selectedApplication.documentsAvailable">
+            <strong>Identity documents</strong>
+            <button type="button" class="btn-secondary" (click)="reviewApplicationDocument('pan')">View PAN image</button>
+            <button type="button" class="btn-secondary" (click)="reviewApplicationDocument('aadhaar')">View Aadhaar image</button>
+            <button type="button" class="btn-secondary" (click)="reviewApplicationDocument('selfie')">View live selfie</button>
+          </div>
+          <p *ngIf="selectedApplication.applicationId && !selectedApplication.documentsAvailable" class="no-data">
+            Application documents have been deleted according to the retention policy.
+          </p>
+          <div class="application-document-preview" *ngIf="applicationDocumentPreview">
+            <p>{{ applicationDocumentPreviewType | titlecase }} image</p>
+            <img [src]="applicationDocumentPreview" [alt]="applicationDocumentPreviewType + ' application document'">
+          </div>
+
+          <div class="application-limit-control">
+            <label>Approved credit limit (₹)
+              <input type="number" min="1" step="1000" [(ngModel)]="applicationApprovedLimit"
+                [disabled]="selectedApplication.status !== 'Pending'">
+            </label>
+            <span>Status: <strong>{{ selectedApplication.status }}</strong></span>
+          </div>
+          <p *ngIf="selectedApplication.status === 'Approved' && !selectedApplication.accountNumber" class="no-data">
+            Approved as a guest application. No NeoBank account or card was created.
+          </p>
+          <div class="modal-actions application-review-actions">
+            <button *ngIf="selectedApplication.applicationId && selectedApplication.status === 'Pending'"
+              type="button" class="btn-secondary" (click)="saveApplicationChanges()" [disabled]="isSavingApplication">
+              Save edited details
+            </button>
+            <button *ngIf="selectedApplication.status === 'Pending'" type="button" class="btn-success"
+              (click)="approveGuestApplication()" [disabled]="isSavingApplication">
+              {{ isSavingApplication ? 'Saving...' : 'Approve and set limit' }}
+            </button>
+            <button *ngIf="selectedApplication.status === 'Pending'" type="button" class="btn-danger"
+              (click)="rejectGuestApplication()" [disabled]="isSavingApplication">Reject application</button>
           </div>
         </div>
       </div>

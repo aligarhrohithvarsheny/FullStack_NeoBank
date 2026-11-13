@@ -1580,6 +1580,152 @@
   white-space: nowrap;
 }
 
+.guest-application-queue {
+  margin: 22px 0;
+  padding: 20px;
+  border: 1px solid #dbe5f1;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.application-queue-heading,
+.application-queue-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.application-queue-heading h3,
+.application-queue-heading p {
+  margin: 0 0 6px;
+}
+
+.application-queue-heading p {
+  color: #64748b;
+  font-size: 13px;
+}
+
+.application-queue-actions select,
+.application-review-grid input,
+.application-review-grid select,
+.application-review-grid textarea,
+.application-limit-control input {
+  min-height: 38px;
+  padding: 8px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  font: inherit;
+}
+
+.application-table-wrap {
+  max-height: 380px;
+  overflow: auto;
+  margin-top: 16px;
+}
+
+.application-table {
+  min-width: 900px;
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.application-table th,
+.application-table td {
+  padding: 11px 10px;
+  border-bottom: 1px solid #e2e8f0;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.application-review-modal {
+  width: min(940px, calc(100vw - 32px));
+  max-height: 92vh;
+  overflow-y: auto;
+}
+
+.application-review-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.application-review-grid label,
+.application-limit-control label {
+  display: grid;
+  gap: 6px;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.application-review-grid input,
+.application-review-grid select,
+.application-review-grid textarea {
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.application-review-grid input[readonly],
+.application-review-grid select:disabled,
+.application-review-grid textarea[readonly] {
+  background: #f8fafc;
+}
+
+.application-address-field {
+  grid-column: 1 / -1;
+}
+
+.application-document-actions,
+.application-limit-control {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 18px;
+  padding: 14px;
+  border-radius: 9px;
+  background: #f8fafc;
+}
+
+.application-document-preview {
+  margin-top: 14px;
+  padding: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 9px;
+  text-align: center;
+}
+
+.application-document-preview img {
+  max-width: 100%;
+  max-height: 420px;
+  object-fit: contain;
+}
+
+.application-limit-control label {
+  min-width: 220px;
+}
+
+.application-review-actions {
+  flex-wrap: wrap;
+}
+
+@media (max-width: 680px) {
+  .application-queue-heading,
+  .application-queue-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .application-review-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .application-address-field {
+    grid-column: auto;
+  }
+}
+
 .transaction-table .status-badge.successful {
   color: #166534;
   background: #dcfce7;

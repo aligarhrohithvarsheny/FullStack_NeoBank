@@ -2,7 +2,7 @@ import { Component, OnInit, OnDestroy, Inject, PLATFORM_ID } from '@angular/core
 import { Router } from '@angular/router';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { catchError, forkJoin, of } from 'rxjs';
 import { environment } from '../../../../environment/environment';
 
@@ -266,7 +266,7 @@ export class Cards implements OnInit, OnDestroy {
     this.newCardRequests = savedNewCardRequests ? JSON.parse(savedNewCardRequests) : [];
 
     // Load credit card applications
-    this.http.get(`${environment.apiBaseUrl}/api/credit-card-requests/status/Pending`).subscribe({
+    this.http.get(`${environment.apiBaseUrl}/api/credit-card-requests/status/Pending`, this.adminAuthOptions()).subscribe({
       next: (res: any) => {
         this.creditRequests = Array.isArray(res) ? res : [];
       },
@@ -275,6 +275,15 @@ export class Cards implements OnInit, OnDestroy {
         this.creditRequests = [];
       }
     });
+  }
+
+  private adminAuthOptions() {
+    const token = isPlatformBrowser(this.platformId)
+      ? sessionStorage.getItem('adminSessionToken')
+      : null;
+    return {
+      headers: new HttpHeaders(token ? { Authorization: `Bearer ${token}` } : {})
+    };
   }
 
   saveCards() {
@@ -719,11 +728,16 @@ export class Cards implements OnInit, OnDestroy {
 
     approveCreditRequest(req: any) {
       if (!req || !req.id) { alert('Invalid request'); return; }
+      const approvedLimit = Number(req.approvedLimit);
+      if (!Number.isFinite(approvedLimit) || approvedLimit <= 0 || approvedLimit > 1_000_000_000) {
+        alert('Enter a valid approved credit limit before approving this application.');
+        return;
+      }
       if (confirm(`Approve credit application for ${req.userName}?`)) {
-        const adminName = 'Admin';
-        this.http.put(`${environment.apiBaseUrl}/api/credit-card-requests/approve/${req.id}?adminName=${adminName}`, {}).subscribe({
+        this.http.put(`${environment.apiBaseUrl}/api/credit-card-requests/approve/${req.id}`,
+          { approvedLimit }, this.adminAuthOptions()).subscribe({
           next: (res: any) => {
-            alert(`Credit application approved for ${req.userName}. Card ending with ${res.last4 || 'N/A'}`);
+            alert(`Credit application approved for ${req.userName} with a limit of ₹${res.approvedLimit}. Card ending with ${res.last4 || 'N/A'}`);
             this.loadCards();
             this.loadRequests();
           },
@@ -738,8 +752,8 @@ export class Cards implements OnInit, OnDestroy {
     rejectCreditRequest(req: any) {
       if (!req || !req.id) { alert('Invalid request'); return; }
       if (confirm(`Reject credit application for ${req.userName}?`)) {
-        const adminName = 'Admin';
-        this.http.put(`${environment.apiBaseUrl}/api/credit-card-requests/reject/${req.id}?adminName=${adminName}`, {}).subscribe({
+        this.http.put(`${environment.apiBaseUrl}/api/credit-card-requests/reject/${req.id}`,
+          {}, this.adminAuthOptions()).subscribe({
           next: (res: any) => {
             alert(`Credit application rejected for ${req.userName}`);
             this.loadRequests();

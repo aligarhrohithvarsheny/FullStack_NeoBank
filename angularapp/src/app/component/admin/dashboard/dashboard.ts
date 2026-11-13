@@ -7163,12 +7163,11 @@ export class Dashboard implements OnInit, OnDestroy {
 
     const payload = {
       accountNumber: this.applyCreditCardForm.accountNumber,
-      userName: this.applyCreditCardForm.userName,
-      userEmail: this.applyCreditCardForm.userEmail,
-      pan: this.applyCreditCardForm.pan
+      pan: this.applyCreditCardForm.pan,
+      annualIncome: this.applyCreditCardForm.income
     };
 
-    this.http.post(`${environment.apiBaseUrl}/api/credit-card-requests/create?income=${this.applyCreditCardForm.income || 0}`, payload).subscribe({
+    this.http.post(`${environment.apiBaseUrl}/api/credit-card-requests/admin/create`, payload, this.getAdminAuthOptions()).subscribe({
       next: (res: any) => {
         alert('Credit card application submitted successfully');
         this.showApplyCreditCardModal = false;

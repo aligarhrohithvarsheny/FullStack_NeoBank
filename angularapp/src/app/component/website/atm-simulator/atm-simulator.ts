@@ -84,6 +84,8 @@ export class AtmSimulatorComponent implements OnInit, OnDestroy {
   upiWithdrawalToken = '';
   upiWithdrawalExpiresAt = '';
   upiWithdrawalStatusMessage = '';
+  upiSenderId = '';
+  upiSenderName = '';
   lastUpiTransactionRef = '';
   private upiWithdrawalPoll: any = null;
   private upiWithdrawalCompleted = false;
@@ -616,6 +618,13 @@ export class AtmSimulatorComponent implements OnInit, OnDestroy {
           });
           this.upiWithdrawalToken = request.requestToken;
           this.upiWithdrawalExpiresAt = request.expiresAt;
+          this.upiSenderId = request.senderUpiId || '';
+          this.upiSenderName = request.senderName || this.username;
+          this.selectedAtmInfo = {
+            ...this.selectedAtmInfo,
+            atmName: request.atmName || this.selectedAtmInfo?.atmName,
+            location: request.atmLocation || request.location || this.selectedAtmInfo?.location
+          };
           this.upiWithdrawalStatusMessage = 'Waiting for UPI approval...';
           this.upiWithdrawalCompleted = false;
           this.currentStep = 'upi-qr';
@@ -647,6 +656,13 @@ export class AtmSimulatorComponent implements OnInit, OnDestroy {
             this.currentBalance = Number(status.balanceAfter ?? this.currentBalance);
             this.lastTransactionRef = status.transactionRef || '';
             this.lastUpiTransactionRef = status.upiTransactionRef || '';
+            this.upiSenderId = status.senderUpiId || this.upiSenderId;
+            this.upiSenderName = status.senderName || this.upiSenderName;
+            this.selectedAtmInfo = {
+              ...this.selectedAtmInfo,
+              atmName: status.atmName || this.selectedAtmInfo?.atmName,
+              location: status.atmLocation || this.selectedAtmInfo?.location
+            };
             this.withdrawalCompleted.emit();
             this.startDispensing();
           } else if (['FAILED', 'EXPIRED', 'CANCELLED'].includes(status.status)) {
@@ -748,6 +764,14 @@ export class AtmSimulatorComponent implements OnInit, OnDestroy {
       balance: this.currentBalance,
       txnId: this.lastTransactionRef || 'ATM' + Date.now().toString().slice(-8),
       paymentMethod: this.isUpiMode ? 'UPI QR' : 'Debit card',
+      accountType: this.accountType,
+      atmId: this.selectedAtmId,
+      atmName: this.selectedAtmInfo?.atmName || '',
+      atmLocation: this.selectedAtmInfo?.location || '',
+      status: 'SUCCESS',
+      senderName: this.isUpiMode ? this.upiSenderName : '',
+      senderUpiId: this.isUpiMode ? this.upiSenderId : '',
+      receiverUpiId: this.isUpiMode ? 'atmwithdrawal@neobank' : '',
       upiTransactionRef: this.lastUpiTransactionRef
     };
   }
@@ -816,6 +840,8 @@ export class AtmSimulatorComponent implements OnInit, OnDestroy {
     this.upiWithdrawalToken = '';
     this.upiWithdrawalExpiresAt = '';
     this.upiWithdrawalStatusMessage = '';
+    this.upiSenderId = '';
+    this.upiSenderName = '';
     this.lastUpiTransactionRef = '';
     this.upiWithdrawalCompleted = false;
     this.fetchBalance();

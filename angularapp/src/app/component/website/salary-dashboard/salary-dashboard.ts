@@ -409,8 +409,25 @@ export class SalaryDashboard implements OnInit, OnDestroy {
   applyForSalaryCreditCard(): void {
     if (!this.account?.accountNumber || !this.creditCardPrediction) return;
     this.isApplyingCredit = true;
-    const payload = { accountNumber: this.account.accountNumber, userName: this.account.employeeName, userEmail: this.account.email || '', pan: this.creditCardPan.trim().toUpperCase() };
-    this.http.post(`${environment.apiBaseUrl}/api/credit-card-requests/create?income=${this.creditCardIncome || this.account.monthlySalary || 0}`, payload).subscribe({
+    let employeeSession: any;
+    try {
+      employeeSession = JSON.parse(sessionStorage.getItem('salaryEmployee') || '{}');
+    } catch (error) {
+      console.error('Unable to read salary account session:', error);
+      this.isApplyingCredit = false;
+      this.alertService.userError('Application Failed', 'Your session is invalid. Please sign in again.');
+      return;
+    }
+    const token = employeeSession.authToken || employeeSession.token;
+    if (!token) {
+      this.isApplyingCredit = false;
+      this.alertService.userError('Application Failed', 'Your session is invalid. Please sign in again.');
+      return;
+    }
+    const monthlyIncome = Number(this.creditCardIncome || this.account.monthlySalary || 0);
+    this.http.post(`${environment.apiBaseUrl}/api/credit-card-requests/create`,
+      { pan: this.creditCardPan.trim().toUpperCase(), annualIncome: monthlyIncome * 12 },
+      { headers: new HttpHeaders({ Authorization: `Bearer ${token}` }) }).subscribe({
       next: () => { this.isApplyingCredit = false; this.creditCardApplicationSent = true; this.alertService.userSuccess('Application Submitted', 'Your credit-card application is now visible to admin for review.'); },
       error: () => { this.isApplyingCredit = false; this.alertService.userError('Application Failed', 'Unable to submit credit-card application'); }
     });

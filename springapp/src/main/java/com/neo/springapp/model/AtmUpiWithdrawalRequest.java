@@ -32,6 +32,9 @@ public class AtmUpiWithdrawalRequest {
     @Column(name = "user_email")
     private String userEmail;
 
+    @Column(name = "sender_upi_id")
+    private String senderUpiId;
+
     @Column(nullable = false, length = 30)
     private String status = "PENDING";
 
@@ -83,6 +86,8 @@ public class AtmUpiWithdrawalRequest {
     public void setUserName(String userName) { this.userName = userName; }
     public String getUserEmail() { return userEmail; }
     public void setUserEmail(String userEmail) { this.userEmail = userEmail; }
+    public String getSenderUpiId() { return senderUpiId; }
+    public void setSenderUpiId(String senderUpiId) { this.senderUpiId = senderUpiId; }
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
     public String getFailureReason() { return failureReason; }
@@ -95,4 +100,6 @@ public class AtmUpiWithdrawalRequest {
     public void setPinAttempts(Integer pinAttempts) { this.pinAttempts = pinAttempts; }
     public LocalDateTime getExpiresAt() { return expiresAt; }
     public void setExpiresAt(LocalDateTime expiresAt) { this.expiresAt = expiresAt; }
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public LocalDateTime getUpdatedAt() { return updatedAt; }
 }

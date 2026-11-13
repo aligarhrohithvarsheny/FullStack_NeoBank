@@ -353,6 +353,10 @@
                   <p class="atm-amount-display">₹{{ selectedAmount | number }}</p>
                   <img *ngIf="upiWithdrawalQr" [src]="upiWithdrawalQr" alt="UPI ATM withdrawal QR code"
                        style="width:180px;height:180px;background:#fff;padding:8px;border-radius:12px;">
+                  <p *ngIf="upiSenderId" class="atm-screen-subtitle">Paying from: {{ upiSenderId }}</p>
+                  <p *ngIf="selectedAtmId" class="atm-screen-subtitle">
+                    ATM: {{ selectedAtmInfo?.atmName || selectedAtmId }}<span *ngIf="selectedAtmInfo?.location"> · {{ selectedAtmInfo.location }}</span>
+                  </p>
                   <p class="atm-screen-subtitle">Scan in your NeoBank UPI dashboard and enter your {{ isSalaryAccount ? '4-digit transaction PIN' : '6-digit UPI PIN' }}.</p>
                   <p class="atm-status-text atm-pulse-text">{{ upiWithdrawalStatusMessage }}</p>
                   <p class="atm-screen-subtitle">Request expires {{ upiWithdrawalExpiresAt | date:'shortTime' }}</p>
@@ -415,6 +419,8 @@
                   </div>
                   <h3 class="atm-screen-title atm-text-success">Transaction Successful!</h3>
                   <p class="atm-amount-display">₹{{ selectedAmount | number }}</p>
+                  <p *ngIf="isUpiMode && upiSenderId" class="atm-screen-subtitle">Withdrawn from UPI: {{ upiSenderId }}</p>
+                  <p *ngIf="isUpiMode && lastUpiTransactionRef" class="atm-screen-subtitle">UPI reference: {{ lastUpiTransactionRef }}</p>
                   <p class="atm-status-text atm-pulse-text">Please Collect Your Cash</p>
                   <button class="atm-insert-btn atm-btn-success" (click)="collectCash()">
                     <span>Cash Collected ✓</span>
@@ -432,11 +438,18 @@
                       <p class="atm-receipt-line">ATM WITHDRAWAL</p>
                       <p class="atm-receipt-line">{{ receiptData?.date }}</p>
                       <p class="atm-receipt-line">A/C: {{ receiptData?.accountNumber }}</p>
+                      <p class="atm-receipt-line">Account type: {{ receiptData?.accountType }}</p>
+                      <p class="atm-receipt-line">ATM: {{ receiptData?.atmName || receiptData?.atmId }}</p>
+                      <p *ngIf="receiptData?.atmLocation" class="atm-receipt-line">Location: {{ receiptData?.atmLocation }}</p>
                       <p class="atm-receipt-line">Amount: ₹{{ receiptData?.amount | number }}</p>
                       <p class="atm-receipt-line">Bal: ₹{{ receiptData?.balance | number:'1.2-2' }}</p>
+                      <p class="atm-receipt-line">Status: {{ receiptData?.status }}</p>
                       <p class="atm-receipt-line">Method: {{ receiptData?.paymentMethod }}</p>
                       <p class="atm-receipt-line">Txn: {{ receiptData?.txnId }}</p>
-                      <p *ngIf="receiptData?.upiTransactionRef" class="atm-receipt-line">UPI: {{ receiptData?.upiTransactionRef }}</p>
+                      <p *ngIf="receiptData?.senderName" class="atm-receipt-line">Customer: {{ receiptData?.senderName }}</p>
+                      <p *ngIf="receiptData?.senderUpiId" class="atm-receipt-line">From UPI: {{ receiptData?.senderUpiId }}</p>
+                      <p *ngIf="receiptData?.receiverUpiId" class="atm-receipt-line">ATM UPI: {{ receiptData?.receiverUpiId }}</p>
+                      <p *ngIf="receiptData?.upiTransactionRef" class="atm-receipt-line">UPI Ref: {{ receiptData?.upiTransactionRef }}</p>
                       <div class="atm-receipt-divider"></div>
                       <p class="atm-receipt-footer">Thank you for banking with NeoBank</p>
                     </div>

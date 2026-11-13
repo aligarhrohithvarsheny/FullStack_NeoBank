@@ -760,12 +760,12 @@ export class Card implements OnInit, OnDestroy {
       return;
     }
     const payload: any = {
-      accountNumber: this.userProfile?.accountNumber || '',
-      userName: this.userProfile?.name || '',
-      userEmail: this.userProfile?.email || '',
-      pan: this.panInput
+      pan: this.panInput,
+      annualIncome: this.incomeInput || this.userProfile?.income || 0
     };
-    this.http.post(`${environment.apiBaseUrl}/api/credit-card-requests/create?income=${this.incomeInput || 0}`, payload).subscribe({
+    this.http.post(`${environment.apiBaseUrl}/api/credit-card-requests/create`, payload, {
+      headers: this.getUserAuthHeaders()
+    }).subscribe({
       next: (res: any) => {
         this.alertService.success('Application Submitted', 'Your credit card application has been submitted for review.');
         this.closeApplyCreditForm();

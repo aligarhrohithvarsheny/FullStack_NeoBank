@@ -54,4 +54,10 @@ public interface SalaryAccountRepository extends JpaRepository<SalaryAccount, Lo
     SalaryAccount findByUpiId(String upiId);
 
     List<SalaryAccount> findByAccountLockedTrue();
+
+    @Query("SELECT DISTINCT sa.companyName FROM SalaryAccount sa "
+            + "WHERE sa.companyName IS NOT NULL AND TRIM(sa.companyName) <> '' "
+            + "AND LOWER(sa.companyName) LIKE LOWER(CONCAT('%', :query, '%')) "
+            + "ORDER BY sa.companyName")
+    List<String> findCompanyNameSuggestions(@Param("query") String query);
 }

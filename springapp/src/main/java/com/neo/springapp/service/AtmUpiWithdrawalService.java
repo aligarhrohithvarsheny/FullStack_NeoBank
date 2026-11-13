@@ -67,18 +67,15 @@ public class AtmUpiWithdrawalService {
         request.setAmount(amount);
         request.setUserName(account.name());
         request.setUserEmail(account.email());
+        request.setSenderUpiId(account.upiId());
         request.setStatus("PENDING");
         request.setExpiresAt(LocalDateTime.now().plusMinutes(5));
         requestRepository.save(request);
 
-        Map<String, Object> result = new LinkedHashMap<>();
+        Map<String, Object> result = requestResponse(request);
         result.put("success", true);
         result.put("requestToken", request.getRequestToken());
-        result.put("amount", amount);
-        result.put("atmId", atm.getAtmId());
-        result.put("atmName", atm.getAtmName());
         result.put("location", atm.getLocation());
-        result.put("expiresAt", request.getExpiresAt());
         result.put("qrPayload", "upi://pay?pa=" + ATM_UPI_ID
                 + "&pn=NeoBank%20ATM&am=" + BigDecimal.valueOf(amount).setScale(2).toPlainString()
                 + "&cu=INR&tn=ATMREQ%3A" + request.getRequestToken());
@@ -140,6 +137,7 @@ public class AtmUpiWithdrawalService {
             return result;
         }
 
+        request.setSenderUpiId(account.upiId());
         String upiReference = "UPIATM" + UUID.randomUUID().toString().replace("-", "").substring(0, 20)
                 .toUpperCase(Locale.ROOT);
         Map<String, Object> withdrawal = atmManagementService.processWithdrawal(
@@ -175,7 +173,7 @@ public class AtmUpiWithdrawalService {
             SalaryUpiTransaction transaction = new SalaryUpiTransaction();
             transaction.setSalaryAccountId(account.id());
             transaction.setAccountNumber(request.getAccountNumber());
-            transaction.setUpiId(account.upiId());
+            transaction.setUpiId(request.getSenderUpiId());
             transaction.setRecipientUpi(ATM_UPI_ID);
             transaction.setRecipientName("NeoBank ATM");
             transaction.setType("DEBIT");
@@ -191,7 +189,7 @@ public class AtmUpiWithdrawalService {
         SavingsUpiTransaction transaction = new SavingsUpiTransaction();
         transaction.setTransactionRef(reference);
         transaction.setSenderAccount(request.getAccountNumber());
-        transaction.setSenderUpiId(account.upiId());
+        transaction.setSenderUpiId(request.getSenderUpiId());
         transaction.setSenderName(account.name());
         transaction.setReceiverUpiId(ATM_UPI_ID);
         transaction.setReceiverName("NeoBank ATM");
@@ -227,15 +225,33 @@ public class AtmUpiWithdrawalService {
         result.put("status", request.getStatus());
         result.put("amount", request.getAmount());
         result.put("atmId", request.getAtmId());
+        result.put("atmTransactionRef", request.getAtmTransactionRef());
+        result.put("accountType", request.getAccountType());
+        result.put("accountNumberMasked", maskAccountNumber(request.getAccountNumber()));
+        result.put("senderName", request.getUserName());
+        result.put("senderUpiId", request.getSenderUpiId());
+        result.put("receiverUpiId", ATM_UPI_ID);
+        result.put("paymentMethod", "UPI ATM WITHDRAWAL");
+        result.put("createdAt", request.getCreatedAt());
+        result.put("updatedAt", request.getUpdatedAt());
         result.put("expiresAt", request.getExpiresAt());
         result.put("transactionRef", request.getAtmTransactionRef());
         result.put("upiTransactionRef", request.getUpiTransactionRef());
+        atmMachineRepository.findByAtmId(request.getAtmId()).ifPresent(atm -> {
+            result.put("atmName", atm.getAtmName());
+            result.put("atmLocation", atm.getLocation());
+        });
         if (request.getAtmTransactionRef() != null) {
             atmTransactionRepository.findByTransactionRef(request.getAtmTransactionRef())
                     .ifPresent(transaction -> result.put("balanceAfter", transaction.getBalanceAfter()));
         }
         if (request.getFailureReason() != null) result.put("message", request.getFailureReason());
         return result;
+    }
+
+    private String maskAccountNumber(String accountNumber) {
+        if (accountNumber == null || accountNumber.isBlank()) return "";
+        return "****" + accountNumber.substring(Math.max(0, accountNumber.length() - 4));
     }
 
     private Map<String, Object> failure(String message) {

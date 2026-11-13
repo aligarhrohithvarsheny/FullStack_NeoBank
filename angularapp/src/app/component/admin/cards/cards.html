@@ -66,8 +66,8 @@
               <th>User Name</th>
               <th>Account Number</th>
               <th>PAN</th>
-              <th>Predicted CIBIL</th>
-              <th>Suggested Limit</th>
+              <th>Annual Income</th>
+              <th>Admin Approved Limit</th>
               <th>Requested Date</th>
               <th>Status</th>
               <th>Actions</th>
@@ -78,13 +78,21 @@
               <td>{{ req.userName }}</td>
               <td>{{ req.accountNumber }}</td>
               <td>{{ req.pan }}</td>
-              <td>{{ req.predictedCibil || 'N/A' }}</td>
-              <td>₹{{ req.suggestedLimit || 'N/A' }}</td>
+              <td>₹{{ req.annualIncome | number:'1.0-0' }}</td>
+              <td>
+                <input *ngIf="req.status === 'Pending'" type="number" min="1" max="1000000000"
+                       step="1" [(ngModel)]="req.approvedLimit" aria-label="Approved credit limit"
+                       placeholder="Enter limit">
+                <span *ngIf="req.status !== 'Pending'">
+                  {{ req.approvedLimit ? ('₹' + (req.approvedLimit | number:'1.0-0')) : '—' }}
+                </span>
+              </td>
               <td>{{ req.requestDate | date:'short' }}</td>
               <td [ngClass]="getRequestStatusClass(req.status)"><span class="status-badge">{{ req.status }}</span></td>
               <td class="actions">
                 <div *ngIf="req.status === 'Pending'">
-                  <button (click)="approveCreditRequest(req)" class="approve-btn">Approve</button>
+                  <button (click)="approveCreditRequest(req)" class="approve-btn"
+                          [disabled]="!req.approvedLimit || req.approvedLimit <= 0">Approve &amp; Set Limit</button>
                   <button (click)="rejectCreditRequest(req)" class="reject-btn">Reject</button>
                 </div>
                 <span *ngIf="req.status !== 'Pending'">Processed</span>

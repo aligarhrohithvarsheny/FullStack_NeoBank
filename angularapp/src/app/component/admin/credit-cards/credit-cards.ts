@@ -46,6 +46,15 @@ export class CreditCards implements OnInit, OnDestroy {
   creditCardSearchQuery: string = '';
   creditCardStatusFilter: string = 'ALL';
   showApplyCreditCardModal: boolean = false;
+  guestApplications: any[] = [];
+  applicationStatusFilter = 'Pending';
+  isLoadingApplications = false;
+  selectedApplication: any = null;
+  applicationEdit: any = null;
+  applicationApprovedLimit: number | null = null;
+  isSavingApplication = false;
+  applicationDocumentPreview = '';
+  applicationDocumentPreviewType = '';
   applyCreditCardForm = {
     accountNumber: '',
     userName: '',
@@ -123,6 +132,7 @@ export class CreditCards implements OnInit, OnDestroy {
         }
       }
       this.loadCreditCards();
+      this.loadGuestApplications();
       this.loadTransferFeePercent();
       this.loadEmiSettings();
       this.loadCreditLimitIncreaseCeiling();
@@ -132,6 +142,155 @@ export class CreditCards implements OnInit, OnDestroy {
 
   ngOnDestroy() {
     if (this.refreshTimer) clearInterval(this.refreshTimer);
+    this.clearApplicationDocumentPreview();
+  }
+
+  loadGuestApplications() {
+    this.isLoadingApplications = true;
+    this.http.get<any[]>(
+      `${environment.apiBaseUrl}/api/credit-card-requests/status/${encodeURIComponent(this.applicationStatusFilter)}`,
+      this.authOptions()
+    ).subscribe({
+      next: applications => {
+        this.guestApplications = Array.isArray(applications) ? applications : [];
+        this.isLoadingApplications = false;
+      },
+      error: error => {
+        this.isLoadingApplications = false;
+        this.alertService.operationError(
+          'Load credit card applications',
+          error.error?.message || 'Unable to load applications'
+        );
+      }
+    });
+  }
+
+  reviewApplication(application: any) {
+    this.clearApplicationDocumentPreview();
+    this.selectedApplication = application;
+    this.applicationApprovedLimit = application.approvedLimit ?? null;
+    this.applicationEdit = {
+      userName: application.userName || '',
+      userEmail: application.userEmail || '',
+      pan: application.pan || '',
+      annualIncome: application.annualIncome ?? null,
+      mobileNumber: application.mobileNumber || '',
+      dateOfBirth: application.dateOfBirth || '',
+      aadhaarLastFour: application.aadhaarLastFour || '',
+      address: application.address || '',
+      employmentType: application.employmentType || 'SALARIED',
+      employerName: application.employerName || '',
+      designation: application.designation || ''
+    };
+  }
+
+  saveApplicationChanges() {
+    if (!this.selectedApplication?.id || !this.selectedApplication.applicationId || !this.applicationEdit) return;
+    this.isSavingApplication = true;
+    this.http.put<any>(
+      `${environment.apiBaseUrl}/api/credit-card-requests/admin/update/${this.selectedApplication.id}`,
+      this.applicationEdit,
+      this.authOptions()
+    ).subscribe({
+      next: updated => {
+        this.selectedApplication = updated;
+        this.applicationEdit = { ...this.applicationEdit };
+        this.isSavingApplication = false;
+        this.loadGuestApplications();
+        this.alertService.success('Application updated', 'Applicant details were saved.');
+      },
+      error: error => {
+        this.isSavingApplication = false;
+        this.alertService.operationError(
+          'Update application',
+          error.error?.message || 'Unable to update application'
+        );
+      }
+    });
+  }
+
+  reviewApplicationDocument(documentType: 'pan' | 'aadhaar' | 'selfie') {
+    if (!this.selectedApplication?.id) return;
+    this.http.get(
+      `${environment.apiBaseUrl}/api/credit-card-requests/admin/${this.selectedApplication.id}/documents/${documentType}`,
+      { ...this.authOptions(), responseType: 'blob' }
+    ).subscribe({
+      next: document => {
+        this.clearApplicationDocumentPreview();
+        this.applicationDocumentPreview = URL.createObjectURL(document);
+        this.applicationDocumentPreviewType = documentType;
+      },
+      error: error => this.alertService.operationError(
+        'View application document',
+        error.error?.message || 'Unable to load this document'
+      )
+    });
+  }
+
+  approveGuestApplication() {
+    if (!this.selectedApplication?.id || !this.applicationApprovedLimit || this.applicationApprovedLimit <= 0) {
+      this.alertService.error('Invalid limit', 'Enter a positive approved credit limit.');
+      return;
+    }
+    this.isSavingApplication = true;
+    this.http.put<any>(
+      `${environment.apiBaseUrl}/api/credit-card-requests/approve/${this.selectedApplication.id}`,
+      { approvedLimit: this.applicationApprovedLimit },
+      this.authOptions()
+    ).subscribe({
+      next: updated => {
+        this.selectedApplication = updated;
+        this.isSavingApplication = false;
+        this.alertService.success('Application approved', updated.accountNumber
+          ? 'The approved credit card has been issued.'
+          : 'The application and credit limit were approved. No card was issued because the applicant has no NeoBank account.');
+        this.loadGuestApplications();
+      },
+      error: error => {
+        this.isSavingApplication = false;
+        this.alertService.operationError(
+          'Approve application',
+          error.error?.message || 'Unable to approve application'
+        );
+      }
+    });
+  }
+
+  rejectGuestApplication() {
+    if (!this.selectedApplication?.id) return;
+    this.isSavingApplication = true;
+    this.http.put<any>(
+      `${environment.apiBaseUrl}/api/credit-card-requests/reject/${this.selectedApplication.id}`,
+      {},
+      this.authOptions()
+    ).subscribe({
+      next: updated => {
+        this.selectedApplication = updated;
+        this.isSavingApplication = false;
+        this.alertService.success('Application rejected', 'The applicant will see the updated status when tracking.');
+        this.loadGuestApplications();
+      },
+      error: error => {
+        this.isSavingApplication = false;
+        this.alertService.operationError(
+          'Reject application',
+          error.error?.message || 'Unable to reject application'
+        );
+      }
+    });
+  }
+
+  closeApplicationReview() {
+    this.clearApplicationDocumentPreview();
+    this.selectedApplication = null;
+    this.applicationEdit = null;
+    this.applicationApprovedLimit = null;
+  }
+
+  private clearApplicationDocumentPreview() {
+    if (this.applicationDocumentPreview) URL.revokeObjectURL(this.applicationDocumentPreview);
+    this.applicationDocumentPreview = '';
+    this.applicationDocumentPreviewType = '';
   }
 
   private authOptions() {
@@ -526,12 +685,11 @@ export class CreditCards implements OnInit, OnDestroy {
 
     const payload = {
       accountNumber: this.applyCreditCardForm.accountNumber,
-      userName: this.applyCreditCardForm.userName,
-      userEmail: this.applyCreditCardForm.userEmail,
-      pan: this.applyCreditCardForm.pan
+      pan: this.applyCreditCardForm.pan,
+      annualIncome: this.applyCreditCardForm.income
     };
 
-    this.http.post(`${environment.apiBaseUrl}/api/credit-card-requests/create?income=${this.applyCreditCardForm.income || 0}`, payload).subscribe({
+    this.http.post(`${environment.apiBaseUrl}/api/credit-card-requests/admin/create`, payload, this.authOptions()).subscribe({
       next: (response: any) => {
         this.alertService.success('Success', 'Credit card application submitted successfully');
         this.showApplyCreditCardModal = false;

@@ -156,6 +156,7 @@ export const routes: Routes = [
       { path: 'user', component: User },
       { path: 'cards360', component: Cards360 },
       { path: 'cards360/dashboard', component: Cards360 },
+      { path: 'credit-card-apply', loadComponent: () => import('./component/website/credit-card-apply/credit-card-apply').then(m => m.CreditCardApply) },
       { path: 'insurance', component: Insurance, canActivate: [insuranceAuthGuard] },
       { path: 'insurance-login', component: InsuranceLogin },
       { path: 'insurance-apply', component: InsuranceGuest },

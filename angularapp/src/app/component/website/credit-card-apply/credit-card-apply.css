@@ -1,0 +1,252 @@
+.guest-credit-application {
+  min-height: 100vh;
+  padding: 48px 6vw 72px;
+  color: #172033;
+  background: linear-gradient(135deg, #f3f7ff 0%, #fbfcff 54%, #edf4ff 100%);
+}
+
+.application-header,
+.application-layout {
+  width: min(1120px, 100%);
+  margin: 0 auto;
+}
+
+.application-header {
+  margin-bottom: 30px;
+}
+
+.back-link {
+  display: inline-block;
+  margin-bottom: 28px;
+  color: #2458a6;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.application-eyebrow {
+  display: block;
+  margin-bottom: 8px;
+  color: #3876d8;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .14em;
+}
+
+.application-header h1 {
+  margin: 0;
+  font-size: clamp(32px, 5vw, 48px);
+}
+
+.application-header p,
+.privacy-note,
+.selfie-capture p {
+  color: #68758a;
+  line-height: 1.6;
+}
+
+.application-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(280px, .8fr);
+  align-items: start;
+  gap: 24px;
+}
+
+.application-panel,
+.tracking-panel {
+  padding: 28px;
+  border: 1px solid #e1e8f4;
+  border-radius: 20px;
+  background: #fff;
+  box-shadow: 0 16px 45px rgba(31, 65, 117, .08);
+}
+
+.application-panel h2,
+.tracking-panel h2 {
+  margin: 0 0 20px;
+}
+
+.application-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.application-fields label,
+.tracking-panel label {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  color: #27344a;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.application-fields input,
+.application-fields select,
+.application-fields textarea,
+.tracking-panel input {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid #d5deeb;
+  border-radius: 9px;
+  background: #fff;
+  color: #172033;
+  font: inherit;
+}
+
+.application-fields textarea {
+  resize: vertical;
+}
+
+.wide-field {
+  grid-column: 1 / -1;
+}
+
+.subheading {
+  margin-top: 28px !important;
+}
+
+.privacy-note {
+  margin: -8px 0 18px;
+  padding: 12px;
+  border-radius: 10px;
+  background: #f2f7ff;
+  font-size: 13px;
+}
+
+.application-fields small,
+.selfie-capture small {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.selfie-capture {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  align-items: center;
+  margin-top: 20px;
+  padding: 16px;
+  border: 1px dashed #b8c8df;
+  border-radius: 12px;
+}
+
+.selfie-capture h3 {
+  margin: 0;
+}
+
+.selfie-capture video,
+.selfie-capture img {
+  width: 180px;
+  max-height: 180px;
+  border-radius: 12px;
+  object-fit: cover;
+  background: #172033;
+}
+
+.hidden-canvas {
+  display: none;
+}
+
+.primary-button,
+.secondary-button {
+  min-height: 42px;
+  padding: 10px 16px;
+  border: 0;
+  border-radius: 9px;
+  font: inherit;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.primary-button {
+  color: #fff;
+  background: #225fc0;
+}
+
+.secondary-button {
+  color: #225fc0;
+  background: #eaf2ff;
+}
+
+.primary-button:disabled,
+.secondary-button:disabled {
+  cursor: not-allowed;
+  opacity: .6;
+}
+
+.consent-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin: 20px 0;
+  color: #3e4c62;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.consent-row input {
+  margin-top: 3px;
+}
+
+.submit-button {
+  width: 100%;
+}
+
+.form-error {
+  color: #b42318;
+  font-size: 13px;
+}
+
+.application-success,
+.tracking-result {
+  margin-top: 20px;
+  padding: 16px;
+  border-radius: 12px;
+  background: #effaf3;
+  color: #1b5831;
+  overflow-wrap: anywhere;
+}
+
+.application-success h3 {
+  margin: 0 0 8px;
+}
+
+.tracking-panel form {
+  display: grid;
+  gap: 14px;
+}
+
+.tracking-result {
+  background: #f2f7ff;
+  color: #27344a;
+}
+
+.tracking-result p {
+  margin: 7px 0;
+}
+
+@media (max-width: 760px) {
+  .guest-credit-application {
+    padding: 28px 16px 48px;
+  }
+
+  .application-layout,
+  .application-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .application-panel,
+  .tracking-panel {
+    padding: 20px;
+  }
+
+  .wide-field {
+    grid-column: auto;
+  }
+
+  .selfie-capture {
+    grid-template-columns: 1fr;
+  }
+}

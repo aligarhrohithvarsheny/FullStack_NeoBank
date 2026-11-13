@@ -2,7 +2,8 @@
   <div class="back-button">
     <button (click)="goBack()">⬅ Back to Dashboard</button>
     <button (click)="refreshCardData()" class="refresh-btn">Refresh Card Data</button>
-    <button (click)="openApplyForm()" class="apply-credit-btn" *ngIf="creditCards.length === 0">
+    <button (click)="openApplyForm()" class="apply-credit-btn"
+            *ngIf="creditCards.length === 0 && !isLoadingApplications && !hasOpenCreditCardApplication">
       Apply for Credit Card
     </button>
   </div>
@@ -24,12 +25,51 @@
   <div *ngIf="!isLoading && creditCards.length === 0" class="no-card-state">
     <div class="no-card-message">
       <h3>No Credit Card Found</h3>
-      <p>You don't have a credit card yet. Apply now to get started!</p>
-      <button (click)="openApplyForm()" class="apply-credit-btn-large">
+      <p *ngIf="!latestCreditCardApplication">Apply with your PAN and annual income. An admin will review your details and decide the credit limit.</p>
+      <p *ngIf="latestCreditCardApplication?.status === 'Pending' || latestCreditCardApplication?.status === 'Under Review'">
+        Your application is being reviewed. The bank will update its status after review.
+      </p>
+      <p *ngIf="latestCreditCardApplication?.status === 'Approved'">
+        Your application was approved with a limit of ₹{{ latestCreditCardApplication?.approvedLimit | number:'1.0-0' }}.
+        Refresh your card information if the card is not shown yet.
+      </p>
+      <p *ngIf="latestCreditCardApplication?.status === 'Rejected'">
+        Your previous application was not approved. You may submit a new application with updated details.
+      </p>
+      <button (click)="openApplyForm()" class="apply-credit-btn-large"
+              *ngIf="!isLoadingApplications && !hasOpenCreditCardApplication">
         Apply for Credit Card
       </button>
     </div>
   </div>
+
+  <p *ngIf="applicationError && !showApplyForm" class="application-error">{{ applicationError }}</p>
+
+  <section class="application-history" *ngIf="isLoadingApplications || creditCardApplications.length">
+    <div class="section-heading">
+      <div>
+        <span class="eyebrow">APPLICATION TRACKING</span>
+        <h3>Credit card applications</h3>
+      </div>
+      <button type="button" class="refresh-btn" (click)="loadCreditCardApplications()" [disabled]="isLoadingApplications">
+        {{ isLoadingApplications ? 'Refreshing...' : 'Refresh' }}
+      </button>
+    </div>
+    <p *ngIf="isLoadingApplications" class="no-data">Loading your application history...</p>
+    <table *ngIf="!isLoadingApplications && creditCardApplications.length">
+      <thead>
+        <tr><th>Submitted</th><th>Status</th><th>Annual income</th><th>Approved limit</th></tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let application of creditCardApplications">
+          <td>{{ application.requestDate | date:'mediumDate' }}</td>
+          <td>{{ application.status }}</td>
+          <td>₹{{ application.annualIncome | number:'1.0-0' }}</td>
+          <td>{{ application.approvedLimit ? ('₹' + (application.approvedLimit | number:'1.0-0')) : 'Set by admin after review' }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
 
   <!-- Card Display -->
   <div id="cardOverview" *ngIf="!isLoading && selectedCard" class="card-container">
@@ -801,17 +841,23 @@
   <div *ngIf="showApplyForm" class="modal-overlay" (click)="closeApplyForm()">
     <div class="modal" (click)="$event.stopPropagation()">
       <h3>Apply for Credit Card</h3>
-      <p>Please review terms and provide PAN and optional income to get a limit estimate.</p>
-      <label>PAN Card Number <span style="color: #666; font-size: 0.85rem;">(10 characters: ABCDE1234F)</span></label>
-      <input type="text" [(ngModel)]="panInput" placeholder="Enter PAN (e.g., ABCDE1234F)" maxlength="10" 
+      <p>Provide your details for admin review. The approved credit limit is decided by the bank; no limit is assigned when you submit.</p>
+      <label for="credit-application-pan">PAN Card Number (10 characters)</label>
+      <input id="credit-application-pan" type="text" [(ngModel)]="panInput"
+             placeholder="ABCDE1234F" maxlength="10" autocomplete="off"
              style="text-transform: uppercase;" (input)="panInput = panInput.toUpperCase()" />
-      <label>Annual Income (optional)</label>
-      <input type="number" [(ngModel)]="incomeInput" placeholder="Annual income" />
+      <label for="credit-application-income">Annual Income (₹)</label>
+      <input id="credit-application-income" type="number" [(ngModel)]="incomeInput"
+             min="1" step="1" placeholder="Enter annual income" />
+      <p class="application-error" *ngIf="applicationError">{{ applicationError }}</p>
       <div class="modal-actions">
-        <button (click)="previewCreditPrediction()" class="preview-btn">Preview Terms & Estimate</button>
-        <button (click)="closeApplyForm()" class="cancel-btn">Cancel</button>
+        <button type="button" (click)="submitCreditApplication()" class="apply-credit-btn"
+                [disabled]="isSubmittingApplication">
+          {{ isSubmittingApplication ? 'Submitting...' : 'Submit for Admin Review' }}
+        </button>
+        <button type="button" (click)="closeApplyForm()" class="cancel-btn" [disabled]="isSubmittingApplication">Cancel</button>
       </div>
-      <div *ngIf="showTermsModal" class="terms">
+      <div *ngIf="false" class="terms">
         <h4>Credit Card Prediction & Offer</h4>
         <div class="prediction-details">
           <div class="prediction-card">

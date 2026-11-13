@@ -100,6 +100,16 @@ interface EmiSettings {
   tenuresMonths: number[];
 }
 
+interface CreditCardApplication {
+  id: number;
+  status: string;
+  pan: string;
+  annualIncome: number;
+  approvedLimit?: number | null;
+  requestDate: string;
+  processedDate?: string | null;
+}
+
 @Component({
   selector: 'app-creditcard',
   standalone: true,
@@ -136,6 +146,10 @@ export class CreditCard implements OnInit {
   showApplyForm: boolean = false;
   panInput: string = '';
   incomeInput: number | null = null;
+  creditCardApplications: CreditCardApplication[] = [];
+  isLoadingApplications = false;
+  isSubmittingApplication = false;
+  applicationError = '';
   showTermsModal: boolean = false;
   predictedCibil: number | null = null;
   suggestedLimit: number | null = null;
@@ -230,7 +244,18 @@ export class CreditCard implements OnInit {
     if (isPlatformBrowser(this.platformId)) {
       this.loadUserProfile();
       this.loadCreditCards();
+      this.loadCreditCardApplications();
     }
+  }
+
+  get hasOpenCreditCardApplication(): boolean {
+    return this.creditCardApplications.some(application =>
+      ['pending', 'under review', 'approved'].includes(String(application.status).toLowerCase())
+    );
+  }
+
+  get latestCreditCardApplication(): CreditCardApplication | null {
+    return this.creditCardApplications[0] || null;
   }
 
   loadUserProfile() {
@@ -891,7 +916,11 @@ export class CreditCard implements OnInit {
   }
 
   openApplyForm() {
+    if (this.hasOpenCreditCardApplication) return;
     this.showApplyForm = true;
+    this.applicationError = '';
+    this.panInput = this.userProfile?.pan || '';
+    this.incomeInput = this.userProfile?.income || null;
   }
 
   closeApplyForm() {
@@ -909,73 +938,56 @@ export class CreditCard implements OnInit {
     this.cibilReportData = null;
   }
 
-  previewCreditPrediction() {
-    if (!this.panInput) {
-      this.alertService.validationError('PAN is required');
+  submitCreditApplication() {
+    const pan = this.panInput.trim().toUpperCase();
+    const income = Number(this.incomeInput);
+    if (!/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(pan)) {
+      this.applicationError = 'Enter a valid 10-character PAN (for example, ABCDE1234F).';
       return;
     }
-    
-    // Validate PAN format (10 characters: 5 letters, 4 digits, 1 letter)
-    if (this.panInput.length !== 10) {
-      this.alertService.validationError('PAN must be 10 characters long');
+    if (!Number.isFinite(income) || income <= 0) {
+      this.applicationError = 'Enter your annual income to submit the application.';
       return;
     }
-    
-    // Fetch credit prediction
-    this.http.post(`${environment.apiBaseUrl}/api/credit-card-requests/preview?pan=${this.panInput}&income=${this.incomeInput || 0}`, {}).subscribe({
+    if (this.isSubmittingApplication || this.hasOpenCreditCardApplication) return;
+
+    this.isSubmittingApplication = true;
+    this.applicationError = '';
+    this.http.post<CreditCardApplication>(
+      `${environment.apiBaseUrl}/api/credit-card-requests/create`,
+      { pan, annualIncome: income },
+      this.authOptions()
+    ).subscribe({
       next: (res: any) => {
-        this.predictedCibil = res.predictedCibil;
-        this.suggestedLimit = res.suggestedLimit;
-        this.panBasedLimit = res.panBasedLimit;
-        this.cardType = res.cardType;
-        this.eligibility = res.eligibility;
-        this.interestRate = res.interestRate;
-        this.annualFee = res.annualFee;
-        this.showTermsModal = true;
+        this.isSubmittingApplication = false;
+        this.alertService.success('Application Submitted', 'Your credit card application has been submitted for review.');
+        this.closeApplyForm();
+        this.loadCreditCardApplications();
       },
       error: (err: any) => {
-        console.error('Error previewing credit prediction:', err);
-        this.alertService.operationError('Credit prediction', err?.message || 'Preview failed');
-      }
-    });
-
-    // Also lookup CIBIL report from manager-uploaded data
-    this.isLoadingCibilReport = true;
-    this.cibilReportData = null;
-    this.http.get<any>(`${environment.apiBaseUrl}/api/cibil-reports/lookup/pan/${this.panInput}`).subscribe({
-      next: (res: any) => {
-        this.isLoadingCibilReport = false;
-        if (res.found) {
-          this.cibilReportData = res;
-        }
-      },
-      error: () => {
-        this.isLoadingCibilReport = false;
+        this.isSubmittingApplication = false;
+        console.error('Error submitting credit application:', err);
+        this.applicationError = err.error?.message || 'Unable to submit your application. Please try again.';
       }
     });
   }
 
-  submitCreditApplication() {
-    if (!this.panInput || !this.userProfile) {
-      this.alertService.validationError('PAN is required');
-      return;
-    }
-    
-    const payload: any = {
-      accountNumber: this.userProfile.accountNumber,
-      userName: this.userProfile.name,
-      userEmail: this.userProfile.email,
-      pan: this.panInput
-    };
-    
-    this.http.post(`${environment.apiBaseUrl}/api/credit-card-requests/create?income=${this.incomeInput || 0}`, payload).subscribe({
-      next: (res: any) => {
-        this.alertService.success('Application Submitted', 'Your credit card application has been submitted for review.');
-        this.closeApplyForm();
+  loadCreditCardApplications() {
+    if (!isPlatformBrowser(this.platformId)) return;
+    this.isLoadingApplications = true;
+    this.applicationError = '';
+    this.http.get<CreditCardApplication[]>(
+      `${environment.apiBaseUrl}/api/credit-card-requests/my-applications`,
+      this.authOptions()
+    ).subscribe({
+      next: applications => {
+        this.creditCardApplications = Array.isArray(applications) ? applications : [];
+        this.isLoadingApplications = false;
       },
-      error: (err: any) => {
-        console.error('Error submitting credit application:', err);
-        this.alertService.operationError('Credit application', err?.message || 'Submission failed');
+      error: error => {
+        console.error('Error loading credit card applications:', error);
+        this.applicationError = error.error?.message || 'Unable to load your credit card applications.';
+        this.isLoadingApplications = false;
       }
     });
   }

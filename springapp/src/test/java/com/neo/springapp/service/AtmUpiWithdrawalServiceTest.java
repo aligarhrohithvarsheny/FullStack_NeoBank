@@ -54,6 +54,11 @@ class AtmUpiWithdrawalServiceTest {
 
         assertTrue((Boolean) response.get("success"));
         assertTrue(((String) response.get("qrPayload")).contains("pa=" + "atmwithdrawal@neobank"));
+        assertEquals("acc001@neobank", response.get("senderUpiId"));
+        assertEquals("atmwithdrawal@neobank", response.get("receiverUpiId"));
+        assertEquals("SAVINGS", response.get("accountType"));
+        assertEquals("NeoBank ATM", response.get("atmName"));
+        assertEquals("Main Street", response.get("atmLocation"));
         verify(requestRepository).save(any(AtmUpiWithdrawalRequest.class));
     }
 

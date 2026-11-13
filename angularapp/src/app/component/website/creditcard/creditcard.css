@@ -300,6 +300,39 @@ section {
   box-shadow: 0 8px 25px rgba(147, 51, 234, 0.4);
 }
 
+.application-history {
+  margin: 24px 0;
+  padding: 22px;
+  background: #fff;
+  border: 1px solid #e9d5ff;
+  border-radius: 12px;
+}
+
+.application-history .section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.application-history table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.application-history th,
+.application-history td {
+  padding: 11px;
+  border-bottom: 1px solid #e5e7eb;
+  text-align: left;
+}
+
+.application-error {
+  color: #b91c1c;
+  margin-top: 10px;
+}
+
 .no-card-state {
   text-align: center;
   padding: 60px 20px;

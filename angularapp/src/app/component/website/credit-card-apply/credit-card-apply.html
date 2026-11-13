@@ -1,0 +1,155 @@
+<main class="guest-credit-application">
+  <header class="application-header">
+    <a routerLink="/website/landing" class="back-link">← NeoBank home</a>
+    <span class="application-eyebrow">NEOBANK CREDIT</span>
+    <h1>Apply for a credit card</h1>
+    <p>Apply online even if you don't have a NeoBank account. Your application is reviewed by our team.</p>
+  </header>
+
+  <div class="application-layout">
+    <section class="application-panel">
+      <h2>Applicant details</h2>
+      <form (ngSubmit)="submitApplication()" #applicationForm="ngForm">
+        <div class="application-fields">
+          <label>
+            Full name
+            <input name="userName" [(ngModel)]="application.userName" required maxlength="120" autocomplete="name">
+          </label>
+          <label>
+            Email address
+            <input type="email" name="userEmail" [(ngModel)]="application.userEmail" required autocomplete="email">
+          </label>
+          <label>
+            Mobile number
+            <input type="tel" name="mobileNumber" [(ngModel)]="application.mobileNumber" required
+              inputmode="numeric" pattern="[6-9][0-9]{9}" maxlength="10" autocomplete="tel-national">
+          </label>
+          <label>
+            PAN
+            <input name="pan" [(ngModel)]="application.pan" required pattern="[A-Za-z]{5}[0-9]{4}[A-Za-z]"
+              maxlength="10" autocapitalize="characters">
+          </label>
+          <label>
+            Aadhaar (last four digits only)
+            <input name="aadhaarLastFour" [(ngModel)]="application.aadhaarLastFour" required
+              inputmode="numeric" pattern="[0-9]{4}" maxlength="4">
+          </label>
+          <label>
+            Date of birth
+            <input type="date" name="dateOfBirth" [(ngModel)]="application.dateOfBirth" required [max]="maxDate">
+          </label>
+          <label>
+            Annual income (₹)
+            <input type="number" name="annualIncome" [(ngModel)]="application.annualIncome" required
+              min="1" max="1000000000" step="1" inputmode="decimal">
+          </label>
+          <label>
+            Employment type
+            <select name="employmentType" [(ngModel)]="application.employmentType" required>
+              <option value="SALARIED">Salaried employee</option>
+              <option value="SELF_EMPLOYED">Self-employed</option>
+            </select>
+          </label>
+          <label>
+            {{ application.employmentType === 'SELF_EMPLOYED' ? 'Business name' : 'Company / employer name' }}
+            <input name="employerName" [(ngModel)]="application.employerName" (input)="searchCompanies()"
+              [attr.list]="application.employmentType === 'SALARIED' ? 'credit-card-companies' : null"
+              required maxlength="150" autocomplete="organization">
+            <datalist id="credit-card-companies">
+              <option *ngFor="let company of companySuggestions" [value]="company"></option>
+            </datalist>
+          </label>
+          <label>
+            Designation / occupation
+            <input name="designation" [(ngModel)]="application.designation" required maxlength="120">
+          </label>
+          <label class="wide-field">
+            Residential address
+            <textarea name="address" [(ngModel)]="application.address" required maxlength="500" rows="3"
+              autocomplete="street-address"></textarea>
+          </label>
+        </div>
+
+        <h2 class="subheading">Identity documents</h2>
+        <p class="privacy-note">Images are private and available only to authorized admins. They are deleted 90 days after a final decision. Only the last four Aadhaar digits are stored.</p>
+        <div class="application-fields">
+          <label>
+            PAN image (JPEG or PNG, up to 5 MB)
+            <input type="file" accept="image/jpeg,image/png" (change)="onDocumentSelected('pan', $event)" required>
+            <small>{{ panDocument?.name || 'No PAN image selected' }}</small>
+          </label>
+          <label>
+            Aadhaar image (JPEG or PNG, up to 5 MB)
+            <input type="file" accept="image/jpeg,image/png" (change)="onDocumentSelected('aadhaar', $event)" required>
+            <small>{{ aadhaarDocument?.name || 'No Aadhaar image selected' }}</small>
+          </label>
+        </div>
+
+        <div class="selfie-capture">
+          <div>
+            <h3>Live face capture</h3>
+            <p>Allow camera access and take a current photo. This is stored for application review.</p>
+            <button type="button" class="secondary-button" (click)="openCamera()" [disabled]="isCameraOpen">
+              {{ selfie ? 'Retake live photo' : 'Open camera' }}
+            </button>
+            <button *ngIf="isCameraOpen" type="button" class="primary-button"
+              (click)="captureSelfie(selfieVideo, selfieCanvas)">Capture photo</button>
+          </div>
+          <video #selfieVideo id="credit-card-selfie-video" *ngIf="isCameraOpen" autoplay playsinline></video>
+          <img *ngIf="selfiePreview" [src]="selfiePreview" alt="Captured live selfie preview">
+          <canvas #selfieCanvas class="hidden-canvas"></canvas>
+          <small>{{ selfie ? 'Live selfie captured' : 'No live selfie captured' }}</small>
+        </div>
+
+        <label class="consent-row">
+          <input type="checkbox" name="consent" [(ngModel)]="application.consent" required>
+          <span>I consent to NeoBank processing these details and documents to assess and verify my credit card application.</span>
+        </label>
+        <p class="form-error" *ngIf="errorMessage">{{ errorMessage }}</p>
+        <button type="submit" class="primary-button submit-button"
+          [disabled]="applicationForm.invalid || isSubmitting">
+          {{ isSubmitting ? 'Submitting application...' : 'Submit application' }}
+        </button>
+      </form>
+
+      <div class="application-success" *ngIf="submittedApplication">
+        <h3>Application submitted</h3>
+        <p>Your application ID is <strong>{{ submittedApplication.applicationId }}</strong>.</p>
+        <p>Save this ID. Track your application using this ID, your PAN, and mobile number.</p>
+      </div>
+    </section>
+
+    <aside class="tracking-panel">
+      <span class="application-eyebrow">APPLICATION STATUS</span>
+      <h2>Track an application</h2>
+      <form (ngSubmit)="trackApplication()" #trackingForm="ngForm">
+        <label>
+          Application ID
+          <input name="applicationId" [(ngModel)]="tracking.applicationId" required>
+        </label>
+        <label>
+          PAN
+          <input name="trackingPan" [(ngModel)]="tracking.pan" required maxlength="10">
+        </label>
+        <label>
+          Mobile number
+          <input name="trackingMobile" [(ngModel)]="tracking.mobileNumber" required inputmode="numeric" maxlength="10">
+        </label>
+        <p class="form-error" *ngIf="trackingError">{{ trackingError }}</p>
+        <button type="submit" class="secondary-button" [disabled]="trackingForm.invalid || isTracking">
+          {{ isTracking ? 'Checking...' : 'Track application' }}
+        </button>
+      </form>
+      <div class="tracking-result" *ngIf="trackedApplication">
+        <p><strong>Application:</strong> {{ trackedApplication.applicationId }}</p>
+        <p><strong>Status:</strong> {{ trackedApplication.status }}</p>
+        <p><strong>Submitted:</strong> {{ trackedApplication.requestDate | date:'medium' }}</p>
+        <p *ngIf="trackedApplication.processedDate"><strong>Decision date:</strong> {{ trackedApplication.processedDate | date:'medium' }}</p>
+        <p *ngIf="trackedApplication.approvedLimit"><strong>Approved limit:</strong> ₹{{ trackedApplication.approvedLimit | number:'1.0-0' }}</p>
+        <p *ngIf="trackedApplication.status === 'Approved' && !trackedApplication.cardIssued">
+          Your application is approved. A card has not been issued because no NeoBank account is linked.
+        </p>
+      </div>
+    </aside>
+  </div>
+</main>

@@ -102,7 +102,7 @@
     <p *ngIf="cardGenerationSuccess" class="card-success">{{ cardGenerationSuccess }}</p>
   </div>
 
-  <section *ngIf="card" class="card-history">
+  <div *ngIf="card" class="card-history">
     <h4>Debit Card History</h4>
     <p *ngIf="isLoadingCardHistory">Loading card history...</p>
     <p *ngIf="cardHistoryError" class="card-error">{{ cardHistoryError }}</p>
@@ -125,7 +125,7 @@
         </tr>
       </tbody>
     </table>
-  </section>
+  </div>
 
   <!-- Card Actions -->
   <div *ngIf="card" class="card-actions">

@@ -91,6 +91,12 @@ export class Landing implements OnInit, OnDestroy {
       route: 'website/cards360'
     },
     {
+      label: 'Apply for a Credit Card',
+      description: 'Apply as a NeoBank customer or a new applicant and track your application.',
+      keywords: 'credit card apply application pan income guest track',
+      route: 'website/credit-card-apply'
+    },
+    {
       label: 'FASTag',
       description: 'Access FASTag services and account login.',
       keywords: 'fastag toll recharge tag',
