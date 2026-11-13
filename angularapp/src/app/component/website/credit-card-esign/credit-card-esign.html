@@ -64,6 +64,9 @@
     <h2>Signature recorded</h2>
     <p>{{ notice }}</p>
     <p *ngIf="agreement?.applicationId">
+      <strong>Application ID: {{ agreement.applicationId }}</strong>
+    </p>
+    <p *ngIf="agreement?.applicationId">
       For a guest application, track the application with its ID, PAN, and mobile number to reveal the generated
       card details after email verification.
     </p>

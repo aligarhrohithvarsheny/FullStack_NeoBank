@@ -70,6 +70,22 @@ class CreditCardRequestServiceTest {
     }
 
     @Test
+    void acceptsTheExactSevenHundredFiftyScoreThresholdForAdminReview() {
+        CreditCardRequestRepository requestRepository = mock(CreditCardRequestRepository.class);
+        when(requestRepository.findByAccountNumberOrderByRequestDateDesc("ACC123")).thenReturn(List.of());
+        when(requestRepository.save(any(CreditCardRequest.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        CreditCardRequest request = application("ABCDE0001F");
+
+        CreditCardRequest saved = createService(requestRepository, mock(CreditCardRepository.class))
+                .saveRequest(request, 84000d);
+
+        assertEquals(750, saved.getPredictedCibil());
+        assertEquals("Pending", saved.getStatus());
+        assertNull(saved.getRejectionReason());
+    }
+
+    @Test
     void rejectsAnotherOpenApplicationForTheSameAccount() {
         CreditCardRequestRepository requestRepository = mock(CreditCardRequestRepository.class);
         CreditCardRequest existing = application("ABCDE1234F");

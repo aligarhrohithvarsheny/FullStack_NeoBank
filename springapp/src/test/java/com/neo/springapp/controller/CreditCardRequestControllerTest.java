@@ -153,6 +153,26 @@ class CreditCardRequestControllerTest {
     }
 
     @Test
+    void agreementSignatureResponseConfirmsIssuanceWithoutReturningCardCredentials() {
+        when(service.signCreditCardAgreement(
+                eq("secret-link-token"), eq("captcha-id"), eq("A1B2C3"), eq("Applicant"), eq(true), anyString()))
+                .thenReturn(new CreditCardRequestService.AgreementSignResult(true, true));
+
+        var response = controller.signCreditCardAgreement(
+                "secret-link-token",
+                new CreditCardRequestController.AgreementSignRequest(
+                        "captcha-id", "A1B2C3", "Applicant", true),
+                new org.springframework.mock.web.MockHttpServletRequest());
+
+        assertEquals(200, response.getStatusCode().value());
+        var result = (java.util.Map<?, ?>) response.getBody();
+        assertEquals("Approved", result.get("status"));
+        assertEquals(true, result.get("cardDetailsAvailable"));
+        assertFalse(result.containsKey("cardNumber"));
+        assertFalse(result.containsKey("cvv"));
+    }
+
+    @Test
     void nonStaffCannotViewApplicationDocuments() {
         var response = controller.getApplicationDocument(
                 17L, "pan", authenticated(new SessionPrincipal(5L, "ACC123", "USER")));

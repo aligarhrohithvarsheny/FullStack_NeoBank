@@ -869,7 +869,9 @@
               type="button" class="btn-secondary" (click)="saveApplicationChanges()" [disabled]="isSavingApplication">
               Save edited details
             </button>
-            <button *ngIf="selectedApplication.status === 'Pending' && selectedApplication.predictedCibil >= 750" type="button" class="btn-success"
+            <button *ngIf="selectedApplication.status === 'Pending' &&
+                (selectedApplication.predictedCibil == null || selectedApplication.predictedCibil >= 750)"
+              type="button" class="btn-success"
               (click)="approveGuestApplication()" [disabled]="isSavingApplication">
               {{ isSavingApplication ? 'Saving...' : 'Approve limit and email e-sign link' }}
             </button>

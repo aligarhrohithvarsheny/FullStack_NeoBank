@@ -311,7 +311,7 @@ public class CreditCardRequestService {
             request.setEligibility("Rejected");
             request.setDocumentsDeleteAfter(LocalDateTime.now().plusDays(90));
             request = repo.save(request);
-            return new ApprovalResult(request, null, null);
+            return new ApprovalResult(request, null, null, false);
         }
         if (approvedLimit == null || !Double.isFinite(approvedLimit)
                 || approvedLimit <= 0 || approvedLimit > 1_000_000_000d) {
@@ -336,12 +336,10 @@ public class CreditCardRequestService {
         repo.save(request);
 
         String shareUrl = frontendUrl + "/credit-card-esign/" + token;
-        if (!emailService.sendCreditCardAgreementLinkEmail(
+        boolean emailSent = emailService.sendCreditCardAgreementLinkEmail(
                 request.getUserEmail(), request.getUserName(), shareUrl,
-                request.getCardAgreementExpiresAt().toString())) {
-            throw new IllegalStateException("The e-sign link could not be emailed. Check the email configuration and retry.");
-        }
-        return new ApprovalResult(request, shareUrl, request.getCardAgreementExpiresAt());
+                request.getCardAgreementExpiresAt().toString());
+        return new ApprovalResult(request, shareUrl, request.getCardAgreementExpiresAt(), emailSent);
     }
 
     @Transactional
@@ -361,11 +359,9 @@ public class CreditCardRequestService {
         request.setAgreementCaptchaExpiresAt(null);
         repo.save(request);
         String shareUrl = frontendUrl + "/credit-card-esign/" + token;
-        if (!emailService.sendCreditCardAgreementLinkEmail(
-                request.getUserEmail(), request.getUserName(), shareUrl, expiresAt.toString())) {
-            throw new IllegalStateException("The e-sign link could not be emailed. Check the email configuration and retry.");
-        }
-        return new AgreementLinkResult(shareUrl, expiresAt);
+        boolean emailSent = emailService.sendCreditCardAgreementLinkEmail(
+                request.getUserEmail(), request.getUserName(), shareUrl, expiresAt.toString());
+        return new AgreementLinkResult(shareUrl, expiresAt, emailSent);
     }
 
     @Transactional(readOnly = true)
@@ -756,8 +752,9 @@ public class CreditCardRequestService {
         return predictor.getPanBasedLimit(pan);
     }
 
-    public record ApprovalResult(CreditCardRequest application, String shareUrl, LocalDateTime expiresAt) {}
-    public record AgreementLinkResult(String shareUrl, LocalDateTime expiresAt) {}
+    public record ApprovalResult(CreditCardRequest application, String shareUrl,
+                                 LocalDateTime expiresAt, boolean emailSent) {}
+    public record AgreementLinkResult(String shareUrl, LocalDateTime expiresAt, boolean emailSent) {}
     public record AgreementSignResult(boolean signed, boolean guestCard) {}
     public record GuestApplicationUpdate(String userName, String userEmail, String pan, Double annualIncome,
                                          String mobileNumber, String dateOfBirth, String aadhaarLastFour,

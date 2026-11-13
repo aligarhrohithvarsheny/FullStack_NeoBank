@@ -127,7 +127,10 @@ public class CreditCardRequestController {
     @GetMapping("/agreement/{token}")
     public ResponseEntity<?> creditCardAgreementDetails(@PathVariable String token) {
         try {
-            return ResponseEntity.ok(service.creditCardAgreementDetails(token));
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CACHE_CONTROL, "no-store, no-cache, must-revalidate")
+                    .header(HttpHeaders.PRAGMA, "no-cache")
+                    .body(service.creditCardAgreementDetails(token));
         } catch (IllegalArgumentException | IllegalStateException ex) {
             return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));
         }
@@ -136,7 +139,10 @@ public class CreditCardRequestController {
     @GetMapping("/agreement/{token}/captcha")
     public ResponseEntity<?> creditCardAgreementCaptcha(@PathVariable String token) {
         try {
-            return ResponseEntity.ok(service.createCreditCardAgreementCaptcha(token));
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CACHE_CONTROL, "no-store, no-cache, must-revalidate")
+                    .header(HttpHeaders.PRAGMA, "no-cache")
+                    .body(service.createCreditCardAgreementCaptcha(token));
         } catch (IllegalArgumentException | IllegalStateException ex) {
             return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));
         }
@@ -296,7 +302,8 @@ public class CreditCardRequestController {
             return ResponseEntity.ok(Map.of(
                     "application", result.application(),
                     "shareUrl", result.shareUrl(),
-                    "expiresAt", result.expiresAt()));
+                    "expiresAt", result.expiresAt(),
+                    "emailSent", result.emailSent()));
         } catch (IllegalArgumentException | IllegalStateException ex) {
             return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));
         } catch (RuntimeException ex) {
@@ -310,7 +317,10 @@ public class CreditCardRequestController {
         if (!isStaff(authentication)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         try {
             CreditCardRequestService.AgreementLinkResult result = service.renewCreditCardAgreementLink(id);
-            return ResponseEntity.ok(Map.of("shareUrl", result.shareUrl(), "expiresAt", result.expiresAt()));
+            return ResponseEntity.ok(Map.of(
+                    "shareUrl", result.shareUrl(),
+                    "expiresAt", result.expiresAt(),
+                    "emailSent", result.emailSent()));
         } catch (IllegalArgumentException | IllegalStateException ex) {
             return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));
         }

@@ -244,7 +244,14 @@ export class CreditCards implements OnInit, OnDestroy {
         this.selectedApplication = updated.application;
         this.agreementShareUrl = updated.shareUrl;
         this.isSavingApplication = false;
-        this.alertService.success('Approval terms sent', 'The applicant was emailed a secure e-sign link. A card will be issued after signature.');
+        if (updated.emailSent) {
+          this.alertService.success('Approval terms sent', 'The applicant was emailed a secure e-sign link. A card will be issued after signature.');
+        } else {
+          this.alertService.operationError(
+            'Email unavailable',
+            'The e-sign link was created but could not be emailed. Copy the link below and share it with the applicant.'
+          );
+        }
         this.loadGuestApplications();
       },
       error: error => {
@@ -260,7 +267,7 @@ export class CreditCards implements OnInit, OnDestroy {
   renewCreditCardAgreementLink() {
     if (!this.selectedApplication?.id) return;
     this.isSavingApplication = true;
-    this.http.post<{ shareUrl: string; expiresAt: string }>(
+    this.http.post<{ shareUrl: string; expiresAt: string; emailSent: boolean }>(
       `${environment.apiBaseUrl}/api/credit-card-requests/admin/${this.selectedApplication.id}/agreement-link`,
       {},
       this.authOptions()
@@ -268,7 +275,14 @@ export class CreditCards implements OnInit, OnDestroy {
       next: result => {
         this.agreementShareUrl = result.shareUrl;
         this.isSavingApplication = false;
-        this.alertService.success('E-sign link sent', 'A new secure link was emailed and the previous link was invalidated.');
+        if (result.emailSent) {
+          this.alertService.success('E-sign link sent', 'A new secure link was emailed and the previous link was invalidated.');
+        } else {
+          this.alertService.operationError(
+            'Email unavailable',
+            'The previous link was invalidated. Copy the new link below and share it with the applicant.'
+          );
+        }
       },
       error: error => {
         this.isSavingApplication = false;
