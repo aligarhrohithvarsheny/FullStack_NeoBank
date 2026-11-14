@@ -74,7 +74,8 @@
           <thead>
             <tr>
               <th>Application ID</th><th>Applicant</th><th>PAN</th><th>Mobile</th>
-              <th>Employment</th><th>Annual income</th><th>Simulated score</th><th>Decision</th><th>Submitted</th><th>Review</th>
+              <th>Employment</th><th>Annual income</th><th>Simulated score</th><th>Decision</th>
+              <th>Card number / status</th><th>Submitted</th><th>Review</th>
             </tr>
           </thead>
           <tbody>
@@ -87,6 +88,7 @@
               <td>₹{{ application.annualIncome | number:'1.0-0' }}</td>
               <td>{{ application.predictedCibil ?? '—' }}</td>
               <td>{{ application.rejectionReason || application.status }}</td>
+              <td>{{ application.last4 ? ('•••• ' + application.last4 + ' · ' + (application.issuedCardStatus || 'Active')) : 'Not generated' }}</td>
               <td>{{ application.requestDate | date:'short' }}</td>
               <td><button type="button" class="btn-secondary" (click)="reviewApplication(application)">Review details</button></td>
             </tr>
@@ -859,15 +861,68 @@
           <p *ngIf="selectedApplication.status === 'Pending Card Issuance'" class="no-data">
             The applicant signed the agreement. Review the Aadhaar document and last four digits above, then generate the card.
           </p>
+          <p *ngIf="selectedApplication.status === 'Approved' && !selectedApplication.last4" class="no-data">
+            This application is approved but has no generated card number yet. Review Aadhaar before generating it.
+          </p>
           <div class="agreement-share-panel" *ngIf="agreementShareUrl">
             <label>Secure e-sign link
               <input [value]="agreementShareUrl" readonly>
             </label>
             <button type="button" class="btn-secondary" (click)="copyAgreementLink()">Copy link</button>
           </div>
-          <p *ngIf="selectedApplication.status === 'Approved' && !selectedApplication.accountNumber" class="no-data">
-            Card generated after signature and Aadhaar review. Guest card details are available to the applicant after email verification.
+          <p *ngIf="selectedApplication.status === 'Approved' && selectedApplication.applicationId && selectedApplication.last4" class="no-data">
+            Current card: •••• {{ selectedApplication.last4 }} · {{ selectedApplication.issuedCardStatus || 'Active' }}.
+            Guest card details are available to the applicant after email verification.
           </p>
+          <section class="card-number-history" *ngIf="selectedApplication.status === 'Approved' || selectedApplication.status === 'Pending Card Issuance'">
+            <h4>Card number actions</h4>
+            <label *ngIf="selectedApplication.status === 'Pending Card Issuance' || !selectedApplication.last4 || selectedApplication.issuedCardStatus === 'Blocked'"
+              class="aadhaar-review-confirmation">
+              <input type="checkbox" [(ngModel)]="aadhaarDocumentVerified">
+              I reviewed the Aadhaar details and identity document for this application.
+            </label>
+            <label *ngIf="isApplicationCardActive(selectedApplication) || selectedApplication.status === 'Pending Card Issuance' || !selectedApplication.last4 || selectedApplication.issuedCardStatus === 'Blocked'">
+              Action reason
+              <textarea [(ngModel)]="cardActionReason" maxlength="500" rows="2"
+                placeholder="Required for generation, blocking, or replacement"></textarea>
+            </label>
+            <div class="modal-actions">
+              <button *ngIf="selectedApplication.status === 'Pending Card Issuance' ||
+                  (selectedApplication.status === 'Approved' && (!selectedApplication.last4 || selectedApplication.issuedCardStatus === 'Blocked'))"
+                type="button" class="btn-success" (click)="generateApprovedCardNumber()"
+                [disabled]="isSavingApplication || !aadhaarDocumentVerified || !cardActionReason.trim()">
+                {{ isSavingApplication ? 'Generating...' : (selectedApplication.last4 ? 'Generate replacement card number' : 'Generate card number') }}
+              </button>
+              <button *ngIf="selectedApplication.status === 'Approved' && isApplicationCardActive(selectedApplication)"
+                type="button" class="btn-danger" (click)="blockApprovedCard()"
+                [disabled]="isSavingApplication || !cardActionReason.trim()">
+                {{ isSavingApplication ? 'Blocking...' : 'Block current card number' }}
+              </button>
+            </div>
+            <p *ngIf="selectedApplication.issuedCardStatus === 'Blocked'" class="no-data">
+              The old card is blocked. Generate a replacement number to reactivate card issuance.
+            </p>
+            <div class="card-history-table-wrap">
+              <h5>Card number history</h5>
+              <p *ngIf="isLoadingCardNumberHistory" class="no-data">Loading card history...</p>
+              <p *ngIf="!isLoadingCardNumberHistory && !cardNumberHistory.length" class="no-data">No card number actions recorded.</p>
+              <table class="application-table" *ngIf="!isLoadingCardNumberHistory && cardNumberHistory.length">
+                <thead>
+                  <tr><th>Action</th><th>Old number</th><th>New number</th><th>Time</th><th>Reason</th><th>Admin</th></tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let action of cardNumberHistory">
+                    <td>{{ action.action }}</td>
+                    <td>{{ action.oldMaskedCardNumber || '—' }}</td>
+                    <td>{{ action.newMaskedCardNumber || '—' }}</td>
+                    <td>{{ action.generatedAt | date:'short' }}</td>
+                    <td>{{ action.reason }}</td>
+                    <td>{{ action.generatedBy || '—' }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
           <div class="modal-actions application-review-actions">
             <button *ngIf="selectedApplication.applicationId && selectedApplication.status === 'Pending'"
               type="button" class="btn-secondary" (click)="saveApplicationChanges()" [disabled]="isSavingApplication">
@@ -882,14 +937,6 @@
             <button *ngIf="selectedApplication.status === 'Pending Signature'" type="button" class="btn-secondary"
               (click)="renewCreditCardAgreementLink()" [disabled]="isSavingApplication">
               {{ isSavingApplication ? 'Sending...' : 'Email a new e-sign link' }}
-            </button>
-            <label *ngIf="selectedApplication.status === 'Pending Card Issuance'" class="aadhaar-review-confirmation">
-              <input type="checkbox" [(ngModel)]="aadhaarDocumentVerified">
-              I reviewed the Aadhaar details and identity document for this application.
-            </label>
-            <button *ngIf="selectedApplication.status === 'Pending Card Issuance'" type="button" class="btn-success"
-              (click)="issueSignedCreditCard()" [disabled]="isSavingApplication || !aadhaarDocumentVerified">
-              {{ isSavingApplication ? 'Generating...' : 'Generate card after Aadhaar review' }}
             </button>
             <button *ngIf="selectedApplication.status === 'Pending'" type="button" class="btn-danger"
               (click)="rejectGuestApplication()" [disabled]="isSavingApplication">Reject application</button>

@@ -3,9 +3,11 @@ package com.neo.springapp.service;
 import com.neo.springapp.model.Card;
 import com.neo.springapp.model.CreditCard;
 import com.neo.springapp.model.CreditCardRequest;
+import com.neo.springapp.model.CreditCardNumberHistory;
 import com.neo.springapp.repository.CardRepository;
 import com.neo.springapp.repository.CreditCardRequestRepository;
 import com.neo.springapp.repository.CreditCardRepository;
+import com.neo.springapp.repository.CreditCardNumberHistoryRepository;
 import com.neo.springapp.repository.SalaryAccountRepository;
 import com.neo.springapp.repository.VirtualCardRepository;
 import com.neo.springapp.model.SalaryAccount;
@@ -50,6 +52,7 @@ public class CreditCardRequestService {
     private final CreditScorePredictorService predictor;
     private final CardRepository cardRepository;
     private final CreditCardRepository creditCardRepository;
+    private final CreditCardNumberHistoryRepository cardNumberHistoryRepository;
     private final VirtualCardRepository virtualCardRepository;
     private final AccountService accountService;
     private final SalaryAccountRepository salaryAccountRepository;
@@ -60,6 +63,7 @@ public class CreditCardRequestService {
 
     public CreditCardRequestService(CreditCardRequestRepository repo, CreditScorePredictorService predictor,
                                     CardRepository cardRepository, CreditCardRepository creditCardRepository,
+                                    CreditCardNumberHistoryRepository cardNumberHistoryRepository,
                                     VirtualCardRepository virtualCardRepository,
                                     AccountService accountService, SalaryAccountRepository salaryAccountRepository,
                                     CreditCardApplicationDocumentService documentService, OtpService otpService,
@@ -69,6 +73,7 @@ public class CreditCardRequestService {
         this.predictor = predictor;
         this.cardRepository = cardRepository;
         this.creditCardRepository = creditCardRepository;
+        this.cardNumberHistoryRepository = cardNumberHistoryRepository;
         this.virtualCardRepository = virtualCardRepository;
         this.accountService = accountService;
         this.salaryAccountRepository = salaryAccountRepository;
@@ -229,7 +234,9 @@ public class CreditCardRequestService {
         }
         if (request.getAccountNumber() != null || !"Approved".equalsIgnoreCase(request.getStatus())
                 || request.getGuestCardNumber() == null || request.getGuestCardExpiry() == null
-                || request.getGuestCardCvv() == null) {
+                || request.getGuestCardCvv() == null
+                || (request.getIssuedCardStatus() != null
+                && !"Active".equalsIgnoreCase(request.getIssuedCardStatus()))) {
             throw new IllegalStateException("Card details are available after an eligible guest application is approved.");
         }
         return request;
@@ -464,10 +471,12 @@ public class CreditCardRequestService {
     }
 
     @Transactional
-    public CreditCardRequest issueSignedCreditCard(Long id, String adminName, boolean aadhaarDocumentVerified) {
+    public CreditCardRequest generateApprovedCardNumber(
+            Long id, String adminName, boolean aadhaarDocumentVerified, String reason) {
         CreditCardRequest request = repo.findById(id).orElse(null);
         if (request == null) return null;
-        if (!"Pending Card Issuance".equalsIgnoreCase(request.getStatus())
+        if (!("Pending Card Issuance".equalsIgnoreCase(request.getStatus())
+                || "Approved".equalsIgnoreCase(request.getStatus()))
                 || request.getCardAgreementSignedAt() == null
                 || request.getCardAgreementSignatureHash() == null) {
             throw new IllegalStateException("The applicant must sign the agreement before card issuance.");
@@ -475,10 +484,113 @@ public class CreditCardRequestService {
         if (!aadhaarDocumentVerified) {
             throw new IllegalArgumentException("Review and confirm the applicant's Aadhaar verification before issuance.");
         }
+        String normalizedReason = validateCardActionReason(reason);
+        boolean reissue = request.getLast4() != null;
+        if (reissue && !"Blocked".equalsIgnoreCase(request.getIssuedCardStatus())) {
+            throw new IllegalStateException("Block the current card before generating a replacement number.");
+        }
+
+        String previousCardNumber = reissue ? currentCardNumber(request) : null;
         LocalDateTime issuedAt = LocalDateTime.now();
-        issueApprovedCard(request, issuedAt);
+        if (reissue) disableReplacedCard(request, previousCardNumber);
+        issueApprovedCard(request, issuedAt, reissue, previousCardNumber);
         request.setProcessedBy(adminName);
-        return repo.save(request);
+        CreditCardRequest saved = repo.save(request);
+        recordCardNumberHistory(saved, reissue ? previousCardNumber : null,
+                currentCardNumber(saved), reissue ? "REISSUE" : "GENERATE",
+                normalizedReason, adminName, issuedAt);
+        return saved;
+    }
+
+    @Transactional
+    public CreditCardRequest blockApprovedCard(Long id, String adminName, String reason) {
+        CreditCardRequest request = repo.findById(id).orElse(null);
+        if (request == null) return null;
+        if (!"Approved".equalsIgnoreCase(request.getStatus()) || request.getLast4() == null
+                || (request.getIssuedCardStatus() != null
+                && !"Active".equalsIgnoreCase(request.getIssuedCardStatus()))) {
+            throw new IllegalStateException("Only an active, generated card can be blocked.");
+        }
+        String normalizedReason = validateCardActionReason(reason);
+        String cardNumber = currentCardNumber(request);
+        disableCurrentCard(request, cardNumber, false);
+        request.setIssuedCardStatus("Blocked");
+        request.setProcessedBy(adminName);
+        CreditCardRequest saved = repo.save(request);
+        recordCardNumberHistory(saved, cardNumber, null, "BLOCK", normalizedReason, adminName,
+                LocalDateTime.now());
+        return saved;
+    }
+
+    public List<CreditCardNumberHistory> getCardNumberHistory(Long requestId) {
+        return cardNumberHistoryRepository.findByRequestIdOrderByGeneratedAtDesc(requestId);
+    }
+
+    private String validateCardActionReason(String reason) {
+        if (reason == null || reason.isBlank() || reason.trim().length() > 500) {
+            throw new IllegalArgumentException("Enter a reason (up to 500 characters) for this card action.");
+        }
+        return reason.trim();
+    }
+
+    private String currentCardNumber(CreditCardRequest request) {
+        if (request.getGuestCardNumber() != null) return request.getGuestCardNumber();
+        if (request.getAccountNumber() == null || request.getAccountNumber().isBlank()) {
+            throw new IllegalStateException("The current card number was not found.");
+        }
+        return creditCardRepository.findByAccountNumber(request.getAccountNumber()).stream()
+                .map(CreditCard::getCardNumber)
+                .filter(number -> number != null && number.endsWith(request.getLast4()))
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("The current card number was not found."));
+    }
+
+    private void disableReplacedCard(CreditCardRequest request, String cardNumber) {
+        disableCurrentCard(request, cardNumber, true);
+    }
+
+    private void disableCurrentCard(CreditCardRequest request, String cardNumber, boolean replaced) {
+        if (request.getAccountNumber() == null || request.getAccountNumber().isBlank()) return;
+        String status = replaced ? "Replaced" : "Blocked";
+        creditCardRepository.findByAccountNumber(request.getAccountNumber()).stream()
+                .filter(card -> cardNumber.equals(card.getCardNumber()))
+                .forEach(card -> {
+                    card.setBlocked(true);
+                    card.setDeactivated(true);
+                    card.setStatus(status);
+                    card.setOnlineTransactionsEnabled(false);
+                    card.setPosTransactionsEnabled(false);
+                    card.setContactlessEnabled(false);
+                    card.setAtmWithdrawalsEnabled(false);
+                    card.setInternationalTransactionsEnabled(false);
+                    creditCardRepository.save(card);
+                });
+        cardRepository.findByAccountNumber(request.getAccountNumber()).stream()
+                .filter(card -> cardNumber.equals(card.getCardNumber()))
+                .forEach(card -> {
+                    card.setBlocked(true);
+                    card.setDeactivated(true);
+                    card.setStatus(status);
+                    cardRepository.save(card);
+                });
+    }
+
+    private void recordCardNumberHistory(CreditCardRequest request, String oldCardNumber, String newCardNumber,
+                                         String action, String reason, String adminName, LocalDateTime createdAt) {
+        CreditCardNumberHistory history = new CreditCardNumberHistory();
+        history.setRequestId(request.getId());
+        history.setOldMaskedCardNumber(maskCardNumber(oldCardNumber));
+        history.setNewMaskedCardNumber(maskCardNumber(newCardNumber));
+        history.setAction(action);
+        history.setReason(reason);
+        history.setGeneratedBy(adminName);
+        history.setGeneratedAt(createdAt);
+        cardNumberHistoryRepository.save(history);
+    }
+
+    private String maskCardNumber(String cardNumber) {
+        if (cardNumber == null || cardNumber.length() < 4) return null;
+        return "**** **** **** " + cardNumber.substring(cardNumber.length() - 4);
     }
 
     private CreditCardRequest requirePendingAgreement(String token) {
@@ -511,8 +623,9 @@ public class CreditCardRequestService {
         }
     }
 
-    private void issueApprovedCard(CreditCardRequest request, LocalDateTime issuedAt) {
-        String cardNumber = generateUniqueGuestCardNumber();
+    private void issueApprovedCard(
+            CreditCardRequest request, LocalDateTime issuedAt, boolean reissue, String previousCardNumber) {
+        String cardNumber = generateUniqueGuestCardNumber(previousCardNumber);
         String cvv = String.format(Locale.ROOT, "%03d", CARD_RANDOM.nextInt(1000));
         LocalDate expiry = issuedAt.toLocalDate().plusYears(3);
         String expiryDate = String.format(Locale.ROOT, "%02d/%02d",
@@ -522,7 +635,18 @@ public class CreditCardRequestService {
             request.setGuestCardExpiry(expiryDate);
             request.setGuestCardCvv(cvv);
         } else {
-            validateAccountForCardIssuance(request);
+            if (reissue) {
+                Account account = accountService.getAccountByNumber(request.getAccountNumber());
+                SalaryAccount salaryAccount = account == null
+                        ? salaryAccountRepository.findByAccountNumber(request.getAccountNumber()) : null;
+                String accountStatus = account != null ? account.getStatus()
+                        : salaryAccount == null ? null : salaryAccount.getStatus();
+                if (!"ACTIVE".equalsIgnoreCase(accountStatus)) {
+                    throw new IllegalStateException("Cannot replace credit card: the customer account is not active.");
+                }
+            } else {
+                validateAccountForCardIssuance(request);
+            }
             CreditCard creditCard = new CreditCard();
             creditCard.setCardNumber(cardNumber);
             creditCard.setCvv(cvv);
@@ -550,6 +674,7 @@ public class CreditCardRequestService {
             cardRepository.save(card);
         }
         request.setLast4(cardNumber.substring(12));
+        request.setIssuedCardStatus("Active");
         request.setStatus("Approved");
         request.setEligibility("Approved");
         request.setProcessedDate(issuedAt);
@@ -631,7 +756,7 @@ public class CreditCardRequestService {
         }
     }
 
-    private String generateUniqueGuestCardNumber() {
+    private String generateUniqueGuestCardNumber(String excludedCardNumber) {
         for (int attempt = 0; attempt < 20; attempt++) {
             StringBuilder number = new StringBuilder("4");
             while (number.length() < 15) {
@@ -639,7 +764,8 @@ public class CreditCardRequestService {
             }
             number.append(luhnCheckDigit(number.toString()));
             String candidate = number.toString();
-            if (cardRepository.findByCardNumber(candidate) == null
+            if (!candidate.equals(excludedCardNumber)
+                    && cardRepository.findByCardNumber(candidate) == null
                     && creditCardRepository.findByCardNumber(candidate).isEmpty()
                     && virtualCardRepository.findByCardNumber(candidate).isEmpty()
                     && !repo.existsByGuestCardNumber(candidate)) {

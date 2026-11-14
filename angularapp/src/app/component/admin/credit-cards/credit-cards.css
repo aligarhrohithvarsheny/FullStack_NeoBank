@@ -1706,6 +1706,48 @@
   min-width: 220px;
 }
 
+.card-number-history {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+  padding: 14px;
+  border: 1px solid #dbe5ef;
+  border-radius: 9px;
+  background: #f8fafc;
+}
+
+.card-number-history h4,
+.card-history-table-wrap h5 {
+  margin: 0;
+  color: #1e293b;
+}
+
+.card-number-history > label:not(.aadhaar-review-confirmation) {
+  display: grid;
+  gap: 6px;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.card-number-history textarea {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  font: inherit;
+}
+
+.card-history-table-wrap {
+  overflow-x: auto;
+}
+
+.card-history-table-wrap .application-table {
+  min-width: 760px;
+  background: white;
+}
+
 .application-score-summary,
 .agreement-share-panel {
   margin-top: 14px;

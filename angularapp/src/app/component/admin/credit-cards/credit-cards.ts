@@ -57,6 +57,9 @@ export class CreditCards implements OnInit, OnDestroy {
   isSavingApplication = false;
   applicationDocumentPreview = '';
   applicationDocumentPreviewType = '';
+  cardNumberHistory: any[] = [];
+  isLoadingCardNumberHistory = false;
+  cardActionReason = '';
   applyCreditCardForm = {
     accountNumber: '',
     userName: '',
@@ -171,6 +174,8 @@ export class CreditCards implements OnInit, OnDestroy {
     this.clearApplicationDocumentPreview();
     this.agreementShareUrl = '';
     this.aadhaarDocumentVerified = false;
+    this.cardActionReason = '';
+    this.cardNumberHistory = [];
     this.selectedApplication = application;
     this.applicationApprovedLimit = application.approvedLimit ?? null;
     this.applicationEdit = {
@@ -186,6 +191,12 @@ export class CreditCards implements OnInit, OnDestroy {
       employerName: application.employerName || '',
       designation: application.designation || ''
     };
+    this.loadCardNumberHistory(application.id);
+  }
+
+  isApplicationCardActive(application: any): boolean {
+    return !!application?.last4
+      && (application.issuedCardStatus == null || application.issuedCardStatus === 'Active');
   }
 
   saveApplicationChanges() {
@@ -293,32 +304,84 @@ export class CreditCards implements OnInit, OnDestroy {
     });
   }
 
-  issueSignedCreditCard() {
+  loadCardNumberHistory(applicationId: number) {
+    this.isLoadingCardNumberHistory = true;
+    this.http.get<any[]>(
+      `${environment.apiBaseUrl}/api/credit-card-requests/admin/${applicationId}/card-history`,
+      this.authOptions()
+    ).subscribe({
+      next: history => {
+        this.cardNumberHistory = Array.isArray(history) ? history : [];
+        this.isLoadingCardNumberHistory = false;
+      },
+      error: error => {
+        this.cardNumberHistory = [];
+        this.isLoadingCardNumberHistory = false;
+        this.alertService.operationError('Load card history', error.error?.message || 'Unable to load card generation history.');
+      }
+    });
+  }
+
+  generateApprovedCardNumber() {
     if (!this.selectedApplication?.id) return;
+    if (!this.cardActionReason.trim()) {
+      this.alertService.error('Reason required', 'Enter why this card number is being generated.');
+      return;
+    }
     if (!this.aadhaarDocumentVerified) {
       this.alertService.error('Aadhaar review required', 'Review the applicant Aadhaar details before issuing the card.');
       return;
     }
     this.isSavingApplication = true;
-    this.http.post<{ status: string; maskedCardNumber: string }>(
-      `${environment.apiBaseUrl}/api/credit-card-requests/admin/${this.selectedApplication.id}/issue-card`,
-      { aadhaarDocumentVerified: true },
+    this.http.post<{ status: string; cardStatus: string; maskedCardNumber: string }>(
+      `${environment.apiBaseUrl}/api/credit-card-requests/admin/${this.selectedApplication.id}/generate-card`,
+      { aadhaarDocumentVerified: true, reason: this.cardActionReason.trim() },
       this.authOptions()
     ).subscribe({
       next: result => {
         this.selectedApplication = {
           ...this.selectedApplication,
           status: result.status,
+          issuedCardStatus: result.cardStatus,
           last4: result.maskedCardNumber.slice(-4)
         };
         this.aadhaarDocumentVerified = false;
+        this.cardActionReason = '';
         this.isSavingApplication = false;
         this.loadGuestApplications();
+        this.loadCardNumberHistory(this.selectedApplication.id);
         this.alertService.success('Card generated', `Card ${result.maskedCardNumber} was generated after signature and Aadhaar review.`);
       },
       error: error => {
         this.isSavingApplication = false;
         this.alertService.operationError('Generate card', error.error?.message || 'Unable to generate the card.');
+      }
+    });
+  }
+
+  blockApprovedCard() {
+    if (!this.selectedApplication?.id) return;
+    if (!this.cardActionReason.trim()) {
+      this.alertService.error('Reason required', 'Enter why this card must be blocked.');
+      return;
+    }
+    this.isSavingApplication = true;
+    this.http.post<{ cardStatus: string }>(
+      `${environment.apiBaseUrl}/api/credit-card-requests/admin/${this.selectedApplication.id}/block-card`,
+      { reason: this.cardActionReason.trim() },
+      this.authOptions()
+    ).subscribe({
+      next: result => {
+        this.selectedApplication = { ...this.selectedApplication, issuedCardStatus: result.cardStatus };
+        this.cardActionReason = '';
+        this.isSavingApplication = false;
+        this.loadGuestApplications();
+        this.loadCardNumberHistory(this.selectedApplication.id);
+        this.alertService.success('Card blocked', 'The old card is disabled. Generate a replacement number when ready.');
+      },
+      error: error => {
+        this.isSavingApplication = false;
+        this.alertService.operationError('Block card', error.error?.message || 'Unable to block the card.');
       }
     });
   }
@@ -369,6 +432,8 @@ export class CreditCards implements OnInit, OnDestroy {
     this.applicationApprovedLimit = null;
     this.agreementShareUrl = '';
     this.aadhaarDocumentVerified = false;
+    this.cardActionReason = '';
+    this.cardNumberHistory = [];
   }
 
   private clearApplicationDocumentPreview() {

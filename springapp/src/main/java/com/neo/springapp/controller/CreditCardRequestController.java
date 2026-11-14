@@ -115,10 +115,12 @@ public class CreditCardRequestController {
         status.put("rejectionReason", request.getRejectionReason());
         status.put("scoreNotice", "Simulated estimate based on PAN pattern and declared income; not a bureau score.");
         boolean approved = "Approved".equalsIgnoreCase(request.getStatus());
-        status.put("cardIssued", approved && (request.getAccountNumber() != null
-                || request.getGuestCardNumber() != null));
-        status.put("cardDetailsAvailable", approved && request.getGuestCardNumber() != null);
-        if (request.getGuestCardNumber() != null) {
+        boolean hasGuestCard = request.getGuestCardNumber() != null;
+        status.put("cardIssued", approved && request.getLast4() != null);
+        status.put("cardStatus", request.getIssuedCardStatus());
+        status.put("cardDetailsAvailable", approved && hasGuestCard
+                && "Active".equalsIgnoreCase(request.getIssuedCardStatus()));
+        if (hasGuestCard) {
             status.put("maskedCardNumber", "**** **** **** " + request.getGuestCardNumber().substring(12));
         }
         return ResponseEntity.ok(status);
@@ -171,27 +173,54 @@ public class CreditCardRequestController {
         }
     }
 
-    @PostMapping("/admin/{id}/issue-card")
-    public ResponseEntity<?> issueSignedCreditCard(
+    @PostMapping("/admin/{id}/generate-card")
+    public ResponseEntity<?> generateApprovedCardNumber(
             @PathVariable Long id,
-            @RequestBody(required = false) CardIssuanceRequest body,
+            @RequestBody(required = false) CardGenerationRequest body,
             Authentication authentication) {
         SessionPrincipal principal = staffPrincipal(authentication);
         if (principal == null) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         if (body == null) {
-            return ResponseEntity.badRequest().body(Map.of("message", "Aadhaar verification confirmation is required."));
+            return ResponseEntity.badRequest().body(Map.of("message", "Card generation details are required."));
         }
         try {
-            CreditCardRequest issued = service.issueSignedCreditCard(
-                    id, String.valueOf(principal.userId()), body.aadhaarDocumentVerified());
+            CreditCardRequest issued = service.generateApprovedCardNumber(
+                    id, String.valueOf(principal.userId()), body.aadhaarDocumentVerified(), body.reason());
             if (issued == null) return ResponseEntity.notFound().build();
             return ResponseEntity.ok(Map.of(
                     "status", issued.getStatus(),
+                    "cardStatus", issued.getIssuedCardStatus(),
                     "applicationId", issued.getApplicationId() == null ? "" : issued.getApplicationId(),
                     "maskedCardNumber", "**** **** **** " + issued.getLast4()));
         } catch (IllegalArgumentException | IllegalStateException ex) {
             return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));
         }
+    }
+
+    @PostMapping("/admin/{id}/block-card")
+    public ResponseEntity<?> blockApprovedCard(
+            @PathVariable Long id, @RequestBody(required = false) CardActionRequest body,
+            Authentication authentication) {
+        SessionPrincipal principal = staffPrincipal(authentication);
+        if (principal == null) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        if (body == null) return ResponseEntity.badRequest().body(Map.of("message", "A block reason is required."));
+        try {
+            CreditCardRequest blocked = service.blockApprovedCard(
+                    id, String.valueOf(principal.userId()), body.reason());
+            if (blocked == null) return ResponseEntity.notFound().build();
+            return ResponseEntity.ok(Map.of(
+                    "status", blocked.getStatus(),
+                    "cardStatus", blocked.getIssuedCardStatus(),
+                    "maskedCardNumber", "**** **** **** " + blocked.getLast4()));
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));
+        }
+    }
+
+    @GetMapping("/admin/{id}/card-history")
+    public ResponseEntity<?> cardNumberHistory(@PathVariable Long id, Authentication authentication) {
+        if (!isStaff(authentication)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        return ResponseEntity.ok(service.getCardNumberHistory(id));
     }
 
     @PostMapping("/guest/card-details/request-otp")
@@ -421,7 +450,8 @@ public class CreditCardRequestController {
     public record ApprovalRequest(Double approvedLimit) {}
     public record TrackingRequest(String applicationId, String pan, String mobileNumber) {}
     public record AgreementSignRequest(String challengeId, String captchaAnswer, String signedName, boolean consent) {}
-    public record CardIssuanceRequest(boolean aadhaarDocumentVerified) {}
+    public record CardGenerationRequest(boolean aadhaarDocumentVerified, String reason) {}
+    public record CardActionRequest(String reason) {}
     public record CardDetailsOtpRequest(String applicationId, String pan, String mobileNumber, String otp) {}
     public record GuestApplicationUpdate(String userName, String userEmail, String pan, Double annualIncome,
                                          String mobileNumber, String dateOfBirth, String aadhaarLastFour,

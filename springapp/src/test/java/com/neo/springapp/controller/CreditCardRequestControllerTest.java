@@ -120,6 +120,8 @@ class CreditCardRequestControllerTest {
         request.setGuestCardNumber("4111111111111111");
         request.setGuestCardExpiry("12/29");
         request.setGuestCardCvv("123");
+        request.setLast4("1111");
+        request.setIssuedCardStatus("Active");
         when(service.trackGuestApplication("CC2026ABCDEF1234", "ABCDE1234F", "9876543210"))
                 .thenReturn(request);
 
@@ -175,9 +177,20 @@ class CreditCardRequestControllerTest {
 
     @Test
     void requiresStaffAuthenticationToGenerateCardAfterSignature() {
-        var response = controller.issueSignedCreditCard(
+        var response = controller.generateApprovedCardNumber(
                 17L,
-                new CreditCardRequestController.CardIssuanceRequest(true),
+                new CreditCardRequestController.CardGenerationRequest(true, "Initial issuance"),
+                authenticated(new SessionPrincipal(5L, "ACC123", "USER")));
+
+        assertEquals(403, response.getStatusCode().value());
+        verifyNoInteractions(service);
+    }
+
+    @Test
+    void requiresStaffAuthenticationToBlockCard() {
+        var response = controller.blockApprovedCard(
+                17L,
+                new CreditCardRequestController.CardActionRequest("Reported lost"),
                 authenticated(new SessionPrincipal(5L, "ACC123", "USER")));
 
         assertEquals(403, response.getStatusCode().value());

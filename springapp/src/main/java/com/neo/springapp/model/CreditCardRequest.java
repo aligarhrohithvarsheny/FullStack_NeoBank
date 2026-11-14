@@ -83,6 +83,8 @@ public class CreditCardRequest {
     @ToString.Exclude
     @Column(name = "guest_card_cvv", length = 3)
     private String guestCardCvv;
+    @Column(name = "issued_card_status", length = 20)
+    private String issuedCardStatus;
     @Column(name = "card_details_otp_sent_at")
     private LocalDateTime cardDetailsOtpSentAt;
     @Column(name = "card_details_otp_attempts")
