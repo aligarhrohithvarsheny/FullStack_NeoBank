@@ -162,10 +162,33 @@ public class CreditCardRequestController {
                         "message", "CAPTCHA is incorrect or expired. Refresh the CAPTCHA and try again."));
             }
             return ResponseEntity.ok(Map.of(
-                    "status", "Approved",
-                    "cardIssued", true,
-                    "cardDetailsAvailable", result.guestCard(),
-                    "message", "Your demo signature was recorded and the approved card was generated."));
+                    "status", "Pending Card Issuance",
+                    "cardIssued", false,
+                    "cardDetailsAvailable", false,
+                    "message", "Your signature was recorded. An admin will review the Aadhaar verification and issue the card."));
+        } catch (IllegalArgumentException | IllegalStateException ex) {
+            return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));
+        }
+    }
+
+    @PostMapping("/admin/{id}/issue-card")
+    public ResponseEntity<?> issueSignedCreditCard(
+            @PathVariable Long id,
+            @RequestBody(required = false) CardIssuanceRequest body,
+            Authentication authentication) {
+        SessionPrincipal principal = staffPrincipal(authentication);
+        if (principal == null) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        if (body == null) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Aadhaar verification confirmation is required."));
+        }
+        try {
+            CreditCardRequest issued = service.issueSignedCreditCard(
+                    id, String.valueOf(principal.userId()), body.aadhaarDocumentVerified());
+            if (issued == null) return ResponseEntity.notFound().build();
+            return ResponseEntity.ok(Map.of(
+                    "status", issued.getStatus(),
+                    "applicationId", issued.getApplicationId() == null ? "" : issued.getApplicationId(),
+                    "maskedCardNumber", "**** **** **** " + issued.getLast4()));
         } catch (IllegalArgumentException | IllegalStateException ex) {
             return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));
         }
@@ -398,6 +421,7 @@ public class CreditCardRequestController {
     public record ApprovalRequest(Double approvedLimit) {}
     public record TrackingRequest(String applicationId, String pan, String mobileNumber) {}
     public record AgreementSignRequest(String challengeId, String captchaAnswer, String signedName, boolean consent) {}
+    public record CardIssuanceRequest(boolean aadhaarDocumentVerified) {}
     public record CardDetailsOtpRequest(String applicationId, String pan, String mobileNumber, String otp) {}
     public record GuestApplicationUpdate(String userName, String userEmail, String pan, Double annualIncome,
                                          String mobileNumber, String dateOfBirth, String aadhaarLastFour,

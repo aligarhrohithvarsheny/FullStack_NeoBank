@@ -156,7 +156,7 @@ class CreditCardRequestControllerTest {
     void agreementSignatureResponseConfirmsIssuanceWithoutReturningCardCredentials() {
         when(service.signCreditCardAgreement(
                 eq("secret-link-token"), eq("captcha-id"), eq("A1B2C3"), eq("Applicant"), eq(true), anyString()))
-                .thenReturn(new CreditCardRequestService.AgreementSignResult(true, true));
+                .thenReturn(new CreditCardRequestService.AgreementSignResult(true));
 
         var response = controller.signCreditCardAgreement(
                 "secret-link-token",
@@ -166,10 +166,22 @@ class CreditCardRequestControllerTest {
 
         assertEquals(200, response.getStatusCode().value());
         var result = (java.util.Map<?, ?>) response.getBody();
-        assertEquals("Approved", result.get("status"));
-        assertEquals(true, result.get("cardDetailsAvailable"));
+        assertEquals("Pending Card Issuance", result.get("status"));
+        assertEquals(false, result.get("cardIssued"));
+        assertEquals(false, result.get("cardDetailsAvailable"));
         assertFalse(result.containsKey("cardNumber"));
         assertFalse(result.containsKey("cvv"));
+    }
+
+    @Test
+    void requiresStaffAuthenticationToGenerateCardAfterSignature() {
+        var response = controller.issueSignedCreditCard(
+                17L,
+                new CreditCardRequestController.CardIssuanceRequest(true),
+                authenticated(new SessionPrincipal(5L, "ACC123", "USER")));
+
+        assertEquals(403, response.getStatusCode().value());
+        verifyNoInteractions(service);
     }
 
     @Test

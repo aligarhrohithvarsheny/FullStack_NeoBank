@@ -198,6 +198,38 @@ export class CreditCardApply implements OnDestroy {
     }, 'image/jpeg', 0.9);
   }
 
+  checkCreditScore(): void {
+    const pan = this.application.pan.trim().toUpperCase();
+    const income = this.application.annualIncome;
+    if (!/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(pan) || income === null || income <= 0) {
+      return;
+    }
+    const key = `${pan}|${income}`;
+    if (key === this.lastScorePreviewKey || this.isCheckingCreditScore) {
+      return;
+    }
+    this.isCheckingCreditScore = true;
+    this.scorePreviewError = '';
+    const params = new HttpParams().set('pan', pan).set('income', String(income));
+    this.http.post<CreditScorePreview>(`${this.apiUrl}/preview`, null, { params }).subscribe({
+      next: preview => {
+        this.scorePreview = preview;
+        this.lastScorePreviewKey = key;
+        this.isCheckingCreditScore = false;
+      },
+      error: error => {
+        this.scorePreviewError = error.error?.message || 'The simulated score estimate is unavailable.';
+        this.isCheckingCreditScore = false;
+      }
+    });
+  }
+
+  resetCreditScorePreview(): void {
+    this.scorePreview = null;
+    this.scorePreviewError = '';
+    this.lastScorePreviewKey = '';
+  }
+
   async submitApplication(): Promise<void> {
     this.errorMessage = '';
     this.submittedApplication = null;
@@ -208,38 +240,6 @@ export class CreditCardApply implements OnDestroy {
     if (!this.application.consent) {
       this.errorMessage = 'Please provide consent before submitting your application.';
       return;
-    }
-
-    checkCreditScore(): void {
-      const pan = this.application.pan.trim().toUpperCase();
-      const income = this.application.annualIncome;
-      if (!/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(pan) || income === null || income <= 0) {
-        return;
-      }
-      const key = `${pan}|${income}`;
-      if (key === this.lastScorePreviewKey || this.isCheckingCreditScore) {
-        return;
-      }
-      this.isCheckingCreditScore = true;
-      this.scorePreviewError = '';
-      const params = new HttpParams().set('pan', pan).set('income', String(income));
-      this.http.post<CreditScorePreview>(`${this.apiUrl}/preview`, null, { params }).subscribe({
-        next: preview => {
-          this.scorePreview = preview;
-          this.lastScorePreviewKey = key;
-          this.isCheckingCreditScore = false;
-        },
-        error: error => {
-          this.scorePreviewError = error.error?.message || 'The simulated score estimate is unavailable.';
-          this.isCheckingCreditScore = false;
-        }
-      });
-    }
-
-    resetCreditScorePreview(): void {
-      this.scorePreview = null;
-      this.scorePreviewError = '';
-      this.lastScorePreviewKey = '';
     }
 
     const body = new FormData();

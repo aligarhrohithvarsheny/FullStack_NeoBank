@@ -155,7 +155,7 @@ class CreditCardRequestServiceTest {
     }
 
     @Test
-    void cardIsGeneratedAtTheRequestedLimitOnlyAfterGuestSignsTheAgreement() {
+    void cardIsGeneratedAtTheRequestedLimitOnlyAfterSignatureAndAdminAadhaarReview() {
         CreditCardRequestRepository requestRepository = mock(CreditCardRequestRepository.class);
         CreditCardRepository creditCardRepository = mock(CreditCardRepository.class);
         CreditCardRequestService service = createService(requestRepository, creditCardRepository);
@@ -187,9 +187,17 @@ class CreditCardRequestServiceTest {
                 token, "captcha-1", "abc234", "Guest applicant", true, "127.0.0.1");
 
         assertTrue(signature.signed());
-        assertTrue(signature.guestCard());
-        assertEquals("Approved", request.getStatus());
+        assertEquals("Pending Card Issuance", request.getStatus());
         assertEquals(42000d, request.getApprovedLimit());
+        assertNull(request.getGuestCardNumber());
+        assertNull(request.getGuestCardExpiry());
+        assertNull(request.getGuestCardCvv());
+        assertThrows(IllegalArgumentException.class, () -> service.issueSignedCreditCard(22L, "admin-9", false));
+
+        CreditCardRequest issued = service.issueSignedCreditCard(22L, "admin-9", true);
+
+        assertSame(request, issued);
+        assertEquals("Approved", request.getStatus());
         assertTrue(request.getGuestCardNumber().matches("4[0-9]{15}"));
         assertTrue(hasValidLuhnChecksum(request.getGuestCardNumber()));
         assertTrue(request.getGuestCardExpiry().matches("(0[1-9]|1[0-2])/\\d{2}"));
@@ -198,6 +206,20 @@ class CreditCardRequestServiceTest {
         assertNull(request.getCardAgreementTokenHash());
         assertNotNull(request.getDocumentsDeleteAfter());
         verify(creditCardRepository, never()).save(any(CreditCard.class));
+    }
+
+    @Test
+    void cannotIssueCardBeforeTheAgreementHasBeenSigned() {
+        CreditCardRequestRepository requestRepository = mock(CreditCardRequestRepository.class);
+        CreditCardRequest request = new CreditCardRequest();
+        request.setId(23L);
+        request.setStatus("Pending Signature");
+        when(requestRepository.findById(23L)).thenReturn(Optional.of(request));
+        CreditCardRequestService service = createService(requestRepository, mock(CreditCardRepository.class));
+
+        assertThrows(IllegalStateException.class, () -> service.issueSignedCreditCard(23L, "admin-9", true));
+
+        verify(requestRepository, never()).save(any(CreditCardRequest.class));
     }
 
     @Test

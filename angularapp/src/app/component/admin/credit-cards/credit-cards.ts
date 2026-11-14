@@ -52,6 +52,7 @@ export class CreditCards implements OnInit, OnDestroy {
   selectedApplication: any = null;
   applicationEdit: any = null;
   applicationApprovedLimit: number | null = null;
+  aadhaarDocumentVerified = false;
   agreementShareUrl = '';
   isSavingApplication = false;
   applicationDocumentPreview = '';
@@ -169,6 +170,7 @@ export class CreditCards implements OnInit, OnDestroy {
   reviewApplication(application: any) {
     this.clearApplicationDocumentPreview();
     this.agreementShareUrl = '';
+    this.aadhaarDocumentVerified = false;
     this.selectedApplication = application;
     this.applicationApprovedLimit = application.approvedLimit ?? null;
     this.applicationEdit = {
@@ -245,7 +247,7 @@ export class CreditCards implements OnInit, OnDestroy {
         this.agreementShareUrl = updated.shareUrl;
         this.isSavingApplication = false;
         if (updated.emailSent) {
-          this.alertService.success('Approval terms sent', 'The applicant was emailed a secure e-sign link. A card will be issued after signature.');
+          this.alertService.success('Approval terms sent', 'The applicant was emailed a secure e-sign link. After signing, staff must review Aadhaar verification and generate the card.');
         } else {
           this.alertService.operationError(
             'Email unavailable',
@@ -287,6 +289,36 @@ export class CreditCards implements OnInit, OnDestroy {
       error: error => {
         this.isSavingApplication = false;
         this.alertService.operationError('Send e-sign link', error.error?.message || 'Unable to send the link');
+      }
+    });
+  }
+
+  issueSignedCreditCard() {
+    if (!this.selectedApplication?.id) return;
+    if (!this.aadhaarDocumentVerified) {
+      this.alertService.error('Aadhaar review required', 'Review the applicant Aadhaar details before issuing the card.');
+      return;
+    }
+    this.isSavingApplication = true;
+    this.http.post<{ status: string; maskedCardNumber: string }>(
+      `${environment.apiBaseUrl}/api/credit-card-requests/admin/${this.selectedApplication.id}/issue-card`,
+      { aadhaarDocumentVerified: true },
+      this.authOptions()
+    ).subscribe({
+      next: result => {
+        this.selectedApplication = {
+          ...this.selectedApplication,
+          status: result.status,
+          last4: result.maskedCardNumber.slice(-4)
+        };
+        this.aadhaarDocumentVerified = false;
+        this.isSavingApplication = false;
+        this.loadGuestApplications();
+        this.alertService.success('Card generated', `Card ${result.maskedCardNumber} was generated after signature and Aadhaar review.`);
+      },
+      error: error => {
+        this.isSavingApplication = false;
+        this.alertService.operationError('Generate card', error.error?.message || 'Unable to generate the card.');
       }
     });
   }
@@ -336,6 +368,7 @@ export class CreditCards implements OnInit, OnDestroy {
     this.applicationEdit = null;
     this.applicationApprovedLimit = null;
     this.agreementShareUrl = '';
+    this.aadhaarDocumentVerified = false;
   }
 
   private clearApplicationDocumentPreview() {

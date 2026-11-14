@@ -55,7 +55,7 @@
       <p class="error-message" *ngIf="error">{{ error }}</p>
       <button type="submit" class="primary-button"
         [disabled]="signForm.invalid || !captcha || signing">
-        {{ signing ? 'Recording signature...' : 'Sign and generate card' }}
+        {{ signing ? 'Recording signature...' : 'Sign agreement' }}
       </button>
     </form>
   </section>
@@ -64,14 +64,14 @@
     <h2>Signature recorded</h2>
     <p>{{ notice }}</p>
     <p *ngIf="agreement?.applicationId">
-      <strong>Application ID: {{ agreement.applicationId }}</strong>
+      <strong>Application ID: {{ agreement?.applicationId }}</strong>
     </p>
     <p *ngIf="agreement?.applicationId">
-      For a guest application, track the application with its ID, PAN, and mobile number to reveal the generated
-      card details after email verification.
+      The signature is recorded. An admin must review the Aadhaar details and generate the card before it is available.
+      Track this application with its ID, PAN, and mobile number for status updates.
     </p>
     <p *ngIf="!agreement?.applicationId">
-      Your issued credit card is now available in your NeoBank account.
+      Your signature is recorded. An admin must review Aadhaar verification and generate the card before it appears in your account.
     </p>
     <a routerLink="/website/landing" class="secondary-button">Return to NeoBank</a>
   </section>

@@ -444,7 +444,7 @@ public class CreditCardRequestService {
             request.setAgreementCaptchaAnswerHash(null);
             request.setAgreementCaptchaExpiresAt(null);
             repo.save(request);
-            return new AgreementSignResult(false, false);
+            return new AgreementSignResult(false);
         }
 
         LocalDateTime signedAt = LocalDateTime.now();
@@ -457,10 +457,28 @@ public class CreditCardRequestService {
         request.setAgreementCaptchaAnswerHash(null);
         request.setAgreementCaptchaExpiresAt(null);
         request.setCardAgreementTokenHash(null);
-        issueApprovedCard(request, signedAt);
+        request.setStatus("Pending Card Issuance");
+        request.setEligibility("Pending Card Issuance");
         repo.save(request);
-        return new AgreementSignResult(true,
-                request.getAccountNumber() == null || request.getAccountNumber().isBlank());
+        return new AgreementSignResult(true);
+    }
+
+    @Transactional
+    public CreditCardRequest issueSignedCreditCard(Long id, String adminName, boolean aadhaarDocumentVerified) {
+        CreditCardRequest request = repo.findById(id).orElse(null);
+        if (request == null) return null;
+        if (!"Pending Card Issuance".equalsIgnoreCase(request.getStatus())
+                || request.getCardAgreementSignedAt() == null
+                || request.getCardAgreementSignatureHash() == null) {
+            throw new IllegalStateException("The applicant must sign the agreement before card issuance.");
+        }
+        if (!aadhaarDocumentVerified) {
+            throw new IllegalArgumentException("Review and confirm the applicant's Aadhaar verification before issuance.");
+        }
+        LocalDateTime issuedAt = LocalDateTime.now();
+        issueApprovedCard(request, issuedAt);
+        request.setProcessedBy(adminName);
+        return repo.save(request);
     }
 
     private CreditCardRequest requirePendingAgreement(String token) {
@@ -569,6 +587,7 @@ public class CreditCardRequestService {
     private boolean isOpenApplicationStatus(String status) {
         return "Pending".equalsIgnoreCase(status)
                 || "Pending Signature".equalsIgnoreCase(status)
+                || "Pending Card Issuance".equalsIgnoreCase(status)
                 || "Approved".equalsIgnoreCase(status);
     }
 
@@ -755,7 +774,7 @@ public class CreditCardRequestService {
     public record ApprovalResult(CreditCardRequest application, String shareUrl,
                                  LocalDateTime expiresAt, boolean emailSent) {}
     public record AgreementLinkResult(String shareUrl, LocalDateTime expiresAt, boolean emailSent) {}
-    public record AgreementSignResult(boolean signed, boolean guestCard) {}
+    public record AgreementSignResult(boolean signed) {}
     public record GuestApplicationUpdate(String userName, String userEmail, String pan, Double annualIncome,
                                          String mobileNumber, String dateOfBirth, String aadhaarLastFour,
                                          String address, String employmentType, String employerName,

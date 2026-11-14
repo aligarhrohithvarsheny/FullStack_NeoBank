@@ -177,7 +177,10 @@
         </p>
         <p *ngIf="trackedApplication.status === 'Pending Signature'">
           Admin approved your application. Check the email address on your application for the secure e-sign link.
-          The card will be generated after you review and sign the terms.
+          After signing, an admin will review the Aadhaar verification before generating the card.
+        </p>
+        <p *ngIf="trackedApplication.status === 'Pending Card Issuance'">
+          Your signature is recorded. An admin must review the Aadhaar verification and generate the card before it is available.
         </p>
         <p *ngIf="trackedApplication.status === 'Approved' && !trackedApplication.cardIssued">
           Your application is approved. Card details are not available yet; contact NeoBank support for assistance.

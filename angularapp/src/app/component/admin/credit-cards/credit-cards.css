@@ -1748,6 +1748,18 @@
   flex-wrap: wrap;
 }
 
+.aadhaar-review-confirmation {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: #334155;
+  font-weight: 600;
+}
+
+.aadhaar-review-confirmation input {
+  margin-top: 3px;
+}
+
 @media (max-width: 680px) {
   .application-queue-heading,
   .application-queue-actions {
