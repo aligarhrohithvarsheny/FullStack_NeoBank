@@ -35,7 +35,7 @@ class CardServiceDebitCardGenerationTest {
             return saved;
         });
 
-        Card card = service.generateDebitCardForUser(user);
+        Card card = service.generateDebitCardForUser(user, "123456789012");
 
         assertEquals("Visa Debit", card.getCardType());
         assertEquals("ACC123", card.getAccountNumber());
@@ -63,7 +63,8 @@ class CardServiceDebitCardGenerationTest {
         when(cardRepository.findByAccountNumber("ACC123")).thenReturn(List.of(
                 new Card("4111111111111111", "Visa Debit", "Test User", "ACC123", "test@example.com")));
 
-        assertThrows(IllegalStateException.class, () -> service.generateDebitCardForUser(approvedUser()));
+        assertThrows(IllegalStateException.class,
+                () -> service.generateDebitCardForUser(approvedUser(), "123456789012"));
         verify(cardRepository, never()).save(any(Card.class));
         verify(historyRepository, never()).save(any(CardActionHistory.class));
     }
@@ -76,11 +77,28 @@ class CardServiceDebitCardGenerationTest {
         User user = approvedUser();
         user.setStatus("PENDING");
 
-        assertThrows(IllegalStateException.class, () -> service.generateDebitCardForUser(user));
+        assertThrows(IllegalStateException.class,
+                () -> service.generateDebitCardForUser(user, "123456789012"));
 
         user.setStatus("APPROVED");
         user.getAccount().setStatus("CLOSED");
-        assertThrows(IllegalStateException.class, () -> service.generateDebitCardForUser(user));
+        assertThrows(IllegalStateException.class,
+                () -> service.generateDebitCardForUser(user, "123456789012"));
+        verify(cardRepository, never()).save(any(Card.class));
+    }
+
+    @Test
+    void requiresTheRegisteredVerifiedAadhaarBeforeGeneratingCard() {
+        CardRepository cardRepository = mock(CardRepository.class);
+        CardService service = createService(cardRepository, mock(CardActionHistoryRepository.class));
+        User user = approvedUser();
+
+        assertThrows(IllegalArgumentException.class,
+                () -> service.generateDebitCardForUser(user, "123456789013"));
+        user.getAccount().setAadharVerified(false);
+        assertThrows(IllegalStateException.class,
+                () -> service.generateDebitCardForUser(user, "123456789012"));
+
         verify(cardRepository, never()).save(any(Card.class));
     }
 
@@ -94,6 +112,9 @@ class CardServiceDebitCardGenerationTest {
         Account account = new Account();
         account.setName("Test User");
         account.setStatus("ACTIVE");
+        account.setAadharNumber("123456789012");
+        account.setAadharVerified(true);
+        account.setAadharVerificationStatus("VERIFIED");
 
         User user = new User();
         user.setStatus("APPROVED");

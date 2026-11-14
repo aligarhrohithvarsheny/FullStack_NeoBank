@@ -95,6 +95,12 @@
     <button *ngIf="cardLoadError" (click)="refreshCardData()" class="apply-new-card-btn">
       Retry
     </button>
+    <label *ngIf="!cardLoadError" class="card-aadhaar-confirmation">
+      Aadhaar number for card activation
+      <input type="text" name="aadharActivationInput" [(ngModel)]="aadharActivationInput"
+        inputmode="numeric" pattern="[0-9]{12}" maxlength="12" autocomplete="off"
+        aria-label="12-digit Aadhaar number for card activation">
+    </label>
     <button *ngIf="!cardLoadError" (click)="generateDebitCard()" class="apply-new-card-btn" [disabled]="isGeneratingCard">
       {{ isGeneratingCard ? 'Generating...' : 'Generate Debit Card' }}
     </button>

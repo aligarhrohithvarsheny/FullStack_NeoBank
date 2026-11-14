@@ -148,12 +148,16 @@ public class CardController {
 
     @PostMapping("/generate/debit")
     public ResponseEntity<?> generateDebitCard(
+            @RequestBody(required = false) DebitCardGenerationRequest body,
             @org.springframework.security.core.annotation.AuthenticationPrincipal
             com.neo.springapp.service.UserSessionTokenService.SessionPrincipal principal) {
         if (principal == null || !"USER".equals(principal.scope())
                 || principal.accountNumber() == null || principal.accountNumber().isBlank()) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("message", "Sign in with a customer account to generate a debit card."));
+        }
+        if (body == null) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Enter your Aadhaar number to continue."));
         }
 
         User user = userRepository.findByAccountNumber(principal.accountNumber()).orElse(null);
@@ -163,7 +167,10 @@ public class CardController {
         }
 
         try {
-            return ResponseEntity.status(HttpStatus.CREATED).body(cardService.generateDebitCardForUser(user));
+            return ResponseEntity.status(HttpStatus.CREATED)
+                    .body(cardService.generateDebitCardForUser(user, body.aadhaarNumber()));
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));
         } catch (IllegalStateException ex) {
             return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("message", ex.getMessage()));
         }
@@ -284,4 +291,6 @@ public class CardController {
     public Card getCardById(@PathVariable Long cardId) {
         return cardService.getCardById(cardId);
     }
+
+    public record DebitCardGenerationRequest(String aadhaarNumber) {}
 }

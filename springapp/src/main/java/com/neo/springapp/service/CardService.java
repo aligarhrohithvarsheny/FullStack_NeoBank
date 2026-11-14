@@ -16,6 +16,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
+import java.security.MessageDigest;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
@@ -40,7 +42,7 @@ public class CardService {
     }
 
     @Transactional
-    public Card generateDebitCardForUser(User user) {
+    public Card generateDebitCardForUser(User user, String aadhaarNumber) {
         if (user == null || !"APPROVED".equalsIgnoreCase(user.getStatus())
                 || user.getAccount() == null || user.getAccountNumber() == null
                 || user.getAccountNumber().isBlank()) {
@@ -50,6 +52,18 @@ public class CardService {
         Account account = user.getAccount();
         if (!"ACTIVE".equalsIgnoreCase(account.getStatus())) {
             throw new IllegalStateException("Your account is not active and cannot receive a debit card.");
+        }
+        String normalizedAadhaar = aadhaarNumber == null ? "" : aadhaarNumber.trim();
+        String registeredAadhaar = account.getAadharNumber() == null ? "" : account.getAadharNumber().trim();
+        if (!normalizedAadhaar.matches("[0-9]{12}")
+                || !MessageDigest.isEqual(
+                normalizedAadhaar.getBytes(StandardCharsets.US_ASCII),
+                registeredAadhaar.getBytes(StandardCharsets.US_ASCII))) {
+            throw new IllegalArgumentException("The Aadhaar number does not match this account.");
+        }
+        if (!account.isAadharVerified()
+                || !"VERIFIED".equalsIgnoreCase(account.getAadharVerificationStatus())) {
+            throw new IllegalStateException("Complete Aadhaar verification before generating your debit card.");
         }
 
         boolean hasDebitCard = cardRepository.findByAccountNumber(user.getAccountNumber()).stream()

@@ -38,19 +38,23 @@ class CardControllerDebitCardTest {
         Card card = new Card();
         card.setId(8L);
         when(userRepository.findByAccountNumber("ACC123")).thenReturn(Optional.of(user));
-        when(cardService.generateDebitCardForUser(user)).thenReturn(card);
+        when(cardService.generateDebitCardForUser(user, "123456789012")).thenReturn(card);
 
-        var response = controller.generateDebitCard(new SessionPrincipal(7L, "ACC123", "USER"));
+        var response = controller.generateDebitCard(
+                new CardController.DebitCardGenerationRequest("123456789012"),
+                new SessionPrincipal(7L, "ACC123", "USER"));
 
         assertEquals(HttpStatus.CREATED, response.getStatusCode());
         assertEquals(card, response.getBody());
         verify(userRepository).findByAccountNumber("ACC123");
-        verify(cardService).generateDebitCardForUser(user);
+        verify(cardService).generateDebitCardForUser(user, "123456789012");
     }
 
     @Test
     void refusesCardGenerationForNonUserScopes() {
-        var response = controller.generateDebitCard(new SessionPrincipal(1L, "ACC123", "ADMIN"));
+        var response = controller.generateDebitCard(
+                new CardController.DebitCardGenerationRequest("123456789012"),
+                new SessionPrincipal(1L, "ACC123", "ADMIN"));
 
         assertEquals(HttpStatus.UNAUTHORIZED, response.getStatusCode());
         verifyNoInteractions(userRepository, cardService);

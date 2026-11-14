@@ -498,6 +498,23 @@ section {
   margin: 14px auto 0;
 }
 
+.card-aadhaar-confirmation {
+  display: grid;
+  gap: 8px;
+  max-width: 360px;
+  margin: 18px auto 0;
+  text-align: left;
+  font-weight: 600;
+}
+
+.card-aadhaar-confirmation input {
+  min-height: 42px;
+  padding: 8px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  font: inherit;
+}
+
 .card-error,
 .card-success {
   margin-top: 12px;

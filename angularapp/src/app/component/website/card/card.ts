@@ -32,7 +32,6 @@ interface UserProfile {
   accountType: string;
   joinDate: string;
   pan?: string;
-  aadhar?: string;
   occupation?: string;
   income?: number;
 }
@@ -93,6 +92,7 @@ export class Card implements OnInit, OnDestroy {
   isGeneratingCard: boolean = false;
   cardGenerationError: string = '';
   cardGenerationSuccess: string = '';
+  aadharActivationInput = '';
   cardHistory: CardActionHistory[] = [];
   isLoadingCardHistory: boolean = false;
   cardHistoryError: string = '';
@@ -207,7 +207,6 @@ export class Card implements OnInit, OnDestroy {
         accountType: 'Savings Account',
         joinDate: new Date().toISOString().split('T')[0],
         pan: '',
-        aadhar: '',
         occupation: '',
         income: 0
       };
@@ -241,7 +240,6 @@ export class Card implements OnInit, OnDestroy {
           accountType: 'Savings Account',
           joinDate: new Date().toISOString().split('T')[0],
           pan: '',
-          aadhar: '',
           occupation: '',
           income: 0
         };
@@ -256,7 +254,6 @@ export class Card implements OnInit, OnDestroy {
   private fetchAndApplyUserProfile(url: string) {
     this.http.get(url).subscribe({
       next: (userData: any) => {
-        console.log('User profile loaded from MySQL:', userData);
         this.userProfile = {
           name: userData.account?.name || userData.username || this.userProfile?.name || 'User',
           email: userData.email || this.userProfile?.email || 'user@example.com',
@@ -267,7 +264,6 @@ export class Card implements OnInit, OnDestroy {
           accountType: userData.account?.accountType || 'Savings Account',
           joinDate: userData.joinDate ? new Date(userData.joinDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
           pan: userData.account?.pan || '',
-          aadhar: userData.account?.aadharNumber || '',
           occupation: userData.account?.occupation || '',
           income: userData.account?.income || 0
         };
@@ -288,7 +284,6 @@ export class Card implements OnInit, OnDestroy {
             accountType: 'Savings Account',
             joinDate: new Date().toISOString().split('T')[0],
             pan: '',
-            aadhar: '',
             occupation: '',
             income: 0
           };
@@ -336,21 +331,28 @@ export class Card implements OnInit, OnDestroy {
 
   generateDebitCard() {
     if (!this.userProfile || this.isGeneratingCard) return;
+    const aadhaarNumber = this.aadharActivationInput.trim();
+    if (!/^[0-9]{12}$/.test(aadhaarNumber)) {
+      this.cardGenerationError = 'Enter the 12-digit Aadhaar number registered to your verified account.';
+      return;
+    }
 
     this.isGeneratingCard = true;
     this.cardGenerationError = '';
     this.cardGenerationSuccess = '';
-    this.http.post<any>(`${environment.apiBaseUrl}/api/cards/generate/debit`, {}, {
+    this.http.post<any>(`${environment.apiBaseUrl}/api/cards/generate/debit`, { aadhaarNumber }, {
       headers: this.getUserAuthHeaders()
     }).subscribe({
       next: (response) => {
         this.isGeneratingCard = false;
+        this.aadharActivationInput = '';
         this.card = this.mapBackendCard(response);
         this.cardGenerationSuccess = 'Your debit card was generated and saved to card history.';
         this.loadCardHistory();
       },
       error: (err: any) => {
         this.isGeneratingCard = false;
+        this.aadharActivationInput = '';
         console.error('Error generating debit card:', err);
         this.cardGenerationError = err.error?.message || 'Unable to generate your debit card. Please try again.';
       }
