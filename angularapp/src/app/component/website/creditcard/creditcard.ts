@@ -106,6 +106,8 @@ interface CreditCardApplication {
   pan: string;
   annualIncome: number;
   approvedLimit?: number | null;
+  last4?: string | null;
+  issuedCardStatus?: string | null;
   requestDate: string;
   processedDate?: string | null;
 }
@@ -998,6 +1000,7 @@ export class CreditCard implements OnInit {
 
   refreshCardData() {
     this.loadCreditCards();
+    this.loadCreditCardApplications();
   }
 
   blockCard() {

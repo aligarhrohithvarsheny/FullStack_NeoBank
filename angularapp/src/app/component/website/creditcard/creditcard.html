@@ -51,14 +51,14 @@
         <span class="eyebrow">APPLICATION TRACKING</span>
         <h3>Credit card applications</h3>
       </div>
-      <button type="button" class="refresh-btn" (click)="loadCreditCardApplications()" [disabled]="isLoadingApplications">
+      <button type="button" class="refresh-btn" (click)="refreshCardData()" [disabled]="isLoadingApplications || isLoading">
         {{ isLoadingApplications ? 'Refreshing...' : 'Refresh' }}
       </button>
     </div>
     <p *ngIf="isLoadingApplications" class="no-data">Loading your application history...</p>
     <table *ngIf="!isLoadingApplications && creditCardApplications.length">
       <thead>
-        <tr><th>Submitted</th><th>Status</th><th>Annual income</th><th>Approved limit</th></tr>
+        <tr><th>Submitted</th><th>Status</th><th>Annual income</th><th>Approved limit</th><th>Card number / status</th></tr>
       </thead>
       <tbody>
         <tr *ngFor="let application of creditCardApplications">
@@ -66,6 +66,7 @@
           <td>{{ application.status }}</td>
           <td>₹{{ application.annualIncome | number:'1.0-0' }}</td>
           <td>{{ application.approvedLimit ? ('₹' + (application.approvedLimit | number:'1.0-0')) : 'Set by admin after review' }}</td>
+          <td>{{ application.last4 ? ('•••• ' + application.last4 + ' · ' + (application.issuedCardStatus || 'Active')) : 'Not generated' }}</td>
         </tr>
       </tbody>
     </table>

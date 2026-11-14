@@ -116,10 +116,12 @@ public class CreditCardRequestController {
         status.put("scoreNotice", "Simulated estimate based on PAN pattern and declared income; not a bureau score.");
         boolean approved = "Approved".equalsIgnoreCase(request.getStatus());
         boolean hasGuestCard = request.getGuestCardNumber() != null;
+        boolean guestCardActive = request.getIssuedCardStatus() == null
+                || "Active".equalsIgnoreCase(request.getIssuedCardStatus());
         status.put("cardIssued", approved && request.getLast4() != null);
         status.put("cardStatus", request.getIssuedCardStatus());
         status.put("cardDetailsAvailable", approved && hasGuestCard
-                && "Active".equalsIgnoreCase(request.getIssuedCardStatus()));
+                && guestCardActive);
         if (hasGuestCard) {
             status.put("maskedCardNumber", "**** **** **** " + request.getGuestCardNumber().substring(12));
         }

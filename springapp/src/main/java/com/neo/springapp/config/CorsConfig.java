@@ -19,15 +19,15 @@ import java.util.stream.Collectors;
  * Reads allowed origins from SPRING_WEB_CORS_ALLOWED_ORIGINS environment variable.
  * Format: https://domain1.com,https://domain2.com
  * 
- * Supports Vercel production and preview URLs:
- * - Production: https://full-stack-neo-bank22.vercel.app
- * - Preview: https://*.vercel.app (wildcard pattern)
+ * Supports the production Firebase and Vercel frontend origins.
  */
 @Configuration
 public class CorsConfig {
+    private static final String VERCEL_PRODUCTION_ORIGIN = "https://full-stack-neo-bank22.vercel.app";
     private static final List<String> DEFAULT_ALLOWED_ORIGINS = Arrays.asList(
         "https://neo-bank-669.web.app",
         "https://neo-bank-669.firebaseapp.com",
+        VERCEL_PRODUCTION_ORIGIN,
         "https://fullstack-neobank.onrender.com",
         "http://localhost:4200",
         "http://localhost:4000"
@@ -72,6 +72,9 @@ public class CorsConfig {
                 .collect(Collectors.toList());
 
             if (!origins.isEmpty()) {
+                if (!origins.contains(VERCEL_PRODUCTION_ORIGIN)) {
+                    origins.add(VERCEL_PRODUCTION_ORIGIN);
+                }
                 configuration.setAllowedOriginPatterns(origins);
                 System.out.println("✅ CORS configured with origins: " + origins);
             } else {

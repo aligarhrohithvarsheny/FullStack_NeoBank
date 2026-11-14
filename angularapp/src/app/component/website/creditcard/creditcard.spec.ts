@@ -86,4 +86,25 @@ describe('CreditCard application', () => {
     expect(component.applicationError).toContain('valid 10-character PAN');
     httpMock.expectNone(`${environment.apiBaseUrl}/api/credit-card-requests/create`);
   });
+
+  it('refreshes issued cards and shows the generated number suffix in application history', () => {
+    component.refreshCardData();
+
+    httpMock.expectOne(`${environment.apiBaseUrl}/api/credit-cards/account/ACC123`).flush([]);
+    httpMock.expectOne(request =>
+      request.url.endsWith('/api/credit-card-requests/my-applications')
+    ).flush([{
+      id: 15,
+      status: 'Approved',
+      pan: 'ABCDE1234F',
+      annualIncome: 84000,
+      approvedLimit: 42000,
+      last4: '1234',
+      issuedCardStatus: 'Active',
+      requestDate: '2026-11-13T00:00:00'
+    }]);
+
+    expect(component.latestCreditCardApplication?.last4).toBe('1234');
+    expect(component.latestCreditCardApplication?.issuedCardStatus).toBe('Active');
+  });
 });

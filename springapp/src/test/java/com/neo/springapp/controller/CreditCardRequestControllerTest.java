@@ -138,6 +138,24 @@ class CreditCardRequestControllerTest {
     }
 
     @Test
+    void guestTrackingKeepsPreviouslyIssuedCardsAccessibleWhenStatusWasNotRecorded() {
+        CreditCardRequest request = new CreditCardRequest();
+        request.setApplicationId("CC2026ABCDEF1234");
+        request.setStatus("Approved");
+        request.setGuestCardNumber("4111111111111111");
+        request.setLast4("1111");
+        when(service.trackGuestApplication("CC2026ABCDEF1234", "ABCDE1234F", "9876543210"))
+                .thenReturn(request);
+
+        var response = controller.trackGuest(new CreditCardRequestController.TrackingRequest(
+                "CC2026ABCDEF1234", "ABCDE1234F", "9876543210"));
+
+        var status = (java.util.Map<?, ?>) response.getBody();
+        assertEquals(true, status.get("cardDetailsAvailable"));
+        assertEquals("**** **** **** 1111", status.get("maskedCardNumber"));
+    }
+
+    @Test
     void fullGuestCardDetailsResponseIsNotCacheable() {
         when(service.verifyGuestCardDetailsOtp("CC2026ABCDEF1234", "ABCDE1234F", "9876543210", "123456"))
                 .thenReturn(java.util.Map.of(
