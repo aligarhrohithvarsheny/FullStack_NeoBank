@@ -282,6 +282,25 @@ class CreditCardRequestServiceTest {
     }
 
     @Test
+    void adminCardDetailsRequireAadhaarReviewAndDoNotIncludeCvv() {
+        CreditCardRequestRepository requestRepository = mock(CreditCardRequestRepository.class);
+        CreditCardRequest request = approvedGuestRequest();
+        request.setId(25L);
+        request.setAadhaarLastFour("4321");
+        request.setGuestCardExpiry("12/29");
+        when(requestRepository.findById(25L)).thenReturn(Optional.of(request));
+        CreditCardRequestService service = createService(requestRepository, mock(CreditCardRepository.class));
+
+        assertThrows(IllegalArgumentException.class, () -> service.getAdminGuestCardDetails(25L, false));
+
+        Map<String, Object> details = service.getAdminGuestCardDetails(25L, true);
+        assertEquals("4111111111111111", details.get("cardNumber"));
+        assertEquals("12/29", details.get("expiryDate"));
+        assertEquals("Active", details.get("cardStatus"));
+        assertFalse(details.containsKey("cvv"));
+    }
+
+    @Test
     void approvedGuestCardDetailsAreReturnedOnlyAfterEmailOtpVerification() {
         CreditCardRequestRepository requestRepository = mock(CreditCardRequestRepository.class);
         OtpService otpService = mock(OtpService.class);

@@ -60,6 +60,16 @@ export class CreditCards implements OnInit, OnDestroy {
   cardNumberHistory: any[] = [];
   isLoadingCardNumberHistory = false;
   cardActionReason = '';
+  aadhaarVerifiedForCardReveal = false;
+  revealedGuestCardDetails: {
+    cardNumber: string;
+    expiryDate: string;
+    cardholderName: string;
+    approvedLimit: number;
+    cardStatus: string;
+  } | null = null;
+  isRevealingGuestCardDetails = false;
+  private guestCardDetailsTimeout: ReturnType<typeof setTimeout> | null = null;
   applyCreditCardForm = {
     accountNumber: '',
     userName: '',
@@ -148,6 +158,7 @@ export class CreditCards implements OnInit, OnDestroy {
   ngOnDestroy() {
     if (this.refreshTimer) clearInterval(this.refreshTimer);
     this.clearApplicationDocumentPreview();
+    this.clearRevealedGuestCardDetails();
   }
 
   loadGuestApplications() {
@@ -176,6 +187,9 @@ export class CreditCards implements OnInit, OnDestroy {
     this.aadhaarDocumentVerified = false;
     this.cardActionReason = '';
     this.cardNumberHistory = [];
+    this.aadhaarVerifiedForCardReveal = false;
+    this.isRevealingGuestCardDetails = false;
+    this.clearRevealedGuestCardDetails();
     this.selectedApplication = application;
     this.applicationApprovedLimit = application.approvedLimit ?? null;
     this.applicationEdit = {
@@ -197,6 +211,55 @@ export class CreditCards implements OnInit, OnDestroy {
   isApplicationCardActive(application: any): boolean {
     return !!application?.last4
       && (application.issuedCardStatus == null || application.issuedCardStatus === 'Active');
+  }
+
+  revealAdminGuestCardDetails() {
+    if (!this.selectedApplication?.id || !this.canRevealCardNumber || this.isRevealingGuestCardDetails) return;
+    if (!this.aadhaarVerifiedForCardReveal) {
+      this.alertService.error('Aadhaar review required', 'Review the applicant Aadhaar details before viewing the card.');
+      return;
+    }
+
+    const applicationId = Number(this.selectedApplication.id);
+    this.isRevealingGuestCardDetails = true;
+    this.http.post<NonNullable<CreditCards['revealedGuestCardDetails']>>(
+      `${environment.apiBaseUrl}/api/credit-card-requests/admin/${applicationId}/card-details`,
+      { aadhaarDocumentVerified: true },
+      this.authOptions()
+    ).subscribe({
+      next: details => {
+        if (Number(this.selectedApplication?.id) !== applicationId) return;
+        this.revealedGuestCardDetails = details;
+        this.isRevealingGuestCardDetails = false;
+        this.aadhaarVerifiedForCardReveal = false;
+        this.clearGuestCardDetailsTimeout();
+        this.guestCardDetailsTimeout = setTimeout(() => this.clearRevealedGuestCardDetails(), 60_000);
+      },
+      error: error => {
+        if (Number(this.selectedApplication?.id) !== applicationId) return;
+        this.isRevealingGuestCardDetails = false;
+        this.alertService.operationError(
+          'Reveal guest card details',
+          error.error?.message || 'Unable to reveal card details.'
+        );
+      }
+    });
+  }
+
+  hideAdminGuestCardDetails() {
+    this.clearRevealedGuestCardDetails();
+  }
+
+  private clearRevealedGuestCardDetails() {
+    this.revealedGuestCardDetails = null;
+    this.clearGuestCardDetailsTimeout();
+  }
+
+  private clearGuestCardDetailsTimeout() {
+    if (this.guestCardDetailsTimeout !== null) {
+      clearTimeout(this.guestCardDetailsTimeout);
+      this.guestCardDetailsTimeout = null;
+    }
   }
 
   saveApplicationChanges() {
@@ -434,6 +497,9 @@ export class CreditCards implements OnInit, OnDestroy {
     this.aadhaarDocumentVerified = false;
     this.cardActionReason = '';
     this.cardNumberHistory = [];
+    this.aadhaarVerifiedForCardReveal = false;
+    this.isRevealingGuestCardDetails = false;
+    this.clearRevealedGuestCardDetails();
   }
 
   private clearApplicationDocumentPreview() {

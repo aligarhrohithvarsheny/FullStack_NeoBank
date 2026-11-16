@@ -526,6 +526,27 @@ public class CreditCardRequestService {
         return cardNumberHistoryRepository.findByRequestIdOrderByGeneratedAtDesc(requestId);
     }
 
+    public Map<String, Object> getAdminGuestCardDetails(Long requestId, boolean aadhaarDocumentVerified) {
+        if (!aadhaarDocumentVerified) {
+            throw new IllegalArgumentException("Review the applicant's Aadhaar details before viewing card details.");
+        }
+        CreditCardRequest request = repo.findById(requestId).orElse(null);
+        if (request == null) return null;
+        if (request.getApplicationId() == null || request.getAccountNumber() != null
+                || !"Approved".equalsIgnoreCase(request.getStatus())
+                || request.getGuestCardNumber() == null || request.getGuestCardExpiry() == null
+                || request.getAadhaarLastFour() == null
+                || !request.getAadhaarLastFour().matches("\\d{4}")) {
+            throw new IllegalStateException("Aadhaar details and an issued guest card are required.");
+        }
+        return Map.of(
+                "cardNumber", request.getGuestCardNumber(),
+                "expiryDate", request.getGuestCardExpiry(),
+                "cardholderName", request.getUserName() == null ? "" : request.getUserName(),
+                "approvedLimit", request.getApprovedLimit() == null ? 0d : request.getApprovedLimit(),
+                "cardStatus", request.getIssuedCardStatus() == null ? "Active" : request.getIssuedCardStatus());
+    }
+
     private String validateCardActionReason(String reason) {
         if (reason == null || reason.isBlank() || reason.trim().length() > 500) {
             throw new IllegalArgumentException("Enter a reason (up to 500 characters) for this card action.");

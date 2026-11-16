@@ -1,8 +1,10 @@
 package com.neo.springapp.controller;
 
 import com.neo.springapp.model.CreditCardRequest;
+import com.neo.springapp.model.AdminAuditLog;
 import com.neo.springapp.model.SalaryAccount;
 import com.neo.springapp.model.User;
+import com.neo.springapp.repository.AdminAuditLogRepository;
 import com.neo.springapp.repository.SalaryAccountRepository;
 import com.neo.springapp.repository.UserRepository;
 import com.neo.springapp.service.CreditCardRequestService;
@@ -27,12 +29,15 @@ public class CreditCardRequestController {
     private final CreditCardRequestService service;
     private final UserRepository userRepository;
     private final SalaryAccountRepository salaryAccountRepository;
+    private final AdminAuditLogRepository adminAuditLogRepository;
 
     public CreditCardRequestController(CreditCardRequestService service, UserRepository userRepository,
-                                       SalaryAccountRepository salaryAccountRepository) {
+                                       SalaryAccountRepository salaryAccountRepository,
+                                       AdminAuditLogRepository adminAuditLogRepository) {
         this.service = service;
         this.userRepository = userRepository;
         this.salaryAccountRepository = salaryAccountRepository;
+        this.adminAuditLogRepository = adminAuditLogRepository;
     }
 
     @PostMapping("/create")
@@ -223,6 +228,40 @@ public class CreditCardRequestController {
     public ResponseEntity<?> cardNumberHistory(@PathVariable Long id, Authentication authentication) {
         if (!isStaff(authentication)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         return ResponseEntity.ok(service.getCardNumberHistory(id));
+    }
+
+    @PostMapping("/admin/{id}/card-details")
+    public ResponseEntity<?> revealAdminGuestCardDetails(
+            @PathVariable Long id,
+            @RequestBody(required = false) CardDetailsRevealRequest body,
+            Authentication authentication) {
+        SessionPrincipal principal = adminPrincipal(authentication);
+        if (principal == null) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        if (body == null || !body.aadhaarDocumentVerified()) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("message", "Review and confirm the applicant's Aadhaar details first."));
+        }
+        try {
+            Map<String, Object> details = service.getAdminGuestCardDetails(id, true);
+            if (details == null) return ResponseEntity.notFound().build();
+
+            AdminAuditLog audit = new AdminAuditLog(
+                    principal.userId(), principal.accountNumber(),
+                    "SENSITIVE_GUEST_CARD_DETAILS_REVEAL", "CREDIT_CARD_APPLICATION", id);
+            audit.setEntityName("Guest credit card details");
+            audit.setReasonForChange("Admin reviewed Aadhaar details before viewing card number");
+            audit.setStatus("COMPLETED");
+            adminAuditLogRepository.save(audit);
+
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CACHE_CONTROL, "no-store, no-cache, must-revalidate")
+                    .header(HttpHeaders.PRAGMA, "no-cache")
+                    .body(details);
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));
+        } catch (IllegalStateException ex) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("message", ex.getMessage()));
+        }
     }
 
     @PostMapping("/guest/card-details/request-otp")
@@ -424,6 +463,12 @@ public class CreditCardRequestController {
         return principal;
     }
 
+    private SessionPrincipal adminPrincipal(Authentication authentication) {
+        if (authentication == null || !(authentication.getPrincipal() instanceof SessionPrincipal principal)
+                || !"ADMIN".equals(principal.scope())) return null;
+        return principal;
+    }
+
     private boolean isStaff(Authentication authentication) {
         return staffPrincipal(authentication) != null;
     }
@@ -454,6 +499,7 @@ public class CreditCardRequestController {
     public record AgreementSignRequest(String challengeId, String captchaAnswer, String signedName, boolean consent) {}
     public record CardGenerationRequest(boolean aadhaarDocumentVerified, String reason) {}
     public record CardActionRequest(String reason) {}
+    public record CardDetailsRevealRequest(boolean aadhaarDocumentVerified) {}
     public record CardDetailsOtpRequest(String applicationId, String pan, String mobileNumber, String otp) {}
     public record GuestApplicationUpdate(String userName, String userEmail, String pan, Double annualIncome,
                                          String mobileNumber, String dateOfBirth, String aadhaarLastFour,

@@ -872,8 +872,36 @@
           </div>
           <p *ngIf="selectedApplication.status === 'Approved' && selectedApplication.applicationId && selectedApplication.last4" class="no-data">
             Current card: •••• {{ selectedApplication.last4 }} · {{ selectedApplication.issuedCardStatus || 'Active' }}.
-            Guest card details are available to the applicant after email verification.
+            Admin card details can be revealed after Aadhaar review. Applicant self-service verification remains unchanged.
           </p>
+          <section class="admin-guest-card-panel"
+            *ngIf="selectedApplication.status === 'Approved' && selectedApplication.applicationId && selectedApplication.last4">
+            <label class="aadhaar-review-confirmation">
+              <input type="checkbox" [(ngModel)]="aadhaarVerifiedForCardReveal">
+              I reviewed the applicant's Aadhaar details for this card access.
+            </label>
+            <div class="modal-actions">
+              <button *ngIf="!revealedGuestCardDetails" type="button" class="btn-secondary"
+                (click)="revealAdminGuestCardDetails()"
+                [disabled]="!canRevealCardNumber || isRevealingGuestCardDetails || !aadhaarVerifiedForCardReveal">
+                {{ isRevealingGuestCardDetails ? 'Loading card...' : 'View card after Aadhaar review' }}
+              </button>
+              <button *ngIf="revealedGuestCardDetails" type="button" class="btn-secondary"
+                (click)="hideAdminGuestCardDetails()">Hide card details</button>
+            </div>
+            <article class="admin-guest-card" *ngIf="revealedGuestCardDetails" aria-live="polite">
+              <header>
+                <span>NEOBANK · CREDIT</span>
+                <strong>{{ revealedGuestCardDetails.cardStatus }}</strong>
+              </header>
+              <p class="admin-guest-card-number">{{ revealedGuestCardDetails.cardNumber }}</p>
+              <footer>
+                <span>{{ revealedGuestCardDetails.cardholderName }}</span>
+                <span>VALID THRU {{ revealedGuestCardDetails.expiryDate }}</span>
+              </footer>
+              <small>Limit ₹{{ revealedGuestCardDetails.approvedLimit | number:'1.0-0' }} · Hidden automatically after one minute.</small>
+            </article>
+          </section>
           <section class="card-number-history" *ngIf="selectedApplication.status === 'Approved' || selectedApplication.status === 'Pending Card Issuance'">
             <h4>Card number actions</h4>
             <label *ngIf="selectedApplication.status === 'Pending Card Issuance' || !selectedApplication.last4 || selectedApplication.issuedCardStatus === 'Blocked'"

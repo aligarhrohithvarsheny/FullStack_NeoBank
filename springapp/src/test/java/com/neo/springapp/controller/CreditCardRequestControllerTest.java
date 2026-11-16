@@ -3,6 +3,7 @@ package com.neo.springapp.controller;
 import com.neo.springapp.model.Account;
 import com.neo.springapp.model.CreditCardRequest;
 import com.neo.springapp.model.User;
+import com.neo.springapp.repository.AdminAuditLogRepository;
 import com.neo.springapp.repository.UserRepository;
 import com.neo.springapp.repository.SalaryAccountRepository;
 import com.neo.springapp.service.CreditCardRequestService;
@@ -24,13 +25,16 @@ class CreditCardRequestControllerTest {
     private CreditCardRequestService service;
     private UserRepository userRepository;
     private SalaryAccountRepository salaryAccountRepository;
+    private AdminAuditLogRepository adminAuditLogRepository;
 
     @BeforeEach
     void setUp() {
         service = mock(CreditCardRequestService.class);
         userRepository = mock(UserRepository.class);
         salaryAccountRepository = mock(SalaryAccountRepository.class);
-        controller = new CreditCardRequestController(service, userRepository, salaryAccountRepository);
+        adminAuditLogRepository = mock(AdminAuditLogRepository.class);
+        controller = new CreditCardRequestController(
+                service, userRepository, salaryAccountRepository, adminAuditLogRepository);
     }
 
     @Test
@@ -213,6 +217,53 @@ class CreditCardRequestControllerTest {
 
         assertEquals(403, response.getStatusCode().value());
         verifyNoInteractions(service);
+    }
+
+    @Test
+    void guestCardDetailsRevealIsAdminOnlyAndRequiresAadhaarReview() {
+        var userResponse = controller.revealAdminGuestCardDetails(
+                17L,
+                new CreditCardRequestController.CardDetailsRevealRequest(true),
+                authenticated(new SessionPrincipal(5L, "ACC123", "USER")));
+        var managerResponse = controller.revealAdminGuestCardDetails(
+                17L,
+                new CreditCardRequestController.CardDetailsRevealRequest(true),
+                authenticated(new SessionPrincipal(6L, "MGR123", "MANAGER")));
+        var unverifiedResponse = controller.revealAdminGuestCardDetails(
+                17L,
+                new CreditCardRequestController.CardDetailsRevealRequest(false),
+                authenticated(new SessionPrincipal(7L, "ADM123", "ADMIN")));
+
+        assertEquals(403, userResponse.getStatusCode().value());
+        assertEquals(403, managerResponse.getStatusCode().value());
+        assertEquals(400, unverifiedResponse.getStatusCode().value());
+        verifyNoInteractions(service, adminAuditLogRepository);
+    }
+
+    @Test
+    void adminGuestCardDetailsRevealIsNoStoreAndAudited() {
+        when(service.getAdminGuestCardDetails(17L, true)).thenReturn(java.util.Map.of(
+                "cardNumber", "4111111111111111",
+                "expiryDate", "12/29",
+                "cardholderName", "Applicant",
+                "approvedLimit", 42000d,
+                "cardStatus", "Active"));
+        when(adminAuditLogRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var response = controller.revealAdminGuestCardDetails(
+                17L,
+                new CreditCardRequestController.CardDetailsRevealRequest(true),
+                authenticated(new SessionPrincipal(7L, "ADM123", "ADMIN")));
+
+        assertEquals(200, response.getStatusCode().value());
+        assertEquals("no-store, no-cache, must-revalidate",
+                response.getHeaders().getFirst("Cache-Control"));
+        assertEquals("4111111111111111",
+                ((java.util.Map<?, ?>) response.getBody()).get("cardNumber"));
+        verify(adminAuditLogRepository).save(argThat(audit ->
+                "SENSITIVE_GUEST_CARD_DETAILS_REVEAL".equals(audit.getActionType())
+                        && Long.valueOf(17L).equals(audit.getEntityId())
+                        && "COMPLETED".equals(audit.getStatus())));
     }
 
     @Test
