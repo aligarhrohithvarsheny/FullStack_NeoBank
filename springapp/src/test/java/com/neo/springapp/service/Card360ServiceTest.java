@@ -6,6 +6,7 @@ import com.neo.springapp.model.Card360Access;
 import com.neo.springapp.model.Card360ClosureRequest;
 import com.neo.springapp.model.CreditCard;
 import com.neo.springapp.model.CreditCardTransaction;
+import com.neo.springapp.model.CreditCardRequest;
 import com.neo.springapp.model.User;
 import com.neo.springapp.repository.*;
 import org.junit.jupiter.api.BeforeEach;
@@ -32,6 +33,7 @@ class Card360ServiceTest {
     @Mock private CreditCardTransactionRepository creditTransactionRepository;
     @Mock private Card360ClosureRequestRepository closureRequestRepository;
     @Mock private UserRepository userRepository;
+    @Mock private CreditCardRequestRepository creditCardRequestRepository;
     @Mock private AdminService adminService;
     @Mock private CreditCardService creditCardService;
 
@@ -42,8 +44,8 @@ class Card360ServiceTest {
     void setUp() {
         tokenService = new UserSessionTokenService("test-secret-with-at-least-32-characters");
         service = new Card360Service(accessRepository, auditRepository, cardRepository, creditCardRepository,
-                creditTransactionRepository, closureRequestRepository, userRepository, adminService, tokenService,
-                creditCardService);
+                creditTransactionRepository, closureRequestRepository, userRepository, creditCardRequestRepository,
+                adminService, tokenService, creditCardService);
     }
 
     @Test
@@ -334,6 +336,104 @@ class Card360ServiceTest {
         assertThat(card.containsKey("cardNumber")).isFalse();
         assertThat(card.containsKey("cvv")).isFalse();
         assertThat(card.containsKey("pin")).isFalse();
+    }
+
+    @Test
+    void externalCustomerCanSignInAndOnlySeesTheirMaskedIssuedCard() {
+        CreditCardRequest guest = new CreditCardRequest();
+        guest.setId(42L);
+        guest.setApplicationId("CC2026ABCDEF1234");
+        guest.setUserName("External Customer");
+        guest.setUserEmail("guest@example.com");
+        guest.setGuestCardNumber("4111111111111234");
+        guest.setGuestCardExpiry("12/29");
+        guest.setLast4("1234");
+        guest.setStatus("Approved");
+        guest.setIssuedCardStatus("Active");
+
+        Card360Access access = new Card360Access();
+        access.setAccountNumber("GUEST_CARD:42");
+        access.setEnabled(true);
+        when(cardRepository.findByCardNumber("4111111111111234")).thenReturn(null);
+        when(creditCardRepository.findByCardNumber("4111111111111234")).thenReturn(Optional.empty());
+        when(creditCardRequestRepository.findByGuestCardNumber("4111111111111234")).thenReturn(guest);
+        when(accessRepository.findByAccountNumber("GUEST_CARD:42")).thenReturn(Optional.of(access));
+        when(creditCardRequestRepository.findById(42L)).thenReturn(Optional.of(guest));
+
+        Map<String, Object> login = service.login("4111 1111 1111 1234", "GUEST@example.com");
+        UserSessionTokenService.SessionPrincipal principal =
+                tokenService.verify((String) login.get("token"));
+        assertThat(login.get("externalCustomer")).isEqualTo(true);
+        assertThat(principal).isNotNull();
+        assertThat(principal.accountNumber()).isEqualTo("GUEST_CARD:42");
+
+        Map<?, ?> card = (Map<?, ?>) ((List<?>) service.getCustomerCards("GUEST_CARD:42").get("cards")).get(0);
+        assertThat(card.get("maskedNumber")).isEqualTo("•••• •••• •••• 1234");
+        assertThat(card.get("cardholderName")).isEqualTo("External Customer");
+        assertThat(card.containsKey("cardNumber")).isFalse();
+        assertThat(card.containsKey("cvv")).isFalse();
+    }
+
+    @Test
+    void adminCanProvisionExternalCards360AccessByApplicationId() {
+        Admin admin = new Admin();
+        admin.setEmail("admin@neobank.test");
+        admin.setRole("ADMIN");
+        CreditCardRequest guest = new CreditCardRequest();
+        guest.setId(42L);
+        guest.setApplicationId("CC2026ABCDEF1234");
+        guest.setUserName("External Customer");
+        guest.setUserEmail("guest@example.com");
+        guest.setGuestCardNumber("4111111111111234");
+        guest.setGuestCardExpiry("12/29");
+        guest.setLast4("1234");
+        guest.setStatus("Approved");
+        guest.setIssuedCardStatus("Active");
+        when(adminService.login("admin@neobank.test", "admin-password")).thenReturn(admin);
+        when(userRepository.findByAccountNumber("CC2026ABCDEF1234")).thenReturn(Optional.empty());
+        when(creditCardRequestRepository.findByApplicationId("CC2026ABCDEF1234")).thenReturn(guest);
+        when(accessRepository.findByAccountNumber("GUEST_CARD:42")).thenReturn(Optional.empty());
+
+        Map<String, Object> response = service.generatePasscode(
+                "CC2026ABCDEF1234", "admin@neobank.test", "admin-password");
+
+        assertThat(response.get("externalCustomer")).isEqualTo(true);
+        assertThat(response.get("email")).isEqualTo("guest@example.com");
+        assertThat(savedAccess().getAccountNumber()).isEqualTo("GUEST_CARD:42");
+        assertThat(savedAccess().isEnabled()).isTrue();
+    }
+
+    @Test
+    void adminCanLookUpAnExternalCardByRegisteredEmailWithoutAadhaar() {
+        Admin admin = new Admin();
+        admin.setEmail("admin@neobank.test");
+        admin.setRole("ADMIN");
+        CreditCardRequest guest = new CreditCardRequest();
+        guest.setId(42L);
+        guest.setApplicationId("CC2026ABCDEF1234");
+        guest.setUserName("External Customer");
+        guest.setUserEmail("guest@example.com");
+        guest.setGuestCardNumber("4111111111111234");
+        guest.setGuestCardExpiry("12/29");
+        guest.setLast4("1234");
+        guest.setStatus("Approved");
+        guest.setIssuedCardStatus("Active");
+        when(adminService.login("admin@neobank.test", "admin-password")).thenReturn(admin);
+        when(userRepository.findByAccountNumber("guest@example.com")).thenReturn(Optional.empty());
+        when(creditCardRequestRepository.findByApplicationId("guest@example.com")).thenReturn(null);
+        when(creditCardRequestRepository.findByUserEmailIgnoreCaseAndAccountNumberIsNullOrderByRequestDateDesc(
+                "guest@example.com")).thenReturn(List.of(guest));
+        when(accessRepository.findByAccountNumber("GUEST_CARD:42")).thenReturn(Optional.empty());
+
+        Map<String, Object> result = service.getAdminCustomerDetails(
+                "guest@example.com", "admin@neobank.test", "admin-password");
+        Map<?, ?> card = (Map<?, ?>) ((List<?>) result.get("cards")).get(0);
+
+        assertThat(result.get("customerType")).isEqualTo("EXTERNAL");
+        assertThat(result.get("applicationId")).isEqualTo("CC2026ABCDEF1234");
+        assertThat(card.get("maskedNumber")).isEqualTo("•••• •••• •••• 1234");
+        assertThat(card.containsKey("cardNumber")).isFalse();
+        assertThat(card.containsKey("aadhaarNumber")).isFalse();
     }
 
     private User approvedUser() {

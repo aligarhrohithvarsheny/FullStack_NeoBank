@@ -134,8 +134,10 @@
             <span>{{ maskCardNumber(card.maskedCardNumber || card.cardNumber) }}</span>
           </div>
           <div class="card-info-row">
-            <label>Account Number:</label>
+            <label>{{ card.isExternal ? 'External application:' : 'Account Number:' }}</label>
+            <span *ngIf="card.isExternal">{{ card.applicationId }}</span>
             <button type="button" class="account-number-link" (click)="openAccount360(card.accountNumber, $event)"
+              *ngIf="!card.isExternal"
               [disabled]="!card.accountNumber" aria-label="Open customer 360 account details">
               {{ card.accountNumber || '—' }} <i class="fa fa-external-link-alt" aria-hidden="true"></i>
             </button>
@@ -173,7 +175,42 @@
     </div>
 
     <!-- Credit Card Details Modal -->
-    <div class="modal-overlay" *ngIf="selectedCreditCard" (click)="closeCreditCardDetails()">
+    <div class="modal-overlay" *ngIf="selectedCreditCard && selectedCreditCard.isExternal" (click)="closeCreditCardDetails()">
+      <div class="modal-content" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h3>External Credit Card · {{ selectedCreditCard.userName }}</h3>
+          <button class="close-btn" (click)="closeCreditCardDetails()">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="info-grid">
+            <div class="info-item"><label>Application ID:</label><span>{{ selectedCreditCard.applicationId }}</span></div>
+            <div class="info-item"><label>Registered email:</label><span>{{ selectedCreditCard.userEmail }}</span></div>
+            <div class="info-item"><label>Card number:</label><span>{{ selectedCreditCard.maskedCardNumber }}</span></div>
+            <div class="info-item"><label>Expiry:</label><span>{{ selectedCreditCard.expiryDate }}</span></div>
+            <div class="info-item"><label>Status:</label><span class="status-badge">{{ selectedCreditCard.status }}</span></div>
+          </div>
+          <label class="external-limit-control">Approved credit limit (₹)
+            <input type="number" min="1" step="1000" [(ngModel)]="externalCardApprovedLimit">
+          </label>
+          <button class="btn-primary" type="button" (click)="saveExternalCardLimit()" [disabled]="isSavingExternalCard">
+            {{ isSavingExternalCard ? 'Saving…' : 'Save credit limit' }}
+          </button>
+          <label class="external-limit-control" *ngIf="selectedCreditCard.status?.toLowerCase() === 'active'">
+            Reason for blocking
+            <textarea maxlength="500" rows="2" [(ngModel)]="externalCardActionReason"></textarea>
+          </label>
+          <button class="btn-danger" type="button" *ngIf="selectedCreditCard.status?.toLowerCase() === 'active'"
+            (click)="blockExternalCard()" [disabled]="isSavingExternalCard || !externalCardActionReason.trim()">
+            Block card
+          </button>
+          <p class="no-data" *ngIf="selectedCreditCard.status?.toLowerCase() === 'blocked'">
+            This card is blocked. Review the application to generate a replacement card.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-overlay" *ngIf="selectedCreditCard && !selectedCreditCard.isExternal" (click)="closeCreditCardDetails()">
       <div class="modal-content" (click)="$event.stopPropagation()">
         <div class="modal-header">
           <h3>Credit Card Details - {{ selectedCreditCard.userName }}</h3>

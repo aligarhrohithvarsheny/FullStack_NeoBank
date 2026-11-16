@@ -27,6 +27,9 @@ interface Card360AdminCard {
 
 interface Card360AdminCustomer {
   accountNumber: string;
+  reference: string;
+  customerType: 'NEOBANK' | 'EXTERNAL';
+  applicationId?: string;
   customerName: string;
   email: string;
   cards: Card360AdminCard[];
@@ -56,6 +59,7 @@ interface CardClosureRequest {
 })
 export class Cards360Admin {
   accountNumber = '';
+  private loadedIdentifier = '';
   adminEmail = '';
   adminPassword = '';
   passcode = '';
@@ -97,6 +101,7 @@ export class Cards360Admin {
           this.loading = false;
           this.passcode = result.passcode;
           this.enabled = true;
+          if (this.customer) this.customer.enabled = true;
           this.notice = 'One-time provisioning passcode generated and access enabled. Future customer sign-ins use their registered email and card number.';
           this.loadHistory();
         },
@@ -108,6 +113,7 @@ export class Cards360Admin {
     this.passcode = '';
     this.history = [];
     this.customer = null;
+    this.loadedIdentifier = '';
     this.closureRequests = [];
     this.enabled = null;
     this.notice = '';
@@ -123,9 +129,10 @@ export class Cards360Admin {
         next: result => {
           this.loading = false;
           this.customer = result;
+          this.loadedIdentifier = this.accountNumber.trim();
           this.enabled = result.enabled;
           this.notice = 'Approved customer details loaded. Card numbers are masked for security.';
-          this.loadClosureRequests();
+          if (result.customerType !== 'EXTERNAL') this.loadClosureRequests();
         },
         error: err => this.fail(err)
       });
@@ -140,6 +147,7 @@ export class Cards360Admin {
         next: result => {
           this.loading = false;
           this.enabled = result.enabled;
+          if (this.customer) this.customer.enabled = result.enabled;
           this.passcode = '';
           this.notice = `Cards360 sign-in ${enabled ? 'enabled' : 'disabled'} for ${this.accountNumber}.`;
           this.loadHistory();
@@ -158,6 +166,10 @@ export class Cards360Admin {
   }
 
   loadClosureRequests(): void {
+    if (this.customer?.customerType === 'EXTERNAL') {
+      this.closureRequests = [];
+      return;
+    }
     if (!this.validateLoadedCustomer()) return;
     this.http.post<CardClosureRequest[]>(`${environment.apiBaseUrl}/api/card360/admin/closure-requests`,
       { ...this.credentials(), accountNumber: this.accountNumber.trim() }).subscribe({
@@ -211,7 +223,7 @@ export class Cards360Admin {
 
   private validateLoadedCustomer(): boolean {
     if (!this.validate()) return false;
-    if (!this.customer || this.customer.accountNumber !== this.accountNumber.trim()) {
+    if (!this.customer || this.loadedIdentifier !== this.accountNumber.trim()) {
       this.error = 'Fetch and verify this customer account before managing Cards360 access.';
       return false;
     }

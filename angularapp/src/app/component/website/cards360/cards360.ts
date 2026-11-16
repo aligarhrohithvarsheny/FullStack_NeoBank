@@ -200,11 +200,13 @@ export class Cards360 implements OnInit, OnDestroy {
   ] as const;
 
   private readonly tokenKey = 'card360Token';
+  private readonly guestSessionKey = 'card360ExternalCustomer';
   private readonly expiredSessionMessageKey = 'card360SessionExpiredMessage';
   private readonly api = `${environment.apiBaseUrl}/api/card360`;
   private requestRefreshTimer: ReturnType<typeof setInterval> | null = null;
   private sessionExpiryTimer: ReturnType<typeof setTimeout> | null = null;
   private handlingExpiredSession = false;
+  guestAccess = false;
   private readonly searchActivityByCard = new Map<string, { transactions: Card360Transaction[]; bills: Card360Bill[] }>();
 
   constructor(
@@ -217,6 +219,7 @@ export class Cards360 implements OnInit, OnDestroy {
     if (!isPlatformBrowser(this.platformId)) return;
     if (this.router.url.includes('/dashboard')) {
       const token = sessionStorage.getItem(this.tokenKey);
+      this.guestAccess = sessionStorage.getItem(this.guestSessionKey) === 'true';
       if (!token || !this.startSessionMonitoring(token)) {
         if (!token) void this.router.navigate(['/website/cards360']);
         return;
@@ -459,12 +462,15 @@ export class Cards360 implements OnInit, OnDestroy {
   signIn(): void {
     this.error = '';
     this.loading = true;
-    this.http.post<{ token: string }>(`${this.api}/login`, {
+    this.http.post<{ token: string; externalCustomer?: boolean }>(`${this.api}/login`, {
       cardNumber: this.cardNumber.replace(/\s/g, ''),
       email: this.email.trim()
     }).subscribe({
       next: response => {
         sessionStorage.setItem(this.tokenKey, response.token);
+        this.guestAccess = response.externalCustomer === true;
+        if (this.guestAccess) sessionStorage.setItem(this.guestSessionKey, 'true');
+        else sessionStorage.removeItem(this.guestSessionKey);
         sessionStorage.removeItem(this.expiredSessionMessageKey);
         this.handlingExpiredSession = false;
         this.cardNumber = '';
@@ -498,16 +504,18 @@ export class Cards360 implements OnInit, OnDestroy {
         this.searchActivityByCard.clear();
         this.updateDashboardSearchResults();
         this.loadSearchActivityForCards();
-        this.loadCustomerRequests();
+        if (!this.guestAccess) this.loadCustomerRequests();
         if (this.selectedCardKey && this.selectedCard) this.selectCard(this.selectedCard);
         else if (this.selectedCardKey) this.showOverview();
       },
       error: err => this.handleProtectedError(err)
     });
-    this.http.get<Cards360PaymentAccount>(`${this.api}/payment-account`, { headers: this.headers() }).subscribe({
-      next: result => this.paymentAccount = result,
-      error: err => this.handleProtectedError(err)
-    });
+    if (!this.guestAccess) {
+      this.http.get<Cards360PaymentAccount>(`${this.api}/payment-account`, { headers: this.headers() }).subscribe({
+        next: result => this.paymentAccount = result,
+        error: err => this.handleProtectedError(err)
+      });
+    }
   }
 
   selectCard(card: Card360Card): void {
@@ -568,6 +576,7 @@ export class Cards360 implements OnInit, OnDestroy {
   }
 
   loadCustomerRequests(): void {
+    if (this.guestAccess) return;
     this.http.get<Card360ServiceRequest[]>(`${environment.apiBaseUrl}/api/credit-card-requests/mine`,
       { headers: this.headers() }).subscribe({
         next: requests => {
@@ -589,7 +598,7 @@ export class Cards360 implements OnInit, OnDestroy {
   }
 
   private refreshCustomerRequestHistory(): void {
-    if (this.selectedCard?.type !== 'credit') return;
+    if (this.guestAccess || this.selectedCard?.type !== 'credit') return;
     this.http.get<Card360ServiceRequest[]>(`${environment.apiBaseUrl}/api/credit-card-requests/mine`,
       { headers: this.headers() }).subscribe({
         next: requests => {
@@ -1121,6 +1130,7 @@ export class Cards360 implements OnInit, OnDestroy {
   signOut(): void {
     this.clearSessionTimers();
     sessionStorage.removeItem(this.tokenKey);
+    sessionStorage.removeItem(this.guestSessionKey);
     sessionStorage.removeItem(this.expiredSessionMessageKey);
     this.handlingExpiredSession = false;
     this.cards = [];
@@ -1465,6 +1475,8 @@ export class Cards360 implements OnInit, OnDestroy {
     this.handlingExpiredSession = true;
     this.clearSessionTimers();
     sessionStorage.removeItem(this.tokenKey);
+    sessionStorage.removeItem(this.guestSessionKey);
+    this.guestAccess = false;
     this.cards = [];
     this.selectedTransactions = [];
     this.cardBills = [];

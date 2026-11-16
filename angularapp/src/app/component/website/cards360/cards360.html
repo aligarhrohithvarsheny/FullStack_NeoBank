@@ -23,7 +23,25 @@
     </form>
   </section>
 
-  <section *ngIf="router.url.includes('/dashboard')" class="c360-dashboard">
+  <section *ngIf="router.url.includes('/dashboard') && guestAccess" class="c360-dashboard">
+    <div class="c360-title">
+      <div><span class="c360-eyebrow">EXTERNAL CREDIT CARD</span><h1>Cards360</h1></div>
+      <button class="c360-secondary" type="button" (click)="loadDashboard()">Refresh</button>
+    </div>
+    <p class="c360-error" *ngIf="error" role="alert">{{ error }}</p>
+    <p *ngIf="loading" class="c360-muted">Loading your card details…</p>
+    <article class="c360-card" *ngFor="let card of cards">
+      <span class="c360-eyebrow">{{ card.cardType }}</span>
+      <h2>{{ card.cardholderName }}</h2>
+      <p>{{ card.maskedNumber }}</p>
+      <p>Status: {{ card.status }} · Expires {{ card.expiryDate }}</p>
+      <p>Approved limit: ₹{{ card.approvedLimit ?? 0 | number:'1.2-2' }}</p>
+      <small>For card activity, bills, or account-linked services, contact NeoBank support.</small>
+    </article>
+    <p *ngIf="!loading && !cards.length" class="c360-muted">No active external card is available for this sign-in.</p>
+  </section>
+
+  <section *ngIf="router.url.includes('/dashboard') && !guestAccess" class="c360-dashboard">
     <div class="c360-title">
       <div><span class="c360-eyebrow">CARD OVERVIEW</span><h1>Cards360</h1></div>
       <button class="c360-secondary" type="button" (click)="loadDashboard()">Refresh</button>

@@ -13,6 +13,10 @@ public interface CreditCardRequestRepository extends JpaRepository<CreditCardReq
     List<CreditCardRequest> findByAccountNumberOrderByRequestDateDesc(String accountNumber);
     List<CreditCardRequest> findByPanIgnoreCaseAndMobileNumberOrderByRequestDateDesc(String pan, String mobileNumber);
     CreditCardRequest findByApplicationId(String applicationId);
+    CreditCardRequest findByGuestCardNumber(String guestCardNumber);
+    List<CreditCardRequest> findByUserEmailIgnoreCaseAndAccountNumberIsNullOrderByRequestDateDesc(String userEmail);
+    List<CreditCardRequest> findByMobileNumberAndAccountNumberIsNullOrderByRequestDateDesc(String mobileNumber);
+    List<CreditCardRequest> findByAccountNumberIsNullAndStatusIgnoreCaseAndGuestCardNumberIsNotNull(String status);
     CreditCardRequest findByCardAgreementTokenHash(String tokenHash);
     boolean existsByGuestCardNumber(String guestCardNumber);
     List<CreditCardRequest> findByDocumentsDeleteAfterBeforeAndDocumentsAvailableTrue(LocalDateTime cutoff);

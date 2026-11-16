@@ -20,6 +20,7 @@ public class Card360Service {
     private final CreditCardTransactionRepository creditTransactionRepository;
     private final Card360ClosureRequestRepository closureRequestRepository;
     private final UserRepository userRepository;
+    private final CreditCardRequestRepository creditCardRequestRepository;
     private final AdminService adminService;
     private final UserSessionTokenService tokenService;
     private final CreditCardService creditCardService;
@@ -31,6 +32,7 @@ public class Card360Service {
                           CreditCardTransactionRepository creditTransactionRepository,
                           Card360ClosureRequestRepository closureRequestRepository,
                           UserRepository userRepository,
+                          CreditCardRequestRepository creditCardRequestRepository,
                           AdminService adminService, UserSessionTokenService tokenService,
                           CreditCardService creditCardService) {
         this.accessRepository = accessRepository;
@@ -40,6 +42,7 @@ public class Card360Service {
         this.creditTransactionRepository = creditTransactionRepository;
         this.closureRequestRepository = closureRequestRepository;
         this.userRepository = userRepository;
+        this.creditCardRequestRepository = creditCardRequestRepository;
         this.adminService = adminService;
         this.tokenService = tokenService;
         this.creditCardService = creditCardService;
@@ -57,12 +60,21 @@ public class Card360Service {
     @Transactional(noRollbackFor = IllegalArgumentException.class)
     public Map<String, Object> generatePasscode(String accountNumber, String adminEmail, String adminPassword) {
         Admin admin = requireAdmin(adminEmail, adminPassword);
-        User user = userRepository.findByAccountNumber(accountNumber)
+        String identifier = accountNumber.trim();
+        User user = userRepository.findByAccountNumber(identifier)
                 .filter(value -> "APPROVED".equalsIgnoreCase(value.getStatus()))
-                .orElseThrow(() -> new IllegalArgumentException("Approved customer account not found"));
+                .orElse(null);
+        CreditCardRequest guest = user == null ? findExternalCustomer(identifier) : null;
+        if (user == null && guest == null) {
+            throw new IllegalArgumentException("Approved customer account or issued external card not found");
+        }
+        if (guest != null && !isActiveExternalCard(guest)) {
+            throw new IllegalArgumentException("Cards360 access requires an active external credit card");
+        }
+        String accessKey = guest == null ? identifier : guestAccessKey(guest);
 
-        Card360Access access = accessRepository.findByAccountNumber(accountNumber).orElseGet(Card360Access::new);
-        access.setAccountNumber(accountNumber);
+        Card360Access access = accessRepository.findByAccountNumber(accessKey).orElseGet(Card360Access::new);
+        access.setAccountNumber(accessKey);
         String passcode = generatePasscodeValue();
         access.setPasscodeHash(encoder.encode(passcode));
         access.setEnabled(true);
@@ -71,30 +83,40 @@ public class Card360Service {
         access.setUpdatedBy(admin.getEmail());
         access.setUpdatedAt(LocalDateTime.now());
         accessRepository.save(access);
-        record(accountNumber, null, null, "PASSCODE_GENERATED", null, "Enabled", admin.getEmail());
+        record(accessKey, null, null, "PASSCODE_GENERATED", null, "Enabled", admin.getEmail());
 
-        String customerName = user.getAccount() != null
+        String customerName = guest != null ? Objects.toString(guest.getUserName(), "Customer")
+                : user.getAccount() != null
                 ? Objects.toString(user.getAccount().getName(), Objects.toString(user.getUsername(), "Customer"))
                 : Objects.toString(user.getUsername(), "Customer");
-        return Map.of("success", true, "passcode", passcode, "customerName", customerName, "email", user.getEmail());
+        String email = guest != null ? Objects.toString(guest.getUserEmail(), "") : Objects.toString(user.getEmail(), "");
+        return Map.of("success", true, "passcode", passcode, "customerName", customerName,
+                "email", email, "externalCustomer", guest != null);
     }
 
     @Transactional(noRollbackFor = IllegalArgumentException.class)
     public Map<String, Object> setEnabled(String accountNumber, boolean enabled, String adminEmail, String adminPassword) {
         Admin admin = requireAdmin(adminEmail, adminPassword);
-        if (enabled) {
-            userRepository.findByAccountNumber(accountNumber)
-                    .filter(value -> "APPROVED".equalsIgnoreCase(value.getStatus()))
-                    .orElseThrow(() -> new IllegalArgumentException("Approved customer account not found"));
+        String identifier = accountNumber.trim();
+        User user = userRepository.findByAccountNumber(identifier)
+                .filter(value -> "APPROVED".equalsIgnoreCase(value.getStatus()))
+                .orElse(null);
+        CreditCardRequest guest = user == null ? findExternalCustomer(identifier) : null;
+        if (user == null && guest == null) {
+            throw new IllegalArgumentException("Approved customer account or issued external card not found");
         }
-        Card360Access access = accessRepository.findByAccountNumber(accountNumber)
+        if (enabled && guest != null && !isActiveExternalCard(guest)) {
+            throw new IllegalArgumentException("Cards360 access requires an active external credit card");
+        }
+        String accessKey = guest == null ? identifier : guestAccessKey(guest);
+        Card360Access access = accessRepository.findByAccountNumber(accessKey)
                 .orElseThrow(() -> new IllegalArgumentException("Card360 access has not been set up for this account"));
         boolean previous = access.isEnabled();
         access.setEnabled(enabled);
         access.setUpdatedBy(admin.getEmail());
         access.setUpdatedAt(LocalDateTime.now());
         accessRepository.save(access);
-        record(accountNumber, null, null, "LOGIN_" + (enabled ? "ENABLED" : "DISABLED"),
+        record(accessKey, null, null, "LOGIN_" + (enabled ? "ENABLED" : "DISABLED"),
                 Boolean.toString(previous), Boolean.toString(enabled), admin.getEmail());
         return Map.of("success", true, "enabled", enabled);
     }
@@ -107,29 +129,48 @@ public class Card360Service {
         String normalizedEmail = email.trim().toLowerCase(Locale.ROOT);
         String normalizedCardNumber = cardNumber.replaceAll("[\\s-]", "");
         String accountNumber = findCardAccount(normalizedCardNumber, normalizedEmail);
-        if (accountNumber == null) {
-            throw new IllegalArgumentException("Unable to sign in. Check your details or contact the bank.");
+        if (accountNumber != null) {
+            Card360Access access = accessRepository.findByAccountNumber(accountNumber)
+                    .orElseThrow(() -> new IllegalArgumentException("Unable to sign in. Check your details or contact the bank."));
+            if (!access.isEnabled()) {
+                throw new IllegalArgumentException("Unable to sign in. Check your details or contact the bank.");
+            }
+
+            access.setFailedAttempts(0);
+            access.setLockedUntil(null);
+            accessRepository.save(access);
+            User user = userRepository.findByAccountNumber(accountNumber)
+                    .filter(value -> "APPROVED".equalsIgnoreCase(value.getStatus()))
+                    .orElseThrow(() -> new IllegalArgumentException("Unable to sign in. Check your details or contact the bank."));
+            return Map.of("success", true, "token", tokenService.issueCard360(user.getId(), accountNumber),
+                    "externalCustomer", false);
         }
 
-        Card360Access access = accessRepository.findByAccountNumber(accountNumber)
+        CreditCardRequest guest = creditCardRequestRepository.findByGuestCardNumber(normalizedCardNumber);
+        if (!isActiveExternalCard(guest)
+                || !normalizedEmail.equalsIgnoreCase(Objects.toString(guest.getUserEmail(), "").trim())) {
+            throw new IllegalArgumentException("Unable to sign in. Check your details or contact the bank.");
+        }
+        String guestKey = guestAccessKey(guest);
+        Card360Access access = accessRepository.findByAccountNumber(guestKey)
+                .filter(Card360Access::isEnabled)
                 .orElseThrow(() -> new IllegalArgumentException("Unable to sign in. Check your details or contact the bank."));
-        if (!access.isEnabled()) {
-            throw new IllegalArgumentException("Unable to sign in. Check your details or contact the bank.");
-        }
-
         access.setFailedAttempts(0);
         access.setLockedUntil(null);
         accessRepository.save(access);
-        User user = userRepository.findByAccountNumber(accountNumber)
-                .filter(value -> "APPROVED".equalsIgnoreCase(value.getStatus()))
-                .orElseThrow(() -> new IllegalArgumentException("Unable to sign in. Check your details or contact the bank."));
-        return Map.of("success", true, "token", tokenService.issueCard360(user.getId(), accountNumber));
+        return Map.of("success", true, "token", tokenService.issueCard360(guest.getId(), guestKey),
+                "externalCustomer", true);
     }
 
     @Transactional(readOnly = true)
     public Map<String, Object> getCustomerCards(String accountNumber) {
         requireEnabled(accountNumber);
         List<Map<String, Object>> cards = new ArrayList<>();
+        CreditCardRequest guest = findExternalCustomerByAccessKey(accountNumber);
+        if (guest != null) {
+            cards.add(externalGuestCardView(guest));
+            return Map.of("cards", cards, "externalCustomer", true);
+        }
         for (Card card : cardRepository.findByAccountNumber(accountNumber)) {
             cards.add(debitCardView(card));
         }
@@ -329,12 +370,18 @@ public class Card360Service {
     @Transactional(readOnly = true)
     public Map<String, Object> getPaymentAccount(String accountNumber) {
         requireEnabled(accountNumber);
+        if (findExternalCustomerByAccessKey(accountNumber) != null) {
+            throw new IllegalArgumentException("Linked NeoBank payment accounts are not available for external cardholders");
+        }
         return creditCardService.getCards360PaymentAccount(accountNumber);
     }
 
     @Transactional
     public Map<String, Object> payCreditCardBill(String accountNumber, Long creditCardId, double amount) {
         requireEnabled(accountNumber);
+        if (findExternalCustomerByAccessKey(accountNumber) != null) {
+            throw new IllegalArgumentException("Bill payments from a NeoBank account are not available for external cardholders");
+        }
         Map<String, Object> result = creditCardService.payCards360Bill(accountNumber, creditCardId, amount);
         record(accountNumber, "credit", creditCardId, "CARD_BILL_PAYMENT", null,
                 Objects.toString(result.get("paidAmount"), "0"), "CUSTOMER:" + accountNumber);
@@ -345,6 +392,13 @@ public class Card360Service {
     public List<Map<String, Object>> getCardTransactions(String accountNumber, String type, long cardId) {
         requireEnabled(accountNumber);
         List<Map<String, Object>> items = new ArrayList<>();
+        CreditCardRequest guest = findExternalCustomerByAccessKey(accountNumber);
+        if (guest != null) {
+            if (!"credit".equalsIgnoreCase(type) || !Objects.equals(guest.getId(), cardId)) {
+                throw new IllegalArgumentException("Card not found");
+            }
+            return items;
+        }
         if ("credit".equalsIgnoreCase(type)) {
             CreditCard card = creditCardRepository.findById(cardId)
                     .filter(value -> accountNumber.equals(value.getAccountNumber()))
@@ -394,6 +448,11 @@ public class Card360Service {
     @Transactional(readOnly = true)
     public List<Map<String, Object>> getCreditCardBills(String accountNumber, long cardId) {
         requireEnabled(accountNumber);
+        CreditCardRequest guest = findExternalCustomerByAccessKey(accountNumber);
+        if (guest != null) {
+            if (!Objects.equals(guest.getId(), cardId)) throw new IllegalArgumentException("Card not found");
+            return List.of();
+        }
         CreditCard card = creditCardRepository.findById(cardId)
                 .filter(value -> accountNumber.equals(value.getAccountNumber()))
                 .orElseThrow(() -> new IllegalArgumentException("Card not found"));
@@ -545,22 +604,42 @@ public class Card360Service {
     public Map<String, Object> getAdminCustomerDetails(String accountNumber, String adminEmail, String adminPassword) {
         requireAdmin(adminEmail, adminPassword);
         if (isBlank(accountNumber)) throw new IllegalArgumentException("Customer account number is required");
-        User user = userRepository.findByAccountNumber(accountNumber.trim())
+        String identifier = accountNumber.trim();
+        User user = userRepository.findByAccountNumber(identifier)
                 .filter(value -> "APPROVED".equalsIgnoreCase(value.getStatus()))
-                .orElseThrow(() -> new IllegalArgumentException("Approved customer account not found"));
+                .orElse(null);
+        if (user == null) {
+            CreditCardRequest guest = findExternalCustomer(identifier);
+            if (guest == null) {
+                throw new IllegalArgumentException("Approved customer account or issued external card not found");
+            }
+            Map<String, Object> result = new HashMap<>();
+            result.put("accountNumber", "");
+            result.put("customerType", "EXTERNAL");
+            result.put("applicationId", guest.getApplicationId());
+            result.put("reference", guest.getApplicationId());
+            result.put("customerName", Objects.toString(guest.getUserName(), "Customer"));
+            result.put("email", Objects.toString(guest.getUserEmail(), ""));
+            result.put("cards", List.of(externalGuestCardView(guest)));
+            Optional<Card360Access> access = accessRepository.findByAccountNumber(guestAccessKey(guest));
+            result.put("enabled", access.isPresent() && access.get().isEnabled());
+            return result;
+        }
         List<Map<String, Object>> cards = new ArrayList<>();
-        for (Card card : cardRepository.findByAccountNumber(accountNumber.trim())) {
+        for (Card card : cardRepository.findByAccountNumber(identifier)) {
             cards.add(debitCardView(card));
         }
-        for (CreditCard card : creditCardRepository.findByAccountNumber(accountNumber.trim())) {
+        for (CreditCard card : creditCardRepository.findByAccountNumber(identifier)) {
             cards.add(creditCardView(card));
         }
         Map<String, Object> result = new HashMap<>();
-        result.put("accountNumber", accountNumber.trim());
+        result.put("accountNumber", identifier);
+        result.put("customerType", "NEOBANK");
+        result.put("reference", identifier);
         result.put("customerName", Objects.toString(user.getUsername(), "Customer"));
         result.put("email", Objects.toString(user.getEmail(), ""));
         result.put("cards", cards);
-        Optional<Card360Access> access = accessRepository.findByAccountNumber(accountNumber.trim());
+        Optional<Card360Access> access = accessRepository.findByAccountNumber(identifier);
         result.put("enabled", access.isPresent() && access.get().isEnabled());
         return result;
     }
@@ -568,7 +647,17 @@ public class Card360Service {
     @Transactional(noRollbackFor = IllegalArgumentException.class)
     public List<Card360Audit> getAuditHistory(String accountNumber, String adminEmail, String adminPassword) {
         requireAdmin(adminEmail, adminPassword);
-        return auditRepository.findTop200ByAccountNumberOrderByCreatedAtDesc(accountNumber);
+        if (isBlank(accountNumber)) throw new IllegalArgumentException("Customer reference is required");
+        String identifier = accountNumber.trim();
+        User user = userRepository.findByAccountNumber(identifier)
+                .filter(value -> "APPROVED".equalsIgnoreCase(value.getStatus()))
+                .orElse(null);
+        CreditCardRequest guest = user == null ? findExternalCustomer(identifier) : null;
+        if (user == null && guest == null) {
+            throw new IllegalArgumentException("Approved customer account or issued external card not found");
+        }
+        return auditRepository.findTop200ByAccountNumberOrderByCreatedAtDesc(
+                guest == null ? identifier : guestAccessKey(guest));
     }
 
     private String findCardAccount(String number, String email) {
@@ -692,9 +781,78 @@ public class Card360Service {
         accessRepository.findByAccountNumber(accountNumber)
                 .filter(access -> access.isEnabled())
                 .orElseThrow(() -> new IllegalArgumentException("Card360 access is disabled"));
+        if (findExternalCustomerByAccessKey(accountNumber) != null) return;
         userRepository.findByAccountNumber(accountNumber)
                 .filter(user -> "APPROVED".equalsIgnoreCase(user.getStatus()))
                 .orElseThrow(() -> new IllegalArgumentException("Approved customer account not found"));
+    }
+
+    private CreditCardRequest findExternalCustomer(String identifier) {
+        if (isBlank(identifier)) return null;
+        String value = identifier.trim();
+        CreditCardRequest byApplicationId = creditCardRequestRepository.findByApplicationId(value);
+        if (isIssuedExternalCard(byApplicationId)) return byApplicationId;
+
+        List<CreditCardRequest> matches = new ArrayList<>();
+        creditCardRequestRepository.findByUserEmailIgnoreCaseAndAccountNumberIsNullOrderByRequestDateDesc(value)
+                .stream().filter(this::isIssuedExternalCard).forEach(matches::add);
+        if (value.matches("\\d{10}")) {
+            creditCardRequestRepository.findByMobileNumberAndAccountNumberIsNullOrderByRequestDateDesc(value)
+                    .stream().filter(this::isIssuedExternalCard)
+                    .filter(request -> matches.stream().noneMatch(existing -> existing.getId().equals(request.getId())))
+                    .forEach(matches::add);
+        }
+        if (matches.size() > 1) {
+            throw new IllegalArgumentException("Multiple issued cards matched. Use the customer application ID.");
+        }
+        return matches.isEmpty() ? null : matches.get(0);
+    }
+
+    private CreditCardRequest findExternalCustomerByAccessKey(String accessKey) {
+        if (accessKey == null || !accessKey.startsWith("GUEST_CARD:")) return null;
+        try {
+            CreditCardRequest request = creditCardRequestRepository.findById(
+                    Long.parseLong(accessKey.substring("GUEST_CARD:".length()))).orElse(null);
+            return isActiveExternalCard(request) ? request : null;
+        } catch (NumberFormatException exception) {
+            return null;
+        }
+    }
+
+    private boolean isIssuedExternalCard(CreditCardRequest request) {
+        return request != null && isBlank(request.getAccountNumber())
+                && request.getApplicationId() != null
+                && "Approved".equalsIgnoreCase(request.getStatus())
+                && request.getGuestCardNumber() != null
+                && request.getGuestCardExpiry() != null
+                && request.getLast4() != null;
+    }
+
+    private boolean isActiveExternalCard(CreditCardRequest request) {
+        return isIssuedExternalCard(request)
+                && "Active".equalsIgnoreCase(Objects.toString(request.getIssuedCardStatus(), "Active"));
+    }
+
+    private String guestAccessKey(CreditCardRequest request) {
+        return "GUEST_CARD:" + request.getId();
+    }
+
+    private Map<String, Object> externalGuestCardView(CreditCardRequest request) {
+        Map<String, Object> result = new HashMap<>();
+        result.put("id", request.getId());
+        result.put("type", "credit");
+        result.put("cardType", "Credit Card");
+        result.put("cardholderName", Objects.toString(request.getUserName(), ""));
+        result.put("maskedNumber", mask(request.getGuestCardNumber()));
+        result.put("status", Objects.toString(request.getIssuedCardStatus(), "Active"));
+        result.put("pinSet", false);
+        result.put("expiryDate", Objects.toString(request.getGuestCardExpiry(), ""));
+        result.put("blocked", !"Active".equalsIgnoreCase(Objects.toString(request.getIssuedCardStatus(), "Active")));
+        result.put("approvedLimit", request.getApprovedLimit() == null ? 0d : request.getApprovedLimit());
+        result.put("availableLimit", request.getApprovedLimit() == null ? 0d : request.getApprovedLimit());
+        result.put("spendingLimit", request.getApprovedLimit() == null ? 0d : request.getApprovedLimit());
+        result.put("outstandingBalance", 0d);
+        return result;
     }
 
     private String generatePasscodeValue() {

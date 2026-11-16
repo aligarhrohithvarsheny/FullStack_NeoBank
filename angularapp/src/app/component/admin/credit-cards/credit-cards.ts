@@ -17,6 +17,8 @@ export class CreditCards implements OnInit, OnDestroy {
   private refreshTimer: any = null;
   creditCards: any[] = [];
   filteredCreditCards: any[] = [];
+  private bankCreditCards: any[] = [];
+  private externalCreditCards: any[] = [];
   isLoadingCreditCards: boolean = false;
   canRevealCardNumber = false;
   isRevealingCardNumber = false;
@@ -45,6 +47,9 @@ export class CreditCards implements OnInit, OnDestroy {
   };
   creditCardSearchQuery: string = '';
   creditCardStatusFilter: string = 'ALL';
+  externalCardApprovedLimit: number | null = null;
+  externalCardActionReason = '';
+  isSavingExternalCard = false;
   showApplyCreditCardModal: boolean = false;
   guestApplications: any[] = [];
   applicationStatusFilter = 'Pending';
@@ -412,6 +417,7 @@ export class CreditCards implements OnInit, OnDestroy {
         this.cardActionReason = '';
         this.isSavingApplication = false;
         this.loadGuestApplications();
+        this.loadCreditCards();
         this.loadCardNumberHistory(this.selectedApplication.id);
         this.alertService.success('Card generated', `Card ${result.maskedCardNumber} was generated after signature and Aadhaar review.`);
       },
@@ -517,13 +523,14 @@ export class CreditCards implements OnInit, OnDestroy {
   private silentRefresh() {
     this.http.get(`${environment.apiBaseUrl}/api/credit-cards/all`, this.authOptions()).subscribe({
       next: (response: any) => {
-        this.creditCards = Array.isArray(response) ? response : (response.content || []);
-        this.filterCreditCards();
+        this.bankCreditCards = Array.isArray(response) ? response : (response.content || []);
+        this.mergeCreditCardLists();
         if (this.selectedCreditCard?.id) {
           const fresh = this.creditCards.find(c => c.id === this.selectedCreditCard.id);
           if (fresh) this.selectedCreditCard = fresh;
-          this.loadCreditCardDetails(this.selectedCreditCard.id);
+          if (!this.selectedCreditCard?.isExternal) this.loadCreditCardDetails(this.selectedCreditCard.id);
         }
+        this.loadExternalGuestCards(true);
       },
       error: () => {}
     });
@@ -547,9 +554,10 @@ export class CreditCards implements OnInit, OnDestroy {
     this.http.get(`${environment.apiBaseUrl}/api/credit-cards/all`, this.authOptions()).subscribe({
       next: (response: any) => {
         console.log('Credit cards response:', response);
-        this.creditCards = Array.isArray(response) ? response : (response.content || []);
-        this.filterCreditCards();
+        this.bankCreditCards = Array.isArray(response) ? response : (response.content || []);
+        this.mergeCreditCardLists();
         this.isLoadingCreditCards = false;
+        this.loadExternalGuestCards();
       },
       error: (err: any) => {
         console.error('Error loading credit cards:', err);
@@ -563,10 +571,38 @@ export class CreditCards implements OnInit, OnDestroy {
         this.alertService.error('Error', errorMessage);
         this.isLoadingCreditCards = false;
         // Set empty array on error to prevent UI issues
-        this.creditCards = [];
-        this.filteredCreditCards = [];
+        this.bankCreditCards = [];
+        this.mergeCreditCardLists();
+        this.loadExternalGuestCards(true);
       }
     });
+  }
+
+  private loadExternalGuestCards(silent = false) {
+    this.http.get<any[]>(
+      `${environment.apiBaseUrl}/api/credit-card-requests/admin/issued-cards`,
+      this.authOptions()
+    ).subscribe({
+      next: cards => {
+        this.externalCreditCards = Array.isArray(cards) ? cards : [];
+        this.mergeCreditCardLists();
+      },
+      error: error => {
+        this.externalCreditCards = [];
+        this.mergeCreditCardLists();
+        if (!silent) {
+          this.alertService.operationError(
+            'Load external credit cards',
+            error.error?.message || 'Unable to load issued external credit cards.'
+          );
+        }
+      }
+    });
+  }
+
+  private mergeCreditCardLists() {
+    this.creditCards = [...this.bankCreditCards, ...this.externalCreditCards];
+    this.filterCreditCards();
   }
 
   filterCreditCards() {
@@ -585,6 +621,8 @@ export class CreditCards implements OnInit, OnDestroy {
       filtered = filtered.filter(card =>
         card.userName?.toLowerCase().includes(query) ||
         card.accountNumber?.includes(query) ||
+        card.applicationId?.toLowerCase().includes(query) ||
+        card.userEmail?.toLowerCase().includes(query) ||
         card.cardNumber?.includes(query) ||
         card.maskedCardNumber?.includes(query)
       );
@@ -601,6 +639,11 @@ export class CreditCards implements OnInit, OnDestroy {
     }
     this.hideRevealedCardNumber();
     this.selectedCreditCard = card;
+    if (card.isExternal) {
+      this.externalCardApprovedLimit = Number(card.approvedLimit ?? 0);
+      this.externalCardActionReason = '';
+      return;
+    }
     this.selectedTransaction = null;
     this.selectedCardServiceRequests = [];
     this.cardServiceRequestError = '';
@@ -608,6 +651,63 @@ export class CreditCards implements OnInit, OnDestroy {
     this.loadCreditCardDetails(card.id);
     this.loadCardServiceRequests(card.id);
     this.loadEmiPlans();
+  }
+
+  saveExternalCardLimit() {
+    const card = this.selectedCreditCard;
+    if (!card?.isExternal || !Number.isFinite(Number(this.externalCardApprovedLimit))
+        || Number(this.externalCardApprovedLimit) <= 0) {
+      this.alertService.error('Invalid limit', 'Enter a credit limit greater than zero.');
+      return;
+    }
+    this.isSavingExternalCard = true;
+    this.http.put<any>(
+      `${environment.apiBaseUrl}/api/credit-card-requests/admin/issued-cards/${card.id}/limit`,
+      { approvedLimit: Number(this.externalCardApprovedLimit) },
+      this.authOptions()
+    ).subscribe({
+      next: updated => {
+        this.isSavingExternalCard = false;
+        this.selectedCreditCard = { ...card, ...updated };
+        this.loadCreditCards();
+        this.alertService.success('Limit updated', 'External customer credit limit was updated.');
+      },
+      error: error => {
+        this.isSavingExternalCard = false;
+        this.alertService.operationError(
+          'Update external card limit',
+          error.error?.message || 'Unable to update the credit limit.'
+        );
+      }
+    });
+  }
+
+  blockExternalCard() {
+    const card = this.selectedCreditCard;
+    if (!card?.isExternal || card.status?.toLowerCase() !== 'active') return;
+    if (!this.externalCardActionReason.trim()) {
+      this.alertService.error('Reason required', 'Enter why this card must be blocked.');
+      return;
+    }
+    this.isSavingExternalCard = true;
+    this.http.post<{ cardStatus: string }>(
+      `${environment.apiBaseUrl}/api/credit-card-requests/admin/${card.id}/block-card`,
+      { reason: this.externalCardActionReason.trim() },
+      this.authOptions()
+    ).subscribe({
+      next: result => {
+        this.isSavingExternalCard = false;
+        this.selectedCreditCard = { ...card, status: result.cardStatus };
+        this.externalCardActionReason = '';
+        this.loadCreditCards();
+        this.loadCardNumberHistory(card.id);
+        this.alertService.success('Card blocked', 'The external customer card was blocked.');
+      },
+      error: error => {
+        this.isSavingExternalCard = false;
+        this.alertService.operationError('Block external card', error.error?.message || 'Unable to block the card.');
+      }
+    });
   }
 
   closeCreditCardDetails() {

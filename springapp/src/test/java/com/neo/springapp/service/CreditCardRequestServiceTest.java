@@ -73,6 +73,27 @@ class CreditCardRequestServiceTest {
     }
 
     @Test
+    void issuedExternalCardsAreListedWithoutFullCardDetailsAndCanHaveLimitManaged() {
+        CreditCardRequestRepository requestRepository = mock(CreditCardRequestRepository.class);
+        CreditCardRequest request = approvedGuestRequest();
+        request.setId(55L);
+        when(requestRepository.findByAccountNumberIsNullAndStatusIgnoreCaseAndGuestCardNumberIsNotNull("Approved"))
+                .thenReturn(List.of(request));
+        when(requestRepository.findById(55L)).thenReturn(Optional.of(request));
+        when(requestRepository.save(request)).thenReturn(request);
+        CreditCardRequestService service = createService(requestRepository, mock(CreditCardRepository.class));
+
+        Map<String, Object> listed = service.getIssuedExternalCards().get(0);
+        assertEquals("CC2026ABCDEF1234", listed.get("applicationId"));
+        assertEquals("**** **** **** 1111", listed.get("maskedCardNumber"));
+        assertFalse(listed.containsKey("guestCardNumber"));
+
+        Map<String, Object> updated = service.updateIssuedExternalCardLimit(55L, 75000d);
+        assertEquals(75000d, request.getApprovedLimit());
+        assertEquals(75000d, updated.get("approvedLimit"));
+    }
+
+    @Test
     void acceptsTheExactSevenHundredFiftyScoreThresholdForAdminReview() {
         CreditCardRequestRepository requestRepository = mock(CreditCardRequestRepository.class);
         when(requestRepository.findByAccountNumberOrderByRequestDateDesc("ACC123")).thenReturn(List.of());

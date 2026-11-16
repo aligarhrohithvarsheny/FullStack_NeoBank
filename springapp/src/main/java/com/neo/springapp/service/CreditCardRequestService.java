@@ -27,6 +27,7 @@ import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
 import java.time.LocalDate;
 import java.time.Duration;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -299,6 +300,52 @@ public class CreditCardRequestService {
 
     public List<CreditCardRequest> getRequestsByStatus(String status) {
         return repo.findByStatus(status);
+    }
+
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> getIssuedExternalCards() {
+        return repo.findByAccountNumberIsNullAndStatusIgnoreCaseAndGuestCardNumberIsNotNull("Approved")
+                .stream()
+                .filter(request -> request.getLast4() != null && request.getGuestCardExpiry() != null)
+                .map(this::externalCardManagementView)
+                .toList();
+    }
+
+    @Transactional
+    public Map<String, Object> updateIssuedExternalCardLimit(Long id, Double approvedLimit) {
+        if (approvedLimit == null || !Double.isFinite(approvedLimit)
+                || approvedLimit <= 0 || approvedLimit > 1_000_000_000d) {
+            throw new IllegalArgumentException("Enter an approved limit greater than zero and at most ₹1,000,000,000.");
+        }
+        CreditCardRequest request = repo.findById(id)
+                .filter(this::isIssuedExternalCard)
+                .orElseThrow(() -> new IllegalArgumentException("Issued external credit card not found."));
+        request.setApprovedLimit(approvedLimit);
+        return externalCardManagementView(repo.save(request));
+    }
+
+    private boolean isIssuedExternalCard(CreditCardRequest request) {
+        return request != null && (request.getAccountNumber() == null || request.getAccountNumber().isBlank())
+                && request.getApplicationId() != null
+                && "Approved".equalsIgnoreCase(request.getStatus())
+                && request.getGuestCardNumber() != null
+                && request.getLast4() != null;
+    }
+
+    private Map<String, Object> externalCardManagementView(CreditCardRequest request) {
+        Map<String, Object> card = new HashMap<>();
+        card.put("id", request.getId());
+        card.put("applicationId", request.getApplicationId());
+        card.put("userName", request.getUserName());
+        card.put("userEmail", request.getUserEmail());
+        card.put("maskedCardNumber", maskCardNumber(request.getGuestCardNumber()));
+        card.put("expiryDate", request.getGuestCardExpiry());
+        card.put("approvedLimit", request.getApprovedLimit());
+        card.put("currentBalance", 0d);
+        card.put("availableLimit", request.getApprovedLimit());
+        card.put("status", request.getIssuedCardStatus() == null ? "Active" : request.getIssuedCardStatus());
+        card.put("isExternal", true);
+        return card;
     }
 
     public List<CreditCardRequest> getRequestsByAccountNumber(String accountNumber) {

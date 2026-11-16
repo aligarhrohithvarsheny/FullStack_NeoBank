@@ -230,6 +230,25 @@ public class CreditCardRequestController {
         return ResponseEntity.ok(service.getCardNumberHistory(id));
     }
 
+    @GetMapping("/admin/issued-cards")
+    public ResponseEntity<?> issuedExternalCards(Authentication authentication) {
+        if (!isStaff(authentication)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        return ResponseEntity.ok(service.getIssuedExternalCards());
+    }
+
+    @PutMapping("/admin/issued-cards/{id}/limit")
+    public ResponseEntity<?> updateIssuedExternalCardLimit(
+            @PathVariable Long id, @RequestBody(required = false) ApprovalRequest body,
+            Authentication authentication) {
+        if (!isStaff(authentication)) return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        if (body == null) return ResponseEntity.badRequest().body(Map.of("message", "An approved credit limit is required."));
+        try {
+            return ResponseEntity.ok(service.updateIssuedExternalCardLimit(id, body.approvedLimit()));
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));
+        }
+    }
+
     @PostMapping("/admin/{id}/card-details")
     public ResponseEntity<?> revealAdminGuestCardDetails(
             @PathVariable Long id,
