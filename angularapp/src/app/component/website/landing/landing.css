@@ -1424,46 +1424,145 @@ html { scroll-behavior: smooth; }
   .dash-nav-item { display: none; }
 }
 
-.credit-products-section{padding:80px 24px;background:#fff8fb;scroll-margin-top:90px}
-.credit-products-container{max-width:1200px;margin:0 auto}
-.credit-products-heading{text-align:center;max-width:720px;margin:0 auto 34px}
-.credit-products-heading>p{color:#64748b;line-height:1.6}
-.credit-products-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:22px}
-.credit-product-card{overflow:hidden;border:1px solid #e6dfe7;border-radius:12px;background:#fff;box-shadow:0 6px 24px #29143c0b;transition:transform .2s ease,box-shadow .2s ease}
-.credit-product-card:hover{transform:translateY(-4px);box-shadow:0 12px 30px #29143c16}
-.credit-product-art{height:188px;display:flex;align-items:center;justify-content:center;background:#f4dce8;padding:12px}
-.credit-product-art>img{max-width:100%;max-height:100%;object-fit:contain;border-radius:8px}
-.neobank-card-art{position:relative;width:104px;height:148px;border-radius:8px;padding:12px 9px;color:#fff;overflow:hidden;box-shadow:0 5px 14px #0003;display:flex;flex-direction:column;justify-content:space-between}
-.neobank-card-art:after{content:"";position:absolute;width:135px;height:135px;border:1px solid #ffffff47;border-radius:50%;right:-78px;top:24px;box-shadow:0 0 0 12px #ffffff12,0 0 0 25px #ffffff0b}
-.neobank-card-brand{font-size:11px;font-weight:800;letter-spacing:.5px}
-.neobank-card-chip{display:block;width:20px;height:16px;border:1px solid #f7d88a;border-radius:4px;background:linear-gradient(135deg,#f9e6a5,#c38d28)}
-.neobank-card-contactless{position:absolute;top:42px;left:36px;font-size:12px;transform:rotate(90deg);opacity:.85}
-.neobank-card-name{font-size:10px;font-weight:800;line-height:1.15;z-index:1}
-.neobank-card-number{font-size:6px;letter-spacing:.55px;white-space:nowrap;z-index:1}
-.theme-emerald .neobank-card-art{background:linear-gradient(145deg,#063c32,#0b604e 55%,#111f28)}
-.theme-gold .neobank-card-art{background:linear-gradient(145deg,#a77824,#d7b85c 45%,#34453d)}
-.theme-ocean .neobank-card-art{background:linear-gradient(145deg,#0d4e79,#277fb2 50%,#442557)}
-.theme-sunset .neobank-card-art{background:linear-gradient(145deg,#ed9a2c,#d65358 48%,#402347)}
-.theme-ruby .neobank-card-art{background:linear-gradient(145deg,#e44d61,#a32e55 52%,#152f57)}
-.theme-lilac .neobank-card-art{background:linear-gradient(145deg,#fff,#f8f6ff 50%,#e8defc);color:#542b82}
-.credit-product-content{padding:19px 18px 17px;text-align:center}
-.credit-product-content h3{margin:0 0 6px;font-size:19px;font-weight:600;color:#152033}
-.credit-product-description{min-height:20px;margin:0 0 14px;font-size:13px;color:#64748b}
-.credit-product-benefits{min-height:66px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;align-items:start}
-.credit-product-benefits span{font-size:11px;line-height:1.35;color:#64748b}
-.credit-product-actions{display:flex;align-items:center;justify-content:center;gap:18px;margin-top:12px}
-.credit-learn-button{border:0;border-radius:24px;padding:10px 20px;background:#cf3f16;color:#fff;font-size:12px;font-weight:700;cursor:pointer}
-.credit-learn-button:hover{background:#a83210}
-.credit-apply-button{border:0;background:transparent;color:#bd3b17;font-size:12px;font-weight:700;cursor:pointer}
-.credit-apply-button span{font-size:20px;vertical-align:-1px;margin-left:4px}
-.credit-products-empty{grid-column:1/-1;text-align:center;color:#64748b}
-.credit-product-modal-backdrop{position:fixed;inset:0;z-index:1200;display:grid;place-items:center;padding:20px;background:#0f172a99}
-.credit-product-modal{position:relative;width:min(680px,100%);max-height:90vh;overflow:auto;border-radius:16px;background:#fff;padding:30px;box-shadow:0 24px 80px #0004}
-.credit-product-modal h2{margin:12px 0 8px;color:#12213a}
-.credit-product-modal h3{margin:20px 0 8px;color:#17233a;font-size:16px}
-.credit-product-modal p,.credit-product-modal li{color:#536174;line-height:1.6}
-.credit-product-modal ul{padding-left:22px}
-.credit-product-terms{white-space:pre-line}
-.credit-product-modal-close{position:absolute;top:12px;right:14px;width:36px;height:36px;border:0;border-radius:50%;background:#f1f5f9;font-size:24px;cursor:pointer}
-@media(max-width:900px){.credit-products-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:580px){.credit-products-section{padding:58px 16px}.credit-products-grid{grid-template-columns:1fr}.credit-product-art{height:175px}.credit-product-modal{padding:25px 20px}}
+.credit-products-section {
+  padding: 80px 24px;
+  background: #fff8fb;
+  scroll-margin-top: 90px;
+}
+
+.credit-products-container { max-width: 1200px; margin: 0 auto; }
+.credit-products-heading { max-width: 720px; margin: 0 auto 34px; text-align: center; }
+.credit-products-heading > p { color: #64748b; line-height: 1.6; }
+.credit-products-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 22px; }
+.credit-product-card {
+  overflow: hidden;
+  border: 1px solid #e6dfe7;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 6px 24px #29143c0b;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.credit-product-card:hover { transform: translateY(-4px); box-shadow: 0 12px 30px #29143c16; }
+.credit-product-art {
+  display: flex;
+  height: 188px;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  background: #f4dce8;
+}
+.credit-product-art > img { max-width: 100%; max-height: 100%; border-radius: 8px; object-fit: contain; }
+.neobank-card-art {
+  position: relative;
+  display: flex;
+  width: 104px;
+  height: 148px;
+  flex-direction: column;
+  justify-content: space-between;
+  overflow: hidden;
+  padding: 12px 9px;
+  border-radius: 8px;
+  color: #fff;
+  box-shadow: 0 5px 14px #0003;
+}
+.neobank-card-art::after {
+  position: absolute;
+  top: 24px;
+  right: -78px;
+  width: 135px;
+  height: 135px;
+  border: 1px solid #ffffff47;
+  border-radius: 50%;
+  box-shadow: 0 0 0 12px #ffffff12, 0 0 0 25px #ffffff0b;
+  content: "";
+}
+.neobank-card-brand { font-size: 11px; font-weight: 800; letter-spacing: 0.5px; }
+.neobank-card-chip {
+  display: block;
+  width: 20px;
+  height: 16px;
+  border: 1px solid #f7d88a;
+  border-radius: 4px;
+  background: linear-gradient(135deg, #f9e6a5, #c38d28);
+}
+.neobank-card-contactless { position: absolute; top: 42px; left: 36px; font-size: 12px; opacity: 0.85; transform: rotate(90deg); }
+.neobank-card-name { z-index: 1; font-size: 10px; font-weight: 800; line-height: 1.15; }
+.neobank-card-number { z-index: 1; font-size: 6px; letter-spacing: 0.55px; white-space: nowrap; }
+.theme-emerald .neobank-card-art { background: linear-gradient(145deg, #063c32, #0b604e 55%, #111f28); }
+.theme-gold .neobank-card-art { background: linear-gradient(145deg, #a77824, #d7b85c 45%, #34453d); }
+.theme-ocean .neobank-card-art { background: linear-gradient(145deg, #0d4e79, #277fb2 50%, #442557); }
+.theme-sunset .neobank-card-art { background: linear-gradient(145deg, #ed9a2c, #d65358 48%, #402347); }
+.theme-ruby .neobank-card-art { background: linear-gradient(145deg, #e44d61, #a32e55 52%, #152f57); }
+.theme-lilac .neobank-card-art { color: #542b82; background: linear-gradient(145deg, #fff, #f8f6ff 50%, #e8defc); }
+.credit-product-content { padding: 19px 18px 17px; text-align: center; }
+.credit-product-content h3 { margin: 0 0 6px; color: #152033; font-size: 19px; font-weight: 600; }
+.credit-product-description { min-height: 20px; margin: 0 0 14px; color: #64748b; font-size: 13px; }
+.credit-product-benefits {
+  display: grid;
+  min-height: 66px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: start;
+  gap: 8px;
+}
+.credit-product-benefits span { color: #64748b; font-size: 11px; line-height: 1.35; }
+.credit-product-actions { display: flex; align-items: center; justify-content: center; gap: 18px; margin-top: 12px; }
+.credit-learn-button {
+  padding: 10px 20px;
+  border: 0;
+  border-radius: 24px;
+  color: #fff;
+  background: #cf3f16;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.credit-learn-button:hover { background: #a83210; }
+.credit-apply-button { border: 0; color: #bd3b17; background: transparent; font-size: 12px; font-weight: 700; cursor: pointer; }
+.credit-apply-button span { margin-left: 4px; font-size: 20px; vertical-align: -1px; }
+.credit-products-empty { grid-column: 1 / -1; color: #64748b; text-align: center; }
+.credit-product-modal-backdrop {
+  position: fixed;
+  z-index: 1200;
+  display: grid;
+  padding: 20px;
+  place-items: center;
+  background: #0f172a99;
+  inset: 0;
+}
+.credit-product-modal {
+  position: relative;
+  width: min(680px, 100%);
+  max-height: 90vh;
+  overflow: auto;
+  padding: 30px;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 24px 80px #0004;
+}
+.credit-product-modal h2 { margin: 12px 0 8px; color: #12213a; }
+.credit-product-modal h3 { margin: 20px 0 8px; color: #17233a; font-size: 16px; }
+.credit-product-modal p,
+.credit-product-modal li { color: #536174; line-height: 1.6; }
+.credit-product-modal ul { padding-left: 22px; }
+.credit-product-terms { white-space: pre-line; }
+.credit-product-modal-close {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 50%;
+  background: #f1f5f9;
+  font-size: 24px;
+  cursor: pointer;
+}
+@media (max-width: 900px) {
+  .credit-products-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 580px) {
+  .credit-products-section { padding: 58px 16px; }
+  .credit-products-grid { grid-template-columns: 1fr; }
+  .credit-product-art { height: 175px; }
+  .credit-product-modal { padding: 25px 20px; }
+}
