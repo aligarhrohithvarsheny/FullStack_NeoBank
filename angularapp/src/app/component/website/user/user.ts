@@ -58,6 +58,15 @@ export class User implements OnInit, OnDestroy {
   signupOtpVerifying: boolean = false;
   signupEmailVerified: boolean = false;
   signupResending: boolean = false;
+  registrationStep = 1;
+  registrationCustomerId = '';
+  registrationActivationCode = '';
+  registrationEmail = '';
+  registrationAadhaar = '';
+  registrationPassword = '';
+  registrationConfirmPassword = '';
+  isVerifyingRegistration = false;
+  isActivatingRegistration = false;
 
   // For account unlock
   showUnlockButton: boolean = false;
@@ -254,19 +263,8 @@ export class User implements OnInit, OnDestroy {
         if (authResponse.requiresOtp && authResponse.challengeId) {
           this.showSavingsLoginOtp(authResponse);
         } else if (authResponse.requiresPasswordSetup) {
-          // New password setup required for newly approved accounts
-          this.successMessage = authResponse.message || 'Your account has been approved. Please set up your password to proceed.';
-          this.errorMessage = '';
-          
-          // Store email in session for password setup component
-          sessionStorage.setItem('setupEmail', normalizedEmail);
-          
-          this.alertService.userSuccess('Account Approved', 'Please set up your password now.');
-          
-          // Redirect to password setup page
-          setTimeout(() => {
-            this.router.navigate(['/password-setup']);
-          }, 500);
+          this.switchToSignup();
+          this.successMessage = 'First-time online access requires a bank-issued activation code. Enter your customer ID to register.';
         } else if (authResponse.success && authResponse.user) {
           // Direct login (if OTP is not required)
           const userData = authResponse.user;
@@ -600,19 +598,8 @@ export class User implements OnInit, OnDestroy {
         if (authResponse.requiresOtp && authResponse.challengeId) {
           this.showSavingsLoginOtp(authResponse);
         } else if (authResponse.requiresPasswordSetup) {
-          // New password setup required for newly approved accounts
-          this.successMessage = authResponse.message || 'Your account has been approved. Please set up your password to proceed.';
-          this.errorMessage = '';
-          
-          // Store email in session for password setup component
-          sessionStorage.setItem('setupEmail', normalizedEmail);
-          
-          this.alertService.userSuccess('Account Approved', 'Please set up your password now.');
-          
-          // Redirect to password setup page
-          setTimeout(() => {
-            this.router.navigate(['/password-setup']);
-          }, 500);
+          this.switchToSignup();
+          this.successMessage = 'First-time online access requires a bank-issued activation code. Enter your customer ID to register.';
         } else if (authResponse.success && authResponse.role === 'ADMIN') {
           // Admin login detected - redirect to admin login page
           this.alertService.userSuccess('Admin Account Detected', 'Please use the admin login page.');
@@ -674,14 +661,9 @@ export class User implements OnInit, OnDestroy {
         console.error('Authentication error:', err);
         console.error('Error details:', JSON.stringify(err, null, 2));
 
-        // Approved but password not set: API returns 400 with requiresPasswordSetup — route to setup, no duplicate "Login Failed" + inline error
         if (err.error?.requiresPasswordSetup || err.error?.passwordNotSet) {
-          const msg = err.error.message || 'Please set your password before signing in.';
-          this.errorMessage = '';
-          this.successMessage = msg;
-          sessionStorage.setItem('setupEmail', normalizedEmail);
-          this.alertService.userSuccess('Set your password', msg);
-          setTimeout(() => this.router.navigate(['/password-setup']), 400);
+          this.switchToSignup();
+          this.successMessage = 'First-time online access requires a bank-issued activation code. Enter your customer ID to register.';
           return;
         }
         
@@ -982,6 +964,13 @@ export class User implements OnInit, OnDestroy {
   switchToSignup() {
     this.currentPage = 'signup';
     this.signupStep = 1;
+    this.registrationStep = 1;
+    this.registrationCustomerId = '';
+    this.registrationActivationCode = '';
+    this.registrationEmail = '';
+    this.registrationAadhaar = '';
+    this.registrationPassword = '';
+    this.registrationConfirmPassword = '';
     this.signupOtp = '';
     this.signupEmailVerified = false;
     this.signupName = '';
@@ -999,14 +988,7 @@ export class User implements OnInit, OnDestroy {
   }
 
   switchToSalarySignup() {
-    this.currentPage = 'salary-signup';
-    this.salaryVerified = false;
-    this.salaryCustomerId = '';
-    this.salarySignupPassword = '';
-    this.salaryConfirmPassword = '';
-    this.salaryEmployeeName = '';
-    this.salaryExistingAccountNumber = '';
-    this.clearMessages();
+    this.switchToSignup();
   }
 
   switchToCurrentLogin() {
@@ -1015,15 +997,7 @@ export class User implements OnInit, OnDestroy {
   }
 
   switchToCurrentSignup() {
-    this.currentPage = 'current-signup';
-    this.currentAccVerified = false;
-    this.currentAccCustomerId = '';
-    this.currentAccSignupPassword = '';
-    this.currentAccConfirmPassword = '';
-    this.currentAccOwnerName = '';
-    this.currentAccBusinessName = '';
-    this.currentAccExistingAccountNumber = '';
-    this.clearMessages();
+    this.switchToSignup();
   }
 
   switchToCurrentTeamLogin() {
@@ -1053,6 +1027,11 @@ export class User implements OnInit, OnDestroy {
     this.successMessage = '';
 
     const accNum = this.unifiedAccountNumber.trim();
+
+    if (/^(?:CUST\d{5}|\d{9})$/i.test(accNum)) {
+      this.customerIdLogin(accNum);
+      return;
+    }
 
     // Remember username
     if (this.rememberUsername) {
@@ -1214,6 +1193,191 @@ export class User implements OnInit, OnDestroy {
     this.showPassword = !this.showPassword;
   }
 
+  private customerIdLogin(customerId: string): void {
+    this.http.post<any>(`${environment.apiBaseUrl}/api/customer-access/login`, {
+      customerId,
+      password: this.unifiedPassword
+    }).subscribe({
+      next: response => {
+        this.isUnifiedLoggingIn = false;
+        if (!response?.success || !response.token) {
+          this.errorMessage = response?.message || 'Customer ID or password is incorrect, or online access is unavailable.';
+          return;
+        }
+
+        sessionStorage.removeItem('currentUser');
+        sessionStorage.removeItem('salaryEmployee');
+        sessionStorage.removeItem('currentAccount');
+        if (response.accountType === 'SALARY' && response.account) {
+          const account = response.account;
+          sessionStorage.setItem('salaryEmployee', JSON.stringify({
+            id: account.id,
+            employeeName: account.employeeName,
+            accountNumber: account.accountNumber,
+            customerId: account.customerId,
+            companyName: account.companyName,
+            designation: account.designation,
+            email: account.email,
+            authToken: response.token,
+            loginTime: new Date().toISOString()
+          }));
+          this.alertService.userSuccess('Login Successful', `Welcome ${account.employeeName || 'Salary account customer'}!`);
+          this.router.navigate(['/website/salary-dashboard']);
+          return;
+        }
+
+        if (response.accountType === 'CURRENT' && response.account) {
+          const account = response.account;
+          sessionStorage.setItem('currentAccount', JSON.stringify({
+            id: account.id,
+            ownerName: account.ownerName,
+            businessName: account.businessName,
+            businessType: account.businessType,
+            gstNumber: account.gstNumber,
+            accountNumber: account.accountNumber,
+            customerId: account.customerId,
+            email: account.email,
+            mobile: account.mobile,
+            shopAddress: account.shopAddress,
+            city: account.city,
+            state: account.state,
+            pincode: account.pincode,
+            balance: account.balance,
+            overdraftLimit: account.overdraftLimit,
+            overdraftEnabled: account.overdraftEnabled,
+            status: account.status,
+            sessionToken: response.token,
+            loginTime: new Date().toISOString()
+          }));
+          this.alertService.userSuccess('Login Successful', `Welcome ${account.ownerName || 'Current account customer'}!`);
+          this.router.navigate(['/website/current-account-dashboard']);
+          return;
+        }
+
+        if (response.accountType === 'SAVINGS' && response.user) {
+          const user = response.user;
+          sessionStorage.setItem('currentUser', JSON.stringify({
+            id: user.id,
+            name: user.account?.name || user.username,
+            email: user.email,
+            accountNumber: user.accountNumber,
+            customerId,
+            status: user.status,
+            passwordSet: true,
+            authToken: response.token,
+            loginTime: new Date().toISOString()
+          }));
+          this.alertService.userSuccess('Login Successful', `Welcome ${user.account?.name || user.username}!`);
+          this.navigateAfterUserLogin();
+          return;
+        }
+
+        this.errorMessage = 'Customer ID or password is incorrect, or online access is unavailable.';
+      },
+      error: error => {
+        this.isUnifiedLoggingIn = false;
+        this.errorMessage = error.error?.message || 'Unable to sign in with those details.';
+      }
+    });
+  }
+
+  verifyCustomerActivationCode(): void {
+    if (!this.registrationCustomerId.trim() || !this.registrationActivationCode.trim()) {
+      this.errorMessage = 'Enter your customer ID and the activation code provided by NeoBank.';
+      return;
+    }
+    this.isVerifyingRegistration = true;
+    this.errorMessage = '';
+    this.http.post<any>(`${environment.apiBaseUrl}/api/customer-access/registration/verify-code`, {
+      customerId: this.registrationCustomerId.trim(),
+      activationCode: this.registrationActivationCode.trim()
+    }).subscribe({
+      next: response => {
+        this.isVerifyingRegistration = false;
+        if (!response?.success) {
+          this.errorMessage = response?.message || 'Unable to verify registration details.';
+          return;
+        }
+        this.registrationStep = 2;
+        this.successMessage = 'Activation code verified. Enter the email and Aadhaar number registered with your account.';
+      },
+      error: error => {
+        this.isVerifyingRegistration = false;
+        this.errorMessage = error.error?.message || 'Unable to verify registration details.';
+      }
+    });
+  }
+
+  verifyCustomerRegistrationDetails(): void {
+    const email = this.registrationEmail.trim().toLowerCase();
+    const aadhaar = this.registrationAadhaar.replace(/\D/g, '');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !/^\d{12}$/.test(aadhaar)) {
+      this.errorMessage = 'Enter the registered email address and a valid 12-digit Aadhaar number.';
+      return;
+    }
+    this.isVerifyingRegistration = true;
+    this.errorMessage = '';
+    this.http.post<any>(`${environment.apiBaseUrl}/api/customer-access/registration/verify-details`, {
+      customerId: this.registrationCustomerId.trim(),
+      activationCode: this.registrationActivationCode.trim(),
+      email,
+      aadhaar
+    }).subscribe({
+      next: response => {
+        this.isVerifyingRegistration = false;
+        if (!response?.success) {
+          this.errorMessage = response?.message || 'Unable to verify registration details.';
+          return;
+        }
+        this.registrationStep = 3;
+        this.successMessage = 'Details verified. Create a password for customer-ID sign in.';
+      },
+      error: error => {
+        this.isVerifyingRegistration = false;
+        this.errorMessage = error.error?.message || 'Unable to verify registration details.';
+      }
+    });
+  }
+
+  activateCustomerOnlineAccess(): void {
+    if (this.registrationPassword.length < 10 || this.registrationPassword !== this.registrationConfirmPassword) {
+      this.errorMessage = this.registrationPassword !== this.registrationConfirmPassword
+        ? 'The passwords do not match.'
+        : 'Choose a password with at least 10 characters.';
+      return;
+    }
+    this.isActivatingRegistration = true;
+    this.errorMessage = '';
+    this.http.post<any>(`${environment.apiBaseUrl}/api/customer-access/registration/activate`, {
+      customerId: this.registrationCustomerId.trim(),
+      activationCode: this.registrationActivationCode.trim(),
+      email: this.registrationEmail.trim().toLowerCase(),
+      aadhaar: this.registrationAadhaar.replace(/\D/g, ''),
+      password: this.registrationPassword
+    }).subscribe({
+      next: response => {
+        this.isActivatingRegistration = false;
+        if (!response?.success) {
+          this.errorMessage = response?.message || 'Online access could not be activated.';
+          return;
+        }
+        this.unifiedAccountNumber = this.registrationCustomerId.trim();
+        this.registrationActivationCode = '';
+        this.registrationAadhaar = '';
+        this.registrationPassword = '';
+        this.registrationConfirmPassword = '';
+        this.registrationEmail = '';
+        this.registrationStep = 1;
+        this.currentPage = 'login';
+        this.successMessage = 'Registration complete. Sign in with your customer ID and new password.';
+      },
+      error: error => {
+        this.isActivatingRegistration = false;
+        this.errorMessage = error.error?.message || 'Online access could not be activated.';
+      }
+    });
+  }
+
   loadRememberedUsername() {
     if (typeof localStorage === 'undefined') return;
     const saved = localStorage.getItem('neobank_remembered_username');
@@ -1258,37 +1422,8 @@ export class User implements OnInit, OnDestroy {
   }
 
   salarySignup() {
-    if (!this.salarySignupPassword || !this.salaryConfirmPassword) {
-      this.errorMessage = 'Please fill in all fields';
-      return;
-    }
-    if (this.salarySignupPassword.length < 6) {
-      this.errorMessage = 'Password must be at least 6 characters';
-      return;
-    }
-    if (this.salarySignupPassword !== this.salaryConfirmPassword) {
-      this.errorMessage = 'Passwords do not match';
-      return;
-    }
-    this.salarySigningUp = true;
-    this.errorMessage = '';
-    this.salaryAccountService.signup(this.salaryCustomerId.trim(), this.salarySignupPassword).subscribe({
-      next: (res: any) => {
-        this.salarySigningUp = false;
-        if (res.success) {
-          this.alertService.userSuccess('Signup Successful', 'Password set successfully. You can now login with Account Number: ' + res.accountNumber);
-          this.successMessage = 'Password set! Your Account Number is: ' + res.accountNumber + '. Use it to login.';
-          this.currentPage = 'salary-login';
-          this.salaryAccountNumber = res.accountNumber;
-        } else {
-          this.errorMessage = res.message || 'Signup failed';
-        }
-      },
-      error: () => {
-        this.salarySigningUp = false;
-        this.errorMessage = 'Signup failed. Please try again.';
-      }
-    });
+    this.switchToSignup();
+    this.successMessage = 'Use your customer ID and the activation code provided by NeoBank to register.';
   }
 
   salaryLogin() {
@@ -1444,37 +1579,8 @@ export class User implements OnInit, OnDestroy {
   }
 
   currentAccSignup() {
-    if (!this.currentAccSignupPassword || !this.currentAccConfirmPassword) {
-      this.errorMessage = 'Please fill in all fields';
-      return;
-    }
-    if (this.currentAccSignupPassword.length < 6) {
-      this.errorMessage = 'Password must be at least 6 characters';
-      return;
-    }
-    if (this.currentAccSignupPassword !== this.currentAccConfirmPassword) {
-      this.errorMessage = 'Passwords do not match';
-      return;
-    }
-    this.currentAccSigningUp = true;
-    this.errorMessage = '';
-    this.currentAccountService.signup(this.currentAccCustomerId.trim(), this.currentAccSignupPassword).subscribe({
-      next: (res: any) => {
-        this.currentAccSigningUp = false;
-        if (res.success) {
-          this.alertService.userSuccess('Signup Successful', 'Password set successfully. You can now login with Account Number: ' + res.accountNumber);
-          this.successMessage = 'Password set! Your Account Number is: ' + res.accountNumber + '. Use it to login.';
-          this.currentPage = 'current-login';
-          this.currentAccNumber = res.accountNumber;
-        } else {
-          this.errorMessage = res.message || 'Signup failed';
-        }
-      },
-      error: () => {
-        this.currentAccSigningUp = false;
-        this.errorMessage = 'Signup failed. Please try again.';
-      }
-    });
+    this.switchToSignup();
+    this.successMessage = 'Use your customer ID and the activation code provided by NeoBank to register.';
   }
 
   currentAccLogin() {

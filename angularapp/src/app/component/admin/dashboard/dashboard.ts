@@ -13,6 +13,7 @@ import { FasttagAdmin } from '../fasttag/fasttag-admin';
 import { BankFormsAdminComponent } from '../bank-forms-admin/bank-forms-admin';
 import { BankingProducts } from '../banking-products/banking-products';
 import { CreditCardProducts } from '../credit-card-products/credit-card-products';
+import { CustomerAccess } from '../customer-access/customer-access';
 import { environment } from '../../../../environment/environment';
 import { FundTransferReceiptData, printFundTransferReceipt } from '../../../service/fund-transfer-receipt';
 import { forkJoin, of } from 'rxjs';
@@ -49,7 +50,7 @@ interface TransactionDetails {
   templateUrl: './dashboard.html',
   styleUrls: ['./dashboard.css'],
   encapsulation: ViewEncapsulation.None,
-  imports: [FormsModule, CommonModule, FasttagAdmin, BankFormsAdminComponent, BankingProducts, CreditCardProducts],
+  imports: [FormsModule, CommonModule, FasttagAdmin, BankFormsAdminComponent, BankingProducts, CreditCardProducts, CustomerAccess],
   standalone: true
 })
 export class Dashboard implements OnInit, OnDestroy {
@@ -197,6 +198,7 @@ export class Dashboard implements OnInit, OnDestroy {
     { section: 'profile', icon: 'fa-user-shield', label: 'Admin Profile', description: 'View and manage admin profile', gradient: 'linear-gradient(135deg, #667eea, #764ba2)' },
     { section: 'users', icon: 'fa-users', label: 'Manage Users', description: 'View, edit and manage all user accounts', gradient: 'linear-gradient(135deg, #f093fb, #f5576c)', featureKey: 'manage-users', route: 'users' },
     { section: 'user-control', icon: 'fa-user-cog', label: 'Full User Control', description: 'Block, unblock and control user access', gradient: 'linear-gradient(135deg, #4facfe, #00f2fe)', featureKey: 'user-control', route: 'user-control' },
+    { section: 'customer-access-codes', icon: 'fa-key', label: 'Customer Login Activation Codes', description: 'Issue single-use offline codes for first-time customer sign-in', gradient: 'linear-gradient(135deg, #0f766e, #38bdf8)', featureKey: 'user-control' },
     { section: 'bulk-export', icon: 'fa-file-download', label: 'Bulk Data Export', description: 'Export account data in bulk PDF/Excel', gradient: 'linear-gradient(135deg, #43e97b, #38f9d7)', featureKey: 'manage-users' },
     { section: 'bank-forms', icon: 'fa-file-alt', label: 'Bank Forms', description: 'Download 60 banking forms as PDF and upload by account number', gradient: 'linear-gradient(135deg, #667eea, #764ba2)' },
     { section: 'deposit-withdraw', icon: 'fa-exchange-alt', label: 'Deposit/Withdraw', description: 'Process deposits and withdrawals', gradient: 'linear-gradient(135deg, #fa709a, #fee140)', featureKey: 'deposit-withdraw' },

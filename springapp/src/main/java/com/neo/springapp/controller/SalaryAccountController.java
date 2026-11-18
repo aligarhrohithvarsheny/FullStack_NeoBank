@@ -13,6 +13,7 @@ import com.neo.springapp.service.SessionHistoryService;
 import com.neo.springapp.service.UserSessionTokenService;
 import com.neo.springapp.repository.NetBankingServiceControlRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -277,22 +278,9 @@ public class SalaryAccountController {
 
     @PostMapping("/signup")
     public ResponseEntity<Map<String, Object>> signup(@RequestBody Map<String, String> body) {
-        String customerId = body.get("customerId");
-        String password = body.get("password");
-        if (customerId == null || password == null || customerId.isEmpty() || password.isEmpty()) {
-            Map<String, Object> err = new HashMap<>();
-            err.put("success", false);
-            err.put("message", "Customer ID and password are required");
-            return ResponseEntity.badRequest().body(err);
-        }
-        if (password.length() < 6) {
-            Map<String, Object> err = new HashMap<>();
-            err.put("success", false);
-            err.put("message", "Password must be at least 6 characters");
-            return ResponseEntity.badRequest().body(err);
-        }
-        Map<String, Object> result = salaryAccountService.signup(customerId, password);
-        return ResponseEntity.ok(result);
+        return ResponseEntity.status(HttpStatus.GONE).body(Map.of(
+                "success", false,
+                "message", "Use customer-ID registration with a bank-issued activation code to set up online access."));
     }
 
     @PostMapping("/login")

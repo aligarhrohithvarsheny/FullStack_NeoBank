@@ -1,0 +1,33 @@
+<section class="customer-access-admin">
+  <header>
+    <span class="access-eyebrow">CUSTOMER ONLINE ACCESS</span>
+    <h2>Issue activation code</h2>
+    <p>Issue a one-time code to a customer with an approved Savings, Salary or Current account. Hand the code to the verified customer out-of-band.</p>
+  </header>
+
+  <form class="activation-issue-form" (ngSubmit)="issueCode()">
+    <label>
+      Account type
+      <select name="accountType" [(ngModel)]="accountType">
+        <option value="SAVINGS">Savings</option>
+        <option value="SALARY">Salary</option>
+        <option value="CURRENT">Current</option>
+      </select>
+    </label>
+    <label>
+      Customer ID
+      <input name="customerId" [(ngModel)]="customerId" autocomplete="off" maxlength="40" required>
+    </label>
+    <button type="submit" [disabled]="isIssuing">
+      {{ isIssuing ? 'Issuing…' : 'Generate one-time code' }}
+    </button>
+  </form>
+
+  <p class="activation-error" *ngIf="error" role="alert">{{ error }}</p>
+  <div class="activation-code-result" *ngIf="issuedCode">
+    <strong>Give this code to the verified customer now. It will not be shown again.</strong>
+    <code>{{ issuedCode.activationCode }}</code>
+    <p>Valid until {{ issuedCode.expiresAt | date:'medium' }}. Issuing another code invalidates this one.</p>
+    <button type="button" (click)="clearIssuedCode()">Hide code</button>
+  </div>
+</section>

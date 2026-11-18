@@ -17,6 +17,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -532,88 +533,13 @@ public class UserController {
         return ResponseEntity.ok(beginLoginOtp(user, clientIp, deviceInfo, "IP: " + clientIp, "MOBILE_DOB", null));
     }
 
-    // SECURITY: Set password for approved accounts (required before first login)
+    // Retired: first-time credentials must use customer-ID registration with an activation code.
     @PostMapping("/set-password")
     public ResponseEntity<Map<String, Object>> setPasswordForApprovedAccount(
             @RequestBody Map<String, String> request) {
-        try {
-            String email = request.get("email");
-            String newPassword = request.get("newPassword");
-            String confirmPassword = request.get("confirmPassword");
-            
-            if (email == null || newPassword == null || confirmPassword == null) {
-                Map<String, Object> response = new HashMap<>();
-                response.put("success", false);
-                response.put("message", "Email, new password and confirm password are required");
-                return ResponseEntity.badRequest().body(response);
-            }
-            
-            // Validate password match
-            if (!newPassword.equals(confirmPassword)) {
-                Map<String, Object> response = new HashMap<>();
-                response.put("success", false);
-                response.put("message", "Passwords do not match");
-                return ResponseEntity.badRequest().body(response);
-            }
-            
-            // Validate password strength (minimum 8 characters, at least 1 uppercase, 1 lowercase, 1 number)
-            if (newPassword.length() < 8) {
-                Map<String, Object> response = new HashMap<>();
-                response.put("success", false);
-                response.put("message", "Password must be at least 8 characters long");
-                return ResponseEntity.badRequest().body(response);
-            }
-            
-            if (!newPassword.matches("^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d).+$")) {
-                Map<String, Object> response = new HashMap<>();
-                response.put("success", false);
-                response.put("message", "Password must contain at least one uppercase letter, one lowercase letter, and one number");
-                return ResponseEntity.badRequest().body(response);
-            }
-            
-            // Check if user exists and is APPROVED
-            Optional<User> userOpt = userService.findByEmail(email);
-            if (!userOpt.isPresent()) {
-                Map<String, Object> response = new HashMap<>();
-                response.put("success", false);
-                response.put("message", "User account not found");
-                return ResponseEntity.badRequest().body(response);
-            }
-            
-            User user = userOpt.get();
-            
-            // SECURITY: Only allow password setup for APPROVED accounts that haven't set password
-            if (!"APPROVED".equalsIgnoreCase(user.getStatus())) {
-                Map<String, Object> response = new HashMap<>();
-                response.put("success", false);
-                response.put("message", "Your account must be approved before setting a password");
-                return ResponseEntity.badRequest().body(response);
-            }
-            
-            // Encrypt and set the password
-            String encryptedPassword = passwordService.encryptPassword(newPassword);
-            user.setPassword(encryptedPassword);
-            user.setPasswordSet(true);
-            user.setFailedLoginAttempts(0);
-            user.setAccountLocked(false);
-            
-            // Save updated user
-            userService.saveUser(user);
-            
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", true);
-            response.put("message", "Password set successfully! You can now login with your email and new password.");
-            System.out.println("✅ Password set successfully for approved account: " + email);
-            
-            return ResponseEntity.ok(response);
-            
-        } catch (Exception e) {
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", false);
-            response.put("message", "Failed to set password: " + e.getMessage());
-            System.out.println("❌ Error setting password: " + e.getMessage());
-            return ResponseEntity.internalServerError().body(response);
-        }
+        return ResponseEntity.status(HttpStatus.GONE).body(Map.of(
+                "success", false,
+                "message", "Use customer-ID registration with a bank-issued activation code to set up online access."));
     }
 
     // Verify the short-lived challenge created after a valid password login.
@@ -1083,32 +1009,12 @@ public class UserController {
             }
             user.setEmail(emailNorm);
 
-            // If this email already belongs to an APPROVED user who has not set a password yet
-            // (e.g. admin-opened or KYC-approved account), complete first-time password setup instead
-            // of failing as "duplicate email". This matches /send-signup-otp which allows OTP for the same case.
             Optional<User> existingOpt = userService.getUserByEmail(emailNorm);
             if (existingOpt.isPresent()) {
-                User existing = existingOpt.get();
-                boolean needsPassword = "APPROVED".equalsIgnoreCase(existing.getStatus()) && !existing.isPasswordSet();
-                String rawPw = user.getPassword();
-                if (needsPassword && rawPw != null && !rawPw.isBlank()) {
-                    if (!passwordService.isEncrypted(rawPw)) {
-                        existing.setPassword(passwordService.encryptPassword(rawPw));
-                    } else {
-                        existing.setPassword(rawPw);
-                    }
-                    existing.setPasswordSet(true);
-                    if (user.getUsername() != null && !user.getUsername().isBlank()) {
-                        existing.setUsername(user.getUsername().trim());
-                    }
-                    User saved = userService.saveUser(existing);
-                    System.out.println("✅ First-time password set for existing user: " + emailNorm);
-                    response.put("success", true);
-                    response.put("activationCompleted", true);
-                    response.put("message", "Password set successfully! You can now sign in with your email and password.");
-                    response.put("user", createUserResponse(saved));
-                    return ResponseEntity.ok(response);
-                }
+                response.put("success", false);
+                response.put("message", "This email is already registered. Use customer-ID registration with your bank-issued activation code.");
+                response.put("errorType", "EMAIL_EXISTS");
+                return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
             }
             
             // Validate unique fields (case-insensitive) for new registrations
@@ -1147,10 +1053,9 @@ public class UserController {
                 }
             }
             
-            // Encrypt password before saving
-            if (user.getPassword() != null && !passwordService.isEncrypted(user.getPassword())) {
-                user.setPassword(passwordService.encryptPassword(user.getPassword()));
-            }
+            user.setStatus("PENDING");
+            user.setPasswordSet(false);
+            user.setPassword(null);
             User savedUser = userService.saveUser(user);
             System.out.println("✅ User created successfully: " + savedUser.getEmail());
             

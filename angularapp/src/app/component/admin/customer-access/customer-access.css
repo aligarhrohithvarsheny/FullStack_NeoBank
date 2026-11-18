@@ -1,0 +1,16 @@
+.customer-access-admin{max-width:900px;margin:12px auto;padding:28px;border:1px solid #dfe7ef;border-radius:16px;background:#fff;box-shadow:0 12px 32px #0f172a0b}
+.customer-access-admin header{margin-bottom:24px}
+.access-eyebrow{color:#0f766e;font-size:11px;font-weight:800;letter-spacing:1.5px}
+.customer-access-admin h2{margin:8px 0;color:#142238;font-size:25px}
+.customer-access-admin header p{max-width:700px;color:#64748b;line-height:1.6}
+.activation-issue-form{display:grid;grid-template-columns:1fr 1.4fr auto;align-items:end;gap:14px}
+.activation-issue-form label{display:grid;gap:8px;color:#334155;font-size:13px;font-weight:700}
+.activation-issue-form input,.activation-issue-form select{min-height:44px;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#0f172a;font:inherit}
+.activation-issue-form button,.activation-code-result button{min-height:44px;padding:10px 18px;border:0;border-radius:8px;background:#0f766e;color:#fff;font-weight:700;cursor:pointer}
+.activation-issue-form button:disabled{opacity:.6;cursor:wait}
+.activation-error{margin:18px 0 0;color:#b91c1c}
+.activation-code-result{display:grid;gap:12px;margin-top:22px;padding:18px;border:1px solid #facc15;border-radius:12px;background:#fffbeb;color:#854d0e}
+.activation-code-result code{width:fit-content;padding:12px 16px;border:1px dashed #b45309;border-radius:8px;background:#fff;color:#7c2d12;font-size:24px;font-weight:800;letter-spacing:3px}
+.activation-code-result p{margin:0;color:#713f12}
+.activation-code-result button{width:fit-content;min-height:36px;background:#475569}
+@media(max-width:680px){.customer-access-admin{padding:20px}.activation-issue-form{grid-template-columns:1fr}.activation-code-result code{font-size:20px}}

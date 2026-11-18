@@ -2353,3 +2353,63 @@
     font-size: 13px;
   }
 }
+
+.jpm-auth-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 0 0 22px;
+  border-bottom: 1px solid #d5dce5;
+}
+
+.jpm-auth-tabs button {
+  padding: 12px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: #64748b;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+
+.jpm-auth-tabs button.active {
+  border-bottom-color: #e85d24;
+  color: #c2410c;
+  font-weight: 700;
+}
+
+.jpm-registration-progress {
+  display: grid;
+  grid-template-columns: 32px 1fr 32px 1fr 32px;
+  align-items: center;
+  gap: 8px;
+  margin: 24px auto;
+  max-width: 360px;
+}
+
+.jpm-registration-progress span {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border: 1px solid #cbd5e1;
+  border-radius: 50%;
+  color: #64748b;
+  background: #fff;
+  font-size: 12px;
+}
+
+.jpm-registration-progress span.active,
+.jpm-registration-progress span.complete {
+  border-color: #6b287e;
+  color: #fff;
+  background: #6b287e;
+}
+
+.jpm-registration-progress i {
+  height: 1px;
+  background: #cbd5e1;
+}
+
+.jpm-registration-progress i.active { background: #6b287e; }
+.jpm-registration-step-title { margin: 0 0 18px; color: #49215a; font-size: 16px; }
+.jpm-registration-back { display: block; margin-top: 14px; padding: 8px 0; border: 0; background: transparent; cursor: pointer; }

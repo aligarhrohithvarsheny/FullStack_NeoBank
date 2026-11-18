@@ -851,6 +851,13 @@
     <app-credit-card-products></app-credit-card-products>
   </div>
 
+  <div class="section-content" *ngIf="activeSection === 'customer-access-codes'" style="padding: 24px;">
+    <button type="button" class="close-btn" (click)="setActiveSection('home')" style="float:right;background:none;border:none;font-size:20px;cursor:pointer;color:#888;">
+      <i class="fa fa-times"></i>
+    </button>
+    <app-customer-access></app-customer-access>
+  </div>
+
   <section class="section-content" *ngIf="activeSection === 'bank-account-link'" style="padding: 24px;">
     <div class="section-header">
       <div>
