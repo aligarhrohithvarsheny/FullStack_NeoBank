@@ -1,0 +1,16 @@
+{
+  "planHash": "4df1e5719f2d8112b59142cdac96919c99f5c37bf0111c3af76a871aee3d6a3a",
+  "phase": "standalone",
+  "recordedAtUtc": "2026-11-18T10:04:45.5239513Z",
+  "retryCount": 0,
+  "resetBaseline": false,
+  "complete": false,
+  "runningStep": "initializing",
+  "result": {
+    "setupSucceeded": false,
+    "setupDurationMs": 0,
+    "setupFailureOutput": null,
+    "assertions": [],
+    "executions": []
+  }
+}

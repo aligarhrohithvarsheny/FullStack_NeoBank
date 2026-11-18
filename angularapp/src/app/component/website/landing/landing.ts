@@ -2,6 +2,8 @@ import { Component, ViewEncapsulation, HostListener, OnInit, OnDestroy, Inject, 
 import { Router, RouterLink } from '@angular/router';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { HttpClient } from '@angular/common/http';
+import { environment } from '../../../../environment/environment';
 import { AccountRecoveryService, RecoveryAccountType } from '../../../service/account-recovery.service';
 import { LoanRepayment } from '../loan-repayment/loan-repayment';
 
@@ -19,6 +21,20 @@ type LandingSearchResult = {
   sectionId?: string;
   action?: 'account-recovery';
 };
+
+interface LandingCreditCardProduct {
+  productCode: string;
+  name: string;
+  description: string;
+  theme: string;
+  features: string[];
+  eligibility: string;
+  termsAndConditions: string;
+  imageData: string | null;
+  annualFee: number;
+  sortOrder: number;
+  active: boolean;
+}
 
 @Component({
   selector: 'app-landing',
@@ -95,6 +111,12 @@ export class Landing implements OnInit, OnDestroy {
       description: 'Apply as a NeoBank customer or a new applicant and track your application.',
       keywords: 'credit card apply application pan income guest track',
       route: 'website/credit-card-apply'
+    },
+    {
+      label: 'NeoBank Credit Cards',
+      description: 'Compare NeoBank credit card products, benefits and eligibility.',
+      keywords: 'credit card rewards benefits eligibility terms cards',
+      sectionId: 'credit-cards'
     },
     {
       label: 'FASTag',
@@ -249,6 +271,8 @@ export class Landing implements OnInit, OnDestroy {
   zigzag3Visible = false;
   zigzag4Visible = false;
   cardsVisible = false;
+  creditCardProducts = this.defaultCreditCardProducts();
+  selectedCreditCardProduct: LandingCreditCardProduct | null = null;
   paymentGatewayVisible = false;
   dashboardVisible = false;
   securityVisible = false;
@@ -258,6 +282,7 @@ export class Landing implements OnInit, OnDestroy {
 
   constructor(
     private router: Router,
+    private http: HttpClient,
     private accountRecoveryService: AccountRecoveryService,
     @Inject(PLATFORM_ID) private platformId: Object
   ) {
@@ -281,6 +306,7 @@ export class Landing implements OnInit, OnDestroy {
       return;
     }
 
+    this.loadCreditCardProducts();
     // Set hero visible after short delay
     setTimeout(() => this.heroVisible = true, 300);
 
@@ -316,9 +342,48 @@ export class Landing implements OnInit, OnDestroy {
     this.activeFooterInformation = null;
   }
 
+  openCreditCardDetails(product: LandingCreditCardProduct): void {
+    this.selectedCreditCardProduct = product;
+  }
+
+  closeCreditCardDetails(): void {
+    this.selectedCreditCardProduct = null;
+  }
+
+  applyForCreditCard(): void {
+    this.selectedCreditCardProduct = null;
+    this.goTo('website/credit-card-apply');
+  }
+
+  private loadCreditCardProducts(): void {
+    this.http.get<LandingCreditCardProduct[]>(`${environment.apiBaseUrl}/api/credit-card-products`)
+      .subscribe({
+        next: products => {
+          if (Array.isArray(products)) this.creditCardProducts = products;
+        },
+        error: () => {
+          // Keep the built-in NeoBank catalogue visible if the catalogue service is unavailable.
+        }
+      });
+  }
+
+  private defaultCreditCardProducts(): LandingCreditCardProduct[] {
+    const eligibility = 'Applicants must meet NeoBank identity, income and credit assessment requirements. Approval is subject to verification.';
+    const termsAndConditions = 'Credit facilities are subject to approval. Fees, interest, repayment obligations and card usage are governed by the final NeoBank card agreement. Review the agreement before accepting an offer.';
+    return [
+      { productCode: 'ZENITH_PLUS', name: 'Zenith+ Credit Card', description: 'Premium privileges for every day', theme: 'emerald', features: ['Metal Credit Card', 'Grand Welcome', 'Taj Epicure Membership'], eligibility, termsAndConditions, imageData: null, annualFee: 0, sortOrder: 0, active: true },
+      { productCode: 'ANANTA', name: 'Ananta Credit Card', description: 'Benefits that travel with you', theme: 'gold', features: ['Up to 15% discount on merchants', 'Exciting travel benefits', 'Accelerated reward points'], eligibility, termsAndConditions, imageData: null, annualFee: 0, sortOrder: 1, active: true },
+      { productCode: 'LAKSYA', name: 'Laksya Credit Card', description: 'A little more from every purchase', theme: 'ocean', features: ['Up to 15% discount on merchants', 'Complimentary airport lounge access', 'Accelerated reward points'], eligibility, termsAndConditions, imageData: null, annualFee: 0, sortOrder: 2, active: true },
+      { productCode: 'TEJAS', name: 'Tejas Credit Card', description: 'Reward your everyday spending', theme: 'sunset', features: ['5 reward points on AU Rewardz', 'Up to 10% cashback', 'Instant reward on activation'], eligibility, termsAndConditions, imageData: null, annualFee: 0, sortOrder: 3, active: true },
+      { productCode: 'PRATHAMA', name: 'Prathama Credit Card', description: 'More value with every tap', theme: 'ruby', features: ['Up to 2 reward points on tap and pay', '500 bonus reward points on recurring payment', '1% fuel surcharge waiver'], eligibility, termsAndConditions, imageData: null, annualFee: 0, sortOrder: 4, active: true },
+      { productCode: 'LIT', name: 'LIT Credit Card', description: 'Choose features for your lifestyle', theme: 'lilac', features: ['Choose features as per your lifestyle', 'Pay for the features used', 'Switch features on or off when needed'], eligibility, termsAndConditions, imageData: null, annualFee: 0, sortOrder: 5, active: true }
+    ];
+  }
+
   @HostListener('document:keydown.escape')
   onEscapeKey() {
     this.closeFooterInformation();
+    this.closeCreditCardDetails();
     this.closeSearch();
     this.closeAccountRecovery();
   }

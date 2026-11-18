@@ -33,6 +33,7 @@
             <a href="#" class="dropdown-item" (click)="openAccountRecovery($event)">Recover Account</a>
             <a href="#" class="dropdown-item" (click)="goTo('website/user', $event)">Internet Banking</a>
             <a href="#" class="dropdown-item" (click)="goTo('website/cards360', $event)">NeoBank Cards360</a>
+            <a href="#credit-cards" class="dropdown-item" (click)="showPersonalDropdown = false">Credit Cards</a>
             <a href="#" class="dropdown-item" (click)="goTo('website/fasttag-login', $event)">FASTag Login</a>
           </div>
         </div>
@@ -362,6 +363,42 @@
       </div>
     </div>
     <app-loan-repayment id="loan-repayment"></app-loan-repayment>
+  </section>
+
+  <section class="credit-products-section" id="credit-cards">
+    <div class="credit-products-container">
+      <header class="credit-products-heading">
+        <span class="section-badge">NeoBank Credit Cards</span>
+        <h2 class="section-title centered">A card for the way<br><span class="gradient-text">you live</span></h2>
+        <p>Explore card benefits, eligibility and terms before you apply. Product details are provided by NeoBank.</p>
+      </header>
+      <div class="credit-products-grid">
+        <article class="credit-product-card" *ngFor="let product of creditCardProducts">
+          <div class="credit-product-art" [ngClass]="'theme-' + product.theme">
+            <img *ngIf="product.imageData" [src]="product.imageData" [alt]="product.name + ' card artwork'">
+            <div *ngIf="!product.imageData" class="neobank-card-art">
+              <span class="neobank-card-brand">NeoBank</span>
+              <span class="neobank-card-chip" aria-hidden="true"></span>
+              <span class="neobank-card-contactless" aria-hidden="true">)))</span>
+              <span class="neobank-card-name">{{ product.name }}</span>
+              <span class="neobank-card-number">•••• &nbsp; •••• &nbsp; •••• &nbsp; 3600</span>
+            </div>
+          </div>
+          <div class="credit-product-content">
+            <h3>{{ product.name }}</h3>
+            <p class="credit-product-description">{{ product.description }}</p>
+            <div class="credit-product-benefits">
+              <span *ngFor="let feature of product.features | slice:0:3">{{ feature }}</span>
+            </div>
+            <div class="credit-product-actions">
+              <button type="button" class="credit-learn-button" (click)="openCreditCardDetails(product)">Learn more</button>
+              <button type="button" class="credit-apply-button" (click)="applyForCreditCard()">Apply Now <span aria-hidden="true">›</span></button>
+            </div>
+          </div>
+        </article>
+        <p *ngIf="!creditCardProducts.length" class="credit-products-empty">NeoBank credit card products will be available soon.</p>
+      </div>
+    </div>
   </section>
 
   <!-- ========== 5. ZIGZAG: INSURANCE ========== -->
@@ -920,6 +957,23 @@
           </button>
         </div>
       </form>
+    </section>
+  </div>
+
+  <div class="credit-product-modal-backdrop" *ngIf="selectedCreditCardProduct" (click)="closeCreditCardDetails()">
+    <section class="credit-product-modal" role="dialog" aria-modal="true"
+      [attr.aria-label]="selectedCreditCardProduct.name + ' details'" (click)="$event.stopPropagation()">
+      <button type="button" class="credit-product-modal-close" aria-label="Close card details" (click)="closeCreditCardDetails()">×</button>
+      <span class="section-badge">NeoBank Credit Card</span>
+      <h2>{{ selectedCreditCardProduct.name }}</h2>
+      <p>{{ selectedCreditCardProduct.description }}</p>
+      <h3>Benefits</h3>
+      <ul><li *ngFor="let feature of selectedCreditCardProduct.features">{{ feature }}</li></ul>
+      <h3>Eligibility</h3>
+      <p>{{ selectedCreditCardProduct.eligibility }}</p>
+      <h3>Terms and conditions</h3>
+      <p class="credit-product-terms">{{ selectedCreditCardProduct.termsAndConditions }}</p>
+      <button type="button" class="credit-learn-button" (click)="applyForCreditCard()">Apply Now</button>
     </section>
   </div>
 

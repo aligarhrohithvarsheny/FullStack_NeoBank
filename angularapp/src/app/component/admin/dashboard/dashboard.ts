@@ -12,6 +12,7 @@ import { PaymentGatewayService } from '../../../service/payment-gateway.service'
 import { FasttagAdmin } from '../fasttag/fasttag-admin';
 import { BankFormsAdminComponent } from '../bank-forms-admin/bank-forms-admin';
 import { BankingProducts } from '../banking-products/banking-products';
+import { CreditCardProducts } from '../credit-card-products/credit-card-products';
 import { environment } from '../../../../environment/environment';
 import { FundTransferReceiptData, printFundTransferReceipt } from '../../../service/fund-transfer-receipt';
 import { forkJoin, of } from 'rxjs';
@@ -48,7 +49,7 @@ interface TransactionDetails {
   templateUrl: './dashboard.html',
   styleUrls: ['./dashboard.css'],
   encapsulation: ViewEncapsulation.None,
-  imports: [FormsModule, CommonModule, FasttagAdmin, BankFormsAdminComponent, BankingProducts],
+  imports: [FormsModule, CommonModule, FasttagAdmin, BankFormsAdminComponent, BankingProducts, CreditCardProducts],
   standalone: true
 })
 export class Dashboard implements OnInit, OnDestroy {
@@ -222,6 +223,7 @@ export class Dashboard implements OnInit, OnDestroy {
     { section: 'cards', icon: 'fa-credit-card', label: 'Manage Cards', description: 'Manage debit cards', gradient: 'linear-gradient(135deg, #ff9a9e, #fecfef)', featureKey: 'cards', route: 'cards' },
     { section: 'cards360', icon: 'fa-credit-card', label: 'Cards360 Access', description: 'Issue customer passcodes, control access, and review card activity history', gradient: 'linear-gradient(135deg, #0f766e, #38bdf8)', route: 'cards360' },
     { section: 'credit-cards', icon: 'fa-credit-card', label: 'Credit Cards', description: 'Manage credit card applications', gradient: 'linear-gradient(135deg, #fbc2eb, #a18cd1)', featureKey: 'cards', route: 'credit-cards' },
+    { section: 'credit-card-products', icon: 'fa-credit-card', label: 'Credit Card Products', description: 'Update landing page card names, artwork, benefits, eligibility and terms', gradient: 'linear-gradient(135deg, #0f766e, #38bdf8)', featureKey: 'cards' },
     { section: 'current-accounts', icon: 'fa-building', label: 'Current Accounts', description: 'Manage business current accounts', gradient: 'linear-gradient(135deg, #84fab0, #8fd3f4)', route: 'current-accounts' },
     { section: 'open-account', icon: 'fa-user-plus', label: 'Open Account (No KYC)', description: 'Admin account opening approvals', gradient: 'linear-gradient(135deg, #a6c0fe, #f68084)', route: 'admin-open-account' },
     { section: 'insurance', icon: 'fa-file-medical', label: 'Insurance', description: 'Manage insurance applications', gradient: 'linear-gradient(135deg, #fccb90, #d57eeb)', route: 'insurance-dashboard' },

@@ -1,0 +1,66 @@
+<section class="card-products-admin">
+  <header class="catalog-header">
+    <div>
+      <span class="catalog-eyebrow">NEOBANK · PRODUCT CATALOGUE</span>
+      <h2>Credit card products</h2>
+      <p>Update card names, artwork, benefits, eligibility and terms together. Saved products appear on the public landing page.</p>
+    </div>
+    <div class="catalog-actions">
+      <button type="button" class="catalog-secondary" (click)="addProduct()">Add card</button>
+      <button type="button" class="catalog-primary" (click)="saveAll()" [disabled]="saving || loading">
+        {{ saving ? 'Saving…' : 'Save all changes' }}
+      </button>
+    </div>
+  </header>
+
+  <p *ngIf="loading" class="catalog-message">Loading card products…</p>
+  <p *ngIf="error" class="catalog-error" role="alert">{{ error }}</p>
+  <p *ngIf="success" class="catalog-success" role="status">{{ success }}</p>
+
+  <article class="product-editor" *ngFor="let product of products; let index = index">
+    <header class="product-editor-heading">
+      <strong>{{ product.name || 'New NeoBank card' }}</strong>
+      <label class="active-toggle"><input type="checkbox" [(ngModel)]="product.active"> Show on landing page</label>
+      <button type="button" class="remove-product" (click)="removeProduct(index)" aria-label="Remove card product">Remove</button>
+    </header>
+
+    <div class="product-editor-grid">
+      <label>Product name
+        <input type="text" [(ngModel)]="product.name" maxlength="120">
+      </label>
+      <label>Short description
+        <input type="text" [(ngModel)]="product.description" maxlength="500">
+      </label>
+      <label>Annual fee (₹)
+        <input type="number" min="0" step="100" [(ngModel)]="product.annualFee">
+      </label>
+      <label>Card artwork theme
+        <select [(ngModel)]="product.theme">
+          <option value="emerald">Emerald</option>
+          <option value="gold">Gold</option>
+          <option value="ocean">Ocean</option>
+          <option value="sunset">Sunset</option>
+          <option value="ruby">Ruby</option>
+          <option value="lilac">Lilac</option>
+        </select>
+      </label>
+      <label class="wide-field">Benefits (one per line)
+        <textarea rows="4" [ngModel]="featuresText(product)" (ngModelChange)="onFeaturesChanged(product, $event)"></textarea>
+      </label>
+      <label class="wide-field">Eligibility
+        <textarea rows="4" [(ngModel)]="product.eligibility"></textarea>
+      </label>
+      <label class="wide-field">Terms and conditions
+        <textarea rows="6" [(ngModel)]="product.termsAndConditions"></textarea>
+      </label>
+      <div class="artwork-field">
+        <label>Card image (PNG, JPEG or WebP; up to 1 MB)
+          <input type="file" accept="image/png,image/jpeg,image/webp" (change)="selectImage(product, $event)">
+        </label>
+        <img *ngIf="product.imageData" [src]="product.imageData" alt="Credit card artwork preview">
+        <button *ngIf="product.imageData" type="button" class="catalog-secondary" (click)="clearImage(product)">Use NeoBank theme artwork</button>
+      </div>
+    </div>
+  </article>
+  <p *ngIf="!loading && !products.length" class="catalog-message">No card products loaded.</p>
+</section>
