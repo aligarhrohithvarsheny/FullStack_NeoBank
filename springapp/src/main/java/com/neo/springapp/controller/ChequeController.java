@@ -12,6 +12,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
@@ -361,6 +362,25 @@ public class ChequeController {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body(Map.of("error", "Unable to check cheque book eligibility"));
+        }
+    }
+
+    @PostMapping("/admin/estimate-cibil")
+    public ResponseEntity<Map<String, Object>> generateCibilEstimate(
+            @RequestBody Map<String, String> request,
+            Authentication authentication) {
+        if (authentication == null
+                || !(authentication.getPrincipal() instanceof SessionPrincipal principal)
+                || !("ADMIN".equals(principal.scope()) || "MANAGER".equals(principal.scope()))) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "Staff authorization is required"));
+        }
+        try {
+            return ResponseEntity.ok(chequeBookIssuanceService.generateCibilEstimate(request.get("accountNumber")));
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("error", "Unable to generate a score estimate"));
         }
     }
 

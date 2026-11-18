@@ -58,11 +58,21 @@
           <input type="number" min="0.01" step="0.01" [(ngModel)]="newBookCost">
         </label>
         <div class="cibil-score" [class.eligible]="isCibilEligible" [class.ineligible]="!isCibilEligible">
-          <span>Stored CIBIL score</span>
+          <span>Verified stored CIBIL score</span>
           <strong *ngIf="!isLoadingIssueEligibility && storedCibilScore !== null">{{ storedCibilScore }}</strong>
           <strong *ngIf="isLoadingIssueEligibility">Loading…</strong>
           <strong *ngIf="!isLoadingIssueEligibility && storedCibilScore === null">Not found</strong>
           <small>Minimum required: 300</small>
+        </div>
+        <div class="cibil-estimate">
+          <span>Simulated estimate (display only)</span>
+          <strong *ngIf="estimatedCibilScore !== null">{{ estimatedCibilScore }}</strong>
+          <strong *ngIf="isGeneratingCibilEstimate">Generating…</strong>
+          <button type="button" class="estimate-button" (click)="generateCibilEstimate()"
+            [disabled]="isGeneratingCibilEstimate">
+            {{ isGeneratingCibilEstimate ? 'Generating…' : 'Generate estimate' }}
+          </button>
+          <small>Not a bureau score. Does not affect eligibility and is not saved.</small>
         </div>
       </div>
       <p class="help-text" *ngIf="!isLoadingIssueEligibility && !isCibilEligible">

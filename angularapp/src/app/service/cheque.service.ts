@@ -200,6 +200,12 @@ export class ChequeService {
     return this.http.get<any>(`${this.apiBaseUrl}/admin/issue-eligibility`, { params });
   }
 
+  generateCibilEstimate(accountNumber: string): Observable<any> {
+    return this.http.post<any>(`${this.apiBaseUrl}/admin/estimate-cibil`, {
+      accountNumber: accountNumber.trim()
+    });
+  }
+
   issueChequeBookForAdmin(
     accountNumber: string,
     leafCount: number,

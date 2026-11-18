@@ -32,12 +32,17 @@
 .search-button:disabled, .close-button:disabled, .issue-button:disabled { opacity: .58; cursor: not-allowed; }
 .help-text { margin: 10px 0 0; color: #768397; font-size: 11px; }
 .issue-book-panel { margin-top: 18px; padding: 18px; background: #f7fafc; border: 1px solid #dfe8ef; border-radius: 10px; }
-.issue-fields { display: grid; grid-template-columns: repeat(2, minmax(140px, 1fr)) minmax(180px, 1fr); align-items: end; gap: 12px; }
+.issue-fields { display: grid; grid-template-columns: repeat(4, minmax(140px, 1fr)); align-items: end; gap: 12px; }
 .cibil-score { display: grid; gap: 3px; min-height: 42px; padding: 8px 12px; background: #fff; border: 1px solid #d8e1e9; border-radius: 8px; }
 .cibil-score span, .cibil-score small { color: #6b7789; font-size: 10px; }
 .cibil-score strong { font-size: 14px; }
 .cibil-score.eligible strong { color: #067647; }
 .cibil-score.ineligible strong { color: #b42318; }
+.cibil-estimate { display: grid; gap: 4px; min-height: 42px; padding: 8px 12px; background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; }
+.cibil-estimate span, .cibil-estimate small { color: #475569; font-size: 10px; }
+.cibil-estimate strong { color: #075985; font-size: 14px; }
+.estimate-button { justify-self: start; padding: 5px 9px; color: #075985; background: #e0f2fe; border: 1px solid #7dd3fc; border-radius: 6px; font: inherit; font-size: 10px; font-weight: 750; cursor: pointer; }
+.estimate-button:disabled { opacity: .58; cursor: not-allowed; }
 .issue-actions { margin-top: 14px; }
 .table-wrap { width: 100%; overflow-x: auto; border: 1px solid #e5eaf0; border-radius: 9px; }
 table { width: 100%; min-width: 920px; border-collapse: collapse; table-layout: auto; }

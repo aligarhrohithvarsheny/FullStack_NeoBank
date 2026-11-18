@@ -47,6 +47,7 @@ public class ChequeBookIssuanceService {
     @Autowired private SavingsChequeBankRangeRepository savingsChequeBankRangeRepository;
     @Autowired private ChequeBookClosureHistoryRepository closureHistoryRepository;
     @Autowired private CibilReportRepository cibilReportRepository;
+    @Autowired private CreditScorePredictorService creditScorePredictorService;
     @Autowired private AccountService accountService;
     @Autowired private TransactionService transactionService;
 
@@ -135,6 +136,45 @@ public class ChequeBookIssuanceService {
         response.put("minimumCibilScore", MINIMUM_CIBIL_SCORE);
         response.put("eligible", score != null && score >= MINIMUM_CIBIL_SCORE);
         return response;
+    }
+
+    @Transactional(readOnly = true)
+    public Map<String, Object> generateCibilEstimate(String accountNumber) {
+        if (accountNumber == null || accountNumber.isBlank()) {
+            throw new IllegalArgumentException("Account number is required.");
+        }
+
+        String normalized = accountNumber.trim();
+        String pan;
+        Double annualIncome = null;
+        var savings = accountRepository.findByAccountNumber(normalized);
+        if (savings != null) {
+            pan = savings.getPan();
+            annualIncome = savings.getIncome();
+        } else {
+            var salary = salaryAccountRepository.findByAccountNumber(normalized);
+            if (salary != null) {
+                pan = salary.getPanNumber();
+                Double monthlySalary = salary.getMonthlySalary();
+                annualIncome = monthlySalary == null ? null : monthlySalary * 12;
+            } else {
+                var current = currentAccountRepository.findByAccountNumber(normalized)
+                        .orElseThrow(() -> new IllegalArgumentException("Account was not found."));
+                pan = current.getPanNumber();
+            }
+        }
+
+        if (pan == null || !pan.trim().matches("(?i)[A-Z]{5}[0-9]{4}[A-Z]")) {
+            throw new IllegalStateException("A valid PAN is required to generate an estimate.");
+        }
+
+        int estimate = creditScorePredictorService.predictCibilFromPanAndIncome(
+                pan.trim().toUpperCase(Locale.ROOT), annualIncome);
+        return Map.of(
+                "estimatedScore", estimate,
+                "scoreSource", "SIMULATED_PAN_INCOME_ESTIMATE",
+                "scoreNotice", "Simulated estimate based on PAN pattern and declared income. Not a bureau score; display only."
+        );
     }
 
     @Transactional

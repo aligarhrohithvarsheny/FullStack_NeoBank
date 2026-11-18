@@ -25,6 +25,8 @@ export class ChequeBookClosureComponent {
   isLoadingIssueEligibility = false;
   isIssuingBook = false;
   storedCibilScore: number | null = null;
+  estimatedCibilScore: number | null = null;
+  isGeneratingCibilEstimate = false;
   isCibilEligible = false;
   newBookLeafCount = 30;
   newBookCost = 199;
@@ -62,6 +64,7 @@ export class ChequeBookClosureComponent {
 
     this.showIssueBookForm = false;
     this.storedCibilScore = null;
+    this.estimatedCibilScore = null;
     this.isCibilEligible = false;
     this.isLoadingClosureBooks = true;
     this.chequeService.getChequeBooksByAccountNumber(accountNumber).subscribe({
@@ -92,6 +95,7 @@ export class ChequeBookClosureComponent {
     this.showIssueBookForm = true;
     this.isLoadingIssueEligibility = true;
     this.storedCibilScore = null;
+    this.estimatedCibilScore = null;
     this.isCibilEligible = false;
     this.chequeService.getAdminChequeBookIssueEligibility(accountNumber).subscribe({
       next: eligibility => {
@@ -104,6 +108,27 @@ export class ChequeBookClosureComponent {
         this.alertService.error(
           'Eligibility unavailable',
           err?.error?.error || 'Unable to retrieve the stored CIBIL score for this account.'
+        );
+      }
+    });
+  }
+
+  generateCibilEstimate(): void {
+    const accountNumber = this.closureAccountNumber.trim();
+    if (!accountNumber || this.isGeneratingCibilEstimate) return;
+
+    this.isGeneratingCibilEstimate = true;
+    this.estimatedCibilScore = null;
+    this.chequeService.generateCibilEstimate(accountNumber).subscribe({
+      next: estimate => {
+        this.estimatedCibilScore = estimate?.estimatedScore ?? null;
+        this.isGeneratingCibilEstimate = false;
+      },
+      error: err => {
+        this.isGeneratingCibilEstimate = false;
+        this.alertService.error(
+          'Estimate unavailable',
+          err?.error?.error || 'Unable to generate a simulated score estimate for this account.'
         );
       }
     });
@@ -125,7 +150,7 @@ export class ChequeBookClosureComponent {
     }
     if (!confirm(
       `Issue ${this.newBookLeafCount} active cheque numbers to ${accountNumber}?\n` +
-      `₹${this.newBookCost.toFixed(2)} will be debited. Stored CIBIL score: ${this.storedCibilScore}.`
+      `₹${this.newBookCost.toFixed(2)} will be debited. Verified stored CIBIL score: ${this.storedCibilScore}.`
     )) {
       return;
     }
