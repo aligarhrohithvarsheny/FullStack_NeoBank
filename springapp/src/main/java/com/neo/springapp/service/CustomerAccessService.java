@@ -3,11 +3,13 @@ package com.neo.springapp.service;
 import com.neo.springapp.model.Account;
 import com.neo.springapp.model.CurrentAccount;
 import com.neo.springapp.model.CustomerActivationCode;
+import com.neo.springapp.model.CustomerActivationCodeHistory;
 import com.neo.springapp.model.SalaryAccount;
 import com.neo.springapp.model.User;
 import com.neo.springapp.repository.AccountRepository;
 import com.neo.springapp.repository.CurrentAccountRepository;
 import com.neo.springapp.repository.CustomerActivationCodeRepository;
+import com.neo.springapp.repository.CustomerActivationCodeHistoryRepository;
 import com.neo.springapp.repository.SalaryAccountRepository;
 import com.neo.springapp.repository.UserRepository;
 import org.springframework.stereotype.Service;
@@ -36,6 +38,7 @@ public class CustomerAccessService {
     private final SalaryAccountRepository salaryAccountRepository;
     private final UserRepository userRepository;
     private final CustomerActivationCodeRepository activationCodeRepository;
+    private final CustomerActivationCodeHistoryRepository activationCodeHistoryRepository;
     private final CurrentAccountService currentAccountService;
     private final SalaryAccountService salaryAccountService;
     private final PasswordService passwordService;
@@ -47,6 +50,7 @@ public class CustomerAccessService {
             SalaryAccountRepository salaryAccountRepository,
             UserRepository userRepository,
             CustomerActivationCodeRepository activationCodeRepository,
+            CustomerActivationCodeHistoryRepository activationCodeHistoryRepository,
             CurrentAccountService currentAccountService,
             SalaryAccountService salaryAccountService,
             PasswordService passwordService,
@@ -56,6 +60,7 @@ public class CustomerAccessService {
         this.salaryAccountRepository = salaryAccountRepository;
         this.userRepository = userRepository;
         this.activationCodeRepository = activationCodeRepository;
+        this.activationCodeHistoryRepository = activationCodeHistoryRepository;
         this.currentAccountService = currentAccountService;
         this.salaryAccountService = salaryAccountService;
         this.passwordService = passwordService;
@@ -67,30 +72,83 @@ public class CustomerAccessService {
         AccountType type = AccountType.from(accountType);
         String normalizedCustomerId = normalizeCustomerId(customerId);
         List<CustomerRecord> matches = findMatches(normalizedCustomerId);
-        if (matches.size() != 1 || matches.get(0).type != type) {
+        List<CustomerRecord> typedMatches = matches.stream()
+                .filter(customer -> customer.type == type)
+                .toList();
+        if (typedMatches.size() != 1) {
+            List<CustomerRecord> activeMatches = matches.stream()
+                    .filter(CustomerRecord::isActive)
+                    .toList();
+            if (typedMatches.isEmpty() && activeMatches.size() == 1) {
+                throw new IllegalArgumentException("This customer ID belongs to an active "
+                        + activeMatches.get(0).type.name().toLowerCase(Locale.ROOT)
+                        + " account. Select that account type and try again.");
+            }
             throw new IllegalArgumentException("Customer record is unavailable or ambiguous. Verify the customer ID and account type.");
         }
 
-        CustomerRecord customer = matches.get(0);
-        if (!customer.isActive() || customer.isPasswordSet()
-                || blank(customer.email()) || blank(customer.aadhaar())) {
+        CustomerRecord customer = typedMatches.get(0);
+        if (customer.isPasswordSet()) {
+            throw new IllegalArgumentException("Online access already exists for this customer. No new activation code is needed.");
+        }
+        if (!customer.isActive() || blank(customer.email()) || blank(customer.aadhaar())) {
             throw new IllegalArgumentException("This customer is not eligible for first-time online access. Review the account record.");
         }
 
-        String code = generateActivationCode();
         LocalDateTime now = LocalDateTime.now();
         CustomerActivationCode activation = activationCodeRepository.findForUpdate(normalizedCustomerId)
                 .orElseGet(CustomerActivationCode::new);
+        activationCodeHistoryRepository
+                .findFirstByCustomerIdAndStatusOrderByIssuedAtDesc(normalizedCustomerId, "ACTIVE")
+                .ifPresent(previous -> {
+                    if (activation.getConsumedAt() != null) {
+                        previous.setStatus("USED");
+                        previous.setUsedAt(activation.getConsumedAt());
+                    } else {
+                        previous.setStatus(activation.getExpiresAt() != null
+                                && !activation.getExpiresAt().isAfter(now) ? "EXPIRED" : "REGENERATED");
+                    }
+                    activationCodeHistoryRepository.save(previous);
+                });
+
+        String code = generateActivationCode();
         activation.setCustomerId(normalizedCustomerId);
         activation.setAccountType(type.name());
         activation.setCodeHash(passwordService.encryptPassword(code));
         activation.setIssuedBy(issuedBy);
         activation.setIssuedAt(now);
-        activation.setExpiresAt(now.plusHours(24));
+        activation.setExpiresAt(now.plusDays(7));
         activation.setConsumedAt(null);
         activation.setFailedAttempts(0);
         activationCodeRepository.save(activation);
+
+        CustomerActivationCodeHistory history = new CustomerActivationCodeHistory();
+        history.setCustomerId(normalizedCustomerId);
+        history.setAccountType(type.name());
+        history.setIssuedBy(issuedBy);
+        history.setIssuedAt(now);
+        history.setExpiresAt(activation.getExpiresAt());
+        history.setStatus("ACTIVE");
+        activationCodeHistoryRepository.save(history);
         return new IssuedCode(code, activation.getExpiresAt(), type.name());
+    }
+
+    @Transactional
+    public List<ActivationHistoryEntry> getActivationCodeHistory() {
+        LocalDateTime now = LocalDateTime.now();
+        List<CustomerActivationCodeHistory> history = activationCodeHistoryRepository.findTop200ByOrderByIssuedAtDesc();
+        boolean updated = false;
+        for (CustomerActivationCodeHistory entry : history) {
+            if ("ACTIVE".equals(entry.getStatus()) && !entry.getExpiresAt().isAfter(now)) {
+                entry.setStatus("EXPIRED");
+                updated = true;
+            }
+        }
+        if (updated) activationCodeHistoryRepository.saveAll(history);
+        return history.stream().map(entry -> new ActivationHistoryEntry(
+                entry.getId(), entry.getCustomerId(), entry.getAccountType(), entry.getIssuedBy(),
+                entry.getIssuedAt(), entry.getExpiresAt(), entry.getStatus(), entry.getUsedAt(),
+                entry.getFirstLoginAt(), entry.getLastLoginAt())).toList();
     }
 
     @Transactional(noRollbackFor = IllegalArgumentException.class)
@@ -135,6 +193,7 @@ public class CustomerAccessService {
         customer.resetLoginFailures();
         activation.setConsumedAt(LocalDateTime.now());
         activationCodeRepository.save(activation);
+        markActivationUsed(activation);
         customer.save();
         return new RegistrationResult(true, "Online access is ready. Sign in with your customer ID.", customer.type.name());
     }
@@ -142,7 +201,10 @@ public class CustomerAccessService {
     @Transactional
     public Map<String, Object> authenticate(String customerId, String password) {
         if (blank(customerId) || blank(password)) return invalidLogin();
-        List<CustomerRecord> matches = findMatches(normalizeCustomerId(customerId));
+        List<CustomerRecord> matches = findMatches(normalizeCustomerId(customerId)).stream()
+                .filter(CustomerRecord::isActive)
+                .filter(CustomerRecord::isPasswordSet)
+                .toList();
         if (matches.size() != 1) return invalidLogin();
         CustomerRecord customer = matches.get(0);
 
@@ -169,6 +231,7 @@ public class CustomerAccessService {
             user.setFailedLoginAttempts(0);
             user.setLastFailedLoginTime(null);
             userRepository.save(user);
+            recordSuccessfulLogin(customer);
             Map<String, Object> response = success(AccountType.SAVINGS, user.getId(), user.getAccountNumber());
             response.put("user", savingsUserView(user, account));
             return response;
@@ -178,6 +241,7 @@ public class CustomerAccessService {
             SalaryAccount salary = (SalaryAccount) customer.entity;
             Map<String, Object> result = salaryAccountService.authenticate(salary.getAccountNumber(), password);
             if (!Boolean.TRUE.equals(result.get("success"))) return invalidLogin();
+            recordSuccessfulLogin(customer);
             Map<String, Object> response = success(AccountType.SALARY, salary.getId(), salary.getAccountNumber());
             response.put("account", salaryAccountView(salary));
             return response;
@@ -186,6 +250,7 @@ public class CustomerAccessService {
         CurrentAccount current = (CurrentAccount) customer.entity;
         Map<String, Object> result = currentAccountService.authenticate(current.getAccountNumber(), password);
         if (!Boolean.TRUE.equals(result.get("success"))) return invalidLogin();
+        recordSuccessfulLogin(customer);
         Map<String, Object> response = success(AccountType.CURRENT, current.getId(), current.getAccountNumber());
         response.put("account", result.get("account"));
         return response;
@@ -237,9 +302,18 @@ public class CustomerAccessService {
 
     private CustomerActivationCode getValidActivation(String customerId, String rawCode) {
         CustomerActivationCode activation = activationCodeRepository.findForUpdate(customerId).orElse(null);
-        if (activation == null || activation.getConsumedAt() != null
-                || activation.getExpiresAt().isBefore(LocalDateTime.now())
-                || activation.getFailedAttempts() >= MAX_ACTIVATION_ATTEMPTS) {
+        if (activation == null) {
+            return null;
+        }
+        CustomerRecord customer = findCustomer(activation);
+        if (customer != null && customer.isPasswordSet()) {
+            throw new IllegalArgumentException("Online access already exists for this customer. Sign in with your customer ID.");
+        }
+        if (activation.getConsumedAt() != null || activation.getFailedAttempts() >= MAX_ACTIVATION_ATTEMPTS) {
+            return null;
+        }
+        if (!activation.getExpiresAt().isAfter(LocalDateTime.now())) {
+            markActivationExpired(activation);
             return null;
         }
         String code = rawCode == null ? "" : rawCode.trim().toUpperCase(Locale.ROOT);
@@ -253,6 +327,44 @@ public class CustomerAccessService {
     private void recordFailedAttempt(CustomerActivationCode activation) {
         activation.setFailedAttempts(activation.getFailedAttempts() + 1);
         activationCodeRepository.save(activation);
+        if (activation.getFailedAttempts() >= MAX_ACTIVATION_ATTEMPTS) {
+            updateCurrentHistory(activation, history -> history.setStatus("LOCKED"));
+        }
+    }
+
+    private void markActivationUsed(CustomerActivationCode activation) {
+        updateCurrentHistory(activation, history -> {
+            history.setStatus("USED");
+            history.setUsedAt(activation.getConsumedAt());
+        });
+    }
+
+    private void markActivationExpired(CustomerActivationCode activation) {
+        updateCurrentHistory(activation, history -> history.setStatus("EXPIRED"));
+    }
+
+    private void updateCurrentHistory(CustomerActivationCode activation,
+                                      java.util.function.Consumer<CustomerActivationCodeHistory> update) {
+        activationCodeHistoryRepository
+                .findFirstByCustomerIdAndAccountTypeAndStatusOrderByIssuedAtDesc(
+                        activation.getCustomerId(), activation.getAccountType(), "ACTIVE")
+                .filter(history -> history.getIssuedAt().equals(activation.getIssuedAt()))
+                .ifPresent(history -> {
+                    update.accept(history);
+                    activationCodeHistoryRepository.save(history);
+                });
+    }
+
+    private void recordSuccessfulLogin(CustomerRecord customer) {
+        LocalDateTime now = LocalDateTime.now();
+        activationCodeHistoryRepository
+                .findFirstByCustomerIdAndAccountTypeAndStatusOrderByIssuedAtDesc(
+                        customer.customerId(), customer.type.name(), "USED")
+                .ifPresent(history -> {
+                    if (history.getFirstLoginAt() == null) history.setFirstLoginAt(now);
+                    history.setLastLoginAt(now);
+                    activationCodeHistoryRepository.save(history);
+                });
     }
 
     private IllegalArgumentException invalidRegistration() {
@@ -321,6 +433,10 @@ public class CustomerAccessService {
     }
 
     public record IssuedCode(String activationCode, LocalDateTime expiresAt, String accountType) {}
+    public record ActivationHistoryEntry(Long id, String customerId, String accountType, String issuedBy,
+                                         LocalDateTime issuedAt, LocalDateTime expiresAt, String status,
+                                         LocalDateTime usedAt, LocalDateTime firstLoginAt,
+                                         LocalDateTime lastLoginAt) {}
     public record ActivationRequest(String customerId, String email, String aadhaar, String activationCode, String password) {}
     public record RegistrationResult(boolean success, String message, String accountType) {}
 
@@ -372,6 +488,12 @@ public class CustomerAccessService {
             if (entity instanceof User user) return user.getEmail();
             if (entity instanceof SalaryAccount account) return account.getEmail();
             return ((CurrentAccount) entity).getEmail();
+        }
+
+        String customerId() {
+            if (entity instanceof User user) return user.getAccount().getCustomerId();
+            if (entity instanceof SalaryAccount account) return account.getCustomerId();
+            return ((CurrentAccount) entity).getCustomerId();
         }
 
         String aadhaar() {

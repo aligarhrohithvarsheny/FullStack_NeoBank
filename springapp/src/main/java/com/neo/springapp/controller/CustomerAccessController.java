@@ -5,6 +5,7 @@ import com.neo.springapp.service.UserSessionTokenService.SessionPrincipal;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -37,6 +38,14 @@ public class CustomerAccessController {
         } catch (IllegalArgumentException exception) {
             return ResponseEntity.badRequest().body(Map.of("message", exception.getMessage()));
         }
+    }
+
+    @GetMapping("/activation-codes/history")
+    public ResponseEntity<?> getActivationCodeHistory(Authentication authentication) {
+        if (adminPrincipal(authentication) == null) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", "Admin access is required."));
+        }
+        return ResponseEntity.ok(customerAccessService.getActivationCodeHistory());
     }
 
     @PostMapping("/registration/verify-code")
