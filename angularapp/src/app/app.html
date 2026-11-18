@@ -1,2 +1,21 @@
 <router-outlet> </router-outlet>
 <app-alert></app-alert>
+
+<div class="neobank-upload-progress" *ngIf="loadingIndicator.isUploadActive()" role="progressbar"
+  aria-label="File upload in progress" aria-valuetext="Uploading">
+  <span></span>
+</div>
+
+<div class="neobank-preloader-backdrop" *ngIf="loadingIndicator.isVisible()" role="status" aria-live="polite" aria-busy="true">
+  <div class="neobank-preloader-card">
+    <div class="neobank-preloader-logo-wrap">
+      <img src="assets/images/neobank-logo.svg" alt="NeoBank" class="neobank-preloader-logo">
+      <span class="neobank-preloader-orbit"></span>
+    </div>
+    <strong>NeoBank</strong>
+    <span class="neobank-preloader-message">
+      {{ loadingIndicator.isUploadActive() ? 'Uploading securely…' : 'Loading securely…' }}
+    </span>
+    <div class="neobank-preloader-track" aria-hidden="true"><span></span></div>
+  </div>
+</div>

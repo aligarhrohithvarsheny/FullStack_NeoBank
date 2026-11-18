@@ -2,7 +2,7 @@
   <header>
     <span class="access-eyebrow">CUSTOMER ONLINE ACCESS</span>
     <h2>Issue activation code</h2>
-    <p>Issue a one-time code to a customer with an approved Savings, Salary or Current account. Hand the code to the verified customer out-of-band.</p>
+    <p>Issue a one-time code to an approved Savings, Salary or Current account. The code is valid for seven days; generating a replacement immediately invalidates the previous code.</p>
   </header>
 
   <form class="activation-issue-form" (ngSubmit)="issueCode()">
@@ -27,7 +27,54 @@
   <div class="activation-code-result" *ngIf="issuedCode">
     <strong>Give this code to the verified customer now. It will not be shown again.</strong>
     <code>{{ issuedCode.activationCode }}</code>
-    <p>Valid until {{ issuedCode.expiresAt | date:'medium' }}. Issuing another code invalidates this one.</p>
+    <p>Valid until {{ issuedCode.expiresAt | date:'medium' }}. This code can be used once.</p>
+    <button type="button" class="download-voucher" (click)="downloadVoucher()">Download PDF voucher</button>
     <button type="button" (click)="clearIssuedCode()">Hide code</button>
   </div>
+
+  <section class="activation-history">
+    <div class="activation-history-heading">
+      <div>
+        <h3>Activation history</h3>
+        <p>Showing the latest 200 records. Refreshes automatically every 10 seconds; activation and login timestamps update after customer activity.</p>
+      </div>
+      <button type="button" (click)="loadHistory()" [disabled]="isLoadingHistory">
+        {{ isLoadingHistory ? 'Refreshing…' : 'Refresh' }}
+      </button>
+    </div>
+    <p class="activation-error" *ngIf="historyError" role="alert">{{ historyError }}</p>
+    <div class="activation-history-table-wrap">
+      <table class="activation-history-table">
+        <thead>
+          <tr>
+            <th>Customer ID</th>
+            <th>Account</th>
+            <th>Generated</th>
+            <th>Expires</th>
+            <th>Status</th>
+            <th>Used</th>
+            <th>First login</th>
+            <th>Last login</th>
+            <th>Issued by</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let entry of history">
+            <td>{{ entry.customerId }}</td>
+            <td>{{ entry.accountType }}</td>
+            <td>{{ entry.issuedAt | date:'short' }}</td>
+            <td>{{ entry.expiresAt | date:'short' }}</td>
+            <td><span class="history-status" [ngClass]="'status-' + entry.status.toLowerCase()">{{ entry.status === 'USED' ? 'ACCESS ACTIVE' : entry.status }}</span></td>
+            <td>{{ entry.usedAt ? (entry.usedAt | date:'short') : '—' }}</td>
+            <td>{{ entry.firstLoginAt ? (entry.firstLoginAt | date:'short') : '—' }}</td>
+            <td>{{ entry.lastLoginAt ? (entry.lastLoginAt | date:'short') : '—' }}</td>
+            <td>{{ entry.issuedBy }}</td>
+          </tr>
+          <tr *ngIf="!isLoadingHistory && !history.length && !historyError">
+            <td colspan="9" class="history-empty">No activation codes have been generated yet.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
 </section>

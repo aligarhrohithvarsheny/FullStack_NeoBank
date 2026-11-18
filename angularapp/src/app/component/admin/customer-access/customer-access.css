@@ -14,3 +14,22 @@
 .activation-code-result p{margin:0;color:#713f12}
 .activation-code-result button{width:fit-content;min-height:36px;background:#475569}
 @media(max-width:680px){.customer-access-admin{padding:20px}.activation-issue-form{grid-template-columns:1fr}.activation-code-result code{font-size:20px}}
+.activation-code-result .download-voucher{width:fit-content;background:#0f766e}
+.activation-history{margin-top:32px}
+.activation-history-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:14px}
+.activation-history-heading h3{margin:0;color:#142238;font-size:19px}
+.activation-history-heading p{margin:6px 0 0;color:#64748b;font-size:13px}
+.activation-history-heading button{min-height:38px;padding:8px 14px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#334155;font-weight:700;cursor:pointer}
+.activation-history-heading button:disabled{opacity:.6;cursor:wait}
+.activation-history-table-wrap{overflow-x:auto;border:1px solid #e2e8f0;border-radius:10px}
+.activation-history-table{width:100%;border-collapse:collapse;font-size:12px;white-space:nowrap}
+.activation-history-table th,.activation-history-table td{padding:11px 12px;border-bottom:1px solid #e2e8f0;text-align:left}
+.activation-history-table th{background:#f8fafc;color:#475569;font-size:11px;text-transform:uppercase;letter-spacing:.04em}
+.activation-history-table td{color:#334155}
+.history-status{display:inline-block;padding:4px 7px;border-radius:999px;background:#e2e8f0;color:#475569;font-size:10px;font-weight:800}
+.status-active{background:#dbeafe;color:#1d4ed8}
+.status-used{background:#dcfce7;color:#166534}
+.status-expired,.status-locked{background:#fee2e2;color:#991b1b}
+.status-regenerated{background:#fef3c7;color:#92400e}
+.history-empty{padding:24px!important;text-align:center!important;color:#64748b!important}
+@media(max-width:680px){.activation-history-heading{align-items:flex-start;flex-direction:column}.activation-history-heading button{width:100%}}

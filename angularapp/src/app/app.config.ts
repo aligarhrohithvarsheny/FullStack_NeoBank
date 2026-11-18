@@ -10,6 +10,7 @@ import { TransactionService } from './service/transaction';
 import { ssrHttpInterceptor } from './interceptor/ssr-http.interceptor';
 import { apiRetryInterceptor } from './interceptor/api-retry.interceptor';
 import { insuranceAuthInterceptor } from './interceptor/insurance-auth.interceptor';
+import { loadingIndicatorInterceptor } from './interceptor/loading-indicator.interceptor';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -17,7 +18,7 @@ export const appConfig: ApplicationConfig = {
     provideZoneChangeDetection({ eventCoalescing: true }),
     provideRouter(routes), 
     provideClientHydration(withEventReplay()),
-    provideHttpClient(withInterceptors([ssrHttpInterceptor, insuranceAuthInterceptor, apiRetryInterceptor]), withFetch()),
+    provideHttpClient(withInterceptors([loadingIndicatorInterceptor, ssrHttpInterceptor, insuranceAuthInterceptor, apiRetryInterceptor]), withFetch()),
     UserService,
     AccountService,
     TransactionService
